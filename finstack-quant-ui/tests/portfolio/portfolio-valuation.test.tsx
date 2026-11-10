@@ -124,10 +124,18 @@ it(
     const report = unwrap(await proxy().valuePortfolio(parityRequest));
     expect(serializeHost(report)).toBe(serializeHost(hostParity.report));
     const { expected } = hostParity;
-    expect(
+    // `expected` comes from the native Python run; the worker is wasm32. The
+    // Py/WASM parity tests allow 1e-9 relative for that libm drift.
+    const parity = (actual: number, wanted: number) =>
+      expect(Math.abs(actual - wanted)).toBeLessThanOrEqual(
+        1e-9 * Math.max(1, Math.abs(wanted)),
+      );
+    parity(
       Number(report.valuation.position_values["POS-1"].value_base.amount),
-    ).toBe(expected.valuation_position_value_base);
-    expect(Number(report.valuation.by_entity.FUND.amount)).toBe(
+      expected.valuation_position_value_base,
+    );
+    parity(
+      Number(report.valuation.by_entity.FUND.amount),
       expected.valuation_entity_value,
     );
     expect(report.metrics.aggregated.dv01.total).toBe(
@@ -212,7 +220,7 @@ it("summarizes the total, the stamped FX policy and entities in registration ord
   const reversed = { ...galleryReport, entityIds: ["RATES", "CREDIT"] };
   render(<PortfolioSummary report={reversed} />);
   // Exact returned money (MoneyValue keeps the raw amount as its title).
-  expect(screen.getAllByTitle("1110934.085252535").length).toBeGreaterThan(0);
+  expect(screen.getAllByTitle("1110934.085252534").length).toBeGreaterThan(0);
   expect(screen.getByText("cashflow_date")).toBeTruthy();
   const rows = rowsOf(
     within(screen.getByRole("region", { name: "Value by entity" })).getByRole(
@@ -223,7 +231,7 @@ it("summarizes the total, the stamped FX policy and entities in registration ord
     "RATES",
     "CREDIT",
   ]);
-  expect(within(rows[1]!).getByTitle("8912.21632401552")).toBeTruthy();
+  expect(within(rows[1]!).getByTitle("8912.216324015288")).toBeTruthy();
   expect(screen.getByText("No position fell back to PV only.")).toBeTruthy();
 });
 it("lists degraded positions with their native risk error", () => {
@@ -371,7 +379,7 @@ it("renders the worker valuation and series through the hooks, then the native e
       ).toBeTruthy(),
     { timeout: budget(5000) },
   );
-  expect(screen.getAllByTitle("3000227.82081091").length).toBeGreaterThan(0);
+  expect(screen.getAllByTitle("3000227.8208109112").length).toBeGreaterThan(0);
   unmount();
   render(
     <FinstackQueryProvider>

@@ -89,22 +89,25 @@ const PINNED_PV: &[(&str, PvReference)] = &[
     // Independently reconciled with QuantLib schedules, Black pricing and an
     // annuity-measure convexity calculation: reference floating-leg growth
     // uses contractual ACT/360 accrual, rather than the ACT/365F curve clock.
-    ("cms_option", PvReference::Recorded("147738.4488021919")),
+    ("cms_option", PvReference::Recorded("147738.44880219188")),
     (
         "cms_spread_option",
-        PvReference::Recorded("14329.01531811942"),
+        PvReference::Recorded("14329.015318119422"),
     ),
-    ("cms_swap", PvReference::Recorded("-99606.9359312007")),
-    ("commodity_swap", PvReference::Recorded("57241.779109393")),
-    ("deposit", PvReference::Recorded("725.21946906587275")),
+    ("cms_swap", PvReference::Recorded("-99606.93593120069")),
+    (
+        "commodity_swap",
+        PvReference::Recorded("57241.779109393014"),
+    ),
+    ("deposit", PvReference::Recorded("725.21946906583275")),
     ("forward_rate_agreement", PvReference::ContractualRate),
     (
         "inflation_cap_floor",
-        PvReference::Recorded("3742.853205610149"),
+        PvReference::Recorded("3742.8532056101494"),
     ),
     ("inflation_linked_bond", PvReference::CanonicalRoundtrip),
-    ("inflation_swap", PvReference::Recorded("-4080.8031999999")),
-    ("quanto_option", PvReference::Recorded("257243.9712687773")),
+    ("inflation_swap", PvReference::Recorded("-4080.80319999993")),
+    ("quanto_option", PvReference::Recorded("257243.97126877733")),
     // These wire tests check the current canonical contract exactly; model
     // discretization/RNG evolution is covered by the dedicated model tests.
     ("snowball", PvReference::CanonicalRoundtrip),
@@ -112,7 +115,7 @@ const PINNED_PV: &[(&str, PvReference)] = &[
     ("tarn", PvReference::CanonicalRoundtrip),
     (
         "yoy_inflation_swap",
-        PvReference::Recorded("-13354.31626472641"),
+        PvReference::Recorded("-13354.316264726407"),
     ),
 ];
 
@@ -421,7 +424,7 @@ fn rescaled_inputs_reprice_to_recorded_reference() {
             ],
             // Independent reconciliation includes the explicit funding
             // accruals (0.25), distinct from the 92/92/91/90-day curve spans.
-            PvReference::Recorded("-19227.15357332333"),
+            PvReference::Recorded("-19227.15357332345"),
         ),
         (
             // A floating pool asset at SOFR + 450bp with a 5000bp index floor

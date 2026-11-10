@@ -1051,7 +1051,8 @@ mod tests {
             .collapse_to_base_by_date_kind(&market, Currency::USD, as_of, None)
             .expect("CIP collapse should succeed when both discount curves exist");
 
-        let expected = 1.10 * 0.99 / 0.95;
+        // CIP forward: spot times the foreign/domestic discount-factor ratio.
+        let expected = 1.10 * (0.99 / 0.95);
         assert_eq!(
             by_date_kind[&payment][&CFKind::Fixed],
             Money::new(expected, Currency::USD).expect("valid money fixture")
@@ -1118,7 +1119,8 @@ mod tests {
             .collapse_to_base_by_date_kind(&market, Currency::USD, as_of, Some(&curves))
             .expect("explicit curve-id map should resolve CIP discounts");
 
-        let expected = 1.10 * 0.99 / 0.95;
+        // CIP forward: spot times the foreign/domestic discount-factor ratio.
+        let expected = 1.10 * (0.99 / 0.95);
         assert_eq!(
             by_date_kind[&payment][&CFKind::Fixed],
             Money::new(expected, Currency::USD).expect("valid money fixture")

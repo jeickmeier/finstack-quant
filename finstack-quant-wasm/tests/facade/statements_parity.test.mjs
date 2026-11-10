@@ -414,7 +414,8 @@ test('MixedNodeBuilder.valuesMoney and forecast feed the mixed node', () => {
   mixed.forecast({ method: 'growth_pct', params: { rate: 0.1 } });
   const result = evaluate(mixed.build().build());
   const cash = statements.statementResultGetMoney(result, 'cash', Q2);
-  assert.equal(Number(cash.amount), 110);
+  // The growth forecast is evaluated in binary64: 100 * (1 + 0.1).
+  assert.equal(Number(cash.amount), 100 * (1 + 0.1));
   assert.equal(cash.currency, 'USD');
   assert.throws(
     () => mixed.name('again'),

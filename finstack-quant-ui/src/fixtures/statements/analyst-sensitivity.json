@@ -364,7 +364,7 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "222058215",
+                "amount": "222058214.99999997",
                 "currency": "USD"
               },
               "2025Q4": {
@@ -432,7 +432,7 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "147113567.4375",
+                "amount": "147113567.43749997",
                 "currency": "USD"
               },
               "2025Q4": {
@@ -470,7 +470,7 @@
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "91908533.9928",
+                "amount": "91908533.99280001",
                 "currency": "USD"
               }
             },
@@ -500,7 +500,7 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "57183495.0375",
+                "amount": "57183495.037499964",
                 "currency": "USD"
               },
               "2025Q4": {
@@ -568,11 +568,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "44643974.63749997",
+                "amount": "44643974.637499966",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "33289337.7828875",
+                "amount": "33289337.782887496",
                 "currency": "USD"
               }
             },
@@ -636,11 +636,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "35721474.63749997",
+                "amount": "35721474.637499966",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "24259337.7828875",
+                "amount": "24259337.782887496",
                 "currency": "USD"
               }
             },
@@ -670,11 +670,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "8394546.53981249",
+                "amount": "8394546.539812492",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "5700944.37897856",
+                "amount": "5700944.378978562",
                 "currency": "USD"
               }
             },
@@ -704,11 +704,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "27326928.09768748",
+                "amount": "27326928.097687475",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "18558393.40390893",
+                "amount": "18558393.403908934",
                 "currency": "USD"
               }
             },
@@ -930,11 +930,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "217078007.5375",
+                "amount": "217078007.53749996",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "208762577.0875875",
+                "amount": "208762577.08758748",
                 "currency": "USD"
               }
             },
@@ -968,7 +968,7 @@
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "11453540.671485",
+                "amount": "11453540.671485001",
                 "currency": "USD"
               }
             },
@@ -1002,7 +1002,7 @@
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "28900084.49962393",
+                "amount": "28900084.499623932",
                 "currency": "USD"
               }
             },
@@ -1835,7 +1835,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "975000",
+                    "amount": "975000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -1861,7 +1861,7 @@
                 },
                 "2024Q2": {
                   "interest_expense_cash": {
-                    "amount": "985833.333333334",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -1885,7 +1885,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "975000",
+                    "amount": "975000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -1911,7 +1911,7 @@
                 },
                 "2024Q3": {
                   "interest_expense_cash": {
-                    "amount": "985833.333333334",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -1935,7 +1935,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -1961,7 +1961,7 @@
                 },
                 "2024Q4": {
                   "interest_expense_cash": {
-                    "amount": "996666.666666667",
+                    "amount": "996666.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -1985,7 +1985,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -2011,7 +2011,7 @@
                 },
                 "2025Q1": {
                   "interest_expense_cash": {
-                    "amount": "996666.666666667",
+                    "amount": "996666.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -2035,7 +2035,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "964166.666666667",
+                    "amount": "964166.6666666667",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -2085,7 +2085,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "975000",
+                    "amount": "975000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -2111,7 +2111,7 @@
                 },
                 "2025Q3": {
                   "interest_expense_cash": {
-                    "amount": "985833.333333334",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -2135,7 +2135,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -2161,7 +2161,7 @@
                 },
                 "2025Q4": {
                   "interest_expense_cash": {
-                    "amount": "996666.666666667",
+                    "amount": "996666.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -2185,7 +2185,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -2238,7 +2238,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7500000",
+                  "amount": "7500000.0000000001",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -2264,7 +2264,7 @@
               },
               "2024Q2": {
                 "interest_expense_cash": {
-                  "amount": "7583333.333333334",
+                  "amount": "7583333.3333333334",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -2288,7 +2288,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7483687.5",
+                  "amount": "7483687.5000000001",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -2314,7 +2314,7 @@
               },
               "2024Q3": {
                 "interest_expense_cash": {
-                  "amount": "7566839.583333334",
+                  "amount": "7566839.5833333334",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -2338,7 +2338,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7550345.833333333",
+                  "amount": "7550345.8333333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -2364,7 +2364,7 @@
               },
               "2024Q4": {
                 "interest_expense_cash": {
-                  "amount": "7633316.666666667",
+                  "amount": "7633316.6666666666",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -2388,7 +2388,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7533852.083333333",
+                  "amount": "7533852.0833333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -2414,7 +2414,7 @@
               },
               "2025Q1": {
                 "interest_expense_cash": {
-                  "amount": "7616641.666666667",
+                  "amount": "7616641.6666666666",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -2438,7 +2438,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7352141.666666667",
+                  "amount": "7352141.6666666667",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -2488,7 +2488,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7418437.5",
+                  "amount": "7418437.5000000001",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -2514,7 +2514,7 @@
               },
               "2025Q3": {
                 "interest_expense_cash": {
-                  "amount": "7500864.583333334",
+                  "amount": "7500864.5833333334",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -2538,7 +2538,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7484370.833333333",
+                  "amount": "7484370.8333333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -2564,7 +2564,7 @@
               },
               "2025Q4": {
                 "interest_expense_cash": {
-                  "amount": "7566616.666666667",
+                  "amount": "7566616.6666666666",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -2588,7 +2588,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7467877.083333333",
+                  "amount": "7467877.0833333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -2641,7 +2641,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7500000",
+                    "amount": "7500000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -2667,7 +2667,7 @@
                 },
                 "2024Q2": {
                   "interest_expense_cash": {
-                    "amount": "7583333.333333334",
+                    "amount": "7583333.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -2691,7 +2691,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7483687.5",
+                    "amount": "7483687.5000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -2717,7 +2717,7 @@
                 },
                 "2024Q3": {
                   "interest_expense_cash": {
-                    "amount": "7566839.583333334",
+                    "amount": "7566839.5833333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -2741,7 +2741,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7550345.833333333",
+                    "amount": "7550345.8333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -2767,7 +2767,7 @@
                 },
                 "2024Q4": {
                   "interest_expense_cash": {
-                    "amount": "7633316.666666667",
+                    "amount": "7633316.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -2791,7 +2791,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7533852.083333333",
+                    "amount": "7533852.0833333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -2817,7 +2817,7 @@
                 },
                 "2025Q1": {
                   "interest_expense_cash": {
-                    "amount": "7616641.666666667",
+                    "amount": "7616641.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -2841,7 +2841,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7352141.666666667",
+                    "amount": "7352141.6666666667",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -2891,7 +2891,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7418437.5",
+                    "amount": "7418437.5000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -2917,7 +2917,7 @@
                 },
                 "2025Q3": {
                   "interest_expense_cash": {
-                    "amount": "7500864.583333334",
+                    "amount": "7500864.5833333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -2941,7 +2941,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7484370.833333333",
+                    "amount": "7484370.8333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -2967,7 +2967,7 @@
                 },
                 "2025Q4": {
                   "interest_expense_cash": {
-                    "amount": "7566616.666666667",
+                    "amount": "7566616.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -2991,7 +2991,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7467877.083333333",
+                    "amount": "7467877.0833333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -3024,19 +3024,19 @@
                 "currency": "USD"
               },
               "2024Q2": {
-                "amount": "85716666.6666667",
+                "amount": "85716666.66666667",
                 "currency": "USD"
               },
               "2024Q3": {
-                "amount": "93333160.4166667",
+                "amount": "93333160.41666669",
                 "currency": "USD"
               },
               "2024Q4": {
-                "amount": "99766683.3333333",
+                "amount": "99766683.33333331",
                 "currency": "USD"
               },
               "2025Q1": {
-                "amount": "105083358.3333333",
+                "amount": "105083358.33333331",
                 "currency": "USD"
               },
               "2025Q2": {
@@ -3044,11 +3044,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "105199135.4166667",
+                "amount": "105199135.41666669",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "105133383.3333333",
+                "amount": "105133383.33333331",
                 "currency": "USD"
               }
             },
@@ -3491,7 +3491,7 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "222058215",
+                "amount": "222058214.99999997",
                 "currency": "USD"
               },
               "2025Q4": {
@@ -3559,11 +3559,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "147113567.4375",
+                "amount": "147113567.43749997",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "168621570.9968625",
+                "amount": "168621570.99686247",
                 "currency": "USD"
               }
             },
@@ -3597,7 +3597,7 @@
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "91908533.9928",
+                "amount": "91908533.99280001",
                 "currency": "USD"
               }
             },
@@ -3627,11 +3627,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "57183495.0375",
+                "amount": "57183495.037499964",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "76713037.0040625",
+                "amount": "76713037.00406246",
                 "currency": "USD"
               }
             },
@@ -3695,11 +3695,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "44643974.63749997",
+                "amount": "44643974.637499966",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "63947805.2368625",
+                "amount": "63947805.23686246",
                 "currency": "USD"
               }
             },
@@ -3763,11 +3763,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "35721474.63749997",
+                "amount": "35721474.637499966",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "54917805.2368625",
+                "amount": "54917805.23686246",
                 "currency": "USD"
               }
             },
@@ -3797,11 +3797,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "8394546.53981249",
+                "amount": "8394546.539812492",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "12905684.23066268",
+                "amount": "12905684.230662677",
                 "currency": "USD"
               }
             },
@@ -3831,7 +3831,7 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "27326928.09768748",
+                "amount": "27326928.097687475",
                 "currency": "USD"
               },
               "2025Q4": {
@@ -4057,11 +4057,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "217078007.5375",
+                "amount": "217078007.53749996",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "239421044.5415624",
+                "amount": "239421044.54156244",
                 "currency": "USD"
               }
             },
@@ -4129,7 +4129,7 @@
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "49808580.8415848",
+                "amount": "49808580.84158479",
                 "currency": "USD"
               }
             },
@@ -4163,7 +4163,7 @@
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "47686530.8415848",
+                "amount": "47686530.84158479",
                 "currency": "USD"
               }
             }
@@ -4962,7 +4962,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "975000",
+                    "amount": "975000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -4988,7 +4988,7 @@
                 },
                 "2024Q2": {
                   "interest_expense_cash": {
-                    "amount": "985833.333333334",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -5012,7 +5012,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "975000",
+                    "amount": "975000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -5038,7 +5038,7 @@
                 },
                 "2024Q3": {
                   "interest_expense_cash": {
-                    "amount": "985833.333333334",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -5062,7 +5062,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -5088,7 +5088,7 @@
                 },
                 "2024Q4": {
                   "interest_expense_cash": {
-                    "amount": "996666.666666667",
+                    "amount": "996666.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -5112,7 +5112,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -5138,7 +5138,7 @@
                 },
                 "2025Q1": {
                   "interest_expense_cash": {
-                    "amount": "996666.666666667",
+                    "amount": "996666.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -5162,7 +5162,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "964166.666666667",
+                    "amount": "964166.6666666667",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -5212,7 +5212,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "975000",
+                    "amount": "975000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -5238,7 +5238,7 @@
                 },
                 "2025Q3": {
                   "interest_expense_cash": {
-                    "amount": "985833.333333334",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -5262,7 +5262,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -5288,7 +5288,7 @@
                 },
                 "2025Q4": {
                   "interest_expense_cash": {
-                    "amount": "996666.666666667",
+                    "amount": "996666.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -5312,7 +5312,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -5365,7 +5365,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7500000",
+                  "amount": "7500000.0000000001",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -5391,7 +5391,7 @@
               },
               "2024Q2": {
                 "interest_expense_cash": {
-                  "amount": "7583333.333333334",
+                  "amount": "7583333.3333333334",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -5415,7 +5415,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7483687.5",
+                  "amount": "7483687.5000000001",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -5441,7 +5441,7 @@
               },
               "2024Q3": {
                 "interest_expense_cash": {
-                  "amount": "7566839.583333334",
+                  "amount": "7566839.5833333334",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -5465,7 +5465,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7550345.833333333",
+                  "amount": "7550345.8333333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -5491,7 +5491,7 @@
               },
               "2024Q4": {
                 "interest_expense_cash": {
-                  "amount": "7633316.666666667",
+                  "amount": "7633316.6666666666",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -5515,7 +5515,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7533852.083333333",
+                  "amount": "7533852.0833333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -5541,7 +5541,7 @@
               },
               "2025Q1": {
                 "interest_expense_cash": {
-                  "amount": "7616641.666666667",
+                  "amount": "7616641.6666666666",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -5565,7 +5565,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7352141.666666667",
+                  "amount": "7352141.6666666667",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -5615,7 +5615,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7418437.5",
+                  "amount": "7418437.5000000001",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -5641,7 +5641,7 @@
               },
               "2025Q3": {
                 "interest_expense_cash": {
-                  "amount": "7500864.583333334",
+                  "amount": "7500864.5833333334",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -5665,7 +5665,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7484370.833333333",
+                  "amount": "7484370.8333333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -5691,7 +5691,7 @@
               },
               "2025Q4": {
                 "interest_expense_cash": {
-                  "amount": "7566616.666666667",
+                  "amount": "7566616.6666666666",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -5715,7 +5715,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7467877.083333333",
+                  "amount": "7467877.0833333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -5768,7 +5768,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7500000",
+                    "amount": "7500000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -5794,7 +5794,7 @@
                 },
                 "2024Q2": {
                   "interest_expense_cash": {
-                    "amount": "7583333.333333334",
+                    "amount": "7583333.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -5818,7 +5818,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7483687.5",
+                    "amount": "7483687.5000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -5844,7 +5844,7 @@
                 },
                 "2024Q3": {
                   "interest_expense_cash": {
-                    "amount": "7566839.583333334",
+                    "amount": "7566839.5833333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -5868,7 +5868,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7550345.833333333",
+                    "amount": "7550345.8333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -5894,7 +5894,7 @@
                 },
                 "2024Q4": {
                   "interest_expense_cash": {
-                    "amount": "7633316.666666667",
+                    "amount": "7633316.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -5918,7 +5918,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7533852.083333333",
+                    "amount": "7533852.0833333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -5944,7 +5944,7 @@
                 },
                 "2025Q1": {
                   "interest_expense_cash": {
-                    "amount": "7616641.666666667",
+                    "amount": "7616641.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -5968,7 +5968,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7352141.666666667",
+                    "amount": "7352141.6666666667",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -6018,7 +6018,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7418437.5",
+                    "amount": "7418437.5000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -6044,7 +6044,7 @@
                 },
                 "2025Q3": {
                   "interest_expense_cash": {
-                    "amount": "7500864.583333334",
+                    "amount": "7500864.5833333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -6068,7 +6068,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7484370.833333333",
+                    "amount": "7484370.8333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -6094,7 +6094,7 @@
                 },
                 "2025Q4": {
                   "interest_expense_cash": {
-                    "amount": "7566616.666666667",
+                    "amount": "7566616.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -6118,7 +6118,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7467877.083333333",
+                    "amount": "7467877.0833333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -6151,19 +6151,19 @@
                 "currency": "USD"
               },
               "2024Q2": {
-                "amount": "85716666.6666667",
+                "amount": "85716666.66666667",
                 "currency": "USD"
               },
               "2024Q3": {
-                "amount": "93333160.4166667",
+                "amount": "93333160.41666669",
                 "currency": "USD"
               },
               "2024Q4": {
-                "amount": "99766683.3333333",
+                "amount": "99766683.33333331",
                 "currency": "USD"
               },
               "2025Q1": {
-                "amount": "105083358.3333333",
+                "amount": "105083358.33333331",
                 "currency": "USD"
               },
               "2025Q2": {
@@ -6171,11 +6171,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "105199135.4166667",
+                "amount": "105199135.41666669",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "105133383.3333333",
+                "amount": "105133383.33333331",
                 "currency": "USD"
               }
             },
@@ -6418,7 +6418,7 @@
               "2025Q1": 86100000,
               "2025Q2": 87994200,
               "2025Q3": 89930072.4,
-              "2025Q4": 82717680.59352
+              "2025Q4": 82717680.59352002
             },
             "revenue": {
               "2024Q1": 182400000,
@@ -6468,7 +6468,7 @@
               "2025Q1": 51380000,
               "2025Q2": 54144512.5,
               "2025Q3": 57183495.037499964,
-              "2025Q4": 70574656.67635499
+              "2025Q4": 70574656.67635497
             },
             "interest_coverage": {
               "2024Q1": 4.500980666853461,
@@ -6478,7 +6478,7 @@
               "2025Q1": 5.656254300261456,
               "2025Q2": 5.92552804377565,
               "2025Q3": 6.408909502661806,
-              "2025Q4": 7.8155765976029885
+              "2025Q4": 7.815576597602988
             },
             "ltm_ebitda": {
               "2024Q1": "nan",
@@ -6488,7 +6488,7 @@
               "2025Q1": 198520000,
               "2025Q2": 207664512.5,
               "2025Q3": 217078007.53749996,
-              "2025Q4": 233282664.21385497
+              "2025Q4": 233282664.21385494
             },
             "leverage": {
               "2024Q1": "nan",
@@ -6498,7 +6498,7 @@
               "2025Q1": 2.166028611726778,
               "2025Q2": 2.0224928898239174,
               "2025Q3": 1.888721960602909,
-              "2025Q4": 1.8432574124145387
+              "2025Q4": 1.8432574124145389
             },
             "ebit": {
               "2024Q1": 28960000,
@@ -6508,7 +6508,7 @@
               "2025Q1": 39280000,
               "2025Q2": 41826712.5,
               "2025Q3": 44643974.637499966,
-              "2025Q4": 57809424.90915499
+              "2025Q4": 57809424.909154974
             },
             "ufcf": {
               "2024Q1": 23322400,
@@ -6518,7 +6518,7 @@
               "2025Q1": 30692700,
               "2025Q2": 32515040.0625,
               "2025Q3": 34478959.17268747,
-              "2025Q4": 44263285.52105357
+              "2025Q4": 44263285.52105355
             },
             "pretax_income": {
               "2024Q1": 20037500,
@@ -6528,7 +6528,7 @@
               "2025Q1": 30196250,
               "2025Q2": 32689212.5,
               "2025Q3": 35721474.637499966,
-              "2025Q4": 48779424.90915499
+              "2025Q4": 48779424.909154974
             },
             "taxes": {
               "2024Q1": 4708812.5,
@@ -6538,7 +6538,7 @@
               "2025Q1": 7096118.75,
               "2025Q2": 7681964.9375,
               "2025Q3": 8394546.539812492,
-              "2025Q4": 11463164.853651421
+              "2025Q4": 11463164.853651417
             },
             "free_cash_flow": {
               "2024Q1": 25419187.5,
@@ -6548,7 +6548,7 @@
               "2025Q1": 32827381.25,
               "2025Q2": 34662352.5625,
               "2025Q3": 36575746.67268747,
-              "2025Q4": 46385335.52105357
+              "2025Q4": 46385335.52105355
             },
             "net_income": {
               "2024Q1": 15328687.5,
@@ -6558,7 +6558,7 @@
               "2025Q1": 23100131.25,
               "2025Q2": 25007247.5625,
               "2025Q3": 27326928.097687475,
-              "2025Q4": 37316260.05550357
+              "2025Q4": 37316260.055503555
             },
             "ebitda_margin_pct": {
               "2024Q1": 0.22017543859649122,
@@ -6568,7 +6568,7 @@
               "2025Q1": 0.24666346615458473,
               "2025Q2": 0.252364320038779,
               "2025Q3": 0.2575157826856348,
-              "2025Q4": 0.3050100930079146
+              "2025Q4": 0.30501009300791454
             },
             "gross_margin_pct": {
               "2024Q1": 0.65,
@@ -6618,11 +6618,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "222058215",
+                "amount": "222058214.99999997",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "231384660.03",
+                "amount": "231384660.02999997",
                 "currency": "USD"
               }
             },
@@ -6686,7 +6686,7 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "147113567.4375",
+                "amount": "147113567.43749997",
                 "currency": "USD"
               },
               "2025Q4": {
@@ -6724,7 +6724,7 @@
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "82717680.59352",
+                "amount": "82717680.59352002",
                 "currency": "USD"
               }
             },
@@ -6754,11 +6754,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "57183495.0375",
+                "amount": "57183495.037499964",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "70574656.676355",
+                "amount": "70574656.67635497",
                 "currency": "USD"
               }
             },
@@ -6822,11 +6822,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "44643974.63749997",
+                "amount": "44643974.637499966",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "57809424.909155",
+                "amount": "57809424.909154974",
                 "currency": "USD"
               }
             },
@@ -6890,11 +6890,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "35721474.63749997",
+                "amount": "35721474.637499966",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "48779424.909155",
+                "amount": "48779424.909154974",
                 "currency": "USD"
               }
             },
@@ -6924,11 +6924,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "8394546.53981249",
+                "amount": "8394546.539812492",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "11463164.85365142",
+                "amount": "11463164.853651417",
                 "currency": "USD"
               }
             },
@@ -6958,11 +6958,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "27326928.09768748",
+                "amount": "27326928.097687475",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "37316260.05550357",
+                "amount": "37316260.055503555",
                 "currency": "USD"
               }
             },
@@ -7184,11 +7184,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "217078007.5375",
+                "amount": "217078007.53749996",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "233282664.213855",
+                "amount": "233282664.21385494",
                 "currency": "USD"
               }
             },
@@ -7222,7 +7222,7 @@
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "12726156.30165",
+                "amount": "12726156.301649999",
                 "currency": "USD"
               }
             },
@@ -7256,7 +7256,7 @@
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "46385335.5210536",
+                "amount": "46385335.52105355",
                 "currency": "USD"
               }
             },
@@ -7290,7 +7290,7 @@
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "44263285.52105357",
+                "amount": "44263285.52105355",
                 "currency": "USD"
               }
             }
@@ -8089,7 +8089,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "975000",
+                    "amount": "975000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -8115,7 +8115,7 @@
                 },
                 "2024Q2": {
                   "interest_expense_cash": {
-                    "amount": "985833.333333334",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -8139,7 +8139,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "975000",
+                    "amount": "975000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -8165,7 +8165,7 @@
                 },
                 "2024Q3": {
                   "interest_expense_cash": {
-                    "amount": "985833.333333334",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -8189,7 +8189,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -8215,7 +8215,7 @@
                 },
                 "2024Q4": {
                   "interest_expense_cash": {
-                    "amount": "996666.666666667",
+                    "amount": "996666.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -8239,7 +8239,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -8265,7 +8265,7 @@
                 },
                 "2025Q1": {
                   "interest_expense_cash": {
-                    "amount": "996666.666666667",
+                    "amount": "996666.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -8289,7 +8289,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "964166.666666667",
+                    "amount": "964166.6666666667",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -8339,7 +8339,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "975000",
+                    "amount": "975000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -8365,7 +8365,7 @@
                 },
                 "2025Q3": {
                   "interest_expense_cash": {
-                    "amount": "985833.333333334",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -8389,7 +8389,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -8415,7 +8415,7 @@
                 },
                 "2025Q4": {
                   "interest_expense_cash": {
-                    "amount": "996666.666666667",
+                    "amount": "996666.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -8439,7 +8439,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -8492,7 +8492,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7500000",
+                  "amount": "7500000.0000000001",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -8518,7 +8518,7 @@
               },
               "2024Q2": {
                 "interest_expense_cash": {
-                  "amount": "7583333.333333334",
+                  "amount": "7583333.3333333334",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -8542,7 +8542,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7483687.5",
+                  "amount": "7483687.5000000001",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -8568,7 +8568,7 @@
               },
               "2024Q3": {
                 "interest_expense_cash": {
-                  "amount": "7566839.583333334",
+                  "amount": "7566839.5833333334",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -8592,7 +8592,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7550345.833333333",
+                  "amount": "7550345.8333333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -8618,7 +8618,7 @@
               },
               "2024Q4": {
                 "interest_expense_cash": {
-                  "amount": "7633316.666666667",
+                  "amount": "7633316.6666666666",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -8642,7 +8642,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7533852.083333333",
+                  "amount": "7533852.0833333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -8668,7 +8668,7 @@
               },
               "2025Q1": {
                 "interest_expense_cash": {
-                  "amount": "7616641.666666667",
+                  "amount": "7616641.6666666666",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -8692,7 +8692,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7352141.666666667",
+                  "amount": "7352141.6666666667",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -8742,7 +8742,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7418437.5",
+                  "amount": "7418437.5000000001",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -8768,7 +8768,7 @@
               },
               "2025Q3": {
                 "interest_expense_cash": {
-                  "amount": "7500864.583333334",
+                  "amount": "7500864.5833333334",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -8792,7 +8792,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7484370.833333333",
+                  "amount": "7484370.8333333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -8818,7 +8818,7 @@
               },
               "2025Q4": {
                 "interest_expense_cash": {
-                  "amount": "7566616.666666667",
+                  "amount": "7566616.6666666666",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -8842,7 +8842,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7467877.083333333",
+                  "amount": "7467877.0833333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -8895,7 +8895,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7500000",
+                    "amount": "7500000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -8921,7 +8921,7 @@
                 },
                 "2024Q2": {
                   "interest_expense_cash": {
-                    "amount": "7583333.333333334",
+                    "amount": "7583333.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -8945,7 +8945,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7483687.5",
+                    "amount": "7483687.5000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -8971,7 +8971,7 @@
                 },
                 "2024Q3": {
                   "interest_expense_cash": {
-                    "amount": "7566839.583333334",
+                    "amount": "7566839.5833333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -8995,7 +8995,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7550345.833333333",
+                    "amount": "7550345.8333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -9021,7 +9021,7 @@
                 },
                 "2024Q4": {
                   "interest_expense_cash": {
-                    "amount": "7633316.666666667",
+                    "amount": "7633316.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -9045,7 +9045,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7533852.083333333",
+                    "amount": "7533852.0833333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -9071,7 +9071,7 @@
                 },
                 "2025Q1": {
                   "interest_expense_cash": {
-                    "amount": "7616641.666666667",
+                    "amount": "7616641.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -9095,7 +9095,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7352141.666666667",
+                    "amount": "7352141.6666666667",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -9145,7 +9145,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7418437.5",
+                    "amount": "7418437.5000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -9171,7 +9171,7 @@
                 },
                 "2025Q3": {
                   "interest_expense_cash": {
-                    "amount": "7500864.583333334",
+                    "amount": "7500864.5833333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -9195,7 +9195,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7484370.833333333",
+                    "amount": "7484370.8333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -9221,7 +9221,7 @@
                 },
                 "2025Q4": {
                   "interest_expense_cash": {
-                    "amount": "7566616.666666667",
+                    "amount": "7566616.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -9245,7 +9245,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7467877.083333333",
+                    "amount": "7467877.0833333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -9278,19 +9278,19 @@
                 "currency": "USD"
               },
               "2024Q2": {
-                "amount": "85716666.6666667",
+                "amount": "85716666.66666667",
                 "currency": "USD"
               },
               "2024Q3": {
-                "amount": "93333160.4166667",
+                "amount": "93333160.41666669",
                 "currency": "USD"
               },
               "2024Q4": {
-                "amount": "99766683.3333333",
+                "amount": "99766683.33333331",
                 "currency": "USD"
               },
               "2025Q1": {
-                "amount": "105083358.3333333",
+                "amount": "105083358.33333331",
                 "currency": "USD"
               },
               "2025Q2": {
@@ -9298,11 +9298,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "105199135.4166667",
+                "amount": "105199135.41666669",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "105133383.3333333",
+                "amount": "105133383.33333331",
                 "currency": "USD"
               }
             },
@@ -9545,7 +9545,7 @@
               "2025Q1": 86100000,
               "2025Q2": 87994200,
               "2025Q3": 89930072.4,
-              "2025Q4": 101099387.39208
+              "2025Q4": 101099387.39208002
             },
             "revenue": {
               "2024Q1": 182400000,
@@ -9595,7 +9595,7 @@
               "2025Q1": 51380000,
               "2025Q2": 54144512.5,
               "2025Q3": 57183495.037499964,
-              "2025Q4": 52192949.877794996
+              "2025Q4": 52192949.877794966
             },
             "interest_coverage": {
               "2024Q1": 4.500980666853461,
@@ -9605,7 +9605,7 @@
               "2025Q1": 5.656254300261456,
               "2025Q2": 5.92552804377565,
               "2025Q3": 6.408909502661806,
-              "2025Q4": 5.779950152579734
+              "2025Q4": 5.7799501525797305
             },
             "ltm_ebitda": {
               "2024Q1": "nan",
@@ -9635,7 +9635,7 @@
               "2025Q1": 39280000,
               "2025Q2": 41826712.5,
               "2025Q3": 44643974.637499966,
-              "2025Q4": 39427718.110594995
+              "2025Q4": 39427718.110594966
             },
             "ufcf": {
               "2024Q1": 23322400,
@@ -9645,7 +9645,7 @@
               "2025Q1": 30692700,
               "2025Q2": 32515040.0625,
               "2025Q3": 34478959.17268747,
-              "2025Q4": 30201279.820155177
+              "2025Q4": 30201279.820155147
             },
             "pretax_income": {
               "2024Q1": 20037500,
@@ -9655,7 +9655,7 @@
               "2025Q1": 30196250,
               "2025Q2": 32689212.5,
               "2025Q3": 35721474.637499966,
-              "2025Q4": 30397718.110594995
+              "2025Q4": 30397718.110594966
             },
             "taxes": {
               "2024Q1": 4708812.5,
@@ -9665,7 +9665,7 @@
               "2025Q1": 7096118.75,
               "2025Q2": 7681964.9375,
               "2025Q3": 8394546.539812492,
-              "2025Q4": 7143463.7559898235
+              "2025Q4": 7143463.755989816
             },
             "free_cash_flow": {
               "2024Q1": 25419187.5,
@@ -9675,7 +9675,7 @@
               "2025Q1": 32827381.25,
               "2025Q2": 34662352.5625,
               "2025Q3": 36575746.67268747,
-              "2025Q4": 32323329.820155177
+              "2025Q4": 32323329.820155147
             },
             "net_income": {
               "2024Q1": 15328687.5,
@@ -9685,7 +9685,7 @@
               "2025Q1": 23100131.25,
               "2025Q2": 25007247.5625,
               "2025Q3": 27326928.097687475,
-              "2025Q4": 23254254.35460517
+              "2025Q4": 23254254.35460515
             },
             "ebitda_margin_pct": {
               "2024Q1": 0.22017543859649122,
@@ -9695,7 +9695,7 @@
               "2025Q1": 0.24666346615458473,
               "2025Q2": 0.252364320038779,
               "2025Q3": 0.2575157826856348,
-              "2025Q4": 0.22556789145411785
+              "2025Q4": 0.22556789145411774
             },
             "gross_margin_pct": {
               "2024Q1": 0.65,
@@ -9745,11 +9745,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "222058215",
+                "amount": "222058214.99999997",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "231384660.03",
+                "amount": "231384660.02999997",
                 "currency": "USD"
               }
             },
@@ -9813,7 +9813,7 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "147113567.4375",
+                "amount": "147113567.43749997",
                 "currency": "USD"
               },
               "2025Q4": {
@@ -9851,7 +9851,7 @@
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "101099387.39208",
+                "amount": "101099387.39208002",
                 "currency": "USD"
               }
             },
@@ -9881,11 +9881,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "57183495.0375",
+                "amount": "57183495.037499964",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "52192949.877795",
+                "amount": "52192949.877794966",
                 "currency": "USD"
               }
             },
@@ -9949,11 +9949,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "44643974.63749997",
+                "amount": "44643974.637499966",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "39427718.110595",
+                "amount": "39427718.110594966",
                 "currency": "USD"
               }
             },
@@ -10017,11 +10017,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "35721474.63749997",
+                "amount": "35721474.637499966",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "30397718.110595",
+                "amount": "30397718.110594966",
                 "currency": "USD"
               }
             },
@@ -10051,11 +10051,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "8394546.53981249",
+                "amount": "8394546.539812492",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "7143463.75598982",
+                "amount": "7143463.755989816",
                 "currency": "USD"
               }
             },
@@ -10085,11 +10085,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "27326928.09768748",
+                "amount": "27326928.097687475",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "23254254.35460517",
+                "amount": "23254254.35460515",
                 "currency": "USD"
               }
             },
@@ -10311,11 +10311,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "217078007.5375",
+                "amount": "217078007.53749996",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "214900957.415295",
+                "amount": "214900957.41529495",
                 "currency": "USD"
               }
             },
@@ -10349,7 +10349,7 @@
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "12726156.30165",
+                "amount": "12726156.301649999",
                 "currency": "USD"
               }
             },
@@ -10383,7 +10383,7 @@
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "32323329.82015518",
+                "amount": "32323329.820155147",
                 "currency": "USD"
               }
             },
@@ -10417,7 +10417,7 @@
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "30201279.82015518",
+                "amount": "30201279.820155147",
                 "currency": "USD"
               }
             }
@@ -11216,7 +11216,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "975000",
+                    "amount": "975000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -11242,7 +11242,7 @@
                 },
                 "2024Q2": {
                   "interest_expense_cash": {
-                    "amount": "985833.333333334",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -11266,7 +11266,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "975000",
+                    "amount": "975000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -11292,7 +11292,7 @@
                 },
                 "2024Q3": {
                   "interest_expense_cash": {
-                    "amount": "985833.333333334",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -11316,7 +11316,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -11342,7 +11342,7 @@
                 },
                 "2024Q4": {
                   "interest_expense_cash": {
-                    "amount": "996666.666666667",
+                    "amount": "996666.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -11366,7 +11366,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -11392,7 +11392,7 @@
                 },
                 "2025Q1": {
                   "interest_expense_cash": {
-                    "amount": "996666.666666667",
+                    "amount": "996666.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -11416,7 +11416,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "964166.666666667",
+                    "amount": "964166.6666666667",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -11466,7 +11466,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "975000",
+                    "amount": "975000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -11492,7 +11492,7 @@
                 },
                 "2025Q3": {
                   "interest_expense_cash": {
-                    "amount": "985833.333333334",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -11516,7 +11516,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -11542,7 +11542,7 @@
                 },
                 "2025Q4": {
                   "interest_expense_cash": {
-                    "amount": "996666.666666667",
+                    "amount": "996666.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -11566,7 +11566,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "985833.333333333",
+                    "amount": "985833.3333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -11619,7 +11619,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7500000",
+                  "amount": "7500000.0000000001",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -11645,7 +11645,7 @@
               },
               "2024Q2": {
                 "interest_expense_cash": {
-                  "amount": "7583333.333333334",
+                  "amount": "7583333.3333333334",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -11669,7 +11669,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7483687.5",
+                  "amount": "7483687.5000000001",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -11695,7 +11695,7 @@
               },
               "2024Q3": {
                 "interest_expense_cash": {
-                  "amount": "7566839.583333334",
+                  "amount": "7566839.5833333334",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -11719,7 +11719,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7550345.833333333",
+                  "amount": "7550345.8333333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -11745,7 +11745,7 @@
               },
               "2024Q4": {
                 "interest_expense_cash": {
-                  "amount": "7633316.666666667",
+                  "amount": "7633316.6666666666",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -11769,7 +11769,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7533852.083333333",
+                  "amount": "7533852.0833333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -11795,7 +11795,7 @@
               },
               "2025Q1": {
                 "interest_expense_cash": {
-                  "amount": "7616641.666666667",
+                  "amount": "7616641.6666666666",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -11819,7 +11819,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7352141.666666667",
+                  "amount": "7352141.6666666667",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -11869,7 +11869,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7418437.5",
+                  "amount": "7418437.5000000001",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -11895,7 +11895,7 @@
               },
               "2025Q3": {
                 "interest_expense_cash": {
-                  "amount": "7500864.583333334",
+                  "amount": "7500864.5833333334",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -11919,7 +11919,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7484370.833333333",
+                  "amount": "7484370.8333333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -11945,7 +11945,7 @@
               },
               "2025Q4": {
                 "interest_expense_cash": {
-                  "amount": "7566616.666666667",
+                  "amount": "7566616.6666666666",
                   "currency": "USD"
                 },
                 "interest_income_cash": {
@@ -11969,7 +11969,7 @@
                   "currency": "USD"
                 },
                 "accrued_interest": {
-                  "amount": "7467877.083333333",
+                  "amount": "7467877.0833333334",
                   "currency": "USD"
                 },
                 "opening_balance": {
@@ -12022,7 +12022,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7500000",
+                    "amount": "7500000.0000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -12048,7 +12048,7 @@
                 },
                 "2024Q2": {
                   "interest_expense_cash": {
-                    "amount": "7583333.333333334",
+                    "amount": "7583333.3333333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -12072,7 +12072,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7483687.5",
+                    "amount": "7483687.5000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -12098,7 +12098,7 @@
                 },
                 "2024Q3": {
                   "interest_expense_cash": {
-                    "amount": "7566839.583333334",
+                    "amount": "7566839.5833333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -12122,7 +12122,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7550345.833333333",
+                    "amount": "7550345.8333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -12148,7 +12148,7 @@
                 },
                 "2024Q4": {
                   "interest_expense_cash": {
-                    "amount": "7633316.666666667",
+                    "amount": "7633316.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -12172,7 +12172,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7533852.083333333",
+                    "amount": "7533852.0833333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -12198,7 +12198,7 @@
                 },
                 "2025Q1": {
                   "interest_expense_cash": {
-                    "amount": "7616641.666666667",
+                    "amount": "7616641.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -12222,7 +12222,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7352141.666666667",
+                    "amount": "7352141.6666666667",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -12272,7 +12272,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7418437.5",
+                    "amount": "7418437.5000000001",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -12298,7 +12298,7 @@
                 },
                 "2025Q3": {
                   "interest_expense_cash": {
-                    "amount": "7500864.583333334",
+                    "amount": "7500864.5833333334",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -12322,7 +12322,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7484370.833333333",
+                    "amount": "7484370.8333333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -12348,7 +12348,7 @@
                 },
                 "2025Q4": {
                   "interest_expense_cash": {
-                    "amount": "7566616.666666667",
+                    "amount": "7566616.6666666666",
                     "currency": "USD"
                   },
                   "interest_income_cash": {
@@ -12372,7 +12372,7 @@
                     "currency": "USD"
                   },
                   "accrued_interest": {
-                    "amount": "7467877.083333333",
+                    "amount": "7467877.0833333334",
                     "currency": "USD"
                   },
                   "opening_balance": {
@@ -12405,19 +12405,19 @@
                 "currency": "USD"
               },
               "2024Q2": {
-                "amount": "85716666.6666667",
+                "amount": "85716666.66666667",
                 "currency": "USD"
               },
               "2024Q3": {
-                "amount": "93333160.4166667",
+                "amount": "93333160.41666669",
                 "currency": "USD"
               },
               "2024Q4": {
-                "amount": "99766683.3333333",
+                "amount": "99766683.33333331",
                 "currency": "USD"
               },
               "2025Q1": {
-                "amount": "105083358.3333333",
+                "amount": "105083358.33333331",
                 "currency": "USD"
               },
               "2025Q2": {
@@ -12425,11 +12425,11 @@
                 "currency": "USD"
               },
               "2025Q3": {
-                "amount": "105199135.4166667",
+                "amount": "105199135.41666669",
                 "currency": "USD"
               },
               "2025Q4": {
-                "amount": "105133383.3333333",
+                "amount": "105133383.33333331",
                 "currency": "USD"
               }
             },
@@ -12869,11 +12869,11 @@
             "currency": "USD"
           },
           "2025Q3": {
-            "amount": "222058215",
+            "amount": "222058214.99999997",
             "currency": "USD"
           },
           "2025Q4": {
-            "amount": "231384660.03",
+            "amount": "231384660.02999997",
             "currency": "USD"
           }
         },
@@ -12937,7 +12937,7 @@
             "currency": "USD"
           },
           "2025Q3": {
-            "amount": "147113567.4375",
+            "amount": "147113567.43749997",
             "currency": "USD"
           },
           "2025Q4": {
@@ -12975,7 +12975,7 @@
             "currency": "USD"
           },
           "2025Q4": {
-            "amount": "91908533.9928",
+            "amount": "91908533.99280001",
             "currency": "USD"
           }
         },
@@ -13005,11 +13005,11 @@
             "currency": "USD"
           },
           "2025Q3": {
-            "amount": "57183495.0375",
+            "amount": "57183495.037499964",
             "currency": "USD"
           },
           "2025Q4": {
-            "amount": "61383803.277075",
+            "amount": "61383803.27707498",
             "currency": "USD"
           }
         },
@@ -13073,11 +13073,11 @@
             "currency": "USD"
           },
           "2025Q3": {
-            "amount": "44643974.63749997",
+            "amount": "44643974.637499966",
             "currency": "USD"
           },
           "2025Q4": {
-            "amount": "48618571.509875",
+            "amount": "48618571.50987498",
             "currency": "USD"
           }
         },
@@ -13141,7 +13141,7 @@
             "currency": "USD"
           },
           "2025Q3": {
-            "amount": "35721474.63749997",
+            "amount": "35721474.637499966",
             "currency": "USD"
           },
           "2025Q4": {
@@ -13175,7 +13175,7 @@
             "currency": "USD"
           },
           "2025Q3": {
-            "amount": "8394546.53981249",
+            "amount": "8394546.539812492",
             "currency": "USD"
           },
           "2025Q4": {
@@ -13209,11 +13209,11 @@
             "currency": "USD"
           },
           "2025Q3": {
-            "amount": "27326928.09768748",
+            "amount": "27326928.097687475",
             "currency": "USD"
           },
           "2025Q4": {
-            "amount": "30285257.20505436",
+            "amount": "30285257.205054358",
             "currency": "USD"
           }
         },
@@ -13435,11 +13435,11 @@
             "currency": "USD"
           },
           "2025Q3": {
-            "amount": "217078007.5375",
+            "amount": "217078007.53749996",
             "currency": "USD"
           },
           "2025Q4": {
-            "amount": "224091810.814575",
+            "amount": "224091810.81457496",
             "currency": "USD"
           }
         },
@@ -13473,7 +13473,7 @@
             "currency": "USD"
           },
           "2025Q4": {
-            "amount": "12726156.30165",
+            "amount": "12726156.301649999",
             "currency": "USD"
           }
         },
@@ -14340,7 +14340,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "975000",
+                "amount": "975000.0000000001",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -14366,7 +14366,7 @@
             },
             "2024Q2": {
               "interest_expense_cash": {
-                "amount": "985833.333333334",
+                "amount": "985833.3333333334",
                 "currency": "USD"
               },
               "interest_income_cash": {
@@ -14390,7 +14390,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "975000",
+                "amount": "975000.0000000001",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -14416,7 +14416,7 @@
             },
             "2024Q3": {
               "interest_expense_cash": {
-                "amount": "985833.333333334",
+                "amount": "985833.3333333334",
                 "currency": "USD"
               },
               "interest_income_cash": {
@@ -14440,7 +14440,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "985833.333333333",
+                "amount": "985833.3333333334",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -14466,7 +14466,7 @@
             },
             "2024Q4": {
               "interest_expense_cash": {
-                "amount": "996666.666666667",
+                "amount": "996666.6666666666",
                 "currency": "USD"
               },
               "interest_income_cash": {
@@ -14490,7 +14490,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "985833.333333333",
+                "amount": "985833.3333333334",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -14516,7 +14516,7 @@
             },
             "2025Q1": {
               "interest_expense_cash": {
-                "amount": "996666.666666667",
+                "amount": "996666.6666666666",
                 "currency": "USD"
               },
               "interest_income_cash": {
@@ -14540,7 +14540,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "964166.666666667",
+                "amount": "964166.6666666667",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -14590,7 +14590,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "975000",
+                "amount": "975000.0000000001",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -14616,7 +14616,7 @@
             },
             "2025Q3": {
               "interest_expense_cash": {
-                "amount": "985833.333333334",
+                "amount": "985833.3333333334",
                 "currency": "USD"
               },
               "interest_income_cash": {
@@ -14640,7 +14640,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "985833.333333333",
+                "amount": "985833.3333333334",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -14666,7 +14666,7 @@
             },
             "2025Q4": {
               "interest_expense_cash": {
-                "amount": "996666.666666667",
+                "amount": "996666.6666666666",
                 "currency": "USD"
               },
               "interest_income_cash": {
@@ -14690,7 +14690,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "985833.333333333",
+                "amount": "985833.3333333334",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -14743,7 +14743,7 @@
               "currency": "USD"
             },
             "accrued_interest": {
-              "amount": "7500000",
+              "amount": "7500000.0000000001",
               "currency": "USD"
             },
             "opening_balance": {
@@ -14769,7 +14769,7 @@
           },
           "2024Q2": {
             "interest_expense_cash": {
-              "amount": "7583333.333333334",
+              "amount": "7583333.3333333334",
               "currency": "USD"
             },
             "interest_income_cash": {
@@ -14793,7 +14793,7 @@
               "currency": "USD"
             },
             "accrued_interest": {
-              "amount": "7483687.5",
+              "amount": "7483687.5000000001",
               "currency": "USD"
             },
             "opening_balance": {
@@ -14819,7 +14819,7 @@
           },
           "2024Q3": {
             "interest_expense_cash": {
-              "amount": "7566839.583333334",
+              "amount": "7566839.5833333334",
               "currency": "USD"
             },
             "interest_income_cash": {
@@ -14843,7 +14843,7 @@
               "currency": "USD"
             },
             "accrued_interest": {
-              "amount": "7550345.833333333",
+              "amount": "7550345.8333333334",
               "currency": "USD"
             },
             "opening_balance": {
@@ -14869,7 +14869,7 @@
           },
           "2024Q4": {
             "interest_expense_cash": {
-              "amount": "7633316.666666667",
+              "amount": "7633316.6666666666",
               "currency": "USD"
             },
             "interest_income_cash": {
@@ -14893,7 +14893,7 @@
               "currency": "USD"
             },
             "accrued_interest": {
-              "amount": "7533852.083333333",
+              "amount": "7533852.0833333334",
               "currency": "USD"
             },
             "opening_balance": {
@@ -14919,7 +14919,7 @@
           },
           "2025Q1": {
             "interest_expense_cash": {
-              "amount": "7616641.666666667",
+              "amount": "7616641.6666666666",
               "currency": "USD"
             },
             "interest_income_cash": {
@@ -14943,7 +14943,7 @@
               "currency": "USD"
             },
             "accrued_interest": {
-              "amount": "7352141.666666667",
+              "amount": "7352141.6666666667",
               "currency": "USD"
             },
             "opening_balance": {
@@ -14993,7 +14993,7 @@
               "currency": "USD"
             },
             "accrued_interest": {
-              "amount": "7418437.5",
+              "amount": "7418437.5000000001",
               "currency": "USD"
             },
             "opening_balance": {
@@ -15019,7 +15019,7 @@
           },
           "2025Q3": {
             "interest_expense_cash": {
-              "amount": "7500864.583333334",
+              "amount": "7500864.5833333334",
               "currency": "USD"
             },
             "interest_income_cash": {
@@ -15043,7 +15043,7 @@
               "currency": "USD"
             },
             "accrued_interest": {
-              "amount": "7484370.833333333",
+              "amount": "7484370.8333333334",
               "currency": "USD"
             },
             "opening_balance": {
@@ -15069,7 +15069,7 @@
           },
           "2025Q4": {
             "interest_expense_cash": {
-              "amount": "7566616.666666667",
+              "amount": "7566616.6666666666",
               "currency": "USD"
             },
             "interest_income_cash": {
@@ -15093,7 +15093,7 @@
               "currency": "USD"
             },
             "accrued_interest": {
-              "amount": "7467877.083333333",
+              "amount": "7467877.0833333334",
               "currency": "USD"
             },
             "opening_balance": {
@@ -15146,7 +15146,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "7500000",
+                "amount": "7500000.0000000001",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -15172,7 +15172,7 @@
             },
             "2024Q2": {
               "interest_expense_cash": {
-                "amount": "7583333.333333334",
+                "amount": "7583333.3333333334",
                 "currency": "USD"
               },
               "interest_income_cash": {
@@ -15196,7 +15196,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "7483687.5",
+                "amount": "7483687.5000000001",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -15222,7 +15222,7 @@
             },
             "2024Q3": {
               "interest_expense_cash": {
-                "amount": "7566839.583333334",
+                "amount": "7566839.5833333334",
                 "currency": "USD"
               },
               "interest_income_cash": {
@@ -15246,7 +15246,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "7550345.833333333",
+                "amount": "7550345.8333333334",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -15272,7 +15272,7 @@
             },
             "2024Q4": {
               "interest_expense_cash": {
-                "amount": "7633316.666666667",
+                "amount": "7633316.6666666666",
                 "currency": "USD"
               },
               "interest_income_cash": {
@@ -15296,7 +15296,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "7533852.083333333",
+                "amount": "7533852.0833333334",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -15322,7 +15322,7 @@
             },
             "2025Q1": {
               "interest_expense_cash": {
-                "amount": "7616641.666666667",
+                "amount": "7616641.6666666666",
                 "currency": "USD"
               },
               "interest_income_cash": {
@@ -15346,7 +15346,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "7352141.666666667",
+                "amount": "7352141.6666666667",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -15396,7 +15396,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "7418437.5",
+                "amount": "7418437.5000000001",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -15422,7 +15422,7 @@
             },
             "2025Q3": {
               "interest_expense_cash": {
-                "amount": "7500864.583333334",
+                "amount": "7500864.5833333334",
                 "currency": "USD"
               },
               "interest_income_cash": {
@@ -15446,7 +15446,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "7484370.833333333",
+                "amount": "7484370.8333333334",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -15472,7 +15472,7 @@
             },
             "2025Q4": {
               "interest_expense_cash": {
-                "amount": "7566616.666666667",
+                "amount": "7566616.6666666666",
                 "currency": "USD"
               },
               "interest_income_cash": {
@@ -15496,7 +15496,7 @@
                 "currency": "USD"
               },
               "accrued_interest": {
-                "amount": "7467877.083333333",
+                "amount": "7467877.0833333334",
                 "currency": "USD"
               },
               "opening_balance": {
@@ -15529,19 +15529,19 @@
             "currency": "USD"
           },
           "2024Q2": {
-            "amount": "85716666.6666667",
+            "amount": "85716666.66666667",
             "currency": "USD"
           },
           "2024Q3": {
-            "amount": "93333160.4166667",
+            "amount": "93333160.41666669",
             "currency": "USD"
           },
           "2024Q4": {
-            "amount": "99766683.3333333",
+            "amount": "99766683.33333331",
             "currency": "USD"
           },
           "2025Q1": {
-            "amount": "105083358.3333333",
+            "amount": "105083358.33333331",
             "currency": "USD"
           },
           "2025Q2": {
@@ -15549,11 +15549,11 @@
             "currency": "USD"
           },
           "2025Q3": {
-            "amount": "105199135.4166667",
+            "amount": "105199135.41666669",
             "currency": "USD"
           },
           "2025Q4": {
-            "amount": "105133383.3333333",
+            "amount": "105133383.33333331",
             "currency": "USD"
           }
         },
@@ -15659,8 +15659,8 @@
     },
     {
       "parameter_id": "opex@2025Q4",
-      "downside": 9190853.399280012,
-      "upside": -9190853.399279982
+      "downside": 9190853.399279997,
+      "upside": -9190853.399280012
     }
   ]
 }

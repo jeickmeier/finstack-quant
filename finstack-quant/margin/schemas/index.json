@@ -146,7 +146,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/margin_funding_cost.schema.json",
-      "bytes": 1245,
+      "bytes": 1246,
       "kind": "output",
       "path": "schemas/margin/1/margin_funding_cost.schema.json",
       "summary": "Margin funding cost result.",

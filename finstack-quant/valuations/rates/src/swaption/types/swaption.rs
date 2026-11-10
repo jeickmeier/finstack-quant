@@ -387,7 +387,7 @@ impl Swaption {
         as_of: Date,
     ) -> Result<Option<Money>> {
         match self.terminal_value_raw(curves, as_of)? {
-            Some(pv) => Ok(Some(Money::new(pv, self.notional.currency())?)),
+            Some(pv) => Ok(Some(Money::from_model_value(pv, self.notional.currency())?)),
             None => Ok(None),
         }
     }
@@ -427,7 +427,7 @@ impl Swaption {
         time_to_expiry: f64,
     ) -> Result<Money> {
         let pv = self.price_quote_at_raw(curves, quote, as_of, forward_rate, time_to_expiry)?;
-        Money::new(pv, self.notional.currency())
+        Money::from_model_value(pv, self.notional.currency())
     }
 
     fn price_quote_at_raw(
@@ -536,7 +536,7 @@ impl Swaption {
         as_of: Date,
     ) -> Result<Money> {
         let pv = self.price_sabr_before_expiry_raw(market, as_of)?;
-        Money::new(pv, self.notional.currency())
+        Money::from_model_value(pv, self.notional.currency())
     }
 
     pub(crate) fn price_sabr_before_expiry_raw(
@@ -1059,7 +1059,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Swaption {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         let pv = self.base_value_raw(curves, as_of)?;
-        Money::new(pv, self.notional.currency())
+        Money::from_model_value(pv, self.notional.currency())
     }
 
     fn base_value_raw(

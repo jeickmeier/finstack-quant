@@ -22,18 +22,18 @@
   },
   "sources_uses_balanced": true,
   "exit_enterprise_value": {
-    "amount": "552454229.493675",
+    "amount": "552454229.4936748",
     "currency": "USD"
   },
-  "exit_metric": 61383803.277075,
+  "exit_metric": 61383803.27707498,
   "exit_net_debt": {
     "amount": "430000000",
     "currency": "USD"
   },
   "exit_equity_proceeds": {
-    "amount": "122454229.493675",
+    "amount": "122454229.49367476",
     "currency": "USD"
   },
-  "moic": 1.0802243251029904,
+  "moic": 1.0802243251029884,
   "checks": null
 }

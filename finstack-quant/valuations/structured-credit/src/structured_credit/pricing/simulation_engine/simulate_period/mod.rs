@@ -359,7 +359,7 @@ pub(super) fn simulate_period(
         let budget = if required_paydown >= recyclable.amount() {
             Money::from((0_i64, state.currency))
         } else {
-            recyclable.checked_sub(Money::new(required_paydown, state.currency)?)?
+            recyclable.checked_sub(Money::from_model_value(required_paydown, state.currency)?)?
         };
         recycle_reinvestment_principal(state, budget, price / 100.0, pay_date, context)?
     } else {
@@ -449,7 +449,7 @@ pub(super) fn simulate_period(
     // Canonical asset balances already reflect amortization, defaults, and
     // any par purchased with reinvested cash. Restricted cash is passed once.
     let coverage_test_pool_balance =
-        Money::new(state.pool_state.balances.iter().sum(), state.currency)?;
+        Money::from_model_value(state.pool_state.balances.iter().sum(), state.currency)?;
 
     // Equity's cash to date for the incentive-fee hurdle: capital at closing
     // against every recorded equity distribution (waterfall payments and
@@ -507,7 +507,8 @@ pub(super) fn simulate_period(
         record::record_tranche_flows(state, &inputs, &waterfall_result, afc_carryover)?;
 
     // Asset state is authoritative, including par bought away from par.
-    state.pool_outstanding = Money::new(state.pool_state.balances.iter().sum(), state.currency)?;
+    state.pool_outstanding =
+        Money::from_model_value(state.pool_state.balances.iter().sum(), state.currency)?;
 
     // Realized excess spread this period, annualized on the opening pool
     // balance: interest collections less the debt coupons due, the fees paid
@@ -591,7 +592,7 @@ pub(super) fn simulate_period(
         defaults: pool_flows.default,
         recoveries: released_recoveries,
         reinvested_par: reinvested_cash,
-        fees_paid: Money::new(fees_paid, state.currency)?,
+        fees_paid: Money::from_model_value(fees_paid, state.currency)?,
         excess_spread: state.excess_spread_history.last().copied().unwrap_or(0.0),
         coverage_tests,
         waterfall: waterfall_result,
@@ -655,7 +656,7 @@ fn apply_tranche_draws(
             if headroom > 1.0 {
                 draws.push((
                     readvance.tranche_id.clone(),
-                    Money::new(headroom, state.currency)?,
+                    Money::from_model_value(headroom, state.currency)?,
                 ));
             }
         }

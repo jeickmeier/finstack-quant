@@ -198,7 +198,8 @@ pub(super) fn advance(
         .enumerate()
         .map(|(i, tranche)| (tranche.id.as_str(), i))
         .collect();
-    let pool_balance = Money::new(state.pool_state.balances.iter().sum(), state.currency)?;
+    let pool_balance =
+        Money::from_model_value(state.pool_state.balances.iter().sum(), state.currency)?;
     let unresolved_npl = state.unresolved_npl();
     let special_serviced_balance = special_serviced_balance(
         &state.pool,

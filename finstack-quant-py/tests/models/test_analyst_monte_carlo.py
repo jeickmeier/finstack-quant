@@ -194,8 +194,10 @@ def test_asian_exact_one_fixing_and_geometric_benchmark() -> None:
         assert asian_option_price(call, 1, convention) == pytest.approx(vanilla, abs=1e-12)
     european = EuropeanPricer(4096, 17, False).price_gbm(call, num_steps=1)
     asian = PathDependentPricer(4096, 17, False, False).price_asian(call, num_steps=1)
-    assert asian.mean.amount == european.mean.amount
-    # The two payoff reducers may round their sample variance one ulp apart.
+    # The two payoff reducers sum in different orders, so their sample mean and
+    # variance may differ by a few ulps; Money keeps each mean's shortest
+    # round-trip text instead of rounding both to 15 significant digits.
+    assert asian.mean.amount == pytest.approx(european.mean.amount, abs=1e-14)
     assert asian.stderr == pytest.approx(european.stderr, abs=1e-14)
 
     paths = _gbm_spot_paths(12, 4096, 17)

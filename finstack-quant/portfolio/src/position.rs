@@ -393,7 +393,7 @@ impl Position {
                 notional_currency, value.currency()
             );
         }
-        Money::new(value.amount() * self.scale_factor(), value.currency())
+        Money::from_model_value(value.amount() * self.scale_factor(), value.currency())
     }
 
     /// Unit-aware scale factor applied to instrument P&L or PV.

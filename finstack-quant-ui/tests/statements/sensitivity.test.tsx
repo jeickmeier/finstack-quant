@@ -299,7 +299,7 @@ it("presents the native tornado and the target metric in every returned scenario
       ),
   ).toEqual([
     ["Revenue · 2025Q4", "-15,329,233.726987481", "15,329,233.726987481"],
-    ["Opex · 2025Q4", "9,190,853.399280012", "-9,190,853.399279982"],
+    ["Opex · 2025Q4", "9,190,853.399279997", "-9,190,853.399280012"],
   ]);
   const scenarios = screen.getByRole("table", {
     name: "Returned sensitivity scenarios",

@@ -83,7 +83,7 @@ impl PreparedTranche {
                         .clone()?;
                     pv += row.cashflow.amount.amount() * df;
                 }
-                Money::new(pv, projection.tranche.notional.currency())
+                Money::from_model_value(pv, projection.tranche.notional.currency())
             }
         }
     }
@@ -204,7 +204,7 @@ impl CdsTranchePricer {
             } else {
                 0.0
             };
-            PreparedState::Wiped(Money::new(pv, tranche.notional.currency())?)
+            PreparedState::Wiped(Money::from_model_value(pv, tranche.notional.currency())?)
         } else {
             let projection = self.prepare_projection_inputs(tranche, market, as_of)?;
             let mut discounts = FxHashMap::default();
@@ -297,7 +297,7 @@ impl CdsTranchePricer {
                     cashflow: CashFlow::new(
                         payment_date,
                         None,
-                        Money::new(premium_amount * premium_sign, tranche.notional.currency())?,
+                        Money::from_model_value(premium_amount * premium_sign, tranche.notional.currency())?,
                         CFKind::Fixed,
                         accrual_period,
                         Some(coupon),
@@ -312,7 +312,7 @@ impl CdsTranchePricer {
                     cashflow: CashFlow::new(
                         payment_date,
                         None,
-                        Money::new(
+                        Money::from_model_value(
                             default_amount * protection_sign,
                             tranche.notional.currency(),
                         )?,
@@ -350,7 +350,7 @@ impl CdsTranchePricer {
                 cashflow: CashFlow::new(
                     date,
                     None,
-                    Money::new(amount.amount() * premium_sign, amount.currency())?,
+                    Money::from_model_value(amount.amount() * premium_sign, amount.currency())?,
                     CFKind::Fee,
                     0.0,
                     None,

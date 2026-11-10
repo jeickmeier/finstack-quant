@@ -86,7 +86,7 @@
       "as_of": "2025-01-15",
       "clean_price_pct": 108.0,
       "dirty_price": {
-        "amount": "1080277.777777778",
+        "amount": "1080277.7777777778",
         "currency": "USD"
       },
       "instrument_id": "CALLABLE-USD-10Y",
@@ -120,7 +120,7 @@
         },
         {
           "date": "2031-01-15",
-          "i_spread": -0.000918268364712,
+          "i_spread": -0.000918268364713,
           "is_worst": false,
           "kind": "call",
           "make_whole": false,

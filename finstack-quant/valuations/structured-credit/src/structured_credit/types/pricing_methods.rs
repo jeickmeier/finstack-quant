@@ -179,7 +179,7 @@ impl StructuredCredit {
             return Ok(result);
         };
         let factor = 1.0 + shock;
-        result.npv = Money::new(result.npv.amount() * factor, result.npv.currency())?;
+        result.npv = Money::from_model_value(result.npv.amount() * factor, result.npv.currency())?;
         result.clean_price *= factor;
         result.dirty_price *= factor;
         result.pv_std_error *= factor.abs();
@@ -187,7 +187,8 @@ impl StructuredCredit {
         let hi = result.pv_confidence_interval.1 * factor;
         result.pv_confidence_interval = (lo.min(hi), lo.max(hi));
         for tranche in &mut result.tranche_results {
-            tranche.npv = Money::new(tranche.npv.amount() * factor, tranche.npv.currency())?;
+            tranche.npv =
+                Money::from_model_value(tranche.npv.amount() * factor, tranche.npv.currency())?;
             tranche.price_pct *= factor;
         }
         Ok(result)
@@ -428,7 +429,7 @@ impl StructuredCredit {
         for (date, amount) in &cashflows.cashflows {
             if *date > as_of {
                 let df = disc.df_between_dates(as_of, *date)?;
-                let flow_pv = Money::new(amount.amount() * df, amount.currency())?;
+                let flow_pv = Money::from_model_value(amount.amount() * df, amount.currency())?;
                 pv = pv.checked_add(flow_pv)?;
             }
         }
@@ -438,7 +439,8 @@ impl StructuredCredit {
                 && flow.date > as_of
             {
                 let df = disc.df_between_dates(as_of, flow.date)?;
-                let flow_pv = Money::new(flow.amount.amount() * df, flow.amount.currency())?;
+                let flow_pv =
+                    Money::from_model_value(flow.amount.amount() * df, flow.amount.currency())?;
                 pv = pv.checked_add(flow_pv)?;
             }
         }

@@ -23,7 +23,7 @@
 
 use crate::config::{FinstackConfig, RoundingMode};
 use crate::currency::Currency;
-use crate::decimal::f64_to_decimal;
+use crate::decimal::{f64_to_decimal, f64_to_decimal_model_value};
 use crate::{Error, InputError};
 use core::fmt;
 
@@ -231,15 +231,16 @@ impl Money {
 
     /// Construct from a finite f64 without ingest rounding.
     ///
-    /// Ingests the `f64` through its shortest round-trippable Decimal form,
-    /// preserving its Decimal precision. Use
-    /// [`Self::from_decimal`] when the caller already holds an exact Decimal.
+    /// Ingests the `f64` exactly through its shortest round-trip decimal text
+    /// ([`f64_to_decimal`]). Use [`Self::from_decimal`] when the caller already
+    /// holds an exact Decimal, and [`Self::from_model_value`] for a pricer's
+    /// model output.
     ///
     /// # Errors
     ///
     /// Returns `InputError::NonFiniteValue` for NaN or infinity, or
-    /// `InputError::ConversionOverflow` when the finite amount cannot be
-    /// represented by the internal Decimal type.
+    /// `InputError::ConversionOverflow` when the shortest text is outside the
+    /// Decimal domain (too large, or nonzero below `1e-28`).
     ///
     /// # Arguments
     ///
@@ -247,6 +248,42 @@ impl Money {
     /// * `currency` - ISO-4217 currency that defines scale, rounding, and display units
     pub fn new(amount: f64, currency: Currency) -> Result<Self, Error> {
         Self::try_new_impl(amount, currency, None)
+    }
+
+    /// Construct from a pricer's model value, rounding explicitly to
+    /// Decimal's 28-digit scale (half-even).
+    ///
+    /// The named model-value boundary (owner decision on
+    /// CORE-CONVENTIONS-012 B2b, [`f64_to_decimal_model_value`]): a model
+    /// value below `0.5e-28` becomes an exact zero. Use it only for model
+    /// outputs (PVs, expected losses, projected cashflows); input admission
+    /// uses [`Self::new`].
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::NonFiniteValue` for NaN or infinity, or
+    /// `InputError::ConversionOverflow` when the magnitude is too large for
+    /// the internal Decimal type.
+    ///
+    /// # Arguments
+    ///
+    /// * `amount` - Finite model value in major currency units
+    /// * `currency` - ISO-4217 currency of the amount
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::money::Money;
+    ///
+    /// assert!(Money::new(1e-30, Currency::USD).is_err());
+    /// assert_eq!(Money::from_model_value(1e-30, Currency::USD)?.amount(), 0.0);
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn from_model_value(amount: f64, currency: Currency) -> Result<Self, Error> {
+        Ok(Self::from_decimal(
+            f64_to_decimal_model_value(amount)?,
+            currency,
+        ))
     }
 
     /// An exact zero amount in `currency`.

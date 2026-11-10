@@ -335,7 +335,7 @@
           "metric": "i_spread",
           "value": {
             "ok": true,
-            "value": 5.864772130576013e-7
+            "value": 5.864772132900542e-7
           }
         },
         {
@@ -396,21 +396,21 @@
           "metric": "duration_mod",
           "value": {
             "ok": true,
-            "value": 7.884016394316983
+            "value": 7.884016394316978
           }
         },
         {
           "metric": "duration_mac",
           "value": {
             "ok": true,
-            "value": 8.003729780089104
+            "value": 8.0037297800891
           }
         },
         {
           "metric": "convexity",
           "value": {
             "ok": true,
-            "value": 0.7303810506431888
+            "value": 0.7303810506431881
           }
         },
         {
@@ -572,14 +572,14 @@
           "metric": "i_spread",
           "value": {
             "ok": true,
-            "value": 0.013406410815163163
+            "value": 0.013406410815163281
           }
         },
         {
           "metric": "g_spread",
           "value": {
             "ok": true,
-            "value": 0.017356639725528502
+            "value": 0.01735663972552862
           }
         },
         {
@@ -625,28 +625,28 @@
           "metric": "duration_mod",
           "value": {
             "ok": true,
-            "value": 7.73679790371274
+            "value": 7.736797903712736
           }
         },
         {
           "metric": "duration_mac",
           "value": {
             "ok": true,
-            "value": 7.906134954416403
+            "value": 7.9061349544164
           }
         },
         {
           "metric": "convexity",
           "value": {
             "ok": true,
-            "value": 0.709404890422373
+            "value": 0.7094048904223722
           }
         },
         {
           "metric": "dv01",
           "value": {
             "ok": true,
-            "value": -766.0323440737886
+            "value": -766.0323440737856
           }
         },
         {
@@ -682,7 +682,7 @@
           "metric": "theta",
           "value": {
             "ok": true,
-            "value": 10624.113381981966
+            "value": 10624.113381982199
           }
         },
         {
@@ -696,14 +696,14 @@
           "metric": "theta_roll_down",
           "value": {
             "ok": true,
-            "value": 10624.113381981966
+            "value": 10624.113381982199
           }
         },
         {
           "metric": "carry_total",
           "value": {
             "ok": true,
-            "value": 10624.113381981966
+            "value": 10624.113381982199
           }
         },
         {
@@ -717,14 +717,14 @@
           "metric": "pull_to_par",
           "value": {
             "ok": true,
-            "value": 10775.892526850874
+            "value": 10775.892526850876
           }
         },
         {
           "metric": "roll_down",
           "value": {
             "ok": true,
-            "value": -151.77914486890768
+            "value": -151.77914486867667
           }
         },
         {
@@ -745,7 +745,7 @@
           "metric": "breakeven",
           "value": {
             "ok": true,
-            "value": 13.861172395663042
+            "value": 13.861172395663345
           }
         }
       ]
@@ -797,7 +797,7 @@
           "metric": "i_spread",
           "value": {
             "ok": true,
-            "value": 0.009619558636213138
+            "value": 0.00961955863621338
           }
         },
         {
@@ -854,28 +854,28 @@
           "metric": "duration_mod",
           "value": {
             "ok": true,
-            "value": 4.063779339302141
+            "value": 4.0637793393021395
           }
         },
         {
           "metric": "duration_mac",
           "value": {
             "ok": true,
-            "value": 4.145100757289969
+            "value": 4.145100757289968
           }
         },
         {
           "metric": "convexity",
           "value": {
             "ok": true,
-            "value": 0.19365862451192978
+            "value": 0.19365862451192964
           }
         },
         {
           "metric": "dv01",
           "value": {
             "ok": true,
-            "value": -410.4886455037338
+            "value": -410.4886455037329
           }
         },
         {
@@ -911,7 +911,7 @@
           "metric": "theta",
           "value": {
             "ok": true,
-            "value": 10624.113381981966
+            "value": 10624.113381982199
           }
         },
         {
@@ -925,14 +925,14 @@
           "metric": "theta_roll_down",
           "value": {
             "ok": true,
-            "value": 10624.113381981966
+            "value": 10624.113381982199
           }
         },
         {
           "metric": "carry_total",
           "value": {
             "ok": true,
-            "value": 10624.113381981966
+            "value": 10624.113381982199
           }
         },
         {
@@ -946,14 +946,14 @@
           "metric": "pull_to_par",
           "value": {
             "ok": true,
-            "value": 10055.948638841362
+            "value": 10055.948638841357
           }
         },
         {
           "metric": "roll_down",
           "value": {
             "ok": true,
-            "value": 568.1647431406036
+            "value": 568.1647431408419
           }
         },
         {
@@ -974,7 +974,7 @@
           "metric": "breakeven",
           "value": {
             "ok": true,
-            "value": 25.881625468457276
+            "value": 25.881625468457894
           }
         }
       ]
@@ -1019,14 +1019,14 @@
           "metric": "z_spread",
           "value": {
             "ok": true,
-            "value": 0.012301304656585155
+            "value": 0.012301304656585212
           }
         },
         {
           "metric": "i_spread",
           "value": {
             "ok": true,
-            "value": 0.012314441712921762
+            "value": 0.012314441712922109
           }
         },
         {
@@ -1062,7 +1062,7 @@
           "metric": "asw_market",
           "value": {
             "ok": true,
-            "value": 0.012275533380796518
+            "value": 0.012275533380796544
           }
         },
         {
@@ -1087,21 +1087,21 @@
           "metric": "duration_mod",
           "value": {
             "ok": true,
-            "value": 7.748890680617758
+            "value": 7.7488906806177535
           }
         },
         {
           "metric": "duration_mac",
           "value": {
             "ok": true,
-            "value": 7.914261634072679
+            "value": 7.914261634072676
           }
         },
         {
           "metric": "convexity",
           "value": {
             "ok": true,
-            "value": 0.711114246827838
+            "value": 0.7111142468278371
           }
         },
         {
@@ -1133,14 +1133,14 @@
           "metric": "jump_to_default",
           "value": {
             "ok": true,
-            "value": -598439.031080942
+            "value": -598439.0310809418
           }
         },
         {
           "metric": "theta",
           "value": {
             "ok": true,
-            "value": 10750.413228582009
+            "value": 10750.413228582358
           }
         },
         {
@@ -1154,14 +1154,14 @@
           "metric": "theta_roll_down",
           "value": {
             "ok": true,
-            "value": 10750.413228582009
+            "value": 10750.413228582358
           }
         },
         {
           "metric": "carry_total",
           "value": {
             "ok": true,
-            "value": 10750.413228582009
+            "value": 10750.41322858259
           }
         },
         {
@@ -1175,14 +1175,14 @@
           "metric": "pull_to_par",
           "value": {
             "ok": true,
-            "value": 10597.72099482611
+            "value": 10597.72099482633
           }
         },
         {
           "metric": "roll_down",
           "value": {
             "ok": true,
-            "value": 152.692233755899
+            "value": 152.69223375626098
           }
         },
         {
@@ -1259,7 +1259,7 @@
           "metric": "i_spread",
           "value": {
             "ok": true,
-            "value": 0.02510408479906795
+            "value": 0.025104084799068137
           }
         },
         {
@@ -1302,7 +1302,7 @@
           "metric": "discount_margin",
           "value": {
             "ok": true,
-            "value": 0.02622520336570998
+            "value": 0.026225203365709986
           }
         },
         {
@@ -1408,14 +1408,14 @@
           "metric": "pull_to_par",
           "value": {
             "ok": true,
-            "value": 249.57046643596732
+            "value": 249.57046643597278
           }
         },
         {
           "metric": "roll_down",
           "value": {
             "ok": true,
-            "value": -249.57046643596732
+            "value": -249.57046643597278
           }
         },
         {

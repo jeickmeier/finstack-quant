@@ -370,8 +370,8 @@ impl PeriodDiagnostics {
             reserve_balance: state.reserve_balance,
             spread_account: state.spread_account,
             funding_account: state.principal_funding_account,
-            delinquent_balance: Money::new(delinquent, state.currency)?,
-            servicer_advances_outstanding: Money::new(
+            delinquent_balance: Money::from_model_value(delinquent, state.currency)?,
+            servicer_advances_outstanding: Money::from_model_value(
                 state.servicer_advances_outstanding(),
                 state.currency,
             )?,

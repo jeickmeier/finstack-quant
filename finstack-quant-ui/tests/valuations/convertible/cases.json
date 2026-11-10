@@ -224,62 +224,62 @@
           {
             "spot": 25,
             "is_market_spot": false,
-            "price": 927591.852314915,
-            "delta": 372.28488877415657,
-            "hedge_ratio": 0.03722848887741566,
+            "price": 927591.8523149154,
+            "delta": 372.28488877252676,
+            "hedge_ratio": 0.03722848887725268,
             "regime": "busted",
             "conversion_value": 250000,
             "parity": 0.25,
-            "conversion_premium": 2.71036740925966,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 2.7103674092596615,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 50,
             "is_market_spot": false,
-            "price": 964341.536920296,
-            "delta": 2613.9579885699786,
-            "hedge_ratio": 0.2613957988569979,
+            "price": 964341.5369202961,
+            "delta": 2613.9579885704443,
+            "hedge_ratio": 0.26139579885704445,
             "regime": "busted",
             "conversion_value": 500000,
             "parity": 0.5,
-            "conversion_premium": 0.928683073840592,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.9286830738405922,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 75,
             "is_market_spot": false,
-            "price": 1064844.808733085,
-            "delta": 5107.271890598039,
-            "hedge_ratio": 0.510727189059804,
+            "price": 1064844.808733084,
+            "delta": 5107.271890597728,
+            "hedge_ratio": 0.5107271890597728,
             "regime": "balanced",
             "conversion_value": 750000,
             "parity": 0.75,
-            "conversion_premium": 0.41979307831077994,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.4197930783107786,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 100,
             "is_market_spot": true,
-            "price": 1216986.854087339,
-            "delta": 6891.442109636497,
-            "hedge_ratio": 0.6891442109636496,
+            "price": 1216986.8540873388,
+            "delta": 6891.442109636613,
+            "hedge_ratio": 0.6891442109636613,
             "regime": "balanced",
             "conversion_value": 1000000,
             "parity": 1,
-            "conversion_premium": 0.21698685408733898,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.21698685408733875,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 125,
             "is_market_spot": false,
-            "price": 1404250.47538887,
+            "price": 1404250.4753888699,
             "delta": 7928.454343600757,
             "hedge_ratio": 0.7928454343600757,
             "regime": "balanced",
             "conversion_value": 1250000,
             "parity": 1.25,
-            "conversion_premium": 0.12340038031109613,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.1234003803110959,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 150,
@@ -291,31 +291,31 @@
             "conversion_value": 1500000,
             "parity": 1.5,
             "conversion_premium": 0.07471482114803596,
-            "bond_floor": 925520.7029548261
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 200,
             "is_market_spot": false,
-            "price": 2061957.070366833,
+            "price": 2061957.0703668331,
             "delta": 9318.472885190218,
             "hedge_ratio": 0.9318472885190219,
             "regime": "equity_sensitive",
             "conversion_value": 2000000,
             "parity": 2,
-            "conversion_premium": 0.030978535183416422,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.030978535183416644,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 300,
             "is_market_spot": false,
             "price": 3018989.286719361,
-            "delta": 9752.70987728533,
-            "hedge_ratio": 0.9752709877285329,
+            "delta": 9752.709877285408,
+            "hedge_ratio": 0.9752709877285408,
             "regime": "equity_sensitive",
             "conversion_value": 3000000,
             "parity": 3,
             "conversion_premium": 0.006329762239786874,
-            "bond_floor": 925520.7029548261
+            "bond_floor": 925520.702954826
           }
         ]
       },
@@ -363,49 +363,49 @@
           "metric": "conversion_premium",
           "value": {
             "ok": true,
-            "value": 0.21698685408733898
+            "value": 0.21698685408733875
           }
         },
         {
           "metric": "bond_floor",
           "value": {
             "ok": true,
-            "value": 925520.7029548261
+            "value": 925520.702954826
           }
         },
         {
           "metric": "delta",
           "value": {
             "ok": true,
-            "value": 6891.442109636497
+            "value": 6891.442109636613
           }
         },
         {
           "metric": "gamma",
           "value": {
             "ok": true,
-            "value": 459.3187207849696
+            "value": 459.3187207847368
           }
         },
         {
           "metric": "vega",
           "value": {
             "ok": true,
-            "value": 6597.566955366981
+            "value": 6597.566955367331
           }
         },
         {
           "metric": "rho",
           "value": {
             "ok": true,
-            "value": -192.65143232850824
+            "value": -192.6514323282754
           }
         },
         {
           "metric": "theta",
           "value": {
             "ok": true,
-            "value": 3.1843090299516916
+            "value": 3.184309030417353
           }
         },
         {
@@ -423,7 +423,7 @@
           "metric": "dv01",
           "value": {
             "ok": true,
-            "value": -192.65143232850824
+            "value": -192.6514323282754
           }
         },
         {
@@ -452,28 +452,28 @@
           "metric": "dividend01",
           "value": {
             "ok": true,
-            "value": -270.0180781440593
+            "value": -270.0180781441757
           }
         },
         {
           "metric": "conversion01",
           "value": {
             "ok": true,
-            "value": 6891.442109636962
+            "value": 6891.442109636846
           }
         },
         {
           "metric": "accrued",
           "value": {
             "ok": true,
-            "value": 8273.972602739721
+            "value": 8273.972602739726
           }
         },
         {
           "metric": "clean_price",
           "value": {
             "ok": true,
-            "value": 1208712.8814845993
+            "value": 1208712.881484599
           }
         }
       ]
@@ -493,98 +493,98 @@
           {
             "spot": 25,
             "is_market_spot": false,
-            "price": 927465.706831695,
-            "delta": 392.518012000015,
-            "hedge_ratio": 0.0392518012000015,
+            "price": 927465.7068316943,
+            "delta": 392.518011998618,
+            "hedge_ratio": 0.039251801199861804,
             "regime": "busted",
             "conversion_value": 250000,
             "parity": 0.25,
-            "conversion_premium": 2.70986282732678,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 2.7098628273267775,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 50,
             "is_market_spot": false,
-            "price": 960805.371288773,
-            "delta": 2864.852658072952,
-            "hedge_ratio": 0.2864852658072952,
+            "price": 960805.3712887726,
+            "delta": 2864.8526580722537,
+            "hedge_ratio": 0.2864852658072254,
             "regime": "busted",
             "conversion_value": 500000,
             "parity": 0.5,
-            "conversion_premium": 0.9216107425775459,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.921610742577545,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 75,
             "is_market_spot": false,
-            "price": 1050484.3305765,
-            "delta": 3751.8897114880383,
-            "hedge_ratio": 0.37518897114880384,
+            "price": 1050484.3305765004,
+            "delta": 3751.889711488349,
+            "hedge_ratio": 0.37518897114883487,
             "regime": "busted",
             "conversion_value": 750000,
             "parity": 0.75,
-            "conversion_premium": 0.400645774102,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.4006457741020004,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 100,
             "is_market_spot": true,
-            "price": 1196276.464430252,
+            "price": 1196276.4644302519,
             "delta": 7533.985725156032,
             "hedge_ratio": 0.7533985725156032,
             "regime": "balanced",
             "conversion_value": 1000000,
             "parity": 1,
-            "conversion_premium": 0.19627646443025215,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.19627646443025193,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 125,
             "is_market_spot": false,
-            "price": 1379054.054287391,
-            "delta": 7133.560147823952,
-            "hedge_ratio": 0.7133560147823952,
+            "price": 1379054.0542873908,
+            "delta": 7133.560147823766,
+            "hedge_ratio": 0.7133560147823765,
             "regime": "balanced",
             "conversion_value": 1250000,
             "parity": 1.25,
-            "conversion_premium": 0.10324324342991287,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.10324324342991265,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 150,
             "is_market_spot": false,
-            "price": 1584060.955823349,
-            "delta": 8167.990799069016,
-            "hedge_ratio": 0.8167990799069016,
+            "price": 1584060.9558233486,
+            "delta": 8167.990799068783,
+            "hedge_ratio": 0.8167990799068784,
             "regime": "equity_sensitive",
             "conversion_value": 1500000,
             "parity": 1.5,
-            "conversion_premium": 0.05604063721556596,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.056040637215565736,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 200,
             "is_market_spot": false,
-            "price": 2041615.215464106,
-            "delta": 9151.71202814777,
-            "hedge_ratio": 0.9151712028147769,
+            "price": 2041615.2154641056,
+            "delta": 9151.712028147711,
+            "hedge_ratio": 0.915171202814771,
             "regime": "equity_sensitive",
             "conversion_value": 2000000,
             "parity": 2,
-            "conversion_premium": 0.020807607732052924,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.020807607732052702,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 300,
             "is_market_spot": false,
-            "price": 3011587.92603059,
-            "delta": 9898.346237370046,
-            "hedge_ratio": 0.9898346237370046,
+            "price": 3011587.926030591,
+            "delta": 9898.346237369735,
+            "hedge_ratio": 0.9898346237369735,
             "regime": "equity_sensitive",
             "conversion_value": 3000000,
             "parity": 3,
-            "conversion_premium": 0.003862642010196815,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.003862642010197037,
+            "bond_floor": 925520.702954826
           }
         ]
       },
@@ -632,14 +632,14 @@
           "metric": "conversion_premium",
           "value": {
             "ok": true,
-            "value": 0.19627646443025215
+            "value": 0.19627646443025193
           }
         },
         {
           "metric": "bond_floor",
           "value": {
             "ok": true,
-            "value": 925520.7029548261
+            "value": 925520.702954826
           }
         },
         {
@@ -660,35 +660,35 @@
           "metric": "vega",
           "value": {
             "ok": true,
-            "value": 6419.883040528972
+            "value": 6419.883040528855
           }
         },
         {
           "metric": "rho",
           "value": {
             "ok": true,
-            "value": -183.40981420199387
+            "value": -183.4098142022267
           }
         },
         {
           "metric": "theta",
           "value": {
             "ok": true,
-            "value": -5.271868878044188
+            "value": -5.271868877578527
           }
         },
         {
           "metric": "implied_vol",
           "value": {
             "ok": true,
-            "value": 0.3263258891594133
+            "value": 0.32632588915941874
           }
         },
         {
           "metric": "dv01",
           "value": {
             "ok": true,
-            "value": -183.40981420199387
+            "value": -183.4098142022267
           }
         },
         {
@@ -706,14 +706,14 @@
           "metric": "oas",
           "value": {
             "ok": true,
-            "value": -0.016498097038138676
+            "value": -0.01649809703813874
           }
         },
         {
           "metric": "dividend01",
           "value": {
             "ok": true,
-            "value": -163.50429936649843
+            "value": -163.50429936661484
           }
         },
         {
@@ -727,14 +727,14 @@
           "metric": "accrued",
           "value": {
             "ok": true,
-            "value": 8273.972602739721
+            "value": 8273.972602739726
           }
         },
         {
           "metric": "clean_price",
           "value": {
             "ok": true,
-            "value": 1188002.4918275124
+            "value": 1188002.4918275122
           }
         }
       ]
@@ -755,26 +755,26 @@
           {
             "spot": 50,
             "is_market_spot": false,
-            "price": 964341.536920296,
-            "delta": 2613.9579885699786,
-            "hedge_ratio": 0.2613957988569979,
+            "price": 964341.5369202961,
+            "delta": 2613.9579885704443,
+            "hedge_ratio": 0.26139579885704445,
             "regime": "busted",
             "conversion_value": 500000,
             "parity": 0.5,
-            "conversion_premium": 0.928683073840592,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.9286830738405922,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 100,
             "is_market_spot": true,
-            "price": 1216986.854087339,
-            "delta": 6891.442109636497,
-            "hedge_ratio": 0.6891442109636496,
+            "price": 1216986.8540873388,
+            "delta": 6891.442109636613,
+            "hedge_ratio": 0.6891442109636613,
             "regime": "balanced",
             "conversion_value": 1000000,
             "parity": 1,
-            "conversion_premium": 0.21698685408733898,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.21698685408733875,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 150,
@@ -786,7 +786,7 @@
             "conversion_value": 1500000,
             "parity": 1.5,
             "conversion_premium": 0.07471482114803596,
-            "bond_floor": 925520.7029548261
+            "bond_floor": 925520.702954826
           }
         ]
       },
@@ -834,49 +834,49 @@
           "metric": "conversion_premium",
           "value": {
             "ok": true,
-            "value": 0.21698685408733898
+            "value": 0.21698685408733875
           }
         },
         {
           "metric": "bond_floor",
           "value": {
             "ok": true,
-            "value": 925520.7029548261
+            "value": 925520.702954826
           }
         },
         {
           "metric": "delta",
           "value": {
             "ok": true,
-            "value": 6891.442109636497
+            "value": 6891.442109636613
           }
         },
         {
           "metric": "gamma",
           "value": {
             "ok": true,
-            "value": 459.3187207849696
+            "value": 459.3187207847368
           }
         },
         {
           "metric": "vega",
           "value": {
             "ok": true,
-            "value": 6597.566955366981
+            "value": 6597.566955367331
           }
         },
         {
           "metric": "rho",
           "value": {
             "ok": true,
-            "value": -192.65143232850824
+            "value": -192.6514323282754
           }
         },
         {
           "metric": "theta",
           "value": {
             "ok": true,
-            "value": 3.1843090299516916
+            "value": 3.184309030417353
           }
         },
         {
@@ -894,7 +894,7 @@
           "metric": "dv01",
           "value": {
             "ok": true,
-            "value": -192.65143232850824
+            "value": -192.6514323282754
           }
         },
         {
@@ -923,28 +923,28 @@
           "metric": "dividend01",
           "value": {
             "ok": true,
-            "value": -270.0180781440593
+            "value": -270.0180781441757
           }
         },
         {
           "metric": "conversion01",
           "value": {
             "ok": true,
-            "value": 6891.442109636962
+            "value": 6891.442109636846
           }
         },
         {
           "metric": "accrued",
           "value": {
             "ok": true,
-            "value": 8273.972602739721
+            "value": 8273.972602739726
           }
         },
         {
           "metric": "clean_price",
           "value": {
             "ok": true,
-            "value": 1208712.8814845993
+            "value": 1208712.881484599
           }
         }
       ]
@@ -964,98 +964,98 @@
           {
             "spot": 25,
             "is_market_spot": false,
-            "price": 405602.6634880229,
-            "delta": 11075.353974143392,
+            "price": 405602.66348802304,
+            "delta": 11075.353974143509,
             "hedge_ratio": null,
             "regime": null,
             "conversion_value": 312500,
             "parity": 0.3125,
-            "conversion_premium": 0.2979285231616733,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.29792852316167373,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 50,
             "is_market_spot": false,
-            "price": 649149.916239298,
-            "delta": 8414.22725428897,
+            "price": 649149.9162392982,
+            "delta": 8414.227254289086,
             "hedge_ratio": null,
             "regime": null,
             "conversion_value": 625000,
             "parity": 0.625,
-            "conversion_premium": 0.03863986598287661,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.03863986598287705,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 75,
             "is_market_spot": false,
-            "price": 842545.464170092,
-            "delta": 7041.227166049338,
+            "price": 842545.4641700919,
+            "delta": 7041.227166049493,
             "hedge_ratio": null,
             "regime": null,
             "conversion_value": 937500,
             "parity": 0.9375,
-            "conversion_premium": -0.10128483821856848,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": -0.1012848382185686,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 100,
             "is_market_spot": true,
-            "price": 1017726.584213427,
-            "delta": 6819.874946378521,
+            "price": 1017726.5842134272,
+            "delta": 6819.874946378637,
             "hedge_ratio": null,
             "regime": null,
             "conversion_value": 1000000,
             "parity": 1,
             "conversion_premium": 0.0177265842134271,
-            "bond_floor": 925520.7029548261
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 125,
             "is_market_spot": false,
-            "price": 1192752.594833253,
-            "delta": 6982.323483704403,
+            "price": 1192752.5948332527,
+            "delta": 6982.323483704589,
             "hedge_ratio": null,
             "regime": null,
             "conversion_value": 1041666.6666666667,
             "parity": 1.0416666666666667,
-            "conversion_premium": 0.14504249103992284,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.14504249103992262,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 150,
             "is_market_spot": false,
-            "price": 1371577.498772502,
-            "delta": 7197.986841088937,
+            "price": 1371577.4987725015,
+            "delta": 7197.986841089248,
             "hedge_ratio": null,
             "regime": null,
             "conversion_value": 1250000,
             "parity": 1.25,
-            "conversion_premium": 0.09726199901800148,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.09726199901800126,
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 200,
             "is_market_spot": false,
-            "price": 1743261.900368282,
-            "delta": 7581.223173611041,
+            "price": 1743261.9003682823,
+            "delta": 7581.223173610808,
             "hedge_ratio": null,
             "regime": null,
             "conversion_value": 1666666.6666666667,
             "parity": 1.6666666666666667,
             "conversion_premium": 0.045957140220969306,
-            "bond_floor": 925520.7029548261
+            "bond_floor": 925520.702954826
           },
           {
             "spot": 300,
             "is_market_spot": false,
-            "price": 2520619.768805115,
-            "delta": 7875.6175257948535,
+            "price": 2520619.7688051146,
+            "delta": 7875.617525795009,
             "hedge_ratio": null,
             "regime": null,
             "conversion_value": 2500000,
             "parity": 2.5,
-            "conversion_premium": 0.008247907522046072,
-            "bond_floor": 925520.7029548261
+            "conversion_premium": 0.00824790752204585,
+            "bond_floor": 925520.702954826
           }
         ]
       },
@@ -1110,21 +1110,21 @@
           "metric": "bond_floor",
           "value": {
             "ok": true,
-            "value": 925520.7029548261
+            "value": 925520.702954826
           }
         },
         {
           "metric": "delta",
           "value": {
             "ok": true,
-            "value": 6819.874946378521
+            "value": 6819.874946378637
           }
         },
         {
           "metric": "gamma",
           "value": {
             "ok": true,
-            "value": 9.313225746154785e-10
+            "value": 4.656612873077393e-10
           }
         },
         {
@@ -1138,14 +1138,14 @@
           "metric": "rho",
           "value": {
             "ok": true,
-            "value": -109.24720594345126
+            "value": -109.2472059436841
           }
         },
         {
           "metric": "theta",
           "value": {
             "ok": true,
-            "value": 43.237119022989646
+            "value": 43.23711902310606
           }
         },
         {
@@ -1163,7 +1163,7 @@
           "metric": "dv01",
           "value": {
             "ok": true,
-            "value": -109.24720594345126
+            "value": -109.2472059436841
           }
         },
         {
@@ -1206,14 +1206,14 @@
           "metric": "accrued",
           "value": {
             "ok": true,
-            "value": 8273.972602739721
+            "value": 8273.972602739726
           }
         },
         {
           "metric": "clean_price",
           "value": {
             "ok": true,
-            "value": 1009452.6116106873
+            "value": 1009452.6116106875
           }
         }
       ]

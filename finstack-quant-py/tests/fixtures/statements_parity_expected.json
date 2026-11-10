@@ -706,25 +706,25 @@
     },
     "dcf": {
       "currency": "USD",
-      "enterprise_value": 1341.428116329968,
-      "equity_value": 1341.428116329968
+      "enterprise_value": 1341.4281163299675,
+      "equity_value": 1341.4281163299675
     },
     "dcf_sensitivity": {
       "exit_multiple": {
         "baseline_enterprise_value": {
-          "amount": "578.73294823879",
+          "amount": "578.7329482387904",
           "currency": "USD"
         },
         "entries": [
           {
-            "downside": -49.60618979454796,
+            "downside": -49.60618979454807,
             "parameter_id": "exit_multiple",
-            "upside": 49.606189794549095
+            "upside": 49.60618979454807
           },
           {
-            "downside": 9.804209516737046,
+            "downside": 9.804209516736364,
             "parameter_id": "wacc",
-            "upside": -9.548166706545999
+            "upside": -9.548166706546226
           }
         ],
         "terminal_growth_up": null,
@@ -734,19 +734,19 @@
       },
       "gordon_growth": {
         "baseline_enterprise_value": {
-          "amount": "1341.428116329968",
+          "amount": "1341.4281163299675",
           "currency": "USD"
         },
         "entries": [
           {
-            "downside": 192.52997095733917,
+            "downside": 192.52997095733986,
             "parameter_id": "wacc",
             "upside": -149.7327288717579
           },
           {
             "downside": -138.94326308195195,
             "parameter_id": "terminal_growth",
-            "upside": 178.64133824822306
+            "upside": 178.64133824822375
           }
         ],
         "terminal_growth_up": 0.03,

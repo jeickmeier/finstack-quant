@@ -191,7 +191,7 @@ impl CmsReplicationPricer {
         as_of: Date,
     ) -> Result<Money> {
         let pv = self.price_internal_raw(inst, curves, as_of)?;
-        Money::new(pv, inst.notional.currency())
+        Money::from_model_value(pv, inst.notional.currency())
     }
 
     fn price_internal_raw(

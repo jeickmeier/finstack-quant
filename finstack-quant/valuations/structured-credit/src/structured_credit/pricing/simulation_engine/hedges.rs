@@ -93,11 +93,11 @@ pub(super) fn period_hedge_flows(
             .sum::<f64>()
             * scale;
         if net > 0.0 {
-            receipts = receipts.checked_add(Money::new(net, state.currency)?)?;
+            receipts = receipts.checked_add(Money::from_model_value(net, state.currency)?)?;
         } else if net < 0.0 {
             payments.push((
                 schedule.id.clone(),
-                Money::new(-net, state.currency)?,
+                Money::from_model_value(-net, state.currency)?,
                 schedule.priority,
             ));
         }

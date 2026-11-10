@@ -171,7 +171,7 @@ it("lists supplied sensitivities by risk class without totals", () => {
 it("presents the returned result, its indicative badge and the detail drill-down", async () => {
   const { rerender } = render(<SimmReport result={result} />);
   expect(screen.getByLabelText("Initial margin").textContent).toBe(
-    "USD 13,958,205.61533609",
+    "USD 13,958,205.615336092",
   );
   expect(screen.getByText("Indicative")).toBeTruthy();
   const breakdown = within(

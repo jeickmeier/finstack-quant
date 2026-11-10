@@ -169,21 +169,21 @@
               [
                 "2024-04-01",
                 {
-                  "amount": "7163491.292056633",
+                  "amount": "7163491.2920566321",
                   "currency": "USD"
                 }
               ],
               [
                 "2024-07-01",
                 {
-                  "amount": "6740680.660928912",
+                  "amount": "6740680.6609289117",
                   "currency": "USD"
                 }
               ],
               [
                 "2024-10-01",
                 {
-                  "amount": "6359999.051162289",
+                  "amount": "6359999.0511622868",
                   "currency": "USD"
                 }
               ],
@@ -197,14 +197,14 @@
               [
                 "2025-04-01",
                 {
-                  "amount": "302276.6164387214",
+                  "amount": "302276.61643872136",
                   "currency": "USD"
                 }
               ],
               [
                 "2025-07-01",
                 {
-                  "amount": "284435.3485763136",
+                  "amount": "284435.34857631364",
                   "currency": "USD"
                 }
               ],
@@ -228,7 +228,7 @@
                 "date": "2024-04-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "1516666.666666663",
+                  "amount": "1516666.6666666671",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -238,7 +238,7 @@
                 "date": "2024-04-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "5646824.62538997",
+                  "amount": "5646824.625389965",
                   "currency": "USD"
                 },
                 "kind": "amortization",
@@ -248,7 +248,7 @@
                 "date": "2024-07-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "1431023.159848252",
+                  "amount": "1431023.1598482527",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -258,7 +258,7 @@
                 "date": "2024-07-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "5309657.50108066",
+                  "amount": "5309657.501080659",
                   "currency": "USD"
                 },
                 "kind": "amortization",
@@ -268,7 +268,7 @@
                 "date": "2024-10-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "1365333.940727449",
+                  "amount": "1365333.9407274498",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -278,7 +278,7 @@
                 "date": "2024-10-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "4994665.11043484",
+                  "amount": "4994665.110434837",
                   "currency": "USD"
                 },
                 "kind": "amortization",
@@ -288,7 +288,7 @@
                 "date": "2025-01-02",
                 "reset_date": null,
                 "amount": {
-                  "amount": "1288749.075700779",
+                  "amount": "1288749.075700783",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -298,7 +298,7 @@
                 "date": "2025-01-02",
                 "reset_date": null,
                 "amount": {
-                  "amount": "4695863.85392389",
+                  "amount": "4695863.853923886",
                   "currency": "USD"
                 },
                 "kind": "amortization",
@@ -308,7 +308,7 @@
                 "date": "2025-04-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "302276.6164387214",
+                  "amount": "302276.61643872136",
                   "currency": "USD"
                 },
                 "kind": "amortization",
@@ -318,7 +318,7 @@
                 "date": "2025-07-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "284435.3485763136",
+                  "amount": "284435.34857631364",
                   "currency": "USD"
                 },
                 "kind": "amortization",
@@ -372,7 +372,7 @@
                 "end": "2024-07-01",
                 "payment_date": "2024-07-01",
                 "opening_balance": {
-                  "amount": "94353175.37461003",
+                  "amount": "94353175.374610035",
                   "currency": "USD"
                 },
                 "coupon_rate": 0.06,
@@ -383,7 +383,7 @@
                 "end": "2024-10-01",
                 "payment_date": "2024-10-01",
                 "opening_balance": {
-                  "amount": "89043517.87352937",
+                  "amount": "89043517.873529376",
                   "currency": "USD"
                 },
                 "coupon_rate": 0.06,
@@ -394,7 +394,7 @@
                 "end": "2025-01-01",
                 "payment_date": "2025-01-02",
                 "opening_balance": {
-                  "amount": "84048852.76309453",
+                  "amount": "84048852.763094539",
                   "currency": "USD"
                 },
                 "coupon_rate": 0.06,
@@ -405,28 +405,28 @@
               [
                 "2024-04-01",
                 {
-                  "amount": "1516666.666666663",
+                  "amount": "1516666.6666666671",
                   "currency": "USD"
                 }
               ],
               [
                 "2024-07-01",
                 {
-                  "amount": "1431023.159848252",
+                  "amount": "1431023.1598482527",
                   "currency": "USD"
                 }
               ],
               [
                 "2024-10-01",
                 {
-                  "amount": "1365333.940727449",
+                  "amount": "1365333.9407274498",
                   "currency": "USD"
                 }
               ],
               [
                 "2025-01-02",
                 {
-                  "amount": "1288749.075700779",
+                  "amount": "1288749.075700783",
                   "currency": "USD"
                 }
               ]
@@ -435,42 +435,42 @@
               [
                 "2024-04-01",
                 {
-                  "amount": "5646824.62538997",
+                  "amount": "5646824.625389965",
                   "currency": "USD"
                 }
               ],
               [
                 "2024-07-01",
                 {
-                  "amount": "5309657.50108066",
+                  "amount": "5309657.501080659",
                   "currency": "USD"
                 }
               ],
               [
                 "2024-10-01",
                 {
-                  "amount": "4994665.11043484",
+                  "amount": "4994665.110434837",
                   "currency": "USD"
                 }
               ],
               [
                 "2025-01-02",
                 {
-                  "amount": "4695863.85392389",
+                  "amount": "4695863.853923886",
                   "currency": "USD"
                 }
               ],
               [
                 "2025-04-01",
                 {
-                  "amount": "302276.6164387214",
+                  "amount": "302276.61643872136",
                   "currency": "USD"
                 }
               ],
               [
                 "2025-07-01",
                 {
-                  "amount": "284435.3485763136",
+                  "amount": "284435.34857631364",
                   "currency": "USD"
                 }
               ],
@@ -505,11 +505,11 @@
               "currency": "USD"
             },
             "total_interest": {
-              "amount": "5601772.842943143",
+              "amount": "5601772.8429431526",
               "currency": "USD"
             },
             "total_principal": {
-              "amount": "21753219.9750221452",
+              "amount": "21753219.9750221322",
               "currency": "USD"
             },
             "total_pik": {
@@ -531,23 +531,23 @@
             {
               "payment_date": "2024-04-01",
               "pool_balance": {
-                "amount": "94097701.6109929",
+                "amount": "94097701.61099292",
                 "currency": "USD"
               },
-              "pool_factor": 0.9409770161099289,
+              "pool_factor": 0.9409770161099292,
               "wac": 0.07,
               "weighted_avg_spread_bp": null,
               "warf": 3649.9999999999995,
               "interest_collections": {
-                "amount": "1764987.263780753",
+                "amount": "1764987.2637807531",
                 "currency": "USD"
               },
               "principal_collections": {
-                "amount": "5398504.02827588",
+                "amount": "5398504.028275879",
                 "currency": "USD"
               },
               "defaults": {
-                "amount": "503794.360731202",
+                "amount": "503794.3607312023",
                 "currency": "USD"
               },
               "recoveries": {
@@ -582,41 +582,41 @@
                 "amount": "0",
                 "currency": "USD"
               },
-              "excess_spread": 0.0018721141128642132,
+              "excess_spread": 0.0018721141128642275,
               "coverage_tests": [
                 {
                   "test_id": "OC_CLONOTES-A",
-                  "ratio": 0.997984822557075,
+                  "ratio": 0.9979848225570753,
                   "trigger_level": 2,
-                  "cushion": -1.002015177442925,
+                  "cushion": -1.0020151774429247,
                   "passing": false
                 }
               ],
               "waterfall": {
                 "payment_date": "2024-04-01",
                 "total_available": {
-                  "amount": "7163491.292056633",
+                  "amount": "7163491.2920566321",
                   "currency": "USD"
                 },
                 "tier_allocations": [
                   [
                     "CLONOTES-A_interest",
                     {
-                      "amount": "1516666.666666667",
+                      "amount": "1516666.6666666665",
                       "currency": "USD"
                     }
                   ],
                   [
                     "CLONOTES-A_coverage",
                     {
-                      "amount": "248320.597114086",
+                      "amount": "248320.5971140866",
                       "currency": "USD"
                     }
                   ],
                   [
                     "principal",
                     {
-                      "amount": "5398504.02827588",
+                      "amount": "5398504.028275879",
                       "currency": "USD"
                     }
                   ],
@@ -637,11 +637,11 @@
                       "tranche": "CLONOTES-A"
                     },
                     "requested_amount": {
-                      "amount": "1516666.666666667",
+                      "amount": "1516666.6666666665",
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "1516666.666666667",
+                      "amount": "1516666.6666666665",
                       "currency": "USD"
                     },
                     "shortfall": {
@@ -663,11 +663,11 @@
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "248320.597114086",
+                      "amount": "248320.5971140866",
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "99751679.402885914",
+                      "amount": "99751679.4028859134",
                       "currency": "USD"
                     },
                     "diverted": true,
@@ -681,24 +681,26 @@
                       "tranche": "CLONOTES-A"
                     },
                     "requested_amount": {
-                      "amount": "99751679.4028859",
+                      "amount": "99751679.40288591",
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "5398504.02827588",
+                      "amount": "5398504.028275879",
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "94353175.37461002",
+                      "amount": "94353175.374610031",
                       "currency": "USD"
                     },
                     "diverted": false,
                     "is_principal": true
                   }
                 ],
-                "coverage_tests": [["OC_CLONOTES-A", 0.997984822557075, false]],
+                "coverage_tests": [
+                  ["OC_CLONOTES-A", 0.9979848225570753, false]
+                ],
                 "diverted_cash": {
-                  "amount": "248320.597114086",
+                  "amount": "248320.5971140866",
                   "currency": "USD"
                 },
                 "remaining_cash": {
@@ -723,7 +725,7 @@
                     "source_tier": "CLONOTES-A_coverage",
                     "target_tranche": "CLONOTES-A_principal",
                     "amount": {
-                      "amount": "248320.597114086",
+                      "amount": "248320.5971140866",
                       "currency": "USD"
                     },
                     "reason": "coverage test failed: OC_CLONOTES-A"
@@ -738,7 +740,7 @@
               "credit_enhancement": [
                 {
                   "tranche_id": "CLONOTES-A",
-                  "credit_enhancement": -0.0027149840989027676
+                  "credit_enhancement": -0.0027149840989024497
                 }
               ]
             },
@@ -753,7 +755,7 @@
               "weighted_avg_spread_bp": null,
               "warf": 3649.9999999999995,
               "interest_collections": {
-                "amount": "1660812.448944442",
+                "amount": "1660812.4489444417",
                 "currency": "USD"
               },
               "principal_collections": {
@@ -761,7 +763,7 @@
                 "currency": "USD"
               },
               "defaults": {
-                "amount": "474058.914293856",
+                "amount": "474058.91429385607",
                 "currency": "USD"
               },
               "recoveries": {
@@ -796,7 +798,7 @@
                 "amount": "0",
                 "currency": "USD"
               },
-              "excess_spread": 0.001707405077530826,
+              "excess_spread": 0.001707405077530806,
               "coverage_tests": [
                 {
                   "test_id": "OC_CLONOTES-A",
@@ -809,21 +811,21 @@
               "waterfall": {
                 "payment_date": "2024-07-01",
                 "total_available": {
-                  "amount": "6740680.660928912",
+                  "amount": "6740680.6609289117",
                   "currency": "USD"
                 },
                 "tier_allocations": [
                   [
                     "CLONOTES-A_interest",
                     {
-                      "amount": "1431023.159848252",
+                      "amount": "1431023.1598482523",
                       "currency": "USD"
                     }
                   ],
                   [
                     "CLONOTES-A_coverage",
                     {
-                      "amount": "229789.28909619",
+                      "amount": "229789.2890961894",
                       "currency": "USD"
                     }
                   ],
@@ -851,11 +853,11 @@
                       "tranche": "CLONOTES-A"
                     },
                     "requested_amount": {
-                      "amount": "1431023.159848252",
+                      "amount": "1431023.1598482523",
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "1431023.159848252",
+                      "amount": "1431023.1598482523",
                       "currency": "USD"
                     },
                     "shortfall": {
@@ -873,15 +875,15 @@
                       "tranche": "CLONOTES-A"
                     },
                     "requested_amount": {
-                      "amount": "94353175.37461",
+                      "amount": "94353175.37461004",
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "229789.28909619",
+                      "amount": "229789.2890961894",
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "94123386.08551381",
+                      "amount": "94123386.0855138506",
                       "currency": "USD"
                     },
                     "diverted": true,
@@ -895,7 +897,7 @@
                       "tranche": "CLONOTES-A"
                     },
                     "requested_amount": {
-                      "amount": "94123386.0855139",
+                      "amount": "94123386.08551385",
                       "currency": "USD"
                     },
                     "paid_amount": {
@@ -903,7 +905,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "89043517.87352943",
+                      "amount": "89043517.87352938",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -914,7 +916,7 @@
                   ["OC_CLONOTES-A", 0.9984863178973162, false]
                 ],
                 "diverted_cash": {
-                  "amount": "229789.28909619",
+                  "amount": "229789.2890961894",
                   "currency": "USD"
                 },
                 "remaining_cash": {
@@ -939,7 +941,7 @@
                     "source_tier": "CLONOTES-A_coverage",
                     "target_tranche": "CLONOTES-A_principal",
                     "amount": {
-                      "amount": "229789.28909619",
+                      "amount": "229789.2890961894",
                       "currency": "USD"
                     },
                     "reason": "coverage test failed: OC_CLONOTES-A"
@@ -961,23 +963,23 @@
             {
               "payment_date": "2024-10-01",
               "pool_balance": {
-                "amount": "83317656.7097372",
+                "amount": "83317656.70973723",
                 "currency": "USD"
               },
-              "pool_factor": 0.833176567097372,
+              "pool_factor": 0.8331765670973723,
               "wac": 0.07,
               "weighted_avg_spread_bp": null,
               "warf": 3650,
               "interest_collections": {
-                "amount": "1579959.818817459",
+                "amount": "1579959.8188174588",
                 "currency": "USD"
               },
               "principal_collections": {
-                "amount": "4780039.23234483",
+                "amount": "4780039.232344828",
                 "currency": "USD"
               },
               "defaults": {
-                "amount": "446078.5426325454",
+                "amount": "446078.54263254534",
                 "currency": "USD"
               },
               "recoveries": {
@@ -1012,41 +1014,41 @@
                 "amount": "0",
                 "currency": "USD"
               },
-              "excess_spread": 0.0016350990794158724,
+              "excess_spread": 0.0016350990794158436,
               "coverage_tests": [
                 {
                   "test_id": "OC_CLONOTES-A",
-                  "ratio": 0.9989728298809725,
+                  "ratio": 0.9989728298809728,
                   "trigger_level": 2,
-                  "cushion": -1.0010271701190274,
+                  "cushion": -1.0010271701190272,
                   "passing": false
                 }
               ],
               "waterfall": {
                 "payment_date": "2024-10-01",
                 "total_available": {
-                  "amount": "6359999.051162289",
+                  "amount": "6359999.0511622868",
                   "currency": "USD"
                 },
                 "tier_allocations": [
                   [
                     "CLONOTES-A_interest",
                     {
-                      "amount": "1365333.94072745",
+                      "amount": "1365333.9407274504",
                       "currency": "USD"
                     }
                   ],
                   [
                     "CLONOTES-A_coverage",
                     {
-                      "amount": "214625.878090009",
+                      "amount": "214625.8780900084",
                       "currency": "USD"
                     }
                   ],
                   [
                     "principal",
                     {
-                      "amount": "4780039.23234483",
+                      "amount": "4780039.232344828",
                       "currency": "USD"
                     }
                   ],
@@ -1067,11 +1069,11 @@
                       "tranche": "CLONOTES-A"
                     },
                     "requested_amount": {
-                      "amount": "1365333.94072745",
+                      "amount": "1365333.9407274504",
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "1365333.94072745",
+                      "amount": "1365333.9407274504",
                       "currency": "USD"
                     },
                     "shortfall": {
@@ -1089,15 +1091,15 @@
                       "tranche": "CLONOTES-A"
                     },
                     "requested_amount": {
-                      "amount": "89043517.8735294",
+                      "amount": "89043517.87352937",
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "214625.878090009",
+                      "amount": "214625.8780900084",
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "88828891.995439391",
+                      "amount": "88828891.9954393616",
                       "currency": "USD"
                     },
                     "diverted": true,
@@ -1111,15 +1113,15 @@
                       "tranche": "CLONOTES-A"
                     },
                     "requested_amount": {
-                      "amount": "88828891.9954394",
+                      "amount": "88828891.99543937",
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "4780039.23234483",
+                      "amount": "4780039.232344828",
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "84048852.76309457",
+                      "amount": "84048852.763094542",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -1127,10 +1129,10 @@
                   }
                 ],
                 "coverage_tests": [
-                  ["OC_CLONOTES-A", 0.9989728298809725, false]
+                  ["OC_CLONOTES-A", 0.9989728298809728, false]
                 ],
                 "diverted_cash": {
-                  "amount": "214625.878090009",
+                  "amount": "214625.8780900084",
                   "currency": "USD"
                 },
                 "remaining_cash": {
@@ -1155,7 +1157,7 @@
                     "source_tier": "CLONOTES-A_coverage",
                     "target_tranche": "CLONOTES-A_principal",
                     "amount": {
-                      "amount": "214625.878090009",
+                      "amount": "214625.8780900084",
                       "currency": "USD"
                     },
                     "reason": "coverage test failed: OC_CLONOTES-A"
@@ -1170,17 +1172,17 @@
               "credit_enhancement": [
                 {
                   "tranche_id": "CLONOTES-A",
-                  "credit_enhancement": -0.008776003577545159
+                  "credit_enhancement": -0.008776003577544976
                 }
               ]
             },
             {
               "payment_date": "2025-01-02",
               "pool_balance": {
-                "amount": "78400000",
+                "amount": "78399999.99999996",
                 "currency": "USD"
               },
-              "pool_factor": 0.784,
+              "pool_factor": 0.7839999999999996,
               "wac": 0.07,
               "weighted_avg_spread_bp": null,
               "warf": 3649.9999999999995,
@@ -1193,7 +1195,7 @@
                 "currency": "USD"
               },
               "defaults": {
-                "amount": "419749.6559970384",
+                "amount": "419749.65599703835",
                 "currency": "USD"
               },
               "recoveries": {
@@ -1228,13 +1230,13 @@
                 "amount": "0",
                 "currency": "USD"
               },
-              "excess_spread": 0.0014430044709275152,
+              "excess_spread": 0.0014430044709275315,
               "coverage_tests": [
                 {
                   "test_id": "OC_CLONOTES-A",
-                  "ratio": 0.9994677283069215,
+                  "ratio": 0.999467728306921,
                   "trigger_level": 2,
-                  "cushion": -1.0005322716930785,
+                  "cushion": -1.000532271693079,
                   "passing": false
                 }
               ],
@@ -1248,14 +1250,14 @@
                   [
                     "CLONOTES-A_interest",
                     {
-                      "amount": "1288749.075700783",
+                      "amount": "1288749.0757007827",
                       "currency": "USD"
                     }
                   ],
                   [
                     "CLONOTES-A_coverage",
                     {
-                      "amount": "197956.800183654",
+                      "amount": "197956.8001836543",
                       "currency": "USD"
                     }
                   ],
@@ -1283,11 +1285,11 @@
                       "tranche": "CLONOTES-A"
                     },
                     "requested_amount": {
-                      "amount": "1288749.075700783",
+                      "amount": "1288749.0757007827",
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "1288749.075700783",
+                      "amount": "1288749.0757007827",
                       "currency": "USD"
                     },
                     "shortfall": {
@@ -1305,15 +1307,15 @@
                       "tranche": "CLONOTES-A"
                     },
                     "requested_amount": {
-                      "amount": "84048852.7630945",
+                      "amount": "84048852.76309454",
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "197956.800183654",
+                      "amount": "197956.8001836543",
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "83850895.962910846",
+                      "amount": "83850895.9629108857",
                       "currency": "USD"
                     },
                     "diverted": true,
@@ -1327,7 +1329,7 @@
                       "tranche": "CLONOTES-A"
                     },
                     "requested_amount": {
-                      "amount": "83850895.9629109",
+                      "amount": "83850895.96291089",
                       "currency": "USD"
                     },
                     "paid_amount": {
@@ -1335,18 +1337,16 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "79352988.909170668",
+                      "amount": "79352988.909170658",
                       "currency": "USD"
                     },
                     "diverted": false,
                     "is_principal": true
                   }
                 ],
-                "coverage_tests": [
-                  ["OC_CLONOTES-A", 0.9994677283069215, false]
-                ],
+                "coverage_tests": [["OC_CLONOTES-A", 0.999467728306921, false]],
                 "diverted_cash": {
-                  "amount": "197956.800183654",
+                  "amount": "197956.8001836543",
                   "currency": "USD"
                 },
                 "remaining_cash": {
@@ -1371,7 +1371,7 @@
                     "source_tier": "CLONOTES-A_coverage",
                     "target_tranche": "CLONOTES-A_principal",
                     "amount": {
-                      "amount": "197956.800183654",
+                      "amount": "197956.8001836543",
                       "currency": "USD"
                     },
                     "reason": "coverage test failed: OC_CLONOTES-A"
@@ -1392,7 +1392,7 @@
                     "currency": "USD"
                   },
                   "principal": {
-                    "amount": "302276.6164387214",
+                    "amount": "302276.61643872136",
                     "currency": "USD"
                   },
                   "incentive_fee": {
@@ -1409,7 +1409,7 @@
                     "currency": "USD"
                   },
                   "principal": {
-                    "amount": "284435.3485763136",
+                    "amount": "284435.34857631364",
                     "currency": "USD"
                   },
                   "incentive_fee": {
@@ -1455,7 +1455,7 @@
               "credit_enhancement": [
                 {
                   "tranche_id": "CLONOTES-A",
-                  "credit_enhancement": -0.012155470780237787
+                  "credit_enhancement": -0.012155470780238554
                 }
               ]
             }

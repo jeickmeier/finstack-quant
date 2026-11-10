@@ -48,9 +48,9 @@ pub(super) fn fund_collateral_draws(
     let from_principal = remaining.min(principal_collections.amount().max(0.0));
     let unfunded = remaining - from_principal;
 
-    let from_reserve = Money::new(from_reserve, ccy)?;
-    let from_principal = Money::new(from_principal, ccy)?;
-    let unfunded = Money::new(unfunded, ccy)?;
+    let from_reserve = Money::from_model_value(from_reserve, ccy)?;
+    let from_principal = Money::from_model_value(from_principal, ccy)?;
+    let unfunded = Money::from_model_value(unfunded, ccy)?;
 
     state.reserve_balance = state.reserve_balance.checked_sub(from_reserve)?;
     state.draws_from_reserve = state.draws_from_reserve.checked_add(from_reserve)?;
@@ -82,7 +82,7 @@ pub(super) fn replenish_reserve_from_repayments(
         return Ok(Money::from((0_i64, ccy)));
     };
     let room = (target.amount() - state.reserve_balance.amount()).max(0.0);
-    let diverted = Money::new(repayments.amount().max(0.0).min(room), ccy)?;
+    let diverted = Money::from_model_value(repayments.amount().max(0.0).min(room), ccy)?;
     state.reserve_balance = state.reserve_balance.checked_add(diverted)?;
     state.reserve_replenished = state.reserve_replenished.checked_add(diverted)?;
     Ok(diverted)
@@ -108,7 +108,7 @@ pub(super) fn reserve_interest_amount(
     }
     let accrual =
         DayCount::Act360.year_fraction(period_start, pay_date, DayCountContext::default())?;
-    Money::new(balance * rate * accrual, state.currency)
+    Money::from_model_value(balance * rate * accrual, state.currency)
 }
 
 /// Reserve interest routed for one period.

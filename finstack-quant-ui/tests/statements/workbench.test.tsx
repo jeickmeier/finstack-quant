@@ -973,7 +973,7 @@ it("runs a native sensitivity and applies a goal-seek solution only on explicit 
   await waitFor(() => expect(accepted.mock.calls.length).toBe(before + 1));
   expect(
     JSON.parse(accepted.mock.lastCall![0]).nodes.revenue.values["2025Q4"],
-  ).toEqual({ amount: "244390239.9891321", currency: "USD" });
+  ).toEqual({ amount: "244390239.98913208", currency: "USD" });
   await within(seek).findByText("Applied to the model.");
   // The solve is not repeated on the applied model, and the sensitivity of the old model is hidden.
   expect(

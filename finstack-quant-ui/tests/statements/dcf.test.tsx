@@ -293,8 +293,8 @@ it("presents the returned valuation, bridge, periods, terminal value and tornado
           .map((cell) => cell.textContent),
       ),
   ).toEqual([
-    ["Terminal growth", "-191,902,948.3931589", "246,732,362.21977592"],
-    ["Wacc", "241,830,333.02504706", "-188,031,363.85586596"],
+    ["Terminal growth", "-191,902,948.3931594", "246,732,362.21977568"],
+    ["Wacc", "241,830,333.02504635", "-188,031,363.85586596"],
   ]);
 });
 

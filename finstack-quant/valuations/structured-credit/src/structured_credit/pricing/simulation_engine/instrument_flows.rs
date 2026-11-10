@@ -751,7 +751,8 @@ pub(super) fn run_period(
                 state.pool_state.balances[i] = schedule.opening_balance;
             }
         }
-        state.pool_outstanding = Money::new(state.pool_state.balances.iter().sum(), ccy)?;
+        state.pool_outstanding =
+            Money::from_model_value(state.pool_state.balances.iter().sum(), ccy)?;
     }
 
     let empty = PeriodBucket::default();
@@ -889,7 +890,7 @@ pub(super) fn run_period(
                 flows.workout_claims.push((
                     immediate_date,
                     Money::from((0_i64, ccy)),
-                    Money::new(discount_loss, ccy)?,
+                    Money::from_model_value(discount_loss, ccy)?,
                 ));
             }
             redeemed = cash;
@@ -929,8 +930,8 @@ pub(super) fn run_period(
     let collections = total_scheduled + total_prepay;
     let funding = fund_collateral_draws(
         state,
-        Money::new(requested_total, ccy)?,
-        Money::new(collections, ccy)?,
+        Money::from_model_value(requested_total, ccy)?,
+        Money::from_model_value(collections, ccy)?,
     )?;
     if funding.unfunded.amount() > 0.0 {
         tracing::warn!(
@@ -964,15 +965,17 @@ pub(super) fn run_period(
     // Revolver repayments replenish the reserve toward its target, bounded
     // by the principal cash still available after draw funding.
     let room = (collections - funding.from_principal.amount()).max(0.0);
-    let replenished =
-        replenish_reserve_from_repayments(state, Money::new(revolver_repayments.min(room), ccy)?)?;
+    let replenished = replenish_reserve_from_repayments(
+        state,
+        Money::from_model_value(revolver_repayments.min(room), ccy)?,
+    )?;
 
-    flows.interest = Money::new(total_interest, ccy)?;
-    flows.scheduled_principal = Money::new(total_scheduled, ccy)?;
-    flows.prepayment = Money::new(total_prepay, ccy)?;
-    flows.default = Money::new(total_default, ccy)?;
-    flows.recovery = Money::new(total_recovery, ccy)?;
-    flows.call_premium = Money::new(total_premium, ccy)?;
+    flows.interest = Money::from_model_value(total_interest, ccy)?;
+    flows.scheduled_principal = Money::from_model_value(total_scheduled, ccy)?;
+    flows.prepayment = Money::from_model_value(total_prepay, ccy)?;
+    flows.default = Money::from_model_value(total_default, ccy)?;
+    flows.recovery = Money::from_model_value(total_recovery, ccy)?;
+    flows.call_premium = Money::from_model_value(total_premium, ccy)?;
     flows.draw_from_principal = funding.from_principal;
     flows.reserve_replenished = replenished;
     Ok(flows)

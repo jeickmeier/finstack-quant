@@ -631,11 +631,11 @@ fn term_loan_tree_prices_are_bit_pinned() {
         .amount();
 
     let got = [short_rate.to_bits(), rates_credit.to_bits()];
-    // Short-rate settlement matches on both hosts. The rates-credit lattice
-    // moves by a few ulps between macOS and the Linux libm on GitHub Actions.
+    // Both lattices move by a few ulps between macOS and the Linux libm on
+    // GitHub Actions.
     const PINS: [[u64; 2]; 2] = [
-        [4_711_601_891_810_740_306, 4_711_280_227_318_290_590],
-        [4_711_601_891_810_740_306, 4_711_280_227_318_290_584],
+        [4_711_601_891_810_740_309, 4_711_280_227_318_290_591],
+        [4_711_601_891_810_740_308, 4_711_280_227_318_290_586],
     ];
     assert!(
         PINS.contains(&got),

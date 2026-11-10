@@ -11,13 +11,13 @@
     "instrument_id": "US912828XG33",
     "as_of": "2025-01-01",
     "value": {
-      "amount": "1000438.964391248",
+      "amount": "1000438.9643912482",
       "currency": "USD"
     },
     "measures": {
-      "ytm": 0.04192805926047216,
+      "ytm": 0.04192805926047167,
       "dv01": -99.2633986165165,
-      "duration_mod": 0.969221509109137,
+      "duration_mod": 0.9692215091091372,
       "bucketed_dv01": -99.26339861511951,
       "bucketed_dv01::USD-OIS::10y": 0,
       "bucketed_dv01::USD-OIS::15y": 0,

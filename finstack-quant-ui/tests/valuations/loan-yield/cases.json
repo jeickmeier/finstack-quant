@@ -236,14 +236,14 @@
           "metric": "discount_margin",
           "value": {
             "ok": true,
-            "value": 0.04637937512498048
+            "value": 0.046379375124980526
           }
         },
         {
           "metric": "all_in_rate",
           "value": {
             "ok": true,
-            "value": 0.08186565174819767
+            "value": 0.08186565174819765
           }
         },
         {
@@ -257,14 +257,14 @@
           "metric": "oid_eir_amortization",
           "value": {
             "ok": true,
-            "value": 149999.99999183073
+            "value": 149999.99999183076
           }
         },
         {
           "metric": "embedded_option_value",
           "value": {
             "ok": true,
-            "value": -84118.60506433435
+            "value": -84118.60506439209
           }
         },
         {
@@ -511,14 +511,14 @@
           "metric": "discount_margin",
           "value": {
             "ok": true,
-            "value": 0.04637937512498048
+            "value": 0.046379375124980526
           }
         },
         {
           "metric": "all_in_rate",
           "value": {
             "ok": true,
-            "value": 0.08186565174819767
+            "value": 0.08186565174819765
           }
         },
         {
@@ -532,7 +532,7 @@
           "metric": "oid_eir_amortization",
           "value": {
             "ok": true,
-            "value": 149999.99999183073
+            "value": 149999.99999183076
           }
         },
         {
@@ -801,7 +801,7 @@
           "metric": "all_in_rate",
           "value": {
             "ok": true,
-            "value": 0.08186565174819767
+            "value": 0.08186565174819765
           }
         },
         {
@@ -815,14 +815,14 @@
           "metric": "oid_eir_amortization",
           "value": {
             "ok": true,
-            "value": 149999.99999183073
+            "value": 149999.99999183076
           }
         },
         {
           "metric": "embedded_option_value",
           "value": {
             "ok": true,
-            "value": -1602277.5629965942
+            "value": -1602277.562996598
           }
         },
         {
@@ -1027,21 +1027,21 @@
           "metric": "ytm",
           "value": {
             "ok": true,
-            "value": 0.030220631914932287
+            "value": 0.030220631914932114
           }
         },
         {
           "metric": "ytw",
           "value": {
             "ok": true,
-            "value": 0.030220631914932287
+            "value": 0.030220631914932114
           }
         },
         {
           "metric": "ytc",
           "value": {
             "ok": true,
-            "value": 0.030220631914932287
+            "value": 0.030220631914932114
           }
         },
         {
@@ -1087,14 +1087,14 @@
           "metric": "oid_eir_rate",
           "value": {
             "ok": true,
-            "value": 0.06134952969236703
+            "value": 0.061349529692367205
           }
         },
         {
           "metric": "oid_eir_amortization",
           "value": {
             "ok": true,
-            "value": 2.9917350730102044e-7
+            "value": 2.9902730602771044e-7
           }
         },
         {
@@ -1261,14 +1261,14 @@
           "metric": "discount_margin",
           "value": {
             "ok": true,
-            "value": 3.896250394659865e-12
+            "value": 3.8962403848777896e-12
           }
         },
         {
           "metric": "all_in_rate",
           "value": {
             "ok": true,
-            "value": 0.07436634348437687
+            "value": 0.07436634348437686
           }
         },
         {
@@ -1282,7 +1282,7 @@
           "metric": "oid_eir_amortization",
           "value": {
             "ok": true,
-            "value": -8.329425327247009e-8
+            "value": -8.288770914077759e-8
           }
         },
         {
@@ -1487,21 +1487,21 @@
           "metric": "ytm",
           "value": {
             "ok": true,
-            "value": 0.042855465303588254
+            "value": 0.0428554653035882
           }
         },
         {
           "metric": "ytw",
           "value": {
             "ok": true,
-            "value": 0.042855465303588254
+            "value": 0.0428554653035882
           }
         },
         {
           "metric": "ytc",
           "value": {
             "ok": true,
-            "value": 0.042855465303588254
+            "value": 0.0428554653035882
           }
         },
         {
@@ -1547,14 +1547,14 @@
           "metric": "oid_eir_rate",
           "value": {
             "ok": true,
-            "value": 0.06134952969236703
+            "value": 0.061349529692367205
           }
         },
         {
           "metric": "oid_eir_amortization",
           "value": {
             "ok": true,
-            "value": 2.9917350730102044e-7
+            "value": 2.9902730602771044e-7
           }
         },
         {
@@ -1568,14 +1568,14 @@
           "metric": "recovery01",
           "value": {
             "ok": true,
-            "value": 7109.563406302064
+            "value": 7109.563406302006
           }
         },
         {
           "metric": "jump_to_default",
           "value": {
             "ok": true,
-            "value": -648814.790624271
+            "value": -648814.7906242693
           }
         }
       ]

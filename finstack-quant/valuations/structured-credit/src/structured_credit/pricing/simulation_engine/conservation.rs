@@ -272,7 +272,7 @@ fn purchase_replacement_collateral(
     if coupon / price_fraction < min_yield {
         return Ok(Money::from((0_i64, state.currency)));
     }
-    let par = Money::new(
+    let par = Money::from_model_value(
         par_acquired_at_price(recyclable.amount(), price_fraction),
         state.currency,
     )?;

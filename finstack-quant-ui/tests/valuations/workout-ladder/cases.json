@@ -55,7 +55,7 @@
         "quote_date": "2024-07-16",
         "clean_price_pct": 106,
         "dirty_price": {
-          "amount": "1060115.489130435",
+          "amount": "1060115.4891304348",
           "currency": "USD"
         },
         "rows": [
@@ -68,8 +68,8 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.015079736312720887,
-            "i_spread": -0.015434971506143667,
+            "yield_rate": 0.015079736312720826,
+            "i_spread": -0.015434971506143728,
             "is_worst": true
           },
           {
@@ -81,8 +81,8 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.027145394765111512,
-            "i_spread": -0.003258073201643428,
+            "yield_rate": 0.027145394765111762,
+            "i_spread": -0.003258073201643178,
             "is_worst": false
           },
           {
@@ -94,8 +94,8 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.030557802958688242,
-            "i_spread": 0.00016984424455165903,
+            "yield_rate": 0.03055780295868841,
+            "i_spread": 0.00016984424455182556,
             "is_worst": false
           },
           {
@@ -107,14 +107,14 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.034999945164670254,
-            "i_spread": 0.004631880049727179,
+            "yield_rate": 0.03499994516467037,
+            "i_spread": 0.004631880049727297,
             "is_worst": false
           }
         ]
       },
-      "ytw": 0.015079736312720887,
-      "iSpread": -0.015434971506143667
+      "ytw": 0.015079736312720826,
+      "iSpread": -0.015434971506143728
     },
     "discount": {
       "request": {
@@ -128,7 +128,7 @@
         "quote_date": "2024-07-16",
         "clean_price_pct": 90,
         "dirty_price": {
-          "amount": "900115.489130435",
+          "amount": "900115.4891304348",
           "currency": "USD"
         },
         "rows": [
@@ -141,8 +141,8 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.13070982086776173,
-            "i_spread": 0.10019511304889717,
+            "yield_rate": 0.13070982086776198,
+            "i_spread": 0.10019511304889742,
             "is_worst": false
           },
           {
@@ -154,8 +154,8 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.07827886208073906,
-            "i_spread": 0.047875394113984115,
+            "yield_rate": 0.07827886208073896,
+            "i_spread": 0.04787539411398402,
             "is_worst": false
           },
           {
@@ -167,8 +167,8 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.06438294380873168,
-            "i_spread": 0.033994985094595094,
+            "yield_rate": 0.06438294380873154,
+            "i_spread": 0.033994985094594955,
             "is_worst": false
           },
           {
@@ -180,14 +180,14 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.0562032718434587,
-            "i_spread": 0.025835206728515622,
+            "yield_rate": 0.05620327184345839,
+            "i_spread": 0.025835206728515317,
             "is_worst": true
           }
         ]
       },
-      "ytw": 0.0562032718434587,
-      "iSpread": 0.025835206728515622
+      "ytw": 0.05620327184345839,
+      "iSpread": 0.025835206728515317
     },
     "putable": {
       "request": {
@@ -201,7 +201,7 @@
         "quote_date": "2024-07-16",
         "clean_price_pct": 108,
         "dirty_price": {
-          "amount": "1080115.489130435",
+          "amount": "1080115.4891304348",
           "currency": "USD"
         },
         "rows": [
@@ -214,8 +214,8 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.009984148296144949,
-            "i_spread": -0.020452658525617742,
+            "yield_rate": 0.009984148296144886,
+            "i_spread": -0.020452658525617805,
             "is_worst": true
           },
           {
@@ -227,14 +227,14 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.032617973947759546,
-            "i_spread": 0.0022499088328164704,
+            "yield_rate": 0.03261797394775966,
+            "i_spread": 0.0022499088328165814,
             "is_worst": false
           }
         ]
       },
-      "ytw": 0.009984148296144949,
-      "iSpread": -0.020452658525617742
+      "ytw": 0.009984148296144886,
+      "iSpread": -0.020452658525617805
     },
     "makeWhole": {
       "request": {
@@ -248,7 +248,7 @@
         "quote_date": "2024-07-16",
         "clean_price_pct": 103,
         "dirty_price": {
-          "amount": "1030115.489130435",
+          "amount": "1030115.4891304348",
           "currency": "USD"
         },
         "rows": [
@@ -257,12 +257,12 @@
             "kind": "call",
             "redemption_price_pct": 105.95513835866797,
             "redemption_amount": {
-              "amount": "1059551.38358668",
+              "amount": "1059551.3835866796",
               "currency": "USD"
             },
             "make_whole": true,
-            "yield_rate": 0.052167143116953835,
-            "i_spread": 0.021730336295191145,
+            "yield_rate": 0.05216714311695357,
+            "i_spread": 0.02173033629519088,
             "is_worst": false
           },
           {
@@ -274,14 +274,14 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.03867405040278965,
-            "i_spread": 0.008305985287846575,
+            "yield_rate": 0.038674050402789754,
+            "i_spread": 0.008305985287846679,
             "is_worst": true
           }
         ]
       },
-      "ytw": 0.03867405040278965,
-      "iSpread": 0.008305985287846575
+      "ytw": 0.038674050402789754,
+      "iSpread": 0.008305985287846679
     },
     "bullet": {
       "request": {
@@ -295,7 +295,7 @@
         "quote_date": "2024-07-16",
         "clean_price_pct": 109.92951854841088,
         "dirty_price": {
-          "amount": "1099410.674614544",
+          "amount": "1099410.6746145438",
           "currency": "USD"
         },
         "rows": [
@@ -308,14 +308,14 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.03036862933426007,
-            "i_spread": 5.864772130576013e-7,
+            "yield_rate": 0.0303686293342603,
+            "i_spread": 5.864772132900542e-7,
             "is_worst": true
           }
         ]
       },
-      "ytw": 0.03036862933426007,
-      "iSpread": 5.864772130576013e-7
+      "ytw": 0.0303686293342603,
+      "iSpread": 5.864772132900542e-7
     },
     "quoteDateCall": {
       "request": {
@@ -329,7 +329,7 @@
         "quote_date": "2024-07-16",
         "clean_price_pct": 100,
         "dirty_price": {
-          "amount": "1000115.489130435",
+          "amount": "1000115.4891304348",
           "currency": "USD"
         },
         "rows": [
@@ -355,8 +355,8 @@
               "currency": "USD"
             },
             "make_whole": false,
-            "yield_rate": 0.042476779387507206,
-            "i_spread": 0.01210871427256413,
+            "yield_rate": 0.04247677938750732,
+            "i_spread": 0.012108714272564242,
             "is_worst": false
           }
         ]

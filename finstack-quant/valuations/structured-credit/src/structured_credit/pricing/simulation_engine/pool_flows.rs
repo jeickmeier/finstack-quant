@@ -332,8 +332,10 @@ pub(super) fn calculate_pool_flows_with_rates(
             state.pool_state.liquidation[i] = None;
             let liquidated = balance * (1.0 - spec.reperformance_prob.clamp(0.0, 1.0));
             let proceeds = liquidated * spec.net_proceeds_fraction();
-            total_default = total_default.checked_add(Money::new(liquidated, currency)?)?;
-            total_recovery = total_recovery.checked_add(Money::new(proceeds, currency)?)?;
+            total_default =
+                total_default.checked_add(Money::from_model_value(liquidated, currency)?)?;
+            total_recovery =
+                total_recovery.checked_add(Money::from_model_value(proceeds, currency)?)?;
             if liquidated > 0.0 {
                 // Dated so the deal's recovery lag lands the release today.
                 let claim_date = request.pay_date.add_months(
@@ -345,8 +347,8 @@ pub(super) fn calculate_pool_flows_with_rates(
                 )?;
                 workout_claims.push((
                     claim_date,
-                    Money::new(proceeds, currency)?,
-                    Money::new(liquidated, currency)?,
+                    Money::from_model_value(proceeds, currency)?,
+                    Money::from_model_value(liquidated, currency)?,
                 ));
             }
             let reperforming = balance - liquidated;
@@ -506,7 +508,7 @@ pub(super) fn calculate_pool_flows_with_rates(
         // appraised share of a specially serviced loan.
         let appraisal_haircut = 1.0 - state.pool_state.appraisal_reduction[i].clamp(0.0, 1.0);
         let interest_base = card_base.unwrap_or(performing_bop);
-        let interest = Money::new(
+        let interest = Money::from_model_value(
             interest_base * rate * accrual_factor * default_accrual_haircut * appraisal_haircut,
             currency,
         )?;
@@ -573,8 +575,10 @@ pub(super) fn calculate_pool_flows_with_rates(
             reimburse_from_collections,
             &mut non_recoverable_advances,
         );
-        total_default = total_default.checked_add(Money::new(default_amt, currency)?)?;
-        total_recovery = total_recovery.checked_add(Money::new(recovery_amt, currency)?)?;
+        total_default =
+            total_default.checked_add(Money::from_model_value(default_amt, currency)?)?;
+        total_recovery =
+            total_recovery.checked_add(Money::from_model_value(recovery_amt, currency)?)?;
 
         // Mark asset as fully defaulted if default consumed (nearly) all the
         // BOP balance. Relative tolerance 1 - 1e-10 catches floating-point
@@ -617,10 +621,10 @@ pub(super) fn calculate_pool_flows_with_rates(
                     reimburse_from_collections,
                     &mut non_recoverable_advances,
                 );
-                total_default =
-                    total_default.checked_add(Money::new(matured_delinquent, currency)?)?;
-                total_recovery =
-                    total_recovery.checked_add(Money::new(matured_recovery, currency)?)?;
+                total_default = total_default
+                    .checked_add(Money::from_model_value(matured_delinquent, currency)?)?;
+                total_recovery = total_recovery
+                    .checked_add(Money::from_model_value(matured_recovery, currency)?)?;
             }
             // Balloon: the loss share defaults into a workout, the extension
             // share is extended at the extension coupon and pays at the
@@ -656,14 +660,14 @@ pub(super) fn calculate_pool_flows_with_rates(
                             })?
                         };
                         let claim_date = request.pay_date.add_months(shift)?;
-                        total_default =
-                            total_default.checked_add(Money::new(workout, currency)?)?;
-                        total_recovery =
-                            total_recovery.checked_add(Money::new(recovery, currency)?)?;
+                        total_default = total_default
+                            .checked_add(Money::from_model_value(workout, currency)?)?;
+                        total_recovery = total_recovery
+                            .checked_add(Money::from_model_value(recovery, currency)?)?;
                         workout_claims.push((
                             claim_date,
-                            Money::new(recovery, currency)?,
-                            Money::new(workout, currency)?,
+                            Money::from_model_value(recovery, currency)?,
+                            Money::from_model_value(workout, currency)?,
                         ));
                     }
                     let extended = performing_at_maturity * extension_prob;
@@ -694,7 +698,8 @@ pub(super) fn calculate_pool_flows_with_rates(
                 }
                 _ => (0.0, 0.0),
             };
-            let balloon = Money::new(performing_at_maturity - extended - workout, currency)?;
+            let balloon =
+                Money::from_model_value(performing_at_maturity - extended - workout, currency)?;
             total_scheduled = total_scheduled.checked_add(balloon)?;
             state.pool_state.balances[i] = extended;
             continue;
@@ -858,7 +863,7 @@ pub(super) fn calculate_pool_flows_with_rates(
         };
 
         total_scheduled =
-            total_scheduled.checked_add(Money::new(scheduled_principal, currency)?)?;
+            total_scheduled.checked_add(Money::from_model_value(scheduled_principal, currency)?)?;
 
         // Scheduled principal arrears a curing balance repays this period.
         let mut cured_arrears_principal = 0.0_f64;
@@ -920,10 +925,10 @@ pub(super) fn calculate_pool_flows_with_rates(
             let to_trust = repaid - reimbursed;
             if to_trust > 0.0 {
                 let interest_part = to_trust * repaid_interest / repaid;
-                total_interest =
-                    total_interest.checked_add(Money::new(interest_part, currency)?)?;
-                total_scheduled =
-                    total_scheduled.checked_add(Money::new(to_trust - interest_part, currency)?)?;
+                total_interest = total_interest
+                    .checked_add(Money::from_model_value(interest_part, currency)?)?;
+                total_scheduled = total_scheduled
+                    .checked_add(Money::from_model_value(to_trust - interest_part, currency)?)?;
             }
             // Servicer advances of the P&I missed this period, capped by
             // what the servicer deems recoverable on this loan.
@@ -941,10 +946,12 @@ pub(super) fn calculate_pool_flows_with_rates(
                 let advanced = missed.min(room);
                 if advanced > 0.0 && missed > 0.0 {
                     let advanced_interest = advanced * missed_interest / missed;
-                    total_interest =
-                        total_interest.checked_add(Money::new(advanced_interest, currency)?)?;
-                    total_scheduled = total_scheduled
-                        .checked_add(Money::new(advanced - advanced_interest, currency)?)?;
+                    total_interest = total_interest
+                        .checked_add(Money::from_model_value(advanced_interest, currency)?)?;
+                    total_scheduled = total_scheduled.checked_add(Money::from_model_value(
+                        advanced - advanced_interest,
+                        currency,
+                    )?)?;
                     pool_state.advances[i] += advanced;
                 }
             }
@@ -967,7 +974,7 @@ pub(super) fn calculate_pool_flows_with_rates(
         } else {
             (card_base.unwrap_or(balance_after_sched) * period_smm).min(balance_after_sched)
         };
-        total_prepay = total_prepay.checked_add(Money::new(prepay_amt, currency)?)?;
+        total_prepay = total_prepay.checked_add(Money::from_model_value(prepay_amt, currency)?)?;
         // Prepayment penalties reach the trust as interest.
         if let Some(penalty) = &state.pool_state.prepayment_penalty[i] {
             let curve = match penalty.discount_curve_id() {
@@ -982,7 +989,8 @@ pub(super) fn calculate_pool_flows_with_rates(
                 curve.as_deref(),
             )?;
             if premium > 0.0 {
-                total_interest = total_interest.checked_add(Money::new(premium, currency)?)?;
+                total_interest =
+                    total_interest.checked_add(Money::from_model_value(premium, currency)?)?;
             }
         }
 
@@ -996,9 +1004,12 @@ pub(super) fn calculate_pool_flows_with_rates(
             let rem = fee - from_interest;
             let from_scheduled = rem.min(scheduled_principal.max(0.0));
             let from_prepay = (rem - from_scheduled).min(prepay_amt.max(0.0));
-            total_interest = total_interest.checked_sub(Money::new(from_interest, currency)?)?;
-            total_scheduled = total_scheduled.checked_sub(Money::new(from_scheduled, currency)?)?;
-            total_prepay = total_prepay.checked_sub(Money::new(from_prepay, currency)?)?;
+            total_interest =
+                total_interest.checked_sub(Money::from_model_value(from_interest, currency)?)?;
+            total_scheduled =
+                total_scheduled.checked_sub(Money::from_model_value(from_scheduled, currency)?)?;
+            total_prepay =
+                total_prepay.checked_sub(Money::from_model_value(from_prepay, currency)?)?;
             special_servicing_fees += fee;
         }
 
@@ -1013,7 +1024,7 @@ pub(super) fn calculate_pool_flows_with_rates(
         let mut owed = non_recoverable_advances;
         for total in [&mut total_interest, &mut total_scheduled, &mut total_prepay] {
             let take = owed.min(total.amount().max(0.0));
-            *total = total.checked_sub(Money::new(take, currency)?)?;
+            *total = total.checked_sub(Money::from_model_value(take, currency)?)?;
             owed -= take;
         }
     }
@@ -1025,7 +1036,7 @@ pub(super) fn calculate_pool_flows_with_rates(
         default: total_default,
         recovery: total_recovery,
         workout_claims,
-        special_servicing_fees: Money::new(special_servicing_fees, currency)?,
+        special_servicing_fees: Money::from_model_value(special_servicing_fees, currency)?,
         ..PoolFlows::zero(currency)
     })
 }

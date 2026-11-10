@@ -208,7 +208,7 @@ fn equity_option_defaults_are_bit_identical() {
         (
             "vanna",
             measure(&opt, &market, as_of, MetricId::Vanna, d()),
-            0x3f3720cead800000,
+            0x3f3720cead880000,
         ),
         (
             "volga",
@@ -218,17 +218,17 @@ fn equity_option_defaults_are_bit_identical() {
         (
             "charm",
             measure(&opt, &market, as_of, MetricId::Charm, d()),
-            0xc0142f1e783b1d00,
+            0xc0142f1e783b7840,
         ),
         (
             "speed",
             measure(&opt, &market, as_of, MetricId::Speed, d()),
-            0xbfac6cb09b97e000,
+            0xbfac6cb09b99b000,
         ),
         (
             "color",
             measure(&opt, &market, as_of, MetricId::Color, d()),
-            0x40073fbf6d9ec400,
+            0x40073fbf6da03100,
         ),
     ]);
 }
@@ -583,14 +583,14 @@ fn quanto_defaults_are_bit_identical() {
     let (opt, market) = (quanto_option(), quanto_market());
     let m = |id| measure(&opt, &market, QUANTO_AS_OF, id, PricingOptions::default());
     assert_pins(&[
-        ("delta", m(MetricId::Delta), 0x402d387eb9b2e2f9),
-        ("gamma", m(MetricId::Gamma), 0x3f5998b5a0d6ce52),
+        ("delta", m(MetricId::Delta), 0x402d387eb9b2e33f),
+        ("gamma", m(MetricId::Gamma), 0x3f5998b5a0d6c17b),
         // Currency per volatility percentage point (0.01), rather than per decimal sigma.
-        ("vega", m(MetricId::Vega), 0x40aee02c44085cc0),
-        ("rho", m(MetricId::Rho), 0xc01e1b66ed300000),
-        ("foreign_rho", m(MetricId::ForeignRho), 0x4049b76ea7a3c800),
+        ("vega", m(MetricId::Vega), 0x40aee02c44085cf0),
+        ("rho", m(MetricId::Rho), 0xc01e1b66ed314000),
+        ("foreign_rho", m(MetricId::ForeignRho), 0x4049b76ea7a3a000),
         ("fx01", m(MetricId::Fx01), 0x0000000000000000),
-        ("fx_vega", m(MetricId::FxVega), 0x4069b5dd2fd70a00),
+        ("fx_vega", m(MetricId::FxVega), 0x4069b5dd2fd70700),
     ]);
 }
 
@@ -673,11 +673,11 @@ fn fx_barrier_defaults_are_bit_identical() {
     let m = |id| measure(&opt, &market, as_of, id, PricingOptions::default());
     assert_pins(&[
         ("delta", m(MetricId::Delta), 0x411bdd91514e6e26),
-        ("gamma", m(MetricId::Gamma), 0x4124b16b0eb0aceb),
-        ("vega", m(MetricId::Vega), 0x4092ef1227cc1860),
-        ("rho", m(MetricId::Rho), 0x40464c009e4a2800),
-        ("vanna", m(MetricId::Vanna), 0xc0e2b4c78f91a6d0),
-        ("volga", m(MetricId::Volga), 0xc086ad0d63429780),
+        ("gamma", m(MetricId::Gamma), 0x4124b16b0eb09cc7),
+        ("vega", m(MetricId::Vega), 0x4092ef1227cc1800),
+        ("rho", m(MetricId::Rho), 0x40464c009e4a0800),
+        ("vanna", m(MetricId::Vanna), 0xc0e2b4c78f91a6a0),
+        ("volga", m(MetricId::Volga), 0xc086ad0d63429900),
     ]);
 }
 

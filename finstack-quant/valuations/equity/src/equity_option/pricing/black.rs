@@ -57,7 +57,7 @@ pub(crate) fn compute_pv(
         unit_price,
         "equity option unit price",
     )?;
-    Money::new(unit_price * inst.quantity, ccy)
+    Money::from_model_value(unit_price * inst.quantity, ccy)
 }
 /// Cash greeks for an equity option (scaled by contract size; vega per 1% vol,
 /// rho per 1bp).

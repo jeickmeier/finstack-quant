@@ -151,7 +151,7 @@ pub(super) fn resolve_period_waterfall<'w>(
     if let Some(target) = flags.reserve_target {
         resolve::apply_reserve_target(
             period_waterfall.to_mut(),
-            Money::new(target, state.currency)?,
+            Money::from_model_value(target, state.currency)?,
         );
     }
 

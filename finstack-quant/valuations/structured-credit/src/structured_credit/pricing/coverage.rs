@@ -97,7 +97,7 @@ fn borrowing_base_test(spec: &CoverageTestSpec, context: &TestContext) -> Result
         let paydown = (denominator.amount() - numerator.amount() / trigger_level)
             .max(0.0)
             .min(denominator.amount());
-        Some(Money::new(paydown, denominator.currency())?)
+        Some(Money::from_model_value(paydown, denominator.currency())?)
     } else {
         None
     };
@@ -155,7 +155,7 @@ fn oc_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult>
                 } else {
                     1.0
                 };
-                Money::new(current.amount() * factor, current.currency())?
+                Money::from_model_value(current.amount() * factor, current.currency())?
             }
             Some(current) => current,
             None => collateral_value(context.pool, context.rules, None)?,
@@ -197,7 +197,7 @@ fn oc_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult>
     let cure_amount = if !passing && trigger_level > 0.0 {
         let paydown_needed = denominator.amount() - numerator.amount() / trigger_level;
         let capped = paydown_needed.max(0.0).min(denominator.amount());
-        Some(Money::new(capped, denominator.currency())?)
+        Some(Money::from_model_value(capped, denominator.currency())?)
     } else {
         None
     };
@@ -230,7 +230,7 @@ fn ic_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult>
 
     let (tranche_rate, accrual_factor) = rate_and_accrual(tranche, context)?;
 
-    let interest_due = Money::new(
+    let interest_due = Money::from_model_value(
         tranche_bal.amount() * tranche_rate * accrual_factor
             + carried_deferred(context, tranche.id.as_str()),
         tranche_bal.currency(),
@@ -277,7 +277,7 @@ fn ic_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult>
                 .and_then(|b| b.get(t.id.as_str()))
                 .copied()
                 .unwrap_or(t.current_balance);
-            let interest = Money::new(
+            let interest = Money::from_model_value(
                 t_bal.amount() * rate * accrual + carried_deferred(context, t.id.as_str()),
                 t_bal.currency(),
             )?;
@@ -349,7 +349,10 @@ fn ic_test(spec: &CoverageTestSpec, context: &TestContext) -> Result<TestResult>
         } else {
             cash_shortfall
         };
-        Some(Money::new(cure, context.interest_collections.currency())?)
+        Some(Money::from_model_value(
+            cure,
+            context.interest_collections.currency(),
+        )?)
     } else {
         None
     };
@@ -663,7 +666,7 @@ fn collateral_value(
         }
     }
 
-    Money::new(total.max(0.0), pool.get_currency())
+    Money::from_model_value(total.max(0.0), pool.get_currency())
 }
 
 #[cfg(test)]

@@ -160,7 +160,7 @@ it("presents the returned result as returned, with MOIC only and no checks", () 
   expect(tile("Exit equity proceeds")).toBe(
     formatRawMoney(result.exit_equity_proceeds),
   );
-  expect(tile("MOIC")).toBe("1.0802243251029904");
+  expect(tile("MOIC")).toBe("1.0802243251029884");
   expect(
     within(screen.getByLabelText("Returned sources and uses"))
       .getAllByRole("definition")
@@ -180,11 +180,11 @@ it("presents the returned result as returned, with MOIC only and no checks", () 
   ).toEqual([
     "40,160,000",
     formatRawMoney(result.entry_enterprise_value),
-    "61,383,803.277075",
+    "61,383,803.27707498",
     formatRawMoney(result.exit_enterprise_value),
     formatRawMoney(result.exit_net_debt),
     formatRawMoney(result.exit_equity_proceeds),
-    "1.0802243251029904",
+    "1.0802243251029884",
   ]);
   expect(
     screen.getByText(/IRR is\s+not part of the native LBO result/),

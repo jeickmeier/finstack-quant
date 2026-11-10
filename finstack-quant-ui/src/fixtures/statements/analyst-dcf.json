@@ -49,11 +49,11 @@
     }
   ],
   "pv_explicit": {
-    "amount": "99303232.397786",
+    "amount": "99303232.39778599",
     "currency": "USD"
   },
   "terminal_value": {
-    "amount": "1720217019.298846",
+    "amount": "1720217019.2988462",
     "currency": "USD"
   },
   "terminal_discount_years": 0.7501711156741958,

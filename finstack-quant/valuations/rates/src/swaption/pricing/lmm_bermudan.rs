@@ -855,7 +855,7 @@ mod tests {
         .expect("default price");
         assert_eq!(
             estimate.mean.amount().to_bits(),
-            0x40c98c29d93c5d7b_u64,
+            0x40c98c29d93c5d7c_u64,
             "pv={}",
             estimate.mean.amount()
         );

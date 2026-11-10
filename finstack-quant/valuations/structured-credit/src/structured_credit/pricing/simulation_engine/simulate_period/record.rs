@@ -63,7 +63,7 @@ pub(super) fn record_tranche_flows(
         } else {
             match claim_caps.get(tranche_id_str) {
                 None => Money::from((0_i64, state.currency)),
-                Some(cap) => Money::new(
+                Some(cap) => Money::from_model_value(
                     tranche_period_interest_due(
                         tranche,
                         current_balance.amount(),
@@ -84,7 +84,7 @@ pub(super) fn record_tranche_flows(
         debt_interest_due += current_interest_due.amount();
         // Carryover repaid this period sits outside the capped claim; it is
         // recorded as interest and taken off the carryover balance below.
-        let carryover_paid = Money::new(
+        let carryover_paid = Money::from_model_value(
             waterfall_result
                 .payment_records
                 .iter()
@@ -114,7 +114,7 @@ pub(super) fn record_tranche_flows(
             .get(recipient_key)
             .copied()
             .unwrap_or(Money::from((0_i64, state.currency)));
-        let principal_classified = Money::new(
+        let principal_classified = Money::from_model_value(
             principal_from_waterfall
                 .amount()
                 .min(payment_received.amount())
@@ -124,7 +124,7 @@ pub(super) fn record_tranche_flows(
         let interest_paid = payment_received
             .checked_sub(principal_classified)
             .unwrap_or(Money::from((0_i64, state.currency)));
-        let deferred_repaid = Money::new(
+        let deferred_repaid = Money::from_model_value(
             interest_paid
                 .amount()
                 .min(existing_deferred.amount())
@@ -138,7 +138,7 @@ pub(super) fn record_tranche_flows(
         // paid in full can leave a sub-microcent residue; that is float noise,
         // not a deferral, and must not be booked as one.
         let raw_shortfall = current_interest_due.amount() - current_interest_paid.amount();
-        let current_interest_shortfall = Money::new(
+        let current_interest_shortfall = Money::from_model_value(
             if raw_shortfall > INTEREST_SHORTFALL_FLOOR {
                 raw_shortfall
             } else {
@@ -175,7 +175,7 @@ pub(super) fn record_tranche_flows(
                 .carryover_balance
                 .entry(tranche_id_str.to_string())
                 .or_insert(Money::from((0_i64, state.currency)));
-            *entry = Money::new(
+            *entry = Money::from_model_value(
                 (entry.amount() - carryover_paid.amount() + withheld).max(0.0),
                 state.currency,
             )?;

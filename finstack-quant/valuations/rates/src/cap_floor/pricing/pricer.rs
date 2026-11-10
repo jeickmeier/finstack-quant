@@ -66,7 +66,7 @@ pub(crate) fn price_caplet_quote(
 ) -> finstack_quant_core::Result<Money> {
     let ccy = inputs.currency;
     let pv = price_caplet_quote_raw(inputs, quote)?;
-    Money::new(pv, ccy)
+    Money::from_model_value(pv, ccy)
 }
 
 pub(crate) fn price_caplet_quote_raw(

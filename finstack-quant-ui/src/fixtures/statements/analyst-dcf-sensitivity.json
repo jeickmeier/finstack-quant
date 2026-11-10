@@ -6,12 +6,12 @@
   "entries": [
     {
       "parameter_id": "terminal_growth",
-      "downside": -191902948.3931589,
-      "upside": 246732362.21977592
+      "downside": -191902948.3931594,
+      "upside": 246732362.21977568
     },
     {
       "parameter_id": "wacc",
-      "downside": 241830333.02504706,
+      "downside": 241830333.02504635,
       "upside": -188031363.85586596
     }
   ],

@@ -867,7 +867,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
             detailed_flows.push(finstack_quant_core::cashflow::CashFlow::new(
                 period.payment_date,
                 None,
-                Money::new(base_amount * ratio, self.notional.currency())?,
+                Money::from_model_value(base_amount * ratio, self.notional.currency())?,
                 finstack_quant_core::cashflow::CFKind::InflationCoupon,
                 accrual_factor,
                 Some(coupon_rate),

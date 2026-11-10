@@ -99,7 +99,7 @@ it(
       );
       // The returned model carries the solved driver value and validates natively.
       expect(updated.model!.nodes.revenue!.values!["2025Q4"]).toEqual({
-        amount: "244390239.9891321",
+        amount: "244390239.98913208",
         currency: "USD",
       });
       native.validateFinancialModelJson(serializeHost(updated.model));

@@ -346,9 +346,10 @@ pub(crate) fn apply_target_oc<S: std::hash::BuildHasher>(
                             .unwrap_or(Money::from((0_i64, waterfall.currency)));
                         let pay = balance.amount().max(0.0).min(required);
                         required -= pay;
-                        *target_balance = Money::new(balance.amount() - pay, balance.currency())
-                            .ok()
-                            .or(Some(balance));
+                        *target_balance =
+                            Money::from_model_value(balance.amount() - pay, balance.currency())
+                                .ok()
+                                .or(Some(balance));
                     }
                 }
             }

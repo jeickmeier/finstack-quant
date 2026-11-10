@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-      "sha256": "0167e31074e1fc6929b7dee16bc46792b4a1bf8a41558fd47ff44df2e6f6dcd3"
+      "sha256": "1d4516e3b90fd65a41a06ebfa4bed301783af0ad16e963337f778994f353cf8f"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
@@ -11,7 +11,7 @@
     },
     {
       "path": "finstack-quant/portfolio/tests/fixtures/host_parity.json",
-      "sha256": "454ce7f21091caf608a17ec5a46da33c617c36b16a4006d7a773eb7bdcdd5b86"
+      "sha256": "937bde4e5d065b9abaf8dea491988e2771eae64a3431fb2bff1604e627f8f8ad"
     }
   ],
   "asOf": "2023-12-28",
@@ -29,12 +29,12 @@
         "instrument_type": "interest_rate_swap",
         "quantity": 1,
         "value": {
-          "amount": "8912.21632401552",
+          "amount": "8912.216324015288",
           "currency": "USD"
         },
         "measures": {
-          "dv01": 4646.2148100399645,
-          "theta": 0.7437544469703425
+          "dv01": 4646.214810040081,
+          "theta": 0.7437544467393309
         }
       },
       {
@@ -44,12 +44,12 @@
         "instrument_type": "interest_rate_swap",
         "quantity": 2,
         "value": {
-          "amount": "17824.43264803104",
+          "amount": "17824.432648030575",
           "currency": "USD"
         },
         "measures": {
-          "dv01": 9292.429620079929,
-          "theta": 1.487508893940685
+          "dv01": 9292.429620080162,
+          "theta": 1.4875088934786618
         }
       },
       {
@@ -59,12 +59,12 @@
         "instrument_type": "deposit",
         "quantity": 1,
         "value": {
-          "amount": "725.219469065873",
+          "amount": "725.2194690658328",
           "currency": "USD"
         },
         "measures": {
           "dv01": -4.9659946569527165,
-          "theta": 0.06052200538067609
+          "theta": 0.06052200547139819
         }
       }
     ],
@@ -75,20 +75,20 @@
         "net_quantity": 1,
         "gross_quantity": 1,
         "net_value": {
-          "amount": "725.219469065873",
+          "amount": "725.2194690658328",
           "currency": "USD"
         },
         "gross_value": {
-          "amount": "725.219469065873",
+          "amount": "725.2194690658328",
           "currency": "USD"
         },
         "net_measures": {
           "dv01": -4.9659946569527165,
-          "theta": 0.06052200538067609
+          "theta": 0.06052200547139819
         },
         "gross_measures": {
           "dv01": 4.9659946569527165,
-          "theta": 0.06052200538067609
+          "theta": 0.06052200547139819
         }
       },
       {
@@ -97,20 +97,20 @@
         "net_quantity": 1,
         "gross_quantity": 1,
         "net_value": {
-          "amount": "8912.21632401552",
+          "amount": "8912.216324015288",
           "currency": "USD"
         },
         "gross_value": {
-          "amount": "8912.21632401552",
+          "amount": "8912.216324015288",
           "currency": "USD"
         },
         "net_measures": {
-          "dv01": 4646.2148100399645,
-          "theta": 0.7437544469703425
+          "dv01": 4646.214810040081,
+          "theta": 0.7437544467393309
         },
         "gross_measures": {
-          "dv01": 4646.2148100399645,
-          "theta": 0.7437544469703425
+          "dv01": 4646.214810040081,
+          "theta": 0.7437544467393309
         }
       },
       {
@@ -119,20 +119,20 @@
         "net_quantity": 2,
         "gross_quantity": 2,
         "net_value": {
-          "amount": "17824.43264803104",
+          "amount": "17824.432648030575",
           "currency": "USD"
         },
         "gross_value": {
-          "amount": "17824.43264803104",
+          "amount": "17824.432648030575",
           "currency": "USD"
         },
         "net_measures": {
-          "dv01": 9292.429620079929,
-          "theta": 1.487508893940685
+          "dv01": 9292.429620080162,
+          "theta": 1.4875088934786618
         },
         "gross_measures": {
-          "dv01": 9292.429620079929,
-          "theta": 1.487508893940685
+          "dv01": 9292.429620080162,
+          "theta": 1.4875088934786618
         }
       }
     ]
@@ -147,7 +147,7 @@
         "instrument_type": "interest_rate_swap",
         "quantity": 1,
         "value": {
-          "amount": "8912.21632401552",
+          "amount": "8912.216324015288",
           "currency": "USD"
         },
         "measures": {}
@@ -159,7 +159,7 @@
         "instrument_type": "interest_rate_swap",
         "quantity": 2,
         "value": {
-          "amount": "17824.43264803104",
+          "amount": "17824.432648030575",
           "currency": "USD"
         },
         "measures": {}
@@ -171,7 +171,7 @@
         "instrument_type": "deposit",
         "quantity": 1,
         "value": {
-          "amount": "725.219469065873",
+          "amount": "725.2194690658328",
           "currency": "USD"
         },
         "measures": {}
@@ -184,11 +184,11 @@
         "net_quantity": 1,
         "gross_quantity": 1,
         "net_value": {
-          "amount": "725.219469065873",
+          "amount": "725.2194690658328",
           "currency": "USD"
         },
         "gross_value": {
-          "amount": "725.219469065873",
+          "amount": "725.2194690658328",
           "currency": "USD"
         },
         "net_measures": {},
@@ -200,11 +200,11 @@
         "net_quantity": 1,
         "gross_quantity": 1,
         "net_value": {
-          "amount": "8912.21632401552",
+          "amount": "8912.216324015288",
           "currency": "USD"
         },
         "gross_value": {
-          "amount": "8912.21632401552",
+          "amount": "8912.216324015288",
           "currency": "USD"
         },
         "net_measures": {},
@@ -216,11 +216,11 @@
         "net_quantity": 2,
         "gross_quantity": 2,
         "net_value": {
-          "amount": "17824.43264803104",
+          "amount": "17824.432648030575",
           "currency": "USD"
         },
         "gross_value": {
-          "amount": "17824.43264803104",
+          "amount": "17824.432648030575",
           "currency": "USD"
         },
         "net_measures": {},
@@ -232,7 +232,7 @@
     "base_currency": "USD",
     "position_ids": ["IRS-A", "IRS-B", "DEP-1"],
     "factor_ids": ["usd_rates"],
-    "data": [[20.539950367060555], [41.07990073412111], [-4.965994656952489]]
+    "data": [[20.539950367063284], [41.07990073412657], [-4.9659946569527165]]
   },
   "errors": {
     "nonAdditive": {

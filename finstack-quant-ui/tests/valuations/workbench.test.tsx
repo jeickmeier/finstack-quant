@@ -26,6 +26,15 @@ import {
   fixture,
   bondDisplay,
 } from "./workbench-harness";
+// The one-row annual cashflow ladder repeats the bond's exact PV, so the
+// headline valuation is the Money value carrying that title.
+function headline(scope: Pick<typeof screen, "getAllByTitle"> = screen) {
+  const nodes = scope
+    .getAllByTitle(fixture.result.value.amount)
+    .filter((node) => node.classList.contains("finstack-money"));
+  expect(nodes).toHaveLength(1);
+  return nodes[0];
+}
 vi.mock(
   "@/hooks/shared/use-finstack/client",
   () => import("../shared/worker/client"),
@@ -145,9 +154,7 @@ it(
     await userEvent.click(issue);
     expect(document.activeElement).toBe(amount);
     expect(prices()).toHaveLength(1);
-    expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
-      bondDisplay,
-    );
+    expect(headline().textContent).toBe(bondDisplay);
     fireEvent.change(amount, { target: { value: "1000000" } });
     await userEvent.click(screen.getByRole("button", { name: "Settings" }));
     await userEvent.click(
@@ -178,9 +185,7 @@ it(
         ).toBe(true),
       { timeout: budget(3000) },
     );
-    expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
-      bondDisplay,
-    );
+    expect(headline().textContent).toBe(bondDisplay);
     await userEvent.click(
       screen.getByRole("combobox", { name: "Instrument type" }),
     );
@@ -192,9 +197,7 @@ it(
       timeout: budget(3000),
     });
     expect(prices()[2].model).toBe(prices()[0].model);
-    expect(screen.getByTitle(fixture.result.value.amount).textContent).toBe(
-      bondDisplay,
-    );
+    expect(headline().textContent).toBe(bondDisplay);
   },
   budget(15000),
 );
@@ -517,9 +520,7 @@ it(
       { timeout: budget(3000) },
     );
     expect(within(results).getByText("Comparison valuation")).toBeTruthy();
-    expect(
-      within(results).getByTitle(fixture.result.value.amount),
-    ).toBeTruthy();
+    expect(headline(within(results))).toBeTruthy();
     expect(within(results).getByText("2025-02-03")).toBeTruthy();
     await userEvent.click(
       within(screen.getByRole("tablist", { name: "Result views" })).getByRole(
@@ -530,7 +531,7 @@ it(
     const timeRoll = await within(results).findByRole("region", {
       name: "Time roll",
     });
-    expect(within(timeRoll).getAllByTitle("4613.745264131")).toHaveLength(2);
+    expect(within(timeRoll).getAllByTitle("4613.7452641314")).toHaveLength(2);
     // Rust's horizon return of the same base request under the applied
     // scenario; method and calendar stay unset.
     expect(

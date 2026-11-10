@@ -28,7 +28,7 @@ fn append_residual_principal(
                 .amount();
             let fee = (amount.amount() - shortfall).max(0.0) * spec.share;
             if fee > 0.0 {
-                let fee = Money::new(fee, state.currency)?;
+                let fee = Money::from_model_value(fee, state.currency)?;
                 if let Some(last) = state.period_diagnostics.last_mut() {
                     last.fees_paid = last.fees_paid.checked_add(fee)?;
                 }
@@ -94,10 +94,16 @@ fn release_spread_account(
             .map_or(0.0, |amount| amount.amount());
         let interest = remaining.min(deferred).max(0.0);
         if interest > 0.0 {
-            append_terminal_interest(state, &id, Money::new(interest, state.currency)?, date)?;
-            state
-                .deferred_interest
-                .insert(id.clone(), Money::new(deferred - interest, state.currency)?);
+            append_terminal_interest(
+                state,
+                &id,
+                Money::from_model_value(interest, state.currency)?,
+                date,
+            )?;
+            state.deferred_interest.insert(
+                id.clone(),
+                Money::from_model_value(deferred - interest, state.currency)?,
+            );
             remaining -= interest;
         }
         if trapped {
@@ -107,13 +113,14 @@ fn release_spread_account(
                 append_residual_principal(
                     state,
                     &id,
-                    Money::new(principal, state.currency)?,
+                    Money::from_model_value(principal, state.currency)?,
                     date,
                     NonWaterfallSource::SpreadAccountRelease,
                 )?;
-                state
-                    .tranche_balances
-                    .insert(id, Money::new(balance - principal, state.currency)?);
+                state.tranche_balances.insert(
+                    id,
+                    Money::from_model_value(balance - principal, state.currency)?,
+                );
                 remaining -= principal;
             }
         }
@@ -122,7 +129,12 @@ fn release_spread_account(
         && let Some(&i) = order.last()
     {
         let id = state.tranches.tranches[i].id.to_string();
-        append_terminal_interest(state, &id, Money::new(remaining, state.currency)?, date)?;
+        append_terminal_interest(
+            state,
+            &id,
+            Money::from_model_value(remaining, state.currency)?,
+            date,
+        )?;
     }
     state.spread_account = Money::from((0_i64, state.currency));
     state.undistributed_interest = Money::from((0_i64, state.currency));
@@ -169,10 +181,16 @@ fn distribute_terminal_principal(
         let balance = state.tranche_balances[&id].amount();
         let paid = remaining.min(balance).max(0.0);
         if paid > 0.0 {
-            append_residual_principal(state, &id, Money::new(paid, state.currency)?, date, source)?;
+            append_residual_principal(
+                state,
+                &id,
+                Money::from_model_value(paid, state.currency)?,
+                date,
+                source,
+            )?;
             state
                 .tranche_balances
-                .insert(id, Money::new(balance - paid, state.currency)?);
+                .insert(id, Money::from_model_value(balance - paid, state.currency)?);
             remaining -= paid;
         }
     }
@@ -183,7 +201,7 @@ fn distribute_terminal_principal(
         append_residual_principal(
             state,
             &id,
-            Money::new(remaining, state.currency)?,
+            Money::from_model_value(remaining, state.currency)?,
             date,
             source,
         )?;
@@ -242,7 +260,7 @@ fn realize_principal_shortfall(state: &mut SimulationState<'_>, date: Date) -> R
         if balance <= WRITEDOWN_DE_MINIMIS {
             continue;
         }
-        let shortfall = Money::new(balance, state.currency)?;
+        let shortfall = Money::from_model_value(balance, state.currency)?;
         if let Some(res) = state.results.get_mut(&id) {
             res.writedown_flows.push((date, shortfall));
             res.total_writedown = res.total_writedown.checked_add(shortfall)?;
@@ -360,24 +378,26 @@ fn redeem(
                 pay_date,
                 tranche_id_str,
                 NonWaterfallSource::Redemption,
-                Money::new(interest_paid, state.currency)?,
-                Money::new(principal_paid, state.currency)?,
+                Money::from_model_value(interest_paid, state.currency)?,
+                Money::from_model_value(principal_paid, state.currency)?,
             ));
         if let Some(res) = state.results.get_mut(tranche_id_str) {
-            res.cashflows
-                .push((pay_date, Money::new(redemption_amt, state.currency)?));
+            res.cashflows.push((
+                pay_date,
+                Money::from_model_value(redemption_amt, state.currency)?,
+            ));
             if interest_paid > 0.0 {
-                let interest_money = Money::new(interest_paid, state.currency)?;
+                let interest_money = Money::from_model_value(interest_paid, state.currency)?;
                 res.interest_flows.push((pay_date, interest_money));
                 res.total_interest = res.total_interest.checked_add(interest_money)?;
             }
             if principal_paid > 0.0 {
-                let principal_money = Money::new(principal_paid, state.currency)?;
+                let principal_money = Money::from_model_value(principal_paid, state.currency)?;
                 res.principal_flows.push((pay_date, principal_money));
                 res.total_principal = res.total_principal.checked_add(principal_money)?;
             }
             if haircut > WRITEDOWN_DE_MINIMIS {
-                let haircut_money = Money::new(haircut, state.currency)?;
+                let haircut_money = Money::from_model_value(haircut, state.currency)?;
                 res.writedown_flows.push((pay_date, haircut_money));
                 res.total_writedown = res.total_writedown.checked_add(haircut_money)?;
             }
@@ -386,13 +406,16 @@ fn redeem(
         if let Some(def) = state.deferred_interest.get_mut(tranche_id_str) {
             let cured = interest_paid.min(deferred).max(0.0);
             *def = def
-                .checked_sub(Money::new(cured, state.currency)?)
+                .checked_sub(Money::from_model_value(cured, state.currency)?)
                 .unwrap_or(zero);
         }
         // Principal paid and any call discount retire notional.
         if let Some(bal) = state.tranche_balances.get_mut(tranche_id_str) {
             *bal = bal
-                .checked_sub(Money::new(principal_paid + haircut, state.currency)?)
+                .checked_sub(Money::from_model_value(
+                    principal_paid + haircut,
+                    state.currency,
+                )?)
                 .unwrap_or(zero);
         }
     }
@@ -407,7 +430,7 @@ fn redeem(
             .max_by_key(|t| t.payment_priority)
             .map(|t| t.id.as_str().to_string());
         if let Some(id) = residual_id {
-            let residual = Money::new(available, state.currency)?;
+            let residual = Money::from_model_value(available, state.currency)?;
             append_residual_principal(
                 state,
                 &id,

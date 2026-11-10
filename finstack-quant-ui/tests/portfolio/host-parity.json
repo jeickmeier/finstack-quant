@@ -76,11 +76,11 @@
           "position_id": "POS-0",
           "entity_id": "FUND",
           "value_native": {
-            "amount": "1000075.940270303",
+            "amount": "1000075.9402703039",
             "currency": "USD"
           },
           "value_base": {
-            "amount": "1000075.940270303",
+            "amount": "1000075.9402703039",
             "currency": "USD"
           },
           "metric_scale": 1,
@@ -90,19 +90,19 @@
             "instrument_id": "DEP-0",
             "as_of": "2025-01-15",
             "value": {
-              "amount": "1000075.9402703035310711316556",
+              "amount": "1000075.9402703038291542057867",
               "currency": "USD"
             },
             "measures": {
-              "dv01": -49.59280692145694,
-              "bucketed_dv01": -49.592806920350995,
+              "dv01": -49.59280692151515,
+              "bucketed_dv01": -49.5928069204092,
               "bucketed_dv01::USD-OIS::10y": 0,
               "bucketed_dv01::USD-OIS::15y": 0,
               "bucketed_dv01::USD-OIS::1y": 0,
               "bucketed_dv01::USD-OIS::20y": 0,
               "bucketed_dv01::USD-OIS::2y": 0,
               "bucketed_dv01::USD-OIS::30y": 0,
-              "bucketed_dv01::USD-OIS::3m": -0.815224222955294,
+              "bucketed_dv01::USD-OIS::3m": -0.8152242230135016,
               "bucketed_dv01::USD-OIS::3y": 0,
               "bucketed_dv01::USD-OIS::5y": 0,
               "bucketed_dv01::USD-OIS::6m": -48.7775826973957,
@@ -151,11 +151,11 @@
           "position_id": "POS-1",
           "entity_id": "FUND",
           "value_native": {
-            "amount": "2000151.880540607",
+            "amount": "2000151.8805406077",
             "currency": "USD"
           },
           "value_base": {
-            "amount": "2000151.880540607",
+            "amount": "2000151.8805406077",
             "currency": "USD"
           },
           "metric_scale": 1,
@@ -165,19 +165,19 @@
             "instrument_id": "DEP-1",
             "as_of": "2025-01-15",
             "value": {
-              "amount": "2000151.8805406070621422633111",
+              "amount": "2000151.8805406076583084115733",
               "currency": "USD"
             },
             "measures": {
-              "dv01": -99.18561384291388,
-              "bucketed_dv01": -99.18561384070199,
+              "dv01": -99.1856138430303,
+              "bucketed_dv01": -99.1856138408184,
               "bucketed_dv01::USD-OIS::10y": 0,
               "bucketed_dv01::USD-OIS::15y": 0,
               "bucketed_dv01::USD-OIS::1y": 0,
               "bucketed_dv01::USD-OIS::20y": 0,
               "bucketed_dv01::USD-OIS::2y": 0,
               "bucketed_dv01::USD-OIS::30y": 0,
-              "bucketed_dv01::USD-OIS::3m": -1.630448445910588,
+              "bucketed_dv01::USD-OIS::3m": -1.6304484460270032,
               "bucketed_dv01::USD-OIS::3y": 0,
               "bucketed_dv01::USD-OIS::5y": 0,
               "bucketed_dv01::USD-OIS::6m": -97.5551653947914,
@@ -224,12 +224,12 @@
         }
       },
       "total_base_currency": {
-        "amount": "3000227.82081091",
+        "amount": "3000227.8208109112",
         "currency": "USD"
       },
       "by_entity": {
         "FUND": {
-          "amount": "3000227.82081091",
+          "amount": "3000227.8208109112",
           "currency": "USD"
         }
       },
@@ -239,16 +239,16 @@
       "aggregated": {
         "dv01": {
           "metric_id": "dv01",
-          "total": -148.77842076437082,
+          "total": -148.77842076454544,
           "by_entity": {
-            "FUND": -148.77842076437082
+            "FUND": -148.77842076454544
           }
         },
         "bucketed_dv01": {
           "metric_id": "bucketed_dv01",
-          "total": -148.77842076105298,
+          "total": -148.7784207612276,
           "by_entity": {
-            "FUND": -148.77842076105298
+            "FUND": -148.7784207612276
           }
         },
         "bucketed_dv01::USD-OIS::10y": {
@@ -295,9 +295,9 @@
         },
         "bucketed_dv01::USD-OIS::3m": {
           "metric_id": "bucketed_dv01::USD-OIS::3m",
-          "total": -2.445672668865882,
+          "total": -2.445672669040505,
           "by_entity": {
-            "FUND": -2.445672668865882
+            "FUND": -2.445672669040505
           }
         },
         "bucketed_dv01::USD-OIS::3y": {
@@ -333,15 +333,15 @@
         "POS-0": {
           "currency": "USD",
           "metrics": {
-            "dv01": -49.59280692145694,
-            "bucketed_dv01": -49.592806920350995,
+            "dv01": -49.59280692151515,
+            "bucketed_dv01": -49.5928069204092,
             "bucketed_dv01::USD-OIS::10y": 0,
             "bucketed_dv01::USD-OIS::15y": 0,
             "bucketed_dv01::USD-OIS::1y": 0,
             "bucketed_dv01::USD-OIS::20y": 0,
             "bucketed_dv01::USD-OIS::2y": 0,
             "bucketed_dv01::USD-OIS::30y": 0,
-            "bucketed_dv01::USD-OIS::3m": -0.815224222955294,
+            "bucketed_dv01::USD-OIS::3m": -0.8152242230135016,
             "bucketed_dv01::USD-OIS::3y": 0,
             "bucketed_dv01::USD-OIS::5y": 0,
             "bucketed_dv01::USD-OIS::6m": -48.7775826973957,
@@ -351,15 +351,15 @@
         "POS-1": {
           "currency": "USD",
           "metrics": {
-            "dv01": -99.18561384291388,
-            "bucketed_dv01": -99.18561384070199,
+            "dv01": -99.1856138430303,
+            "bucketed_dv01": -99.1856138408184,
             "bucketed_dv01::USD-OIS::10y": 0,
             "bucketed_dv01::USD-OIS::15y": 0,
             "bucketed_dv01::USD-OIS::1y": 0,
             "bucketed_dv01::USD-OIS::20y": 0,
             "bucketed_dv01::USD-OIS::2y": 0,
             "bucketed_dv01::USD-OIS::30y": 0,
-            "bucketed_dv01::USD-OIS::3m": -1.630448445910588,
+            "bucketed_dv01::USD-OIS::3m": -1.6304484460270032,
             "bucketed_dv01::USD-OIS::3y": 0,
             "bucketed_dv01::USD-OIS::5y": 0,
             "bucketed_dv01::USD-OIS::6m": -97.5551653947914,
@@ -416,9 +416,9 @@
       },
       {
         "components": ["USD-OIS", "3m"],
-        "total": -2.445672668865882,
+        "total": -2.445672669040505,
         "by_entity": {
-          "FUND": -2.445672668865882
+          "FUND": -2.445672669040505
         }
       },
       {
@@ -670,9 +670,9 @@
     }
   ],
   "expected": {
-    "valuation_position_value_base": 2000151.880540607,
-    "valuation_entity_value": 3000227.82081091,
-    "metrics_total_dv01": -148.77842076437082,
-    "metrics_position_dv01": -99.18561384291388
+    "valuation_position_value_base": 2000151.8805406075,
+    "valuation_entity_value": 3000227.8208109112,
+    "metrics_total_dv01": -148.77842076454544,
+    "metrics_position_dv01": -99.1856138430303
   }
 }

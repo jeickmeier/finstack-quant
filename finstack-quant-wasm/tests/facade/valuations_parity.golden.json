@@ -1029,9 +1029,9 @@
   "rates": {
     "market": "{\"schema_version\": 1, \"curves\": [{\"type\": \"discount\", \"id\": \"USD-OIS\", \"base\": \"2024-01-01\", \"day_count\": \"act_360\", \"knot_points\": [[0.0, 1.0], [5.0, 0.9], [10.0, 0.8]], \"interp_style\": \"monotone_convex\", \"extrapolation\": \"flat_forward\", \"min_forward_rate\": null, \"allow_non_monotonic\": false, \"min_forward_tenor\": 1e-06}, {\"type\": \"forward\", \"id\": \"USD-SOFR-3M\", \"base\": \"2024-01-01\", \"reset_lag\": 2, \"day_count\": \"act_360\", \"tenor\": 0.25, \"knot_points\": [[0.0, 0.04], [10.0, 0.045]], \"interp_style\": \"linear\", \"extrapolation\": \"flat_forward\"}], \"fx\": null, \"surfaces\": [], \"prices\": {}, \"series\": [], \"inflation_indices\": [], \"dividends\": [], \"credit_indices\": [], \"fx_delta_vol_surfaces\": [], \"vol_cubes\": [], \"hierarchy\": null}",
     "swap": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"interest_rate_swap\",\"spec\":{\"id\":\"IRS-1\",\"notional\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"side\":\"pay\",\"fixed_leg\":{\"discount_curve_id\":\"USD-OIS\",\"rate\":\"0.04\",\"frequency\":{\"count\":6,\"unit\":\"months\"},\"day_count\":\"30_360\",\"business_day_convention\":\"modified_following\",\"calendar_id\":null,\"stub\":\"short_front\",\"start\":\"2024-01-15\",\"end\":\"2029-01-15\",\"payment_lag_days\":0,\"end_of_month\":false},\"float_leg\":{\"discount_curve_id\":\"USD-OIS\",\"forward_curve_id\":\"USD-SOFR-3M\",\"spread_bp\":\"0\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"business_day_convention\":\"modified_following\",\"calendar_id\":null,\"stub\":\"short_front\",\"reset_lag_days\":0,\"fixing_calendar_id\":null,\"start\":\"2024-01-15\",\"end\":\"2029-01-15\",\"compounding\":\"simple\",\"payment_lag_days\":0,\"end_of_month\":false},\"adjust_fixed_accrual_dates\":false,\"adjust_float_accrual_dates\":false,\"attributes\":{}}}}",
-    "price": 91153.2666429046,
+    "price": 91153.26664290437,
     "dv01": 4798.288799512666,
-    "result_json": "{\"schema_version\":1,\"instrument_id\":\"IRS-1\",\"as_of\":\"2024-01-15\",\"value\":{\"amount\":\"91153.2666429046\",\"currency\":\"USD\"},\"measures\":{\"dv01\":4798.288799512666},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002024-01-15T00:00:00.000000000Z\",\"version\":\"0.11.0\"},\"covenants\":null,\"provenance\":{\"model\":\"discounting\",\"requested_as_of\":\"2024-01-15\",\"market_dependencies\":{\"curves\":{\"discount_curves\":[\"USD-OIS\"],\"forward_curves\":[\"USD-SOFR-3M\"],\"credit_curves\":[],\"inflation_curves\":[]},\"market_scalar_ids\":[],\"volatility_dependencies\":[],\"fx_pairs\":[],\"series_ids\":[\"FIXING:USD-SOFR-3M\"]},\"sensitivity_bumps\":{\"rate_bump_bp\":1.0,\"credit_spread_bump_bp\":1.0,\"spot_bump_decimal\":0.01,\"vol_bump_decimal\":0.01}}}",
+    "result_json": "{\"schema_version\":1,\"instrument_id\":\"IRS-1\",\"as_of\":\"2024-01-15\",\"value\":{\"amount\":\"91153.26664290437\",\"currency\":\"USD\"},\"measures\":{\"dv01\":4798.288799512666},\"meta\":{\"numeric_mode\":\"f64\",\"rounding\":{\"mode\":\"bankers\",\"ingest_scale_by_currency\":{},\"output_scale_by_currency\":{},\"tolerances\":{\"generic_epsilon\":1e-10},\"version\":1},\"fx_policy_applied\":null,\"timestamp\":\"+002024-01-15T00:00:00.000000000Z\",\"version\":\"0.11.0\"},\"covenants\":null,\"provenance\":{\"model\":\"discounting\",\"requested_as_of\":\"2024-01-15\",\"market_dependencies\":{\"curves\":{\"discount_curves\":[\"USD-OIS\"],\"forward_curves\":[\"USD-SOFR-3M\"],\"credit_curves\":[],\"inflation_curves\":[]},\"market_scalar_ids\":[],\"volatility_dependencies\":[],\"fx_pairs\":[],\"series_ids\":[\"FIXING:USD-SOFR-3M\"]},\"sensitivity_bumps\":{\"rate_bump_bp\":1.0,\"credit_spread_bump_bp\":1.0,\"spot_bump_decimal\":0.01,\"vol_bump_decimal\":0.01}}}",
     "get_metric": 4798.288799512666,
     "metric_units": {
       "dv01": "currency"
@@ -1039,35 +1039,35 @@
     "all_covenants_passed": true,
     "failed_covenants": [],
     "from_conventions": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"interest_rate_swap\",\"spec\":{\"id\":\"IRS-CONV\",\"notional\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"side\":\"pay\",\"fixed_leg\":{\"discount_curve_id\":\"USD-OIS\",\"rate\":\"0.035\",\"frequency\":{\"count\":1,\"unit\":\"years\"},\"day_count\":\"act_360\",\"business_day_convention\":\"modified_following\",\"calendar_id\":\"usny\",\"stub\":\"short_front\",\"start\":\"2025-01-15\",\"end\":\"2030-01-15\",\"payment_lag_days\":2,\"end_of_month\":false},\"float_leg\":{\"discount_curve_id\":\"USD-OIS\",\"forward_curve_id\":\"USD-SOFR\",\"spread_bp\":\"0\",\"frequency\":{\"count\":1,\"unit\":\"years\"},\"day_count\":\"act_360\",\"business_day_convention\":\"modified_following\",\"calendar_id\":\"usny\",\"stub\":\"short_front\",\"reset_lag_days\":0,\"fixing_calendar_id\":\"usny\",\"start\":\"2025-01-15\",\"end\":\"2030-01-15\",\"compounding\":{\"compounded_in_arrears\":{\"lookback_days\":0}},\"payment_lag_days\":2,\"end_of_month\":false},\"adjust_fixed_accrual_dates\":false,\"adjust_float_accrual_dates\":false,\"attributes\":{}}}}",
-    "swaption_forward_swap_rate": 0.02310339361476069,
+    "swaption_forward_swap_rate": 0.023103393614760687,
     "swaption_strike": 0.03,
     "swaption_underlying_start": "2027-01-17",
     "swaption_underlying_maturity": "2032-01-17"
   },
   "credit": {
-    "market": "{\"schema_version\":1,\"curves\":[{\"type\":\"hazard\",\"id\":\"CDX.NA.IG.HAZARD\",\"base\":\"2024-01-01\",\"knot_points\":[[0.9833333333333333,0.009939038471786458],[3.011111111111111,0.009948300717370006],[5.041666666666667,0.009951337182894962],[7.069444444444445,0.009957938689500746],[10.113888888888889,0.009957849847829001]],\"recovery_rate\":0.4,\"issuer\":\"CDX.NA.IG\",\"seniority\":\"senior\",\"currency\":\"USD\",\"day_count\":\"act_360\",\"par_points\":[[0.9833333333333333,60.0],[3.011111111111111,60.0],[5.041666666666667,60.0],[7.069444444444445,60.0],[10.113888888888889,60.0]],\"par_interp\":\"linear\",\"hazard_calibration\":{\"hazard_params\":{\"base_date\":\"2024-01-01\",\"currency\":\"USD\",\"curve_id\":\"CDX.NA.IG.HAZARD\",\"discount_curve_id\":\"USD-OIS\",\"entity\":\"CDX.NA.IG\",\"method\":\"bootstrap\",\"notional\":1.0,\"par_interp\":\"linear\",\"recovery_rate\":0.4,\"seniority\":\"senior\"},\"calibration_inputs\":[{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-1Y\",\"pillar\":{\"tenor\":{\"count\":1,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2024-12-20\",\"pillar_time\":0.9833333333333333},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-3Y\",\"pillar\":{\"tenor\":{\"count\":3,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2026-12-20\",\"pillar_time\":3.011111111111111},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-5Y\",\"pillar\":{\"tenor\":{\"count\":5,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2028-12-20\",\"pillar_time\":5.041666666666667},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-7Y\",\"pillar\":{\"tenor\":{\"count\":7,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2030-12-20\",\"pillar_time\":7.069444444444445},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-10Y\",\"pillar\":{\"tenor\":{\"count\":10,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2033-12-20\",\"pillar_time\":10.113888888888889}],\"spread_risk_inputs\":[{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-1Y\",\"pillar\":{\"tenor\":{\"count\":1,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2024-12-20\",\"pillar_time\":0.9833333333333333},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-3Y\",\"pillar\":{\"tenor\":{\"count\":3,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2026-12-20\",\"pillar_time\":3.011111111111111},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-5Y\",\"pillar\":{\"tenor\":{\"count\":5,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2028-12-20\",\"pillar_time\":5.041666666666667},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-7Y\",\"pillar\":{\"tenor\":{\"count\":7,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2030-12-20\",\"pillar_time\":7.069444444444445},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-10Y\",\"pillar\":{\"tenor\":{\"count\":10,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2033-12-20\",\"pillar_time\":10.113888888888889}],\"calibration_config\":{\"compute_diagnostics\":false,\"discount_curve\":{\"allow_non_monotonic_final\":null,\"bootstrap_seed_global_solve\":true,\"df_hard_max\":1000000.0,\"df_hard_min\":1e-12,\"jacobian_step_size\":1e-6,\"min_scan_grid_points\":20,\"scan_grid_points\":48,\"scan_grid_step\":0.0001,\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"fail_on_bad_fit\":true,\"forward_curve\":{\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"fx\":{\"cache_capacity\":256,\"enable_triangulation\":true,\"pivot_currency\":\"USD\"},\"hazard_curve\":{\"hazard_hard_max\":10.0,\"hazard_hard_min\":0.0,\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"inflation_curve\":{\"cpi_hard_max\":10000.0,\"cpi_hard_min\":1.0,\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"rate_bounds\":{\"max_rate\":0.5,\"min_rate\":-0.02},\"rate_bounds_policy\":\"auto_currency\",\"solver\":{\"max_iterations\":100,\"tolerance\":1e-12},\"use_parallel\":false,\"validation\":{\"allow_negative_rates\":false,\"check_arbitrage\":true,\"check_forward_positivity\":true,\"check_monotonicity\":true,\"max_cpi_growth\":0.5,\"max_forward_rate\":0.5,\"max_fwd_inflation\":0.5,\"max_hazard_rate\":0.5,\"max_volatility\":5.0,\"min_cpi_growth\":-0.1,\"min_forward_rate\":-0.01,\"min_fwd_inflation\":-0.2,\"minimum_lgd_for_hazard_guess\":1e-6,\"recovery_rate_abs_tolerance\":1e-12,\"tolerance\":1e-10},\"validation_mode\":\"error\",\"vol_surface\":{\"validation_tolerance\":0.001}}},\"fx_policy\":null},{\"type\":\"hazard\",\"id\":\"CORP-HAZARD\",\"base\":\"2024-01-01\",\"knot_points\":[[0.9833333333333333,0.013251931725966034],[3.011111111111111,0.020892854059241104],[5.041666666666667,0.027365193879971373],[7.069444444444445,0.03192911569373183],[10.113888888888889,0.03116688639329024]],\"recovery_rate\":0.4,\"issuer\":\"CORP\",\"seniority\":\"senior\",\"currency\":\"USD\",\"day_count\":\"act_360\",\"par_points\":[[0.9833333333333333,80.0],[3.011111111111111,110.0],[5.041666666666667,130.0],[7.069444444444445,145.0],[10.113888888888889,155.0]],\"par_interp\":\"linear\",\"hazard_calibration\":{\"hazard_params\":{\"base_date\":\"2024-01-01\",\"currency\":\"USD\",\"curve_id\":\"CORP-HAZARD\",\"discount_curve_id\":\"USD-OIS\",\"entity\":\"CORP\",\"method\":\"bootstrap\",\"notional\":1.0,\"par_interp\":\"linear\",\"recovery_rate\":0.4,\"seniority\":\"senior\"},\"calibration_inputs\":[{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-1Y\",\"pillar\":{\"tenor\":{\"count\":1,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":80.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2024-12-20\",\"pillar_time\":0.9833333333333333},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-3Y\",\"pillar\":{\"tenor\":{\"count\":3,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":110.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2026-12-20\",\"pillar_time\":3.011111111111111},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-5Y\",\"pillar\":{\"tenor\":{\"count\":5,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":130.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2028-12-20\",\"pillar_time\":5.041666666666667},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-7Y\",\"pillar\":{\"tenor\":{\"count\":7,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":145.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2030-12-20\",\"pillar_time\":7.069444444444445},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-10Y\",\"pillar\":{\"tenor\":{\"count\":10,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":155.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2033-12-20\",\"pillar_time\":10.113888888888889}],\"spread_risk_inputs\":[{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-1Y\",\"pillar\":{\"tenor\":{\"count\":1,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":80.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2024-12-20\",\"pillar_time\":0.9833333333333333},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-3Y\",\"pillar\":{\"tenor\":{\"count\":3,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":110.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2026-12-20\",\"pillar_time\":3.011111111111111},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-5Y\",\"pillar\":{\"tenor\":{\"count\":5,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":130.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2028-12-20\",\"pillar_time\":5.041666666666667},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-7Y\",\"pillar\":{\"tenor\":{\"count\":7,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":145.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2030-12-20\",\"pillar_time\":7.069444444444445},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-10Y\",\"pillar\":{\"tenor\":{\"count\":10,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":155.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2033-12-20\",\"pillar_time\":10.113888888888889}],\"calibration_config\":{\"compute_diagnostics\":false,\"discount_curve\":{\"allow_non_monotonic_final\":null,\"bootstrap_seed_global_solve\":true,\"df_hard_max\":1000000.0,\"df_hard_min\":1e-12,\"jacobian_step_size\":1e-6,\"min_scan_grid_points\":20,\"scan_grid_points\":48,\"scan_grid_step\":0.0001,\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"fail_on_bad_fit\":true,\"forward_curve\":{\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"fx\":{\"cache_capacity\":256,\"enable_triangulation\":true,\"pivot_currency\":\"USD\"},\"hazard_curve\":{\"hazard_hard_max\":10.0,\"hazard_hard_min\":0.0,\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"inflation_curve\":{\"cpi_hard_max\":10000.0,\"cpi_hard_min\":1.0,\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"rate_bounds\":{\"max_rate\":0.5,\"min_rate\":-0.02},\"rate_bounds_policy\":\"auto_currency\",\"solver\":{\"max_iterations\":100,\"tolerance\":1e-12},\"use_parallel\":false,\"validation\":{\"allow_negative_rates\":false,\"check_arbitrage\":true,\"check_forward_positivity\":true,\"check_monotonicity\":true,\"max_cpi_growth\":0.5,\"max_forward_rate\":0.5,\"max_fwd_inflation\":0.5,\"max_hazard_rate\":0.5,\"max_volatility\":5.0,\"min_cpi_growth\":-0.1,\"min_forward_rate\":-0.01,\"min_fwd_inflation\":-0.2,\"minimum_lgd_for_hazard_guess\":1e-6,\"recovery_rate_abs_tolerance\":1e-12,\"tolerance\":1e-10},\"validation_mode\":\"error\",\"vol_surface\":{\"validation_tolerance\":0.001}}},\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2024-01-01\",\"day_count\":\"act_365f\",\"knot_points\":[[0.0,1.0],[0.0958904109589041,0.9949210178411213],[0.2547945205479452,0.9867389400606845],[1.0191780821917809,0.9499111551186841],[2.0191780821917806,0.9068158219382438],[5.016438356164383,0.8002608829570502],[10.01917808219178,0.6684221021567315]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":-0.005,\"allow_non_monotonic\":false,\"min_forward_tenor\":1e-6,\"rate_calibration\":{\"currency\":\"USD\",\"method\":\"bootstrap\",\"curve_day_count\":\"act_365f\",\"ois_compounding\":null,\"role\":{\"discount\":{\"projection_curve_id\":\"USD-OIS\"}},\"quotes\":[{\"deposit\":{\"index_id\":\"USD-SOFR-OIS\",\"pillar\":{\"tenor\":{\"count\":1,\"unit\":\"months\"}},\"rate\":0.0525}},{\"deposit\":{\"index_id\":\"USD-SOFR-OIS\",\"pillar\":{\"tenor\":{\"count\":3,\"unit\":\"months\"}},\"rate\":0.052}},{\"swap\":{\"index_id\":\"USD-SOFR-OIS\",\"pillar\":{\"tenor\":{\"count\":1,\"unit\":\"years\"}},\"rate\":0.051,\"spread_decimal\":null}},{\"swap\":{\"index_id\":\"USD-SOFR-OIS\",\"pillar\":{\"tenor\":{\"count\":2,\"unit\":\"years\"}},\"rate\":0.049,\"spread_decimal\":null}},{\"swap\":{\"index_id\":\"USD-SOFR-OIS\",\"pillar\":{\"tenor\":{\"count\":5,\"unit\":\"years\"}},\"rate\":0.045,\"spread_decimal\":null}},{\"swap\":{\"index_id\":\"USD-SOFR-OIS\",\"pillar\":{\"tenor\":{\"count\":10,\"unit\":\"years\"}},\"rate\":0.041,\"spread_decimal\":null}}]},\"fx_policy\":null}],\"fx\":null,\"surfaces\":[],\"prices\":{},\"series\":[],\"inflation_indices\":[],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
-    "cds_price": 158636.4732447134,
-    "cds_par_spread": 138.5907848417068,
+    "market": "{\"schema_version\":1,\"curves\":[{\"type\":\"hazard\",\"id\":\"CDX.NA.IG.HAZARD\",\"base\":\"2024-01-01\",\"knot_points\":[[0.9833333333333333,0.009939038471291442],[3.011111111111111,0.009948300717033651],[5.041666666666667,0.009951337183756053],[7.069444444444445,0.009957938689458847],[10.113888888888889,0.009957849847685872]],\"recovery_rate\":0.4,\"issuer\":\"CDX.NA.IG\",\"seniority\":\"senior\",\"currency\":\"USD\",\"day_count\":\"act_360\",\"par_points\":[[0.9833333333333333,60.0],[3.011111111111111,60.0],[5.041666666666667,60.0],[7.069444444444445,60.0],[10.113888888888889,60.0]],\"par_interp\":\"linear\",\"hazard_calibration\":{\"hazard_params\":{\"base_date\":\"2024-01-01\",\"currency\":\"USD\",\"curve_id\":\"CDX.NA.IG.HAZARD\",\"discount_curve_id\":\"USD-OIS\",\"entity\":\"CDX.NA.IG\",\"method\":\"bootstrap\",\"notional\":1.0,\"par_interp\":\"linear\",\"recovery_rate\":0.4,\"seniority\":\"senior\"},\"calibration_inputs\":[{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-1Y\",\"pillar\":{\"tenor\":{\"count\":1,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2024-12-20\",\"pillar_time\":0.9833333333333333},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-3Y\",\"pillar\":{\"tenor\":{\"count\":3,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2026-12-20\",\"pillar_time\":3.011111111111111},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-5Y\",\"pillar\":{\"tenor\":{\"count\":5,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2028-12-20\",\"pillar_time\":5.041666666666667},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-7Y\",\"pillar\":{\"tenor\":{\"count\":7,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2030-12-20\",\"pillar_time\":7.069444444444445},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-10Y\",\"pillar\":{\"tenor\":{\"count\":10,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2033-12-20\",\"pillar_time\":10.113888888888889}],\"spread_risk_inputs\":[{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-1Y\",\"pillar\":{\"tenor\":{\"count\":1,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2024-12-20\",\"pillar_time\":0.9833333333333333},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-3Y\",\"pillar\":{\"tenor\":{\"count\":3,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2026-12-20\",\"pillar_time\":3.011111111111111},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-5Y\",\"pillar\":{\"tenor\":{\"count\":5,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2028-12-20\",\"pillar_time\":5.041666666666667},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-7Y\",\"pillar\":{\"tenor\":{\"count\":7,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2030-12-20\",\"pillar_time\":7.069444444444445},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CDX.NA.IG\",\"id\":\"ISSUER-A-CDS-10Y\",\"pillar\":{\"tenor\":{\"count\":10,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":60.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2033-12-20\",\"pillar_time\":10.113888888888889}],\"calibration_config\":{\"compute_diagnostics\":false,\"discount_curve\":{\"allow_non_monotonic_final\":null,\"bootstrap_seed_global_solve\":true,\"df_hard_max\":1000000.0,\"df_hard_min\":1e-12,\"jacobian_step_size\":1e-6,\"min_scan_grid_points\":20,\"scan_grid_points\":48,\"scan_grid_step\":0.0001,\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"fail_on_bad_fit\":true,\"forward_curve\":{\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"fx\":{\"cache_capacity\":256,\"enable_triangulation\":true,\"pivot_currency\":\"USD\"},\"hazard_curve\":{\"hazard_hard_max\":10.0,\"hazard_hard_min\":0.0,\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"inflation_curve\":{\"cpi_hard_max\":10000.0,\"cpi_hard_min\":1.0,\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"rate_bounds\":{\"max_rate\":0.5,\"min_rate\":-0.02},\"rate_bounds_policy\":\"auto_currency\",\"solver\":{\"max_iterations\":100,\"tolerance\":1e-12},\"use_parallel\":false,\"validation\":{\"allow_negative_rates\":false,\"check_arbitrage\":true,\"check_forward_positivity\":true,\"check_monotonicity\":true,\"max_cpi_growth\":0.5,\"max_forward_rate\":0.5,\"max_fwd_inflation\":0.5,\"max_hazard_rate\":0.5,\"max_volatility\":5.0,\"min_cpi_growth\":-0.1,\"min_forward_rate\":-0.01,\"min_fwd_inflation\":-0.2,\"minimum_lgd_for_hazard_guess\":1e-6,\"recovery_rate_abs_tolerance\":1e-12,\"tolerance\":1e-10},\"validation_mode\":\"error\",\"vol_surface\":{\"validation_tolerance\":0.001}}},\"fx_policy\":null},{\"type\":\"hazard\",\"id\":\"CORP-HAZARD\",\"base\":\"2024-01-01\",\"knot_points\":[[0.9833333333333333,0.013251931725557995],[3.011111111111111,0.020892854059810978],[5.041666666666667,0.02736519387908051],[7.069444444444445,0.031929115694683416],[10.113888888888889,0.03116688639395858]],\"recovery_rate\":0.4,\"issuer\":\"CORP\",\"seniority\":\"senior\",\"currency\":\"USD\",\"day_count\":\"act_360\",\"par_points\":[[0.9833333333333333,80.0],[3.011111111111111,110.0],[5.041666666666667,130.0],[7.069444444444445,145.0],[10.113888888888889,155.0]],\"par_interp\":\"linear\",\"hazard_calibration\":{\"hazard_params\":{\"base_date\":\"2024-01-01\",\"currency\":\"USD\",\"curve_id\":\"CORP-HAZARD\",\"discount_curve_id\":\"USD-OIS\",\"entity\":\"CORP\",\"method\":\"bootstrap\",\"notional\":1.0,\"par_interp\":\"linear\",\"recovery_rate\":0.4,\"seniority\":\"senior\"},\"calibration_inputs\":[{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-1Y\",\"pillar\":{\"tenor\":{\"count\":1,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":80.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2024-12-20\",\"pillar_time\":0.9833333333333333},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-3Y\",\"pillar\":{\"tenor\":{\"count\":3,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":110.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2026-12-20\",\"pillar_time\":3.011111111111111},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-5Y\",\"pillar\":{\"tenor\":{\"count\":5,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":130.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2028-12-20\",\"pillar_time\":5.041666666666667},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-7Y\",\"pillar\":{\"tenor\":{\"count\":7,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":145.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2030-12-20\",\"pillar_time\":7.069444444444445},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-10Y\",\"pillar\":{\"tenor\":{\"count\":10,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":155.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2033-12-20\",\"pillar_time\":10.113888888888889}],\"spread_risk_inputs\":[{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-1Y\",\"pillar\":{\"tenor\":{\"count\":1,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":80.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2024-12-20\",\"pillar_time\":0.9833333333333333},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-3Y\",\"pillar\":{\"tenor\":{\"count\":3,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":110.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2026-12-20\",\"pillar_time\":3.011111111111111},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-5Y\",\"pillar\":{\"tenor\":{\"count\":5,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":130.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2028-12-20\",\"pillar_time\":5.041666666666667},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-7Y\",\"pillar\":{\"tenor\":{\"count\":7,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":145.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2030-12-20\",\"pillar_time\":7.069444444444445},{\"quote\":{\"convention\":{\"currency\":\"USD\",\"doc_clause\":\"isda_na\"},\"entity\":\"CORP\",\"id\":\"ISSUER-A-CDS-10Y\",\"pillar\":{\"tenor\":{\"count\":10,\"unit\":\"years\"}},\"recovery_rate\":0.4,\"spread_bp\":155.0,\"type\":\"cds_par_spread\"},\"pillar_date\":\"2033-12-20\",\"pillar_time\":10.113888888888889}],\"calibration_config\":{\"compute_diagnostics\":false,\"discount_curve\":{\"allow_non_monotonic_final\":null,\"bootstrap_seed_global_solve\":true,\"df_hard_max\":1000000.0,\"df_hard_min\":1e-12,\"jacobian_step_size\":1e-6,\"min_scan_grid_points\":20,\"scan_grid_points\":48,\"scan_grid_step\":0.0001,\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"fail_on_bad_fit\":true,\"forward_curve\":{\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"fx\":{\"cache_capacity\":256,\"enable_triangulation\":true,\"pivot_currency\":\"USD\"},\"hazard_curve\":{\"hazard_hard_max\":10.0,\"hazard_hard_min\":0.0,\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"inflation_curve\":{\"cpi_hard_max\":10000.0,\"cpi_hard_min\":1.0,\"validation_tolerance\":1e-8,\"weighting_scheme\":\"sqrt_time\"},\"rate_bounds\":{\"max_rate\":0.5,\"min_rate\":-0.02},\"rate_bounds_policy\":\"auto_currency\",\"solver\":{\"max_iterations\":100,\"tolerance\":1e-12},\"use_parallel\":false,\"validation\":{\"allow_negative_rates\":false,\"check_arbitrage\":true,\"check_forward_positivity\":true,\"check_monotonicity\":true,\"max_cpi_growth\":0.5,\"max_forward_rate\":0.5,\"max_fwd_inflation\":0.5,\"max_hazard_rate\":0.5,\"max_volatility\":5.0,\"min_cpi_growth\":-0.1,\"min_forward_rate\":-0.01,\"min_fwd_inflation\":-0.2,\"minimum_lgd_for_hazard_guess\":1e-6,\"recovery_rate_abs_tolerance\":1e-12,\"tolerance\":1e-10},\"validation_mode\":\"error\",\"vol_surface\":{\"validation_tolerance\":0.001}}},\"fx_policy\":null},{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2024-01-01\",\"day_count\":\"act_365f\",\"knot_points\":[[0.0,1.0],[0.0958904109589041,0.9949210178407837],[0.2547945205479452,0.9867389400607999],[1.0191780821917809,0.9499111551185905],[2.0191780821917806,0.906815821938046],[5.016438356164383,0.8002608829567903],[10.01917808219178,0.6684221021561494]],\"interp_style\":\"log_linear\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":-0.005,\"allow_non_monotonic\":false,\"min_forward_tenor\":1e-6,\"rate_calibration\":{\"currency\":\"USD\",\"method\":\"bootstrap\",\"curve_day_count\":\"act_365f\",\"ois_compounding\":null,\"role\":{\"discount\":{\"projection_curve_id\":\"USD-OIS\"}},\"quotes\":[{\"deposit\":{\"index_id\":\"USD-SOFR-OIS\",\"pillar\":{\"tenor\":{\"count\":1,\"unit\":\"months\"}},\"rate\":0.0525}},{\"deposit\":{\"index_id\":\"USD-SOFR-OIS\",\"pillar\":{\"tenor\":{\"count\":3,\"unit\":\"months\"}},\"rate\":0.052}},{\"swap\":{\"index_id\":\"USD-SOFR-OIS\",\"pillar\":{\"tenor\":{\"count\":1,\"unit\":\"years\"}},\"rate\":0.051,\"spread_decimal\":null}},{\"swap\":{\"index_id\":\"USD-SOFR-OIS\",\"pillar\":{\"tenor\":{\"count\":2,\"unit\":\"years\"}},\"rate\":0.049,\"spread_decimal\":null}},{\"swap\":{\"index_id\":\"USD-SOFR-OIS\",\"pillar\":{\"tenor\":{\"count\":5,\"unit\":\"years\"}},\"rate\":0.045,\"spread_decimal\":null}},{\"swap\":{\"index_id\":\"USD-SOFR-OIS\",\"pillar\":{\"tenor\":{\"count\":10,\"unit\":\"years\"}},\"rate\":0.041,\"spread_decimal\":null}}]},\"fx_policy\":null}],\"fx\":null,\"surfaces\":[],\"prices\":{},\"series\":[],\"inflation_indices\":[],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
+    "cds_price": 158636.473242151,
+    "cds_par_spread": 138.59078484109972,
     "index": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"cds_index\",\"spec\":{\"id\":\"CDX-IG-42\",\"index_name\":\"CDX.NA.IG\",\"series\":42,\"version\":1,\"notional\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"index_factor\":1.0,\"side\":\"pay\",\"convention\":\"isda_na\",\"premium_leg\":{\"roll_rule\":\"cds_imm\",\"start\":\"2024-03-20\",\"end\":\"2029-06-20\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"stub\":\"short_front\",\"business_day_convention\":\"modified_following\",\"calendar_id\":\"nyse\",\"day_count\":\"act_360\",\"coupon_bp\":\"100\",\"discount_curve_id\":\"USD-OIS\"},\"protection_leg\":{\"credit_curve_id\":\"CDX.NA.IG.HAZARD\",\"recovery_rate\":0.4,\"settlement_delay\":3},\"pricing\":\"single_curve\",\"constituents\":[],\"num_constituents\":125,\"attributes\":{}}}}",
-    "index_par_spread": 59.99799619666451,
-    "index_risky_pv01": 4409.636181503338,
-    "index_cs01": 4480.475884275715,
+    "index_par_spread": 59.99799619742058,
+    "index_risky_pv01": 4409.636181503024,
+    "index_cs01": 4480.475883319654,
     "tranche": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"cds_tranche\",\"spec\":{\"id\":\"CDX-42-3X7\",\"index_name\":\"CDX.NA.IG\",\"series\":42,\"attach_pct\":3.0,\"detach_pct\":7.0,\"notional\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"maturity\":\"2029-12-20\",\"coupon_bp\":100.0,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"business_day_convention\":\"following\",\"calendar_id\":null,\"discount_curve_id\":\"USD-OIS\",\"credit_index_id\":\"CDX.NA.IG.HAZARD\",\"side\":\"pay\",\"start_date\":null,\"realized_loss\":0.0,\"roll_rule\":\"cds_imm\",\"stub\":\"short_front\",\"upfront\":null,\"attributes\":{}}}}"
   },
   "equity": {
     "market": "{\"schema_version\":1,\"curves\":[{\"type\":\"discount\",\"id\":\"USD-OIS\",\"base\":\"2024-01-01\",\"day_count\":\"act_365f\",\"knot_points\":[[0.0,1.0],[1.0,0.9607894391523232],[5.0,0.8187307530779818],[10.0,0.6703200460356393]],\"interp_style\":\"monotone_convex\",\"extrapolation\":\"flat_forward\",\"min_forward_rate\":-0.005,\"allow_non_monotonic\":false,\"min_forward_tenor\":1e-6,\"rate_calibration\":null,\"fx_policy\":null}],\"fx\":null,\"surfaces\":[{\"id\":\"EQUITY-VOL\",\"expiries\":[0.25,1.0,2.0],\"strikes\":[4000.0,4500.0,5000.0],\"secondary_axis\":\"strike\",\"quote_type\":\"black_lognormal\",\"interpolation_mode\":\"vol\",\"vols_row_major\":[0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2,0.2]}],\"prices\":{\"EQUITY-DIVYIELD\":{\"unitless\":0.01},\"EQUITY-SPOT\":{\"price\":{\"amount\":\"4600\",\"currency\":\"USD\"}}},\"series\":[],\"inflation_indices\":[],\"dividends\":[],\"credit_indices\":[],\"fx_delta_vol_surfaces\":[],\"vol_cubes\":[],\"hierarchy\":null}",
-    "price": 32309.87134625175,
+    "price": 32309.871346251748,
     "greeks": {
       "delta": 62.71508985333142,
       "gamma": 0.062114853431391184,
       "vega": 1137.9032722197344,
       "theta": -92.18984525499833,
       "rho": 11.089415789779041,
-      "vanna": -0.37525283822272115,
-      "volga": 3.780472385977191
+      "vanna": -0.37525283822263944,
+      "volga": 3.780472385966277
     },
     "delta": 62.71508985333142,
-    "implied_vol": 0.20000000000000076,
+    "implied_vol": 0.20000000000000043,
     "european": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"equity_option\",\"spec\":{\"id\":\"SPX-CALL\",\"underlying_ticker\":\"SPX\",\"strike\":4500.0,\"option_type\":\"call\",\"exercise_style\":\"european\",\"expiry\":\"2024-06-21\",\"quantity\":100.0,\"currency\":\"USD\",\"day_count\":\"act_365f\",\"settlement\":\"cash\",\"discount_curve_id\":\"USD-OIS\",\"spot_id\":\"EQUITY-SPOT\",\"vol_surface_id\":\"EQUITY-VOL\",\"div_yield_id\":\"EQUITY-DIVYIELD\",\"discrete_dividends\":[],\"attributes\":{}}}}"
   },
   "convertible": {
@@ -1076,12 +1076,12 @@
     "conversion_premium": 976.7777777777778,
     "conversion_ratio": 25.0,
     "greeks": {
-      "price": 847254.678100715,
+      "price": 847254.6781007148,
       "delta": 0.0,
       "gamma": 0.0,
       "vega": 0.0,
       "theta": 139.28618947195355,
-      "rho": -366.89164656196954
+      "rho": -366.89164656220237
     }
   },
   "structured": {
@@ -1587,14 +1587,14 @@
         [
           "2024-04-01",
           {
-            "amount": "3344861.924852584",
+            "amount": "3344861.9248525846",
             "currency": "USD"
           }
         ],
         [
           "2024-07-01",
           {
-            "amount": "3232238.990646198",
+            "amount": "3232238.9906461986",
             "currency": "USD"
           }
         ],
@@ -1608,7 +1608,7 @@
         [
           "2025-01-02",
           {
-            "amount": "3024615.378451763",
+            "amount": "3024615.3784517631",
             "currency": "USD"
           }
         ],
@@ -1629,63 +1629,63 @@
         [
           "2025-10-01",
           {
-            "amount": "2909751.1173538133",
+            "amount": "2909751.1173538139",
             "currency": "USD"
           }
         ],
         [
           "2026-01-02",
           {
-            "amount": "2807897.8501749685",
+            "amount": "2807897.8501749684",
             "currency": "USD"
           }
         ],
         [
           "2026-04-01",
           {
-            "amount": "2697902.3765981849",
+            "amount": "2697902.37659818523",
             "currency": "USD"
           }
         ],
         [
           "2026-07-01",
           {
-            "amount": "2608196.0764093377",
+            "amount": "2608196.07640933724",
             "currency": "USD"
           }
         ],
         [
           "2026-10-01",
           {
-            "amount": "2520837.5405915059",
+            "amount": "2520837.54059150545",
             "currency": "USD"
           }
         ],
         [
           "2027-01-04",
           {
-            "amount": "2431002.9589397634",
+            "amount": "2431002.95893976366",
             "currency": "USD"
           }
         ],
         [
           "2027-04-01",
           {
-            "amount": "2334977.4500475317",
+            "amount": "2334977.45004753136",
             "currency": "USD"
           }
         ],
         [
           "2027-07-01",
           {
-            "amount": "2255361.2438797224",
+            "amount": "2255361.24387972224",
             "currency": "USD"
           }
         ],
         [
           "2027-10-01",
           {
-            "amount": "2177815.7658871493",
+            "amount": "2177815.76588714907",
             "currency": "USD"
           }
         ],
@@ -1709,7 +1709,7 @@
           "date": "2024-04-01",
           "reset_date": null,
           "amount": {
-            "amount": "758333.333333333",
+            "amount": "758333.3333333331",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1719,7 +1719,7 @@
           "date": "2024-04-01",
           "reset_date": null,
           "amount": {
-            "amount": "2586528.591519251",
+            "amount": "2586528.5915192515",
             "currency": "USD"
           },
           "kind": "amortization",
@@ -1739,7 +1739,7 @@
           "date": "2024-07-01",
           "reset_date": null,
           "amount": {
-            "amount": "2506596.504789011",
+            "amount": "2506596.5047890116",
             "currency": "USD"
           },
           "kind": "amortization",
@@ -1749,7 +1749,7 @@
           "date": "2024-10-01",
           "reset_date": null,
           "amount": {
-            "amount": "701587.845991617",
+            "amount": "701587.8459916165",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1759,7 +1759,7 @@
           "date": "2024-10-01",
           "reset_date": null,
           "amount": {
-            "amount": "2429134.577681208",
+            "amount": "2429134.5776812085",
             "currency": "USD"
           },
           "kind": "amortization",
@@ -1769,7 +1769,7 @@
           "date": "2025-01-02",
           "reset_date": null,
           "amount": {
-            "amount": "670548.90416569",
+            "amount": "670548.9041656901",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1789,7 +1789,7 @@
           "date": "2025-04-01",
           "reset_date": null,
           "amount": {
-            "amount": "626545.9231465564",
+            "amount": "626545.9231465554",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1799,7 +1799,7 @@
           "date": "2025-04-01",
           "reset_date": null,
           "amount": {
-            "amount": "2482835.962012462",
+            "amount": "2482835.962012463",
             "currency": "USD"
           },
           "kind": "amortization",
@@ -1809,7 +1809,7 @@
           "date": "2025-07-01",
           "reset_date": null,
           "amount": {
-            "amount": "602127.2566616383",
+            "amount": "602127.2566616376",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1819,7 +1819,7 @@
           "date": "2025-07-01",
           "reset_date": null,
           "amount": {
-            "amount": "2406108.312411662",
+            "amount": "2406108.3124116627",
             "currency": "USD"
           },
           "kind": "amortization",
@@ -1829,7 +1829,7 @@
           "date": "2025-10-01",
           "reset_date": null,
           "amount": {
-            "amount": "577999.3223766153",
+            "amount": "577999.3223766155",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1839,7 +1839,7 @@
           "date": "2025-10-01",
           "reset_date": null,
           "amount": {
-            "amount": "2331751.794977198",
+            "amount": "2331751.7949771984",
             "currency": "USD"
           },
           "kind": "amortization",
@@ -1849,7 +1849,7 @@
           "date": "2026-01-02",
           "reset_date": null,
           "amount": {
-            "amount": "548204.7161074615",
+            "amount": "548204.7161074624",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1859,7 +1859,7 @@
           "date": "2026-01-02",
           "reset_date": null,
           "amount": {
-            "amount": "2259693.134067507",
+            "amount": "2259693.134067506",
             "currency": "USD"
           },
           "kind": "amortization",
@@ -1869,7 +1869,7 @@
           "date": "2026-04-01",
           "reset_date": null,
           "amount": {
-            "amount": "508041.0581031949",
+            "amount": "508041.05810319523",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1889,7 +1889,7 @@
           "date": "2026-07-01",
           "reset_date": null,
           "amount": {
-            "amount": "486008.5448622527",
+            "amount": "486008.54486225224",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1909,7 +1909,7 @@
           "date": "2026-10-01",
           "reset_date": null,
           "amount": {
-            "amount": "464232.4574216179",
+            "amount": "464232.45742161765",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1919,7 +1919,7 @@
           "date": "2026-10-01",
           "reset_date": null,
           "amount": {
-            "amount": "2056605.083169888",
+            "amount": "2056605.0831698878",
             "currency": "USD"
           },
           "kind": "amortization",
@@ -1929,7 +1929,7 @@
           "date": "2027-01-04",
           "reset_date": null,
           "amount": {
-            "amount": "437953.6146922244",
+            "amount": "437953.61469222486",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1939,7 +1939,7 @@
           "date": "2027-01-04",
           "reset_date": null,
           "amount": {
-            "amount": "1993049.344247539",
+            "amount": "1993049.3442475388",
             "currency": "USD"
           },
           "kind": "amortization",
@@ -1949,7 +1949,7 @@
           "date": "2027-04-01",
           "reset_date": null,
           "amount": {
-            "amount": "403519.7671349517",
+            "amount": "403519.76713495166",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1959,7 +1959,7 @@
           "date": "2027-04-01",
           "reset_date": null,
           "amount": {
-            "amount": "1931457.68291258",
+            "amount": "1931457.6829125797",
             "currency": "USD"
           },
           "kind": "amortization",
@@ -1969,7 +1969,7 @@
           "date": "2027-07-01",
           "reset_date": null,
           "amount": {
-            "amount": "383591.8410551944",
+            "amount": "383591.84105519484",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1979,7 +1979,7 @@
           "date": "2027-07-01",
           "reset_date": null,
           "amount": {
-            "amount": "1871769.402824528",
+            "amount": "1871769.4028245274",
             "currency": "USD"
           },
           "kind": "amortization",
@@ -1989,7 +1989,7 @@
           "date": "2027-10-01",
           "reset_date": null,
           "amount": {
-            "amount": "363890.0825313093",
+            "amount": "363890.08253130957",
             "currency": "USD"
           },
           "kind": "fixed",
@@ -1999,7 +1999,7 @@
           "date": "2027-10-01",
           "reset_date": null,
           "amount": {
-            "amount": "1813925.68335584",
+            "amount": "1813925.6833558395",
             "currency": "USD"
           },
           "kind": "amortization",
@@ -2053,7 +2053,7 @@
           "end": "2024-07-01",
           "payment_date": "2024-07-01",
           "opening_balance": {
-            "amount": "57413471.408480749",
+            "amount": "57413471.4084807485",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2064,7 +2064,7 @@
           "end": "2024-10-01",
           "payment_date": "2024-10-01",
           "opening_balance": {
-            "amount": "54906874.903691738",
+            "amount": "54906874.9036917369",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2075,7 +2075,7 @@
           "end": "2025-01-01",
           "payment_date": "2025-01-02",
           "opening_balance": {
-            "amount": "52477740.32601053",
+            "amount": "52477740.3260105284",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2086,7 +2086,7 @@
           "end": "2025-04-01",
           "payment_date": "2025-04-01",
           "opening_balance": {
-            "amount": "50123673.851724457",
+            "amount": "50123673.8517244554",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2097,7 +2097,7 @@
           "end": "2025-07-01",
           "payment_date": "2025-07-01",
           "opening_balance": {
-            "amount": "47640837.889711995",
+            "amount": "47640837.8897119924",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2108,7 +2108,7 @@
           "end": "2025-10-01",
           "payment_date": "2025-10-01",
           "opening_balance": {
-            "amount": "45234729.577300333",
+            "amount": "45234729.5773003297",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2119,7 +2119,7 @@
           "end": "2026-01-01",
           "payment_date": "2026-01-02",
           "opening_balance": {
-            "amount": "42902977.782323135",
+            "amount": "42902977.7823231313",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2130,7 +2130,7 @@
           "end": "2026-04-01",
           "payment_date": "2026-04-01",
           "opening_balance": {
-            "amount": "40643284.648255628",
+            "amount": "40643284.6482556253",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2141,7 +2141,7 @@
           "end": "2026-07-01",
           "payment_date": "2026-07-01",
           "opening_balance": {
-            "amount": "38453423.329760638",
+            "amount": "38453423.3297606353",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2152,7 +2152,7 @@
           "end": "2026-10-01",
           "payment_date": "2026-10-01",
           "opening_balance": {
-            "amount": "36331235.798213553",
+            "amount": "36331235.7982135503",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2163,7 +2163,7 @@
           "end": "2027-01-01",
           "payment_date": "2027-01-04",
           "opening_balance": {
-            "amount": "34274630.715043665",
+            "amount": "34274630.7150436625",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2174,7 +2174,7 @@
           "end": "2027-04-01",
           "payment_date": "2027-04-01",
           "opening_balance": {
-            "amount": "32281581.370796126",
+            "amount": "32281581.3707961237",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2185,7 +2185,7 @@
           "end": "2027-07-01",
           "payment_date": "2027-07-01",
           "opening_balance": {
-            "amount": "30350123.687883546",
+            "amount": "30350123.687883544",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2196,7 +2196,7 @@
           "end": "2027-10-01",
           "payment_date": "2027-10-01",
           "opening_balance": {
-            "amount": "28478354.285059018",
+            "amount": "28478354.2850590166",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2207,7 +2207,7 @@
           "end": "2028-01-01",
           "payment_date": "2028-01-03",
           "opening_balance": {
-            "amount": "26664428.601703178",
+            "amount": "26664428.6017031771",
             "currency": "USD"
           },
           "coupon_rate": 0.05,
@@ -2218,7 +2218,7 @@
         [
           "2024-04-01",
           {
-            "amount": "758333.333333333",
+            "amount": "758333.3333333331",
             "currency": "USD"
           }
         ],
@@ -2232,91 +2232,91 @@
         [
           "2024-10-01",
           {
-            "amount": "701587.845991617",
+            "amount": "701587.8459916165",
             "currency": "USD"
           }
         ],
         [
           "2025-01-02",
           {
-            "amount": "670548.90416569",
+            "amount": "670548.9041656901",
             "currency": "USD"
           }
         ],
         [
           "2025-04-01",
           {
-            "amount": "626545.9231465564",
+            "amount": "626545.9231465554",
             "currency": "USD"
           }
         ],
         [
           "2025-07-01",
           {
-            "amount": "602127.2566616383",
+            "amount": "602127.2566616376",
             "currency": "USD"
           }
         ],
         [
           "2025-10-01",
           {
-            "amount": "577999.3223766153",
+            "amount": "577999.3223766155",
             "currency": "USD"
           }
         ],
         [
           "2026-01-02",
           {
-            "amount": "548204.7161074615",
+            "amount": "548204.7161074624",
             "currency": "USD"
           }
         ],
         [
           "2026-04-01",
           {
-            "amount": "508041.0581031949",
+            "amount": "508041.05810319523",
             "currency": "USD"
           }
         ],
         [
           "2026-07-01",
           {
-            "amount": "486008.5448622527",
+            "amount": "486008.54486225224",
             "currency": "USD"
           }
         ],
         [
           "2026-10-01",
           {
-            "amount": "464232.4574216179",
+            "amount": "464232.45742161765",
             "currency": "USD"
           }
         ],
         [
           "2027-01-04",
           {
-            "amount": "437953.6146922244",
+            "amount": "437953.61469222486",
             "currency": "USD"
           }
         ],
         [
           "2027-04-01",
           {
-            "amount": "403519.7671349517",
+            "amount": "403519.76713495166",
             "currency": "USD"
           }
         ],
         [
           "2027-07-01",
           {
-            "amount": "383591.8410551944",
+            "amount": "383591.84105519484",
             "currency": "USD"
           }
         ],
         [
           "2027-10-01",
           {
-            "amount": "363890.0825313093",
+            "amount": "363890.08253130957",
             "currency": "USD"
           }
         ],
@@ -2332,21 +2332,21 @@
         [
           "2024-04-01",
           {
-            "amount": "2586528.591519251",
+            "amount": "2586528.5915192515",
             "currency": "USD"
           }
         ],
         [
           "2024-07-01",
           {
-            "amount": "2506596.504789011",
+            "amount": "2506596.5047890116",
             "currency": "USD"
           }
         ],
         [
           "2024-10-01",
           {
-            "amount": "2429134.577681208",
+            "amount": "2429134.5776812085",
             "currency": "USD"
           }
         ],
@@ -2360,28 +2360,28 @@
         [
           "2025-04-01",
           {
-            "amount": "2482835.962012462",
+            "amount": "2482835.962012463",
             "currency": "USD"
           }
         ],
         [
           "2025-07-01",
           {
-            "amount": "2406108.312411662",
+            "amount": "2406108.3124116627",
             "currency": "USD"
           }
         ],
         [
           "2025-10-01",
           {
-            "amount": "2331751.794977198",
+            "amount": "2331751.7949771984",
             "currency": "USD"
           }
         ],
         [
           "2026-01-02",
           {
-            "amount": "2259693.134067507",
+            "amount": "2259693.134067506",
             "currency": "USD"
           }
         ],
@@ -2402,35 +2402,35 @@
         [
           "2026-10-01",
           {
-            "amount": "2056605.083169888",
+            "amount": "2056605.0831698878",
             "currency": "USD"
           }
         ],
         [
           "2027-01-04",
           {
-            "amount": "1993049.344247539",
+            "amount": "1993049.3442475388",
             "currency": "USD"
           }
         ],
         [
           "2027-04-01",
           {
-            "amount": "1931457.68291258",
+            "amount": "1931457.6829125797",
             "currency": "USD"
           }
         ],
         [
           "2027-07-01",
           {
-            "amount": "1871769.402824528",
+            "amount": "1871769.4028245274",
             "currency": "USD"
           }
         ],
         [
           "2027-10-01",
           {
-            "amount": "1813925.68335584",
+            "amount": "1813925.6833558395",
             "currency": "USD"
           }
         ],
@@ -2457,11 +2457,11 @@
         "currency": "USD"
       },
       "total_interest": {
-        "amount": "8598939.2966848288",
+        "amount": "8598939.29668482865",
         "currency": "USD"
       },
       "total_principal": {
-        "amount": "60000000",
+        "amount": "60000000.0000000009",
         "currency": "USD"
       },
       "total_pik": {
@@ -2497,22 +2497,22 @@
         "2028-01-03"
       ],
       "cashflow": [
-        3344861.924852584, 3232238.990646198, 3130722.423672825, 3024615.378451763,
-        3109381.8851590184, 3008235.5690733003, 2909751.1173538133, 2807897.8501749686,
-        2697902.376598185, 2608196.0764093376, 2520837.540591506, 2431002.9589397633,
-        2334977.4500475316, 2255361.2438797224, 2177815.765887149, 27005140.74494716
+        3344861.9248525845, 3232238.9906461984, 3130722.423672825, 3024615.378451763,
+        3109381.8851590184, 3008235.5690733003, 2909751.1173538137, 2807897.8501749686,
+        2697902.3765981854, 2608196.0764093376, 2520837.5405915054, 2431002.9589397637,
+        2334977.450047531, 2255361.2438797224, 2177815.765887149, 27005140.74494716
       ],
       "interest": [
-        758333.333333333, 725642.485857187, 701587.845991617, 670548.90416569, 626545.9231465564,
-        602127.2566616383, 577999.3223766153, 548204.7161074615, 508041.058103195,
-        486008.5448622527, 464232.4574216178, 437953.6146922244, 403519.76713495166,
-        383591.8410551944, 363890.0825313093, 340712.143243985
+        758333.3333333331, 725642.4858571868, 701587.8459916165, 670548.9041656901,
+        626545.9231465554, 602127.2566616376, 577999.3223766155, 548204.7161074624,
+        508041.0581031952, 486008.54486225225, 464232.45742161764, 437953.6146922249,
+        403519.76713495166, 383591.8410551948, 363890.08253130957, 340712.143243985
       ],
       "principal": [
-        2586528.591519251, 2506596.504789011, 2429134.577681208, 2354066.474286073,
-        2482835.962012462, 2406108.312411662, 2331751.794977198, 2259693.134067507,
-        2189861.31849499, 2122187.531547085, 2056605.083169888, 1993049.344247539, 1931457.68291258,
-        1871769.402824528, 1813925.68335584, 26664428.60170318
+        2586528.5915192515, 2506596.5047890116, 2429134.5776812085, 2354066.474286073,
+        2482835.962012463, 2406108.3124116627, 2331751.7949771984, 2259693.134067506,
+        2189861.31849499, 2122187.531547085, 2056605.0831698875, 1993049.3442475388,
+        1931457.6829125795, 1871769.4028245271, 1813925.6833558397, 26664428.60170318
       ],
       "pik": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
       "deferred": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
@@ -2526,21 +2526,21 @@
       "moic": 1.4268306128435644,
       "nav_pct": 128.14186716713465,
       "cash_on_cash": [
-        ["2024-04-01", 0.0727961634797052],
-        ["2024-07-01", 0.0698316703396725],
-        ["2024-10-01", 0.0676946004864163],
-        ["2025-01-02", 0.06487990655154739],
-        ["2025-04-01", 0.0608010610591793],
-        ["2025-07-01", 0.0591166414926977],
+        ["2024-04-01", 0.07279616347970515],
+        ["2024-07-01", 0.0698316703396724],
+        ["2024-10-01", 0.06769460048641635],
+        ["2025-01-02", 0.0648799065515474],
+        ["2025-04-01", 0.06080106105917933],
+        ["2025-07-01", 0.059116641492697665],
         ["2025-10-01", 0.057454086741151406],
-        ["2026-01-02", 0.0552133526484656],
-        ["2026-04-01", 0.0518887804654027],
-        ["2026-07-01", 0.0503838140145571],
-        ["2026-10-01", 0.0488981323304844],
-        ["2027-01-04", 0.0469218048607356],
-        ["2027-04-01", 0.04402814898169178],
-        ["2027-07-01", 0.04268146017883712],
-        ["2027-10-01", 0.04135178054027623],
+        ["2026-01-02", 0.055213352648465615],
+        ["2026-04-01", 0.05188878046540272],
+        ["2026-07-01", 0.05038381401455712],
+        ["2026-10-01", 0.048898132330484505],
+        ["2027-01-04", 0.04692180486073564],
+        ["2027-04-01", 0.04402814898169176],
+        ["2027-07-01", 0.042681460178837095],
+        ["2027-10-01", 0.04135178054027627],
         ["2028-01-03", 0.5928892086727441]
       ]
     },
@@ -2549,10 +2549,10 @@
         {
           "payment_date": "2024-04-01",
           "pool_balance": {
-            "amount": "96909677.0477495",
+            "amount": "96909677.04774952",
             "currency": "USD"
           },
-          "pool_factor": 0.9690967704774951,
+          "pool_factor": 0.9690967704774952,
           "wac": 0.08,
           "weighted_avg_spread_bp": null,
           "warf": 3650.000000000001,
@@ -2561,11 +2561,11 @@
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2586528.591519251",
+            "amount": "2586528.5915192513",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "503794.360731214",
+            "amount": "503794.36073121346",
             "currency": "USD"
           },
           "recoveries": {
@@ -2600,27 +2600,27 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.017027400734332936,
+          "excess_spread": 0.017027400734332943,
           "coverage_tests": [
             {
               "test_id": "OC_A",
-              "ratio": 1.661628723059354,
+              "ratio": 1.6616287230593543,
               "trigger_level": 1.2,
-              "cushion": 0.4616287230593541,
+              "cushion": 0.4616287230593543,
               "passing": true
             }
           ],
           "waterfall": {
             "payment_date": "2024-04-01",
             "total_available": {
-              "amount": "4603656.892982969",
+              "amount": "4603656.8929829693",
               "currency": "USD"
             },
             "tier_allocations": [
               [
                 "A_interest",
                 {
-                  "amount": "758333.333333333",
+                  "amount": "758333.3333333333",
                   "currency": "USD"
                 }
               ],
@@ -2634,21 +2634,21 @@
               [
                 "B_interest",
                 {
-                  "amount": "530833.333333333",
+                  "amount": "530833.3333333333",
                   "currency": "USD"
                 }
               ],
               [
                 "principal",
                 {
-                  "amount": "2586528.591519251",
+                  "amount": "2586528.5915192513",
                   "currency": "USD"
                 }
               ],
               [
                 "equity",
                 {
-                  "amount": "727961.634797052",
+                  "amount": "727961.6347970514",
                   "currency": "USD"
                 }
               ]
@@ -2662,11 +2662,11 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "758333.333333333",
+                  "amount": "758333.3333333333",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "758333.333333333",
+                  "amount": "758333.3333333333",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -2684,11 +2684,11 @@
                   "tranche": "B"
                 },
                 "requested_amount": {
-                  "amount": "530833.333333333",
+                  "amount": "530833.3333333333",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "530833.333333333",
+                  "amount": "530833.3333333333",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -2710,11 +2710,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2586528.591519251",
+                  "amount": "2586528.5915192513",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "57413471.408480749",
+                  "amount": "57413471.4084807487",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -2726,11 +2726,11 @@
                 "priority": 5,
                 "recipient": "equity",
                 "requested_amount": {
-                  "amount": "727961.634797052",
+                  "amount": "727961.6347970514",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "727961.634797052",
+                  "amount": "727961.6347970514",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -2741,7 +2741,7 @@
                 "is_principal": false
               }
             ],
-            "coverage_tests": [["OC_A", 1.661628723059354, true]],
+            "coverage_tests": [["OC_A", 1.6616287230593543, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
@@ -2773,38 +2773,38 @@
           "credit_enhancement": [
             {
               "tranche_id": "A",
-              "credit_enhancement": 0.40755688020514313
+              "credit_enhancement": 0.40755688020514325
             },
             {
               "tranche_id": "B",
-              "credit_enhancement": 0.09799027226754423
+              "credit_enhancement": 0.09799027226754436
             },
             {
               "tranche_id": "E",
-              "credit_enhancement": -0.005198597044988744
+              "credit_enhancement": -0.005198597044988589
             }
           ]
         },
         {
           "payment_date": "2024-07-01",
           "pool_balance": {
-            "amount": "93914855.0549911",
+            "amount": "93914855.05499111",
             "currency": "USD"
           },
-          "pool_factor": 0.939148550549911,
+          "pool_factor": 0.9391485505499113,
           "wac": 0.08,
           "weighted_avg_spread_bp": null,
           "warf": 3650.000000000002,
           "interest_collections": {
-            "amount": "1954792.522587245",
+            "amount": "1954792.5225872445",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2506596.504789011",
+            "amount": "2506596.5047890114",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "488225.487969393",
+            "amount": "488225.4879693932",
             "currency": "USD"
           },
           "recoveries": {
@@ -2839,27 +2839,27 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.016732339760676295,
+          "excess_spread": 0.01673233976067624,
           "coverage_tests": [
             {
               "test_id": "OC_A",
-              "ratio": 1.6863334880140861,
+              "ratio": 1.6863334880140868,
               "trigger_level": 1.2,
-              "cushion": 0.48633348801408616,
+              "cushion": 0.4863334880140868,
               "passing": true
             }
           ],
           "waterfall": {
             "payment_date": "2024-07-01",
             "total_available": {
-              "amount": "4461389.027376256",
+              "amount": "4461389.0273762559",
               "currency": "USD"
             },
             "tier_allocations": [
               [
                 "A_interest",
                 {
-                  "amount": "725642.485857187",
+                  "amount": "725642.4858571872",
                   "currency": "USD"
                 }
               ],
@@ -2873,21 +2873,21 @@
               [
                 "B_interest",
                 {
-                  "amount": "530833.333333333",
+                  "amount": "530833.3333333333",
                   "currency": "USD"
                 }
               ],
               [
                 "principal",
                 {
-                  "amount": "2506596.504789011",
+                  "amount": "2506596.5047890114",
                   "currency": "USD"
                 }
               ],
               [
                 "equity",
                 {
-                  "amount": "698316.703396725",
+                  "amount": "698316.703396724",
                   "currency": "USD"
                 }
               ]
@@ -2901,11 +2901,11 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "725642.485857187",
+                  "amount": "725642.4858571872",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "725642.485857187",
+                  "amount": "725642.4858571872",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -2923,11 +2923,11 @@
                   "tranche": "B"
                 },
                 "requested_amount": {
-                  "amount": "530833.333333333",
+                  "amount": "530833.3333333333",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "530833.333333333",
+                  "amount": "530833.3333333333",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -2945,15 +2945,15 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "57413471.4084808",
+                  "amount": "57413471.40848075",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2506596.504789011",
+                  "amount": "2506596.5047890114",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "54906874.903691789",
+                  "amount": "54906874.9036917386",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -2965,11 +2965,11 @@
                 "priority": 5,
                 "recipient": "equity",
                 "requested_amount": {
-                  "amount": "698316.703396725",
+                  "amount": "698316.703396724",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "698316.703396725",
+                  "amount": "698316.703396724",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -2980,7 +2980,7 @@
                 "is_principal": false
               }
             ],
-            "coverage_tests": [["OC_A", 1.6863334880140861, true]],
+            "coverage_tests": [["OC_A", 1.6863334880140868, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
@@ -3012,38 +3012,38 @@
           "credit_enhancement": [
             {
               "tranche_id": "A",
-              "credit_enhancement": 0.41535473944413315
+              "credit_enhancement": 0.4153547394441333
             },
             {
               "tranche_id": "B",
-              "credit_enhancement": 0.09591645694416295
+              "credit_enhancement": 0.09591645694416323
             },
             {
               "tranche_id": "E",
-              "credit_enhancement": -0.010562970555827118
+              "credit_enhancement": -0.010562970555826797
             }
           ]
         },
         {
           "payment_date": "2024-10-01",
           "pool_balance": {
-            "amount": "91012582.733654",
+            "amount": "91012582.73365395",
             "currency": "USD"
           },
-          "pool_factor": 0.9101258273365401,
+          "pool_factor": 0.9101258273365394,
           "wac": 0.08000000000000002,
           "weighted_avg_spread_bp": null,
           "warf": 3650.000000000001,
           "interest_collections": {
-            "amount": "1915200.517522447",
+            "amount": "1915200.5175224468",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2429134.577681208",
+            "amount": "2429134.5776812083",
             "currency": "USD"
           },
           "defaults": {
-            "amount": "473137.743655938",
+            "amount": "473137.74365593825",
             "currency": "USD"
           },
           "recoveries": {
@@ -3078,27 +3078,27 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.016741264560987516,
+          "excess_spread": 0.016741264560987512,
           "coverage_tests": [
             {
               "test_id": "OC_A",
-              "ratio": 1.7124955757035034,
+              "ratio": 1.7124955757035025,
               "trigger_level": 1.2,
-              "cushion": 0.5124955757035035,
+              "cushion": 0.5124955757035026,
               "passing": true
             }
           ],
           "waterfall": {
             "payment_date": "2024-10-01",
             "total_available": {
-              "amount": "4344335.095203655",
+              "amount": "4344335.0952036551",
               "currency": "USD"
             },
             "tier_allocations": [
               [
                 "A_interest",
                 {
-                  "amount": "701587.845991617",
+                  "amount": "701587.8459916167",
                   "currency": "USD"
                 }
               ],
@@ -3112,21 +3112,21 @@
               [
                 "B_interest",
                 {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 }
               ],
               [
                 "principal",
                 {
-                  "amount": "2429134.577681208",
+                  "amount": "2429134.5776812083",
                   "currency": "USD"
                 }
               ],
               [
                 "equity",
                 {
-                  "amount": "676946.004864163",
+                  "amount": "676946.0048641635",
                   "currency": "USD"
                 }
               ]
@@ -3140,11 +3140,11 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "701587.845991617",
+                  "amount": "701587.8459916167",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "701587.845991617",
+                  "amount": "701587.8459916167",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -3162,11 +3162,11 @@
                   "tranche": "B"
                 },
                 "requested_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -3184,15 +3184,15 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "54906874.9036917",
+                  "amount": "54906874.90369174",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2429134.577681208",
+                  "amount": "2429134.5776812083",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "52477740.326010492",
+                  "amount": "52477740.3260105317",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3204,11 +3204,11 @@
                 "priority": 5,
                 "recipient": "equity",
                 "requested_amount": {
-                  "amount": "676946.004864163",
+                  "amount": "676946.0048641635",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "676946.004864163",
+                  "amount": "676946.0048641635",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -3219,7 +3219,7 @@
                 "is_principal": false
               }
             ],
-            "coverage_tests": [["OC_A", 1.7124955757035034, true]],
+            "coverage_tests": [["OC_A", 1.7124955757035025, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
@@ -3251,15 +3251,15 @@
           "credit_enhancement": [
             {
               "tranche_id": "A",
-              "credit_enhancement": 0.42340126222343016
+              "credit_enhancement": 0.4234012622234298
             },
             {
               "tranche_id": "B",
-              "credit_enhancement": 0.09377651036033643
+              "credit_enhancement": 0.0937765103603357
             },
             {
               "tranche_id": "E",
-              "credit_enhancement": -0.016098406927361506
+              "credit_enhancement": -0.01609840692736234
             }
           ]
         },
@@ -3274,7 +3274,7 @@
           "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
-            "amount": "1856014.636347831",
+            "amount": "1856014.6363478308",
             "currency": "USD"
           },
           "principal_collections": {
@@ -3282,7 +3282,7 @@
             "currency": "USD"
           },
           "defaults": {
-            "amount": "458516.259367979",
+            "amount": "458516.2593679787",
             "currency": "USD"
           },
           "recoveries": {
@@ -3317,27 +3317,27 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.01642363280639024,
+          "excess_spread": 0.016423632806390264,
           "coverage_tests": [
             {
               "test_id": "OC_A",
-              "ratio": 1.7402337724079056,
+              "ratio": 1.740233772407906,
               "trigger_level": 1.2,
-              "cushion": 0.5402337724079056,
+              "cushion": 0.540233772407906,
               "passing": true
             }
           ],
           "waterfall": {
             "payment_date": "2025-01-02",
             "total_available": {
-              "amount": "4210081.110633904",
+              "amount": "4210081.1106339038",
               "currency": "USD"
             },
             "tier_allocations": [
               [
                 "A_interest",
                 {
-                  "amount": "670548.90416569",
+                  "amount": "670548.9041656901",
                   "currency": "USD"
                 }
               ],
@@ -3351,7 +3351,7 @@
               [
                 "B_interest",
                 {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 }
               ],
@@ -3365,7 +3365,7 @@
               [
                 "equity",
                 {
-                  "amount": "648799.065515474",
+                  "amount": "648799.0655154741",
                   "currency": "USD"
                 }
               ]
@@ -3379,11 +3379,11 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "670548.90416569",
+                  "amount": "670548.9041656901",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "670548.90416569",
+                  "amount": "670548.9041656901",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -3401,11 +3401,11 @@
                   "tranche": "B"
                 },
                 "requested_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -3423,7 +3423,7 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "52477740.3260105",
+                  "amount": "52477740.326010525",
                   "currency": "USD"
                 },
                 "paid_amount": {
@@ -3431,7 +3431,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "50123673.851724427",
+                  "amount": "50123673.851724452",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3443,11 +3443,11 @@
                 "priority": 5,
                 "recipient": "equity",
                 "requested_amount": {
-                  "amount": "648799.065515474",
+                  "amount": "648799.0655154741",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "648799.065515474",
+                  "amount": "648799.0655154741",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -3458,7 +3458,7 @@
                 "is_principal": false
               }
             ],
-            "coverage_tests": [["OC_A", 1.7402337724079056, true]],
+            "coverage_tests": [["OC_A", 1.740233772407906, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
@@ -3490,15 +3490,15 @@
           "credit_enhancement": [
             {
               "tranche_id": "A",
-              "credit_enhancement": 0.43170437809836143
+              "credit_enhancement": 0.43170437809836154
             },
             {
               "tranche_id": "B",
-              "credit_enhancement": 0.09156832367659234
+              "credit_enhancement": 0.09156832367659251
             },
             {
               "tranche_id": "E",
-              "credit_enhancement": -0.02181036113066403
+              "credit_enhancement": -0.02181036113066386
             }
           ]
         },
@@ -3517,7 +3517,7 @@
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2281318.217719977",
+            "amount": "2281318.2177199773",
             "currency": "USD"
           },
           "defaults": {
@@ -3556,27 +3556,27 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.01548311269355263,
+          "excess_spread": 0.015483112693552648,
           "coverage_tests": [
             {
               "test_id": "OC_A",
-              "ratio": 1.7696799685392377,
+              "ratio": 1.7696799685392381,
               "trigger_level": 1.2,
-              "cushion": 0.5696799685392377,
+              "cushion": 0.5696799685392382,
               "passing": true
             }
           ],
           "waterfall": {
             "payment_date": "2025-04-01",
             "total_available": {
-              "amount": "4242392.4957508114",
+              "amount": "4242392.4957508117",
               "currency": "USD"
             },
             "tier_allocations": [
               [
                 "A_interest",
                 {
-                  "amount": "626545.923146556",
+                  "amount": "626545.9231465557",
                   "currency": "USD"
                 }
               ],
@@ -3597,14 +3597,14 @@
               [
                 "principal",
                 {
-                  "amount": "2482835.9620124624",
+                  "amount": "2482835.9620124627",
                   "currency": "USD"
                 }
               ],
               [
                 "equity",
                 {
-                  "amount": "608010.610591793",
+                  "amount": "608010.6105917933",
                   "currency": "USD"
                 }
               ]
@@ -3618,11 +3618,11 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "626545.923146556",
+                  "amount": "626545.9231465557",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "626545.923146556",
+                  "amount": "626545.9231465557",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -3662,15 +3662,15 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "50123673.8517245",
+                  "amount": "50123673.85172445",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2482835.9620124624",
+                  "amount": "2482835.9620124627",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "47640837.8897120376",
+                  "amount": "47640837.8897119873",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3682,11 +3682,11 @@
                 "priority": 5,
                 "recipient": "equity",
                 "requested_amount": {
-                  "amount": "608010.610591793",
+                  "amount": "608010.6105917933",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "608010.610591793",
+                  "amount": "608010.6105917933",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -3697,7 +3697,7 @@
                 "is_principal": false
               }
             ],
-            "coverage_tests": [["OC_A", 1.7696799685392377, true]],
+            "coverage_tests": [["OC_A", 1.7696799685392381, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
@@ -3729,34 +3729,34 @@
           "credit_enhancement": [
             {
               "tranche_id": "A",
-              "credit_enhancement": 0.4426299098706276
+              "credit_enhancement": 0.44262990987062767
             },
             {
               "tranche_id": "B",
-              "credit_enhancement": 0.09164736118854229
+              "credit_enhancement": 0.09164736118854247
             },
             {
               "tranche_id": "E",
-              "credit_enhancement": -0.025346821705486113
+              "credit_enhancement": -0.02534682170548594
             }
           ]
         },
         {
           "payment_date": "2025-07-01",
           "pool_balance": {
-            "amount": "82832902.1585021",
+            "amount": "82832902.15850206",
             "currency": "USD"
           },
-          "pool_factor": 0.828329021585021,
+          "pool_factor": 0.8283290215850205,
           "wac": 0.08000000000000002,
           "weighted_avg_spread_bp": null,
           "warf": 3650.000000000002,
           "interest_collections": {
-            "amount": "1724127.004921948",
+            "amount": "1724127.0049219477",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2210818.117223905",
+            "amount": "2210818.1172239053",
             "currency": "USD"
           },
           "defaults": {
@@ -3795,13 +3795,13 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.015574148009960409,
+          "excess_spread": 0.015574148009960398,
           "coverage_tests": [
             {
               "test_id": "OC_A",
-              "ratio": 1.8043691186486932,
+              "ratio": 1.8043691186486925,
               "trigger_level": 1.2,
-              "cushion": 0.6043691186486932,
+              "cushion": 0.6043691186486926,
               "passing": true
             }
           ],
@@ -3815,7 +3815,7 @@
               [
                 "A_interest",
                 {
-                  "amount": "602127.256661638",
+                  "amount": "602127.2566616377",
                   "currency": "USD"
                 }
               ],
@@ -3829,21 +3829,21 @@
               [
                 "B_interest",
                 {
-                  "amount": "530833.333333333",
+                  "amount": "530833.3333333333",
                   "currency": "USD"
                 }
               ],
               [
                 "principal",
                 {
-                  "amount": "2406108.3124116623",
+                  "amount": "2406108.3124116626",
                   "currency": "USD"
                 }
               ],
               [
                 "equity",
                 {
-                  "amount": "591166.414926977",
+                  "amount": "591166.4149269767",
                   "currency": "USD"
                 }
               ]
@@ -3857,11 +3857,11 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "602127.256661638",
+                  "amount": "602127.2566616377",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "602127.256661638",
+                  "amount": "602127.2566616377",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -3879,11 +3879,11 @@
                   "tranche": "B"
                 },
                 "requested_amount": {
-                  "amount": "530833.333333333",
+                  "amount": "530833.3333333333",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "530833.333333333",
+                  "amount": "530833.3333333333",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -3901,15 +3901,15 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "47640837.889712",
+                  "amount": "47640837.88971199",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2406108.3124116623",
+                  "amount": "2406108.3124116626",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "45234729.5773003377",
+                  "amount": "45234729.5773003274",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -3921,11 +3921,11 @@
                 "priority": 5,
                 "recipient": "equity",
                 "requested_amount": {
-                  "amount": "591166.414926977",
+                  "amount": "591166.4149269767",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "591166.414926977",
+                  "amount": "591166.4149269767",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -3936,7 +3936,7 @@
                 "is_principal": false
               }
             ],
-            "coverage_tests": [["OC_A", 1.8043691186486932, true]],
+            "coverage_tests": [["OC_A", 1.8043691186486925, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
@@ -3968,25 +3968,25 @@
           "credit_enhancement": [
             {
               "tranche_id": "A",
-              "credit_enhancement": 0.4539038425728107
+              "credit_enhancement": 0.4539038425728104
             },
             {
               "tranche_id": "B",
-              "credit_enhancement": 0.09172891910345644
+              "credit_enhancement": 0.09172891910345596
             },
             {
               "tranche_id": "E",
-              "credit_enhancement": -0.028996055386328278
+              "credit_enhancement": -0.028996055386328833
             }
           ]
         },
         {
           "payment_date": "2025-10-01",
           "pool_balance": {
-            "amount": "80273097.9710827",
+            "amount": "80273097.97108272",
             "currency": "USD"
           },
-          "pool_factor": 0.8027309797108271,
+          "pool_factor": 0.8027309797108272,
           "wac": 0.07999999999999999,
           "weighted_avg_spread_bp": null,
           "warf": 3650.0000000000005,
@@ -3995,7 +3995,7 @@
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2142496.697514823",
+            "amount": "2142496.6975148232",
             "currency": "USD"
           },
           "defaults": {
@@ -4034,27 +4034,27 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.01565350796708841,
+          "excess_spread": 0.015653507967088417,
           "coverage_tests": [
             {
               "test_id": "OC_A",
-              "ratio": 1.8416195840417855,
+              "ratio": 1.8416195840417857,
               "trigger_level": 1.2,
-              "cushion": 0.6416195840417855,
+              "cushion": 0.6416195840417858,
               "passing": true
             }
           ],
           "waterfall": {
             "payment_date": "2025-10-01",
             "total_available": {
-              "amount": "4020958.6514319943",
+              "amount": "4020958.6514319945",
               "currency": "USD"
             },
             "tier_allocations": [
               [
                 "A_interest",
                 {
-                  "amount": "577999.322376615",
+                  "amount": "577999.3223766154",
                   "currency": "USD"
                 }
               ],
@@ -4068,14 +4068,14 @@
               [
                 "B_interest",
                 {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 }
               ],
               [
                 "principal",
                 {
-                  "amount": "2331751.7949771983",
+                  "amount": "2331751.7949771985",
                   "currency": "USD"
                 }
               ],
@@ -4096,11 +4096,11 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "577999.322376615",
+                  "amount": "577999.3223766154",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "577999.322376615",
+                  "amount": "577999.3223766154",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -4118,11 +4118,11 @@
                   "tranche": "B"
                 },
                 "requested_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -4140,15 +4140,15 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "45234729.5773003",
+                  "amount": "45234729.57730033",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2331751.7949771983",
+                  "amount": "2331751.7949771985",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "42902977.7823231017",
+                  "amount": "42902977.7823231315",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4175,7 +4175,7 @@
                 "is_principal": false
               }
             ],
-            "coverage_tests": [["OC_A", 1.8416195840417855, true]],
+            "coverage_tests": [["OC_A", 1.8416195840417857, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
@@ -4207,25 +4207,25 @@
           "credit_enhancement": [
             {
               "tranche_id": "A",
-              "credit_enhancement": 0.46553728625524887
+              "credit_enhancement": 0.46553728625524904
             },
             {
               "tranche_id": "B",
-              "credit_enhancement": 0.09181307779369062
+              "credit_enhancement": 0.09181307779369098
             },
             {
               "tranche_id": "E",
-              "credit_enhancement": -0.03276165836016212
+              "credit_enhancement": -0.03276165836016175
             }
           ]
         },
         {
           "payment_date": "2026-01-02",
           "pool_balance": {
-            "amount": "77792399.9999999",
+            "amount": "77792399.99999985",
             "currency": "USD"
           },
-          "pool_factor": 0.777923999999999,
+          "pool_factor": 0.7779239999999985,
           "wac": 0.08000000000000002,
           "weighted_avg_spread_bp": null,
           "warf": 3650.0,
@@ -4234,7 +4234,7 @@
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "2076286.630320315",
+            "amount": "2076286.6303203147",
             "currency": "USD"
           },
           "defaults": {
@@ -4273,27 +4273,27 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.015421690695859787,
+          "excess_spread": 0.015421690695859795,
           "coverage_tests": [
             {
               "test_id": "OC_A",
-              "ratio": 1.881705406989686,
+              "ratio": 1.8817054069896855,
               "trigger_level": 1.2,
-              "cushion": 0.681705406989686,
+              "cushion": 0.6817054069896855,
               "passing": true
             }
           ],
           "waterfall": {
             "payment_date": "2026-01-02",
             "total_available": {
-              "amount": "3896698.0433262915",
+              "amount": "3896698.0433262912",
               "currency": "USD"
             },
             "tier_allocations": [
               [
                 "A_interest",
                 {
-                  "amount": "548204.716107462",
+                  "amount": "548204.7161074622",
                   "currency": "USD"
                 }
               ],
@@ -4307,21 +4307,21 @@
               [
                 "B_interest",
                 {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 }
               ],
               [
                 "principal",
                 {
-                  "amount": "2259693.1340675065",
+                  "amount": "2259693.1340675062",
                   "currency": "USD"
                 }
               ],
               [
                 "equity",
                 {
-                  "amount": "552133.526484656",
+                  "amount": "552133.5264846561",
                   "currency": "USD"
                 }
               ]
@@ -4335,11 +4335,11 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "548204.716107462",
+                  "amount": "548204.7161074622",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "548204.716107462",
+                  "amount": "548204.7161074622",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -4357,11 +4357,11 @@
                   "tranche": "B"
                 },
                 "requested_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -4379,15 +4379,15 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "42902977.78232314",
+                  "amount": "42902977.78232313",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2259693.1340675065",
+                  "amount": "2259693.1340675062",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "40643284.6482556335",
+                  "amount": "40643284.6482556238",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4399,11 +4399,11 @@
                 "priority": 5,
                 "recipient": "equity",
                 "requested_amount": {
-                  "amount": "552133.526484656",
+                  "amount": "552133.5264846561",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "552133.526484656",
+                  "amount": "552133.5264846561",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -4414,17 +4414,17 @@
                 "is_principal": false
               }
             ],
-            "coverage_tests": [["OC_A", 1.881705406989686, true]],
+            "coverage_tests": [["OC_A", 1.8817054069896855, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
             "remaining_cash": {
-              "amount": "0",
+              "amount": "0.0000000001",
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0",
+              "amount": "0.0000000001",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -4446,30 +4446,30 @@
           "credit_enhancement": [
             {
               "tranche_id": "A",
-              "credit_enhancement": 0.47754170525326783
+              "credit_enhancement": 0.47754170525326767
             },
             {
               "tranche_id": "B",
-              "credit_enhancement": 0.09189992019457266
+              "credit_enhancement": 0.09189992019457233
             },
             {
               "tranche_id": "E",
-              "credit_enhancement": -0.036647341491659075
+              "credit_enhancement": -0.03664734149165948
             }
           ]
         },
         {
           "payment_date": "2026-04-01",
           "pool_balance": {
-            "amount": "75388363.6076934",
+            "amount": "75388363.60769337",
             "currency": "USD"
           },
-          "pool_factor": 0.7538836360769341,
+          "pool_factor": 0.7538836360769338,
           "wac": 0.07999999999999999,
           "weighted_avg_spread_bp": null,
           "warf": 3650.0,
           "interest_collections": {
-            "amount": "1551928.862757222",
+            "amount": "1551928.8627572224",
             "currency": "USD"
           },
           "principal_collections": {
@@ -4512,27 +4512,27 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.014589577906713091,
+          "excess_spread": 0.0145895779067131,
           "coverage_tests": [
             {
               "test_id": "OC_A",
-              "ratio": 1.9249409730883948,
+              "ratio": 1.9249409730883944,
               "trigger_level": 1.2,
-              "cushion": 0.7249409730883949,
+              "cushion": 0.7249409730883944,
               "passing": true
             }
           ],
           "waterfall": {
             "payment_date": "2026-04-01",
             "total_available": {
-              "amount": "3741790.1812522119",
+              "amount": "3741790.1812522124",
               "currency": "USD"
             },
             "tier_allocations": [
               [
                 "A_interest",
                 {
-                  "amount": "508041.058103195",
+                  "amount": "508041.05810319533",
                   "currency": "USD"
                 }
               ],
@@ -4560,7 +4560,7 @@
               [
                 "equity",
                 {
-                  "amount": "518887.804654027",
+                  "amount": "518887.8046540272",
                   "currency": "USD"
                 }
               ]
@@ -4574,11 +4574,11 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "508041.058103195",
+                  "amount": "508041.05810319533",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "508041.058103195",
+                  "amount": "508041.05810319533",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -4618,7 +4618,7 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "40643284.64825563",
+                  "amount": "40643284.648255624",
                   "currency": "USD"
                 },
                 "paid_amount": {
@@ -4626,7 +4626,7 @@
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "38453423.3297606401",
+                  "amount": "38453423.3297606341",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4638,11 +4638,11 @@
                 "priority": 5,
                 "recipient": "equity",
                 "requested_amount": {
-                  "amount": "518887.804654027",
+                  "amount": "518887.8046540272",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "518887.804654027",
+                  "amount": "518887.8046540272",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -4653,17 +4653,17 @@
                 "is_principal": false
               }
             ],
-            "coverage_tests": [["OC_A", 1.9249409730883948, true]],
+            "coverage_tests": [["OC_A", 1.9249409730883944, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
             "remaining_cash": {
-              "amount": "0",
+              "amount": "-0.00000000003",
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0",
+              "amount": "-0.00000000003",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -4685,15 +4685,15 @@
           "credit_enhancement": [
             {
               "tranche_id": "A",
-              "credit_enhancement": 0.48992892948486205
+              "credit_enhancement": 0.48992892948486194
             },
             {
               "tranche_id": "B",
-              "credit_enhancement": 0.09198953188612587
+              "credit_enhancement": 0.0919895318861255
             },
             {
               "tranche_id": "E",
-              "credit_enhancement": -0.04065693398011953
+              "credit_enhancement": -0.04065693398011995
             }
           ]
         },
@@ -4716,11 +4716,11 @@
             "currency": "USD"
           },
           "defaults": {
-            "amount": "379802.3245031016",
+            "amount": "379802.32450310155",
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "172245.9521556017",
+            "amount": "172245.95215560174",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -4751,27 +4751,27 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.014641874806023697,
+          "excess_spread": 0.014641874806023724,
           "coverage_tests": [
             {
               "test_id": "OC_A",
-              "ratio": 1.9716887242246188,
+              "ratio": 1.9716887242246193,
               "trigger_level": 1.2,
-              "cushion": 0.7716887242246189,
+              "cushion": 0.7716887242246193,
               "passing": true
             }
           ],
           "waterfall": {
             "payment_date": "2026-07-01",
             "total_available": {
-              "amount": "3642867.5498882417",
+              "amount": "3642867.54988824174",
               "currency": "USD"
             },
             "tier_allocations": [
               [
                 "A_interest",
                 {
-                  "amount": "486008.544862253",
+                  "amount": "486008.5448622525",
                   "currency": "USD"
                 }
               ],
@@ -4785,21 +4785,21 @@
               [
                 "B_interest",
                 {
-                  "amount": "530833.333333333",
+                  "amount": "530833.3333333333",
                   "currency": "USD"
                 }
               ],
               [
                 "principal",
                 {
-                  "amount": "2122187.5315470847",
+                  "amount": "2122187.53154708474",
                   "currency": "USD"
                 }
               ],
               [
                 "equity",
                 {
-                  "amount": "503838.140145571",
+                  "amount": "503838.1401455712",
                   "currency": "USD"
                 }
               ]
@@ -4813,11 +4813,11 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "486008.544862253",
+                  "amount": "486008.5448622525",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "486008.544862253",
+                  "amount": "486008.5448622525",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -4835,11 +4835,11 @@
                   "tranche": "B"
                 },
                 "requested_amount": {
-                  "amount": "530833.333333333",
+                  "amount": "530833.3333333333",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "530833.333333333",
+                  "amount": "530833.3333333333",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -4857,15 +4857,15 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "38453423.32976064",
+                  "amount": "38453423.32976063",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2122187.5315470847",
+                  "amount": "2122187.53154708474",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "36331235.7982135553",
+                  "amount": "36331235.79821354526",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -4877,11 +4877,11 @@
                 "priority": 5,
                 "recipient": "equity",
                 "requested_amount": {
-                  "amount": "503838.140145571",
+                  "amount": "503838.1401455712",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "503838.140145571",
+                  "amount": "503838.1401455712",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -4892,7 +4892,7 @@
                 "is_principal": false
               }
             ],
-            "coverage_tests": [["OC_A", 1.9716887242246188, true]],
+            "coverage_tests": [["OC_A", 1.9716887242246193, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
@@ -4916,7 +4916,7 @@
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "172245.9521556017",
+              "amount": "172245.95215560174",
               "currency": "USD"
             }
           },
@@ -4924,30 +4924,30 @@
           "credit_enhancement": [
             {
               "tranche_id": "A",
-              "credit_enhancement": 0.5027111661086521
+              "credit_enhancement": 0.5027111661086522
             },
             {
               "tranche_id": "B",
-              "credit_enhancement": 0.09208200117741128
+              "credit_enhancement": 0.09208200117741139
             },
             {
               "tranche_id": "E",
-              "credit_enhancement": -0.04479438713300233
+              "credit_enhancement": -0.04479438713300213
             }
           ]
         },
         {
           "payment_date": "2026-10-01",
           "pool_balance": {
-            "amount": "70800872.4104949",
+            "amount": "70800872.41049492",
             "currency": "USD"
           },
-          "pool_factor": 0.708008724104949,
+          "pool_factor": 0.7080087241049492,
           "wac": 0.08000000000000002,
           "weighted_avg_spread_bp": null,
           "warf": 3650.0000000000005,
           "interest_collections": {
-            "amount": "1489880.447393129",
+            "amount": "1489880.4473931293",
             "currency": "USD"
           },
           "principal_collections": {
@@ -4959,7 +4959,7 @@
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "166922.9959618149",
+            "amount": "166922.99596181485",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -4990,27 +4990,27 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.01468093433653638,
+          "excess_spread": 0.014680934336536437,
           "coverage_tests": [
             {
               "test_id": "OC_A",
-              "ratio": 2.0223687115959104,
+              "ratio": 2.022368711595911,
               "trigger_level": 1.2,
-              "cushion": 0.8223687115959104,
+              "cushion": 0.8223687115959109,
               "passing": true
             }
           ],
           "waterfall": {
             "payment_date": "2026-10-01",
             "total_available": {
-              "amount": "3546485.5305630169",
+              "amount": "3546485.53056301715",
               "currency": "USD"
             },
             "tier_allocations": [
               [
                 "A_interest",
                 {
-                  "amount": "464232.457421618",
+                  "amount": "464232.4574216176",
                   "currency": "USD"
                 }
               ],
@@ -5024,21 +5024,21 @@
               [
                 "B_interest",
                 {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 }
               ],
               [
                 "principal",
                 {
-                  "amount": "2056605.0831698879",
+                  "amount": "2056605.08316988785",
                   "currency": "USD"
                 }
               ],
               [
                 "equity",
                 {
-                  "amount": "488981.323304844",
+                  "amount": "488981.323304845",
                   "currency": "USD"
                 }
               ]
@@ -5052,11 +5052,11 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "464232.457421618",
+                  "amount": "464232.4574216176",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "464232.457421618",
+                  "amount": "464232.4574216176",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -5074,11 +5074,11 @@
                   "tranche": "B"
                 },
                 "requested_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -5096,15 +5096,15 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "36331235.79821356",
+                  "amount": "36331235.79821355",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "2056605.0831698879",
+                  "amount": "2056605.08316988785",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "34274630.7150436721",
+                  "amount": "34274630.71504366215",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5116,11 +5116,11 @@
                 "priority": 5,
                 "recipient": "equity",
                 "requested_amount": {
-                  "amount": "488981.323304844",
+                  "amount": "488981.323304845",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "488981.323304844",
+                  "amount": "488981.323304845",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -5131,17 +5131,17 @@
                 "is_principal": false
               }
             ],
-            "coverage_tests": [["OC_A", 2.0223687115959104, true]],
+            "coverage_tests": [["OC_A", 2.022368711595911, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
             "remaining_cash": {
-              "amount": "0",
+              "amount": "0.0000000001",
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0",
+              "amount": "0.0000000001",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -5155,7 +5155,7 @@
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "166922.9959618149",
+              "amount": "166922.99596181485",
               "currency": "USD"
             }
           },
@@ -5163,34 +5163,34 @@
           "credit_enhancement": [
             {
               "tranche_id": "A",
-              "credit_enhancement": 0.5159010115535936
+              "credit_enhancement": 0.5159010115535938
             },
             {
               "tranche_id": "B",
-              "credit_enhancement": 0.09217741919354991
+              "credit_enhancement": 0.09217741919355028
             },
             {
               "tranche_id": "E",
-              "credit_enhancement": -0.049063778259797984
+              "credit_enhancement": -0.04906377825979754
             }
           ]
         },
         {
           "payment_date": "2027-01-04",
           "pool_balance": {
-            "amount": "68612896.7999998",
+            "amount": "68612896.79999983",
             "currency": "USD"
           },
-          "pool_factor": 0.686128967999998,
+          "pool_factor": 0.6861289679999983,
           "wac": 0.08,
           "weighted_avg_spread_bp": null,
           "warf": 3649.9999999999995,
           "interest_collections": {
-            "amount": "1443838.329966248",
+            "amount": "1443838.3299662475",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "1831284.807942516",
+            "amount": "1831284.8079425163",
             "currency": "USD"
           },
           "defaults": {
@@ -5198,7 +5198,7 @@
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "161764.5363050228",
+            "amount": "161764.53630502276",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -5229,20 +5229,20 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.01441810296326136,
+          "excess_spread": 0.014418102963261367,
           "coverage_tests": [
             {
               "test_id": "OC_A",
-              "ratio": 2.0774705221248717,
+              "ratio": 2.0774705221248726,
               "trigger_level": 1.2,
-              "cushion": 0.8774705221248718,
+              "cushion": 0.8774705221248726,
               "passing": true
             }
           ],
           "waterfall": {
             "payment_date": "2027-01-04",
             "total_available": {
-              "amount": "3436887.6742137868",
+              "amount": "3436887.67421378666",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -5263,21 +5263,21 @@
               [
                 "B_interest",
                 {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 }
               ],
               [
                 "principal",
                 {
-                  "amount": "1993049.3442475388",
+                  "amount": "1993049.34424753906",
                   "currency": "USD"
                 }
               ],
               [
                 "equity",
                 {
-                  "amount": "469218.048607356",
+                  "amount": "469218.0486073564",
                   "currency": "USD"
                 }
               ]
@@ -5313,11 +5313,11 @@
                   "tranche": "B"
                 },
                 "requested_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -5335,15 +5335,15 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "34274630.71504366",
+                  "amount": "34274630.715043664",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "1993049.3442475388",
+                  "amount": "1993049.34424753906",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "32281581.3707961212",
+                  "amount": "32281581.37079612494",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5355,11 +5355,11 @@
                 "priority": 5,
                 "recipient": "equity",
                 "requested_amount": {
-                  "amount": "469218.048607356",
+                  "amount": "469218.0486073564",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "469218.048607356",
+                  "amount": "469218.0486073564",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -5370,17 +5370,17 @@
                 "is_principal": false
               }
             ],
-            "coverage_tests": [["OC_A", 2.0774705221248717, true]],
+            "coverage_tests": [["OC_A", 2.0774705221248726, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
             "remaining_cash": {
-              "amount": "0.0000000004",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0.0000000004",
+              "amount": "0",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -5394,7 +5394,7 @@
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "161764.5363050228",
+              "amount": "161764.53630502276",
               "currency": "USD"
             }
           },
@@ -5402,22 +5402,22 @@
           "credit_enhancement": [
             {
               "tranche_id": "A",
-              "credit_enhancement": 0.5295114639322993
+              "credit_enhancement": 0.5295114639322995
             },
             {
               "tranche_id": "B",
-              "credit_enhancement": 0.0922758799655241
+              "credit_enhancement": 0.09227587996552448
             },
             {
               "tranche_id": "E",
-              "credit_enhancement": -0.05346931469006766
+              "credit_enhancement": -0.0534693146900672
             }
           ]
         },
         {
           "payment_date": "2027-04-01",
           "pool_balance": {
-            "amount": "66492536.7019855",
+            "amount": "66492536.70198551",
             "currency": "USD"
           },
           "pool_factor": 0.664925367019855,
@@ -5425,11 +5425,11 @@
           "weighted_avg_spread_bp": null,
           "warf": 3649.999999999999,
           "interest_collections": {
-            "amount": "1368801.256951869",
+            "amount": "1368801.2569518693",
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "1774692.193201593",
+            "amount": "1774692.1932015926",
             "currency": "USD"
           },
           "defaults": {
@@ -5468,7 +5468,7 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.013576499917099095,
+          "excess_spread": 0.013576499917099104,
           "coverage_tests": [
             {
               "test_id": "OC_A",
@@ -5481,14 +5481,14 @@
           "waterfall": {
             "payment_date": "2027-04-01",
             "total_available": {
-              "amount": "3300258.9398644495",
+              "amount": "3300258.939864449",
               "currency": "USD"
             },
             "tier_allocations": [
               [
                 "A_interest",
                 {
-                  "amount": "403519.7671349516",
+                  "amount": "403519.76713495166",
                   "currency": "USD"
                 }
               ],
@@ -5509,14 +5509,14 @@
               [
                 "principal",
                 {
-                  "amount": "1931457.6829125801",
+                  "amount": "1931457.6829125797",
                   "currency": "USD"
                 }
               ],
               [
                 "equity",
                 {
-                  "amount": "440281.4898169178",
+                  "amount": "440281.4898169176",
                   "currency": "USD"
                 }
               ]
@@ -5530,11 +5530,11 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "403519.7671349516",
+                  "amount": "403519.76713495166",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "403519.7671349516",
+                  "amount": "403519.76713495166",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -5578,11 +5578,11 @@
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "1931457.6829125801",
+                  "amount": "1931457.6829125797",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "30350123.6878835499",
+                  "amount": "30350123.6878835503",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5594,11 +5594,11 @@
                 "priority": 5,
                 "recipient": "equity",
                 "requested_amount": {
-                  "amount": "440281.4898169178",
+                  "amount": "440281.4898169176",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "440281.4898169178",
+                  "amount": "440281.4898169176",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -5615,11 +5615,11 @@
               "currency": "USD"
             },
             "remaining_cash": {
-              "amount": "0",
+              "amount": "0.00000000004",
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0",
+              "amount": "0.00000000004",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -5641,25 +5641,25 @@
           "credit_enhancement": [
             {
               "tranche_id": "A",
-              "credit_enhancement": 0.5435559358502068
+              "credit_enhancement": 0.543555935850207
             },
             {
               "tranche_id": "B",
-              "credit_enhancement": 0.09237748052284106
+              "credit_enhancement": 0.09237748052284116
             },
             {
               "tranche_id": "E",
-              "credit_enhancement": -0.058015337919614225
+              "credit_enhancement": -0.05801533791961411
             }
           ]
         },
         {
           "payment_date": "2027-07-01",
           "pool_balance": {
-            "amount": "64437702.5787505",
+            "amount": "64437702.578750476",
             "currency": "USD"
           },
-          "pool_factor": 0.644377025787505,
+          "pool_factor": 0.6443770257875049,
           "wac": 0.08,
           "weighted_avg_spread_bp": null,
           "warf": 3650.0,
@@ -5668,7 +5668,7 @@
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "1719848.473023287",
+            "amount": "1719848.4730232868",
             "currency": "USD"
           },
           "defaults": {
@@ -5676,7 +5676,7 @@
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "151920.9298012406",
+            "amount": "151920.92980124064",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -5707,20 +5707,20 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.013584875708589817,
+          "excess_spread": 0.013584875708589801,
           "coverage_tests": [
             {
               "test_id": "OC_A",
-              "ratio": 2.2033398115520972,
+              "ratio": 2.2033398115520964,
               "trigger_level": 1.2,
-              "cushion": 1.0033398115520973,
+              "cushion": 1.0033398115520964,
               "passing": true
             }
           ],
           "waterfall": {
             "payment_date": "2027-07-01",
             "total_available": {
-              "amount": "3213009.1790014266",
+              "amount": "3213009.17900142648",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -5741,21 +5741,21 @@
               [
                 "B_interest",
                 {
-                  "amount": "530833.333333333",
+                  "amount": "530833.3333333333",
                   "currency": "USD"
                 }
               ],
               [
                 "principal",
                 {
-                  "amount": "1871769.4028245276",
+                  "amount": "1871769.40282452744",
                   "currency": "USD"
                 }
               ],
               [
                 "equity",
                 {
-                  "amount": "426814.6017883712",
+                  "amount": "426814.601788371",
                   "currency": "USD"
                 }
               ]
@@ -5791,11 +5791,11 @@
                   "tranche": "B"
                 },
                 "requested_amount": {
-                  "amount": "530833.333333333",
+                  "amount": "530833.3333333333",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "530833.333333333",
+                  "amount": "530833.3333333333",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -5813,15 +5813,15 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "30350123.68788355",
+                  "amount": "30350123.687883545",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "1871769.4028245276",
+                  "amount": "1871769.40282452744",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "28478354.2850590224",
+                  "amount": "28478354.28505901756",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -5833,11 +5833,11 @@
                 "priority": 5,
                 "recipient": "equity",
                 "requested_amount": {
-                  "amount": "426814.6017883712",
+                  "amount": "426814.601788371",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "426814.6017883712",
+                  "amount": "426814.601788371",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -5848,17 +5848,17 @@
                 "is_principal": false
               }
             ],
-            "coverage_tests": [["OC_A", 2.2033398115520972, true]],
+            "coverage_tests": [["OC_A", 2.2033398115520964, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
             },
             "remaining_cash": {
-              "amount": "0",
+              "amount": "-0.00000000006",
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "0",
+              "amount": "-0.00000000006",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -5872,7 +5872,7 @@
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "151920.9298012406",
+              "amount": "151920.92980124064",
               "currency": "USD"
             }
           },
@@ -5880,25 +5880,25 @@
           "credit_enhancement": [
             {
               "tranche_id": "A",
-              "credit_enhancement": 0.5580482676232118
+              "credit_enhancement": 0.5580482676232117
             },
             {
               "tranche_id": "B",
-              "credit_enhancement": 0.09248232098915149
+              "credit_enhancement": 0.09248232098915128
             },
             {
               "tranche_id": "E",
-              "credit_enhancement": -0.06270632788886858
+              "credit_enhancement": -0.06270632788886883
             }
           ]
         },
         {
           "payment_date": "2027-10-01",
           "pool_balance": {
-            "amount": "62446369.4660565",
+            "amount": "62446369.46605646",
             "currency": "USD"
           },
-          "pool_factor": 0.6244636946605651,
+          "pool_factor": 0.6244636946605646,
           "wac": 0.08,
           "weighted_avg_spread_bp": null,
           "warf": 3649.9999999999995,
@@ -5907,7 +5907,7 @@
             "currency": "USD"
           },
           "principal_collections": {
-            "amount": "1666699.600917519",
+            "amount": "1666699.6009175188",
             "currency": "USD"
           },
           "defaults": {
@@ -5915,7 +5915,7 @@
             "currency": "USD"
           },
           "recoveries": {
-            "amount": "147226.0824383206",
+            "amount": "147226.08243832057",
             "currency": "USD"
           },
           "reinvested_par": {
@@ -5946,20 +5946,20 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.013578243145434361,
+          "excess_spread": 0.013578243145434389,
           "coverage_tests": [
             {
               "test_id": "OC_A",
-              "ratio": 2.2755909856474155,
+              "ratio": 2.275590985647414,
               "trigger_level": 1.2,
-              "cushion": 1.0755909856474155,
+              "cushion": 1.0755909856474142,
               "passing": true
             }
           ],
           "waterfall": {
             "payment_date": "2027-10-01",
             "total_available": {
-              "amount": "3128000.2379565786",
+              "amount": "3128000.23795657837",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -5980,21 +5980,21 @@
               [
                 "B_interest",
                 {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 }
               ],
               [
                 "principal",
                 {
-                  "amount": "1813925.6833558397",
+                  "amount": "1813925.68335583947",
                   "currency": "USD"
                 }
               ],
               [
                 "equity",
                 {
-                  "amount": "413517.8054027623",
+                  "amount": "413517.8054027627",
                   "currency": "USD"
                 }
               ]
@@ -6030,11 +6030,11 @@
                   "tranche": "B"
                 },
                 "requested_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -6052,15 +6052,15 @@
                   "tranche": "A"
                 },
                 "requested_amount": {
-                  "amount": "28478354.28505902",
+                  "amount": "28478354.285059016",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "1813925.6833558397",
+                  "amount": "1813925.68335583947",
                   "currency": "USD"
                 },
                 "shortfall": {
-                  "amount": "26664428.6017031803",
+                  "amount": "26664428.60170317653",
                   "currency": "USD"
                 },
                 "diverted": false,
@@ -6072,11 +6072,11 @@
                 "priority": 5,
                 "recipient": "equity",
                 "requested_amount": {
-                  "amount": "413517.8054027623",
+                  "amount": "413517.8054027627",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "413517.8054027623",
+                  "amount": "413517.8054027627",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -6087,7 +6087,7 @@
                 "is_principal": false
               }
             ],
-            "coverage_tests": [["OC_A", 2.2755909856474155, true]],
+            "coverage_tests": [["OC_A", 2.275590985647414, true]],
             "diverted_cash": {
               "amount": "0",
               "currency": "USD"
@@ -6111,7 +6111,7 @@
             "had_diversions": false,
             "diverted_amounts": [],
             "recovery_proceeds": {
-              "amount": "147226.0824383206",
+              "amount": "147226.08243832057",
               "currency": "USD"
             }
           },
@@ -6119,15 +6119,15 @@
           "credit_enhancement": [
             {
               "tranche_id": "A",
-              "credit_enhancement": 0.5730027409167966
+              "credit_enhancement": 0.5730027409167963
             },
             {
               "tranche_id": "B",
-              "credit_enhancement": 0.09259050468091931
+              "credit_enhancement": 0.09259050468091866
             },
             {
               "tranche_id": "E",
-              "credit_enhancement": -0.06754690739770638
+              "credit_enhancement": -0.06754690739770715
             }
           ]
         },
@@ -6142,7 +6142,7 @@
           "weighted_avg_spread_bp": null,
           "warf": 3649.999999999999,
           "interest_collections": {
-            "amount": "1273465.407030229",
+            "amount": "1273465.4070302293",
             "currency": "USD"
           },
           "principal_collections": {
@@ -6185,7 +6185,7 @@
             "amount": "0",
             "currency": "USD"
           },
-          "excess_spread": 0.013280248391154206,
+          "excess_spread": 0.013280248391154251,
           "coverage_tests": [
             {
               "test_id": "OC_A",
@@ -6198,7 +6198,7 @@
           "waterfall": {
             "payment_date": "2028-01-03",
             "total_available": {
-              "amount": "2888658.607635527",
+              "amount": "2888658.6076355273",
               "currency": "USD"
             },
             "tier_allocations": [
@@ -6219,7 +6219,7 @@
               [
                 "B_interest",
                 {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 }
               ],
@@ -6262,11 +6262,11 @@
                   "tranche": "B"
                 },
                 "requested_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "paid_amount": {
-                  "amount": "536666.666666667",
+                  "amount": "536666.6666666666",
                   "currency": "USD"
                 },
                 "shortfall": {
@@ -6305,11 +6305,11 @@
               "currency": "USD"
             },
             "remaining_cash": {
-              "amount": "396086.597119577",
+              "amount": "396086.5971195777",
               "currency": "USD"
             },
             "remaining_interest": {
-              "amount": "396086.597119577",
+              "amount": "396086.5971195777",
               "currency": "USD"
             },
             "remaining_principal": {
@@ -6670,7 +6670,7 @@
     "with_standard_fees": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"structured_credit\",\"spec\":{\"id\":\"CLO-TYPED\",\"deal_type\":\"clo\",\"pool\":{\"id\":\"P\",\"deal_type\":\"clo\",\"currency\":\"USD\",\"assets\":[{\"id\":\"L0\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L1\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L2\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L3\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L4\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L5\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L6\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L7\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L8\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L9\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null}],\"cumulative_defaults\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_recoveries\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_prepayments\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_scheduled_amortization\":{\"amount\":\"0\",\"currency\":\"USD\"},\"reinvestment_period\":null,\"collection_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"reserve_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"excess_spread_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"rep_lines\":null},\"tranches\":{\"tranches\":[{\"id\":\"A\",\"attach_pct\":40.0,\"detach_pct\":100.0,\"seniority\":\"senior\",\"rating\":null,\"original_balance\":{\"amount\":\"60000000\",\"currency\":\"USD\"},\"current_balance\":{\"amount\":\"60000000\",\"currency\":\"USD\"},\"coupon\":{\"fixed\":{\"rate\":0.05}},\"oc_trigger\":null,\"ic_trigger\":null,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"deferred_interest\":{\"amount\":\"0\",\"currency\":\"USD\"},\"pik_enabled\":false,\"maturity\":\"2032-01-01\",\"attributes\":{}},{\"id\":\"B\",\"attach_pct\":10.0,\"detach_pct\":40.0,\"seniority\":\"mezzanine\",\"rating\":null,\"original_balance\":{\"amount\":\"30000000\",\"currency\":\"USD\"},\"current_balance\":{\"amount\":\"30000000\",\"currency\":\"USD\"},\"coupon\":{\"fixed\":{\"rate\":0.07}},\"oc_trigger\":null,\"ic_trigger\":null,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"deferred_interest\":{\"amount\":\"0\",\"currency\":\"USD\"},\"pik_enabled\":false,\"maturity\":\"2032-01-01\",\"attributes\":{}},{\"id\":\"E\",\"attach_pct\":0.0,\"detach_pct\":10.0,\"seniority\":\"equity\",\"rating\":null,\"original_balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"current_balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"coupon\":{\"fixed\":{\"rate\":0.0}},\"oc_trigger\":null,\"ic_trigger\":null,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"deferred_interest\":{\"amount\":\"0\",\"currency\":\"USD\"},\"pik_enabled\":false,\"maturity\":\"2032-01-01\",\"attributes\":{}}]},\"closing_date\":\"2024-01-01\",\"first_payment_date\":\"2024-04-01\",\"maturity\":\"2032-01-01\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"calendar_id\":\"nyse\",\"discount_curve_id\":\"USD-OIS\",\"attributes\":{\"meta\":{\"desk\":\"abs\"}},\"prepayment_spec\":{\"curve\":\"constant\",\"cpr\":0.1},\"default_spec\":{\"curve\":\"constant\",\"cdr\":0.02},\"recovery_spec\":{\"rate\":0.4,\"recovery_lag\":12},\"market_conditions\":{\"refi_rate\":0.04},\"deal_metadata\":{\"manager_id\":null,\"servicer_id\":null,\"master_servicer_id\":null,\"special_servicer_id\":null,\"trustee_id\":null},\"hedge_swaps\":[],\"fees\":{\"trustee_fee\":{\"amount\":\"50000\",\"currency\":\"USD\"},\"senior_mgmt_fee_bp\":15.0,\"subordinated_mgmt_fee_bp\":35.0,\"servicing_fee_bp\":0.0,\"master_servicer_fee_bp\":null,\"special_servicer_fee_bp\":null,\"incentive_fee\":{\"hurdle_irr\":0.12,\"share\":0.2}},\"coverage_triggers\":[{\"id\":\"OC_A\",\"tranche_id\":\"A\",\"kind\":\"oc\",\"trigger_level\":1.2,\"action\":\"pay_down_senior\"}],\"cleanup_call_decimal\":0.1,\"call_assumption\":{\"date\":\"2028-01-01\",\"price_pct\":100.0,\"scope\":\"deal\"},\"liquidation_price_pct\":99.0,\"loss_allocation\":\"par_preserving\",\"principal_covers_senior_interest\":true,\"coverage_rules\":{\"rating_haircuts\":{},\"defaulted_valuation\":\"recovery\",\"ccc_bucket\":{\"threshold_pct\":7.5,\"carry_at_market_value\":true},\"discount_obligation\":{\"price_threshold_pct\":80.0}}}}}",
     "enable_stochastic": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"structured_credit\",\"spec\":{\"id\":\"CLO-TYPED\",\"deal_type\":\"clo\",\"pool\":{\"id\":\"P\",\"deal_type\":\"clo\",\"currency\":\"USD\",\"assets\":[{\"id\":\"L0\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L1\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L2\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L3\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L4\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L5\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L6\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L7\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L8\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L9\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null}],\"cumulative_defaults\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_recoveries\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_prepayments\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_scheduled_amortization\":{\"amount\":\"0\",\"currency\":\"USD\"},\"reinvestment_period\":null,\"collection_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"reserve_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"excess_spread_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"rep_lines\":null},\"tranches\":{\"tranches\":[{\"id\":\"A\",\"attach_pct\":40.0,\"detach_pct\":100.0,\"seniority\":\"senior\",\"rating\":null,\"original_balance\":{\"amount\":\"60000000\",\"currency\":\"USD\"},\"current_balance\":{\"amount\":\"60000000\",\"currency\":\"USD\"},\"coupon\":{\"fixed\":{\"rate\":0.05}},\"oc_trigger\":null,\"ic_trigger\":null,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"deferred_interest\":{\"amount\":\"0\",\"currency\":\"USD\"},\"pik_enabled\":false,\"maturity\":\"2032-01-01\",\"attributes\":{}},{\"id\":\"B\",\"attach_pct\":10.0,\"detach_pct\":40.0,\"seniority\":\"mezzanine\",\"rating\":null,\"original_balance\":{\"amount\":\"30000000\",\"currency\":\"USD\"},\"current_balance\":{\"amount\":\"30000000\",\"currency\":\"USD\"},\"coupon\":{\"fixed\":{\"rate\":0.07}},\"oc_trigger\":null,\"ic_trigger\":null,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"deferred_interest\":{\"amount\":\"0\",\"currency\":\"USD\"},\"pik_enabled\":false,\"maturity\":\"2032-01-01\",\"attributes\":{}},{\"id\":\"E\",\"attach_pct\":0.0,\"detach_pct\":10.0,\"seniority\":\"equity\",\"rating\":null,\"original_balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"current_balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"coupon\":{\"fixed\":{\"rate\":0.0}},\"oc_trigger\":null,\"ic_trigger\":null,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"deferred_interest\":{\"amount\":\"0\",\"currency\":\"USD\"},\"pik_enabled\":false,\"maturity\":\"2032-01-01\",\"attributes\":{}}]},\"closing_date\":\"2024-01-01\",\"first_payment_date\":\"2024-04-01\",\"maturity\":\"2032-01-01\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"calendar_id\":\"nyse\",\"discount_curve_id\":\"USD-OIS\",\"attributes\":{\"meta\":{\"desk\":\"abs\"}},\"prepayment_spec\":{\"curve\":\"constant\",\"cpr\":0.1},\"default_spec\":{\"curve\":\"constant\",\"cdr\":0.02},\"recovery_spec\":{\"rate\":0.4,\"recovery_lag\":12},\"stochastic_prepay_spec\":{\"model\":\"factor_correlated\",\"base_spec\":{\"curve\":\"constant\",\"cpr\":0.2},\"factor_loading\":0.25,\"cpr_volatility\":0.15},\"stochastic_default_spec\":{\"model\":\"copula\",\"base_cdr\":0.02,\"copula_spec\":{\"type\":\"gaussian\"},\"correlation\":0.2},\"correlation_structure\":{\"structure\":\"sectored\",\"intra_sector\":0.30000000000000004,\"inter_sector\":0.1,\"prepay_default\":-0.2},\"market_conditions\":{\"refi_rate\":0.04},\"deal_metadata\":{\"manager_id\":null,\"servicer_id\":null,\"master_servicer_id\":null,\"special_servicer_id\":null,\"trustee_id\":null},\"hedge_swaps\":[],\"coverage_triggers\":[{\"id\":\"OC_A\",\"tranche_id\":\"A\",\"kind\":\"oc\",\"trigger_level\":1.2,\"action\":\"pay_down_senior\"}],\"cleanup_call_decimal\":0.1,\"call_assumption\":{\"date\":\"2028-01-01\",\"price_pct\":100.0,\"scope\":\"deal\"},\"liquidation_price_pct\":99.0,\"loss_allocation\":\"par_preserving\",\"principal_covers_senior_interest\":true,\"coverage_rules\":{\"rating_haircuts\":{},\"defaulted_valuation\":\"recovery\",\"ccc_bucket\":{\"threshold_pct\":7.5,\"carry_at_market_value\":true},\"discount_obligation\":{\"price_threshold_pct\":80.0}}}}}",
     "stochastic_deal": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"structured_credit\",\"spec\":{\"id\":\"CLO-TYPED\",\"deal_type\":\"clo\",\"pool\":{\"id\":\"P\",\"deal_type\":\"clo\",\"currency\":\"USD\",\"assets\":[{\"id\":\"L0\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L1\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L2\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L3\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L4\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L5\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L6\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L7\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L8\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L9\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null}],\"cumulative_defaults\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_recoveries\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_prepayments\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_scheduled_amortization\":{\"amount\":\"0\",\"currency\":\"USD\"},\"reinvestment_period\":null,\"collection_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"reserve_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"excess_spread_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"rep_lines\":null},\"tranches\":{\"tranches\":[{\"id\":\"E\",\"attach_pct\":0.0,\"detach_pct\":10.0,\"seniority\":\"equity\",\"rating\":null,\"original_balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"current_balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"coupon\":{\"fixed\":{\"rate\":0.0}},\"oc_trigger\":null,\"ic_trigger\":null,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"deferred_interest\":{\"amount\":\"0\",\"currency\":\"USD\"},\"pik_enabled\":false,\"maturity\":\"2032-01-01\",\"attributes\":{}},{\"id\":\"B\",\"attach_pct\":10.0,\"detach_pct\":40.0,\"seniority\":\"mezzanine\",\"rating\":null,\"original_balance\":{\"amount\":\"30000000\",\"currency\":\"USD\"},\"current_balance\":{\"amount\":\"30000000\",\"currency\":\"USD\"},\"coupon\":{\"fixed\":{\"rate\":0.07}},\"oc_trigger\":null,\"ic_trigger\":null,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"deferred_interest\":{\"amount\":\"0\",\"currency\":\"USD\"},\"pik_enabled\":false,\"maturity\":\"2032-01-01\",\"attributes\":{}},{\"id\":\"A\",\"attach_pct\":40.0,\"detach_pct\":100.0,\"seniority\":\"senior\",\"rating\":null,\"original_balance\":{\"amount\":\"60000000\",\"currency\":\"USD\"},\"current_balance\":{\"amount\":\"60000000\",\"currency\":\"USD\"},\"coupon\":{\"fixed\":{\"rate\":0.05}},\"oc_trigger\":null,\"ic_trigger\":null,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"deferred_interest\":{\"amount\":\"0\",\"currency\":\"USD\"},\"pik_enabled\":false,\"maturity\":\"2032-01-01\",\"attributes\":{}}]},\"closing_date\":\"2024-01-01\",\"first_payment_date\":\"2024-04-01\",\"maturity\":\"2032-01-01\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"calendar_id\":\"nyse\",\"discount_curve_id\":\"USD-OIS\",\"attributes\":{\"meta\":{\"desk\":\"abs\"}},\"prepayment_spec\":{\"curve\":\"constant\",\"cpr\":0.1},\"default_spec\":{\"curve\":\"constant\",\"cdr\":0.02},\"recovery_spec\":{\"rate\":0.4,\"recovery_lag\":12},\"stochastic_prepay_spec\":{\"model\":\"factor_correlated\",\"base_spec\":{\"curve\":\"constant\",\"cpr\":0.2},\"factor_loading\":0.25,\"cpr_volatility\":0.15},\"stochastic_default_spec\":{\"model\":\"copula\",\"base_cdr\":0.02,\"copula_spec\":{\"type\":\"gaussian\"},\"correlation\":0.2},\"correlation_structure\":{\"structure\":\"sectored\",\"intra_sector\":0.30000000000000004,\"inter_sector\":0.1,\"prepay_default\":-0.2},\"market_conditions\":{\"refi_rate\":0.04},\"deal_metadata\":{\"manager_id\":null,\"servicer_id\":null,\"master_servicer_id\":null,\"special_servicer_id\":null,\"trustee_id\":null},\"hedge_swaps\":[],\"coverage_triggers\":[{\"id\":\"OC_A\",\"tranche_id\":\"A\",\"kind\":\"oc\",\"trigger_level\":1.2,\"action\":\"pay_down_senior\"}],\"cleanup_call_decimal\":0.1,\"call_assumption\":{\"date\":\"2028-01-01\",\"price_pct\":100.0,\"scope\":\"deal\"},\"liquidation_price_pct\":99.0,\"loss_allocation\":\"par_preserving\",\"principal_covers_senior_interest\":true,\"coverage_rules\":{\"rating_haircuts\":{},\"defaulted_valuation\":\"recovery\",\"ccc_bucket\":{\"threshold_pct\":7.5,\"carry_at_market_value\":true},\"discount_obligation\":{\"price_threshold_pct\":80.0}}}}}",
-    "stochastic_npv": 108833215.3315885,
+    "stochastic_npv": 108833215.33158845,
     "stochastic_paths": 16,
     "coverage_tests": [
       {
@@ -6681,7 +6681,7 @@
         "action": "pay_down_senior"
       }
     ],
-    "price": 107854191.89011732,
+    "price": 107854191.89011729,
     "wal": 3.271265911235611,
     "effective": {
       "loss_allocation": "par_preserving",
@@ -7322,7 +7322,7 @@
           "quote_date": "2025-01-17",
           "clean_price_pct": 108.0,
           "dirty_price": {
-            "amount": "1080277.777777778",
+            "amount": "1080277.7777777778",
             "currency": "USD"
           },
           "rows": [
@@ -7335,8 +7335,8 @@
                 "currency": "USD"
               },
               "make_whole": false,
-              "yield_rate": 0.023486319414279404,
-              "i_spread": -0.016913469650888645,
+              "yield_rate": 0.023486319414279352,
+              "i_spread": -0.016913469650888698,
               "is_worst": true
             },
             {
@@ -7348,8 +7348,8 @@
                 "currency": "USD"
               },
               "make_whole": false,
-              "yield_rate": 0.030924198064671723,
-              "i_spread": -0.009501964695850653,
+              "yield_rate": 0.030924198064671525,
+              "i_spread": -0.00950196469585085,
               "is_worst": false
             },
             {
@@ -7361,8 +7361,8 @@
                 "currency": "USD"
               },
               "make_whole": false,
-              "yield_rate": 0.035083108793001666,
-              "i_spread": -0.005334805736063292,
+              "yield_rate": 0.035083108793001444,
+              "i_spread": -0.005334805736063514,
               "is_worst": false
             },
             {
@@ -7374,8 +7374,8 @@
                 "currency": "USD"
               },
               "make_whole": false,
-              "yield_rate": 0.03934025265069428,
-              "i_spread": -0.0010831960195526943,
+              "yield_rate": 0.03934025265069439,
+              "i_spread": -0.0010831960195525833,
               "is_worst": false
             }
           ]
@@ -7389,7 +7389,7 @@
           "quote_date": "2025-01-17",
           "clean_price_pct": 108.0,
           "dirty_price": {
-            "amount": "1080277.777777778",
+            "amount": "1080277.7777777778",
             "currency": "USD"
           },
           "rows": [
@@ -7415,8 +7415,8 @@
                 "currency": "USD"
               },
               "make_whole": false,
-              "yield_rate": 0.023486319414279404,
-              "i_spread": -0.016913469650888645,
+              "yield_rate": 0.023486319414279352,
+              "i_spread": -0.016913469650888698,
               "is_worst": false
             },
             {
@@ -7428,8 +7428,8 @@
                 "currency": "USD"
               },
               "make_whole": false,
-              "yield_rate": 0.030924198064671723,
-              "i_spread": -0.009501964695850653,
+              "yield_rate": 0.030924198064671525,
+              "i_spread": -0.00950196469585085,
               "is_worst": false
             },
             {
@@ -7441,8 +7441,8 @@
                 "currency": "USD"
               },
               "make_whole": false,
-              "yield_rate": 0.035083108793001666,
-              "i_spread": -0.005334805736063292,
+              "yield_rate": 0.035083108793001444,
+              "i_spread": -0.005334805736063514,
               "is_worst": false
             },
             {
@@ -7454,8 +7454,8 @@
                 "currency": "USD"
               },
               "make_whole": false,
-              "yield_rate": 0.03934025265069428,
-              "i_spread": -0.0010831960195526943,
+              "yield_rate": 0.03934025265069439,
+              "i_spread": -0.0010831960195525833,
               "is_worst": false
             }
           ]
@@ -7477,21 +7477,21 @@
         {
           "spot": 50.0,
           "is_market_spot": false,
-          "price": 890139.62882991,
-          "delta": 3197.2195999809774,
-          "hedge_ratio": 0.3197219599980977,
+          "price": 890139.6288299104,
+          "delta": 3197.219599980279,
+          "hedge_ratio": 0.3197219599980279,
           "regime": "busted",
           "conversion_value": 500000.0,
           "parity": 0.5,
-          "conversion_premium": 0.7802792576598199,
+          "conversion_premium": 0.7802792576598208,
           "bond_floor": 840222.2618254982
         },
         {
           "spot": 100.0,
           "is_market_spot": true,
           "price": 1181985.93774976,
-          "delta": 7681.307531954953,
-          "hedge_ratio": 0.7681307531954954,
+          "delta": 7681.307531955419,
+          "hedge_ratio": 0.7681307531955419,
           "regime": "balanced",
           "conversion_value": 1000000.0,
           "parity": 1.0,
@@ -7501,13 +7501,13 @@
         {
           "spot": 300.0,
           "is_market_spot": false,
-          "price": 3072843.118731068,
-          "delta": 9943.796154764636,
-          "hedge_ratio": 0.9943796154764636,
+          "price": 3072843.1187310675,
+          "delta": 9943.79615476456,
+          "hedge_ratio": 0.9943796154764559,
           "regime": "equity_sensitive",
           "conversion_value": 3000000.0,
           "parity": 3.0,
-          "conversion_premium": 0.024281039577022767,
+          "conversion_premium": 0.024281039577022545,
           "bond_floor": 840222.2618254982
         }
       ]
@@ -7521,45 +7521,45 @@
         {
           "spot": 25.0,
           "is_market_spot": false,
-          "price": 843172.039577229,
-          "delta": 541.9440776139963,
-          "hedge_ratio": 0.05419440776139963,
+          "price": 843172.0395772293,
+          "delta": 541.944077614462,
+          "hedge_ratio": 0.0541944077614462,
           "regime": "busted",
           "conversion_value": 250000.0,
           "parity": 0.25,
-          "conversion_premium": 2.372688158308916,
+          "conversion_premium": 2.372688158308917,
           "bond_floor": 840222.2618254982
         },
         {
           "spot": 50.0,
           "is_market_spot": false,
-          "price": 890139.62882991,
-          "delta": 3197.2195999809774,
-          "hedge_ratio": 0.3197219599980977,
+          "price": 890139.6288299104,
+          "delta": 3197.219599980279,
+          "hedge_ratio": 0.3197219599980279,
           "regime": "busted",
           "conversion_value": 500000.0,
           "parity": 0.5,
-          "conversion_premium": 0.7802792576598199,
+          "conversion_premium": 0.7802792576598208,
           "bond_floor": 840222.2618254982
         },
         {
           "spot": 75.0,
           "is_market_spot": false,
-          "price": 1009442.081237535,
-          "delta": 5946.545425537974,
-          "hedge_ratio": 0.5946545425537973,
+          "price": 1009442.0812375348,
+          "delta": 5946.545425538439,
+          "hedge_ratio": 0.594654542553844,
           "regime": "balanced",
           "conversion_value": 750000.0,
           "parity": 0.75,
-          "conversion_premium": 0.34592277498338,
+          "conversion_premium": 0.34592277498337975,
           "bond_floor": 840222.2618254982
         },
         {
           "spot": 100.0,
           "is_market_spot": true,
           "price": 1181985.93774976,
-          "delta": 7681.307531954953,
-          "hedge_ratio": 0.7681307531954954,
+          "delta": 7681.307531955419,
+          "hedge_ratio": 0.7681307531955419,
           "regime": "balanced",
           "conversion_value": 1000000.0,
           "parity": 1.0,
@@ -7569,13 +7569,13 @@
         {
           "spot": 125.0,
           "is_market_spot": false,
-          "price": 1387787.218076679,
-          "delta": 8617.033142218366,
-          "hedge_ratio": 0.8617033142218367,
+          "price": 1387787.2180766787,
+          "delta": 8617.033142218552,
+          "hedge_ratio": 0.8617033142218552,
           "regime": "equity_sensitive",
           "conversion_value": 1250000.0,
           "parity": 1.25,
-          "conversion_premium": 0.11022977446134319,
+          "conversion_premium": 0.11022977446134297,
           "bond_floor": 840222.2618254982
         },
         {
@@ -7594,8 +7594,8 @@
           "spot": 200.0,
           "is_market_spot": false,
           "price": 2086504.326790734,
-          "delta": 9736.071813162765,
-          "hedge_ratio": 0.9736071813162765,
+          "delta": 9736.071813162707,
+          "hedge_ratio": 0.9736071813162708,
           "regime": "equity_sensitive",
           "conversion_value": 2000000.0,
           "parity": 2.0,
@@ -7605,13 +7605,13 @@
         {
           "spot": 300.0,
           "is_market_spot": false,
-          "price": 3072843.118731068,
-          "delta": 9943.796154764636,
-          "hedge_ratio": 0.9943796154764636,
+          "price": 3072843.1187310675,
+          "delta": 9943.79615476456,
+          "hedge_ratio": 0.9943796154764559,
           "regime": "equity_sensitive",
           "conversion_value": 3000000.0,
           "parity": 3.0,
-          "conversion_premium": 0.024281039577022767,
+          "conversion_premium": 0.024281039577022545,
           "bond_floor": 840222.2618254982
         }
       ]
@@ -7630,16 +7630,16 @@
           "clean_price_currency": 985000.0,
           "clean_price_pct": 98.5,
           "dirty_price_currency": 985116.7582417582,
-          "ytm": 0.044351276957220874,
-          "ytw": 0.044351276957220874,
+          "ytm": 0.04435127695722075,
+          "ytw": 0.04435127695722075,
           "z_spread": 0.003914535645704291,
           "discount_margin": null,
           "oas": 0.00383334666169536,
           "asw_par": 0.0020661335138041914,
           "asw_market": 0.0038614052742127034,
-          "i_spread": 0.003917410471025062,
+          "i_spread": 0.0039174104710249374,
           "japanese_simple_yield": 0.044669216784072145,
-          "moosmuller_ytm": 0.044373739098146674
+          "moosmuller_ytm": 0.044373739098146556
         }
       },
       {
@@ -7651,16 +7651,16 @@
           "clean_price_currency": 941359.9061228762,
           "clean_price_pct": 94.13599061228763,
           "dirty_price_currency": 941476.6643646344,
-          "ytm": 0.050000000000001966,
-          "ytw": 0.050000000000001966,
+          "ytm": 0.050000000000001724,
+          "ytw": 0.050000000000001724,
           "z_spread": 0.009558928954906983,
           "discount_margin": null,
           "oas": 0.009347770204093305,
           "asw_par": 0.0020661335138041914,
           "asw_market": 0.009204854050569389,
-          "i_spread": 0.009566133513806155,
+          "i_spread": 0.009566133513805912,
           "japanese_simple_yield": 0.051373335189867385,
-          "moosmuller_ytm": 0.05002530191736667
+          "moosmuller_ytm": 0.050025301917366476
         }
       },
       {
@@ -7672,16 +7672,16 @@
           "clean_price_currency": 1080000.0,
           "clean_price_pct": 108.0,
           "dirty_price_currency": 1080277.7777777778,
-          "ytm": 0.04018997575103394,
-          "ytw": 0.03142992538059345,
+          "ytm": 0.040189975751034036,
+          "ytw": 0.03142992538059334,
           "z_spread": -0.009001226726254509,
           "discount_margin": null,
           "oas": -0.012462773937376093,
           "asw_par": 0.009565920458001781,
           "asw_market": -0.018999859774192388,
-          "i_spread": -0.009008937368012664,
+          "i_spread": -0.009008937368012775,
           "japanese_simple_yield": 0.03889091775972083,
-          "moosmuller_ytm": 0.04020040800096852
+          "moosmuller_ytm": 0.040200408000968614
         }
       },
       {
@@ -7693,16 +7693,16 @@
           "clean_price_currency": 966662.7831583631,
           "clean_price_pct": 96.66627831583631,
           "dirty_price_currency": 966940.5609361408,
-          "ytm": 0.05435252015530491,
-          "ytw": 0.05435252015530491,
+          "ytm": 0.05435252015530498,
+          "ytw": 0.05435252015530498,
           "z_spread": 0.013908057237088182,
           "discount_margin": null,
           "oas": 0.009999999998853822,
           "asw_par": 0.009565920458001781,
           "asw_market": 0.013619400880327195,
-          "i_spread": 0.013918505332710697,
+          "i_spread": 0.013918505332710766,
           "japanese_simple_yield": 0.05517209260055246,
-          "moosmuller_ytm": 0.05436653213436486
+          "moosmuller_ytm": 0.054366532134364924
         }
       },
       {
@@ -7714,16 +7714,16 @@
           "clean_price_currency": 979866.2291706767,
           "clean_price_pct": 97.98662291706766,
           "dirty_price_currency": 980116.2291706767,
-          "ytm": 0.049508749745223256,
-          "ytw": 0.049508749745223256,
-          "z_spread": 0.00999999997975296,
-          "discount_margin": 0.009999999999999998,
-          "oas": 0.009888266033727333,
+          "ytm": 0.04950874974522419,
+          "ytw": 0.04950874974522419,
+          "z_spread": 0.009999999979752962,
+          "discount_margin": 0.009999999999999972,
+          "oas": 0.009888266033727326,
           "asw_par": null,
           "asw_market": null,
-          "i_spread": 0.00865422512938617,
+          "i_spread": 0.008654225129387107,
           "japanese_simple_yield": null,
-          "moosmuller_ytm": 0.05022303215366442
+          "moosmuller_ytm": 0.050223032153664506
         }
       }
     ],
@@ -7755,13 +7755,13 @@
       },
       "TermLoan": {
         "json": "{\"schema\": \"finstack_quant.instrument/1\", \"instrument\": {\"type\": \"term_loan\", \"spec\": {\"id\": \"TERM-LOAN-USD-5Y\", \"currency\": \"USD\", \"notional_limit\": {\"amount\": \"10000000\", \"currency\": \"USD\"}, \"issue_date\": \"2024-01-01\", \"maturity\": \"2029-01-01\", \"rate\": {\"fixed\": {\"rate\": 0.06}}, \"frequency\": {\"count\": 3, \"unit\": \"months\"}, \"day_count\": \"act_360\", \"business_day_convention\": \"modified_following\", \"calendar_id\": null, \"stub\": \"none\", \"discount_curve_id\": \"USD-OIS\", \"credit_curve_id\": \"HY-CREDIT\", \"amortization\": {\"percent_of_remaining_per_period\": {\"pct\": 0.025}}, \"coupon_type\": \"cash\", \"upfront_fee\": null, \"ddtl\": null, \"covenants\": null, \"oid_eir\": null, \"call_schedule\": null, \"settlement_days\": 2, \"attributes\": {}}}}",
-        "recovery01": 6903.527543686325,
+        "recovery01": 6903.527543689119,
         "jump_to_default": -6313217.238207126
       },
       "RevolvingCredit": {
         "json": "{\"schema\": \"finstack_quant.instrument/1\", \"instrument\": {\"type\": \"revolving_credit\", \"spec\": {\"id\": \"RCF-USD-3Y\", \"commitment\": {\"amount\": \"50000000\", \"currency\": \"USD\"}, \"commitment_steps\": [], \"margin_steps\": [], \"lc\": null, \"scheduled_fees\": [], \"oid_eir\": null, \"drawn\": {\"amount\": \"10000000\", \"currency\": \"USD\"}, \"issue_date\": \"2024-01-01\", \"maturity\": \"2027-01-01\", \"rate\": {\"fixed\": {\"rate\": 0.05}}, \"day_count\": \"act_360\", \"frequency\": {\"count\": 3, \"unit\": \"months\"}, \"fees\": {\"upfront_fee\": null, \"commitment_fee_tiers\": [{\"threshold\": \"0\", \"bp\": \"25\"}], \"usage_fee_tiers\": [{\"threshold\": \"0\", \"bp\": \"10\"}], \"facility_fee_bp\": 5.0, \"steps\": []}, \"draw_repay_spec\": {\"deterministic\": [{\"date\": \"2024-03-01\", \"amount\": {\"amount\": \"5000000\", \"currency\": \"USD\"}, \"is_draw\": true}, {\"date\": \"2025-06-01\", \"amount\": {\"amount\": \"3000000\", \"currency\": \"USD\"}, \"is_draw\": false}]}, \"discount_curve_id\": \"USD-OIS\", \"credit_curve_id\": \"HY-CREDIT\", \"recovery_rate\": 0.0, \"leq\": 0.0, \"stub\": \"short_front\", \"business_day_convention\": \"modified_following\", \"calendar_id\": \"usny\", \"payment_lag_days\": 0, \"settlement_days\": 0, \"attributes\": {}}}}",
-        "recovery01": 7185.7553733401,
-        "jump_to_default": -10027207.47963173
+        "recovery01": 7185.755373334512,
+        "jump_to_default": -10027207.479631733
       }
     },
     "not_hazard_priced": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"bond\",\"spec\":{\"id\":\"US912828XG33\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"issue_date\":\"2024-01-15\",\"maturity\":\"2034-01-15\",\"cashflow_spec\":{\"fixed\":{\"coupon_type\":\"cash\",\"rate\":\"0.0425\",\"frequency\":{\"count\":6,\"unit\":\"months\"},\"day_count\":\"act_act_isma\",\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"stub\":\"short_front\",\"end_of_month\":false,\"payment_lag_days\":0}},\"discount_curve_id\":\"USD-TREASURY\",\"credit_curve_id\":null,\"call_put\":null,\"attributes\":{},\"settlement_days\":1,\"ex_coupon_days\":0,\"ex_coupon_calendar_id\":\"sifma\"}}}"

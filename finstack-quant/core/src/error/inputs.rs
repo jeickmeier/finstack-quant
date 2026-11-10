@@ -256,11 +256,15 @@ pub enum InputError {
     },
 
     // Numeric Conversion
-    /// Decimal value cannot be represented as f64 (overflow or loss of precision).
+    /// A numeric value cannot be represented exactly across the Decimal/f64
+    /// boundary.
     ///
-    /// This error occurs when attempting to convert an internal `Decimal` amount
-    /// to `f64` and the value is outside the representable range.
-    #[error("Decimal conversion overflow: value cannot be represented as f64")]
+    /// Raised when an `f64`'s shortest round-trip text is outside the Decimal
+    /// domain (too large, or nonzero with more than 28 decimal places), or when
+    /// a `Decimal` cannot be viewed as a finite `f64`.
+    #[error(
+        "Decimal conversion overflow: value is outside the exactly representable Decimal/f64 range"
+    )]
     ConversionOverflow,
 
     /// Non-finite numeric value (NaN or infinity) encountered where finite required.

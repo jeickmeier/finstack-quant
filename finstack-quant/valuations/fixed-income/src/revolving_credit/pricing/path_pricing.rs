@@ -275,10 +275,13 @@ impl RevolvingCreditPricer {
         };
 
         Ok(PathResult {
-            pv: Money::new(total_pv, facility.commitment.currency())?,
+            pv: Money::from_model_value(total_pv, facility.commitment.currency())?,
             path_data: path_schedule.path_data,
             cashflows: path_schedule.schedule,
-            draw_option_cost: Money::new(draw_option_cost, facility.commitment.currency())?,
+            draw_option_cost: Money::from_model_value(
+                draw_option_cost,
+                facility.commitment.currency(),
+            )?,
         })
     }
 

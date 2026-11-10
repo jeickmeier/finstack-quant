@@ -8,7 +8,7 @@
     "canonical": "{\"base_currency\":\"USD\",\"ir_delta\":[[\"USD\",\"10Y\",-8000.0],[\"USD\",\"5Y\",12500.0]],\"ir_vega\":[],\"credit_qualifying_delta\":[],\"credit_qualifying_vega\":[],\"credit_non_qualifying_delta\":[],\"credit_non_qualifying_vega\":[],\"equity_delta\":[[\"AAPL\",250000.0]],\"equity_vega\":[],\"fx_delta\":[[\"EUR\",400000.0]],\"fx_vega\":[],\"commodity_delta\":[],\"commodity_vega\":[],\"curvature\":[]}",
     "result": {
       "amount": {
-        "amount": "13958205.61533609",
+        "amount": "13958205.615336092",
         "currency": "USD"
       },
       "methodology": "simm",

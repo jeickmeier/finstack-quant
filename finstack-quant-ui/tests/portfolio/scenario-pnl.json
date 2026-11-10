@@ -12,16 +12,16 @@
         "scenario_id": "up_10bp",
         "pnl": {
           "total": {
-            "amount": "-1487.415379039",
+            "amount": "-1487.4153790392",
             "currency": "USD"
           },
           "by_position": {
             "POS-0": {
-              "amount": "-495.805126346",
+              "amount": "-495.8051263468",
               "currency": "USD"
             },
             "POS-1": {
-              "amount": "-991.610252693",
+              "amount": "-991.6102526935",
               "currency": "USD"
             }
           }
@@ -81,16 +81,16 @@
         "scenario_id": "down_15bp",
         "pnl": {
           "total": {
-            "amount": "2232.506516544",
+            "amount": "2232.5065165438",
             "currency": "USD"
           },
           "by_position": {
             "POS-0": {
-              "amount": "744.168838848",
+              "amount": "744.1688388477",
               "currency": "USD"
             },
             "POS-1": {
-              "amount": "1488.337677696",
+              "amount": "1488.3376776956",
               "currency": "USD"
             }
           }
@@ -160,11 +160,11 @@
             "position_id": "POS-0",
             "entity_id": "FUND",
             "value_native": {
-              "amount": "999580.135143957",
+              "amount": "999580.1351439571",
               "currency": "USD"
             },
             "value_base": {
-              "amount": "999580.135143957",
+              "amount": "999580.1351439571",
               "currency": "USD"
             },
             "metric_scale": 1,
@@ -174,7 +174,7 @@
               "instrument_id": "DEP-0",
               "as_of": "2025-01-15",
               "value": {
-                "amount": "999580.1351439571909029128236",
+                "amount": "999580.1351439571828554475189",
                 "currency": "USD"
               },
               "measures": {
@@ -223,11 +223,11 @@
             "position_id": "POS-1",
             "entity_id": "FUND",
             "value_native": {
-              "amount": "1999160.270287914",
+              "amount": "1999160.2702879142",
               "currency": "USD"
             },
             "value_base": {
-              "amount": "1999160.270287914",
+              "amount": "1999160.2702879142",
               "currency": "USD"
             },
             "metric_scale": 1,
@@ -237,7 +237,7 @@
               "instrument_id": "DEP-1",
               "as_of": "2025-01-15",
               "value": {
-                "amount": "1999160.2702879143818058256473",
+                "amount": "1999160.2702879143657108950377",
                 "currency": "USD"
               },
               "measures": {
@@ -284,12 +284,12 @@
           }
         },
         "total_base_currency": {
-          "amount": "2998740.405431871",
+          "amount": "2998740.405431872",
           "currency": "USD"
         },
         "by_entity": {
           "FUND": {
-            "amount": "2998740.405431871",
+            "amount": "2998740.405431872",
             "currency": "USD"
           }
         },
@@ -353,16 +353,16 @@
         "scenario_id": "up_10bp",
         "pnl": {
           "total": {
-            "amount": "-1487.415379039",
+            "amount": "-1487.4153790392",
             "currency": "USD"
           },
           "by_position": {
             "POS-0": {
-              "amount": "-495.805126346",
+              "amount": "-495.8051263468",
               "currency": "USD"
             },
             "POS-1": {
-              "amount": "-991.610252693",
+              "amount": "-991.6102526935",
               "currency": "USD"
             }
           }
@@ -422,16 +422,16 @@
         "scenario_id": "down_15bp",
         "pnl": {
           "total": {
-            "amount": "2232.506516544",
+            "amount": "2232.5065165438",
             "currency": "USD"
           },
           "by_position": {
             "POS-0": {
-              "amount": "744.168838848",
+              "amount": "744.1688388477",
               "currency": "USD"
             },
             "POS-1": {
-              "amount": "1488.337677696",
+              "amount": "1488.3376776956",
               "currency": "USD"
             }
           }

@@ -7,3 +7,4 @@
 cc a0895b9da33aa6f715bd49b2944ba59cece6e7fa5aa93bb19c2388f0f6dd8589 # shrinks to spot = 50.0, strike = 129.03479446827262, vol = 0.1, rate = 0.0, div_yield = 0.0, time_to_expiry_days = 30
 cc a794b0814c6787e655e05124b46804e338b2678eb2b6716c4f4fa6523529cc03 # shrinks to spot = 50.0, strike = 123.14297312489938, vol = 0.1, time_to_expiry_days = 30
 cc 40ae9e2273ab53d2ef0a1098fea0f83eb5c38ba0157cab6ef53a901744a8e977 # shrinks to strike = 50.0, vol = 0.1, rate = 0.0, time_to_expiry_days = 30
+cc 8ded3731a5c03f5341e2c08753d3d38f5b5a8b03b29f014304f1ff83adb23538 # shrinks to spot = 149.52256169456277, strike = 50.0, vol = 0.1, rate = 0.0, div_yield = 0.0, time_to_expiry_days = 30

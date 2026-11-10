@@ -1398,11 +1398,11 @@
       }
     },
     "funding_cost": {
-      "cost_for_period": 50000.0,
+      "cost_for_period": 50000.00000000001,
       "spread": 0.020000000000000004,
       "wire": {
         "annual_cost": {
-          "amount": "200000",
+          "amount": "200000.00000000004",
           "currency": "USD"
         },
         "collateral_rate": 0.03,
@@ -1836,7 +1836,7 @@
   },
   "simm": {
     "base_currency": "USD",
-    "breakdown_ir_delta": 1897366.596101028,
+    "breakdown_ir_delta": 1897366.5961010277,
     "breakdown_keys": [
       "Commodity_Delta",
       "Commodity_Vega",
@@ -1875,7 +1875,7 @@
           "currency": "USD"
         },
         "Commodity_Vega": {
-          "amount": "61.05",
+          "amount": "61.050000000000004",
           "currency": "USD"
         },
         "Credit_NonQualifying_Delta": {
@@ -1907,11 +1907,11 @@
           "currency": "USD"
         },
         "FX_Vega": {
-          "amount": "82.08",
+          "amount": "82.07999999999998",
           "currency": "USD"
         },
         "IR_Delta": {
-          "amount": "1897366.596101028",
+          "amount": "1897366.5961010277",
           "currency": "USD"
         },
         "IR_Vega": {
@@ -1919,7 +1919,7 @@
           "currency": "USD"
         },
         "equity_Curvature": {
-          "amount": "127.2445923483521",
+          "amount": "127.24459234835206",
           "currency": "USD"
         }
       },

@@ -62,12 +62,12 @@ it("pins Rust's margin figures: two netting sets, a counted deposit and a zero v
     "USD-REGULATORY-CSA",
   ]);
   expect(run.netting_sets.map((set) => set.initial_margin.amount)).toEqual([
-    "564110.756722781",
-    "282055.3783613904",
+    "564110.7567227349",
+    "282055.37836136745",
   ]);
   expect(run.netting_sets.every((set) => set.is_approximate)).toBe(true);
   expect(run.netting_sets[0]!.variation_margin.amount).toBe("0");
-  expect(run.total_margin.amount).toBe("846166.135084171");
+  expect(run.total_margin.amount).toBe("846166.1350841024");
   expect(run.total_positions).toBe(2);
   expect(run.positions_without_margin).toBe(1);
   expect(run.by_csa["USD-REGULATORY-CSA"]!.transfer.amount).toBe("-1000000");

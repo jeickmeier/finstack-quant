@@ -135,7 +135,7 @@ pub(crate) fn special_serviced_balance(
     special_serviced: Option<&[bool]>,
     currency: Currency,
 ) -> Result<Money> {
-    Money::new(
+    Money::from_model_value(
         pool.assets
             .iter()
             .enumerate()
@@ -353,7 +353,7 @@ pub fn execute_waterfall(
                 Some(pct) => divertible.min(interest_remaining.amount().max(0.0) * pct / 100.0),
                 None => divertible,
             };
-            let divertible = Money::new(divertible, waterfall.currency)?;
+            let divertible = Money::from_model_value(divertible, waterfall.currency)?;
             let action = tier
                 .tests
                 .first()
@@ -443,7 +443,7 @@ pub fn execute_waterfall(
             }
             FundingSource::InterestThenPrincipal => {
                 // Interest proceeds first; only the shortfall touches principal.
-                let from_interest = Money::new(
+                let from_interest = Money::from_model_value(
                     tier_cash.amount().min(interest_remaining.amount()).max(0.0),
                     waterfall.currency,
                 )?;
@@ -715,7 +715,7 @@ fn allocate_pro_rata(
     let mut tier_total = Money::from((0_i64, currency));
 
     for (idx, (recipient, requested)) in recipient_requests.iter().enumerate() {
-        let allocated = Money::new(final_units[idx] as f64 / scale, currency)?;
+        let allocated = Money::from_model_value(final_units[idx] as f64 / scale, currency)?;
 
         // `water_fill_allocation` never allocates above a recipient's cap
         // (`requested`); the `min` is retained as a defensive floor.
@@ -944,7 +944,7 @@ fn cap_residual_at_debt_balance(
         return Ok(requested);
     };
     let unpaid = unpaid_tranche_balance(tranche, ctx.tranche_balances, principal_paid_in_period);
-    Money::new(requested.amount().min(unpaid.max(0.0)), ctx.currency)
+    Money::from_model_value(requested.amount().min(unpaid.max(0.0)), ctx.currency)
 }
 
 /// Contractual coupon for the period with the simulated rate-path shift applied.
@@ -1414,9 +1414,9 @@ fn calculate_payment_amount(
             RoundingConvention::Floor => (val * scale).floor() / scale,
             RoundingConvention::Ceiling => (val * scale).ceil() / scale,
         };
-        Ok(Money::new(rounded_val, currency)?)
+        Ok(Money::from_model_value(rounded_val, currency)?)
     } else {
-        Ok(Money::new(raw_amount, currency)?)
+        Ok(Money::from_model_value(raw_amount, currency)?)
     }
 }
 

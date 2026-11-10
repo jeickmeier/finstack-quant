@@ -1467,8 +1467,14 @@ mod tests {
                 .map(|id| (*id, 1e-320))
                 .collect(),
         );
-        let message = error_of(&results, &model, &config(q(4), None));
-        assert!(message.contains("non-finite"), "{message}");
+        // A subnormal EBITDA is rejected when it is admitted as Money (it is
+        // outside the Decimal domain), before any ratio can become infinite.
+        let error = capital_structure_summary(&results, &model, &config(q(4), None))
+            .expect_err("summary must fail");
+        assert!(
+            error.to_string().contains("Decimal conversion overflow"),
+            "{error}"
+        );
     }
 
     #[test]

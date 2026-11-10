@@ -2037,13 +2037,13 @@ mod tests {
     #[test]
     fn gbm_american_prices_are_bit_stable() {
         const EXPECTED: &[u64] = &[
-            0x402829f6094ad2f8,
+            0x402829f6094ad2fa,
             0x3fcf734a4ce21bbb,
-            0x40233f08bbaf83fd,
+            0x40233f08bbaf83fc,
             0x3fe096537727ca99,
-            0x402649ceac988d35,
+            0x402649ceac988d34,
             0x3fcd1bc42e7f3b9a,
-            0x4020f4f4ccf63499,
+            0x4020f4f4ccf63497,
             0x3fdc7de115fa4ffb,
         ];
         let pricer = LsmcPricer::new(
@@ -2129,13 +2129,13 @@ mod tests {
             actual.push(estimate.stderr.to_bits());
         }
         const LINUX: &[u64] = &[
-            0x402829f6094ad2f8,
+            0x402829f6094ad2fa,
             0x3fcf734a4ce21bbd,
-            0x40233f08bbaf83fd,
+            0x40233f08bbaf83fc,
             0x3fe096537727ca99,
-            0x402649ceac988d35,
+            0x402649ceac988d34,
             0x3fcd1bc42e7f3b9a,
-            0x4020f4f4ccf63499,
+            0x4020f4f4ccf63497,
             0x3fdc7de115fa4ffb,
         ];
         assert!(

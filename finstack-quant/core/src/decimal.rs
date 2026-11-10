@@ -152,40 +152,134 @@ pub fn parse_decimal(amount: &str) -> Result<Decimal> {
     attempt(trimmed, power + removed).ok_or_else(unrepresentable)
 }
 
-/// Convert an `f64` to [`Decimal`], returning an error for non-finite values.
+/// Convert an `f64` to [`Decimal`] through its shortest round-trip text.
 ///
-/// This prevents silent masking of `NaN`/`Infinity` values as zero, which would
-/// result in zero rates, strikes, or spreads that materially misprice
-/// instruments.
+/// The binary64-to-Decimal model boundary (CORE-CONVENTIONS-012 #4): signed
+/// zero is normalized, Rust's shortest round-trip decimal text is taken and
+/// parsed exactly by [`parse_decimal`]. The result is exactly that text's
+/// value, so `0.1 -> 0.1` while `0.1 + 0.2 -> 0.30000000000000004`. No
+/// significant digit is trimmed and nothing underflows to zero: a value
+/// whose text is outside the Decimal domain (nonzero `1e-29`, `1e100`) is an
+/// error. Pricers converting a model value use
+/// [`f64_to_decimal_model_value`] instead.
 ///
 /// # Arguments
 ///
-/// * `value` - Finite floating-point amount, rate, price, or other decimal
-///   quantity to represent exactly where possible.
+/// * `value` - Finite floating-point amount, rate, price or other quantity.
 ///
 /// # Errors
 ///
-/// Returns [`InputError::NonFiniteValue`] for `NaN`, `+inf`, or `-inf`.
-/// Returns [`InputError::ConversionOverflow`] when the finite value cannot be
-/// represented as `Decimal` (extremely large `f64` magnitude).
+/// Returns [`InputError::NonFiniteValue`] for `NaN`, `+inf`, or `-inf`, and
+/// [`InputError::ConversionOverflow`] when the shortest text is not exactly
+/// representable as `Decimal` (too large, or nonzero below `1e-28`).
 ///
 /// # Examples
 ///
 /// ```rust
 /// use finstack_quant_core::decimal::f64_to_decimal;
 ///
-/// assert!(f64_to_decimal(0.05).is_ok());
+/// assert_eq!(f64_to_decimal(0.1)?.to_string(), "0.1");
+/// assert_eq!(f64_to_decimal(0.1 + 0.2)?.to_string(), "0.30000000000000004");
+/// assert!(f64_to_decimal(1e-29).is_err());
 /// assert!(f64_to_decimal(f64::NAN).is_err());
-/// assert!(f64_to_decimal(f64::INFINITY).is_err());
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn f64_to_decimal(value: f64) -> Result<Decimal> {
+    let (negative, coefficient, power) = shortest_parts(value)?;
+    parse_decimal(&format!(
+        "{}{coefficient}e{power}",
+        if negative { "-" } else { "" }
+    ))
+    .map_err(|_| Error::from(InputError::ConversionOverflow))
+}
+
+/// Convert a pricer's model value to [`Decimal`], rounding explicitly to
+/// Decimal's 28-digit scale.
+///
+/// The named model-value adapter (owner decision on CORE-CONVENTIONS-012
+/// B2b): the shortest round-trip text is rounded half-even to 28 decimal
+/// places, so a model value below `0.5e-28` (a deep out-of-the-money PV, a
+/// negligible expected loss) becomes an exact, documented zero instead of
+/// an error. It is only for model outputs entering `Money`; input admission
+/// keeps the strict [`f64_to_decimal`].
+///
+/// # Arguments
+///
+/// * `value` - Finite model value (a PV, expected loss or cashflow) in the
+///   caller's units.
+///
+/// # Errors
+///
+/// Returns [`InputError::NonFiniteValue`] for non-finite input and
+/// [`InputError::ConversionOverflow`] when the magnitude is too large for
+/// `Decimal`.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::decimal::f64_to_decimal_model_value;
+/// use rust_decimal::Decimal;
+///
+/// assert_eq!(f64_to_decimal_model_value(1e-30)?, Decimal::ZERO);
+/// assert_eq!(f64_to_decimal_model_value(0.1)?.to_string(), "0.1");
+/// assert!(f64_to_decimal_model_value(1e100).is_err());
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn f64_to_decimal_model_value(value: f64) -> Result<Decimal> {
+    let (negative, coefficient, power) = shortest_parts(value)?;
+    let overflow = || Error::from(InputError::ConversionOverflow);
+    let max_scale = i64::from(Decimal::MAX_SCALE);
+    if power >= -max_scale {
+        return parse_decimal(&format!(
+            "{}{coefficient}e{power}",
+            if negative { "-" } else { "" }
+        ))
+        .map_err(|_| overflow());
+    }
+    // Drop `drop` digits, rounding half-even to scale 28. A shortest
+    // binary64 coefficient has at most 17 digits, so beyond 38 dropped
+    // digits the value is below half a unit and rounds to zero.
+    let drop = u32::try_from(-max_scale - power).map_err(|_| overflow())?;
+    let rounded = if drop > 38 {
+        0
+    } else {
+        let divisor = 10_u128.pow(drop);
+        let (quotient, remainder) = (coefficient / divisor, coefficient % divisor);
+        let twice = remainder * 2;
+        if twice > divisor || (twice == divisor && quotient % 2 == 1) {
+            quotient + 1
+        } else {
+            quotient
+        }
+    };
+    let signed = i128::try_from(rounded).map_err(|_| overflow())?;
+    Decimal::try_from_i128_with_scale(if negative { -signed } else { signed }, Decimal::MAX_SCALE)
+        .map_err(|_| overflow())
+}
+
+/// Sign, coefficient and power of ten of the shortest round-trip text of a
+/// finite `f64` (`value = ±coefficient * 10^power`); signed zero is zero.
+fn shortest_parts(value: f64) -> Result<(bool, u128, i64)> {
     if !value.is_finite() {
         return Err(InputError::NonFiniteValue {
             kind: NonFiniteKind::classify(value),
         }
         .into());
     }
-    Decimal::try_from(value).map_err(|_| Error::from(InputError::ConversionOverflow))
+    if value == 0.0 {
+        return Ok((false, 0, 0));
+    }
+    let overflow = || Error::from(InputError::ConversionOverflow);
+    // `{:e}` is Rust's shortest round-trip text in scientific form: d[.ddd]eN.
+    let text = format!("{:e}", value.abs());
+    let (mantissa, exponent) = text.split_once('e').ok_or_else(overflow)?;
+    let exponent: i64 = exponent.parse().map_err(|_| overflow())?;
+    let (int_part, frac_part) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    let coefficient: u128 = format!("{int_part}{frac_part}")
+        .parse()
+        .map_err(|_| overflow())?;
+    let frac_len = i64::try_from(frac_part.len()).map_err(|_| overflow())?;
+    Ok((value < 0.0, coefficient, exponent - frac_len))
 }
 
 #[cfg(test)]
@@ -223,6 +317,54 @@ mod tests {
                 kind: NonFiniteKind::NegInfinity
             }))
         ));
+    }
+
+    #[test]
+    fn f64_to_decimal_uses_shortest_round_trip_text() {
+        for (value, text) in [
+            (0.1, "0.1"),
+            (0.1 + 0.2, "0.30000000000000004"),
+            (-2.5, "-2.5"),
+            (1e-28, "0.0000000000000000000000000001"),
+            (123_456.789, "123456.789"),
+        ] {
+            assert_eq!(f64_to_decimal(value).expect("finite").to_string(), text);
+        }
+        assert!(f64_to_decimal(-0.0).expect("zero").is_sign_positive());
+        assert!(matches!(
+            f64_to_decimal(1e-29),
+            Err(Error::Input(InputError::ConversionOverflow))
+        ));
+    }
+
+    #[test]
+    fn model_value_adapter_rounds_to_decimal_scale() {
+        assert_eq!(
+            f64_to_decimal_model_value(1e-29).expect("tiny"),
+            Decimal::ZERO
+        );
+        assert_eq!(
+            f64_to_decimal_model_value(-1e-300).expect("tiny"),
+            Decimal::ZERO
+        );
+        assert_eq!(
+            f64_to_decimal_model_value(6e-29).expect("rounds up"),
+            Decimal::new(1, 28)
+        );
+        assert_eq!(
+            f64_to_decimal_model_value(5e-29).expect("half even"),
+            Decimal::ZERO
+        );
+        assert_eq!(
+            f64_to_decimal_model_value(1.5e-28).expect("half even"),
+            Decimal::new(2, 28)
+        );
+        assert_eq!(
+            f64_to_decimal_model_value(0.1).expect("ordinary"),
+            f64_to_decimal(0.1).expect("ordinary")
+        );
+        assert!(f64_to_decimal_model_value(f64::NAN).is_err());
+        assert!(f64_to_decimal_model_value(1e100).is_err());
     }
 
     #[test]

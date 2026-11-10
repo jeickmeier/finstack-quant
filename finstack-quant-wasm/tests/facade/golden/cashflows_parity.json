@@ -734,7 +734,7 @@
         "date": "2025-04-15",
         "reset_date": "2025-01-15",
         "amount": {
-          "amount": "13798.61111111111",
+          "amount": "13798.611111111111",
           "currency": "USD"
         },
         "kind": "float_reset",
@@ -774,7 +774,7 @@
         "date": "2025-10-15",
         "reset_date": "2025-07-15",
         "amount": {
-          "amount": "14747.68518518518",
+          "amount": "14747.685185185184",
           "currency": "USD"
         },
         "kind": "float_reset",
@@ -794,7 +794,7 @@
         "date": "2026-01-15",
         "reset_date": "2025-10-15",
         "amount": {
-          "amount": "15074.22839506173",
+          "amount": "15074.228395061726",
           "currency": "USD"
         },
         "kind": "float_reset",
@@ -834,7 +834,7 @@
         "date": "2026-07-15",
         "reset_date": "2026-04-15",
         "amount": {
-          "amount": "15358.00540123457",
+          "amount": "15358.005401234566",
           "currency": "USD"
         },
         "kind": "float_reset",
@@ -874,7 +874,7 @@
         "date": "2027-01-15",
         "reset_date": "2026-10-15",
         "amount": {
-          "amount": "15851.54320987654",
+          "amount": "15851.543209876541",
           "currency": "USD"
         },
         "kind": "float_reset",
@@ -1072,7 +1072,7 @@
         "date": "2026-07-15",
         "reset_date": "2026-04-15",
         "amount": {
-          "amount": "15358.00540123457",
+          "amount": "15358.005401234566",
           "currency": "USD"
         },
         "kind": "float_reset",
@@ -1112,7 +1112,7 @@
         "date": "2027-01-15",
         "reset_date": "2026-10-15",
         "amount": {
-          "amount": "15851.54320987654",
+          "amount": "15851.543209876541",
           "currency": "USD"
         },
         "kind": "float_reset",
@@ -1195,7 +1195,7 @@
           "date": "2025-04-15",
           "reset_date": "2025-01-15",
           "amount": {
-            "amount": "13798.61111111111",
+            "amount": "13798.611111111111",
             "currency": "USD"
           },
           "kind": "float_reset",
@@ -1235,7 +1235,7 @@
           "date": "2025-10-15",
           "reset_date": "2025-07-15",
           "amount": {
-            "amount": "14747.68518518518",
+            "amount": "14747.685185185184",
             "currency": "USD"
           },
           "kind": "float_reset",
@@ -1255,7 +1255,7 @@
           "date": "2026-01-15",
           "reset_date": "2025-10-15",
           "amount": {
-            "amount": "15074.22839506173",
+            "amount": "15074.228395061726",
             "currency": "USD"
           },
           "kind": "float_reset",
@@ -1295,7 +1295,7 @@
           "date": "2026-07-15",
           "reset_date": "2026-04-15",
           "amount": {
-            "amount": "17885.78317901235",
+            "amount": "17885.783179012345",
             "currency": "USD"
           },
           "kind": "float_reset",
@@ -1315,7 +1315,7 @@
           "date": "2026-10-15",
           "reset_date": "2026-07-15",
           "amount": {
-            "amount": "18243.82716049383",
+            "amount": "18243.827160493827",
             "currency": "USD"
           },
           "kind": "float_reset",
@@ -1335,7 +1335,7 @@
           "date": "2027-01-15",
           "reset_date": "2026-10-15",
           "amount": {
-            "amount": "18407.0987654321",
+            "amount": "18407.098765432096",
             "currency": "USD"
           },
           "kind": "float_reset",
@@ -1437,7 +1437,7 @@
           "date": "2025-04-15",
           "reset_date": "2025-01-15",
           "amount": {
-            "amount": "13798.61111111111",
+            "amount": "13798.611111111111",
             "currency": "USD"
           },
           "kind": "float_reset",
@@ -1477,7 +1477,7 @@
           "date": "2025-10-15",
           "reset_date": "2025-07-15",
           "amount": {
-            "amount": "14747.68518518518",
+            "amount": "14747.685185185184",
             "currency": "USD"
           },
           "kind": "float_reset",
@@ -1497,7 +1497,7 @@
           "date": "2026-01-15",
           "reset_date": "2025-10-15",
           "amount": {
-            "amount": "15074.22839506173",
+            "amount": "15074.228395061726",
             "currency": "USD"
           },
           "kind": "float_reset",
@@ -1537,7 +1537,7 @@
           "date": "2026-07-15",
           "reset_date": "2026-04-15",
           "amount": {
-            "amount": "15358.00540123457",
+            "amount": "15358.005401234566",
             "currency": "USD"
           },
           "kind": "float_reset",
@@ -1577,7 +1577,7 @@
           "date": "2027-01-15",
           "reset_date": "2026-10-15",
           "amount": {
-            "amount": "15851.54320987654",
+            "amount": "15851.543209876541",
             "currency": "USD"
           },
           "kind": "float_reset",
@@ -2260,19 +2260,19 @@
     },
     "2026Q1": {
       "USD": {
-        "amount": "28823.6831745697",
+        "amount": "28823.683174569695",
         "currency": "USD"
       }
     },
     "2026Q3": {
       "USD": {
-        "amount": "28257.58070752098",
+        "amount": "28257.580707520978",
         "currency": "USD"
       }
     },
     "2027Q1": {
       "USD": {
-        "amount": "950809.836778235",
+        "amount": "950809.8367782349",
         "currency": "USD"
       }
     }
@@ -2486,7 +2486,7 @@
         "date": "2025-04-15",
         "reset_date": "2025-01-15",
         "amount": {
-          "amount": "13798.61111111111",
+          "amount": "13798.611111111111",
           "currency": "USD"
         },
         "kind": "float_reset",
@@ -2526,7 +2526,7 @@
         "date": "2025-10-15",
         "reset_date": "2025-07-15",
         "amount": {
-          "amount": "14747.68518518518",
+          "amount": "14747.685185185184",
           "currency": "USD"
         },
         "kind": "float_reset",
@@ -2546,7 +2546,7 @@
         "date": "2026-01-15",
         "reset_date": "2025-10-15",
         "amount": {
-          "amount": "15074.22839506173",
+          "amount": "15074.228395061726",
           "currency": "USD"
         },
         "kind": "float_reset",
@@ -2586,7 +2586,7 @@
         "date": "2026-07-15",
         "reset_date": "2026-04-15",
         "amount": {
-          "amount": "15358.00540123457",
+          "amount": "15358.005401234566",
           "currency": "USD"
         },
         "kind": "float_reset",
@@ -2626,7 +2626,7 @@
         "date": "2027-01-15",
         "reset_date": "2026-10-15",
         "amount": {
-          "amount": "15851.54320987654",
+          "amount": "15851.543209876541",
           "currency": "USD"
         },
         "kind": "float_reset",
@@ -3027,7 +3027,7 @@
       "currency": "USD"
     },
     "amount_compounded": {
-      "amount": "14889.15650922195",
+      "amount": "14889.156509221946",
       "currency": "USD"
     },
     "index": [
@@ -3040,17 +3040,17 @@
         "currency": "USD"
       },
       {
-        "amount": "29166.66666666667",
+        "amount": "29166.666666666668",
         "currency": "USD"
       },
       {
-        "amount": "27666.66666666667",
+        "amount": "27666.666666666668",
         "currency": "USD"
       }
     ],
     "index_ex_coupon": [
       {
-        "amount": "14889.15650922195",
+        "amount": "14889.156509221946",
         "currency": "USD"
       },
       {

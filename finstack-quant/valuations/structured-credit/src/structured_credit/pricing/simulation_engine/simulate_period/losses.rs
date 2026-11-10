@@ -74,10 +74,10 @@ pub(super) fn allocate_realized_loss(
                 // Reduce tranche balance BEFORE waterfall execution.
                 if let Some(current_balance) = state.tranche_balances.get_mut(tranche_id_str) {
                     let new_balance = (current_balance.amount() - incremental).max(0.0);
-                    *current_balance = Money::new(new_balance, state.currency)?;
+                    *current_balance = Money::from_model_value(new_balance, state.currency)?;
                 }
 
-                let writedown = Money::new(incremental, state.currency)?;
+                let writedown = Money::from_model_value(incremental, state.currency)?;
                 if let Some(res) = state.results.get_mut(tranche_id_str) {
                     res.writedown_flows.push((pay_date, writedown));
                     res.total_writedown = res.total_writedown.checked_add(writedown)?;
@@ -148,10 +148,12 @@ pub(super) fn defaulted_collateral_value(
             crate::structured_credit::types::DefaultedValuation::Recovery => {
                 state.recovery_queue.pending_amount(state.currency)
             }
-            crate::structured_credit::types::DefaultedValuation::MarketValue { pct } => Money::new(
-                state.recovery_queue.pending_par(state.currency).amount() * pct / 100.0,
-                state.currency,
-            )?,
+            crate::structured_credit::types::DefaultedValuation::MarketValue { pct } => {
+                Money::from_model_value(
+                    state.recovery_queue.pending_par(state.currency).amount() * pct / 100.0,
+                    state.currency,
+                )?
+            }
         },
     )
 }

@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "8a60765d749cd9b6aa9889c70475eeb9787646aee8845e6ca1a710052d793619"
+      "sha256": "2f8f6b132cebd7653a567fc3af3fd260b079787b5bb0cff32e651e2075bcdc1a"
     }
   ],
   "base": {
@@ -33,27 +33,27 @@
       "report": {
         "attribution": {
           "total_pnl": {
-            "amount": "8923.410832983",
+            "amount": "8923.4108329828",
             "currency": "USD"
           },
           "mark_to_market_pnl": {
-            "amount": "8923.410832983",
+            "amount": "8923.4108329828",
             "currency": "USD"
           },
           "pv_t0": {
-            "amount": "992091.570117712",
+            "amount": "992091.5701177118",
             "currency": "USD"
           },
           "pv_t1": {
-            "amount": "1001014.980950695",
+            "amount": "1001014.9809506946",
             "currency": "USD"
           },
           "carry": {
-            "amount": "12654.157529919",
+            "amount": "12654.1575299196",
             "currency": "USD"
           },
           "rates_curves_pnl": {
-            "amount": "-3730.746696937",
+            "amount": "-3730.7466969369",
             "currency": "USD"
           },
           "credit_curves_pnl": {
@@ -81,7 +81,7 @@
             "currency": "USD"
           },
           "cross_factor_pnl": {
-            "amount": "0.000000001",
+            "amount": "0.0000000001",
             "currency": "USD"
           },
           "model_params_pnl": {
@@ -98,22 +98,22 @@
           },
           "carry_detail": {
             "total": {
-              "amount": "12654.157529919",
+              "amount": "12654.1575299196",
               "currency": "USD"
             },
             "coupon_income": {
               "total": {
-                "amount": "10566.29834254144",
+                "amount": "10566.298342541439",
                 "currency": "USD"
               }
             },
             "pull_to_par": {
-              "amount": "3683.90908709856",
+              "amount": "3683.909087098905",
               "currency": "USD"
             },
             "roll_down": {
               "total": {
-                "amount": "-1596.049899721",
+                "amount": "-1596.049899720744",
                 "currency": "USD"
               }
             }
@@ -126,12 +126,12 @@
           "vol_detail": null,
           "cross_factor_detail": {
             "total": {
-              "amount": "0.000000001",
+              "amount": "0.0000000001",
               "currency": "USD"
             },
             "by_pair": {
               "Rates×Credit": {
-                "amount": "0.000000001",
+                "amount": "0.0000000001",
                 "currency": "USD"
               }
             }
@@ -162,11 +162,11 @@
           "result_invalid": false
         },
         "initial_value": {
-          "amount": "992091.570117712",
+          "amount": "992091.5701177118",
           "currency": "USD"
         },
         "terminal_value": {
-          "amount": "1001014.980950695",
+          "amount": "1001014.9809506946",
           "currency": "USD"
         },
         "horizon_days": 90,
@@ -229,12 +229,12 @@
           }
         },
         "summary": {
-          "total_return": 0.008994543549971132,
-          "annualized_return": 0.036982234305995565,
+          "total_return": 0.008994543549970932,
+          "annualized_return": 0.03698223430599468,
           "currency": "USD",
           "factor_contributions": {
-            "carry": 0.012755029788649026,
-            "rates_curves": -0.003760486238678901,
+            "carry": 0.012755029788649633,
+            "rates_curves": -0.003760486238678801,
             "credit_curves": 0,
             "inflation_curves": 0,
             "correlations": 0,
@@ -250,18 +250,18 @@
         {
           "field": "carry",
           "amount": {
-            "amount": "12654.157529919",
+            "amount": "12654.1575299196",
             "currency": "USD"
           },
-          "pct_of_total": 141.80852777893284
+          "pct_of_total": 141.80852777894276
         },
         {
           "field": "rates_curves_pnl",
           "amount": {
-            "amount": "-3730.746696937",
+            "amount": "-3730.7466969369",
             "currency": "USD"
           },
-          "pct_of_total": -41.80852777894405
+          "pct_of_total": -41.80852777894387
         },
         {
           "field": "credit_curves_pnl",
@@ -314,10 +314,10 @@
         {
           "field": "cross_factor_pnl",
           "amount": {
-            "amount": "0.000000001",
+            "amount": "0.0000000001",
             "currency": "USD"
           },
-          "pct_of_total": 1.1206477194838633e-11
+          "pct_of_total": 1.1206477194838885e-12
         },
         {
           "field": "model_params_pnl",
@@ -364,19 +364,19 @@
       "report": {
         "attribution": {
           "total_pnl": {
-            "amount": "-4895.657693227",
+            "amount": "-4895.6576932264",
             "currency": "USD"
           },
           "mark_to_market_pnl": {
-            "amount": "-4895.657693227",
+            "amount": "-4895.6576932264",
             "currency": "USD"
           },
           "pv_t0": {
-            "amount": "992091.570117712",
+            "amount": "992091.5701177118",
             "currency": "USD"
           },
           "pv_t1": {
-            "amount": "987195.912424485",
+            "amount": "987195.9124244854",
             "currency": "USD"
           },
           "carry": {
@@ -384,7 +384,7 @@
             "currency": "USD"
           },
           "rates_curves_pnl": {
-            "amount": "-4895.657693227",
+            "amount": "-4895.6576932264",
             "currency": "USD"
           },
           "credit_curves_pnl": {
@@ -482,11 +482,11 @@
           "result_invalid": false
         },
         "initial_value": {
-          "amount": "992091.570117712",
+          "amount": "992091.5701177118",
           "currency": "USD"
         },
         "terminal_value": {
-          "amount": "987195.912424485",
+          "amount": "987195.9124244854",
           "currency": "USD"
         },
         "horizon_days": null,
@@ -541,12 +541,12 @@
           }
         },
         "summary": {
-          "total_return": -0.0049346832900174,
+          "total_return": -0.004934683290016797,
           "annualized_return": null,
           "currency": "USD",
           "factor_contributions": {
             "carry": 0,
-            "rates_curves": -0.0049346832900174,
+            "rates_curves": -0.004934683290016797,
             "credit_curves": 0,
             "inflation_curves": 0,
             "correlations": 0,
@@ -570,7 +570,7 @@
         {
           "field": "rates_curves_pnl",
           "amount": {
-            "amount": "-4895.657693227",
+            "amount": "-4895.6576932264",
             "currency": "USD"
           },
           "pct_of_total": 100
@@ -682,27 +682,27 @@
       "report": {
         "attribution": {
           "total_pnl": {
-            "amount": "8923.410832983",
+            "amount": "8923.4108329828",
             "currency": "USD"
           },
           "mark_to_market_pnl": {
-            "amount": "8923.410832983",
+            "amount": "8923.4108329828",
             "currency": "USD"
           },
           "pv_t0": {
-            "amount": "992091.570117712",
+            "amount": "992091.5701177118",
             "currency": "USD"
           },
           "pv_t1": {
-            "amount": "1001014.980950695",
+            "amount": "1001014.9809506946",
             "currency": "USD"
           },
           "carry": {
-            "amount": "12654.15752991894",
+            "amount": "12654.157529919641",
             "currency": "USD"
           },
           "rates_curves_pnl": {
-            "amount": "-3818.581617124459",
+            "amount": "-3818.5816171669853",
             "currency": "USD"
           },
           "credit_curves_pnl": {
@@ -742,12 +742,12 @@
             "currency": "USD"
           },
           "residual": {
-            "amount": "87.834920188519",
+            "amount": "87.8349202301443",
             "currency": "USD"
           },
           "carry_detail": {
             "total": {
-              "amount": "12654.15752991894",
+              "amount": "12654.157529919641",
               "currency": "USD"
             },
             "coupon_income": {
@@ -758,7 +758,7 @@
             },
             "roll_down": {
               "total": {
-                "amount": "12654.15752991894",
+                "amount": "12654.157529919641",
                 "currency": "USD"
               }
             }
@@ -780,7 +780,7 @@
                 {
                   "tenor_years": 0.25,
                   "sensitivity": {
-                    "amount": "-0.0570394655223936",
+                    "amount": "-0.05703946592984721",
                     "currency": "USD"
                   },
                   "market_move": 40.13702296227314
@@ -788,7 +788,7 @@
                 {
                   "tenor_years": 0.5,
                   "sensitivity": {
-                    "amount": "-1.126289745501708",
+                    "amount": "-1.1262897457345389",
                     "currency": "USD"
                   },
                   "market_move": 37.67123696157303
@@ -796,7 +796,7 @@
                 {
                   "tenor_years": 1,
                   "sensitivity": {
-                    "amount": "-96.7085813235026",
+                    "amount": "-96.7085813235608",
                     "currency": "USD"
                   },
                   "market_move": 38.9041121789846
@@ -804,7 +804,7 @@
                 {
                   "tenor_years": 2,
                   "sensitivity": {
-                    "amount": "-0.2653747999574989",
+                    "amount": "-0.2653748003067449",
                     "currency": "USD"
                   },
                   "market_move": 43.34246664976893
@@ -867,18 +867,18 @@
                 }
               ],
               "explained_pnl": {
-                "amount": "-3818.581617124459",
+                "amount": "-3818.5816171669853",
                 "currency": "USD"
               }
             },
             {
               "factor": "Theta",
               "repriced_pv": {
-                "amount": "1004745.727647631",
+                "amount": "1004745.7276476314",
                 "currency": "USD"
               },
               "explained_pnl": {
-                "amount": "12654.15752991894",
+                "amount": "12654.157529919641",
                 "currency": "USD"
               }
             }
@@ -898,7 +898,7 @@
             "num_repricings": 26,
             "tolerance_abs": 10,
             "tolerance_pct": 5,
-            "residual_pct": 0.9843200300031097,
+            "residual_pct": 0.9843200304696048,
             "rounding": {
               "mode": "bankers",
               "ingest_scale_by_currency": {},
@@ -919,11 +919,11 @@
           "result_invalid": true
         },
         "initial_value": {
-          "amount": "992091.570117712",
+          "amount": "992091.5701177118",
           "currency": "USD"
         },
         "terminal_value": {
-          "amount": "1001014.980950695",
+          "amount": "1001014.9809506946",
           "currency": "USD"
         },
         "horizon_days": 90,
@@ -986,12 +986,12 @@
           }
         },
         "summary": {
-          "total_return": 0.008994543549971132,
-          "annualized_return": 0.036982234305995565,
+          "total_return": 0.008994543549970932,
+          "annualized_return": 0.03698223430599468,
           "currency": "USD",
           "factor_contributions": {
-            "carry": 0.012755029788648965,
-            "rates_curves": -0.0038490213324475515,
+            "carry": 0.012755029788649674,
+            "rates_curves": -0.003849021332490418,
             "credit_curves": 0,
             "inflation_curves": 0,
             "correlations": 0,
@@ -1007,18 +1007,18 @@
         {
           "field": "carry",
           "amount": {
-            "amount": "12654.15752991894",
+            "amount": "12654.157529919641",
             "currency": "USD"
           },
-          "pct_of_total": 141.8085277789322
+          "pct_of_total": 141.80852777894322
         },
         {
           "field": "rates_curves_pnl",
           "amount": {
-            "amount": "-3818.581617124459",
+            "amount": "-3818.5816171669853",
             "currency": "USD"
           },
-          "pct_of_total": -42.79284780893528
+          "pct_of_total": -42.79284780941281
         },
         {
           "field": "credit_curves_pnl",
@@ -1095,10 +1095,10 @@
         {
           "field": "residual",
           "amount": {
-            "amount": "87.834920188519",
+            "amount": "87.8349202301443",
             "currency": "USD"
           },
-          "pct_of_total": 0.9843200300031097
+          "pct_of_total": 0.9843200304696048
         }
       ]
     },
@@ -1125,19 +1125,19 @@
       "report": {
         "attribution": {
           "total_pnl": {
-            "amount": "8923.410832983",
+            "amount": "8923.4108329828",
             "currency": "USD"
           },
           "mark_to_market_pnl": {
-            "amount": "8923.410832983",
+            "amount": "8923.4108329828",
             "currency": "USD"
           },
           "pv_t0": {
-            "amount": "992091.570117712",
+            "amount": "992091.5701177118",
             "currency": "USD"
           },
           "pv_t1": {
-            "amount": "1001014.980950695",
+            "amount": "1001014.9809506946",
             "currency": "USD"
           },
           "carry": {
@@ -1145,7 +1145,7 @@
             "currency": "USD"
           },
           "rates_curves_pnl": {
-            "amount": "-3808.019346859281",
+            "amount": "-3808.019346901798",
             "currency": "USD"
           },
           "credit_curves_pnl": {
@@ -1185,7 +1185,7 @@
             "currency": "USD"
           },
           "residual": {
-            "amount": "77.272649922291",
+            "amount": "77.272649964608",
             "currency": "USD"
           },
           "carry_detail": {
@@ -1217,7 +1217,7 @@
                 {
                   "tenor_years": 0.25,
                   "sensitivity": {
-                    "amount": "-0.0570394655223936",
+                    "amount": "-0.05703946592984721",
                     "currency": "USD"
                   },
                   "market_move": 40.13702296227314
@@ -1225,7 +1225,7 @@
                 {
                   "tenor_years": 0.5,
                   "sensitivity": {
-                    "amount": "-1.126289745501708",
+                    "amount": "-1.1262897457345389",
                     "currency": "USD"
                   },
                   "market_move": 37.67123696157303
@@ -1233,7 +1233,7 @@
                 {
                   "tenor_years": 1,
                   "sensitivity": {
-                    "amount": "-96.7085813235026",
+                    "amount": "-96.7085813235608",
                     "currency": "USD"
                   },
                   "market_move": 38.9041121789846
@@ -1241,7 +1241,7 @@
                 {
                   "tenor_years": 2,
                   "sensitivity": {
-                    "amount": "-0.2653747999574989",
+                    "amount": "-0.2653748003067449",
                     "currency": "USD"
                   },
                   "market_move": 43.34246664976893
@@ -1304,20 +1304,20 @@
                 }
               ],
               "explained_pnl": {
-                "amount": "-3818.581617124459",
+                "amount": "-3818.5816171669853",
                 "currency": "USD"
               }
             },
             {
               "factor": "RatesConvexity",
               "move_unit": "basis_point",
-              "market_move": 38.902681590185864,
+              "market_move": 38.90268159020386,
               "explained_pnl": {
                 "amount": "0",
                 "currency": "USD"
               },
               "gamma_pnl": {
-                "amount": "10.56227026517806",
+                "amount": "10.562270265187822",
                 "currency": "USD"
               }
             }
@@ -1330,7 +1330,7 @@
             "num_repricings": 2,
             "tolerance_abs": 10,
             "tolerance_pct": 1,
-            "residual_pct": 0.8659541891389033,
+            "residual_pct": 0.8659541896131473,
             "rounding": {
               "mode": "bankers",
               "ingest_scale_by_currency": {},
@@ -1350,11 +1350,11 @@
           "result_invalid": false
         },
         "initial_value": {
-          "amount": "992091.570117712",
+          "amount": "992091.5701177118",
           "currency": "USD"
         },
         "terminal_value": {
-          "amount": "1001014.980950695",
+          "amount": "1001014.9809506946",
           "currency": "USD"
         },
         "horizon_days": 90,
@@ -1417,12 +1417,12 @@
           }
         },
         "summary": {
-          "total_return": 0.008994543549971132,
-          "annualized_return": 0.036982234305995565,
+          "total_return": 0.008994543549970932,
+          "annualized_return": 0.03698223430599468,
           "currency": "USD",
           "factor_contributions": {
-            "carry": 0.012755029788650023,
-            "rates_curves": -0.003838374865343789,
+            "carry": 0.012755029788650027,
+            "rates_curves": -0.003838374865386646,
             "credit_curves": 0,
             "inflation_curves": 0,
             "correlations": 0,
@@ -1441,15 +1441,15 @@
             "amount": "12654.15752991999",
             "currency": "USD"
           },
-          "pct_of_total": 141.80852777894395
+          "pct_of_total": 141.80852777894714
         },
         {
           "field": "rates_curves_pnl",
           "amount": {
-            "amount": "-3808.019346859281",
+            "amount": "-3808.019346901798",
             "currency": "USD"
           },
-          "pct_of_total": -42.67448196808284
+          "pct_of_total": -42.674481968560265
         },
         {
           "field": "credit_curves_pnl",
@@ -1526,10 +1526,10 @@
         {
           "field": "residual",
           "amount": {
-            "amount": "77.272649922291",
+            "amount": "77.272649964608",
             "currency": "USD"
           },
-          "pct_of_total": 0.8659541891389033
+          "pct_of_total": 0.8659541896131473
         }
       ]
     }

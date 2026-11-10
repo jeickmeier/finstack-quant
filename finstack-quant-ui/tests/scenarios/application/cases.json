@@ -3,13 +3,13 @@
   "sources": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "8a60765d749cd9b6aa9889c70475eeb9787646aee8845e6ca1a710052d793619"
+      "sha256": "2f8f6b132cebd7653a567fc3af3fd260b079787b5bb0cff32e651e2075bcdc1a"
     }
   ],
   "base": {
     "asOf": "2025-01-01",
     "value": {
-      "amount": "1000438.964391248",
+      "amount": "1000438.9643912482",
       "currency": "USD"
     }
   },
@@ -84,13 +84,13 @@
         "instrument_id": "US912828XG33",
         "as_of": "2025-01-01",
         "value": {
-          "amount": "995488.150413341",
+          "amount": "995488.1504133405",
           "currency": "USD"
         },
         "measures": {
-          "ytm": 0.04703884277653089,
+          "ytm": 0.047038842776531746,
           "dv01": -98.76957239897456,
-          "duration_mod": 0.9667764980918357,
+          "duration_mod": 0.9667764980918353,
           "bucketed_dv01": -98.76957239757758,
           "bucketed_dv01::USD-OIS::10y": 0,
           "bucketed_dv01::USD-OIS::15y": 0,
@@ -455,7 +455,7 @@
               "US912828XG33",
               {
                 "USD": {
-                  "amount": "4613.745264131",
+                  "amount": "4613.7452641314",
                   "currency": "USD"
                 }
               }
@@ -463,7 +463,7 @@
           ],
           "total_carry": {
             "USD": {
-              "amount": "4613.745264131",
+              "amount": "4613.7452641314",
               "currency": "USD"
             }
           },
@@ -476,13 +476,13 @@
         "instrument_id": "US912828XG33",
         "as_of": "2025-02-03",
         "value": {
-          "amount": "1002074.235114868",
+          "amount": "1002074.2351148674",
           "currency": "USD"
         },
         "measures": {
-          "ytm": 0.044364475006134364,
+          "ytm": 0.04436447500613482,
           "dv01": -90.36448919400573,
-          "duration_mod": 0.8788724314855294,
+          "duration_mod": 0.8788724314855293,
           "bucketed_dv01": -90.3644891398726,
           "bucketed_dv01::USD-OIS::10y": 0,
           "bucketed_dv01::USD-OIS::15y": 0,
@@ -848,13 +848,13 @@
         "instrument_id": "US912828XG33",
         "as_of": "2025-01-01",
         "value": {
-          "amount": "1000438.964391248",
+          "amount": "1000438.9643912482",
           "currency": "USD"
         },
         "measures": {
-          "ytm": 0.04192805926047216,
+          "ytm": 0.04192805926047167,
           "dv01": -99.2633986165165,
-          "duration_mod": 0.969221509109137,
+          "duration_mod": 0.9692215091091372,
           "bucketed_dv01": -99.26339861511951,
           "bucketed_dv01::USD-OIS::10y": 0,
           "bucketed_dv01::USD-OIS::15y": 0,
