@@ -138,6 +138,63 @@ pub(crate) fn money_from_amount(obj: &Bound<'_, PyAny>, ccy: Currency) -> PyResu
     Money::new(amount, ccy).map_err(core_to_py)
 }
 
+impl PyMoney {
+    /// Multiply by an exact scalar through `checked_mul`, or by a float
+    /// through the named `checked_mul_f64` adapter.
+    fn scale_by(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+        match extract_scalar(other)? {
+            Scalar::Exact(factor) => self.inner.checked_mul(factor),
+            Scalar::Float(factor) => self.inner.checked_mul_f64(factor),
+        }
+        .map(Self::from_inner)
+        .map_err(core_to_py)
+    }
+}
+
+/// A Money scalar operand: exact (`int`, `decimal.Decimal`) or binary64 (`float`).
+enum Scalar {
+    /// Exact Decimal value of an `int` or `decimal.Decimal`.
+    Exact(rust_decimal::Decimal),
+    /// A `float`, admitted later through the named `f64` adapters.
+    Float(f64),
+}
+
+/// Read a scalar operand; `bool` and other types raise `TypeError`.
+fn extract_scalar(obj: &Bound<'_, PyAny>) -> PyResult<Scalar> {
+    const EXPECTED: &str = "Money scalar must be float, int, or decimal.Decimal";
+    if obj.is_instance_of::<pyo3::types::PyBool>() {
+        return Err(PyTypeError::new_err(EXPECTED));
+    }
+    if obj.is_instance_of::<PyInt>() {
+        return finstack_quant_core::decimal::parse_decimal(obj.str()?.to_str()?)
+            .map(Scalar::Exact)
+            .map_err(core_to_py);
+    }
+    if is_python_decimal(obj)? {
+        return decimal_from_py(obj).map(Scalar::Exact);
+    }
+    if obj.is_instance_of::<PyFloat>() {
+        return Ok(Scalar::Float(obj.extract()?));
+    }
+    Err(PyTypeError::new_err(EXPECTED))
+}
+
+/// Read an exact FX rate (`int`, `decimal.Decimal` or decimal `str`).
+fn extract_exact_rate(obj: &Bound<'_, PyAny>) -> PyResult<rust_decimal::Decimal> {
+    const EXPECTED: &str = "convert_at_rate rate must be int, str or decimal.Decimal; use convert_at_rate_f64 for a float";
+    if obj.is_instance_of::<pyo3::types::PyBool>() || obj.is_instance_of::<PyFloat>() {
+        return Err(PyTypeError::new_err(EXPECTED));
+    }
+    if obj.is_instance_of::<PyInt>() || obj.cast::<PyString>().is_ok() {
+        return finstack_quant_core::decimal::parse_decimal(obj.str()?.to_str()?)
+            .map_err(core_to_py);
+    }
+    if is_python_decimal(obj)? {
+        return decimal_from_py(obj);
+    }
+    Err(PyTypeError::new_err(EXPECTED))
+}
+
 #[pymethods]
 impl PyMoney {
     /// Construct from a finite ``float``/``int`` ``amount`` and a ``Currency``
@@ -294,12 +351,36 @@ impl PyMoney {
         }
     }
 
-    /// Convert using an already-resolved positive FX rate.
+    /// Convert using an already-resolved exact FX rate.
     #[pyo3(text_signature = "(target, rate)")]
-    fn convert_at_rate(&self, target: &Bound<'_, PyAny>, rate: f64) -> PyResult<Self> {
+    fn convert_at_rate(
+        &self,
+        target: &Bound<'_, PyAny>,
+        rate: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
         let target = extract_currency(target)?;
+        let rate = extract_exact_rate(rate)?;
         self.inner
             .convert_at_rate(target, rate)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
+    }
+
+    /// Convert using an already-resolved binary64 FX rate.
+    #[pyo3(text_signature = "(target, rate)")]
+    fn convert_at_rate_f64(
+        &self,
+        target: &Bound<'_, PyAny>,
+        rate: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        let target = extract_currency(target)?;
+        if rate.is_instance_of::<pyo3::types::PyBool>() || !rate.is_instance_of::<PyFloat>() {
+            return Err(PyTypeError::new_err(
+                "convert_at_rate_f64 rate must be a float",
+            ));
+        }
+        self.inner
+            .convert_at_rate_f64(target, rate.extract()?)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
@@ -322,13 +403,9 @@ impl PyMoney {
             .map_err(core_to_py)
     }
 
-    /// Scale by a scalar ``float``.
+    /// Scale by an exact (``int``/``Decimal``) or ``float`` scalar.
     fn __mul__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let scalar: f64 = other.extract()?;
-        self.inner
-            .checked_mul_f64(scalar)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
+        self.scale_by(other)
     }
 
     /// Divide by a scalar ``float`` (``-> Money``) or by a same-currency
@@ -339,15 +416,16 @@ impl PyMoney {
         other: &Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
         if let Ok(rhs) = other.extract::<PyRef<'_, PyMoney>>() {
-            let ratio = self.inner.checked_div(rhs.inner).map_err(core_to_py)?;
+            let ratio = self.inner.ratio(rhs.inner).map_err(core_to_py)?;
             return ratio.into_bound_py_any(py);
         }
-        let scalar: f64 = other.extract()?;
-        self.inner
-            .checked_div_f64(scalar)
-            .map(Self::from_inner)
-            .map_err(core_to_py)?
-            .into_bound_py_any(py)
+        match extract_scalar(other)? {
+            Scalar::Exact(divisor) => self.inner.checked_div(divisor),
+            Scalar::Float(divisor) => self.inner.checked_div_f64(divisor),
+        }
+        .map(Self::from_inner)
+        .map_err(core_to_py)?
+        .into_bound_py_any(py)
     }
 
     /// Unary negation.
@@ -405,13 +483,9 @@ impl PyMoney {
         Ok(Self::from_inner(self.inner.checked_neg()))
     }
 
-    /// Right-multiply by a scalar.
+    /// Right-multiply by an exact or ``float`` scalar.
     fn __rmul__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let scalar: f64 = other.extract()?;
-        self.inner
-            .checked_mul_f64(scalar)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
+        self.scale_by(other)
     }
 
     // Note: `PyMoney` is `frozen`, so in-place ops are not provided.

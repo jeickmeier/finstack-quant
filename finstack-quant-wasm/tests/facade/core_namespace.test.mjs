@@ -61,9 +61,18 @@ test('core.Money amount and lossless amountDecimal', () => {
   assert.equal(typeof m.amountDecimal, 'string');
   assert.equal(m.amountDecimal, '1234.56');
   const eur = new core.Currency('EUR');
-  const converted = m.convertAtRate(eur, 0.9);
+  const converted = m.convertAtRate(eur, '0.9');
   assert.equal(converted.currency.toString(), 'EUR');
-  assert.equal(converted.amount, 1111.104);
+  assert.equal(converted.amountDecimal, '1111.104');
+  assert.equal(m.convertAtRateF64(eur, 0.9).amountDecimal, '1111.104');
+  // Same currency: exactly one; a nonunit rate throws instead of being ignored.
+  assert.equal(m.convertAtRate(usd, '1').amountDecimal, '1234.56');
+  assert.throws(() => m.convertAtRate(usd, '1.0000000000000000000000000001'), /exactly 1/);
+  assert.throws(() => m.convertAtRate(eur, 0.9));
+  // Canonical decimal-string scalars are exact; the F64 adapters take numbers.
+  assert.equal(m.checkedMul('0.1').amountDecimal, '123.456');
+  assert.equal(m.checkedDiv('4').amountDecimal, '308.64');
+  assert.throws(() => m.checkedDiv('0'), /division by zero/);
   const subCent = new core.Money(1.2345, usd);
   assert.equal(subCent.amountDecimal, '1.2345');
 });

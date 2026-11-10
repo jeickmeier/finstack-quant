@@ -82,12 +82,57 @@ def test_decimal_ordering_and_repr_do_not_round_through_float() -> None:
 
 
 def test_convert_at_rate_preserves_decimal_amount_and_retags_currency() -> None:
-    converted = Money.from_decimal(Decimal("10000000000000000.1"), "USD").convert_at_rate("EUR", 1.25)
+    wide = Money.from_decimal(Decimal("10000000000000000.1"), "USD")
+    converted = wide.convert_at_rate("EUR", Decimal("1.25"))
     assert converted.amount_decimal == Decimal("12500000000000000.125")
     assert str(converted.currency) == "EUR"
+    assert wide.convert_at_rate_f64("EUR", 1.25) == converted
+    assert wide.convert_at_rate("EUR", "1.25") == converted
 
     with pytest.raises(ValueError, match=r"rate|positive"):
-        Money(1, "USD").convert_at_rate("EUR", 0.0)
+        Money(1, "USD").convert_at_rate("EUR", Decimal("0"))
+    with pytest.raises(ValueError, match=r"rate|positive"):
+        Money(1, "USD").convert_at_rate_f64("EUR", 0.0)
+
+
+def test_convert_at_rate_requires_exact_unit_rate_for_same_currency() -> None:
+    usd = Money(1, "USD")
+    assert usd.convert_at_rate("USD", 1) == usd
+    with pytest.raises(ValueError, match="exactly 1"):
+        usd.convert_at_rate("USD", Decimal("1.0000000000000000000000000001"))
+    with pytest.raises(ValueError, match="exactly 1"):
+        usd.convert_at_rate_f64("USD", 1.0000000000000002)
+
+
+def test_convert_at_rate_takes_exact_rates_and_the_f64_adapter_takes_floats() -> None:
+    usd = Money(1, "USD")
+    with pytest.raises(TypeError, match="convert_at_rate_f64"):
+        usd.convert_at_rate("EUR", 1.1)
+    with pytest.raises(TypeError, match="float"):
+        usd.convert_at_rate_f64("EUR", Decimal("1.1"))
+    with pytest.raises(TypeError, match="float"):
+        usd.convert_at_rate_f64("EUR", True)
+
+
+def test_scalar_operators_are_exact_for_decimal_and_int() -> None:
+    m = Money.from_decimal(Decimal("100.10"), "USD")
+    assert (m * Decimal("0.1")).amount_decimal == Decimal("10.010")
+    assert (3 * m).amount_decimal == Decimal("300.30")
+    assert (m / Decimal("4")).amount_decimal == Decimal("25.025")
+    # A float scalar is admitted by its shortest round-trip text.
+    assert m * 0.1 == m * Decimal("0.1")
+    with pytest.raises(TypeError, match="scalar"):
+        m * True
+    tiny = Money.from_decimal(Decimal("0.0000000000000000000000000001"), "USD")
+    with pytest.raises(ValueError, match="underflow"):
+        tiny / Decimal("3")
+
+
+def test_addition_is_exact_or_raises() -> None:
+    big = Money.from_decimal(Decimal("10000000000000000000000000000"), "USD")
+    with pytest.raises(ValueError, match="Decimal"):
+        big + Money.from_decimal(Decimal("0.01"), "USD")
+    assert (Money(3, "USD") / Money(4, "USD")) == 0.75
 
 
 def test_from_decimal_accepts_exact_amounts() -> None:

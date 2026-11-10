@@ -193,6 +193,27 @@ pub fn f64_to_decimal(value: f64) -> Result<Decimal> {
     .map_err(|_| Error::from(InputError::ConversionOverflow))
 }
 
+/// Round an exact Decimal once to the nearest binary64 (ties to even).
+///
+/// The Decimal's exact decimal text is parsed by the standard library's
+/// correctly rounded `f64` parser. `rust_decimal`'s own `to_f64`/`as_f64`
+/// divides the fraction in binary64 and can be one ulp off.
+///
+/// # Arguments
+///
+/// * `value` - Exact Decimal to view as binary64.
+///
+/// # Errors
+///
+/// Returns `InputError::ConversionOverflow` if the Decimal's text cannot be
+/// parsed, which does not happen for a valid Decimal.
+pub(crate) fn decimal_to_f64_nearest(value: Decimal) -> Result<f64> {
+    value
+        .to_string()
+        .parse::<f64>()
+        .map_err(|_| InputError::ConversionOverflow.into())
+}
+
 /// Convert a pricer's model value to [`Decimal`], rounding explicitly to
 /// Decimal's 28-digit scale.
 ///

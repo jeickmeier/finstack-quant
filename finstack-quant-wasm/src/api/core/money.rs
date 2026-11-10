@@ -5,6 +5,7 @@ use crate::utils::input::{
     from_js_json, js_f64, js_opt_bool, js_opt_string, js_opt_uint, js_string,
 };
 use crate::utils::to_js_err;
+use crate::utils::wire::js_decimal;
 use finstack_quant_core::config::RoundingMode;
 use finstack_quant_core::money::{FormatOpts, Money as RustMoney};
 use wasm_bindgen::prelude::*;
@@ -96,25 +97,57 @@ impl JsMoney {
         }
     }
 
-    /// Convert using an already-resolved positive FX rate.
-    /// @param target - Target Currency for the converted monetary amount.
-    /// @param rate - FX conversion rate expressed as target-currency units per source-currency unit.
+    /// Convert with an already-resolved exact FX rate (Rust `Money::convert_at_rate`).
     ///
-    /// # Errors
+    /// The rate is exact decimal text, so a contractual rate never passes
+    /// through a JavaScript number. For the same currency the rate must be
+    /// exactly `"1"`; a nonunit rate throws rather than being ignored. No
+    /// target minor-unit rounding is applied.
     ///
-    /// For a different target currency, throws a JavaScript exception if `rate`
-    /// is non-finite or not strictly positive, or if the converted amount cannot
-    /// be represented as a decimal.
+    /// @param target - Target `Currency` of the converted amount.
+    /// @param rate - Strictly positive decimal string in target units per one source unit, for example `"1.0825"`.
     /// @returns Converted `Money` amount in the target currency.
+    /// @throws If `rate` is not a decimal string, is not strictly positive, is not `"1"` for the same currency, or the converted amount overflows or underflows Decimal.
+    ///
+    /// @example
+    /// ```javascript
+    /// const eur = new core.Currency("EUR");
+    /// const usd = new core.Currency("USD");
+    /// const m = core.Money.fromDecimalStr("100.00", eur);
+    /// m.convertAtRate(usd, "1.0825").amountDecimal;  // "108.250000"
+    /// ```
     #[wasm_bindgen(js_name = convertAtRate)]
     pub fn convert_at_rate(
+        &self,
+        target: &JsCurrency,
+        #[wasm_bindgen(unchecked_param_type = "string")] rate: JsValue,
+    ) -> Result<JsMoney, JsValue> {
+        let rate = js_decimal(&rate, "rate")?.into();
+        self.inner
+            .convert_at_rate(target.inner, rate)
+            .map(|inner| JsMoney { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Convert with a binary64 FX rate (Rust `Money::convert_at_rate_f64`).
+    ///
+    /// The number is admitted by its shortest round-trip decimal text and
+    /// then converted exactly as `convertAtRate`; a same-currency rate must be
+    /// exactly `1`.
+    ///
+    /// @param target - Target `Currency` of the converted amount.
+    /// @param rate - Finite, strictly positive number in target units per one source unit.
+    /// @returns Converted `Money` amount in the target currency.
+    /// @throws If `rate` is not a finite, strictly positive number, is not `1` for the same currency, or the converted amount overflows or underflows Decimal.
+    #[wasm_bindgen(js_name = convertAtRateF64)]
+    pub fn convert_at_rate_f64(
         &self,
         target: &JsCurrency,
         #[wasm_bindgen(unchecked_param_type = "number")] rate: JsValue,
     ) -> Result<JsMoney, JsValue> {
         let rate = js_f64(&rate, "rate")?;
         self.inner
-            .convert_at_rate(target.inner, rate)
+            .convert_at_rate_f64(target.inner, rate)
             .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }
@@ -151,6 +184,43 @@ impl JsMoney {
     pub fn checked_sub(&self, other: &JsMoney) -> Result<JsMoney, JsValue> {
         self.inner
             .checked_sub(other.inner)
+            .map(|inner| JsMoney { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Multiply by an exact decimal scalar (Rust `Money::checked_mul`).
+    ///
+    /// The product is exact when representable, otherwise rounded once,
+    /// half-even, at the greatest scale (at most 28 places) that fits.
+    ///
+    /// @param factor - Signed decimal string multiplier, for example `"2.5"`.
+    /// @returns Scaled amount, in the same currency.
+    /// @throws If `factor` is not a decimal string, or the product overflows Decimal or a nonzero product rounds to zero.
+    #[wasm_bindgen(js_name = checkedMul)]
+    pub fn checked_mul(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] factor: JsValue,
+    ) -> Result<JsMoney, JsValue> {
+        let factor = js_decimal(&factor, "factor")?.into();
+        self.inner
+            .checked_mul(factor)
+            .map(|inner| JsMoney { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Divide by an exact nonzero decimal scalar (Rust `Money::checked_div`).
+    ///
+    /// @param divisor - Nonzero signed decimal string divisor, for example `"3"`.
+    /// @returns Scaled amount, in the same currency.
+    /// @throws If `divisor` is not a decimal string or is zero, or the quotient overflows Decimal or a nonzero quotient rounds to zero.
+    #[wasm_bindgen(js_name = checkedDiv)]
+    pub fn checked_div(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "string")] divisor: JsValue,
+    ) -> Result<JsMoney, JsValue> {
+        let divisor = js_decimal(&divisor, "divisor")?.into();
+        self.inner
+            .checked_div(divisor)
             .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }

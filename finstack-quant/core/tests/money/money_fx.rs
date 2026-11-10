@@ -492,7 +492,7 @@ fn explicit_convert_and_add() {
             FxConversionPolicy::CashflowDate,
         )
         .unwrap();
-    let eur_in_usd = eur.convert_at_rate(Currency::USD, rate).unwrap();
+    let eur_in_usd = eur.convert_at_rate_f64(Currency::USD, rate).unwrap();
     let sum = usd.checked_add(eur_in_usd).unwrap();
     // Expected: 100 + 90*1.2 = 208
     assert!((sum.amount() - 208.0).abs() < 1e-9);

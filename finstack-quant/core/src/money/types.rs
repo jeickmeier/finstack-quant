@@ -23,11 +23,13 @@
 
 use crate::config::{FinstackConfig, RoundingMode};
 use crate::currency::Currency;
-use crate::decimal::{f64_to_decimal, f64_to_decimal_model_value};
+use crate::decimal::{decimal_to_f64_nearest, f64_to_decimal, f64_to_decimal_model_value};
 use crate::{Error, InputError};
 use core::fmt;
 
-use super::rounding::{repr_add, repr_div_f64, repr_mul_f64, repr_sub, try_round_f64};
+use super::rounding::{
+    repr_add, repr_div, repr_div_f64, repr_mul, repr_mul_f64, repr_sub, try_round_f64,
+};
 
 /// Format an integer string (optionally prefixed by `-`) with thousands
 /// separator `sep`.
@@ -521,7 +523,10 @@ impl Money {
     /// # Errors
     ///
     /// Returns `Error::CurrencyMismatch` when the currencies differ, or
-    /// `InputError::ConversionOverflow` when the Decimal sum is out of range.
+    /// `InputError::ConversionOverflow` when the sum cannot keep every digit
+    /// down to the currency's minor unit (`1e28 + 0.01` USD is an error, not
+    /// `1e28`). Digits below the minor unit that do not fit in Decimal's 28-29
+    /// digits are rounded once, half-even; a representable sum is exact.
     ///
     /// # Arguments
     ///
@@ -530,10 +535,10 @@ impl Money {
     #[inline]
     pub fn checked_add(self, rhs: Self) -> Result<Self, Error> {
         ensure_same_currency(&self, &rhs)?;
-        Ok(Self {
-            amount: repr_add(self.amount, rhs.amount)?,
-            currency: self.currency,
-        })
+        Ok(Self::from_decimal(
+            repr_add(self.amount, rhs.amount, u32::from(self.currency.decimals()))?,
+            self.currency,
+        ))
     }
 
     /// Subtract two amounts, returning an error when currencies do not match.
@@ -558,8 +563,10 @@ impl Money {
     /// # Errors
     ///
     /// Returns `Error::CurrencyMismatch` when the currencies differ, or
-    /// `InputError::ConversionOverflow` when the Decimal difference is out of
-    /// range.
+    /// `InputError::ConversionOverflow` when the difference cannot keep every
+    /// digit down to the currency's minor unit. Digits below the minor unit
+    /// that do not fit are rounded once, half-even; a representable
+    /// difference is exact.
     ///
     /// # Arguments
     ///
@@ -568,17 +575,57 @@ impl Money {
     #[inline]
     pub fn checked_sub(self, rhs: Self) -> Result<Self, Error> {
         ensure_same_currency(&self, &rhs)?;
-        Ok(Self {
-            amount: repr_sub(self.amount, rhs.amount)?,
-            currency: self.currency,
-        })
+        Ok(Self::from_decimal(
+            repr_sub(self.amount, rhs.amount, u32::from(self.currency.decimals()))?,
+            self.currency,
+        ))
     }
 
-    /// Multiply by an `f64` scalar, returning an error on non-finite or
-    /// non-representable values instead of panicking.
+    /// Multiply by a Decimal scalar (record 012 #7).
     ///
-    /// Prefer this over the `*` operator when the scalar may come from
-    /// untrusted or computed input.
+    /// The product is exact when representable; otherwise it is the exact
+    /// product rounded once, half-even, at the greatest scale (at most 28
+    /// decimal places) whose coefficient fits. Signed and zero factors are
+    /// allowed. No currency minor-unit rounding is applied.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::money::Money;
+    /// use rust_decimal::Decimal;
+    /// # fn main() -> finstack_quant_core::Result<()> {
+    /// let m = Money::from_decimal_str("100.10", Currency::USD)?;
+    /// assert_eq!(m.checked_mul(Decimal::new(25, 1))?.amount_decimal().to_string(), "250.250");
+    /// // A nonzero product below 1e-28 is an underflow error, not zero.
+    /// let tiny = Money::from_decimal_str("0.0000000000000000000000000001", Currency::USD)?;
+    /// assert!(tiny.checked_mul(Decimal::new(1, 1)).is_err());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `factor` - Signed dimensionless Decimal multiplier; zero gives zero.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::ConversionOverflow` when the product's magnitude
+    /// exceeds the Decimal range, or `InputError::DecimalUnderflow` when a
+    /// nonzero product rounds to zero.
+    #[must_use = "returns new Money on success"]
+    pub fn checked_mul(self, factor: rust_decimal::Decimal) -> Result<Self, Error> {
+        Ok(Self::from_decimal(
+            repr_mul(self.amount, factor)?,
+            self.currency,
+        ))
+    }
+
+    /// Multiply by an `f64` scalar: the named float adapter for
+    /// [`Self::checked_mul`].
+    ///
+    /// The scalar is admitted by its shortest round-trip decimal text
+    /// (record 012 #4), so `0.1` multiplies by exactly `0.1`; the product then
+    /// follows [`Self::checked_mul`].
     ///
     /// # Examples
     /// ```rust
@@ -597,20 +644,21 @@ impl Money {
     ///
     /// # Errors
     ///
-    /// Returns `InputError::NonFiniteValue` for a NaN or infinite scalar, or
-    /// `InputError::ConversionOverflow` when the scalar or product is outside
-    /// the Decimal representation range.
+    /// Returns `InputError::NonFiniteValue` for a NaN or infinite scalar,
+    /// `InputError::ConversionOverflow` when the scalar's text is outside the
+    /// Decimal domain or the product overflows, or
+    /// `InputError::DecimalUnderflow` when a nonzero product rounds to zero.
     ///
     /// # Arguments
     ///
-    /// * `rhs` - Right-hand operand combined with this value under the documented arithmetic rules.
+    /// * `rhs` - Finite dimensionless binary64 multiplier, admitted exactly by its shortest round-trip text.
     #[must_use = "returns new Money on success"]
     #[inline]
     pub fn checked_mul_f64(self, rhs: f64) -> Result<Self, Error> {
-        Ok(Self {
-            amount: repr_mul_f64(self.amount, rhs)?,
-            currency: self.currency,
-        })
+        Ok(Self::from_decimal(
+            repr_mul_f64(self.amount, rhs)?,
+            self.currency,
+        ))
     }
 
     /// Negate the amount, preserving the currency.
@@ -637,11 +685,49 @@ impl Money {
         }
     }
 
-    /// Divide by an `f64` scalar, returning an error on non-finite, zero, or
-    /// non-representable values instead of panicking.
+    /// Divide by a nonzero Decimal scalar (record 012 #7).
     ///
-    /// Prefer this over the `/` operator when the scalar may come from
-    /// untrusted or computed input.
+    /// The quotient follows the same bounded rule as [`Self::checked_mul`]:
+    /// exact when representable, otherwise rounded once, half-even, at the
+    /// greatest scale whose coefficient fits.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::money::Money;
+    /// use rust_decimal::Decimal;
+    /// # fn main() -> finstack_quant_core::Result<()> {
+    /// let m = Money::from((1_i64, Currency::USD));
+    /// let third = m.checked_div(Decimal::from(3))?;
+    /// assert_eq!(third.amount_decimal().to_string(), "0.3333333333333333333333333333");
+    /// assert!(m.checked_div(Decimal::ZERO).is_err());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `divisor` - Nonzero signed dimensionless Decimal divisor.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation("division by zero")` for a zero divisor,
+    /// `InputError::ConversionOverflow` when the quotient's magnitude exceeds
+    /// the Decimal range, or `InputError::DecimalUnderflow` when a nonzero
+    /// quotient rounds to zero.
+    #[must_use = "returns new Money on success"]
+    pub fn checked_div(self, divisor: rust_decimal::Decimal) -> Result<Self, Error> {
+        Ok(Self::from_decimal(
+            repr_div(self.amount, divisor)?,
+            self.currency,
+        ))
+    }
+
+    /// Divide by an `f64` scalar: the named float adapter for
+    /// [`Self::checked_div`].
+    ///
+    /// The scalar is admitted by its shortest round-trip decimal text
+    /// (record 012 #4) before the Decimal division.
     ///
     /// # Examples
     /// ```rust
@@ -661,41 +747,63 @@ impl Money {
     ///
     /// # Errors
     ///
-    /// Returns `Error::Validation("division by zero")` for a zero scalar
-    /// (the same error [`Self::checked_div`] reports for a zero `Money`
-    /// divisor), `InputError::NonFiniteValue` for NaN or infinity, or
-    /// `InputError::ConversionOverflow` when the quotient is out of range.
+    /// Returns `Error::Validation("division by zero")` for `0.0` or `-0.0`,
+    /// `InputError::NonFiniteValue` for NaN or infinity,
+    /// `InputError::ConversionOverflow` when the scalar's text is outside the
+    /// Decimal domain or the quotient overflows, or
+    /// `InputError::DecimalUnderflow` when a nonzero quotient rounds to zero.
     ///
     /// # Arguments
     ///
-    /// * `rhs` - Right-hand operand combined with this value under the documented arithmetic rules.
+    /// * `rhs` - Finite nonzero dimensionless binary64 divisor, admitted exactly by its shortest round-trip text.
     #[must_use = "returns new Money on success"]
     #[inline]
     pub fn checked_div_f64(self, rhs: f64) -> Result<Self, Error> {
-        Ok(Self {
-            amount: repr_div_f64(self.amount, rhs)?,
-            currency: self.currency,
-        })
+        Ok(Self::from_decimal(
+            repr_div_f64(self.amount, rhs)?,
+            self.currency,
+        ))
     }
 
-    /// Divide by another same-currency amount, returning a dimensionless f64 ratio.
+    /// Dimensionless binary64 ratio of two same-currency amounts
+    /// (record 012 #5).
+    ///
+    /// Each exact amount is rounded once to the nearest binary64 and the two
+    /// are divided in binary64, so the relative error against the exact
+    /// Decimal ratio is at most about `1.5 * f64::EPSILON`. No Decimal
+    /// quotient is formed, so a ratio outside Decimal's range is still
+    /// returned. A zero numerator returns `0.0`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::money::Money;
+    /// # fn main() -> finstack_quant_core::Result<()> {
+    /// let a = Money::from((3_i64, Currency::USD));
+    /// let b = Money::from((4_i64, Currency::USD));
+    /// assert_eq!(a.ratio(b)?, 0.75);
+    /// assert!(a.ratio(Money::zero(Currency::USD)).is_err());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Arguments
     ///
-    /// * `rhs` - Nonzero divisor in the same currency; no FX conversion is performed.
+    /// * `rhs` - Nonzero denominator in the same currency; no FX conversion is performed.
     ///
     /// # Errors
     ///
-    /// Returns a currency mismatch, division-by-zero, or conversion-overflow error.
-    pub fn checked_div(self, rhs: Self) -> Result<f64, Error> {
+    /// Returns `Error::CurrencyMismatch` when the currencies differ, or
+    /// `Error::Validation("division by zero")` for a zero denominator.
+    pub fn ratio(self, rhs: Self) -> Result<f64, Error> {
         ensure_same_currency(&self, &rhs)?;
         if rhs.amount.is_zero() {
             return Err(Error::Validation("division by zero".into()));
         }
-        self.amount
-            .checked_div(rhs.amount)
-            .map(|ratio| ratio.as_f64())
-            .ok_or(Error::Input(InputError::ConversionOverflow))
+        if self.amount.is_zero() {
+            return Ok(0.0);
+        }
+        Ok(decimal_to_f64_nearest(self.amount)? / decimal_to_f64_nearest(rhs.amount)?)
     }
 
     /// Return the absolute amount in the same currency without rounding.
@@ -726,33 +834,91 @@ impl Money {
         })
     }
 
-    /// Convert this amount using an already-resolved FX rate.
+    /// Convert this amount with an already-resolved FX rate (record 012 #11).
     ///
-    /// The multiplication remains Decimal-backed and therefore preserves the
-    /// stored amount's precision. The supplied rate must be finite and strictly
-    /// positive. A same-currency conversion returns the input unchanged.
+    /// `rate` is the exact number of target units per one source unit and must
+    /// be strictly positive. For the same source and target currency the rate
+    /// must be exactly one; a nonunit rate is rejected rather than ignored.
+    /// The rate is validated before any shortcut. For distinct currencies the
+    /// amount is multiplied by [`Self::checked_mul`]'s bounded rule and
+    /// relabelled; no target minor-unit rounding is applied (round at the
+    /// reporting boundary instead).
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::money::Money;
+    /// use rust_decimal::Decimal;
+    /// # fn main() -> finstack_quant_core::Result<()> {
+    /// let eur = Money::from_decimal_str("100.00", Currency::EUR)?;
+    /// let usd = eur.convert_at_rate(Currency::USD, Decimal::new(10825, 4))?;
+    /// assert_eq!(usd.amount_decimal().to_string(), "108.250000");
+    /// assert!(eur.convert_at_rate(Currency::EUR, Decimal::new(101, 2)).is_err());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `to` - Target currency of the converted amount.
+    /// * `rate` - Strictly positive Decimal FX rate in target units per one source unit; exactly `1` when `to` equals the source currency.
     ///
     /// # Errors
     ///
-    /// Returns `InputError::InvalidFxRate` when `rate` is non-finite or not
-    /// strictly positive, or `InputError::ConversionOverflow` when the
-    /// converted amount cannot be represented as a Decimal.
-    pub fn convert_at_rate(self, to: Currency, rate: f64) -> crate::Result<Self> {
-        let rate = crate::money::fx::validate_fx_rate(self.currency, to, rate)?;
+    /// Returns `InputError::InvalidFxRate` for a rate that is not strictly
+    /// positive, `InputError::NonUnitSameCurrencyRate` for a same-currency
+    /// rate other than one, or the [`Self::checked_mul`] overflow/underflow
+    /// errors.
+    pub fn convert_at_rate(self, to: Currency, rate: rust_decimal::Decimal) -> crate::Result<Self> {
+        if rate <= rust_decimal::Decimal::ZERO {
+            return Err(InputError::InvalidFxRate {
+                from: self.currency,
+                to,
+                rate: decimal_to_f64_nearest(rate)?,
+            }
+            .into());
+        }
         if self.currency == to {
+            if rate != rust_decimal::Decimal::ONE {
+                return Err(InputError::NonUnitSameCurrencyRate { currency: to, rate }.into());
+            }
             return Ok(self);
         }
-        // Retain full Decimal precision, consistent with `Money::new`. Rounding
-        // to the destination minor units here would truncate sub-unit precision
-        // mid-calculation, so the result of a chained computation would depend
-        // on *where* a `convert` was inserted and could break serial≡parallel
-        // determinism. Apply minor-unit rounding only at the reporting boundary
-        // (e.g. via `format`), not on every conversion.
-        let new_amount = repr_mul_f64(self.amount, rate)?;
-        Ok(Self {
-            amount: new_amount,
-            currency: to,
-        })
+        Ok(Self::from_decimal(repr_mul(self.amount, rate)?, to))
+    }
+
+    /// Convert with an `f64` FX rate: the named float adapter for
+    /// [`Self::convert_at_rate`].
+    ///
+    /// The rate must be finite and strictly positive; it is admitted by its
+    /// shortest round-trip decimal text (record 012 #4) and then delegated, so
+    /// a same-currency rate must be exactly `1.0`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::money::Money;
+    /// # fn main() -> finstack_quant_core::Result<()> {
+    /// let eur = Money::from((100_i64, Currency::EUR));
+    /// assert_eq!(eur.convert_at_rate_f64(Currency::USD, 1.1)?.amount(), 110.0);
+    /// assert!(eur.convert_at_rate_f64(Currency::USD, f64::NAN).is_err());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `to` - Target currency of the converted amount.
+    /// * `rate` - Finite, strictly positive binary64 FX rate in target units per one source unit; exactly `1.0` when `to` equals the source currency.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::InvalidFxRate` for a non-finite or non-positive
+    /// rate, `InputError::ConversionOverflow` when its text is outside the
+    /// Decimal domain, and otherwise the [`Self::convert_at_rate`] errors.
+    pub fn convert_at_rate_f64(self, to: Currency, rate: f64) -> crate::Result<Self> {
+        let rate = crate::money::fx::validate_fx_rate(self.currency, to, rate)?;
+        self.convert_at_rate(to, f64_to_decimal(rate)?)
     }
 }
 
@@ -905,7 +1071,7 @@ mod tests {
         let division_by_zero = Err(Error::Validation("division by zero".into()));
         assert_eq!(money.checked_div_f64(0.0).map(|_| ()), division_by_zero);
         assert_eq!(money.checked_div_f64(-0.0).map(|_| ()), division_by_zero);
-        assert_eq!(money.checked_div(zero).map(|_| ()), division_by_zero);
+        assert_eq!(money.ratio(zero).map(|_| ()), division_by_zero);
     }
 
     #[test]
@@ -941,7 +1107,7 @@ mod tests {
     #[test]
     fn convert_rejects_non_finite_rate() {
         let usd = Money::from((5_i64, Currency::USD));
-        assert!(usd.convert_at_rate(Currency::EUR, f64::NAN).is_err());
+        assert!(usd.convert_at_rate_f64(Currency::EUR, f64::NAN).is_err());
     }
 
     #[test]
@@ -1084,7 +1250,7 @@ mod tests {
         let amount = rust_decimal::Decimal::from_str("10000000000000000.1").expect("valid decimal");
         let eur = Money::from_decimal(amount, Currency::EUR);
         let usd = eur
-            .convert_at_rate(Currency::USD, 2.0)
+            .convert_at_rate_f64(Currency::USD, 2.0)
             .expect("valid conversion");
 
         assert_eq!(
@@ -1241,13 +1407,163 @@ mod tests {
     #[test]
     fn convert_at_rate_validates_rate_on_same_currency() {
         let usd = Money::new(100.0, Currency::USD).expect("valid money");
-        assert!(usd.convert_at_rate(Currency::USD, 0.0).is_err());
-        assert!(usd.convert_at_rate(Currency::USD, -1.0).is_err());
-        assert!(usd.convert_at_rate(Currency::USD, f64::NAN).is_err());
+        assert!(usd.convert_at_rate_f64(Currency::USD, 0.0).is_err());
+        assert!(usd.convert_at_rate_f64(Currency::USD, -1.0).is_err());
+        assert!(usd.convert_at_rate_f64(Currency::USD, f64::NAN).is_err());
         assert_eq!(
-            usd.convert_at_rate(Currency::USD, 1.0)
+            usd.convert_at_rate_f64(Currency::USD, 1.0)
                 .expect("valid same-currency rate"),
             usd
+        );
+    }
+
+    fn usd(text: &str) -> Money {
+        Money::from_decimal_str(text, Currency::USD).expect("valid decimal money")
+    }
+
+    #[test]
+    fn arithmetic_results_normalize_zero() {
+        let a = usd("0.10");
+        let zero = a.checked_sub(a).expect("exact cancellation");
+        assert_eq!(zero.amount_decimal().to_string(), "0");
+        assert!(!zero.amount_decimal().is_sign_negative());
+        let product = a
+            .checked_mul(rust_decimal::Decimal::new(-3, 0))
+            .expect("signed factor")
+            .checked_mul(rust_decimal::Decimal::ZERO)
+            .expect("zero factor");
+        assert_eq!(product.amount_decimal().to_string(), "0");
+        assert!(!product.amount_decimal().is_sign_negative());
+        assert_eq!(
+            Money::zero(Currency::USD).checked_neg(),
+            Money::zero(Currency::USD)
+        );
+    }
+
+    #[test]
+    fn addition_never_discards_a_cent() {
+        let big = usd("10000000000000000000000000000");
+        assert!(matches!(
+            big.checked_add(usd("0.01")),
+            Err(Error::Input(InputError::ConversionOverflow))
+        ));
+        assert_eq!(
+            usd("0.1")
+                .checked_add(usd("0.2"))
+                .expect("exact")
+                .amount_decimal()
+                .to_string(),
+            "0.3"
+        );
+    }
+
+    #[test]
+    fn decimal_scalar_operations_are_canonical_and_f64_adapters_delegate() {
+        let m = usd("100.10");
+        assert_eq!(
+            m.checked_mul(rust_decimal::Decimal::new(1, 1))
+                .expect("mul")
+                .amount_decimal(),
+            rust_decimal::Decimal::new(1001, 2)
+        );
+        // The f64 adapter admits 0.1 as exactly 0.1, so both paths agree.
+        assert_eq!(
+            m.checked_mul_f64(0.1).expect("mul f64"),
+            m.checked_mul(rust_decimal::Decimal::new(1, 1))
+                .expect("mul")
+        );
+        assert_eq!(
+            m.checked_div_f64(4.0).expect("div f64"),
+            m.checked_div(rust_decimal::Decimal::from(4)).expect("div")
+        );
+        let tiny = usd("0.0000000000000000000000000001");
+        assert!(matches!(
+            tiny.checked_div(rust_decimal::Decimal::from(3)),
+            Err(Error::Input(InputError::DecimalUnderflow))
+        ));
+    }
+
+    #[test]
+    fn ratio_is_a_direct_binary64_ratio_within_budget() {
+        // Exact ratio n/d to 40 significant decimals, parsed once to binary64.
+        fn reference(n: rust_decimal::Decimal, d: rust_decimal::Decimal) -> f64 {
+            use num_bigint::BigInt;
+            let pow = |e: u32| num_traits::pow(BigInt::from(10_u8), e as usize);
+            let num = BigInt::from(n.mantissa()) * pow(d.scale()) * pow(60);
+            let den = BigInt::from(d.mantissa()) * pow(n.scale());
+            let q = num / den;
+            format!("{q}e-60").parse::<f64>().expect("reference ratio")
+        }
+        let cases = [
+            ("0.75959782851251844215141", "1.3"),
+            ("1", "3"),
+            (
+                "79228162514264337593543950335",
+                "0.0000000000000000000000000001",
+            ),
+            ("-123456789.0123456789", "987.654321"),
+        ];
+        for (n, d) in cases {
+            let (a, b) = (usd(n), usd(d));
+            let got = a.ratio(b).expect("ratio");
+            let want = reference(a.amount_decimal(), b.amount_decimal());
+            assert!(
+                ((got - want) / want).abs() <= 4.0 * f64::EPSILON,
+                "{n}/{d}: {got:e} vs {want:e}"
+            );
+        }
+        assert_eq!(
+            Money::zero(Currency::USD).ratio(usd("2")).expect("zero"),
+            0.0
+        );
+        assert!(usd("1").ratio(Money::zero(Currency::USD)).is_err());
+        assert!(usd("1").ratio(Money::from((1_i64, Currency::EUR))).is_err());
+    }
+
+    #[test]
+    fn convert_at_rate_is_exact_and_validates_before_shortcuts() {
+        let eur = Money::from_decimal_str("-100.000000000000000001", Currency::EUR).expect("eur");
+        let rate = rust_decimal::Decimal::new(10825, 4);
+        let usd_amount = eur.convert_at_rate(Currency::USD, rate).expect("convert");
+        assert_eq!(usd_amount.currency(), Currency::USD);
+        assert_eq!(
+            usd_amount.amount_decimal(),
+            eur.amount_decimal() * rate,
+            "no target minor-unit rounding"
+        );
+        // Same currency: exactly one, never a tolerance.
+        assert_eq!(
+            eur.convert_at_rate(Currency::EUR, rust_decimal::Decimal::ONE)
+                .expect("unit"),
+            eur
+        );
+        assert!(matches!(
+            eur.convert_at_rate(
+                Currency::EUR,
+                rust_decimal::Decimal::from_i128_with_scale(
+                    10_000_000_000_000_000_000_000_000_001,
+                    28
+                )
+            ),
+            Err(Error::Input(InputError::NonUnitSameCurrencyRate { .. }))
+        ));
+        assert!(
+            eur.convert_at_rate_f64(Currency::EUR, 1.0000000000000002)
+                .is_err()
+        );
+        // Validation precedes the zero-amount and same-currency shortcuts.
+        let zero = Money::zero(Currency::EUR);
+        assert!(
+            zero.convert_at_rate(Currency::USD, rust_decimal::Decimal::ZERO)
+                .is_err()
+        );
+        assert!(
+            zero.convert_at_rate(Currency::EUR, rust_decimal::Decimal::NEGATIVE_ONE)
+                .is_err()
+        );
+        assert!(
+            zero.convert_at_rate_f64(Currency::USD, f64::INFINITY)
+                .is_err()
         );
     }
 }

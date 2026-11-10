@@ -176,15 +176,15 @@ fn money_protocol_operations_preserve_currency_and_decimal_precision() {
         "2.36"
     );
     assert!(positive.round(Some(-1)).is_err());
-    assert_eq!(positive.checked_div(negative).unwrap(), -1.0);
+    assert_eq!(positive.ratio(negative).unwrap(), -1.0);
     assert!(
         positive
-            .checked_div(Money::new(0.0, Currency::USD).expect("valid money fixture"))
+            .ratio(Money::new(0.0, Currency::USD).expect("valid money fixture"))
             .is_err()
     );
     assert!(
         positive
-            .checked_div(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
+            .ratio(Money::new(1.0, Currency::EUR).expect("valid money fixture"))
             .is_err()
     );
 }

@@ -267,6 +267,12 @@ pub enum InputError {
     )]
     ConversionOverflow,
 
+    /// A nonzero Decimal product or quotient rounds to zero at Decimal's
+    /// 28-decimal-place scale (record 012 #7). Exact zero and exact
+    /// cancellation are not underflow.
+    #[error("Decimal underflow: a nonzero product or quotient rounds to zero at 28 decimal places")]
+    DecimalUnderflow,
+
     /// Non-finite numeric value (NaN or infinity) encountered where finite required.
     ///
     /// This error occurs when constructing monetary amounts or performing
@@ -300,6 +306,16 @@ pub enum InputError {
         to: Currency,
         /// The invalid rate value.
         rate: f64,
+    },
+
+    /// A same-currency conversion was given a rate other than exactly one
+    /// (record 012 #11); a nonunit rate is rejected, never ignored.
+    #[error("Same-currency conversion for {currency} requires rate exactly 1, got {rate}")]
+    NonUnitSameCurrencyRate {
+        /// The source and target currency.
+        currency: Currency,
+        /// The supplied rate, exactly as given.
+        rate: rust_decimal::Decimal,
     },
 
     /// Invalid business-day basis for Bus/252 day-count (must be positive).

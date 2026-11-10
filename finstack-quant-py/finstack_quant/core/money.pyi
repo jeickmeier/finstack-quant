@@ -330,34 +330,70 @@ class Money:
         """
         ...
 
-    def convert_at_rate(self, target: Union[Currency, str], rate: float) -> Money:
+    def convert_at_rate(self, target: Union[Currency, str], rate: Union[Decimal, int, str]) -> Money:
         """
-        Convert with an already-resolved positive FX rate.
+        Convert with an already-resolved exact FX rate.
 
-        The multiplication remains Decimal-backed; no destination minor-unit
-        rounding is applied until formatting.
+        The rate is exact (``decimal.Decimal``, ``int`` or decimal ``str``),
+        so a contractual rate never passes through ``float``; use
+        ``convert_at_rate_f64`` for a ``float`` rate. The multiplication is
+        Decimal-backed and no destination minor-unit rounding is applied.
+
+        Parameters
+        ----------
+        target : Currency or str
+            Destination currency as a ``Currency`` object or ISO-4217 code.
+        rate : decimal.Decimal, int or str
+            Strictly positive rate satisfying ``1 source_currency = rate
+            target_currency``; it must already reflect the desired quote side.
+            For the same currency it must be exactly ``1``.
+
+        Returns
+        -------
+        Money
+            Amount multiplied by ``rate`` and denominated in ``target``.
+
+        Raises
+        ------
+        TypeError
+            If *rate* is a ``float`` or ``bool`` or another non-exact type.
+        ValueError
+            If *target* is not a recognized currency, *rate* is not strictly
+            positive, a same-currency *rate* is not exactly ``1``, or the
+            converted amount overflows Decimal or a nonzero result rounds to
+            zero at 28 decimal places.
+
+        """
+        ...
+
+    def convert_at_rate_f64(self, target: Union[Currency, str], rate: float) -> Money:
+        """
+        Convert with an already-resolved ``float`` FX rate.
+
+        The rate is admitted by its shortest round-trip decimal text and then
+        converted exactly as ``convert_at_rate``.
 
         Parameters
         ----------
         target : Currency or str
             Destination currency as a ``Currency`` object or ISO-4217 code.
         rate : float
-            Positive conversion rate satisfying ``1 source_currency = rate
-            target_currency``; it must already reflect the desired quote side.
+            Finite, strictly positive rate satisfying ``1 source_currency =
+            rate target_currency``; exactly ``1.0`` for the same currency.
 
         Returns
         -------
         Money
-            Decimal-backed amount multiplied by ``rate`` and denominated in
-            ``target``; same-currency conversion returns this amount unchanged
-            without validating ``rate``.
+            Amount multiplied by ``rate`` and denominated in ``target``.
 
         Raises
         ------
+        TypeError
+            If *rate* is not a ``float`` (``bool`` included).
         ValueError
-            If *target* is not a recognized currency or, for a different
-            currency, *rate* is non-finite or not strictly positive or the
-            converted amount exceeds Decimal's representable range.
+            If *target* is not a recognized currency, *rate* is non-finite or
+            not strictly positive, a same-currency *rate* is not exactly
+            ``1.0``, or the converted amount overflows or underflows Decimal.
 
         """
         ...
@@ -385,22 +421,63 @@ class Money:
     def __ge__(self, other: Money) -> bool: ...
     def __add__(self, other: Money) -> Money: ...
     def __sub__(self, other: Money) -> Money: ...
-    def __mul__(self, other: float) -> Money: ...
-    def __rmul__(self, other: float) -> Money: ...
-    @overload
-    def __truediv__(self, other: Money) -> float: ...
-    @overload
-    def __truediv__(self, other: float) -> Money: ...
-    def __truediv__(self, other: Union[Money, float]) -> Union[Money, float]:
-        """Divide by a scalar (``-> Money``) or by a same-currency ``Money`` (``-> float`` ratio).
+    def __mul__(self, other: Union[float, int, Decimal]) -> Money:
+        """Scale by a scalar: exact for ``int``/``Decimal``, shortest round-trip text for ``float``.
+
+        The product is exact when representable, otherwise rounded once,
+        half-even, at the greatest scale (at most 28 places) that fits.
 
         Raises
         ------
+        TypeError
+            If *other* is a ``bool`` or not a ``float``, ``int`` or ``Decimal``.
+        ValueError
+            If the product overflows Decimal, a nonzero product rounds to
+            zero at 28 decimal places, or a ``float`` scalar is non-finite.
+
+        Returns
+        -------
+        Money
+        """
+        ...
+    def __rmul__(self, other: Union[float, int, Decimal]) -> Money:
+        """Right-multiply by a scalar; identical to ``__mul__``.
+
+        Raises
+        ------
+        TypeError
+            If *other* is a ``bool`` or not a ``float``, ``int`` or ``Decimal``.
+        ValueError
+            If the product overflows or underflows Decimal, or a ``float``
+            scalar is non-finite.
+
+        Returns
+        -------
+        Money
+        """
+        ...
+    @overload
+    def __truediv__(self, other: Money) -> float: ...
+    @overload
+    def __truediv__(self, other: Union[float, int, Decimal]) -> Money: ...
+    def __truediv__(self, other: Union[Money, float, int, Decimal]) -> Union[Money, float]:
+        """Divide by a scalar (``-> Money``) or by a same-currency ``Money`` (``-> float`` ratio).
+
+        A scalar divisor is exact for ``int``/``Decimal`` and admitted by its
+        shortest round-trip text for ``float``. ``Money / Money`` rounds each
+        exact amount once to ``float`` and divides, without a Decimal quotient.
+
+        Raises
+        ------
+        TypeError
+            If *other* is a ``bool`` or not ``Money``, ``float``, ``int`` or
+            ``Decimal``.
         ValueError
             ``Validation error: division by zero`` for a zero scalar or zero
             ``Money`` divisor (the Rust error, identical in WASM
-            ``divScalar(0)``), a non-finite scalar, or a currency mismatch
-            when dividing by ``Money`` in another currency.
+            ``checkedDivF64(0)``), a non-finite scalar, a quotient that
+            overflows Decimal or rounds a nonzero value to zero, or a currency
+            mismatch when dividing by ``Money`` in another currency.
 
         Returns
         -------

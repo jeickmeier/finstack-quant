@@ -270,7 +270,7 @@ impl MarketContext {
             Default::default(),
         ))?;
         Ok(ConvertedMoney {
-            amount: amount.convert_at_rate(target_currency, rate.rate)?,
+            amount: amount.convert_at_rate_f64(target_currency, rate.rate)?,
             rate: Some(rate),
         })
     }

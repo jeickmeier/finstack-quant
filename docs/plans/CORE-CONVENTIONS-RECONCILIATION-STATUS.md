@@ -90,7 +90,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 5 | B1 | committed (`B1:` in git log) | workspace rust-lint; core tests 2218 + 286 doctests; gen-write; py test_core_parity 134, members 6, ergonomics 48, calibration boundaries 45, core_wasm_parity 83, runtime_docs 3684, parity 6067; wasm 1086 | 018 entry narrowed to the term-loan step-up (B1b) | Only bindings consumed the changed API outside core; a CDS quote test now compares against the single binary64 `as_bp` view instead of noise-free decimal shifting (018 #6) |
 | 6 | B1b | committed (`B1b:` in git log) | lint fixed-income; tests fixed-income 1253, covenants 115 | **018 entry deleted**; totals 595→594, Reconciliation 58→57, Core conventions 21→20; record 018, README, INVARIANT_MAP M23–M26, INVARIANTS, financial README, central follow-ups updated | Step-up computed fully before mutation; negative/non-finite increases rejected |
 | 7 | B2 | **B2a committed** (`B2a:` in git log); **B2b committed after owner decision D1** (`B2b:` in git log) | B2a: workspace rust-test (16346 incl. 2 re-pins), gen-write, python-test 14003, wasm-test 1086, ui-check. B2b: workspace rust-test 16360 (again after the sweep) + rust-test --doctest; gen-write + gen-check; python-test 13988; wasm-test-built 1085 after a full wasm-test build; ui-check 1527; dual pins and single re-pins checked in a linux/amd64 rust:1.97.1 container | 012 entry: B2a items recorded; B2b: item 4 recorded as reconciled, blocker sentence removed; record 012 status updated | B2b: shortest-text `f64_to_decimal`; `Money::from_model_value` for pricer outputs (125 failure-driven sites, then a 216-site classified sweep; follow-up commit); re-pins and test changes listed under Needs review |
-| 8 | B3 | skipped (dep B2b) | | | |
+| 8 | B3 | committed after owner decision D7 (`B3:` in git log) | rust-test 16,368 pass; doctests pass; python-test 13,994 pass / 112 skip; wasm-test 1,085 pass; ui-check 1,527 pass; gen-write moved no golden/fixture; Linux x86_64 container: all test binaries pass except the 3 known golden-runner container artifacts (read-only mount, no git); the core doctest run hung under Rosetta emulation and was stopped (doctests pass natively) | 012 entry: arithmetic/rate adapters recorded as reconciled; record 012 status updated | Exact-to-minor-unit sums (D7); Decimal-scalar mul/div with underflow errors and `_f64` adapters; direct `ratio`; Decimal-rate `convert_at_rate` + `convert_at_rate_f64`; Python/WASM twins; see Needs review |
 | 9 | B4 | skipped (dep B3) | | | |
 | 10 | B5 | skipped (dep B4) | | | |
 | 11 | C1 | **C1a and C1b committed** (`C1a:`, `C1b:` in git log) | C1a: workspace rust-lint; rust-test 16346; core doctests 286; gen-write; python-test 14003; wasm-test 1086 | 004 entry: fallible membership/counting recorded | C1 split: C1a = fallible `HolidayCalendar` trait + propagation; C1b = engine semantics (nominal-year gating, reach, checked arithmetic, ordinals, missing-table errors, cache) |
@@ -175,6 +175,7 @@ logged under Needs review.
 | D4 | E2c: quote `Compounding` value in existing fixtures | Hybrid: market-sourced goldens and examples state their actual market quote convention (re-pinned where it differs from payment frequency, each listed in the commit); synthetic unit fixtures state `Periodic(payment frequency)`. |
 | D5 | C3: valuations product BDC defaults | Remove `serde_defaults::bdc_modified_following` and the variance-swap observation defaults; fixtures write `"modified_following"` explicitly. |
 | D6 | D3: 30E/360 ISDA termination status on product paths | Products plumb `Some(is final period)` from their own schedules (as the IRS overnight leg does); the tenor bridge keeps requiring the caller's `DayCountContext`. |
+| D7 | B3: Money sums whose exact value exceeds Decimal's 28-29 digits | Exact to the minor unit: an unrepresentable exact sum rounds once, half-even, at the greatest fitting scale only when every digit at or above the currency's minor unit is kept; otherwise it errors (`1e28 + 0.01` USD still errors). Strict exact-or-error (record 012 #6 as written) broke 458 tests, because sums of full-precision bounded products need one digit more than Decimal holds. Decided 2026-11-09. |
 
 ## Needs review
 
@@ -229,8 +230,10 @@ logged under Needs review.
     projection; splitting them by branch is an owner call.
   - **Not swept:** `statements`, `statements-analytics`, `portfolio`,
     `margin`, `attribution` and `scenarios` (about 120 sites). These are
-    Money arithmetic (scale, ratio, residual) and belong to B3's named f64
-    adapters; until then a computed sub-`1e-12` residue there errors.
+    Money arithmetic written as `Money::new(m.amount() * k)` (scale, ratio,
+    residual). B3 does not touch that pattern, so a computed sub-`1e-12`
+    full-mantissa residue there still errors; moving them to Money
+    arithmetic or the adapter is unscheduled work.
   - No per-family deep-out-of-the-money probe tests were added beyond the
     two proptest seeds proptest recorded (equity option, swaption).
 - **B2b test changes. Each is a test weakening or reframing for owner review:**
@@ -289,6 +292,45 @@ logged under Needs review.
     matches them.
   - **WASM gate:** the WASM figure (1085) is from `wasm-test-built`, after
     one full `wasm-test` build.
+- **B3 (after owner decision D7).**
+  - **Qualification first.** rust_decimal 1.43's `checked_*` was tested
+    against an exact BigInt reference on 200k random pairs and 600k exact
+    half-even ties.
+    - add/sub silently round about 30% of inexact sums (`1e28 + 0.01`
+      returns `1e28`), so the slow path is ours.
+    - mul/div match the record's greatest-scale half-even rule wherever a
+      value is returned; the only gap was returning 0 on nonzero underflow,
+      which now errors.
+    - The reference test lives in `money/rounding.rs`.
+  - **D7.** Strict exact-or-error sums (#6 as written) broke 458 tests:
+    `24889.265874428517229867135231 + 990070.2447286517` needs 30 digits.
+    Sums now round only below the minor unit. This is an owner amendment of
+    an accepted item.
+  - **API.**
+    - `Money::checked_div(Money) -> f64` is renamed `ratio`.
+    - `checked_mul`/`checked_div` now take a Decimal scalar.
+    - `convert_at_rate` takes a Decimal; f64 callers moved to
+      `convert_at_rate_f64` (core `MarketContext` conversion and tests).
+    - The same-currency shortcut in `MarketContext::convert_money` still
+      returns before any rate is read, so it cannot trip the
+      exact-unit-rate rule.
+    - Python: `convert_at_rate` takes `Decimal`/`int`/`str`, and a `float`
+      raises `TypeError` naming `convert_at_rate_f64`. The operators take
+      exact `int`/`Decimal` scalars and reject `bool`.
+    - WASM: `convertAtRate` takes a decimal string; `convertAtRateF64`,
+      `checkedMul` and `checkedDiv` are added.
+  - **Results.** Arithmetic results pass through `from_decimal`'s zero
+    normalization. No golden moved.
+  - **Not done:**
+    - Correctly rounded `amount()` (#5): `as_f64` is one ulp off for about
+      10% of values, and fixing it re-pins nearly everything. It needs its
+      own slice.
+    - The ~65 production `checked_mul_f64`/`checked_div_f64` callers
+      (quantities, discount factors, accrual fractions, attribution scale
+      factors) were not reclassified. Their only new failure is a product
+      below 5e-29 in magnitude.
+    - No before/after performance timing. The add/sub fast path is
+      unchanged; the BigInt slow path runs only when the dependency rescaled.
 - **C3 scope boundary.** Removing `BusinessDayConvention::default` exposed
   `valuations::serde_defaults::bdc_modified_following` and two
   variance-swap observation defaults. These are product-level instrument
