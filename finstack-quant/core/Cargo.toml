@@ -135,3 +135,7 @@ workspace = true
 [[test]]
 name = "core"
 path = "tests/main.rs"
+
+[[bench]]
+name = "binomial_pmf"
+harness = false

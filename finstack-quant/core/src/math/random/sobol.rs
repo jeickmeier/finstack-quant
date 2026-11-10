@@ -358,9 +358,7 @@ impl SobolRng {
     pub fn fill_u01(&mut self, out: &mut [f64]) {
         debug_assert!(
             out.len().is_multiple_of(self.dimension),
-            "fill_u01: buffer length {} is not a multiple of dimension {}",
-            out.len(),
-            self.dimension
+            "fill_u01: buffer length must be a multiple of dimension"
         );
         for chunk in out.chunks_mut(self.dimension) {
             self.fill_point(chunk);
@@ -385,9 +383,7 @@ impl SobolRng {
     pub fn fill_std_normals(&mut self, out: &mut [f64]) {
         debug_assert!(
             out.len().is_multiple_of(self.dimension),
-            "fill_std_normals: buffer length {} is not a multiple of dimension {}",
-            out.len(),
-            self.dimension
+            "fill_std_normals: buffer length must be a multiple of dimension"
         );
         for chunk in out.chunks_mut(self.dimension) {
             self.fill_point(chunk);

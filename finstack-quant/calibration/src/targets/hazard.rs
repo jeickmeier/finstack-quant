@@ -12,9 +12,7 @@ use crate::solver::bootstrap;
 use crate::solver::global;
 use crate::solver::traits::TimeGridAndGuesses;
 use crate::solver::traits::{BootstrapTarget, GlobalSolveTarget};
-use crate::targets::util::{
-    ContextScratch, scheme_factor, sorted_knot_grid, validate_global_knot_grid,
-};
+use crate::targets::util::{scheme_factor, sorted_knot_grid, validate_global_knot_grid};
 use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -25,7 +23,9 @@ use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey,
 use finstack_quant_valuations_core::market::conventions::{
     CdsConvention, CdsConventionSpec, ConventionRegistry,
 };
+use finstack_quant_valuations_credit::cds::{CreditDefaultSwap, pricing::PreparedCds};
 use std::str::FromStr;
+use std::sync::Arc;
 
 /// Bootstrapper for hazard curves from CDS quotes.
 ///
@@ -49,8 +49,21 @@ pub(crate) struct HazardCurveTarget {
     pub(crate) base_context: MarketContext,
     /// Global calibration settings (used for solver controls and weights).
     pub(crate) config: CalibrationConfig,
-    /// Reusable scratch context (see [`ContextScratch`]).
-    scratch: ContextScratch,
+}
+
+/// One source quote and its immutable CDS pricing workspace.
+#[derive(Clone)]
+pub(crate) struct PreparedHazardQuote {
+    source: PreparedQuote<CdsQuote>,
+    pricer: Arc<PreparedCds>,
+}
+
+impl std::fmt::Debug for PreparedHazardQuote {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PreparedHazardQuote")
+            .field("source", &self.source)
+            .finish_non_exhaustive()
+    }
 }
 
 fn convention_key_from_params(
@@ -322,7 +335,6 @@ impl HazardCurveTarget {
         Ok(Self {
             params,
             cds_conventions,
-            scratch: ContextScratch::new(base_context.clone()),
             base_context,
             config,
         })
@@ -347,8 +359,7 @@ impl HazardCurveTarget {
         let target =
             HazardCurveTarget::new(params.clone(), context.clone(), config.clone(), &cds_quotes)?;
 
-        let mut prepared_quotes: Vec<PreparedQuote<CdsQuote>> =
-            Vec::with_capacity(cds_quotes.len());
+        let mut prepared_quotes: Vec<PreparedHazardQuote> = Vec::with_capacity(cds_quotes.len());
         let mut curve_ids = FxHashMap::default();
         curve_ids.insert("discount".to_string(), params.discount_curve_id.to_string());
         curve_ids.insert("credit".to_string(), params.curve_id.to_string());
@@ -370,7 +381,20 @@ impl HazardCurveTarget {
                 ))
             })?;
 
-            prepared_quotes.push(prepared);
+            let cds = prepared
+                .instrument
+                .as_any()
+                .downcast_ref::<CreditDefaultSwap>()
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "hazard quote must construct a CDS".into(),
+                    )
+                })?;
+            let pricer = Arc::new(PreparedCds::new(cds, context, params.base_date)?);
+            prepared_quotes.push(PreparedHazardQuote {
+                source: prepared,
+                pricer,
+            });
         }
 
         // Target-specific validation tolerance for hazard curves.
@@ -408,6 +432,7 @@ impl HazardCurveTarget {
         let mut calibration_inputs = Vec::with_capacity(prepared_quotes.len());
         let mut spread_risk_inputs = Vec::with_capacity(prepared_quotes.len());
         for prepared in &prepared_quotes {
+            let prepared = &prepared.source;
             let original_quote = prepared.quote.as_ref();
             let original_payload = serde_json::to_value(original_quote).map_err(|error| {
                 finstack_quant_core::Error::Validation(format!(
@@ -489,7 +514,7 @@ impl HazardCurveTarget {
         Ok((curve, report))
     }
 
-    fn quote_hazard_guess(&self, pq: &PreparedQuote<CdsQuote>) -> Option<f64> {
+    fn quote_hazard_guess(&self, pq: &PreparedHazardQuote) -> Option<f64> {
         // W6: prefer the *curve's* recovery (`params.recovery_rate`) for the
         // initial guess. The quote-level `recovery_rate` is the protection
         // seller's assumption at quote time; the curve-level recovery is what
@@ -500,14 +525,14 @@ impl HazardCurveTarget {
         // Fall back to the quote recovery if the curve recovery is missing
         // or sentinel (NaN).
         let curve_recovery = self.params.recovery_rate;
-        let quote_spread_bp = match pq.quote.as_ref() {
+        let quote_spread_bp = match pq.source.quote.as_ref() {
             crate::quotes::CdsQuote::CdsParSpread { spread_bp, .. } => *spread_bp,
             crate::quotes::CdsQuote::CdsUpfront { coupon_bp, .. } => *coupon_bp,
         };
         let recovery = if curve_recovery.is_finite() {
             curve_recovery
         } else {
-            match pq.quote.as_ref() {
+            match pq.source.quote.as_ref() {
                 crate::quotes::CdsQuote::CdsParSpread { recovery_rate, .. }
                 | crate::quotes::CdsQuote::CdsUpfront { recovery_rate, .. } => *recovery_rate,
             }
@@ -524,47 +549,25 @@ impl HazardCurveTarget {
             None
         }
     }
-
-    fn with_temp_context<F, T>(&self, curve: &HazardCurve, op: F) -> Result<T>
-    where
-        F: FnOnce(&MarketContext) -> Result<T>,
-    {
-        let curve_id = self.params.curve_id.as_str();
-        self.scratch.with_curve_then(
-            curve,
-            |ctx| {
-                // Sync the credit index (if any) so the pricer sees the trial curve.
-                if let Ok(idx) = ctx.get_credit_index(curve_id) {
-                    let updated = idx
-                        .to_builder()
-                        .index_credit_curve(std::sync::Arc::new(curve.clone()))
-                        .build()?;
-                    ctx.insert_credit_index_mut(curve_id, updated)?;
-                }
-                Ok(())
-            },
-            op,
-        )
-    }
 }
 
 impl BootstrapTarget for HazardCurveTarget {
-    type Quote = PreparedQuote<CdsQuote>;
+    type Quote = PreparedHazardQuote;
     type Curve = HazardCurve;
 
     fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
-        Some(match quote.quote.as_ref() {
+        Some(match quote.source.quote.as_ref() {
             CdsQuote::CdsParSpread { spread_bp, .. } => *spread_bp,
             CdsQuote::CdsUpfront { upfront_pct, .. } => *upfront_pct,
         })
     }
 
     fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
-        quote.quote.id().as_str().to_string()
+        quote.source.quote.id().as_str().to_string()
     }
 
     fn quote_time(&self, quote: &Self::Quote) -> Result<f64> {
-        Ok(quote.pillar_time)
+        Ok(quote.source.pillar_time)
     }
 
     fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
@@ -589,11 +592,7 @@ impl BootstrapTarget for HazardCurveTarget {
     }
 
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
-        let base_date = self.params.base_date;
-        self.with_temp_context(curve, |ctx| {
-            let npv = quote.instrument.value_raw(ctx, base_date)?;
-            Ok(npv / self.params.notional)
-        })
+        Ok(quote.pricer.price(curve)? / self.params.notional)
     }
 
     fn initial_guess(&self, quote: &Self::Quote, previous_knots: &[(f64, f64)]) -> Result<f64> {
@@ -666,7 +665,7 @@ impl BootstrapTarget for HazardCurveTarget {
 }
 
 impl GlobalSolveTarget for HazardCurveTarget {
-    type Quote = PreparedQuote<CdsQuote>;
+    type Quote = PreparedHazardQuote;
     type Curve = HazardCurve;
 
     fn build_time_grid_and_guesses(
@@ -741,24 +740,21 @@ impl GlobalSolveTarget for HazardCurveTarget {
             });
         }
 
-        self.with_temp_context(curve, |ctx| {
-            for (i, quote) in quotes.iter().enumerate() {
-                let npv = quote.instrument.value_raw(ctx, self.params.base_date)?;
-                residuals[i] = npv / self.params.notional;
-            }
-            Ok(())
-        })
+        for (i, quote) in quotes.iter().enumerate() {
+            residuals[i] = quote.pricer.price(curve)? / self.params.notional;
+        }
+        Ok(())
     }
 
     fn quote_value(&self, quote: &Self::Quote) -> Option<f64> {
-        Some(match quote.quote.as_ref() {
+        Some(match quote.source.quote.as_ref() {
             CdsQuote::CdsParSpread { spread_bp, .. } => *spread_bp,
             CdsQuote::CdsUpfront { upfront_pct, .. } => *upfront_pct,
         })
     }
 
     fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
-        quote.quote.id().as_str().to_string()
+        quote.source.quote.id().as_str().to_string()
     }
 
     fn residual_weights(&self, quotes: &[Self::Quote], weights_out: &mut [f64]) -> Result<()> {

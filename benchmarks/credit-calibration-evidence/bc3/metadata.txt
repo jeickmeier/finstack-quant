@@ -1,0 +1,5 @@
+Starting revision: 6c55a7f4c7. BC3 cache source committed with this evidence.
+Main runs: 10 samples, 1 s warmup, 10 s measurement, 10000 resamples.
+Both complete benchmark targets executed sequentially; same release profile and original inputs.
+Raw attachment cache enabled for explicit reusable preparation; ordinary prices share the kernel without cache storage.
+Complete reports exactly equal BC2; snapshot bitwise gate passed.

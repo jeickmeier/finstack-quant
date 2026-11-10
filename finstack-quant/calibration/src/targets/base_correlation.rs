@@ -10,7 +10,6 @@ use crate::quotes::CdsTrancheQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
 use crate::solver::bootstrap;
 use crate::solver::traits::BootstrapTarget;
-use crate::targets::util::ContextScratch;
 use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
@@ -18,7 +17,7 @@ use finstack_quant_core::dates::{Date, DateExt, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
-use finstack_quant_valuations_credit::cds_tranche::CdsTranchePricer;
+use finstack_quant_valuations_credit::cds_tranche::{CdsTranchePricer, PreparedTranche};
 use std::sync::Arc;
 
 #[cfg(test)]
@@ -29,7 +28,8 @@ mod performance_diagnostics;
 #[derive(Debug, Clone)]
 pub(crate) struct CdsTrancheCalibrationQuote {
     pub(crate) quote: CdsTrancheQuote,
-    pub(crate) tranche: finstack_quant_valuations_credit::cds_tranche::CdsTranche,
+    prepared: Arc<PreparedTranche>,
+    notional: f64,
     pub(crate) detachment_pct: f64,
 }
 
@@ -130,8 +130,8 @@ fn detachment_to_pct(detachment: f64) -> f64 {
 pub(crate) struct BaseCorrelationTarget {
     /// Calibration inputs (curve IDs, schedule conventions, detachment points).
     pub params: BaseCorrelationParams,
-    /// Reusable sequential bootstrap scratch context.
-    scratch: ContextScratch,
+    /// Immutable source market used only while preparing quotes.
+    context: MarketContext,
     /// Reusable tranche pricer retaining lazy copula and quadrature caches.
     pricer: CdsTranchePricer,
 }
@@ -141,7 +141,7 @@ impl BaseCorrelationTarget {
     pub(crate) fn new(params: BaseCorrelationParams, base_context: MarketContext) -> Self {
         Self {
             params,
-            scratch: ContextScratch::new(base_context),
+            context: base_context,
             pricer: CdsTranchePricer::new(),
         }
     }
@@ -214,7 +214,12 @@ impl BaseCorrelationTarget {
 
         Ok(CdsTrancheCalibrationQuote {
             quote: quote.clone(),
-            tranche: instrument,
+            prepared: Arc::new(self.pricer.prepare(
+                &instrument,
+                &self.context,
+                self.params.base_date,
+            )?),
+            notional: instrument.notional.amount(),
             detachment_pct: detachment_to_pct(quote.detachment),
         })
     }
@@ -399,30 +404,9 @@ impl BootstrapTarget for BaseCorrelationTarget {
     }
 
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
-        let tranche = &quote.tranche;
-        let index_id = self.params.index_id.as_str();
-        self.scratch.with_curve_then(
-            curve,
-            |ctx| {
-                if let Ok(idx) = ctx.get_credit_index(index_id) {
-                    let updated = idx
-                        .to_builder()
-                        .base_correlation_curve(Arc::new(curve.clone()))
-                        .build()?;
-                    ctx.insert_credit_index_mut(index_id, updated)?;
-                }
-                Ok(())
-            },
-            |ctx| {
-                // Residuals are discounted upfront fractions of tranche notional.
-                // Portfolio-notional scaling would understate a thin tranche's
-                // mispricing by the reciprocal of its attachment/detachment width.
-                let npv = self
-                    .pricer
-                    .price_tranche(tranche, ctx, self.params.base_date)?;
-                Ok(npv.amount() / tranche.notional.amount())
-            },
-        )
+        // Preserve tranche-notional scaling, including thin tranches. The
+        // prepared object owns every non-correlation input for this solve.
+        Ok(quote.prepared.price(curve)?.amount() / quote.notional)
     }
 
     fn initial_guess(&self, _quote: &Self::Quote, previous_knots: &[(f64, f64)]) -> Result<f64> {

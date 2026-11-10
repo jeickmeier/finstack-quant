@@ -16,7 +16,7 @@ for (const [source, kind] of [
   test(`flags ${kind} and names the line`, () => {
     const [error, ...rest] = check(`\n${source}\n`);
     assert.deepEqual(rest, []);
-    assert.match(error, new RegExp(`^exports/a\\.js:2: ${kind.replace(/[*+.]/g, '\\$&')}`));
+    assert.ok(error.startsWith(`exports/a.js:2: ${kind}`));
   });
 }
 

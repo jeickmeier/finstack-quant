@@ -3,8 +3,8 @@
 
 use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_models::correlation::{Copula, CopulaSpec};
+use std::sync::Arc;
 
 // Pricing Model Constants
 //
@@ -94,9 +94,10 @@ pub(super) const PAR_SPREAD_TOLERANCE: f64 = 1e-6;
 /// Default settings follow ISDA standard model conventions: mid-period
 /// protection timing, accrual-on-default in the premium leg, T+1 settlement
 /// for index tranches and T+3 for bespoke tranches.
+#[derive(Clone)]
 pub struct CdsTranchePricer {
     pub(super) copula_spec: CopulaSpec,
-    pub(super) copula: Box<dyn Copula>,
+    pub(super) copula: Arc<dyn Copula>,
 }
 
 /// Which per-name exposure a capped pool expectation integrates over.
@@ -133,13 +134,6 @@ pub(super) struct EffectiveStructure {
     /// Surviving pool fraction `1 − defaulted_notional` (NOT `1 − loss`).
     pub(super) pool_factor: f64,
 }
-
-pub(super) type ProjectionInputs = (
-    std::sync::Arc<CreditIndexData>,
-    Date,
-    Vec<finstack_quant_cashflows::builder::SchedulePeriod>,
-    Vec<ElWdPoint>,
-);
 
 /// Where to discount a projected tranche cashflow.
 ///

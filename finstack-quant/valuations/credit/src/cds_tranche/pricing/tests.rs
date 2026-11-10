@@ -198,9 +198,10 @@ fn projected_schedule_matches_projection_rows_and_settlement_issue_date() {
         .build_projected_schedule(&tranche, &market, as_of)
         .expect("projected tranche schedule");
 
-    let (_, valuation_date, _, _) = pricer
+    let valuation_date = pricer
         .prepare_projection_inputs(&tranche, &market, as_of)
-        .expect("projection inputs");
+        .expect("projection inputs")
+        .valuation_date;
     let expected_flows: Vec<_> = pricer
         .project_discountable_rows(&tranche, &market, as_of)
         .expect("projected rows")
@@ -447,7 +448,7 @@ fn concentration_test_loss(pricer: &CdsTranchePricer, index: &CreditIndexData) -
     let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
     let capped = |cap| {
         pricer
-            .calculate_equity_tranche_capped_hetero(
+            .calculate_equity_tranche_capped(
                 cap,
                 0.3,
                 index,
@@ -477,7 +478,7 @@ fn heterogeneous_work_limit_preflights_large_pools() {
     let index = concentration_test_index(3_000, 0.8);
     let pricer = CdsTranchePricer::new();
     let error = pricer
-        .calculate_equity_tranche_capped_hetero(
+        .calculate_equity_tranche_capped(
             7.0,
             0.3,
             &index,
@@ -2617,7 +2618,7 @@ fn heterogeneous_tail_loss_matches_independent_state_enumeration_and_factor_grid
             0.58,
         ] {
             let actual = pricer
-                .calculate_equity_tranche_capped_hetero(
+                .calculate_equity_tranche_capped(
                     cap * 100.0,
                     rho,
                     &index,
@@ -2674,4 +2675,394 @@ fn heterogeneous_tail_loss_matches_independent_state_enumeration_and_factor_grid
             );
         }
     }
+}
+
+/// Original-engine snapshots supplement the independent SciPy reference.
+/// The pool budget is 1e-10 per cap. A difference of two engines and two
+/// caps is bounded by 4e-10 / tranche width. Monotonicity repair is nonexpansive.
+/// For PV, add protection variation over all periods and coupon exposure;
+/// all fixture discount factors are <= 1 and coupons are 5% per year.
+#[test]
+fn credit_performance_numerical_baseline() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let mut records = Vec::new();
+    for (name, attach, detach, years, rho, hazard, realized) in [
+        ("equity", 0.0, 3.0, 5, 0.25, 0.02, 0.0),
+        ("thin", 6.0, 6.1, 5, 0.25, 0.02, 0.0),
+        ("high", 60.0, 100.0, 10, 0.75, 0.10, 0.0),
+        ("distressed", 15.0, 30.0, 5, 0.25, 0.25, 0.0),
+        ("boundary", 3.0, 7.0, 5, 0.999, 0.02, 0.0),
+        ("seasoned", 7.0, 15.0, 5, 0.25, 0.02, 0.02),
+        ("noncontiguous", 4.0, 9.0, 5, 0.25, 0.02, 0.0),
+    ] {
+        let index_curve = HazardCurve::builder("CDX.NA.IG.42")
+            .base_date(as_of)
+            .recovery_rate(0.4)
+            .knots([(1.0, hazard), (10.0, hazard)])
+            .build()
+            .expect("hazard");
+        let correlation = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
+            .knots([(3.0, rho), (100.0, rho)])
+            .build()
+            .expect("correlation");
+        let index = CreditIndexData::builder()
+            .num_constituents(125)
+            .recovery_rate(0.4)
+            .index_credit_curve(Arc::new(index_curve.clone()))
+            .base_correlation_curve(Arc::new(correlation.clone()))
+            .build()
+            .expect("index");
+        let market = sample_market_context()
+            .insert(index_curve)
+            .insert(correlation)
+            .insert_credit_index("CDX.NA.IG.42", index.clone())
+            .expect("market");
+        let mut tranche = sample_tranche();
+        tranche.attach_pct = attach;
+        tranche.detach_pct = detach;
+        tranche.maturity =
+            Date::from_calendar_date(2025 + years, Month::January, 1).expect("maturity");
+        tranche.realized_loss = realized;
+        let pricer = CdsTranchePricer::new();
+        let inputs = pricer
+            .prepare_projection_inputs(&tranche, &market, as_of)
+            .expect("projection");
+        let periods = &inputs.periods;
+        let curve = inputs
+            .el_curve(&pricer, index.base_correlation_curve())
+            .expect("erosion curve");
+        let raw: Vec<_> = [attach, detach]
+            .into_iter()
+            .map(|cap| {
+                [PoolExposure::Loss, PoolExposure::Recovery]
+                    .into_iter()
+                    .map(|exposure| {
+                        let strike = match exposure {
+                            PoolExposure::Loss => cap,
+                            PoolExposure::Recovery => 100.0 - cap,
+                        };
+                        pricer
+                            .calculate_equity_tranche_capped(
+                                strike,
+                                rho,
+                                &index,
+                                tranche.maturity,
+                                exposure,
+                            )
+                            .expect("capped expectation")
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        super::sensitivities::take_pmf_evaluations();
+        let pv = pricer
+            .price_tranche(&tranche, &market, as_of)
+            .expect("PV")
+            .amount();
+        let pmf_evaluations = super::sensitivities::take_pmf_evaluations();
+        eprintln!("{name}: {pmf_evaluations} PMF evaluations per PV");
+        let delta = pricer
+            .calculate_correlation_delta(&tranche, &market, as_of)
+            .expect("correlation sensitivity");
+        let width = (detach - attach) / 100.0;
+        records.push(serde_json::json!({"name": name, "raw": raw, "curve": curve.iter().map(|p| [p.el_fraction, p.wd_fraction]).collect::<Vec<_>>(), "pv": pv, "delta": delta, "fraction_bound": 4e-10 / width, "pv_bound": tranche.notional.amount() * 4e-10 / width * (2.0 * periods.len() as f64 + 0.05 * (years as f64 + 1.0))}));
+    }
+    // Same-build preparation checks use bit strings: JSON float parsing itself
+    // must not introduce a one-ULP difference into the comparison.
+    fn bit_record(value: &serde_json::Value) -> serde_json::Value {
+        match value {
+            serde_json::Value::Number(number) => serde_json::Value::String(format!(
+                "{:016x}",
+                number.as_f64().expect("numeric record").to_bits()
+            )),
+            serde_json::Value::Array(values) => {
+                serde_json::Value::Array(values.iter().map(bit_record).collect())
+            }
+            serde_json::Value::Object(values) => serde_json::Value::Object(
+                values
+                    .iter()
+                    .map(|(key, value)| (key.clone(), bit_record(value)))
+                    .collect(),
+            ),
+            _ => value.clone(),
+        }
+    }
+    let bit_snapshot = bit_record(&serde_json::json!(records));
+    if let Ok(path) = std::env::var("FQ_CREDIT_SNAPSHOT") {
+        std::fs::write(
+            path,
+            serde_json::to_vec_pretty(
+                &serde_json::json!({"values": records, "bits": bit_snapshot}),
+            )
+            .expect("snapshot JSON"),
+        )
+        .expect("save numerical snapshot");
+    }
+    if let Ok(path) = std::env::var("FQ_CREDIT_BITWISE_REFERENCE") {
+        let reference: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(path).expect("read same-build reference"))
+                .expect("reference JSON");
+        assert_eq!(
+            bit_snapshot, reference["bits"],
+            "preparation must preserve same-build arithmetic bit for bit"
+        );
+    }
+
+    let baseline: Vec<serde_json::Value> = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/credit_performance_baseline.json"
+    ))
+    .expect("original engine baseline");
+    assert_eq!(records.len(), baseline.len());
+    for (actual, expected) in records.iter().zip(&baseline) {
+        assert_eq!(actual["name"], expected["name"]);
+        let fraction_bound = expected["fraction_bound"].as_f64().expect("bound");
+        for field in ["raw", "curve"] {
+            let bound = if field == "raw" {
+                2e-10
+            } else {
+                fraction_bound
+            };
+            let actual_rows = actual[field].as_array().expect("rows");
+            let expected_rows = expected[field].as_array().expect("rows");
+            assert_eq!(actual_rows.len(), expected_rows.len());
+            for (a, e) in actual_rows.iter().zip(expected_rows) {
+                for (a, e) in a
+                    .as_array()
+                    .expect("row")
+                    .iter()
+                    .zip(e.as_array().expect("row"))
+                {
+                    assert!(
+                        (a.as_f64().expect("value") - e.as_f64().expect("value")).abs() <= bound,
+                        "{} {field}: {a} vs {e}, bound={bound}",
+                        actual["name"]
+                    );
+                }
+            }
+        }
+        let pv_bound = expected["pv_bound"].as_f64().expect("PV bound");
+        eprintln!(
+            "{}: PV delta={:.12e}, bound={pv_bound:.12e}",
+            actual["name"],
+            actual["pv"].as_f64().expect("PV") - expected["pv"].as_f64().expect("PV")
+        );
+        assert!(
+            (actual["pv"].as_f64().expect("PV") - expected["pv"].as_f64().expect("PV")).abs()
+                <= pv_bound,
+            "{} PV exceeds {pv_bound}",
+            actual["name"]
+        );
+        // Correlation delta is a central difference per one percentage point;
+        // each of its two PVs carries the same bound.
+        assert!(
+            (actual["delta"].as_f64().expect("delta") - expected["delta"].as_f64().expect("delta"))
+                .abs()
+                <= 2.0 * pv_bound,
+            "{} correlation delta",
+            actual["name"]
+        );
+    }
+}
+
+#[test]
+fn prepared_tranche_snapshots_market_and_reuses_only_correlation_inputs() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let market = sample_market_context();
+    let tranche = sample_tranche();
+    for spec in [
+        CopulaSpec::Gaussian,
+        CopulaSpec::StudentT {
+            degrees_of_freedom: 6.0,
+        },
+    ] {
+        let pricer = CdsTranchePricer::with_copula(spec).expect("copula");
+        let prepared = pricer.prepare(&tranche, &market, as_of).expect("prepare");
+        let index = market.get_credit_index("CDX.NA.IG.42").expect("index");
+        let original = prepared
+            .price(index.base_correlation_curve())
+            .expect("original");
+        assert_eq!(
+            original.amount().to_bits(),
+            pricer
+                .price_tranche(&tranche, &market, as_of)
+                .expect("ordinary")
+                .amount()
+                .to_bits()
+        );
+        for rho in [0.25, 0.8, 0.02, 0.25] {
+            let curve = Arc::new(
+                BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
+                    .knots([(3.0, rho), (100.0, rho)])
+                    .build()
+                    .expect("trial"),
+            );
+            let trial_index = index
+                .to_builder()
+                .base_correlation_curve(Arc::clone(&curve))
+                .build()
+                .expect("trial index");
+            let trial_market = market
+                .clone()
+                .insert(Arc::clone(&curve))
+                .insert_credit_index("CDX.NA.IG.42", trial_index)
+                .expect("trial market");
+            assert_eq!(
+                prepared
+                    .price(&curve)
+                    .expect("prepared trial")
+                    .amount()
+                    .to_bits(),
+                pricer
+                    .price_tranche(&tranche, &trial_market, as_of)
+                    .expect("ordinary trial")
+                    .amount()
+                    .to_bits()
+            );
+        }
+        let hazard = Arc::new(
+            HazardCurve::builder("CDX.NA.IG.42")
+                .base_date(as_of)
+                .recovery_rate(0.4)
+                .knots([(1.0, 0.05), (10.0, 0.06)])
+                .build()
+                .expect("new hazard"),
+        );
+        let changed_index = index
+            .to_builder()
+            .index_credit_curve(Arc::clone(&hazard))
+            .build()
+            .expect("changed index");
+        let changed_market = market
+            .clone()
+            .insert(hazard)
+            .insert_credit_index("CDX.NA.IG.42", changed_index)
+            .expect("changed market");
+        assert_eq!(
+            prepared
+                .price(index.base_correlation_curve())
+                .expect("snapshot unchanged")
+                .amount()
+                .to_bits(),
+            original.amount().to_bits()
+        );
+        assert!(
+            (pricer
+                .price_tranche(&tranche, &changed_market, as_of)
+                .expect("changed valuation")
+                .amount()
+                - original.amount())
+            .abs()
+                > 100.0
+        );
+    }
+}
+
+#[test]
+fn prepared_wiped_tranche_preserves_upfront_without_requiring_credit_index() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let discount = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (10.0, 0.6)])
+        .build()
+        .expect("discount");
+    let market = MarketContext::new().insert(discount);
+    let mut tranche = sample_tranche();
+    tranche.realized_loss = 0.08;
+    tranche.upfront = Some((as_of, Money::from((1000_i64, Currency::USD))));
+    let curve = BaseCorrelationCurve::builder("unused")
+        .knots([(3.0, 0.3), (100.0, 0.3)])
+        .build()
+        .expect("curve");
+    let pricer = CdsTranchePricer::new();
+    let prepared = pricer
+        .prepare(&tranche, &market, as_of)
+        .expect("no credit index needed");
+    assert_eq!(prepared.price(&curve).expect("upfront").amount(), 1000.0);
+}
+
+#[test]
+fn prepared_attachment_cache_tracks_effective_interpolated_correlation() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let market = sample_market_context();
+    let pricer = CdsTranchePricer::new();
+    for attachment in [3.0, 4.0] {
+        let mut tranche = sample_tranche();
+        tranche.attach_pct = attachment;
+        tranche.detach_pct = 7.0;
+        let prepared = pricer.prepare(&tranche, &market, as_of).expect("prepare");
+        // At 3% the attachment is fixed. At 4% it interpolates against the
+        // trial 7% knot, so detachment trials must invalidate the raw cache.
+        for rho in [0.25, 0.26, 0.25, 0.24, 0.24] {
+            let curve = BaseCorrelationCurve::builder("trial")
+                .knots([(3.0, 0.25), (7.0, rho), (100.0, rho)])
+                .build()
+                .expect("curve");
+            let fresh = pricer.prepare(&tranche, &market, as_of).expect("uncached");
+            let expected = fresh.price(&curve).expect("fresh");
+            super::sensitivities::take_pmf_evaluations();
+            let actual = prepared.price(&curve).expect("cached");
+            let first_work = super::sensitivities::take_pmf_evaluations();
+            assert_eq!(actual.amount().to_bits(), expected.amount().to_bits());
+            let repeated = prepared.price(&curve).expect("repeat");
+            let second_work = super::sensitivities::take_pmf_evaluations();
+            assert_eq!(repeated.amount().to_bits(), expected.amount().to_bits());
+            assert!(second_work <= first_work);
+        }
+        let curve = BaseCorrelationCurve::builder("fixed")
+            .knots([(3.0, 0.25), (100.0, 0.25)])
+            .build()
+            .expect("curve");
+        let fresh = pricer.prepare(&tranche, &market, as_of).expect("fresh");
+        super::sensitivities::take_pmf_evaluations();
+        fresh.price(&curve).expect("first");
+        let first_work = super::sensitivities::take_pmf_evaluations();
+        fresh.price(&curve).expect("second");
+        let second_work = super::sensitivities::take_pmf_evaluations();
+        assert!(
+            second_work < first_work,
+            "a fixed nonzero attachment must avoid PMFs: {second_work} vs {first_work}"
+        );
+        eprintln!("attachment {attachment}: first {first_work}, repeated {second_work} PMF calls");
+    }
+}
+
+#[test]
+fn prepared_attachment_cache_does_not_retain_failed_trials() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let market = arbitrage_market_context();
+    let pricer = CdsTranchePricer::new();
+    let tranche = sample_tranche();
+    let prepared = pricer.prepare(&tranche, &market, as_of).expect("prepare");
+    let index = market.get_credit_index("CDX.NA.IG.42").expect("index");
+    let bad = index.base_correlation_curve();
+    super::sensitivities::take_pmf_evaluations();
+    let first_error = prepared.price(bad).expect_err("arbitrage");
+    let first_work = super::sensitivities::take_pmf_evaluations();
+    let second_error = prepared.price(bad).expect_err("repeated arbitrage");
+    let second_work = super::sensitivities::take_pmf_evaluations();
+    assert_eq!(first_error.to_string(), second_error.to_string());
+    assert_eq!(
+        first_work, second_work,
+        "a failed trial must not populate the cache"
+    );
+    let good = BaseCorrelationCurve::builder("flat")
+        .knots([(3.0, 0.25), (100.0, 0.25)])
+        .build()
+        .expect("valid curve");
+    let fresh = pricer.prepare(&tranche, &market, as_of).expect("fresh");
+    assert_eq!(
+        prepared.price(&good).expect("recovered").amount().to_bits(),
+        fresh
+            .price(&good)
+            .expect("fresh valid price")
+            .amount()
+            .to_bits()
+    );
+    assert_eq!(
+        prepared
+            .price(bad)
+            .expect_err("arbitrage remains an error")
+            .to_string(),
+        first_error.to_string()
+    );
 }

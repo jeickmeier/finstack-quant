@@ -1,7 +1,9 @@
 //! Independent conditional references and routing controls for equal exposures.
 
 use super::*;
-use finstack_quant_core::market_data::term_structures::{BaseCorrelationCurve, HazardCurve};
+use finstack_quant_core::market_data::term_structures::{
+    BaseCorrelationCurve, CreditIndexData, HazardCurve,
+};
 use finstack_quant_core::math::summation::neumaier_sum;
 use std::sync::Arc;
 use time::macros::date;
@@ -243,7 +245,7 @@ fn index(pds: &[f64], weights: &[f64], recoveries: &[f64]) -> Result<CreditIndex
 
 fn capped(index: &CreditIndexData, exposure: PoolExposure) -> f64 {
     CdsTranchePricer::new()
-        .calculate_equity_tranche_capped_hetero(100.0, 0.25, index, date!(2026 - 01 - 01), exposure)
+        .calculate_equity_tranche_capped(100.0, 0.25, index, date!(2026 - 01 - 01), exposure)
         .expect("capped expectation")
 }
 
@@ -303,7 +305,7 @@ fn count_candidate_preserves_invalid_input_and_old_work_rejections() {
         .collect();
     let large = index(&pds, &[1.0 / 3000.0; 3000], &[0.4; 3000]).expect("large pool");
     let error = CdsTranchePricer::new()
-        .calculate_equity_tranche_capped_hetero(
+        .calculate_equity_tranche_capped(
             7.0,
             0.25,
             &large,

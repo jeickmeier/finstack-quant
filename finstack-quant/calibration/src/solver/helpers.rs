@@ -33,6 +33,7 @@ fn opposite_signs(a: f64, b: f64) -> bool {
 #[cfg(test)]
 use crate::constants::PENALTY;
 use finstack_quant_core::Result;
+use finstack_quant_core::math::solver::BrentSolver;
 
 /// Diagnostics from bracketing scan, useful for error reporting.
 ///
@@ -503,51 +504,68 @@ pub(crate) fn bracket_solve_1d(
     };
 
     // W-40: a sign-change bracket was found (two consecutive scan points with
-    // opposite signs). Mark this before entering bisection/false-position so
+    // opposite signs). Mark this before entering Brent/false-position so
     // callers can distinguish true bracketed roots from approximate |f|-minima.
     diag.is_sign_change_bracket = true;
 
-    // Market-standard: bracket is valid; converge primarily on f-space (|f| < tol).
-    // We prefer a simple bisection on the bracket to guarantee reduction in |f|
-    // for well-behaved monotone objectives. If midpoints become invalid/penalized
-    // or bisection runs out of iterations, we fall back to bounded false-position
-    // updates inside the last-known-good bracket (below).
-    //
-    // X-space early-break: when the bracket width collapses to machine precision
-    // bisection cannot further improve the candidate, but the false-position
-    // fallback below may still reduce |f| via secant-style updates inside the
-    // tight bracket. So we `break` (don't return) and let the fallback polish.
-    let x_tol_abs = 1e-14_f64;
-    let x_tol_rel = 1e-12_f64;
-    for _ in 0..max_iters.max(50) {
-        let m = 0.5 * (a + b);
-        let fm = objective(m);
-        diag.update(m, fm);
+    // The authoritative scan already paid for both endpoint values. Brent
+    // uses safeguarded interpolation first, but may not accept an x-space stop
+    // as convergence. Keep the same per-phase iteration budgets and retain
+    // the last feasible bracket for the established Illinois recovery below.
+    let evaluated = [(a, fa), (b, fb)];
+    let mut invalid_interior = None;
+    let root = BrentSolver::new()
+        .with_tolerance(tol)
+        .with_max_iterations(max_iters.max(50))
+        .solve_evaluated_bracket(
+            |x| {
+                let value = objective(x);
+                diag.update(x, value);
+                if !value.is_finite() || value.abs() >= OBJECTIVE_VALID_ABS_MAX {
+                    invalid_interior = Some(x);
+                    return Ok(f64::NAN);
+                }
+                if a < x && x < b {
+                    if opposite_signs(fa, value) {
+                        b = x;
+                        fb = value;
+                    } else if opposite_signs(value, fb) {
+                        a = x;
+                        fa = value;
+                    }
+                }
+                Ok(value)
+            },
+            evaluated,
+        );
+    if let Ok(root) = root {
+        diag.bracket_found = true;
+        return Ok((Some(root), diag));
+    }
 
-        if fm.is_finite() && fm.abs() < tol {
-            diag.bracket_found = true;
-            return Ok((Some(m), diag));
-        }
-
-        if !fm.is_finite() || fm.abs() >= OBJECTIVE_VALID_ABS_MAX {
-            // Midpoint produced a penalized/infeasible value. Stop bisecting; leave
-            // (a,fa,b,fb) at their last good values so the false-position fallback
-            // below still has a valid sign-changing bracket.
-            break;
-        }
-
-        if opposite_signs(fa, fm) {
-            b = m;
-            fb = fm;
-        } else {
-            a = m;
-            fa = fm;
-        }
-
-        let bracket_width = b - a;
-        let x_tol = x_tol_abs.max(x_tol_rel * (a.abs().max(b.abs())));
-        if bracket_width <= x_tol {
-            break;
+    let mut recovery_budget = max_iters.max(50);
+    if let Some(invalid) = invalid_interior {
+        // An infeasible interpolation does not imply that the midpoint is
+        // infeasible. Try it once before Illinois recovery, charging the call
+        // to the same existing recovery budget. Never install invalid values.
+        let midpoint = 0.5 * (a + b);
+        if midpoint.to_bits() != invalid.to_bits() {
+            let value = objective(midpoint);
+            diag.update(midpoint, value);
+            recovery_budget -= 1;
+            if value.is_finite() && value.abs() < tol {
+                diag.bracket_found = true;
+                return Ok((Some(midpoint), diag));
+            }
+            if value.is_finite() && value.abs() < OBJECTIVE_VALID_ABS_MAX {
+                if opposite_signs(fa, value) {
+                    b = midpoint;
+                    fb = value;
+                } else if opposite_signs(value, fb) {
+                    a = midpoint;
+                    fa = value;
+                }
+            }
         }
     }
 
@@ -560,13 +578,9 @@ pub(crate) fn bracket_solve_1d(
         return Ok((Some(best_point), diag));
     }
 
-    // The false-position fallback requires a valid sign-changing bracket. After bisection
-    // either: (a) we converged (handled above), (b) bisection_ok = false because a midpoint
-    // produced |f| >= OBJECTIVE_VALID_ABS_MAX and `(a,fa,b,fb)` are last-known-good, or
-    // (c) we ran out of iterations with a still-valid bracket. In all three cases the
-    // invariant "fa and fb straddle zero" should hold; guard explicitly so that an
-    // edge case (e.g. fa or fb became NaN upstream) cannot drive FP on a stale bracket.
-    // `opposite_signs` already implies both are finite and non-zero.
+    // A failed interpolation or an x-space stop leaves the last finite
+    // sign-changing bracket intact. Preserve bounded Illinois recovery for
+    // penalized interiors and residual-space polishing.
     let bracket_valid = opposite_signs(fa, fb) && a < b;
     if !bracket_valid {
         return Ok((diag.best_point, diag));
@@ -575,7 +589,7 @@ pub(crate) fn bracket_solve_1d(
     // Illinois false position halves a repeatedly retained endpoint.
     // `retained`: -1 = a, +1 = b.
     let mut retained: i8 = 0;
-    for _ in 0..max_iters.max(50) {
+    for _ in 0..recovery_budget {
         let denom = fb - fa;
         let mut candidate = if denom.is_finite() && denom.abs() > f64::EPSILON {
             a - fa * (b - a) / denom
@@ -1046,6 +1060,52 @@ mod tests {
             .expect_err("insufficient scan grid must return a checked error");
         assert!(error.to_string().contains("scan grid has 2 points"));
         assert_eq!(calls.get(), 0);
+    }
+    #[test]
+    fn bracket_solver_never_accepts_width_without_residual() {
+        let objective = |x: f64| if x < 0.37123 { -1.0 } else { 1.0 };
+        let scan = dense_scan(0.0, 1.0, &[]);
+        let (root, diag) =
+            bracket_solve_1d(&objective, 0.5, &scan, 1e-12, 100, ScanStrategy::Exhaustive)
+                .expect("diagnostics");
+        assert!(root.is_none());
+        assert!(diag.is_sign_change_bracket);
+        assert!(!diag.bracket_found);
+        assert_eq!(diag.best_value.expect("finite values").abs(), 1.0);
+    }
+
+    #[test]
+    fn bracket_solver_preserves_feasible_bracket_after_invalid_interpolation() {
+        let calls = std::cell::Cell::new(0);
+        let invalid = std::cell::Cell::new(0);
+        let objective = |x: f64| {
+            calls.set(calls.get() + 1);
+            // A rejected interpolation must never replace a finite endpoint.
+            if (0.397..0.3985).contains(&x) {
+                invalid.set(invalid.get() + 1);
+                PENALTY
+            } else {
+                x * x - 0.16
+            }
+        };
+        let scan = dense_scan(0.0, 1.0, &[0.35, 0.45]);
+        let (root, diag) = bracket_solve_1d(
+            &objective,
+            0.48,
+            &scan,
+            1e-12,
+            100,
+            ScanStrategy::Exhaustive,
+        )
+        .expect("solve");
+        let root = root.expect("feasible root");
+        assert!((root * root - 0.16).abs() < 1e-12);
+        assert!(diag.is_sign_change_bracket);
+        assert_eq!(calls.get(), diag.eval_count);
+        assert!(
+            invalid.get() > 0,
+            "must exercise invalid interpolation recovery"
+        );
     }
 }
 

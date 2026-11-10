@@ -208,7 +208,7 @@ where
             let series_id =
                 MetricId::composite(&MetricId::BucketedCs01, &[prepared.hazard_id.as_str()]);
             let cds_cache = match context.instrument_as::<crate::cds::CreditDefaultSwap>() {
-                Ok(cds) => Some(crate::cds::pricing::CdsHazardRepriceCache::try_new(
+                Ok(cds) => Some(crate::cds::pricing::PreparedCds::new(
                     cds,
                     context.curves.as_ref(),
                     context.as_of,
@@ -225,7 +225,7 @@ where
                     &request,
                     move |temp_ctx: &MarketContext| {
                         let surv = temp_ctx.get_hazard(hazard_key.as_str())?;
-                        cache.npv(surv.as_ref())
+                        cache.price(surv.as_ref())
                     },
                 )
             } else {

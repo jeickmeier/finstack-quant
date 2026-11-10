@@ -839,7 +839,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/sabr_calibration_outcome.schema.json",
-      "bytes": 4199,
+      "bytes": 4302,
       "kind": "output",
       "path": "schemas/models/1/sabr_calibration_outcome.schema.json",
       "summary": "Calibrated SABR parameters and deterministic solver diagnostics.",

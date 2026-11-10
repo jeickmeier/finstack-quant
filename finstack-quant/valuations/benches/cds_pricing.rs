@@ -19,6 +19,7 @@ use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::results::ValuationResult;
+use finstack_quant_valuations_credit::cds::pricing::PreparedCds;
 #[allow(dead_code, unused_imports, clippy::expect_used, clippy::unwrap_used)]
 #[path = "../tests/support/credit.rs"]
 mod credit_support;
@@ -218,9 +219,37 @@ fn validate_metrics(result: &ValuationResult, metrics: &[MetricId]) {
     }
 }
 
+fn bench_cds_prepared(c: &mut Criterion) {
+    let market = create_market();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("as of");
+    let cds = create_cds(5);
+    let hazard = market.get_hazard("ACME-HAZARD").expect("hazard");
+    let prepared = PreparedCds::new(&cds, &market, as_of).expect("prepare");
+    let mut group = c.benchmark_group("cds_prepared");
+    group.bench_function("prepare_only_5Y", |b| {
+        b.iter(|| {
+            PreparedCds::new(black_box(&cds), black_box(&market), black_box(as_of))
+                .expect("prepare")
+        })
+    });
+    group.bench_function("reuse_5Y", |b| {
+        b.iter(|| prepared.price(black_box(&hazard)).expect("price"))
+    });
+    group.bench_function("prepare_and_price_5Y", |b| {
+        b.iter(|| {
+            PreparedCds::new(black_box(&cds), black_box(&market), black_box(as_of))
+                .expect("prepare")
+                .price(black_box(&hazard))
+                .expect("price")
+        })
+    });
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_cds_pv,
+    bench_cds_prepared,
     bench_cds_cs01,
     bench_cds_cs01_metrics,
     bench_cds_par_spread

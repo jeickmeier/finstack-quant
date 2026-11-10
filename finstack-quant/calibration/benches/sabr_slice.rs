@@ -49,10 +49,7 @@ fn bench_sabr_slice(c: &mut Criterion) {
             option_type: OptionType::Call,
         },
     ];
-    let settings = CalibrationConfig {
-        fail_on_bad_fit: false,
-        ..Default::default()
-    };
+    let settings = CalibrationConfig::default();
     let params = VolSurfaceParams {
         vol_surface_id: "SPY-VOL".to_string(),
         base_date,
@@ -84,13 +81,15 @@ fn bench_sabr_slice(c: &mut Criterion) {
     let market_quotes: Vec<MarketQuote> = quotes.iter().cloned().map(MarketQuote::Vol).collect();
     c.bench_function("sabr_slice_calibration", |b| {
         b.iter(|| {
-            execute_step(
+            let result = execute_step(
                 black_box(&step),
                 black_box(&market_quotes),
                 black_box(&market),
                 black_box(&settings),
             )
-            .unwrap()
+            .expect("SABR slice must calibrate");
+            assert!(result.1.success, "SABR slice must pass quote validation");
+            result
         })
     });
 }

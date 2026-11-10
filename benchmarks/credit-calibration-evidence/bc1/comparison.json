@@ -1,0 +1,186 @@
+[
+  {
+    "name": "Base correlation: isolated",
+    "id": "calibration_base_correlation_isolated_5_knots",
+    "s0": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 8238501937.5,
+        "upper_bound": 8240804453.9
+      },
+      "point_estimate": 8239613154.1,
+      "standard_error": 590050.1925388484
+    },
+    "bc1": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 4025256895.84,
+        "upper_bound": 4033344802.6125
+      },
+      "point_estimate": 4028962341.5,
+      "standard_error": 2101967.3417522856
+    },
+    "ratio": 0.4889746965238536
+  },
+  {
+    "name": "Base correlation: full plan",
+    "id": "calibration_base_correlation_full_plan_5_knots",
+    "s0": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 8310371332.9,
+        "upper_bound": 8325116079.3
+      },
+      "point_estimate": 8315811175,
+      "standard_error": 4193765.3415025305
+    },
+    "bc1": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 4100237905.4325004,
+        "upper_bound": 4139098102.6974998
+      },
+      "point_estimate": 4114186541.7,
+      "standard_error": 11359113.445914987
+    },
+    "ratio": 0.49474266011096624
+  },
+  {
+    "name": "Equity PV",
+    "id": "cds_tranche_npv/equity_0_3",
+    "s0": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 35544650.375,
+        "upper_bound": 35578763.14303572
+      },
+      "point_estimate": 35562296.62498017,
+      "standard_error": 8822.686614162425
+    },
+    "bc1": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 11384247.105794642,
+        "upper_bound": 11421963.795000002
+      },
+      "point_estimate": 11401643.209626984,
+      "standard_error": 10008.406519605955
+    },
+    "ratio": 0.3206104299129568
+  },
+  {
+    "name": "Mezzanine PV",
+    "id": "cds_tranche_npv/junior_mezz_3_7",
+    "s0": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 46713529.17419642,
+        "upper_bound": 46771258.233333334
+      },
+      "point_estimate": 46739706.18801586,
+      "standard_error": 14824.997233073213
+    },
+    "bc1": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 23758861.575636905,
+        "upper_bound": 23856691.471249998
+      },
+      "point_estimate": 23803638.456428573,
+      "standard_error": 24885.273177718704
+    },
+    "ratio": 0.5092808748235534
+  },
+  {
+    "name": "Thin-tranche PV",
+    "id": "cds_tranche_npv/thin_6_6_1",
+    "s0": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 47426600.748549104,
+        "upper_bound": 47473273.21729167
+      },
+      "point_estimate": 47450697.118154764,
+      "standard_error": 11887.328158542778
+    },
+    "bc1": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 24456375.81486111,
+        "upper_bound": 24493866.42547619
+      },
+      "point_estimate": 24474540.528386243,
+      "standard_error": 9761.870289792063
+    },
+    "ratio": 0.5157888506346563
+  },
+  {
+    "name": "High-detachment PV",
+    "id": "cds_tranche_npv/high_60_100",
+    "s0": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 36959028.00611111,
+        "upper_bound": 37036171.97803175
+      },
+      "point_estimate": 36994190.988531746,
+      "standard_error": 19852.87527133354
+    },
+    "bc1": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 7036.2095469140595,
+        "upper_bound": 7052.678847836393
+      },
+      "point_estimate": 7044.023874742941,
+      "standard_error": 4.136011490272058
+    },
+    "ratio": 0.00019040891790082933
+  },
+  {
+    "name": "Student-t control",
+    "id": "cds_tranche_student_t_npv/junior_mezz_3_7_df6",
+    "s0": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 11915895.447527183,
+        "upper_bound": 11927025.779499998
+      },
+      "point_estimate": 11921325.725293651,
+      "standard_error": 2845.7001582477815
+    },
+    "bc1": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 11935322.267385317,
+        "upper_bound": 11955782.829222223
+      },
+      "point_estimate": 11945507.272936508,
+      "standard_error": 5284.531970278747
+    },
+    "ratio": 1.0020284277269222
+  },
+  {
+    "name": "Heterogeneous control",
+    "id": "cds_tranche_heterogeneous/npv_hetero/50",
+    "s0": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 436039936.8775,
+        "upper_bound": 439329687.3
+      },
+      "point_estimate": 437723258.2,
+      "standard_error": 855622.8690184897
+    },
+    "bc1": {
+      "confidence_interval": {
+        "confidence_level": 0.95,
+        "lower_bound": 427223071.58,
+        "upper_bound": 431612687.5
+      },
+      "point_estimate": 429526370.8,
+      "standard_error": 1128632.4817550268
+    },
+    "ratio": 0.9812738134279017
+  }
+]

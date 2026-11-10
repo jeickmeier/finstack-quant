@@ -12,14 +12,15 @@
 
 #![allow(clippy::unwrap_used)]
 
+#[path = "support/checked_calibration.rs"]
+mod checked;
+use checked::checked_calibrate;
+
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_calibration::api::market_datum::MarketDatum;
-use finstack_quant_calibration::api::{
-    engine,
-    schema::{
-        CalibrationEnvelope, CalibrationPlan, CalibrationStep, DiscountCurveParams,
-        HazardCurveParams, StepParams,
-    },
+use finstack_quant_calibration::api::schema::{
+    CalibrationEnvelope, CalibrationPlan, CalibrationStep, DiscountCurveParams, HazardCurveParams,
+    StepParams,
 };
 use finstack_quant_calibration::quotes::CdsQuote;
 use finstack_quant_calibration::quotes::MarketQuote;
@@ -277,7 +278,7 @@ fn bench_global_discount_quote_count(c: &mut Criterion) {
         &format!("{n}q"),
     );
     group.bench_with_input(BenchmarkId::new("numeric_jac", n), &n, |b, _| {
-        b.iter(|| engine::calibrate(black_box(&env)).unwrap());
+        b.iter(|| checked_calibrate(black_box(&env)));
     });
 
     group.finish();
@@ -305,10 +306,10 @@ fn bench_global_discount_jacobian(c: &mut Criterion) {
     );
 
     group.bench_function("numeric_jac_16q", |b| {
-        b.iter(|| engine::calibrate(black_box(&env_numeric)).unwrap());
+        b.iter(|| checked_calibrate(black_box(&env_numeric)));
     });
     group.bench_function("analytical_jac_16q", |b| {
-        b.iter(|| engine::calibrate(black_box(&env_analytic)).unwrap());
+        b.iter(|| checked_calibrate(black_box(&env_analytic)));
     });
 
     group.finish();
@@ -336,10 +337,10 @@ fn bench_global_vs_bootstrap(c: &mut Criterion) {
     );
 
     group.bench_with_input(BenchmarkId::new("bootstrap", n), &n, |b, _| {
-        b.iter(|| engine::calibrate(black_box(&env_bootstrap)).unwrap());
+        b.iter(|| checked_calibrate(black_box(&env_bootstrap)));
     });
     group.bench_with_input(BenchmarkId::new("global_solve", n), &n, |b, _| {
-        b.iter(|| engine::calibrate(black_box(&env_global)).unwrap());
+        b.iter(|| checked_calibrate(black_box(&env_global)));
     });
 
     group.finish();
@@ -362,7 +363,7 @@ fn bench_global_hazard_tenor_count(c: &mut Criterion) {
         &format!("{m}t"),
     );
     group.bench_with_input(BenchmarkId::new("global_solve", m), &m, |b, _| {
-        b.iter(|| engine::calibrate(black_box(&env)).unwrap());
+        b.iter(|| checked_calibrate(black_box(&env)));
     });
 
     let cds_quotes = make_cds_quotes(m);
@@ -373,7 +374,7 @@ fn bench_global_hazard_tenor_count(c: &mut Criterion) {
         &format!("bs_{m}t"),
     );
     group.bench_with_input(BenchmarkId::new("bootstrap", m), &m, |b, _| {
-        b.iter(|| engine::calibrate(black_box(&env)).unwrap());
+        b.iter(|| checked_calibrate(black_box(&env)));
     });
 
     group.finish();

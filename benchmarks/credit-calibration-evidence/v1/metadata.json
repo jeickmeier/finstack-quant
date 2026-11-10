@@ -1,0 +1,14 @@
+{
+  "starting_revision": "604c0377b8",
+  "samples": 20,
+  "warmup_seconds": 3,
+  "measurement_seconds": 10,
+  "resamples": 10000,
+  "phase": "v1",
+  "input_sha256": {
+    "finstack-quant/calibration/benches/credit_calibration.rs": "f0479a345716bd4c979ca63fab255cf27c611fee3922c51e579f2070d74b30e0",
+    "finstack-quant/calibration/benches/sabr_slice.rs": "c148075296aa313760529ff3979778aec1732b367486401621347aa94a55cfa7",
+    "finstack-quant/calibration/examples/market_bootstrap/06_cdx_index_vol.json": "a53cdaaa1e68d3bd8f312aa91e19679012fe1e718c662877ddc2e4328d083d70"
+  },
+  "numerics": "Financial outputs exactly equal; only residual_evaluations corrected in V1"
+}

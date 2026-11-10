@@ -132,13 +132,18 @@ fn base_correlation_performance_control_export() {
         .expect("canonical quote trades");
     prepared.sort_by(|left, right| left.detachment_pct.total_cmp(&right.detachment_pct));
     assert_eq!(prepared.len(), 5);
+    // Rebuild each canonical trade exactly as quote preparation does; the
+    // prepared quote retains only the pricing snapshot.
+    let build_ctx = target.build_ctx();
+    let overrides = target.build_overrides();
     let mut cases: Vec<_> = prepared
         .into_iter()
         .map(|prepared| ControlCase {
             id: prepared.quote.id.as_str().to_string(),
             role: "quoted",
             quote_id: Some(prepared.quote.id.as_str().to_string()),
-            instrument: prepared.tranche,
+            instrument: build_cds_tranche_instrument(&prepared.quote, &build_ctx, &overrides)
+                .expect("canonical quote trade"),
         })
         .collect();
     for (id, attach_pct, detach_pct) in [

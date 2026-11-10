@@ -9,9 +9,19 @@ use crate::cds_tranche::CdsTranche;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::CreditIndexData};
-use finstack_quant_core::math::distributions::binomial_pmf_all_into;
+use finstack_quant_core::math::distributions::BinomialPmf;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::{Error, Result};
+
+#[cfg(test)]
+thread_local! {
+    static PMF_EVALUATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(super) fn take_pmf_evaluations() -> usize {
+    PMF_EVALUATIONS.with(|count| count.replace(0))
+}
 
 impl CdsTranchePricer {
     /// Apply smooth correlation boundary handling to avoid numerical discontinuities.
@@ -63,14 +73,14 @@ impl CdsTranchePricer {
     /// Uses the binomial distribution to sum over all possible numbers of defaults.
     pub(super) fn conditional_equity_tranche_capped(
         &self,
-        num_constituents: usize,
+        binomial: &BinomialPmf,
         cap_notional: f64,
         conditional_default_prob: f64,
         exposure: f64,
     ) -> Result<f64> {
-        let individual_notional = 1.0 / num_constituents as f64; // Normalized to 1.0 total
+        let individual_notional = 1.0 / binomial.get_count() as f64; // Normalized to 1.0 total
 
-        with_conditional_pmf(num_constituents, conditional_default_prob, |pmf| {
+        with_conditional_pmf(binomial, conditional_default_prob, |pmf| {
             let mut expected = 0.0;
 
             // Sum over all possible numbers of defaults
@@ -92,15 +102,15 @@ impl CdsTranchePricer {
     /// distribution.
     pub(super) fn conditional_equity_tranche_pair(
         &self,
-        num_constituents: usize,
+        binomial: &BinomialPmf,
         loss_cap: f64,
         recovery_cap: f64,
         conditional_default_prob: f64,
         loss_exposure: f64,
         recovery_exposure: f64,
     ) -> Result<(f64, f64)> {
-        let individual_notional = 1.0 / num_constituents as f64;
-        with_conditional_pmf(num_constituents, conditional_default_prob, |pmf| {
+        let individual_notional = 1.0 / binomial.get_count() as f64;
+        with_conditional_pmf(binomial, conditional_default_prob, |pmf| {
             let mut loss = 0.0;
             let mut recovery = 0.0;
             for (k, &prob_k_defaults) in pmf.iter().enumerate() {
@@ -586,10 +596,12 @@ impl CdsTranchePricer {
 /// `(N + 1)`-element vector on every call. The buffer is thread-local, so
 /// parallel tranche pricing remains correct and deterministic.
 fn with_conditional_pmf<T>(
-    num_constituents: usize,
+    binomial: &BinomialPmf,
     conditional_default_prob: f64,
     f: impl FnOnce(&[f64]) -> T,
 ) -> Result<T> {
+    #[cfg(test)]
+    PMF_EVALUATIONS.with(|count| count.set(count.get() + 1));
     if !conditional_default_prob.is_finite() {
         return Err(Error::Validation(
             "conditional default probability must be finite".to_owned(),
@@ -601,7 +613,7 @@ fn with_conditional_pmf<T>(
     }
     PMF_SCRATCH.with(|cell| {
         let mut pmf = cell.borrow_mut();
-        binomial_pmf_all_into(&mut pmf, num_constituents, conditional_default_prob)?;
+        binomial.fill(&mut pmf, conditional_default_prob)?;
         Ok(f(&pmf))
     })
 }
@@ -640,10 +652,10 @@ mod tests {
         let pricer = CdsTranchePricer::new();
         let el = pricer
             .conditional_equity_tranche_capped(
-                125,        // num_constituents
-                0.03,       // cap_notional (3% equity tranche)
-                0.10,       // conditional default probability
-                1.0 - 0.40, // exposure = LGD at 40% recovery
+                &BinomialPmf::new(125), // num_constituents
+                0.03,                   // cap_notional (3% equity tranche)
+                0.10,                   // conditional default probability
+                1.0 - 0.40,             // exposure = LGD at 40% recovery
             )
             .expect("valid probability should produce an expected loss");
         assert!(
@@ -677,7 +689,7 @@ mod tests {
     #[test]
     fn index_sized_homogeneous_pool_uses_finite_binomial() {
         let binomial = CdsTranchePricer::new()
-            .conditional_equity_tranche_capped(125, 0.08, 0.20, 0.60)
+            .conditional_equity_tranche_capped(&BinomialPmf::new(125), 0.08, 0.20, 0.60)
             .expect("binomial");
         let lhp = (0.20_f64 * 0.60).min(0.08);
         assert!(
@@ -690,7 +702,7 @@ mod tests {
     #[test]
     fn conditional_equity_tranche_rejects_nan_probability() {
         let error = CdsTranchePricer::new()
-            .conditional_equity_tranche_capped(125, 0.03, f64::NAN, 0.60)
+            .conditional_equity_tranche_capped(&BinomialPmf::new(125), 0.03, f64::NAN, 0.60)
             .expect_err("NaN conditional probability must fail before integration");
         assert!(matches!(error, finstack_quant_core::Error::Validation(_)));
     }

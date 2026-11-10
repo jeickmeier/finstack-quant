@@ -918,12 +918,12 @@ class SabrCalibrationOutcome:
 
     @property
     def residual_evaluations(self) -> int:
-        """Total objective residual evaluations across attempted starts.
+        """Actual objective residual invocations across all attempted starts, including rejected and failed attempts.
 
         Returns
         -------
         int
-            Total objective residual evaluations across attempted starts.
+            Actual objective residual invocations across all attempted starts, including rejected and failed attempts.
 
         Notes
         -----

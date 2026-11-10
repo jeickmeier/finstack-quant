@@ -111,8 +111,8 @@ See each `benches/*.rs` file for case IDs, fixture sizes, requested metrics, and
 timing boundaries. In particular, preparing a model outside the timer and
 preparing it on every price are different operations.
 
-Calibration targets (`calibration`, `global_calibration`, `df_bootstrap`,
-`fwd_curve`, `sabr_slice`) belong to
+Calibration targets (`calibration`, `credit_calibration`, `global_calibration`,
+`df_bootstrap`, `fwd_curve`, `sabr_slice`) belong to
 [`finstack-quant-calibration`](../../calibration/Cargo.toml). Fourier/COS model
 benchmarks belong to [`finstack-quant-models`](../../models/benches/README.md).
 Portfolio-scale risk benchmarks live in

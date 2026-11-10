@@ -1,0 +1,12 @@
+{
+  "starting_revision": "0cae19c500",
+  "samples": 10,
+  "warmup_seconds": 1,
+  "measurement_seconds": 10,
+  "resamples": 10000,
+  "input_sha256": {
+    "finstack-quant/calibration/examples/market_bootstrap/03_single_name_hazard.json": "b815e12ecc33c23ddb15bdd88a974a3fa29f6d38b69b7eb2364d2046ea8c56f1",
+    "finstack-quant/calibration/benches/credit_calibration.rs": "323021318c23d837c81387e4ad24be92ac76d06d08c299fbfbfd68208fd88b3e"
+  },
+  "note": "H0 benchmarks added before H1 production changes; all five H1 calibration reports exactly match H0."
+}

@@ -321,8 +321,7 @@ pub(super) fn apply_excess_spread(
         debug_assert!(
             ((state.spread_account.amount() - spread_before) - spread_net_capture).abs()
                 <= WRITEDOWN_DE_MINIMIS,
-            "spread-account delta {} != recorded net capture {spread_net_capture}",
-            state.spread_account.amount() - spread_before
+            "spread-account delta does not equal recorded net capture"
         );
     }
     Ok(spread_net_capture)

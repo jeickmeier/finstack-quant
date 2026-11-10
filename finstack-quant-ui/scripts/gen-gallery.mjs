@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { loadRegistry } from "shadcn/registry";
 import { checkGraph, visualTypes, workerRoles } from "./check-registry.mjs";
 import { emit, emitSource, sha256 } from "./fixture-output.mjs";
+import { sourceString } from "./source-string.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url)),
   repo = path.resolve(root, "..");
 const output = path.join(repo, "docs-site/src/components/registry-gallery");
@@ -184,14 +185,20 @@ if (workbenchTypes.size)
   throw new Error(`Missing workbench pricing cases: ${[...workbenchTypes]}`);
 const imports = nonvisual.map((item) => {
   const targets = (item.files ?? [])
-    .map((file) => file.target.replace(/^~\//, ""))
+    .map(({ target }) => (target.startsWith("~/") ? target.slice(2) : target))
     .filter(
       (target) =>
         /\.(?:[cm]?js|tsx?|json)$/.test(target) &&
         !target.endsWith(".d.ts") &&
         !target.endsWith(".worker.ts"),
-    );
-  return `${JSON.stringify(item.name)}:()=>Promise.all([${targets.map((target) => `import(${JSON.stringify("@/" + target.replace(/\.tsx?$/, ""))})`).join(",")}]).then(modules=>({name:${JSON.stringify(item.name)},modules:modules.length}))`;
+    )
+    .map((target) => {
+      const extension = path.extname(target);
+      return extension === ".ts" || extension === ".tsx"
+        ? target.slice(0, -extension.length)
+        : target;
+    });
+  return `${sourceString(item.name)}:()=>Promise.all([${targets.map((target) => `import(${sourceString("@/" + target)})`).join(",")}]).then(modules=>({name:${sourceString(item.name)},modules:modules.length}))`;
 });
 const exampleId = (name) =>
   name.replace(/(?:^|-)(\w)/g, (_, letter) => letter.toUpperCase());

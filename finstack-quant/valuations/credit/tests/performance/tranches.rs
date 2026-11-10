@@ -262,7 +262,7 @@ fn conditional_pricer(pool: &Pool, probabilities: &[f64]) -> CdsTranchePricer {
     }
     CdsTranchePricer {
         copula_spec: spec,
-        copula: Box::new(ConditionalInputs { by_threshold }),
+        copula: Arc::new(ConditionalInputs { by_threshold }),
     }
 }
 
@@ -430,7 +430,7 @@ fn scenario_record(case: &FrozenCase, market: &MarketContext, name: &str, bump: 
     let calls = Arc::new(AtomicUsize::new(0));
     let pricer = CdsTranchePricer {
         copula_spec: case.copula.clone(),
-        copula: Box::new(CountedCopula {
+        copula: Arc::new(CountedCopula {
             inner: case.copula.build().expect("frozen copula"),
             calls: Arc::clone(&calls),
         }),
@@ -445,10 +445,16 @@ fn scenario_record(case: &FrozenCase, market: &MarketContext, name: &str, bump: 
         tranche.realized_loss, 0.0,
         "frozen B4 tranche inputs are unseasoned"
     );
-    let (index, settlement, periods, el_wd) = pricer
+    let projection = pricer
         .prepare_projection_inputs(tranche, &market, case.as_of)
         .expect("actual projected periods");
+    let el_wd = projection
+        .el_curve(&pricer, projection.index.base_correlation_curve())
+        .expect("actual projected EL/WD curve");
     let projection_conditional_pd_calls = calls.swap(0, Ordering::Relaxed);
+    let index = projection.index;
+    let settlement = projection.valuation_date;
+    let periods = projection.periods;
     assert_eq!(periods.len(), el_wd.len());
     assert!(!periods.is_empty());
     assert!(

@@ -1,96 +1,48 @@
 //! Constituent capped expectations by exact default counts, subsets or grid convolution.
 use super::pricer::{
-    CdsTranchePricer, GRID_STEP, HOMOGENEITY_TOLERANCE, MAX_CONVOLUTION_WORK, MAX_GRID_POINTS,
-    PoolExposure,
+    CdsTranchePricer, GRID_STEP, MAX_CONVOLUTION_WORK, MAX_GRID_POINTS, PoolExposure,
 };
-use finstack_quant_core::dates::{Date, DayCountContext};
-use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::{Error, Result};
 use std::cell::RefCell;
 
-impl CdsTranchePricer {
-    /// Integrate a complete constituent pool with per-issuer recovery rates
-    /// using a bounded count, subset or grid distribution at every factor node.
-    pub(super) fn calculate_equity_tranche_capped_hetero(
+pub(super) struct PreparedHeterogeneousPool {
+    thresholds: Vec<f64>,
+    weights: Vec<f64>,
+    loss_exposures: Vec<f64>,
+    recovery_exposures: Vec<f64>,
+}
+impl PreparedHeterogeneousPool {
+    pub(super) fn new(thresholds: Vec<f64>, weights: Vec<f64>, recoveries: Vec<f64>) -> Self {
+        Self {
+            thresholds,
+            weights,
+            loss_exposures: recoveries.iter().map(|recovery| 1.0 - recovery).collect(),
+            recovery_exposures: recoveries,
+        }
+    }
+    /// Integrate the prepared constituent pool using a bounded count, subset
+    /// or grid distribution at every factor node.
+    pub(super) fn capped(
         &self,
-        cap_pct: f64,
+        pricer: &CdsTranchePricer,
+        cap: f64,
         correlation: f64,
-        index_data: &CreditIndexData,
-        maturity: Date,
         exposure: PoolExposure,
     ) -> Result<f64> {
-        let curves = index_data.issuer_credit_curves().ok_or_else(|| {
-            Error::Validation("heterogeneous pricing requires issuer curves".to_owned())
-        })?;
-        let count = usize::from(index_data.num_constituents());
-        if count == 0 || curves.len() != count {
-            return Err(Error::Validation(
-                "heterogeneous pricing requires complete issuer coverage".to_owned(),
-            ));
-        }
-        let correlation = self.smooth_correlation_boundary(correlation);
-        let cap = cap_pct / 100.0;
-        let mut probabilities = Vec::with_capacity(count);
-        let mut recoveries = Vec::with_capacity(count);
-        let mut weights = Vec::with_capacity(count);
-        let mut total_weight = 0.0;
-        for (id, curve) in curves {
-            let weight = index_data.get_issuer_weight(id);
-            if !weight.is_finite() || weight < 0.0 {
-                return Err(Error::Validation(
-                    "issuer weights must be finite and non-negative".to_owned(),
-                ));
-            }
-            total_weight += weight;
-            // Names without exposure must not change the loss distribution or
-            // the choice between the binomial and heterogeneous algorithms.
-            if weight == 0.0 {
-                continue;
-            }
-            let time = curve.day_count().year_fraction(
-                curve.base_date(),
-                maturity,
-                DayCountContext::default(),
-            )?;
-            probabilities.push((1.0 - curve.sp(time)).clamp(0.0, 1.0));
-            recoveries.push(index_data.get_issuer_recovery(id));
-            weights.push(weight);
-        }
-        if (total_weight - 1.0).abs() > 1e-9 {
-            return Err(Error::Validation(
-                "issuer weights must preserve the full pool notional".to_owned(),
-            ));
-        }
-        let count = weights.len();
-        let uniform = |values: &[f64]| {
-            values
-                .iter()
-                .all(|x| (x - values[0]).abs() <= HOMOGENEITY_TOLERANCE)
-        };
-        if uniform(&probabilities) && uniform(&recoveries) && uniform(&weights) {
-            return self.homogeneous_capped_expectation(
-                cap,
-                count,
-                probabilities[0],
-                recoveries[0],
-                correlation,
-                exposure,
-            );
-        }
-        let thresholds: Vec<_> = probabilities
-            .iter()
-            .map(|p| self.default_threshold_for_copula(*p))
-            .collect();
         let conditional_p = |i: usize, factors: &[f64]| {
-            self.conditional_default_prob_copula(self.copula(), thresholds[i], factors, correlation)
+            pricer.conditional_default_prob_copula(
+                pricer.copula(),
+                self.thresholds[i],
+                factors,
+                correlation,
+            )
         };
-        let exposures: Vec<f64> = recoveries
-            .iter()
-            .map(|&recovery| match exposure {
-                PoolExposure::Loss => 1.0 - recovery,
-                PoolExposure::Recovery => recovery,
-            })
-            .collect();
+        let exposures = match exposure {
+            PoolExposure::Loss => &self.loss_exposures,
+            PoolExposure::Recovery => &self.recovery_exposures,
+        };
+        let weights = &self.weights;
+        let count = weights.len();
         let exact_states = u32::try_from(count)
             .ok()
             .and_then(|bits| 1_usize.checked_shl(bits))
@@ -99,7 +51,7 @@ impl CdsTranchePricer {
         // default count. Exact equality is essential: even tiny exposure
         // differences belong to the original subset/grid algorithms. A zero
         // exposure retains its existing cheap path and resource behavior.
-        if equal_positive_exposures(&weights, &recoveries) && exposures[0] != 0.0 {
+        if equal_positive_exposures(weights, &self.recovery_exposures) && exposures[0] != 0.0 {
             if exact_states.is_none() {
                 // Preserve the existing heterogeneous resource failure before
                 // replacing its grid with a smaller exact count distribution.
@@ -115,7 +67,7 @@ impl CdsTranchePricer {
             }
             let points = checked_count_points(count)?;
             let pmf = RefCell::new(vec![0.0; points]);
-            return self.integrate_factors(&|factors| {
+            return pricer.integrate_factors(&|factors| {
                 let mut pmf = pmf.borrow_mut();
                 default_count_pmf(&mut pmf, (0..count).map(|i| conditional_p(i, factors)));
                 Ok(count_capped_expectation(
@@ -139,7 +91,7 @@ impl CdsTranchePricer {
                 }
             }
             let probabilities = RefCell::new(vec![0.0; states]);
-            return self.integrate_factors(&|factors| {
+            return pricer.integrate_factors(&|factors| {
                 let mut probabilities = probabilities.borrow_mut();
                 probabilities[0] = 1.0;
                 for i in 0..count {
@@ -173,7 +125,7 @@ impl CdsTranchePricer {
         }
         let max_points = checked_convolution_grid(count, max_grid_index)?;
         let buffers = RefCell::new((vec![0.0; max_points], vec![0.0; max_points]));
-        self.integrate_factors(&|factors| {
+        pricer.integrate_factors(&|factors| {
             let mut buffers = buffers.borrow_mut();
             let (first, second) = &mut *buffers;
             first[0] = 1.0;

@@ -1,0 +1,6 @@
+Starting revision: 4f1ebfa85a; final BC2 source committed with this evidence.
+Same S0 inputs, toolchain and release profile.
+10 samples, 1 second warmup, 10 second measurement target, 10000 resamples.
+Both complete benchmark targets executed sequentially; all timed fits succeeded.
+Reports exactly equal BC1; fixed-correlation snapshot bitwise gate passed.
+Shared validated copula; local-array experiments removed.

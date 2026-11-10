@@ -56,9 +56,15 @@ fn case_record(case: &CalibrationCase, inputs: &CalibrationInputs) -> Value {
     assert!(notional.is_finite() && notional > 0.0);
     let coupon = tranche.coupon_bp / 10_000.0;
     assert!(coupon.is_finite());
-    let (index, settlement, periods, el_wd) = pricer
+    let projection = pricer
         .prepare_projection_inputs(tranche, market, as_of)
         .expect("actual calibration projection inputs");
+    let el_wd = projection
+        .el_curve(&pricer, projection.index.base_correlation_curve())
+        .expect("actual calibration EL/WD curve");
+    let index = projection.index;
+    let settlement = projection.valuation_date;
+    let periods = projection.periods;
     assert!(index.issuer_credit_curves().is_none());
     assert_eq!(index.num_constituents(), 125);
     assert_eq!(periods.len(), el_wd.len());

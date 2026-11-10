@@ -1,6 +1,7 @@
 //! `CdsPricer`: premium and protection legs, protection-leg integration over the
-//! ISDA Standard Model knot grid, NPV and the hazard-reprice cache.
+//! ISDA Standard Model knot grid, NPV and the prepared CDS workspace.
 
+use super::grid_cache::IsdaWindowCache;
 use super::helpers::{
     date_from_hazard_time, haz_t, isda_standard_model_boundaries, settlement_date, sp_cond_to,
     validate_recovery_consistency,
@@ -45,6 +46,7 @@ pub(super) struct AodInputs<'a> {
     pub(super) as_of: Date,
     pub(super) disc: &'a DiscountCurve,
     pub(super) surv: &'a HazardCurve,
+    pub(super) grid_cache: Option<&'a IsdaWindowCache>,
 }
 
 #[derive(Clone, Copy)]
@@ -128,6 +130,17 @@ impl CdsPricer {
         surv: &HazardCurve,
         as_of: Date,
     ) -> Result<f64> {
+        self.pv_protection_leg_prepared(cds, disc, surv, as_of, None)
+    }
+
+    fn pv_protection_leg_prepared(
+        &self,
+        cds: &CreditDefaultSwap,
+        disc: &DiscountCurve,
+        surv: &HazardCurve,
+        as_of: Date,
+        grid_cache: Option<&IsdaWindowCache>,
+    ) -> Result<f64> {
         // Note: Recovery rate validation is performed at CDS construction time.
         // All public constructors (builder, new_isda) call validate().
         //
@@ -200,6 +213,7 @@ impl CdsPricer {
             as_of,
             disc,
             surv,
+            grid_cache,
         };
         let protection_pv = protection_leg_isda_standard_model_cond(&grid, recovery)?;
 
@@ -272,6 +286,7 @@ impl CdsPricer {
                     as_of,
                     disc,
                     surv,
+                    grid_cache: None,
                 },
                 accrual,
                 df,
@@ -367,6 +382,7 @@ impl CdsPricer {
             as_of: inp.as_of,
             disc: inp.disc,
             surv: inp.surv,
+            grid_cache: inp.grid_cache,
         };
         let mut accrual_pv = 0.0;
         grid.for_each_window(|w| {
@@ -399,12 +415,14 @@ impl CdsPricer {
     }
 }
 
-/// Discount-side state reused across hazard bumps for bucketed CDS CS01.
+/// Immutable CDS contract and discount snapshot for repeated hazard-curve pricing.
 ///
 /// Coupon dates, accruals, and payment discount factors do not change when
 /// only the hazard curve is shocked. Protection and accrual-on-default still
-/// re-integrate against the bumped survival curve.
-pub(crate) struct CdsHazardRepriceCache {
+/// re-integrate against the bumped survival curve. Discount windows are cached
+/// for the last hazard knot topology; changing bases, day count or knot times
+/// replaces that cache. Storage is bounded by this contract’s integration windows.
+pub struct PreparedCds {
     pricer: CdsPricer,
     cds: CreditDefaultSwap,
     disc: std::sync::Arc<DiscountCurve>,
@@ -413,23 +431,35 @@ pub(crate) struct CdsHazardRepriceCache {
     spread: f64,
     upfront_pv: f64,
     clean_accrued: f64,
+    grids: IsdaWindowCache,
 }
 
-impl CdsHazardRepriceCache {
+impl PreparedCds {
     /// Build the cache from the live discount curve and CDS schedule.
     ///
     /// # Arguments
     ///
-    /// * `cds` - Live CDS whose premium schedule and valuation convention are cached.
-    /// * `market` - Market supplying the premium-leg discount curve.
-    /// * `as_of` - Valuation date used to drop expired coupons and compute DFs.
-    pub(crate) fn try_new(
+    /// * `cds` - Valid CDS contract cloned into the workspace, including notional
+    ///   currency, premium coupon in basis points, upfront cash, recovery,
+    ///   settlement/calendar rules and clean/dirty valuation convention.
+    /// * `market` - Supplies the discount curve named by the premium leg. Its
+    ///   immutable Arc snapshot is retained; subsequent market changes do not
+    ///   affect this workspace. No hazard curve is required at preparation.
+    /// * `as_of` - Valuation date used to drop expired coupons and upfronts,
+    ///   condition survival, calculate accrued premium and rebase discounting.
+    ///
+    /// # Errors
+    /// Returns validation, missing-market-data or date/schedule errors for an
+    /// invalid contract, unavailable discount curve or invalid discount/accrual
+    /// inputs. Hazard/recovery compatibility is checked by [`Self::price`].
+    pub fn new(
         cds: &CreditDefaultSwap,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
     ) -> Result<Self> {
         use rust_decimal::prelude::ToPrimitive;
 
+        cds.validate()?;
         let pricer = CdsPricer::new();
         let disc = market.get_discount(&cds.premium_leg.discount_curve_id)?;
         let periods_raw = pricer.coupon_periods(cds, as_of)?;
@@ -470,6 +500,7 @@ impl CdsHazardRepriceCache {
             spread,
             upfront_pv,
             clean_accrued,
+            grids: IsdaWindowCache::default(),
         })
     }
 
@@ -477,12 +508,27 @@ impl CdsHazardRepriceCache {
     ///
     /// # Arguments
     ///
-    /// * `surv` - Bumped or original survival/hazard curve used for protection
-    ///   and accrual-on-default. Discount factors stay at the cached values.
-    pub(crate) fn npv(&self, surv: &HazardCurve) -> Result<f64> {
-        let protection_pv =
-            self.pricer
-                .pv_protection_leg_raw(&self.cds, self.disc.as_ref(), surv, self.as_of)?;
+    /// * `surv` - Trial hazard curve, with decimal annual hazard rates and its
+    ///   own base date/day-count clock. Its recovery must match the CDS; its ID
+    ///   need not match the contract's original credit curve ID. Protection,
+    ///   premium survival and accrual-on-default use this curve. Discounting
+    ///   remains fixed at the snapshot captured by [`Self::new`].
+    ///
+    /// # Returns
+    /// Unrounded signed present value in the CDS notional currency, including
+    /// dated upfront and the contract's clean/dirty accrued treatment.
+    ///
+    /// # Errors
+    /// Returns recovery-validation, survival, discounting or integration/date
+    /// errors from the shared CDS pricing kernel.
+    pub fn price(&self, surv: &HazardCurve) -> Result<f64> {
+        let protection_pv = self.pricer.pv_protection_leg_prepared(
+            &self.cds,
+            self.disc.as_ref(),
+            surv,
+            self.as_of,
+            Some(&self.grids),
+        )?;
         let calendar = self
             .cds
             .premium_leg
@@ -505,6 +551,7 @@ impl CdsHazardRepriceCache {
                     as_of: self.as_of,
                     disc: self.disc.as_ref(),
                     surv,
+                    grid_cache: Some(&self.grids),
                 },
                 accrual,
                 df,
@@ -565,6 +612,7 @@ pub(super) struct IsdaGrid<'a> {
     pub(super) disc: &'a DiscountCurve,
     /// Hazard / survival curve producing default densities.
     pub(super) surv: &'a HazardCurve,
+    pub(super) grid_cache: Option<&'a IsdaWindowCache>,
 }
 
 /// One grid window with piecewise-constant hazard and interest rates.
@@ -588,13 +636,50 @@ pub(super) struct IsdaWindow {
     pub(super) interest_rate: f64,
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct DiscountWindow {
+    pub(super) df1: f64,
+    pub(super) interest_rate: f64,
+}
+
 impl IsdaGrid<'_> {
+    pub(super) fn discount_window(&self, t1: f64, t2: f64, dt: f64) -> Result<DiscountWindow> {
+        // Relative DF anchored at as_of, via settled default date per knot.
+        let settle1 = settlement_date(
+            date_from_hazard_time(self.surv, t1),
+            self.settlement_delay,
+            self.calendar,
+        )?;
+        let settle2 = settlement_date(
+            date_from_hazard_time(self.surv, t2),
+            self.settlement_delay,
+            self.calendar,
+        )?;
+        let df1 = self.disc.df_between_dates(self.as_of, settle1)?;
+        let df2 = self.disc.df_between_dates(self.as_of, settle2)?;
+
+        // Piecewise-constant interest rate (may be negative if df2 > df1).
+        let interest_rate = if df1 > 0.0 && df2 > 0.0 {
+            -(df2 / df1).ln() / dt
+        } else {
+            0.0
+        };
+
+        Ok(DiscountWindow { df1, interest_rate })
+    }
+
     /// Visit every window of the knot grid that carries default probability
     /// (`sp1 > sp2` and `sp1 > 0`).
     pub(super) fn for_each_window(&self, mut visit: impl FnMut(IsdaWindow)) -> Result<()> {
-        let boundaries =
-            isda_standard_model_boundaries(self.t_start, self.t_end, self.surv, self.disc)?;
-        for window in boundaries.windows(2) {
+        let prepared = self.grid_cache.map(|cache| cache.get(self)).transpose()?;
+        let owned;
+        let boundaries = if let Some(grid) = &prepared {
+            grid.boundaries.as_slice()
+        } else {
+            owned = isda_standard_model_boundaries(self.t_start, self.t_end, self.surv, self.disc)?;
+            owned.as_slice()
+        };
+        for (index, window) in boundaries.windows(2).enumerate() {
             let t1 = window[0];
             let t2 = window[1];
             let dt = t2 - t1;
@@ -611,25 +696,9 @@ impl IsdaGrid<'_> {
             // Piecewise-constant hazard rate over [t1, t2].
             let hazard_rate = -(sp2 / sp1).ln() / dt;
 
-            // Relative DF anchored at as_of, via settled default date per knot.
-            let settle1 = settlement_date(
-                date_from_hazard_time(self.surv, t1),
-                self.settlement_delay,
-                self.calendar,
-            )?;
-            let settle2 = settlement_date(
-                date_from_hazard_time(self.surv, t2),
-                self.settlement_delay,
-                self.calendar,
-            )?;
-            let df1 = self.disc.df_between_dates(self.as_of, settle1)?;
-            let df2 = self.disc.df_between_dates(self.as_of, settle2)?;
-
-            // Piecewise-constant interest rate (may be negative if df2 > df1).
-            let interest_rate = if df1 > 0.0 && df2 > 0.0 {
-                -(df2 / df1).ln() / dt
-            } else {
-                0.0
+            let DiscountWindow { df1, interest_rate } = match prepared.as_ref() {
+                Some(grid) => grid.discounts[index].clone()?,
+                None => self.discount_window(t1, t2, dt)?,
             };
 
             visit(IsdaWindow {
@@ -677,8 +746,8 @@ fn protection_leg_isda_standard_model_cond(grid: &IsdaGrid<'_>, recovery: f64) -
 }
 
 #[cfg(test)]
-mod cds_hazard_reprice_cache_tests {
-    use super::{CdsHazardRepriceCache, CdsPricer};
+mod prepared_cds_tests {
+    use super::{CdsPricer, PreparedCds};
     use crate::cds::CreditDefaultSwap;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
@@ -743,17 +812,17 @@ mod cds_hazard_reprice_cache_tests {
         market: &MarketContext,
         hazard: &HazardCurve,
         as_of: Date,
-    ) -> finstack_quant_core::Result<CdsHazardRepriceCache> {
-        let cache = CdsHazardRepriceCache::try_new(cds, market, as_of)?;
+    ) -> finstack_quant_core::Result<PreparedCds> {
+        let cache = PreparedCds::new(cds, market, as_of)?;
 
-        let base_cached = cache.npv(hazard)?;
+        let base_cached = cache.price(hazard)?;
         let base_full = cds.value(market, as_of)?.amount();
         assert_npv_matches(base_cached, base_full, "base hazard");
 
         let bumped_hazard = hazard.with_parallel_hazard_rate_bump_bp(1.0)?;
         let mut bumped_market = market.clone();
         bumped_market.insert_mut(bumped_hazard.clone());
-        let bumped_cached = cache.npv(&bumped_hazard)?;
+        let bumped_cached = cache.price(&bumped_hazard)?;
         let bumped_full = cds.value(&bumped_market, as_of)?.amount();
         assert_npv_matches(bumped_cached, bumped_full, "bumped hazard");
         assert!(
@@ -765,7 +834,7 @@ mod cds_hazard_reprice_cache_tests {
     }
 
     #[test]
-    fn cds_hazard_reprice_cache_matches_value_for_current_coupon_with_accrual_on_default()
+    fn prepared_cds_matches_value_for_current_coupon_with_accrual_on_default()
     -> finstack_quant_core::Result<()> {
         let as_of = date!(2025 - 02 - 15);
         let cds = create_test_cds(CdsValuationConvention::IsdaDirty)?;
@@ -792,8 +861,7 @@ mod cds_hazard_reprice_cache_tests {
     }
 
     #[test]
-    fn cds_hazard_reprice_cache_matches_value_for_bloomberg_clean_accrued()
-    -> finstack_quant_core::Result<()> {
+    fn prepared_cds_matches_value_for_bloomberg_clean_accrued() -> finstack_quant_core::Result<()> {
         let as_of = date!(2025 - 02 - 15);
         let cds = create_test_cds(CdsValuationConvention::BloombergCdswClean)?;
         let (market, hazard) = create_test_market()?;
@@ -805,11 +873,246 @@ mod cds_hazard_reprice_cache_tests {
         );
         Ok(())
     }
+    #[test]
+    fn prepared_cds_matches_raw_pricing_bitwise_and_snapshots_discount()
+    -> finstack_quant_core::Result<()> {
+        let (market, hazard) = create_test_market()?;
+        let discount = market.get_discount("USD-OIS")?;
+        let pricer = CdsPricer::new();
+        for convention in [
+            CdsValuationConvention::IsdaDirty,
+            CdsValuationConvention::BloombergCdswClean,
+            CdsValuationConvention::BloombergCdswCleanFullPremium,
+            CdsValuationConvention::QuantLibIsdaParity,
+        ] {
+            for as_of in [
+                date!(2025 - 01 - 01),
+                date!(2025 - 02 - 15),
+                date!(2025 - 03 - 20),
+            ] {
+                let mut cds = create_test_cds(convention)?;
+                cds.upfront = Some((
+                    as_of + time::Duration::days(3),
+                    Money::new(12345.67, Currency::USD)?,
+                ));
+                let prepared = PreparedCds::new(&cds, &market, as_of)?;
+                for curve in [&hazard, &hazard.with_parallel_hazard_rate_bump_bp(1.0)?] {
+                    let expected = pricer.npv_full(&cds, discount.as_ref(), curve, as_of)?;
+                    assert_eq!(
+                        prepared.price(curve)?.to_bits(),
+                        expected.to_bits(),
+                        "{convention:?} {as_of}"
+                    );
+                }
+                let original = prepared.price(&hazard)?;
+                let replacement = DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (10.0, 0.5)])
+                    .build()?;
+                let changed = market.clone().insert(replacement);
+                assert_eq!(prepared.price(&hazard)?.to_bits(), original.to_bits());
+                assert!(
+                    (PreparedCds::new(&cds, &changed, as_of)?.price(&hazard)? - original).abs()
+                        > 1.0
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_cds_requires_valid_contract_and_discount_but_no_hazard()
+    -> finstack_quant_core::Result<()> {
+        let (market, hazard) = create_test_market()?;
+        let cds = create_test_cds(CdsValuationConvention::IsdaDirty)?;
+        let discount = market.get_discount("USD-OIS")?;
+        let discount_only = MarketContext::new().insert(discount.as_ref().clone());
+        let prepared = PreparedCds::new(&cds, &discount_only, date!(2025 - 02 - 15))?;
+        assert!(prepared.price(&hazard)?.is_finite());
+        assert!(PreparedCds::new(&cds, &MarketContext::new(), date!(2025 - 02 - 15)).is_err());
+        let mismatched = hazard
+            .to_builder_with_id("other")
+            .recovery_rate(0.2)
+            .build()?;
+        assert!(prepared.price(&mismatched).is_err());
+        let mut invalid = cds;
+        invalid.protection_leg.recovery_rate = f64::NAN;
+        assert!(PreparedCds::new(&invalid, &discount_only, date!(2025 - 02 - 15)).is_err());
+        Ok(())
+    }
+    #[test]
+    fn prepared_cds_grids_reuse_rates_and_track_actual_topology() -> finstack_quant_core::Result<()>
+    {
+        use finstack_quant_core::dates::DayCount;
+        let (market, hazard) = create_test_market()?;
+        let cds = create_test_cds(CdsValuationConvention::IsdaDirty)?;
+        let as_of = date!(2025 - 02 - 15);
+        let discount = market.get_discount("USD-OIS")?;
+        let prepared = PreparedCds::new(&cds, &market, as_of)?;
+        let ordinary = CdsPricer::new();
+        let verify = |curve: &HazardCurve| -> finstack_quant_core::Result<()> {
+            assert_eq!(
+                prepared.price(curve)?.to_bits(),
+                ordinary.npv_full(&cds, &discount, curve, as_of)?.to_bits()
+            );
+            Ok(())
+        };
+        verify(&hazard)?;
+        let initial = prepared.grids.build_count();
+        assert!(initial > 1);
+        verify(&hazard)?;
+        verify(&hazard.with_parallel_hazard_rate_bump_bp(1.0)?)?;
+        assert_eq!(
+            prepared.grids.build_count(),
+            initial,
+            "rate changes must not rebuild grids"
+        );
+        let retained = prepared.grids.retained_windows();
+        for (base, day_count, knots) in [
+            (date!(2025 - 01 - 01), DayCount::Act365F, vec![(1.0, 0.02)]),
+            (
+                date!(2025 - 01 - 01),
+                DayCount::Act365F,
+                vec![(1.0, 0.02), (3.0, 0.03)],
+            ),
+            (
+                date!(2024 - 12 - 20),
+                DayCount::Act365F,
+                vec![(1.0, 0.02), (3.0, 0.03)],
+            ),
+            (
+                date!(2024 - 12 - 20),
+                DayCount::Act360,
+                vec![(1.0, 0.02), (3.0, 0.03)],
+            ),
+            (
+                date!(2024 - 12 - 20),
+                DayCount::Act360,
+                vec![(1.0, 0.02), (3.000000001, 0.03)],
+            ),
+        ] {
+            let curve = HazardCurve::builder("trial")
+                .base_date(base)
+                .day_count(day_count)
+                .recovery_rate(0.4)
+                .knots(knots)
+                .build()?;
+            let before = prepared.grids.build_count();
+            verify(&curve)?;
+            assert!(
+                prepared.grids.build_count() > before,
+                "topology must invalidate"
+            );
+            let warm = prepared.grids.build_count();
+            verify(&curve)?;
+            assert_eq!(prepared.grids.build_count(), warm);
+        }
+        verify(&hazard)?;
+        assert_eq!(
+            prepared.grids.retained_windows(),
+            retained,
+            "only the last topology remains"
+        );
+        eprintln!(
+            "CDS grid builds for first trial: {initial}; warm rate-only trial: 0; retained windows: {retained}; bytes per window: {}",
+            std::mem::size_of::<finstack_quant_core::Result<super::DiscountWindow>>()
+                + std::mem::size_of::<f64>()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_grid_defers_discount_errors_until_positive_default_mass()
+    -> finstack_quant_core::Result<()> {
+        use finstack_quant_core::math::interp::ExtrapolationPolicy;
+        let base = date!(2025 - 01 - 01);
+        let disc = DiscountCurve::builder("short")
+            .base_date(base)
+            .knots([(0.0, 1.0), (0.5, 0.98)])
+            .extrapolation(ExtrapolationPolicy::None)
+            .build()?;
+        let zero = HazardCurve::builder("trial")
+            .base_date(base)
+            .recovery_rate(0.4)
+            .knots([(1.0, 0.0), (3.0, 0.0)])
+            .build()?;
+        let positive = zero.with_parallel_hazard_rate_bump_bp(100.0)?;
+        let cache = super::IsdaWindowCache::default();
+        let grid = super::IsdaGrid {
+            t_start: 1.0,
+            t_end: 2.0,
+            settlement_delay: 0,
+            calendar: None,
+            sp_asof: 1.0,
+            as_of: base,
+            disc: &disc,
+            surv: &zero,
+            grid_cache: Some(&cache),
+        };
+        grid.for_each_window(|_| panic!("zero hazard must skip all windows"))?;
+        let builds = cache.build_count();
+        let positive_grid = super::IsdaGrid {
+            surv: &positive,
+            ..grid
+        };
+        let cached_error = positive_grid
+            .for_each_window(|_| {})
+            .expect_err("discount range");
+        let ordinary_error = super::IsdaGrid {
+            grid_cache: None,
+            ..positive_grid
+        }
+        .for_each_window(|_| {})
+        .expect_err("same range");
+        assert_eq!(cached_error.to_string(), ordinary_error.to_string());
+        grid.for_each_window(|_| panic!("zero mass ignores retained errors"))?;
+        assert_eq!(cache.build_count(), builds);
+        let cold = super::IsdaWindowCache::default();
+        let exhausted = super::IsdaGrid {
+            sp_asof: 0.0,
+            grid_cache: Some(&cold),
+            ..positive_grid
+        };
+        assert_eq!(
+            super::protection_leg_isda_standard_model_cond(&exhausted, 0.4)?.to_bits(),
+            0.0_f64.to_bits()
+        );
+        assert_eq!(
+            cold.build_count(),
+            0,
+            "survival floor precedes grid work/errors"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_cds_grid_matches_negative_rates_and_settlement_clocks()
+    -> finstack_quant_core::Result<()> {
+        use finstack_quant_core::dates::DayCount;
+        let (_, hazard) = create_test_market()?;
+        for as_of in [date!(2025 - 01 - 01), date!(2025 - 02 - 15)] {
+            let discount=DiscountCurve::builder("USD-OIS").base_date(date!(2024-12-20)).day_count(DayCount::Act360)
+                .knots([(0.0,1.0),(0.7,1.02),(4.1,1.1),(10.0,1.2)])
+                .validation(finstack_quant_core::market_data::term_structures::ValidationMode::NegativeRateFriendly {forward_floor:-0.1}).build()?;
+            let market = MarketContext::new().insert(discount.clone());
+            for delay in [0, 3, 7] {
+                let mut cds = create_test_cds(CdsValuationConvention::BloombergCdswClean)?;
+                cds.protection_leg.settlement_delay = delay;
+                let prepared = PreparedCds::new(&cds, &market, as_of)?;
+                for curve in [&hazard, &hazard.with_parallel_hazard_rate_bump_bp(1.0)?] {
+                    let expected = CdsPricer::new().npv_full(&cds, &discount, curve, as_of)?;
+                    assert_eq!(prepared.price(curve)?.to_bits(), expected.to_bits());
+                    assert_eq!(prepared.price(curve)?.to_bits(), expected.to_bits());
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod cds_review_regression_tests {
-    use super::{CdsHazardRepriceCache, CdsPricer};
+    use super::{CdsPricer, PreparedCds};
     use crate::cds::CreditDefaultSwap;
     use crate::cds::pricing::AccrualDayCountPolicy;
     use finstack_quant_core::currency::Currency;
@@ -943,8 +1246,7 @@ mod cds_review_regression_tests {
                     let market = MarketContext::new()
                         .insert(disc.clone())
                         .insert(surv.clone());
-                    let cached =
-                        CdsHazardRepriceCache::try_new(&cds, &market, as_of)?.npv(&surv)?;
+                    let cached = PreparedCds::new(&cds, &market, as_of)?.price(&surv)?;
                     close(cached, -expected);
                     close(cached, pricer.npv_full(&cds, &disc, &surv, as_of)?);
                 }
@@ -1008,7 +1310,7 @@ mod cds_review_regression_tests {
                 );
                 let market = MarketContext::new().insert(disc).insert(surv.clone());
                 close(
-                    CdsHazardRepriceCache::try_new(&cds, &market, as_of)?.npv(&surv)?,
+                    PreparedCds::new(&cds, &market, as_of)?.price(&surv)?,
                     -expected_premium,
                 );
             }
@@ -1062,10 +1364,7 @@ mod cds_review_regression_tests {
                 let market = MarketContext::new()
                     .insert(disc.clone())
                     .insert(surv.clone());
-                close(
-                    CdsHazardRepriceCache::try_new(&cds, &market, as_of)?.npv(&surv)?,
-                    npv,
-                );
+                close(PreparedCds::new(&cds, &market, as_of)?.price(&surv)?, npv);
                 values.push(npv);
                 denominators.push(pricer.par_spread_denominator(&cds, &disc, &surv, as_of)?);
             }
