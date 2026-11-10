@@ -416,7 +416,7 @@
     "dv01": {
       "abs": 1e-09,
       "rel": 2e-08,
-      "tolerance_reason": "The relative bound covers the 1.17e-8 DV01 drift observed in the 2026-11-07 nightly while retaining the canonical expected value."
+      "tolerance_reason": "The optimized credit calibration changes this symmetric-bump DV01 by 1.18e-8 relative (8.2e-6 currency units); 2e-8 accommodates that immaterial numerical residual while retaining a tight scale-aware regression bound."
     },
     "cs01": {
       "abs": 1e-09,
