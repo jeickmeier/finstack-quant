@@ -161,6 +161,20 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
   `rust-lint` and acts as an extra per-slice gate. `mise run python-test-file`
   accepts exactly one path.
 
+## Owner decisions after the run (2026-11-09)
+
+Resolved by the owner after the run; these unblock or settle the items
+logged under Needs review.
+
+| # | Item | Decision |
+| --- | --- | --- |
+| D1 | B2b: sub-1e-28 model values entering `Money` | Keep the strict float-to-Decimal converter for inputs; add one named pricer-only adapter (for example `Money::from_model_value`) that rounds explicitly to Decimal's 28-digit scale, half-even. Unblocks B2b and its chain (B3–B5, G1, G4, F6–F8, G5, H6). |
+| D2 | `from_years` removal: source of contractual tenor | `ForwardCurve` stores its index tenor as a `Tenor` (core market-data wire change); callers use it, taking a year value from `to_years_approx` only where a clock is needed. |
+| D3 | G3: scorecard rating-scale source | `CreditScorecardExtension::new(config, &registry)`; `rating_scale` required, no `sp` default; the selected scale is resolved once and snapshotted. Embedded sp/moodys data and `embedded_registry()` are removed; tests and examples supply explicit registry JSON. |
+| D4 | E2c: quote `Compounding` value in existing fixtures | Hybrid: market-sourced goldens and examples state their actual market quote convention (re-pinned where it differs from payment frequency, each listed in the commit); synthetic unit fixtures state `Periodic(payment frequency)`. |
+| D5 | C3: valuations product BDC defaults | Remove `serde_defaults::bdc_modified_following` and the variance-swap observation defaults; fixtures write `"modified_following"` explicitly. |
+| D6 | D3: 30E/360 ISDA termination status on product paths | Products plumb `Some(is final period)` from their own schedules (as the IRS overnight leg does); the tenor bridge keeps requiring the caller's `DayCountContext`. |
+
 ## Needs review
 
 - **A1 representation choice.** Record 020 #2 says no timing may be invented
