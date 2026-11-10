@@ -69,11 +69,11 @@ impl MoneyEstimate {
         currency: Currency,
     ) -> finstack_quant_core::Result<Self> {
         Ok(Self {
-            mean: Money::new(estimate.mean, currency)?,
+            mean: Money::from_model_value(estimate.mean, currency)?,
             stderr: estimate.stderr,
             ci_95: (
-                Money::new(estimate.ci_95.0, currency)?,
-                Money::new(estimate.ci_95.1, currency)?,
+                Money::from_model_value(estimate.ci_95.0, currency)?,
+                Money::from_model_value(estimate.ci_95.1, currency)?,
             ),
             num_paths: estimate.num_paths,
             num_simulated_paths: estimate.num_simulated_paths,

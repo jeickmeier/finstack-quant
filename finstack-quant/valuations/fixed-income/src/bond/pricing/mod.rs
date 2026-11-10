@@ -94,7 +94,7 @@ impl Pricer for BondPricer {
         let mut result = ValuationResult::stamped(
             bond.id(),
             as_of,
-            Money::new(outcome.amount, bond.notional.currency()).map_err(|error| {
+            Money::from_model_value(outcome.amount, bond.notional.currency()).map_err(|error| {
                 finstack_quant_valuations_core::pricer::PricingError::from_core(
                     error,
                     finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(

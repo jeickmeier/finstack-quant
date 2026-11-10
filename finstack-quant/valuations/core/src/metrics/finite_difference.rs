@@ -196,7 +196,7 @@ pub fn scalar_with_numeric_value(
         }
         finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
             finstack_quant_core::market_data::scalars::MarketScalar::Price(
-                finstack_quant_core::money::Money::new(value, money.currency())?,
+                finstack_quant_core::money::Money::from_model_value(value, money.currency())?,
             )
         }
     })

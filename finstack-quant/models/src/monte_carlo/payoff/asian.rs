@@ -355,7 +355,7 @@ impl Payoff for Asian {
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
         let average = self.compute_average();
         let intrinsic = self.option_type.intrinsic(average, self.strike);
-        Money::new(intrinsic * self.notional, currency)
+        Money::from_model_value(intrinsic * self.notional, currency)
     }
 
     /// The last contracted fixing step: the engine validates that the time

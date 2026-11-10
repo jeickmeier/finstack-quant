@@ -418,7 +418,7 @@ impl BasisSwap {
                 let df = disc.as_ref().df_between_dates(as_of, flow.date)?;
                 acc.add(flow.amount.amount() * df);
             }
-            return Money::new(acc.total(), currency);
+            return Money::from_model_value(acc.total(), currency);
         }
         let fwd = market.get_forward(&leg.forward_curve_id)?;
 
@@ -475,7 +475,7 @@ impl BasisSwap {
             acc.add(coupon * df);
         }
 
-        Money::new(acc.total(), currency)
+        Money::from_model_value(acc.total(), currency)
     }
 
     /// Calculates the discounted accrual sum (annuity) for a leg.
@@ -661,7 +661,7 @@ impl BasisSwap {
             flows.push(CashFlow::new(
                 period.payment_date,
                 period.reset_date,
-                Money::new(coupon_amount, self.notional.currency())?,
+                Money::from_model_value(coupon_amount, self.notional.currency())?,
                 CFKind::FloatReset,
                 projection.accrual_year_fraction,
                 Some(all_in_rate),

@@ -404,7 +404,7 @@ impl Payoff for BarrierOptionPayoff {
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
         if self.is_active() {
             let intrinsic = self.option_type.intrinsic(self.terminal_spot, self.strike);
-            Money::new(intrinsic * self.notional, currency)
+            Money::from_model_value(intrinsic * self.notional, currency)
         } else {
             // Rebate payment. With at-hit timing configured and an actual
             // hit (knock-out), compound the rebate forward from τ to
@@ -416,7 +416,7 @@ impl Payoff for BarrierOptionPayoff {
             {
                 rebate_amount *= (rate * (self.total_time - self.hit_time)).exp();
             }
-            Money::new(rebate_amount * self.notional, currency)
+            Money::from_model_value(rebate_amount * self.notional, currency)
         }
     }
 

@@ -613,7 +613,7 @@ impl CmsSwap {
                 CashFlow::new(
                     payment_date,
                     Some(fixing_date),
-                    Money::new(signed_amount, self.notional.currency())?,
+                    Money::from_model_value(signed_amount, self.notional.currency())?,
                     CFKind::FloatReset,
                     accrual_fraction,
                     Some(coupon_rate),
@@ -697,7 +697,7 @@ impl CmsSwap {
                 CashFlow::new(
                     period.payment_date,
                     reset_date,
-                    Money::new(signed, self.notional.currency())?,
+                    Money::from_model_value(signed, self.notional.currency())?,
                     kind,
                     period.accrual_year_fraction,
                     Some(rate),

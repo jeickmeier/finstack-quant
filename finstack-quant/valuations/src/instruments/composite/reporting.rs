@@ -168,11 +168,11 @@ pub(super) fn aggregate_primitive_paths(
             });
         entry.net_quantity += path.quantity;
         entry.gross_quantity += path.quantity.abs();
-        entry.net_value = Money::new(
+        entry.net_value = Money::from_model_value(
             entry.net_value.amount() + path.value.amount(),
             reporting_currency,
         )?;
-        entry.gross_value = Money::new(
+        entry.gross_value = Money::from_model_value(
             entry.gross_value.amount() + path.value.amount().abs(),
             reporting_currency,
         )?;

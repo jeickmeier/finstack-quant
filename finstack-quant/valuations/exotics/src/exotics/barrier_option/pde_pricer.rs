@@ -366,7 +366,7 @@ impl BarrierOptionPdePricer {
             parity.max(0.0) + survival_rebate
         };
 
-        Money::new(unit_price * inst.quantity, ccy).map_err(|error| {
+        Money::from_model_value(unit_price * inst.quantity, ccy).map_err(|error| {
             finstack_quant_valuations_core::pricer::PricingError::from_core(
                 error,
                 finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(inst),

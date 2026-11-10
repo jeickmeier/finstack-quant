@@ -75,7 +75,7 @@ pub(crate) fn compute_pv(
     if future_count == 0 && t > 0.0 {
         let disc_curve = market.get_discount(inst.discount_curve_id.as_str())?;
         let payoff = realized_intrinsic(total_fixings)?;
-        return Money::new(
+        return Money::from_model_value(
             payoff * disc_curve.df_between_dates(as_of, inst.expiry)? * inst.quantity,
             inst.underlying.currency,
         );
@@ -84,7 +84,7 @@ pub(crate) fn compute_pv(
     // Handle expired / fully observed options
     if t <= 0.0 {
         let intrinsic = realized_intrinsic(hist_count)?;
-        return Money::new(intrinsic * inst.quantity, inst.underlying.currency);
+        return Money::from_model_value(intrinsic * inst.quantity, inst.underlying.currency);
     }
 
     let disc_curve = market.get_discount(inst.discount_curve_id.as_str())?;
@@ -160,7 +160,7 @@ pub(crate) fn compute_pv(
         ),
     };
 
-    Money::new(price * inst.quantity, inst.underlying.currency)
+    Money::from_model_value(price * inst.quantity, inst.underlying.currency)
 }
 
 /// Return `(mean, variance)` for a nonempty projection in nondecreasing time.

@@ -268,7 +268,7 @@ fn schedule_from_projection(
             flows.push(CashFlow::new(
                 cf.payment_date,
                 None,
-                Money::new(cf.interest, mbs.current_face.currency())?,
+                Money::from_model_value(cf.interest, mbs.current_face.currency())?,
                 CFKind::Fixed,
                 0.0,
                 Some(mbs.coupon),
@@ -278,7 +278,7 @@ fn schedule_from_projection(
             flows.push(CashFlow::new(
                 cf.payment_date,
                 None,
-                Money::new(cf.scheduled_principal, mbs.current_face.currency())?,
+                Money::from_model_value(cf.scheduled_principal, mbs.current_face.currency())?,
                 CFKind::Amortization,
                 0.0,
                 None,
@@ -288,7 +288,7 @@ fn schedule_from_projection(
             flows.push(CashFlow::new(
                 cf.payment_date,
                 None,
-                Money::new(cf.prepayment, mbs.current_face.currency())?,
+                Money::from_model_value(cf.prepayment, mbs.current_face.currency())?,
                 CFKind::PrePayment,
                 0.0,
                 None,
@@ -463,7 +463,7 @@ pub(crate) fn price_mbs(
     let discount_curve = market.get_discount(&mbs.discount_curve_id)?;
     let pv = discount_schedule(&schedule, &discount_curve, as_of, 0.0)?;
 
-    Money::new(pv, mbs.current_face.currency())
+    Money::from_model_value(pv, mbs.current_face.currency())
 }
 
 /// Price an agency MBS with a spread adjustment.

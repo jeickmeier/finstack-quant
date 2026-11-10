@@ -250,9 +250,10 @@ mod cases {
                 assert!(state.undistributed_interest.amount() > 0.0);
             } else {
                 // A cured period releases the trap. Exact shortest-text Money
-                // admission keeps the f64 waterfall's sub-cent residue, so this
-                // uses the same 1e-6 tolerance as the conservation check above.
-                assert!(state.undistributed_interest.amount().abs() < 1e-6);
+                // admission keeps the f64 waterfall's float residue (about
+                // 1e-10 on these balances) instead of rounding it to zero.
+                let residue = state.undistributed_interest.amount();
+                assert!(residue.abs() < 1e-9, "released trap left {residue}");
             }
         }
         assert_eq!(state.tranche_triggers[0].trigger.breach_date, Some(third));

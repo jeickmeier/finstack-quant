@@ -241,7 +241,7 @@ pub(crate) fn price_tba(tba: &AgencyTba, market: &MarketContext, as_of: Date) ->
     // Positive if pool is worth more than we're paying
     let value = pool_pv.amount() * df_to_settle - trade_pv;
 
-    Money::new(value, tba.notional.currency())
+    Money::from_model_value(value, tba.notional.currency())
 }
 
 #[cfg(test)]

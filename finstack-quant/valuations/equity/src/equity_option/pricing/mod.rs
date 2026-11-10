@@ -95,16 +95,15 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionHestonFourie
             finstack_quant_valuations_core::pricer::PricingError::from_core(error, err_ctx)
         })?;
 
-        let pv = Money::new(price * equity_option.quantity, equity_option.currency).map_err(
-            |error| {
+        let pv = Money::from_model_value(price * equity_option.quantity, equity_option.currency)
+            .map_err(|error| {
                 finstack_quant_valuations_core::pricer::PricingError::from_core(
                     error,
                     finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
                         equity_option,
                     ),
                 )
-            },
-        )?;
+            })?;
         Ok(
             finstack_quant_valuations_core::results::ValuationResult::stamped(
                 equity_option.id(),

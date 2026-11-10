@@ -92,7 +92,7 @@ pub fn npv(
 
     // Eq. 2.5: O = P(t_e) · E_0[(ξV_te + H(K) + D)+]
     let pv_per_n = price_with_calibrated_mean(&ctx, m, ctx.t_expiry.max(0.0))?;
-    Money::new(
+    Money::from_model_value(
         pv_per_n * option.notional.amount(),
         option.notional.currency(),
     )

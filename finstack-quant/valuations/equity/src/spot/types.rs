@@ -315,7 +315,7 @@ impl Equity {
             let dy = self.dividend_yield(market)?;
             s0.amount() / df_horizon * (-dy * t).exp()
         };
-        Money::new(fwd, self.currency)
+        Money::from_model_value(fwd, self.currency)
     }
 }
 
@@ -348,7 +348,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Equity {
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         let spot_px = self.price_per_share(market, as_of)?;
 
-        finstack_quant_core::money::Money::new(
+        finstack_quant_core::money::Money::from_model_value(
             spot_px.amount() * self.effective_quantity(),
             self.currency,
         )

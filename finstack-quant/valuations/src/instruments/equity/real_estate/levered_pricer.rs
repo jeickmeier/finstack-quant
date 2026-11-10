@@ -16,7 +16,7 @@ pub(crate) fn compute_pv(
 ) -> finstack_quant_core::Result<Money> {
     validate_currency(inst)?;
     let asset_pv = inst.asset.value(market, as_of)?;
-    Money::new(
+    Money::from_model_value(
         asset_pv.amount() - financing_pv(inst, market, as_of)?,
         inst.currency,
     )

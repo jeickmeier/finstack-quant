@@ -82,7 +82,7 @@ impl MetricCalculator for ZSpreadCalculator {
         let spread = calculate_tranche_z_spread(
             flows,
             &curve,
-            Money::new(target, deal.pool.get_currency())?,
+            Money::from_model_value(target, deal.pool.get_currency())?,
             settlement,
         )? * ONE_BASIS_POINT;
         if !(Z_SPREAD_MIN..=Z_SPREAD_MAX).contains(&spread) {
@@ -450,7 +450,7 @@ pub fn tranche_discount_margin(
         tranche.current_balance.amount(),
         &cashflows,
     )?;
-    let target_pv = Money::new(
+    let target_pv = Money::from_model_value(
         quote.clean_target(market_price_pct)?,
         tranche.original_balance.currency(),
     )?;

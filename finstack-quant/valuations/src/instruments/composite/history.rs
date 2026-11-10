@@ -218,8 +218,8 @@ fn history_with_warmup(
         rows.push(CompositeHistoryRow {
             date: observation.date,
             value,
-            cashflows: Money::new(cashflows, initial.spec.reporting_currency)?,
-            pnl: Money::new(pnl, initial.spec.reporting_currency)?,
+            cashflows: Money::from_model_value(cashflows, initial.spec.reporting_currency)?,
+            pnl: Money::from_model_value(pnl, initial.spec.reporting_currency)?,
             period_return,
             return_index,
             held_state_effective_date,

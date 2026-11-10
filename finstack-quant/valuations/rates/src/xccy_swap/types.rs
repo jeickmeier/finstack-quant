@@ -692,7 +692,7 @@ impl XccySwap {
             flows.push(finstack_quant_core::cashflow::CashFlow::new(
                 period.payment_date,
                 projected.fixing_date.or(period.reset_date),
-                Money::new(amount, leg.notional.currency())?,
+                Money::from_model_value(amount, leg.notional.currency())?,
                 finstack_quant_core::cashflow::CFKind::FloatReset,
                 projected.year_fraction,
                 Some(all_in),
@@ -996,7 +996,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for XccySwap {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
         let pv = self.base_value_raw(market, as_of)?;
-        Money::new(pv, self.reporting_currency)
+        Money::from_model_value(pv, self.reporting_currency)
     }
 
     fn base_value_raw(

@@ -55,7 +55,7 @@ pub(crate) fn nav(
     // Apply expense ratio drag to per-share value
     let expense_drag = expense_drag(basket, per_share);
     let per_share_after_fees = per_share - expense_drag;
-    Money::new(per_share_after_fees, basket.reporting_currency)
+    Money::from_model_value(per_share_after_fees, basket.reporting_currency)
 }
 
 /// Price of one constituent in its own currency.
@@ -126,5 +126,5 @@ fn to_basket_currency(
         ))?
         .rate;
 
-    Money::new(money.amount() * rate, target)
+    Money::from_model_value(money.amount() * rate, target)
 }

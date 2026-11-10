@@ -117,8 +117,9 @@ fn price_swaption(
 ) -> std::result::Result<ValuationResult, PricingError> {
     let context = PricingErrorContext::from_instrument(swaption).model(model);
     let pv_raw = price_swaption_raw(swaption, market, as_of, model, expected_vol_model)?;
-    let pv = finstack_quant_core::money::Money::new(pv_raw, swaption.notional.currency())
-        .map_err(|error| PricingError::from_core(error, context))?;
+    let pv =
+        finstack_quant_core::money::Money::from_model_value(pv_raw, swaption.notional.currency())
+            .map_err(|error| PricingError::from_core(error, context))?;
     Ok(ValuationResult::stamped(swaption.id(), as_of, pv))
 }
 

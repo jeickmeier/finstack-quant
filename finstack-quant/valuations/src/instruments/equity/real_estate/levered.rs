@@ -195,7 +195,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for LeveredRealEstateEquit
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let flows = levered_pricer::equity_cashflows(self, market, as_of)?
             .into_iter()
-            .map(|(date, amount)| Money::new(amount, self.currency).map(|money| (date, money)))
+            .map(|(date, amount)| {
+                Money::from_model_value(amount, self.currency).map(|money| (date, money))
+            })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
         finstack_quant_cashflows::schedule_from_dated_flows(

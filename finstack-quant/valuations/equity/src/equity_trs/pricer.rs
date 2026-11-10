@@ -285,7 +285,12 @@ pub(crate) fn net_cashflows(
     }
     let flows = flows
         .into_iter()
-        .map(|(date, amount)| Ok((date, Money::new(amount, trs.notional.currency())?)))
+        .map(|(date, amount)| {
+            Ok((
+                date,
+                Money::from_model_value(amount, trs.notional.currency())?,
+            ))
+        })
         .collect::<Result<_>>()?;
     Ok((flows, fixings))
 }

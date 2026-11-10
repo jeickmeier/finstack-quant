@@ -81,10 +81,9 @@ fn bump_and_measure_delta(
 
             bumped_ctx = bumped_ctx.insert_price(
                 synthetic_id.as_ref(),
-                finstack_quant_core::market_data::scalars::MarketScalar::Price(Money::new(
-                    bumped_price,
-                    price.currency(),
-                )?),
+                finstack_quant_core::market_data::scalars::MarketScalar::Price(
+                    Money::from_model_value(bumped_price, price.currency())?,
+                ),
             );
 
             let bumped_basket =
@@ -96,7 +95,8 @@ fn bump_and_measure_delta(
             let (current_price, new_scalar) = match bumped_ctx.get_price(price_id.as_ref())? {
                 MarketScalar::Price(money) => {
                     let price = money.amount();
-                    let bumped = Money::new(price * (1.0 + PRICE_BUMP_PCT), money.currency())?;
+                    let bumped =
+                        Money::from_model_value(price * (1.0 + PRICE_BUMP_PCT), money.currency())?;
                     (price, MarketScalar::Price(bumped))
                 }
                 MarketScalar::Unitless(v) => {

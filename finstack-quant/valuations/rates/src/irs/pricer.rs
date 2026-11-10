@@ -233,7 +233,7 @@ pub(crate) fn compute_pv(
     as_of: Date,
 ) -> Result<Money> {
     let npv_val = compute_pv_raw(irs, context, as_of)?;
-    Money::new(npv_val, irs.notional.currency())
+    Money::from_model_value(npv_val, irs.notional.currency())
 }
 
 /// Compute the raw Net Present Value (f64) without rounding.

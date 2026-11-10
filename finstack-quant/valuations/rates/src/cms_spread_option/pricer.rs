@@ -261,7 +261,7 @@ impl CmsSpreadOptionPricer {
         as_of: Date,
     ) -> Result<Money> {
         let pv = self.price_internal_raw(inst, market, as_of)?;
-        Money::new(pv, inst.notional.currency())
+        Money::from_model_value(pv, inst.notional.currency())
     }
 
     pub(crate) fn price_internal_raw(
@@ -322,7 +322,7 @@ impl Pricer for CmsSpreadOptionPricer {
             )
         })?;
 
-        let value = Money::new(
+        let value = Money::from_model_value(
             data.expected_payoff * data.discount_factor * option.notional.amount(),
             option.notional.currency(),
         )

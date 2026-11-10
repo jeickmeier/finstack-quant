@@ -332,7 +332,10 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxSpot {
                     Some(curve) => curve.df_between_dates(as_of, date)?,
                     None => 1.0,
                 };
-                acc.checked_add(Money::new(amount.amount() * df, amount.currency())?)
+                acc.checked_add(Money::from_model_value(
+                    amount.amount() * df,
+                    amount.currency(),
+                )?)
             },
         )
     }
@@ -372,7 +375,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
                 );
                 matrix.as_ref().rate(q)?.rate
             };
-            let value = Money::new(self.notional.amount() * rate, self.quote_currency)?;
+            let value =
+                Money::from_model_value(self.notional.amount() * rate, self.quote_currency)?;
             vec![(settle_date, value)]
         };
 

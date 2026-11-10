@@ -65,7 +65,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        finstack_quant_core::money::Money::new(
+        finstack_quant_core::money::Money::from_model_value(
             finstack_quant_valuations_core::instruments::Instrument::base_value_raw(
                 self, curves, as_of,
             )?,

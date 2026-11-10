@@ -84,7 +84,7 @@ impl MetricCalculator for YtwCalculator {
             &quote_ctx,
             || Ok(context.base_value.amount()),
         )?;
-        let dirty_now = Money::new(dirty_amt, bond.notional.currency())?;
+        let dirty_now = Money::from_model_value(dirty_amt, bond.notional.currency())?;
 
         // Lower return-floor protection into its pricing-effective call
         // schedule before scanning workouts. Contractual cashflows are

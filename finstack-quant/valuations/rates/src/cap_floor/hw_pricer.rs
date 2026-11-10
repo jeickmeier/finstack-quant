@@ -216,9 +216,10 @@ impl CapFloorHullWhitePricer {
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
         let pv_raw = self.price_internal_raw(cap_floor, market, as_of)?;
-        let pv = Money::new(pv_raw, cap_floor.notional.currency()).map_err(|error| {
-            PricingError::from_core(error, PricingErrorContext::from_instrument(cap_floor))
-        })?;
+        let pv =
+            Money::from_model_value(pv_raw, cap_floor.notional.currency()).map_err(|error| {
+                PricingError::from_core(error, PricingErrorContext::from_instrument(cap_floor))
+            })?;
         Ok(ValuationResult::stamped(cap_floor.id.as_str(), as_of, pv))
     }
 

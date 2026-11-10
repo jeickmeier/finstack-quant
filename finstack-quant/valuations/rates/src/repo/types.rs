@@ -161,7 +161,7 @@ impl CollateralSpec {
             }
         };
 
-        Money::new(unit_value * self.quantity, currency)
+        Money::from_model_value(unit_value * self.quantity, currency)
     }
 }
 
@@ -571,7 +571,7 @@ impl Repo {
         let effective_rate = self.effective_rate()?;
         let interest = self.cash_amount.amount() * effective_rate * year_fraction;
 
-        Money::new(interest, self.cash_amount.currency())
+        Money::from_model_value(interest, self.cash_amount.currency())
     }
 
     /// Calculate total repayment amount (principal + interest).

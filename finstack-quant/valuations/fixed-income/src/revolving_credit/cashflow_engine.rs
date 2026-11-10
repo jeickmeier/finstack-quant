@@ -855,7 +855,7 @@ impl<'a> CashflowEngine<'a> {
                         flows.push(CashFlow::new(
                             sub_end,
                             None,
-                            Money::new(-leg, ccy)?,
+                            Money::from_model_value(-leg, ccy)?,
                             CFKind::Notional,
                             0.0,
                             None,
@@ -871,7 +871,7 @@ impl<'a> CashflowEngine<'a> {
                 let drawn_balance = commitment.checked_mul_f64(avg_utilization)?;
                 // Letters of credit consume availability; the utilization
                 // process is capped so this stays non-negative.
-                let undrawn_balance = Money::new(
+                let undrawn_balance = Money::from_model_value(
                     (commitment.amount() * (1.0 - avg_utilization) - lc_outstanding.amount())
                         .max(0.0),
                     ccy,
@@ -1051,7 +1051,7 @@ impl<'a> CashflowEngine<'a> {
                 flows.push(CashFlow::new(
                     principal_date,
                     None,
-                    Money::new(-balance_change, ccy)?,
+                    Money::from_model_value(-balance_change, ccy)?,
                     CFKind::Notional,
                     0.0,
                     None,
@@ -1065,7 +1065,7 @@ impl<'a> CashflowEngine<'a> {
         self.push_scheduled_fees(&mut flows)?;
 
         // Terminal repayment of outstanding balance
-        let final_balance = Money::new(prev_balance, ccy)?;
+        let final_balance = Money::from_model_value(prev_balance, ccy)?;
 
         let terminal_payment_date = self
             .payment_periods

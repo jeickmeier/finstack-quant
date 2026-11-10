@@ -282,7 +282,9 @@ impl PricingInputs {
         spot: f64,
     ) -> Result<MarketContext> {
         let scalar = match &self.spot_scalar {
-            MarketScalar::Price(money) => MarketScalar::Price(Money::new(spot, money.currency())?),
+            MarketScalar::Price(money) => {
+                MarketScalar::Price(Money::from_model_value(spot, money.currency())?)
+            }
             MarketScalar::Unitless(_) => MarketScalar::Unitless(spot),
         };
         Ok(market.clone().insert_price(self.spot_id.as_str(), scalar))
@@ -368,7 +370,7 @@ fn resolved_value(
         } else {
             0.0
         };
-        return Ok(Some(Money::new(
+        return Ok(Some(Money::from_model_value(
             shares_value
                 + claim.cash.amount() * df * survival
                 + claim.recovery_basis.amount() * recovery,
@@ -423,7 +425,10 @@ fn resolved_value(
             value += cf.amount.amount() * (df * survival + recovery);
         }
     }
-    Ok(Some(Money::new(value, bond.notional.currency())?))
+    Ok(Some(Money::from_model_value(
+        value,
+        bond.notional.currency(),
+    )?))
 }
 
 /// Internal pricing function that reuses pre-computed `PricingInputs`.
@@ -509,7 +514,7 @@ fn price_convertible_bond_with_inputs(
             0.0,
         );
 
-        return Money::new(payoff, bond.notional.currency());
+        return Money::from_model_value(payoff, bond.notional.currency());
     }
 
     let steps = tree_steps(bond)?;
@@ -537,7 +542,7 @@ fn price_convertible_bond_with_inputs(
         dividend_yield: inputs.dividend_yield,
     })?;
 
-    Money::new(pv_amount, bond.notional.currency())
+    Money::from_model_value(pv_amount, bond.notional.currency())
 }
 
 /// Main pricing function for convertible bonds

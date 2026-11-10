@@ -44,7 +44,10 @@ impl LookbackOptionMcPricer {
         if as_of >= inst.expiry {
             let payoff =
                 expired_lookback_payoff(inst, terminal_lookback_spot(inst, curves, as_of)?)?;
-            return finstack_quant_core::money::Money::new(payoff * inst.quantity, inst.currency);
+            return finstack_quant_core::money::Money::from_model_value(
+                payoff * inst.quantity,
+                inst.currency,
+            );
         }
 
         let t = inst
@@ -53,7 +56,10 @@ impl LookbackOptionMcPricer {
         if t <= 0.0 {
             let payoff =
                 expired_lookback_payoff(inst, terminal_lookback_spot(inst, curves, as_of)?)?;
-            return finstack_quant_core::money::Money::new(payoff * inst.quantity, inst.currency);
+            return finstack_quant_core::money::Money::from_model_value(
+                payoff * inst.quantity,
+                inst.currency,
+            );
         }
 
         let LookbackInputs {
@@ -441,7 +447,7 @@ impl Pricer for LookbackOptionAnalyticalPricer {
             return Ok(ValuationResult::stamped(
                 lookback.id(),
                 as_of,
-                Money::new(payoff * lookback.quantity, lookback.currency).map_err(|error| {
+                Money::from_model_value(payoff * lookback.quantity, lookback.currency).map_err(|error| {
                     finstack_quant_valuations_core::pricer::PricingError::from_core(
                         error,
                         finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(lookback),
@@ -464,7 +470,7 @@ impl Pricer for LookbackOptionAnalyticalPricer {
             return Ok(ValuationResult::stamped(
                 lookback.id(),
                 as_of,
-                Money::new(payoff * lookback.quantity, lookback.currency).map_err(|error| {
+                Money::from_model_value(payoff * lookback.quantity, lookback.currency).map_err(|error| {
                     finstack_quant_valuations_core::pricer::PricingError::from_core(
                         error,
                         finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(lookback),
@@ -514,7 +520,7 @@ impl Pricer for LookbackOptionAnalyticalPricer {
             price,
             "lookback closed-form price",
         )?;
-        let pv = Money::new(price * lookback.quantity, currency).map_err(|error| {
+        let pv = Money::from_model_value(price * lookback.quantity, currency).map_err(|error| {
             finstack_quant_valuations_core::pricer::PricingError::from_core(
                 error,
                 finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(

@@ -330,7 +330,7 @@ pub fn execute_waterfall_with_principal_breakdown(
             (beginning + accreted_interest - principal).max(0.0)
         };
 
-        tranche.current_face = Money::new(ending, tranche.current_face.currency())?;
+        tranche.current_face = Money::from_model_value(ending, tranche.current_face.currency())?;
 
         allocations.push(TrancheAllocation {
             tranche_id: tranche.id.clone(),

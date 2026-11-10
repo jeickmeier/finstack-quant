@@ -231,7 +231,7 @@ impl Payoff for TarnPayoff {
         {
             pv += self.notional * final_event.discount_factor;
         }
-        Money::new(pv, currency)
+        Money::from_model_value(pv, currency)
     }
 
     fn reset(&mut self) {

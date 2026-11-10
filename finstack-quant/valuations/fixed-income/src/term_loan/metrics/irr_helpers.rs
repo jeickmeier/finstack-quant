@@ -82,7 +82,7 @@ pub(crate) fn quoted_dirty_from_clean_px(
         settlement,
         &loan.accrual_config(),
     )?;
-    Money::new(
+    Money::from_model_value(
         px / 100.0 * (outstanding.amount() + pending_principal) + accrued,
         loan.currency,
     )
@@ -214,7 +214,7 @@ pub(super) fn solve_irr_to_date(
     let loan: &TermLoan = context.instrument_as()?;
     let (principal, cash_accrued) =
         super::super::pricing::call::ExerciseClaims::new(loan, &schedule)?.at(exercise_date)?;
-    let outstanding = Money::new(principal + cash_accrued, loan.currency)?;
+    let outstanding = Money::from_model_value(principal + cash_accrued, loan.currency)?;
 
     solve_irr_to_exercise(
         loan,
@@ -319,7 +319,10 @@ pub(super) fn exercisable_call_candidates(
                 outstanding,
                 accrued,
             )?;
-            Ok((exercise, Money::new(clean + accrued, loan.currency)?))
+            Ok((
+                exercise,
+                Money::from_model_value(clean + accrued, loan.currency)?,
+            ))
         })
         .collect()
 }

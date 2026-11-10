@@ -156,7 +156,7 @@ impl Payoff for SnowballPayoff {
         } else if let Some(final_event) = self.events.last() {
             pv += self.notional * final_event.discount_factor;
         }
-        Money::new(pv, currency)
+        Money::from_model_value(pv, currency)
     }
 
     fn reset(&mut self) {
@@ -246,7 +246,7 @@ impl SnowballDiscountingPricer {
             .as_ref()
             .df_between_dates(as_of, final_coupon_date)?;
         pv += inst.notional.amount() * redemption_df;
-        Money::new(pv, inst.notional.currency())
+        Money::from_model_value(pv, inst.notional.currency())
     }
 }
 

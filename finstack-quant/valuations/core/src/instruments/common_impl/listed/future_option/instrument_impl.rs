@@ -138,7 +138,7 @@ macro_rules! impl_future_option_instrument {
                 market: &finstack_quant_core::market_data::context::MarketContext,
                 as_of: finstack_quant_core::dates::Date,
             ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-                finstack_quant_core::money::Money::new(
+                finstack_quant_core::money::Money::from_model_value(
                     self.npv_raw(market, as_of)?,
                     self.terms.currency,
                 )

@@ -569,7 +569,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxForward {
                 * (inputs.spot * inputs.df_foreign - contract_rate * inputs.df_domestic)
         });
 
-        finstack_quant_core::money::Money::new(pv, self.quote_currency)
+        finstack_quant_core::money::Money::from_model_value(pv, self.quote_currency)
     }
 
     fn valuation_details(
@@ -604,7 +604,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
         let contract_rate = self.contractual_forward_rate(market, as_of)?;
         let base_amount = Money::new(self.notional.amount(), self.base_currency)?;
         let quote_amount =
-            Money::new(-self.notional.amount() * contract_rate, self.quote_currency)?;
+            Money::from_model_value(-self.notional.amount() * contract_rate, self.quote_currency)?;
 
         let base_flow = (self.maturity, base_amount);
         let quote_schedule = (self.maturity, quote_amount);

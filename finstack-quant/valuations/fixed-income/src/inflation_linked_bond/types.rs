@@ -435,7 +435,7 @@ impl InflationLinkedBond {
                 CashFlow::new(
                     period.payment_date,
                     None,
-                    Money::new(
+                    Money::from_model_value(
                         self.notional.amount() * coupon_rate * accrual_factor,
                         currency,
                     )?,
@@ -585,7 +585,8 @@ impl InflationLinkedBond {
         // 3. Calculate Target Dirty Real Price
         // Price is per 100 notional.
         let target_dirty_price_val = (clean_price / 100.0 * self.notional.amount()) + real_accrued;
-        let target_price = Money::new(target_dirty_price_val, self.notional.currency())?;
+        let target_price =
+            Money::from_model_value(target_dirty_price_val, self.notional.currency())?;
 
         let spec = YtmPricingSpec {
             day_count: self.day_count,

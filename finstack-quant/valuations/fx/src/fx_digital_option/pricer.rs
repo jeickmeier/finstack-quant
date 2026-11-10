@@ -34,7 +34,7 @@ pub(crate) fn compute_pv(
         return if itm {
             match inst.payout_type {
                 DigitalPayoutType::CashOrNothing => Ok(inst.payout_amount),
-                DigitalPayoutType::AssetOrNothing => Ok(Money::new(
+                DigitalPayoutType::AssetOrNothing => Ok(Money::from_model_value(
                     spot * inst.notional.amount(),
                     inst.quote_currency,
                 )?),
@@ -51,7 +51,7 @@ pub(crate) fn compute_pv(
         inst.notional.amount(),
     );
 
-    Money::new(price, inst.quote_currency)
+    Money::from_model_value(price, inst.quote_currency)
 }
 
 pub(crate) fn compute_greeks(

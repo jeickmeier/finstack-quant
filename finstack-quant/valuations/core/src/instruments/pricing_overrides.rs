@@ -1385,7 +1385,7 @@ impl ScenarioPricingOverrides {
         let Some(shock) = self.scenario_price_shock_decimal else {
             return Ok(value);
         };
-        Money::new(value.amount() * (1.0 + shock), value.currency())
+        Money::from_model_value(value.amount() * (1.0 + shock), value.currency())
     }
 }
 

@@ -203,7 +203,7 @@ impl TermLoanDiscountingPricer {
                 loan.frequency.compounding_frequency(),
                 spread,
             )?;
-            Money::new(pv, loan.currency)
+            Money::from_model_value(pv, loan.currency)
         } else {
             npv(disc.as_ref(), settlement_date, &flows)
         }
@@ -484,7 +484,7 @@ impl TermLoanDiscountingPricer {
                 _ => notional_before(flow.date) * all_in_rate * flow.accrual_factor,
             };
             flow.rate = Some(all_in_rate);
-            flow.amount = Money::new(new_amount, flow.amount.currency())?;
+            flow.amount = Money::from_model_value(new_amount, flow.amount.currency())?;
             Ok(())
         })?;
         Ok(())

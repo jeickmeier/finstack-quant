@@ -346,9 +346,12 @@ impl BorrowingBaseRules {
             .sum();
 
         Ok(BorrowingBaseReport {
-            eligible_collateral: Money::new(eligible_total, currency)?,
-            concentration_excess: Money::new((eligible_total - adjusted_total).max(0.0), currency)?,
-            borrowing_base: Money::new(base, currency)?,
+            eligible_collateral: Money::from_model_value(eligible_total, currency)?,
+            concentration_excess: Money::from_model_value(
+                (eligible_total - adjusted_total).max(0.0),
+                currency,
+            )?,
+            borrowing_base: Money::from_model_value(base, currency)?,
         })
     }
 }

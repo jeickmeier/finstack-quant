@@ -367,7 +367,7 @@ impl BondFuturePricer {
             .npv_from_model_price(future.id.as_str(), as_of, || {
                 Self::fair_price_for_future(future, ctd_bond, conversion_factor, market, as_of)
             })?;
-        Money::new(npv, future.terms.currency)
+        Money::from_model_value(npv, future.terms.currency)
     }
 }
 

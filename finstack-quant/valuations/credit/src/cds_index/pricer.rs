@@ -110,7 +110,7 @@ impl CdsIndex {
         let index = self;
         let currency = index.notional.currency();
         let mut total = sum_money(index, curves, as_of, |pricer, cds, disc, surv| {
-            Money::new(
+            Money::from_model_value(
                 pricer.npv_full(cds, disc, surv, as_of)?,
                 cds.notional.currency(),
             )
@@ -119,13 +119,13 @@ impl CdsIndex {
             let df = curves
                 .get_discount(index.premium_leg.discount_curve_id.as_str())?
                 .df_between_dates(as_of, date)?;
-            let upfront = Money::new(amount.amount() * df, amount.currency())?;
+            let upfront = Money::from_model_value(amount.amount() * df, amount.currency())?;
             total = match index.side {
                 PayReceive::Pay => total.checked_sub(upfront)?,
                 PayReceive::Receive => total.checked_add(upfront)?,
             };
         }
-        Money::new(total.amount(), currency)
+        Money::from_model_value(total.amount(), currency)
     }
 
     /// Present value of the protection leg, aggregated by pricing mode.
@@ -641,8 +641,10 @@ fn project_cds_flows(
             let projected_premium = flow.amount.amount().abs() * projected_survival;
             if projected_premium.abs() > f64::EPSILON {
                 let mut projected_flow = flow.clone();
-                projected_flow.amount =
-                    Money::new(projected_premium * premium_sign, flow.amount.currency())?;
+                projected_flow.amount = Money::from_model_value(
+                    projected_premium * premium_sign,
+                    flow.amount.currency(),
+                )?;
                 projected_flows.push(projected_flow);
             }
             if delta_default > 0.0 {
@@ -653,7 +655,7 @@ fn project_cds_flows(
                 projected_flows.push(CashFlow::new(
                     settlement_date,
                     None,
-                    Money::new(
+                    Money::from_model_value(
                         cds.notional.amount()
                             * loss_given_default
                             * conditional_default

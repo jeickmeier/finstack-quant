@@ -126,7 +126,7 @@ impl AutocallableMcPricer {
                 let payment_df = disc_curve.df_between_dates(as_of, payment_date)?;
                 let pv = inst.notional.amount()
                     * (payment_df + fixed_coupon_expiry_ratio * discount_factor);
-                return Ok((Money::new(pv, inst.notional.currency())?, None));
+                return Ok((Money::from_model_value(pv, inst.notional.currency())?, None));
             }
         }
 
@@ -155,7 +155,7 @@ impl AutocallableMcPricer {
             let pv = (redemption_ratio + fixed_coupon_expiry_ratio)
                 * inst.notional.amount()
                 * discount_factor;
-            return Ok((Money::new(pv, inst.notional.currency())?, None));
+            return Ok((Money::from_model_value(pv, inst.notional.currency())?, None));
         }
 
         let future_dates = &inst.observation_dates[n_past..];

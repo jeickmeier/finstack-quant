@@ -414,7 +414,7 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughBergomi
         // terminal payoffs; discount the path mean (and stderr) to present
         // value, matching the Heston and rough-Heston MC pricers.
         let df = (-r * t).exp();
-        let pv = Money::new(mean_pv * df, ccy).map_err(|error| {
+        let pv = Money::from_model_value(mean_pv * df, ccy).map_err(|error| {
             finstack_quant_valuations_core::pricer::PricingError::from_core(
                 error,
                 finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(

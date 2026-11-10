@@ -69,12 +69,12 @@ pub(crate) fn compute_pv(
             OptionType::Call => (f1 - f2 - inst.strike).max(0.0),
             OptionType::Put => (inst.strike - (f1 - f2)).max(0.0),
         };
-        return Money::new(intrinsic * inst.quantity * df, inst.currency);
+        return Money::from_model_value(intrinsic * inst.quantity * df, inst.currency);
     }
 
     let unit_price = kirk_price(inst, market, f1, f2, t, df)?;
 
-    Money::new(unit_price * inst.quantity, inst.currency)
+    Money::from_model_value(unit_price * inst.quantity, inst.currency)
 }
 
 /// Kirk's approximation for spread option pricing.

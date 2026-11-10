@@ -72,7 +72,7 @@ impl AsianOptionHestonMcPricer {
             let pv =
                 super::pricer::expired_value(inst, market, hist_sum, hist_prod_log, hist_count)?;
             return Ok((
-                Money::new(pv.amount() * discount_factor, inst.currency)?,
+                Money::from_model_value(pv.amount() * discount_factor, inst.currency)?,
                 0.0,
             ));
         }

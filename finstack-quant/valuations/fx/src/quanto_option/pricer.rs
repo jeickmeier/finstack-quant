@@ -120,7 +120,7 @@ fn quanto_intrinsic(quanto: &QuantoOption, spot: f64) -> std::result::Result<Mon
         finstack_quant_models::types::OptionType::Call => (spot - strike).max(0.0),
         finstack_quant_models::types::OptionType::Put => (strike - spot).max(0.0),
     };
-    Money::new(intrinsic_unit * scale, quanto.quote_currency).map_err(|error| {
+    Money::from_model_value(intrinsic_unit * scale, quanto.quote_currency).map_err(|error| {
         PricingError::from_core(
             error,
             finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(quanto),
@@ -193,14 +193,15 @@ impl Pricer for QuantoOptionAnalyticalPricer {
         );
 
         let scale = payoff_scale(quanto)?;
-        let pv = Money::new(price * scale, quanto.quote_currency).map_err(|error| {
-            finstack_quant_valuations_core::pricer::PricingError::from_core(
-                error,
-                finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
-                    quanto,
-                ),
-            )
-        })?;
+        let pv =
+            Money::from_model_value(price * scale, quanto.quote_currency).map_err(|error| {
+                finstack_quant_valuations_core::pricer::PricingError::from_core(
+                    error,
+                    finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
+                        quanto,
+                    ),
+                )
+            })?;
         Ok(ValuationResult::stamped(quanto.id(), as_of, pv))
     }
 }

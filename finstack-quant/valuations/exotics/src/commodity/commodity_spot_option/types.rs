@@ -341,7 +341,7 @@ impl CommoditySpotOption {
                 } else {
                     self.forward_price(market, as_of)?
                 };
-                return Money::new(
+                return Money::from_model_value(
                     self.intrinsic_value(spot) * self.quantity * self.multiplier,
                     self.underlying.currency,
                 )
@@ -373,7 +373,7 @@ impl CommoditySpotOption {
                 }
             }
         };
-        Money::new(
+        Money::from_model_value(
             unit * self.quantity * self.multiplier,
             self.underlying.currency,
         )
@@ -571,7 +571,7 @@ impl CommoditySpotOption {
 
         let scale = self.quantity * self.multiplier;
         Ok((
-            Money::new(estimate.mean.amount() * scale, self.underlying.currency)?,
+            Money::from_model_value(estimate.mean.amount() * scale, self.underlying.currency)?,
             Some(
                 finstack_quant_valuations_core::results::MonteCarloValuationDetails {
                     model_key:
@@ -760,7 +760,7 @@ impl Instrument for CommoditySpotOption {
             }
         };
 
-        Money::new(
+        Money::from_model_value(
             unit_price * self.quantity * self.multiplier,
             self.underlying.currency,
         )

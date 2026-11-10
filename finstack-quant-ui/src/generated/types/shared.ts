@@ -45577,6 +45577,8 @@ export interface ScenarioPricingOverrides50 {
  *     .position(Position::Long)
  *     .forward_curve_id(CurveId::new("WTI-FORWARD"))
  *     .discount_curve_id(CurveId::new("USD-OIS"))
+ *     // Illustrative contract settlement calendar; real contracts state theirs.
+ *     .settlement_calendar_id_opt(Some("usny".into()))
  *     .build()
  *     .expect("Valid forward");
  *
@@ -45591,6 +45593,8 @@ export interface ScenarioPricingOverrides50 {
  *     .contract_price_opt(Some(72.0)) // Entry price
  *     .forward_curve_id(CurveId::new("WTI-FORWARD"))
  *     .discount_curve_id(CurveId::new("USD-OIS"))
+ *     // Illustrative contract settlement calendar; real contracts state theirs.
+ *     .settlement_calendar_id_opt(Some("usny".into()))
  *     .build()
  *     .expect("Valid forward");
  * ```

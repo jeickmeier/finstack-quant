@@ -253,7 +253,7 @@ impl Payoff for RangeAccrualPayoff {
 
         let accrual_fraction = total_in_range as f64 / total_obs as f64;
         let payoff = self.coupon_rate * accrual_fraction * self.notional;
-        Money::new(payoff, currency)
+        Money::from_model_value(payoff, currency)
     }
 
     fn reset(&mut self) {

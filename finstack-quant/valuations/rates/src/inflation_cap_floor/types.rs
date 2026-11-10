@@ -375,7 +375,7 @@ impl InflationCapFloor {
         model: ModelKey,
     ) -> finstack_quant_core::Result<Money> {
         let pv = self.npv_raw_with_model(market, as_of, model)?;
-        Money::new(pv, self.notional.currency())
+        Money::from_model_value(pv, self.notional.currency())
     }
 
     /// Raw (unrounded `f64`) present value, used by finite-difference metrics

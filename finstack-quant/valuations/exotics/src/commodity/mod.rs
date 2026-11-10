@@ -41,6 +41,8 @@
 //!     .maturity(date!(2025-12-15))
 //!     .forward_curve_id(CurveId::new("CL-FORWARD"))
 //!     .discount_curve_id(CurveId::new("USD-OIS"))
+//!     // Illustrative contract settlement calendar; real contracts state theirs.
+//!     .settlement_calendar_id_opt(Some("usny".into()))
 //!     .build()
 //!     .expect("Valid forward");
 //! ```

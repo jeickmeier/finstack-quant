@@ -515,7 +515,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CommoditySwapti
                 OptionType::Call => (inputs.forward - self.fixed_price).max(0.0),
                 OptionType::Put => (self.fixed_price - inputs.forward).max(0.0),
             };
-            return Money::new(
+            return Money::from_model_value(
                 intrinsic * inputs.annuity * self.quantity,
                 self.underlying.currency,
             );
@@ -531,7 +531,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CommoditySwapti
             self.option_type,
         )?;
 
-        Money::new(unit_price * self.quantity, self.underlying.currency)
+        Money::from_model_value(unit_price * self.quantity, self.underlying.currency)
     }
 
     fn expiry(&self) -> Option<Date> {

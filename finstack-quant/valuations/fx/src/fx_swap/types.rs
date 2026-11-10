@@ -343,7 +343,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for FxSwap {
         let ctx = FxSwapPricingContext::build(self, curves, as_of)?;
 
         let total_pv = ctx.total_pv();
-        finstack_quant_core::money::Money::new(total_pv, self.quote_currency)
+        finstack_quant_core::money::Money::from_model_value(total_pv, self.quote_currency)
     }
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
@@ -379,7 +379,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
         let near_quote_schedule = self.single_cashflow_schedule(
             as_of,
             self.near_date,
-            Money::new(-near_quote, self.quote_currency)?,
+            Money::from_model_value(-near_quote, self.quote_currency)?,
         )?;
         let far_base_schedule = self.single_cashflow_schedule(
             as_of,
@@ -389,7 +389,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
         let far_quote_schedule = self.single_cashflow_schedule(
             as_of,
             self.far_date,
-            Money::new(far_quote, self.quote_currency)?,
+            Money::from_model_value(far_quote, self.quote_currency)?,
         )?;
 
         Ok(merge_cashflow_schedules(

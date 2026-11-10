@@ -483,7 +483,7 @@ impl AllocationLedger {
         let mut flows: Vec<(Date, Money)> = by_date
             .into_iter()
             .filter(|(_, amt)| amt.abs() > 1e-6)
-            .map(|(date, amt)| Money::new(amt, ccy).map(|money| (date, money)))
+            .map(|(date, amt)| Money::from_model_value(amt, ccy).map(|money| (date, money)))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
         flows.sort_by_key(|(date, _)| *date);
@@ -920,7 +920,7 @@ impl<'a> EquityWaterfallEngine<'a> {
                 if lp_allocated_in_call_so_far > 1e-9 {
                     flows.push((
                         params.allocation_date,
-                        Money::new(lp_allocated_in_call_so_far, params.currency)?,
+                        Money::from_model_value(lp_allocated_in_call_so_far, params.currency)?,
                     ));
                 }
                 self.calculate_lp_irr_to_date(&flows)
@@ -930,10 +930,10 @@ impl<'a> EquityWaterfallEngine<'a> {
                 date: params.allocation_date,
                 deal_id: None, // Set by caller for American style
                 tranche: tranche_name,
-                to_lp: Money::new(to_lp, params.currency)?,
-                to_gp: Money::new(to_gp_paid, params.currency)?,
-                lp_unreturned: Money::new(lp_unreturned, params.currency)?,
-                gp_carry_cum: Money::new(gp_carry_cum_after, params.currency)?,
+                to_lp: Money::from_model_value(to_lp, params.currency)?,
+                to_gp: Money::from_model_value(to_gp_paid, params.currency)?,
+                lp_unreturned: Money::from_model_value(lp_unreturned, params.currency)?,
+                gp_carry_cum: Money::from_model_value(gp_carry_cum_after, params.currency)?,
                 lp_irr_to_date,
                 note: None,
             });
@@ -1106,7 +1106,7 @@ impl<'a> EquityWaterfallEngine<'a> {
         if let Some(mut offset) = timing_rows.last().cloned() {
             let receipts: f64 = timing_rows.iter().map(|row| row.to_lp.amount()).sum();
             offset.date = as_of;
-            offset.to_lp = Money::new(-receipts, currency)?;
+            offset.to_lp = Money::from_model_value(-receipts, currency)?;
             timing_rows.push(offset);
         }
         let reconciled = replay_engine.allocate_distribution(AllocationParams {
@@ -1170,15 +1170,18 @@ impl<'a> EquityWaterfallEngine<'a> {
             return Ok(());
         }
         let mut flows = self.lp_net_history(events, ledger_rows, settlement_date)?;
-        flows.push((settlement_date, Money::new(delta_lp, currency)?));
+        flows.push((
+            settlement_date,
+            Money::from_model_value(delta_lp, currency)?,
+        ));
         let settlement_row = AllocationRow {
             date: settlement_date,
             deal_id: None,
             tranche: Arc::from("Clawback Settlement"),
-            to_lp: Money::new(delta_lp, currency)?,
-            to_gp: Money::new(delta_gp, currency)?,
-            lp_unreturned: Money::new((lp_unreturned - delta_lp).max(0.0), currency)?,
-            gp_carry_cum: Money::new(allowed_gp, currency)?,
+            to_lp: Money::from_model_value(delta_lp, currency)?,
+            to_gp: Money::from_model_value(delta_gp, currency)?,
+            lp_unreturned: Money::from_model_value((lp_unreturned - delta_lp).max(0.0), currency)?,
+            gp_carry_cum: Money::from_model_value(allowed_gp, currency)?,
             lp_irr_to_date: self.calculate_lp_irr_to_date(&flows),
             note: Some(Arc::from("Fund-level clawback and escrow release")),
         };

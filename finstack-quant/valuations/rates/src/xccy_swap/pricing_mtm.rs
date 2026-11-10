@@ -275,7 +275,7 @@ fn project_mtm_cashflows(
     flows.push(CashFlow::new(
         start_r,
         None,
-        Money::new(cf_initial_amount, resetting_leg.notional.currency())?,
+        Money::from_model_value(cf_initial_amount, resetting_leg.notional.currency())?,
         CFKind::Notional,
         0.0,
         None,
@@ -298,7 +298,7 @@ fn project_mtm_cashflows(
         flows.push(CashFlow::new(
             period.payment_date,
             projected.fixing_date.or(period.reset_date),
-            Money::new(
+            Money::from_model_value(
                 constant_leg.side.sign() * projected.unsigned_coupon(n_c, spread_c),
                 constant_leg.notional.currency(),
             )?,
@@ -380,7 +380,7 @@ fn project_mtm_cashflows(
             flows.push(CashFlow::new(
                 period.payment_date,
                 projected_r.fixing_date.or(period.reset_date),
-                Money::new(coupon_amount, resetting_leg.notional.currency())?,
+                Money::from_model_value(coupon_amount, resetting_leg.notional.currency())?,
                 CFKind::FloatReset,
                 projected_r.year_fraction,
                 Some(projected_r.all_in_rate(spread_decimal)),
@@ -395,7 +395,7 @@ fn project_mtm_cashflows(
                 flows.push(CashFlow::new(
                     period.accrual_start,
                     None,
-                    Money::new(rebal_amount, resetting_leg.notional.currency())?,
+                    Money::from_model_value(rebal_amount, resetting_leg.notional.currency())?,
                     CFKind::Notional,
                     0.0,
                     None,
@@ -422,7 +422,7 @@ fn project_mtm_cashflows(
     flows.push(CashFlow::new(
         end_r,
         None,
-        Money::new(cf_final_amount, resetting_leg.notional.currency())?,
+        Money::from_model_value(cf_final_amount, resetting_leg.notional.currency())?,
         CFKind::Notional,
         0.0,
         None,

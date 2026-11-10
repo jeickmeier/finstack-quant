@@ -780,7 +780,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Ndf {
         let settlement_amount = self.settlement_amount(market, as_of)?;
 
         let pv = settlement_amount * df_settlement;
-        Money::new(pv, self.settlement_currency)
+        Money::from_model_value(pv, self.settlement_currency)
     }
 
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
@@ -802,7 +802,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
         let settlement_amount = self.settlement_amount(market, as_of)?;
         let ccy = self.settlement_currency;
         let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
-            vec![(self.maturity, Money::new(settlement_amount, ccy)?)],
+            vec![(
+                self.maturity,
+                Money::from_model_value(settlement_amount, ccy)?,
+            )],
             CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
             finstack_quant_cashflows::ScheduleBuildOpts {

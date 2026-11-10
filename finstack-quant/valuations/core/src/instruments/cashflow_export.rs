@@ -639,7 +639,7 @@ fn envelope_for_priced(
         let row_reporting_currency = envelope_currency.unwrap_or(ccy);
         let base_pv = market
             .convert_money(
-                Money::new(native_pv, ccy)?,
+                Money::from_model_value(native_pv, ccy)?,
                 row_reporting_currency,
                 as_of_date,
             )?

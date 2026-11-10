@@ -552,7 +552,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
         let fixed_flow = CashFlow::new(
             payment_date,
             None,
-            Money::new(fixed_signed, ccy)?,
+            Money::from_model_value(fixed_signed, ccy)?,
             CFKind::Fixed,
             accrual_factor,
             Some(fixed_rate),
@@ -569,7 +569,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
         let inflation_flow = CashFlow::new(
             payment_date,
             Some(self.start_date),
-            Money::new(inflation_signed, ccy)?,
+            Money::from_model_value(inflation_signed, ccy)?,
             CFKind::InflationCoupon,
             accrual_factor,
             inflation_rate,
@@ -966,7 +966,7 @@ impl YoYInflationSwap {
             let fixed_flow = CashFlow::new(
                 pay,
                 None,
-                Money::new(fixed_signed, self.notional.currency())?,
+                Money::from_model_value(fixed_signed, self.notional.currency())?,
                 CFKind::Fixed,
                 accrual,
                 Some(fixed_rate),
@@ -983,7 +983,7 @@ impl YoYInflationSwap {
             let inflation_flow = CashFlow::new(
                 pay,
                 Some(start),
-                Money::new(inflation_signed, self.notional.currency())?,
+                Money::from_model_value(inflation_signed, self.notional.currency())?,
                 CFKind::InflationCoupon,
                 accrual,
                 Some(inflation_rate),
@@ -1033,7 +1033,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for YoYInflationSwa
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         let pv = self.npv_raw(curves, as_of)?;
-        finstack_quant_core::money::Money::new(pv, self.notional.currency())
+        finstack_quant_core::money::Money::from_model_value(pv, self.notional.currency())
     }
 
     fn base_value_raw(

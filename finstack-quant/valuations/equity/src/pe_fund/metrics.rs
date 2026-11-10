@@ -421,14 +421,17 @@ fn scaled_fund(
             event.kind,
             FundEventKind::Distribution | FundEventKind::Proceeds
         ) {
-            event.amount = Money::new(
+            event.amount = Money::from_model_value(
                 event.amount.amount() * (1.0 + bump),
                 event.amount.currency(),
             )?;
         }
     }
     if let Some(nav) = scaled.unrealized_nav {
-        scaled.unrealized_nav = Some(Money::new(nav.amount() * (1.0 + bump), nav.currency())?);
+        scaled.unrealized_nav = Some(Money::from_model_value(
+            nav.amount() * (1.0 + bump),
+            nav.currency(),
+        )?);
     }
     Ok(scaled)
 }

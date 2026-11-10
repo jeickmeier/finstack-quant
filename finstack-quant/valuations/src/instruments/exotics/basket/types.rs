@@ -278,7 +278,7 @@ impl Instrument for Basket {
         // Scale NAV-per-unit by explicit basket notional for portfolio PV.
         let nav_per_unit = super::pricer::nav(self, curves, as_of, 1.0)?;
         let scaled = nav_per_unit.amount() * self.notional.amount();
-        Money::new(scaled, self.notional.currency())
+        Money::from_model_value(scaled, self.notional.currency())
     }
 
     crate::impl_focused_pricing_overrides!();

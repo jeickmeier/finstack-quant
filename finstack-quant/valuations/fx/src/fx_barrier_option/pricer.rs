@@ -388,7 +388,7 @@ fn barrier_state(
 
 /// Scale a per-unit value by the base notional into quote currency.
 fn notional_value(inst: &FxBarrierOption, per_unit: f64) -> finstack_quant_core::Result<Money> {
-    Money::new(per_unit * inst.notional.amount(), inst.quote_currency)
+    Money::from_model_value(per_unit * inst.notional.amount(), inst.quote_currency)
 }
 
 /// FX Barrier option analytical pricer (continuous monitoring).

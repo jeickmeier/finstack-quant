@@ -120,7 +120,7 @@ impl CliquetOptionMcPricer {
                 disc_curve.df_between_dates(as_of, inst.expiry)?
             };
             return Ok((
-                Money::new(
+                Money::from_model_value(
                     clamped * inst.notional.amount() * df,
                     inst.notional.currency(),
                 )?,

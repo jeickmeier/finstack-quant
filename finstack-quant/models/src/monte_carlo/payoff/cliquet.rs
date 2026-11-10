@@ -256,7 +256,7 @@ impl Payoff for CliquetCallPayoff {
         // worthless option expire. Without this floor a negative global floor
         // would make the long call pay a negative amount.
         let payoff_return = total_return.max(0.0);
-        Money::new(payoff_return * self.notional, currency)
+        Money::from_model_value(payoff_return * self.notional, currency)
     }
 
     fn reset(&mut self) {

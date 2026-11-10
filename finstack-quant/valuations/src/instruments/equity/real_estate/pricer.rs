@@ -12,7 +12,7 @@ pub(crate) fn compute_pv(
     if let Some(appraisal) = checked_appraisal(asset)? {
         return Ok(appraisal);
     }
-    Money::new(unappraised_pv(asset, as_of, &|_| 0.0)?, asset.currency)
+    Money::from_model_value(unappraised_pv(asset, as_of, &|_| 0.0)?, asset.currency)
 }
 
 /// Asset value with the risk-free component of the discount rate bumped per

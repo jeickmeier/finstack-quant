@@ -262,7 +262,7 @@ impl Payoff for Lookback {
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
         let intrinsic = self.option_type.intrinsic(self.extreme_spot, self.strike);
-        Money::new(intrinsic * self.notional, currency)
+        Money::from_model_value(intrinsic * self.notional, currency)
     }
 
     fn reset(&mut self) {
@@ -437,7 +437,7 @@ impl Payoff for FloatingStrikeLookback {
         let payoff = self
             .option_type
             .intrinsic(self.terminal_spot, self.extreme_spot);
-        Money::new(payoff * self.notional, currency)
+        Money::from_model_value(payoff * self.notional, currency)
     }
 
     fn reset(&mut self) {

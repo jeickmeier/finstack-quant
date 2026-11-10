@@ -75,6 +75,8 @@ use finstack_quant_valuations_core::instruments::SettlementType;
 ///     .position(Position::Long)
 ///     .forward_curve_id(CurveId::new("WTI-FORWARD"))
 ///     .discount_curve_id(CurveId::new("USD-OIS"))
+///     // Illustrative contract settlement calendar; real contracts state theirs.
+///     .settlement_calendar_id_opt(Some("usny".into()))
 ///     .build()
 ///     .expect("Valid forward");
 ///
@@ -89,6 +91,8 @@ use finstack_quant_valuations_core::instruments::SettlementType;
 ///     .contract_price_opt(Some(72.0)) // Entry price
 ///     .forward_curve_id(CurveId::new("WTI-FORWARD"))
 ///     .discount_curve_id(CurveId::new("USD-OIS"))
+///     // Illustrative contract settlement calendar; real contracts state theirs.
+///     .settlement_calendar_id_opt(Some("usny".into()))
 ///     .build()
 ///     .expect("Valid forward");
 /// ```
@@ -507,7 +511,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CommodityForwar
         let notional_qty = self.quantity * self.multiplier;
         let pv = self.position.sign() * price_diff * notional_qty * df;
 
-        finstack_quant_core::money::Money::new(pv, self.underlying.currency)
+        finstack_quant_core::money::Money::from_model_value(pv, self.underlying.currency)
     }
 
     fn expiry(&self) -> Option<Date> {
@@ -529,7 +533,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommodityForward {
                 let forward = self.forward_price(market, as_of)?;
                 let strike = self.contract_price.unwrap_or(forward);
                 (
-                    Money::new(
+                    Money::from_model_value(
                         self.position.sign() * (forward - strike) * self.quantity * self.multiplier,
                         self.underlying.currency,
                     )?,

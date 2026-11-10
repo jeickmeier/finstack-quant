@@ -291,7 +291,7 @@ pub fn bond_workout_ladder(
 
     let effective_bond = bond.effective_for_pricing(market, as_of)?;
     let schedule = effective_bond.full_cashflow_schedule(market)?;
-    let dirty_price = Money::new(dirty, currency)?;
+    let dirty_price = Money::from_model_value(dirty, currency)?;
     let (exits, worst) = solve_workout_exits(
         &effective_bond,
         market,
@@ -321,7 +321,10 @@ pub fn bond_workout_ladder(
             date,
             kind: exit.path.exit.kind,
             redemption_price_pct: exit.path.redemption.price_pct,
-            redemption_amount: Money::new(exit.path.redemption.clean_amount, currency)?,
+            redemption_amount: Money::from_model_value(
+                exit.path.redemption.clean_amount,
+                currency,
+            )?,
             make_whole: exit.path.exit.make_whole.is_some(),
             yield_rate,
             i_spread,

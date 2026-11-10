@@ -373,8 +373,10 @@ impl CompositeInstrument {
                 self.spec.reporting_currency,
                 as_of,
             )?;
-            exposure.value =
-                Money::new(unit_value * exposure.quantity, self.spec.reporting_currency)?;
+            exposure.value = Money::from_model_value(
+                unit_value * exposure.quantity,
+                self.spec.reporting_currency,
+            )?;
             for (metric_id, value) in result.measures {
                 if !is_additive_metric(&metric_id) {
                     continue;
@@ -442,11 +444,11 @@ impl CompositeInstrument {
                         )?)
                     },
                 )?;
-                let native_value = Money::new(
+                let native_value = Money::from_model_value(
                     valuation.value.amount() * resolved.quantity,
                     valuation.value.currency(),
                 )?;
-                let reporting_value = Money::new(
+                let reporting_value = Money::from_model_value(
                     convert_amount(
                         market,
                         native_value.amount(),
@@ -634,7 +636,7 @@ impl Instrument for CompositeInstrument {
     }
 
     fn base_value(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
-        Money::new(
+        Money::from_model_value(
             self.base_value_raw_impl(market, as_of)?,
             self.spec.reporting_currency,
         )

@@ -71,7 +71,7 @@ impl MetricCalculator for YtmCalculator {
         // Dirty price in currency at the quote date: the quoted clean price
         // plus accrued there, otherwise the model PV carried to the quote date
         // so the solved yield discounts from the same origin.
-        let dirty = Money::new(
+        let dirty = Money::from_model_value(
             quote_date_dirty_target(bond, context, &quote_ctx)?,
             notional.currency(),
         )?;

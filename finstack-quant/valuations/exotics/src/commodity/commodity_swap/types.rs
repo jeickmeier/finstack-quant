@@ -402,7 +402,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CommoditySwap {
             PayReceive::Receive => fixed_pv - floating_pv,
         };
 
-        finstack_quant_core::money::Money::new(npv, self.underlying.currency)
+        finstack_quant_core::money::Money::from_model_value(npv, self.underlying.currency)
     }
 
     fn last_payment_date(&self, _curves: &MarketContext, _as_of: Date) -> Result<Option<Date>> {

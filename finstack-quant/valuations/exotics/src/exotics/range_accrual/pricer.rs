@@ -298,7 +298,7 @@ fn compute_known_value(
             let discount_factor = curves
                 .get_discount(inst.terms.discount_curve_id.as_str())?
                 .df_between_dates(as_of, payment_date)?;
-            Ok(Money::new(
+            Ok(Money::from_model_value(
                 fv * discount_factor,
                 inst.terms.notional.currency(),
             )?)
@@ -556,7 +556,7 @@ pub(crate) fn compute_pv(
         * expected_fraction;
     let pv = fv * discount_factor;
 
-    Money::new(pv, inst.terms.notional.currency())
+    Money::from_model_value(pv, inst.terms.notional.currency())
 }
 
 #[cfg(test)]

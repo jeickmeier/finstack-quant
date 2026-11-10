@@ -89,7 +89,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 4 | A3b | committed (`A3b:` in git log) | lint core/fixed-income/valuations/py/wasm; tests core 2218, fixed-income 1252, valuations 2453 (after gen-write); py test_dates_imm, test_core_parity, test_runtime_docs, parity 6067, test_production_audit 28; wasm 1086 | SIFMA entry: agency/term classification done; remaining data pin/admission (H5) and qualification | `settlement_class` is a required field on AgencyTba and DollarRoll (O2); hand fixture production_mortgage.json given class `a` (FNMA 30Y) |
 | 5 | B1 | committed (`B1:` in git log) | workspace rust-lint; core tests 2218 + 286 doctests; gen-write; py test_core_parity 134, members 6, ergonomics 48, calibration boundaries 45, core_wasm_parity 83, runtime_docs 3684, parity 6067; wasm 1086 | 018 entry narrowed to the term-loan step-up (B1b) | Only bindings consumed the changed API outside core; a CDS quote test now compares against the single binary64 `as_bp` view instead of noise-free decimal shifting (018 #6) |
 | 6 | B1b | committed (`B1b:` in git log) | lint fixed-income; tests fixed-income 1253, covenants 115 | **018 entry deleted**; totals 595→594, Reconciliation 58→57, Core conventions 21→20; record 018, README, INVARIANT_MAP M23–M26, INVARIANTS, financial README, central follow-ups updated | Step-up computed fully before mutation; negative/non-finite increases rejected |
-| 7 | B2 | **B2a committed** (`B2a:` in git log); **B2b committed after owner decision D1** (`B2b:` in git log) | B2a: workspace rust-test (16346 incl. 2 re-pins), gen-write, python-test 14003, wasm-test 1086, ui-check. B2b: workspace rust-test 16360; gen-write + gen-check; python-test 13988; wasm-test 1085; ui-check 1527; dual pins and single re-pins checked in a linux/amd64 rust:1.97.1 container | 012 entry: B2a items recorded; B2b: item 4 recorded as reconciled, blocker sentence removed; record 012 status updated | B2b: shortest-text `f64_to_decimal`; `Money::from_model_value` for pricer outputs (about 125 sites); re-pins and test changes listed under Needs review |
+| 7 | B2 | **B2a committed** (`B2a:` in git log); **B2b committed after owner decision D1** (`B2b:` in git log) | B2a: workspace rust-test (16346 incl. 2 re-pins), gen-write, python-test 14003, wasm-test 1086, ui-check. B2b: workspace rust-test 16360 (again after the sweep) + rust-test --doctest; gen-write + gen-check; python-test 13988; wasm-test-built 1085 after a full wasm-test build; ui-check 1527; dual pins and single re-pins checked in a linux/amd64 rust:1.97.1 container | 012 entry: B2a items recorded; B2b: item 4 recorded as reconciled, blocker sentence removed; record 012 status updated | B2b: shortest-text `f64_to_decimal`; `Money::from_model_value` for pricer outputs (125 failure-driven sites, then a 216-site classified sweep; follow-up commit); re-pins and test changes listed under Needs review |
 | 8 | B3 | skipped (dep B2b) | | | |
 | 9 | B4 | skipped (dep B3) | | | |
 | 10 | B5 | skipped (dep B4) | | | |
@@ -204,45 +204,91 @@ logged under Needs review.
   domain. That includes more than 28 fractional digits, such as a
   17-significant-digit `1.23e-15`, not only sub-`1e-28` values. Pricer
   outputs go through `Money::from_model_value`, which rounds half-even at
-  scale 28. Converted sites: every non-test `Money::new` in the
-  structured-credit pricing and simulation engine, `pricing_methods.rs` and
-  the CDS tranche engine (113), plus single sites in Black equity options,
-  CMS replication, cap/floor, swaption (4), revolving-credit path pricing (2),
-  inflation-linked bond and `Position::scale_value`. Strictest-reading choices
-  for review:
-  - `capital_structure` test `finite_inputs_cannot_produce_an_infinite_ratio`
+  scale 28.
+  - **Which sites use the adapter.** The first commit converted the 125
+    sites that failing tests reached: the structured-credit pricing and
+    simulation engine, `pricing_methods.rs`, the CDS tranche engine, and
+    single sites in Black equity options, CMS replication, cap/floor,
+    swaption, revolving-credit path pricing, inflation-linked bond and
+    `Position::scale_value`. A follow-up sweep classified all 292 remaining
+    non-test `Money::new` sites in `valuations/**/src`, `models`,
+    `calibration` and `cashflows`, and moved 216 model outputs to the adapter
+    (PVs, price × quantity, MC/tree/PDE/closed-form results, projected
+    floating coupons, computed accruals, bumped prices, composite history).
+  - **Kept strict as contractual or caller inputs:** notionals and index
+    factors, contractual upfronts, fees and OID, amortization and sweep
+    amounts, term-loan commitment fees, settlement cash, schema/test-support
+    literals, and the cashflows crate's contractual coupons, fees and
+    redemptions.
+  - **Ambiguous, kept strict:** `commodity_forward` `contractual_invoice_amount`
+    (falls back to the market forward when no contract price is set),
+    `commodity_swap` `classified_flow` (shared by fixed and projected
+    floating legs), `cashflows` `aggregation::sum_by_period` (shared by
+    nominal and PV sums), `structured_credit` pool purchase price and the
+    `dollar_roll` trade cash. Each can error on a sub-`1e-12` full-mantissa
+    projection; splitting them by branch is an owner call.
+  - **Not swept:** `statements`, `statements-analytics`, `portfolio`,
+    `margin`, `attribution` and `scenarios` (about 120 sites). These are
+    Money arithmetic (scale, ratio, residual) and belong to B3's named f64
+    adapters; until then a computed sub-`1e-12` residue there errors.
+  - No per-family deep-out-of-the-money probe tests were added beyond the
+    two proptest seeds proptest recorded (equity option, swaption).
+- **B2b test changes. Each is a test weakening or reframing for owner review:**
+  - `capital_structure` `finite_inputs_cannot_produce_an_infinite_ratio`
     now expects the `Decimal conversion overflow` error. An infinite ratio
     cannot reach `Money`, and the test still proves no infinity escapes.
-  - Structured-credit `production_waterfall_trap_cure_rebreach_conserves_interest`:
-    the non-breached `undistributed_interest` check moved from `== 0.0` to
-    `abs() < 1e-6`. The residual is now float noise rounded to 28 places
-    instead of exact zero. Conservation is unchanged.
-  - Portfolio CIP tests compute `1.10 * (0.99 / 0.95)`, the production
-    evaluation order. The old `1.10 * 0.99 / 0.95` matched only because
-    `Decimal::try_from(f64)` was lossy.
-  - Re-pins from the changed conversion: 10 recorded wire-key PVs, the
-    callable-loan OAS price, the LMM Bermudan pin, term-loan coupon bits,
-    15 bump-routing pins, and the dual macOS/Linux pins (GBM Greeks, LSMC,
-    Asian, barrier PDE, term-loan tree, callable loan). The Linux values come
-    from a local `rust:1.97.1` linux/amd64 container, not from a GitHub
-    Actions run, so the first CI run confirms them. The term-loan tree's
-    short-rate pin now differs by one ulp between hosts; its comment says so.
-    The single-platform re-pins were also checked in that container.
-  - Host goldens regenerated with each file's documented command: valuations,
-    statements, margin and cashflows cross-host goldens, and the portfolio
-    `host_parity.json` (`UPDATE_HOST_PARITY=1`). Every change is at the ulp
-    level except finite-difference outputs, which move up to about 1e-11
-    relative (equity volga, factor stress). The structured-credit waterfall
-    residuals were already about 4e-10 noise and still are.
-  - Host tests changed beyond re-pins: the Python Asian/European one-fixing
-    mean equality now uses the file's existing `abs=1e-14` stderr tolerance.
-    The two reducers differ by two ulps, which the old 15-significant-digit
-    rounding hid. The WASM mixed-node forecast expects `100 * (1 + 0.1)`.
-    The UI portfolio host-parity check compares the wasm32 worker with the
-    native Python values within the parity tests' 1e-9 relative. The UI
-    valuations workbench finds the headline Money among elements with the PV
-    title, because the one-row cashflow ladder now prints the same exact PV.
-    About 25 UI literal pins moved at the last digits.
+  - **Weakening:** the structured-credit trap test's
+    (`production_waterfall_trap_cure_rebreach_conserves_interest`) released
+    trap moved from `== 0.0` to `abs() < 1e-9`. The residue is now about
+    1e-10 of float noise; the old exact zero came from lossy conversion.
+  - **Weakening:** the Python Asian/European one-fixing mean equality is now
+    `approx(abs=1e-14)`, the file's stderr tolerance. The two reducers'
+    means differ by two ulps.
+  - **Weakening:** the UI portfolio host-parity check compares the wasm32
+    worker with the native-Python values within the parity tests' 1e-9
+    relative, not exactly.
+  - **Reframed (same claim):**
+    - The portfolio CIP tests compute `1.10 * (0.99 / 0.95)` in the
+      production order.
+    - The WASM mixed-node forecast expects `100 * (1 + 0.1)`.
+    - The UI valuations workbench finds the headline Money among elements
+      titled with the PV, because the one-row cashflow ladder now prints the
+      same exact PV.
+  - **Re-pins:**
+    - 10 recorded wire-key PVs
+    - the callable-loan OAS price
+    - the LMM Bermudan pin
+    - the term-loan coupon bits
+    - 15 bump-routing pins
+    - the dual macOS/Linux pins: GBM Greeks, LSMC, Asian, barrier PDE,
+      term-loan tree and callable loan
+    - about 25 UI literal pins, at the last digits
+
+    The term-loan tree's short-rate pin now differs by one ulp between hosts.
+  - **Regenerated** with each file's documented command:
+    - the valuations, statements, margin and cashflows cross-host goldens
+    - the portfolio `host_parity.json` (`UPDATE_HOST_PARITY=1`)
+    - the UI fixtures
+
+    Values move at the ulp level, except finite-difference outputs (up to
+    about 1e-11 relative: equity volga, factor stress) and 10
+    structured-credit waterfall residuals, which went from exact 0 to about
+    ±1e-10. A small negative residual is safe: undistributed interest
+    passes through `snap_de_minimis`, and cash conservation uses a
+    tolerance.
+- **B2b platform evidence.**
+  - **Linux:** the full Rust workspace (bindings excluded), run in a local
+    `rust:1.97.1` linux/amd64 container, passes apart from three
+    container-only golden-runner failures (read-only mount, no git).
+  - **H2 doctests fixed here:** it also exposed two commodity-forward
+    doctests broken since H2, which lacked `settlement_calendar_id`. macOS
+    `rust-test` skips doctests.
+  - **Not run on Linux:** Python and the UI. The Python exact-string
+    goldens were regenerated on macOS, so CI on Linux may still show native
+    libm drift there. The wasm32 facade, with libm independent of the host,
+    matches them.
+  - **WASM gate:** the WASM figure (1085) is from `wasm-test-built`, after
+    one full `wasm-test` build.
 - **C3 scope boundary.** Removing `BusinessDayConvention::default` exposed
   `valuations::serde_defaults::bdc_modified_following` and two
   variance-swap observation defaults. These are product-level instrument

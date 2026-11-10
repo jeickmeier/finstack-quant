@@ -192,7 +192,7 @@ impl EquityOptionHestonPdePricer {
             },
         )?;
 
-        Money::new(price * inst.quantity, ccy).map_err(|error| {
+        Money::from_model_value(price * inst.quantity, ccy).map_err(|error| {
             finstack_quant_valuations_core::pricer::PricingError::from_core(
                 error,
                 finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(inst)

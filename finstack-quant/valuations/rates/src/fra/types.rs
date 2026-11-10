@@ -429,7 +429,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for ForwardRateAgre
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         let pv = self.npv_raw(curves, as_of)?;
-        finstack_quant_core::money::Money::new(pv, self.notional.currency())
+        finstack_quant_core::money::Money::from_model_value(pv, self.notional.currency())
     }
 
     fn base_value_raw(
@@ -485,7 +485,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
             let settlement = self.settlement_amount_raw(curves, as_of)?;
             vec![(
                 self.start_date,
-                Money::new(settlement, self.notional.currency())?,
+                Money::from_model_value(settlement, self.notional.currency())?,
             )]
         };
 

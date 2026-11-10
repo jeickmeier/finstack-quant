@@ -276,7 +276,7 @@ impl CmoWaterfall {
             .map(|t| t.current_face.currency())
             .unwrap_or(Currency::USD);
 
-        Money::new(total, currency)
+        Money::from_model_value(total, currency)
     }
 }
 

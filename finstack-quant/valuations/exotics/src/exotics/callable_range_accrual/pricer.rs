@@ -171,7 +171,7 @@ impl Payoff for CallableRangeAccrualPayoff {
         &self,
         currency: finstack_quant_core::currency::Currency,
     ) -> finstack_quant_core::Result<Money> {
-        Money::new(self.note_value(), currency)
+        Money::from_model_value(self.note_value(), currency)
     }
 
     fn reset(&mut self) {
@@ -208,7 +208,7 @@ impl ExerciseBoundaryPayoff for CallableRangeAccrualPayoff {
             .get(exercise_idx)
             .copied()
             .unwrap_or(1.0);
-        Money::new(
+        Money::from_model_value(
             call_price * self.notional + accrued * (1.0 - bond_to_final),
             currency,
         )
@@ -227,7 +227,7 @@ impl ExerciseBoundaryPayoff for CallableRangeAccrualPayoff {
             .get(exercise_idx)
             .copied()
             .unwrap_or(0);
-        Money::new(
+        Money::from_model_value(
             self.note_value()
                 - self.accrued_coupon(in_range_at_call) * self.final_payment_discount(),
             currency,

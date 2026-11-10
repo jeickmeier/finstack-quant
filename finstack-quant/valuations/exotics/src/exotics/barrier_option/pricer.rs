@@ -95,7 +95,7 @@ pub(crate) fn known_knock_out_value(
             .get_discount(inst.discount_curve_id.as_str())?
             .df_between_dates(as_of, inst.expiry)?;
     }
-    Money::new(value, inst.currency).map(Some)
+    Money::from_model_value(value, inst.currency).map(Some)
 }
 
 /// Whether the instrument's rebate should be paid at the hit time.
@@ -151,7 +151,7 @@ pub(crate) fn knocked_in_vanilla_value(
         unit,
         "barrier knocked-in vanilla price",
     )?;
-    Money::new(unit * inst.quantity, inst.currency).map(Some)
+    Money::from_model_value(unit * inst.quantity, inst.currency).map(Some)
 }
 
 /// Monte Carlo barrier payoff on `time_grid`: per-unit rebate, bridge
@@ -336,7 +336,7 @@ pub(crate) fn price_expired_barrier(
         rebate,
     );
 
-    Money::new(pv, inst.currency)
+    Money::from_model_value(pv, inst.currency)
 }
 
 use finstack_quant_models::closed_form::{BarrierParams, barrier_price, barrier_rebate};
@@ -407,7 +407,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
             "barrier closed-form price",
         )?;
 
-        let pv = Money::new(price, barrier_opt.currency).map_err(|error| {
+        let pv = Money::from_model_value(price, barrier_opt.currency).map_err(|error| {
             finstack_quant_valuations_core::pricer::PricingError::from_core(
                 error,
                 finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(

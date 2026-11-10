@@ -811,7 +811,7 @@ fn workout_cashflow_paths(
         };
         path.push((
             candidate.date,
-            Money::new(exit_cash, bond.notional.currency())?,
+            Money::from_model_value(exit_cash, bond.notional.currency())?,
         ));
         paths.push(WorkoutCandidatePath {
             exit: candidate,
@@ -879,7 +879,7 @@ fn solve_workout_path_yield(
         bond,
         &future_flows,
         quote_date,
-        Money::new(residual_target, dirty_price_target.currency())?,
+        Money::from_model_value(residual_target, dirty_price_target.currency())?,
         YtmPricingSpec {
             day_count: bond.cashflow_spec.day_count(),
             notional: bond.notional,
@@ -1101,7 +1101,7 @@ pub(crate) fn price_from_i_spread(
             curves,
             &flows,
             quote_date,
-            Money::new(price, bond.notional.currency())?,
+            Money::from_model_value(price, bond.notional.currency())?,
             &schedule,
         )?;
         if workout.last().map(|(date, _)| *date) == Some(horizon) {

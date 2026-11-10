@@ -240,7 +240,7 @@ pub(crate) fn quoted_workout_path(
     };
 
     let quote_ctx = QuoteDateContext::new(bond, curves, as_of)?;
-    let dirty_now = Money::new(
+    let dirty_now = Money::from_model_value(
         quote_ctx.dirty_from_clean_pct(clean_px, bond.notional.amount()),
         bond.notional.currency(),
     )?;

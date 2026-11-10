@@ -100,16 +100,15 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughHestonF
         let is_call = matches!(equity_option.option_type, OptionType::Call);
         let price = params.price_european(spot, equity_option.strike, r, q, t, is_call);
 
-        let pv = Money::new(price * equity_option.quantity, equity_option.currency).map_err(
-            |error| {
+        let pv = Money::from_model_value(price * equity_option.quantity, equity_option.currency)
+            .map_err(|error| {
                 finstack_quant_valuations_core::pricer::PricingError::from_core(
                     error,
                     finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
                         equity_option,
                     ),
                 )
-            },
-        )?;
+            })?;
         Ok(
             finstack_quant_valuations_core::results::ValuationResult::stamped(
                 equity_option.id(),

@@ -430,8 +430,8 @@ pub fn oid_eir_schedule_from_flows(
         let oid_amortization = interest_income - bucket.interest;
         periods.push(OidEirPeriod {
             date: *date,
-            oid_amortization: Money::new(oid_amortization, currency)?,
-            closing_balance: Money::new(closing_balance, currency)?,
+            oid_amortization: Money::from_model_value(oid_amortization, currency)?,
+            closing_balance: Money::from_model_value(closing_balance, currency)?,
         });
         opening_balance = closing_balance;
         prev = *date;

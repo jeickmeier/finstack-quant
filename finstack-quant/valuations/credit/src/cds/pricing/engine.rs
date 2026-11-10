@@ -108,7 +108,7 @@ impl CdsPricer {
         as_of: Date,
     ) -> Result<Money> {
         let pv = self.pv_protection_leg_raw(cds, disc, surv, as_of)?;
-        Money::new(pv, cds.notional.currency())
+        Money::from_model_value(pv, cds.notional.currency())
     }
 
     /// Calculate PV of protection leg (raw f64)
@@ -230,7 +230,7 @@ impl CdsPricer {
         as_of: Date,
     ) -> Result<Money> {
         let pv = self.pv_premium_leg_raw(cds, disc, surv, as_of)?;
-        Money::new(pv, cds.notional.currency())
+        Money::from_model_value(pv, cds.notional.currency())
     }
 
     /// Calculate PV of premium leg (raw f64)

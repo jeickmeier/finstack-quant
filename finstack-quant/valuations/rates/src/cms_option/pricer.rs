@@ -71,7 +71,7 @@ impl CmsOptionPricer {
         convexity_scale: f64,
     ) -> Result<Money> {
         let pv = self.price_internal_with_convexity_raw(inst, curves, as_of, convexity_scale)?;
-        Money::new(pv, inst.notional.currency())
+        Money::from_model_value(pv, inst.notional.currency())
     }
 
     pub(crate) fn price_internal_with_convexity_raw(

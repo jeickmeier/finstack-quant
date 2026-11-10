@@ -462,7 +462,7 @@ impl BermudanSwaptionPricer {
         let mut result = ValuationResult::stamped(
             swaption.id.as_str(),
             as_of,
-            Money::new(pv, swaption.notional.currency()).map_err(|error| {
+            Money::from_model_value(pv, swaption.notional.currency()).map_err(|error| {
                 finstack_quant_valuations_core::pricer::PricingError::from_core(
                     error,
                     finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(
@@ -819,7 +819,7 @@ pub(crate) fn apply_exercise_today(
     let discount = require_discount_curve(market, swaption.get_discount_curve_id().as_str())?;
     let value =
         value_with_exercise_today(swaption, discount.as_ref(), as_of, result.value.amount())?;
-    result.value = Money::new(value, swaption.notional.currency())?;
+    result.value = Money::from_model_value(value, swaption.notional.currency())?;
     Ok(())
 }
 

@@ -195,8 +195,8 @@ fn truncate_at_call(
         call_date,
         finstack_quant_core::dates::DayCountContext::default(),
     )?;
-    let interest = Money::new(opening * period.coupon_rate * accrual, currency)?;
-    let principal = Money::new(opening * call.price_pct / 100.0, currency)?;
+    let interest = Money::from_model_value(opening * period.coupon_rate * accrual, currency)?;
+    let principal = Money::from_model_value(opening * call.price_pct / 100.0, currency)?;
 
     let before = |dated: &[(Date, Money)]| -> Vec<(Date, Money)> {
         dated
@@ -386,7 +386,7 @@ pub fn tranche_metrics(
         None => quote.external_target(deal)?.unwrap_or(model_dirty),
     };
     let target_price_pct = quote.clean_price(target_value);
-    let target_pv = Money::new(target_value, pv.currency())?;
+    let target_pv = Money::from_model_value(target_value, pv.currency())?;
     let ytm = super::risk::ytm::solve_yield(
         &cashflows.cashflows,
         quote.settlement,

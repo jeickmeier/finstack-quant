@@ -40,7 +40,7 @@ impl MetricCalculator for YtmCalculator {
             as_of,
             context.base_value,
         )?;
-        let price_leg = Money::new(-target_price.amount(), target_price.currency())?;
+        let price_leg = Money::from_model_value(-target_price.amount(), target_price.currency())?;
 
         crate::loan_quotes::ytm_from_schedule(
             &schedule,

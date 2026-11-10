@@ -430,11 +430,13 @@ impl finstack_quant_cashflows::CashflowScheduleSource for RealEstateAsset {
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         let mut flows: Vec<(Date, Money)> = pricer::unlevered_flows(self, as_of)?
             .into_iter()
-            .map(|(date, amount)| Money::new(amount, self.currency).map(|money| (date, money)))
+            .map(|(date, amount)| {
+                Money::from_model_value(amount, self.currency).map(|money| (date, money))
+            })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
         if let Some((date, amount)) = pricer::terminal_sale_proceeds(self, as_of)? {
-            flows.push((date, Money::new(amount, self.currency)?));
+            flows.push((date, Money::from_model_value(amount, self.currency)?));
         }
         finstack_quant_cashflows::schedule_from_dated_flows(
             flows,

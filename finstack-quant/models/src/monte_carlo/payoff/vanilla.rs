@@ -91,7 +91,7 @@ impl Payoff for European {
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
         let intrinsic = self.option_type.intrinsic(self.terminal_spot, self.strike);
-        Money::new(intrinsic * self.notional, currency)
+        Money::from_model_value(intrinsic * self.notional, currency)
     }
 
     fn reset(&mut self) {
@@ -259,7 +259,7 @@ impl Payoff for Forward {
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
         let diff = self.terminal_spot - self.forward_price;
         let payoff = if self.is_long { diff } else { -diff };
-        Money::new(payoff * self.notional, currency)
+        Money::from_model_value(payoff * self.notional, currency)
     }
 
     fn reset(&mut self) {

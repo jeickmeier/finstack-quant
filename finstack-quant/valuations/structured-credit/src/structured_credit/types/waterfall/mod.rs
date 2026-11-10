@@ -252,7 +252,7 @@ impl EquityHistory {
         let currency = candidate.currency();
         let total = candidate.amount().max(0.0);
         let irr_at = |cash: f64| {
-            Money::new(cash, currency)
+            Money::from_model_value(cash, currency)
                 .ok()
                 .and_then(|money| self.irr_with(payment_date, money))
         };
@@ -275,7 +275,7 @@ impl EquityHistory {
                 break;
             }
         }
-        Money::new(high, currency).unwrap_or(candidate)
+        Money::from_model_value(high, currency).unwrap_or(candidate)
     }
 }
 

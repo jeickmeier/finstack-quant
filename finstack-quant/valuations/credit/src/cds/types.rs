@@ -617,7 +617,7 @@ impl CreditDefaultSwap {
                 Ok(finstack_quant_core::cashflow::CashFlow::new(
                     end,
                     None,
-                    Money::new(
+                    Money::from_model_value(
                         self.notional.amount() * spread * accrual,
                         self.notional.currency(),
                     )?,
@@ -702,7 +702,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CreditDefaultSw
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         let npv_amount = self.npv_raw_internal(market, as_of)?;
-        finstack_quant_core::money::Money::new(npv_amount, self.notional.currency())
+        finstack_quant_core::money::Money::from_model_value(npv_amount, self.notional.currency())
     }
 
     fn base_value_raw(

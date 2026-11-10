@@ -87,7 +87,7 @@ impl EquityOptionPdePricer {
                 is_call,
                 matches!(inst.exercise_style, ExerciseStyle::American),
             );
-            return Money::new(price * inst.quantity, ccy).map_err(|error| {
+            return Money::from_model_value(price * inst.quantity, ccy).map_err(|error| {
                 PricingError::from_core(
                     error,
                     PricingErrorContext::from_instrument(inst).model(ModelKey::PdeCrankNicolson1D),
@@ -173,7 +173,7 @@ impl EquityOptionPdePricer {
         })?;
         let price = solution.interpolate(spot.ln());
 
-        Money::new(price * inst.quantity, ccy).map_err(|error| {
+        Money::from_model_value(price * inst.quantity, ccy).map_err(|error| {
             finstack_quant_valuations_core::pricer::PricingError::from_core(
                 error,
                 finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(inst)

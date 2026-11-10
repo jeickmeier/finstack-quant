@@ -436,7 +436,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for EquityFuture {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        Money::new(self.npv_raw(market, as_of)?, self.terms.currency)
+        Money::from_model_value(self.npv_raw(market, as_of)?, self.terms.currency)
     }
 
     fn expiry(&self) -> Option<Date> {

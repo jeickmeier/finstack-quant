@@ -915,7 +915,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for InterestRateFut
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         let pv = self.npv_raw(curves, as_of)?;
-        finstack_quant_core::money::Money::new(pv, self.terms.currency)
+        finstack_quant_core::money::Money::from_model_value(pv, self.terms.currency)
     }
 
     fn base_value_raw(

@@ -337,7 +337,7 @@ impl AssetBackedFacility {
             )?;
             let fee = undrawn * fee_bp / BASIS_POINTS_PER_UNIT * accrual;
             if fee > 0.0 {
-                fees.push((period.payment_date, Money::new(fee, currency)?));
+                fees.push((period.payment_date, Money::from_model_value(fee, currency)?));
             }
         }
         Ok(fees)

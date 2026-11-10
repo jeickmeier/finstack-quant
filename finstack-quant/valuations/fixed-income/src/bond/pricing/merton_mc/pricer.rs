@@ -163,7 +163,7 @@ impl Pricer for SimpleBondMertonMcPricer {
 
         let mc_dirty_pct = mc_result.dirty_price_pct;
         let pv_amount = mc_dirty_pct / 100.0 * bond.notional.amount();
-        let pv = Money::new(pv_amount, bond.notional.currency())
+        let pv = Money::from_model_value(pv_amount, bond.notional.currency())
             .map_err(|error| PricingError::from_core(error, ctx.clone()))?;
 
         let mut measures = IndexMap::new();

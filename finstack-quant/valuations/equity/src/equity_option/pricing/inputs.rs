@@ -106,7 +106,10 @@ pub(crate) fn resolve_lifecycle_value(
         }
     };
 
-    Ok(Some(Money::new(unit_value * inst.quantity, currency)?))
+    Ok(Some(Money::from_model_value(
+        unit_value * inst.quantity,
+        currency,
+    )?))
 }
 
 /// Market state an equity-option model pricer works from.
@@ -160,7 +163,7 @@ pub(crate) fn model_inputs(
             OptionType::Call => (inputs.spot - inst.strike).max(0.0),
             OptionType::Put => (inst.strike - inputs.spot).max(0.0),
         };
-        return Money::new(intrinsic * inst.quantity, inst.currency)
+        return Money::from_model_value(intrinsic * inst.quantity, inst.currency)
             .map(ModelInputs::Settled)
             .map_err(|e| {
                 PricingError::from_core(e, PricingErrorContext::from_instrument(inst).model(model))

@@ -199,7 +199,7 @@ pub fn compute_quotes(
         .quoted_clean_price_pct = Some(clean_price_pct);
 
     // 2) Build metric context with the same model and registries for the rest.
-    let base_value = finstack_quant_core::money::Money::new(
+    let base_value = finstack_quant_core::money::Money::from_model_value(
         pricing_dispatch.price_raw(&bond_for_metrics, market, as_of)?,
         bond_for_metrics.notional.currency(),
     )?;

@@ -68,12 +68,12 @@ pub(crate) fn compute_pv(
                 (-r_d * t).exp() * inst.payout_amount.amount()
             }
         };
-        return Money::new(pv, inst.quote_currency);
+        return Money::from_model_value(pv, inst.quote_currency);
     }
 
     let price = price_touch(inst, spot, r_d, r_f, sigma, t)?;
 
-    Money::new(price, inst.quote_currency)
+    Money::from_model_value(price, inst.quote_currency)
 }
 
 /// Resolve the matrix-based spot needed by touch-option metrics.
