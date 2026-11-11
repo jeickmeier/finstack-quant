@@ -32,8 +32,9 @@ jobs:
         include:
           # Native x86_64 keeps workspace fat LTO. Constrained arm64 jobs use
           # thin LTO: linux-arm64 is a manylinux cross-link that OOMs with fat
-          # LTO (Release #142), and macos-14's 3-core runners spend 40+ minutes
-          # in rustc on finstack-quant-py and hit the job timeout (Release #143).
+          # LTO (Release #142), and macOS arm64 runners spend 40+ minutes in
+          # rustc on finstack-quant-py (Release #143). macos-14 was retired in
+          # November 2026; use the supported macos-15 arm64 image.
           # ── Linux x86_64 ──
           - { os: linux-x64,   runner: ubuntu-24.04,   target: x86_64,  python: "3.12", timeout: 60, lto: fat,  codegen_units: 1 }
           - { os: linux-x64,   runner: ubuntu-24.04,   target: x86_64,  python: "3.13", timeout: 60, lto: fat,  codegen_units: 1 }
@@ -43,9 +44,9 @@ jobs:
           - { os: linux-arm64, runner: ubuntu-24.04,   target: aarch64, python: "3.13", timeout: 60, lto: thin, codegen_units: 16 }
           - { os: linux-arm64, runner: ubuntu-24.04,   target: aarch64, python: "3.14", timeout: 60, lto: thin, codegen_units: 16 }
           # ── macOS arm64 (Apple Silicon) ──
-          - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.12", timeout: 90, lto: thin, codegen_units: 16 }
-          - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.13", timeout: 90, lto: thin, codegen_units: 16 }
-          - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.14", timeout: 90, lto: thin, codegen_units: 16 }
+          - { os: macos-arm64, runner: macos-15,       target: aarch64, python: "3.12", timeout: 90, lto: thin, codegen_units: 16 }
+          - { os: macos-arm64, runner: macos-15,       target: aarch64, python: "3.13", timeout: 90, lto: thin, codegen_units: 16 }
+          - { os: macos-arm64, runner: macos-15,       target: aarch64, python: "3.14", timeout: 90, lto: thin, codegen_units: 16 }
           # ── Windows x86_64 (MSVC fat LTO — larger timeout) ──
           # Release #155 cancelled py3.12 at the 90-minute cap while rustc was
           # still compiling finstack-quant-py. py3.14 finished at 89 minutes.
