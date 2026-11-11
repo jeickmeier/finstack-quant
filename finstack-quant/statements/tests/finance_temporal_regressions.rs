@@ -390,3 +390,39 @@ fn ytd_includes_the_first_period_when_frequency_coarsens_mid_year() {
         }
     }
 }
+
+/// Trailing twelve months of fiscal weeks is a full year of days. Counting
+/// 52 blocks let the short final block of the fiscal year stand in for a
+/// whole week, so every window crossing the year end summed 359 days.
+#[test]
+fn fiscal_weekly_ttm_covers_a_full_year_of_days() {
+    let periods = build_fiscal_periods("FY2024W1..FY2025W10", FiscalConfig::us_federal(), None)
+        .unwrap()
+        .periods;
+    let values: Vec<_> = periods
+        .iter()
+        .map(|period| {
+            let days = (period.end - period.start).whole_days() as f64;
+            (period.id, AmountOrScalar::scalar(days))
+        })
+        .collect();
+    let model = {
+        let mut model_builder = ModelBuilder::new("fiscal-weekly-ttm");
+        model_builder.periods_explicit(periods.clone()).unwrap();
+        model_builder.value("x", &values);
+        model_builder.compute("trailing", "ttm(x)").unwrap();
+        model_builder.build().unwrap()
+    };
+    let result = Evaluator::new().evaluate(&model).unwrap();
+    // Fiscal 2024 (October 2023 to September 2024) holds 29 February 2024,
+    // and so does every twelve-month window ending in these weeks.
+    for period in periods
+        .iter()
+        .filter(|p| p.id.year() == 2025 || p.id.index() == 53)
+    {
+        close(result.get("trailing", &period.id).unwrap(), 366.0);
+    }
+    // A year of history is not yet available one block earlier.
+    let week_52 = periods.iter().find(|p| p.id.index() == 52).unwrap();
+    assert!(result.get("trailing", &week_52.id).unwrap().is_nan());
+}

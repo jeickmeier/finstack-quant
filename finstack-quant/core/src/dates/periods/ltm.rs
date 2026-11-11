@@ -42,7 +42,8 @@ impl LtmWindow {
 /// | Frequency | Window |
 /// | --- | --- |
 /// | Monthly, quarterly, semi-annual, annual | The 12, 4, 2 or 1 periods ending at `period`, Gregorian or fiscal |
-/// | Weekly | The 52 weeks ending at `period` (364 days, the 52/53-week reporting convention) |
+/// | Weekly, Gregorian | The 52 weeks ending at `period` (364 days, the 52/53-week reporting convention) |
+/// | Weekly, fiscal | The 53 blocks ending at `period`: 52 seven-day weeks and the one- or two-day final block of a fiscal year (365 or 366 days) |
 /// | Daily | Every model daily period starting in `[end - 12 months, end)` |
 ///
 /// Daily models may be a calendar-day or a business-day grid. A day absent from
@@ -86,7 +87,13 @@ impl LtmWindow {
 /// ```
 pub fn ltm_window(period: PeriodId, periods: &[Period]) -> crate::Result<LtmWindow> {
     if period.kind() != PeriodKind::Daily {
-        let count = i32::from(period.kind().periods_per_year());
+        // A fiscal year of weeks is 52 seven-day blocks plus a one- or
+        // two-day final block, so its twelve months are 53 blocks.
+        let count = if period.kind() == PeriodKind::Weekly && period.is_fiscal() {
+            i32::from(period.kind().capacity())
+        } else {
+            i32::from(period.kind().periods_per_year())
+        };
         let mut window = LtmWindow {
             slots: Vec::with_capacity(count as usize),
             missing: 0,
@@ -171,6 +178,64 @@ mod tests {
         let window = ltm_window(PeriodId::annual(2024), &annual).unwrap();
         assert_eq!(window.slots, vec![PeriodId::annual(2024)]);
         assert!(window.is_complete());
+    }
+
+    /// A fiscal year is 52 seven-day weeks plus a one- or two-day final
+    /// block, so twelve months of fiscal weeks is 53 blocks: every window
+    /// holds 52 full weeks and exactly one short block, wherever it ends.
+    #[test]
+    fn fiscal_weekly_window_covers_a_full_year_of_days() {
+        use crate::dates::{FiscalConfig, build_fiscal_periods};
+        let periods = build_fiscal_periods("FY2024W1..FY2026W53", FiscalConfig::us_federal(), None)
+            .expect("plan")
+            .periods;
+        let days = |id: &PeriodId| {
+            let period = periods.iter().find(|p| p.id == *id).expect("model period");
+            (period.end - period.start).whole_days()
+        };
+        for at in periods.iter().filter(|p| p.id.year() >= 2025) {
+            let window = ltm_window(at.id, &periods).unwrap();
+            assert!(window.is_complete());
+            assert_eq!(window.slots.len(), 53, "{}", at.id);
+            assert_eq!(window.slots.last(), Some(&at.id));
+            // 52 full weeks and the one short block the window holds.
+            let short_block = window
+                .slots
+                .iter()
+                .find(|id| id.index() == 53)
+                .expect("one final block per window");
+            assert!((1..=2).contains(&days(short_block)));
+            let covered: i64 = window.slots.iter().map(days).sum();
+            assert_eq!(covered, 364 + days(short_block), "{}", at.id);
+        }
+    }
+
+    /// Gregorian weeks have no short block: the window stays 52 weeks even
+    /// across a 53-week ISO year.
+    #[test]
+    fn gregorian_weekly_window_is_fifty_two_full_weeks() {
+        let periods = build_periods("2020W1..2021W20", None)
+            .expect("plan")
+            .periods;
+        assert!(
+            periods
+                .iter()
+                .any(|p| p.id.year() == 2020 && p.id.index() == 53)
+        );
+        for at in periods.iter().filter(|p| p.id.year() == 2021) {
+            let window = ltm_window(at.id, &periods).unwrap();
+            assert!(window.is_complete());
+            assert_eq!(window.slots.len(), 52);
+            let covered: i64 = window
+                .slots
+                .iter()
+                .map(|id| {
+                    let period = periods.iter().find(|p| p.id == *id).expect("model period");
+                    (period.end - period.start).whole_days()
+                })
+                .sum();
+            assert_eq!(covered, 364, "{}", at.id);
+        }
     }
 
     #[test]
