@@ -108,7 +108,7 @@ const date = core.createDate(2024, 9, 30);
 // Analytics: the constructor takes a `PerformancePanel` of prices or returns
 const perf = new analytics.Performance({
   dates: ["2024-01-01", "2024-01-02", "2024-01-03"],
-  series: [[0.01, 0.02, -0.01]],
+  series: [[0.01, 0.02]],
   kind: "returns",
   ticker_names: ["asset"],
   frequency: "daily",
@@ -253,7 +253,7 @@ test("core.Currency creation", () => {
 test("analytics.Performance.sharpe returns a typed array", () => {
   const perf = new analytics.Performance({
     dates: ["2024-01-01", "2024-01-02"],
-    series: [[0.01, 0.02]],
+    series: [[0.01]],
     kind: "returns",
     ticker_names: ["asset"],
     frequency: "daily",

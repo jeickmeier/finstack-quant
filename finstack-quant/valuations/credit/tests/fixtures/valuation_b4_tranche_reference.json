@@ -4,7 +4,8 @@
   "provenance": {
     "scipy_version": "1.18.1",
     "numpy_version": "2.5.1",
-    "script_sha256": "de545e3eab26f724c3bf49cd6e5c2e968f6103b218f09aa4a6516359caf4bf9a",
+    "script_sha256": "104c48640ff24f9cab528c123366c5ea84e9d73ec3953a19cdd60e1734d39ab4",
+    "exact_target": "aarch64-macos",
     "decimal_precision": 80,
     "decimal_rounding": "outward interval bounds at every nonnegative operation",
     "gaussian_quadrature": "QUADPACK plus independently refined composite GL32; estimated uncertainty",

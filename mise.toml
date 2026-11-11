@@ -198,6 +198,17 @@ if [ "${usage_doctest:-false}" = "true" ]; then
   fi
   exec cargo test --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --doc --no-fail-fast
 fi
+if [ "${usage_slow:-false}" = "true" ]; then
+  slow_exports="$(mktemp -d "${TMPDIR:-/tmp}/finstack-slow-tests.XXXXXX")"
+  trap 'rm -rf "$slow_exports"' EXIT
+  export CCM_I3_WORK_EXPORT="${CCM_I3_WORK_EXPORT:-$slow_exports/ccm-i3-work.json}"
+  export CCM_CASHFLOW_ACCRUAL_EXPORT="${CCM_CASHFLOW_ACCRUAL_EXPORT:-$slow_exports/ccm-cashflow-accrual.json}"
+  export CCM_CORE_WORK_EXPORT_DIR="${CCM_CORE_WORK_EXPORT_DIR:-$slow_exports/core-work}"
+  export CCM_CASHFLOW_HISTORY_EXPORT="${CCM_CASHFLOW_HISTORY_EXPORT:-$slow_exports/cashflow-history.json}"
+  export CCM_MODELS_EXPORT_DIR="${CCM_MODELS_EXPORT_DIR:-$slow_exports/models}"
+  export CCM_CONSUMER_EXPORT_DIR="${CCM_CONSUMER_EXPORT_DIR:-$slow_exports/consumer}"
+  export CCM_CASHFLOW_CONSUMER_EXPORT="${CCM_CASHFLOW_CONSUMER_EXPORT:-$slow_exports/cashflow-consumer}"
+fi
 ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only --no-tests pass"
 if [ "${usage_coverage:-false}" = "true" ]; then
   cargo llvm-cov clean --workspace

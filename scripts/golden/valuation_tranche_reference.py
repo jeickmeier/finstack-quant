@@ -826,6 +826,10 @@ def main() -> None:
     )
     _require(payload["schema_version"] == 1, "unsupported export schema")
     _require(isinstance(payload["input_hash"], str) and bool(payload["input_hash"]), "missing input hash")
+    _require(
+        isinstance(payload.get("target"), str) and bool(payload["target"]),
+        "missing Rust diagnostic target",
+    )
     case_ids = [case["id"] for case in payload["cases"]]
     _require(len(case_ids) == len(set(case_ids)), "duplicate reference case IDs")
     script_hash = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
@@ -877,6 +881,7 @@ def main() -> None:
             "scipy_version": scipy.__version__,
             "numpy_version": np.__version__,
             "script_sha256": script_hash,
+            "exact_target": payload["target"],
             "decimal_precision": PRECISION,
             "decimal_rounding": "outward interval bounds at every nonnegative operation",
             "gaussian_quadrature": "QUADPACK plus independently refined composite GL32; estimated uncertainty",
