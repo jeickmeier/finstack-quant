@@ -734,6 +734,8 @@ def commodity_inputs() -> dict[str, dict[str, Any]]:
             "position": "long",
             "quantity": 1000.0,
             "settlement": "cash",
+            # The contract's own settlement calendar dates its payment.
+            "settlement_calendar_id": "usny",
             "underlying_ticker": "CL",
             "unit": "BBL",
             "contract_price": 75.0,

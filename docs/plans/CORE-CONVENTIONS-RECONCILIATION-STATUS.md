@@ -809,19 +809,37 @@ logged under Needs review.
     - **Date assertions:** the lagged-redemption test now expects the last
       PIK on the unadjusted final accrual end, with only the redemption cash
       on the lagged date.
-- **Notebooks broken by earlier slices (found during G5; not fixed yet).**
-  A full run (`run_all_notebooks.py --timeout 120`) after G5-3b: 92 of 101
-  pass. None of the 9 failures involves PIK or write-down rows:
+- **Notebooks broken by earlier slices (found during G5, fixed in `NB:`).**
+  A full run (`run_all_notebooks.py --timeout 120`) after G5-3b passed 92 of
+  101; none of the 9 failures involved PIK or write-down rows, and slice
+  gates do not run notebooks, so they went unnoticed. After the fix all 101
+  pass.
   - FX routing after F6/F7 (`core_types_and_money`, `market_data/fx_matrix`,
-    `market_data_and_curves`): cross requests without a pivot or quote.
-  - `bonds_and_fixed_income`: `ScheduleParams` omits
-    `business_day_convention` (no default since C3).
-  - `commodities`, `pricing_across_asset_classes`: CommodityForward requires
-    a `settlement_calendar_id`.
-  - `portfolio_construction_and_valuation`: `KeyError: 'mode'`.
-  - Both capstones: curve calibration builds an EOM grid whose end
-    2026-01-30 is not a month-end (E3b-1 strict anchors).
-  Slice gates do not run notebooks, so these went unnoticed.
+    `market_data_and_curves`): the F6 sweep gave cells that demonstrate
+    triangulation `FxMatrix(None)`; those cells now name the USD pivot they
+    describe, and one cell gained the required conversion policy.
+  - B4 removed the default rounding mode, so `core_types_and_money` and
+    `portfolio_construction_and_valuation` asserted a stamped `bankers`
+    mode that no longer exists; they now assert the stamp omits an
+    unselected mode (the explicit config still records `bankers`).
+  - C3: the step-up cell in `bonds_and_fixed_income` now states
+    `business_day_convention='modified_following'`, the removed default.
+  - H2: the commodity forward payloads (`_shared/analyst_tracks.py`, the
+    pricing-across-asset-classes data file) now name the contract settlement
+    calendar `usny`, as the Rust `CommodityForward` example does.
+  - **Calibration (production fix).** Both capstones failed in curve
+    calibration, not in the notebooks: a swap quote whose spot date is a
+    month-end sets the end-of-month flag, but the legs anchored on the
+    business-day-adjusted maturity (2026-01-31 is a Saturday, adjusted to
+    the 30th), which E3b-1's strict end-of-month grid rejects. The old
+    builder silently forced that anchor onto the month-end. The calibration
+    swap now anchors end-of-month legs on the calendar month-end of the
+    unadjusted maturity, which the schedule adjusts, giving the old dates;
+    non-end-of-month swaps keep the adjusted maturity, so no other
+    calibration moved. A regression test covers the 2025-01-29 case.
+    (Needs review: anchoring non-end-of-month swaps on the unadjusted
+    maturity is the market convention, but would move existing calibrations;
+    left for E4's date-regime work.)
   - **Margin substitution (Needs review).** Record 015 #2 and #11 say
     substitution kinds carry only genuine monetary transfers, never a marked
     collateral value; margin record 20 (Draft, observed only) describes the

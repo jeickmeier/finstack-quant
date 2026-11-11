@@ -15,7 +15,8 @@
       "quantity": 1000.0,
       "settlement": "cash",
       "unit": "BBL",
-      "underlying_ticker": "CL"
+      "underlying_ticker": "CL",
+      "settlement_calendar_id": "usny"
     },
     "type": "commodity_forward"
   }

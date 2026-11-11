@@ -107,8 +107,10 @@ pub(crate) enum RateResolvedDates {
     Swap {
         /// Swap start date.
         start: Date,
-        /// Swap maturity used by the instrument.
-        maturity: Date,
+        /// End that anchors the legs' regular grid: the adjusted maturity, or
+        /// for an end-of-month swap the calendar month-end the schedule then
+        /// adjusts.
+        end: Date,
         /// Pillar date used by calibration.
         pillar_date: Date,
     },
@@ -267,6 +269,16 @@ fn resolve_rate_quote_dates(
             let cal = calendar_by_id_strict(&conv.market_calendar_id)?;
             let maturity =
                 resolve_pillar_date(pillar, start, cal, conv.market_business_day_convention)?;
+            // A swap starting on a month-end rolls end-of-month, so its grid
+            // anchors on the calendar month-end of the unadjusted maturity,
+            // which the schedule adjusts; an end-of-month grid rejects an
+            // adjusted non-month-end anchor (record CORE-CONVENTIONS-008 #5).
+            let end = if start == start.end_of_month() {
+                resolve_pillar_date(pillar, start, cal, BusinessDayConvention::Unadjusted)?
+                    .end_of_month()
+            } else {
+                maturity
+            };
             let pillar_date = if swap_use_payment_delay {
                 finstack_quant_valuations_core::instruments::pricing::swap_legs::add_payment_delay(
                     maturity,
@@ -278,7 +290,7 @@ fn resolve_rate_quote_dates(
             };
             Ok(RateResolvedDates::Swap {
                 start,
-                maturity,
+                end,
                 pillar_date,
             })
         }
@@ -464,10 +476,7 @@ fn build_swap(
     };
 
     let conv = registry.require_rate_index(index)?;
-    let RateResolvedDates::Swap {
-        start, maturity, ..
-    } = dates
-    else {
+    let RateResolvedDates::Swap { start, end, .. } = dates else {
         return Err(Error::Validation(
             "resolved non-swap dates for swap quote".to_string(),
         ));
@@ -523,7 +532,7 @@ fn build_swap(
         calendar_id: leg_conv.payment_calendar_id.clone(),
         stub: leg_conv.stub,
         start,
-        end: maturity,
+        end,
 
         payment_lag_days: leg_conv.payment_lag_days,
         end_of_month,
@@ -541,7 +550,7 @@ fn build_swap(
         reset_lag_days: leg_conv.reset_lag_days,
         fixing_calendar_id: leg_conv.fixing_calendar_id,
         start,
-        end: maturity,
+        end,
         compounding,
         payment_lag_days: leg_conv.payment_lag_days,
         end_of_month,
@@ -916,6 +925,63 @@ mod tests {
         assert!(swap.fixed_leg.end_of_month);
         assert!(swap.float_leg.end_of_month);
 
+        Ok(())
+    }
+
+    #[test]
+    fn eom_swap_anchors_on_month_end_when_maturity_is_not_a_business_day() -> Result<()> {
+        // Spot from 2025-01-29 is the month-end 2025-01-31; one year later is a
+        // Saturday that adjusts to 2026-01-30, which an end-of-month grid
+        // cannot anchor on.
+        let as_of = Date::from_calendar_date(2025, time::Month::January, 29)
+            .expect("valid swap build date");
+        let mut curve_ids = FxHashMap::default();
+        curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
+        curve_ids.insert("forward".to_string(), "USD-OIS".to_string());
+        let ctx = BuildCtx::new(as_of, 1_000_000.0, curve_ids);
+        let quote = RateQuote::Swap {
+            id: QuoteId::new("USD-OIS-SWAP-1Y"),
+            index: IndexId::new("USD-SOFR-OIS"),
+            pillar: Pillar::Tenor(
+                finstack_quant_core::dates::Tenor::new(
+                    1,
+                    finstack_quant_core::dates::TenorUnit::Years,
+                )
+                .expect("valid tenor fixture"),
+            ),
+            rate: 0.04,
+            spread_decimal: None,
+        };
+        let instrument = build_rate_instrument(&quote, &ctx)?;
+        use finstack_quant_valuations_rates::irs::InterestRateSwap;
+        let swap = instrument
+            .as_any()
+            .downcast_ref::<InterestRateSwap>()
+            .expect("Expected InterestRateSwap");
+        let month_end =
+            Date::from_calendar_date(2026, time::Month::January, 31).expect("valid month-end");
+        assert!(swap.fixed_leg.end_of_month);
+        assert_eq!(swap.fixed_leg.end, month_end);
+        assert_eq!(swap.float_leg.end, month_end);
+        let leg = &swap.fixed_leg;
+        let periods = finstack_quant_cashflows::builder::build_periods(
+            finstack_quant_cashflows::builder::BuildPeriodsParams {
+                start: leg.start,
+                end: leg.end,
+                frequency: leg.frequency,
+                stub: leg.stub,
+                business_day_convention: leg.business_day_convention,
+                calendar_id: leg.calendar_id.as_deref().expect("leg calendar"),
+                end_of_month: leg.end_of_month,
+                day_count: leg.day_count,
+                payment_lag_days: leg.payment_lag_days,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
+            },
+        )?;
+        let last = periods.last().expect("one period");
+        assert_eq!(last.unadjusted_end, month_end);
         Ok(())
     }
 }
