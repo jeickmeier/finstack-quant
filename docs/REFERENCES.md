@@ -37,6 +37,26 @@ and implementation and validation evidence.
   conventions for accrued interest and irregular coupon handling, including
   Actual/Actual (ICMA/ISMA) style calculations.
 
+<a id="uk-dmo-gilt-accrued-interest"></a>
+
+### UK DMO Gilt Accrued Interest
+
+- UK Debt Management Office. [Formulae for Calculating Gilt Prices from Yields](https://www.dmo.gov.uk/media/334d05fo/yldeqns_v4.pdf),
+  fourth edition18December2024, sectionTHREE(1)(i), printed17; subsequent pages
+  contain separate stub/indexation cases. [About Gilts](https://www.dmo.gov.uk/responsibilities/gilt-market/about-gilts/)
+  explains its last-cum boundary and settlement restrictions. Verified for
+  CASHFLOWS-013; these are product clauses, not a universal accrued-interest,
+  rounding or principal-entitlement rule.
+
+<a id="lse-fixed-interest-cum-ex-2024"></a>
+
+### LSE Fixed-Interest Cum and Ex Rules — 2024
+
+- London Stock Exchange. [Rules effective5February2024](https://docs.londonstockexchange.com/sites/default/files/documents/rules-of-the-london-stock-exchange-effective-5-february-2024.pdf),
+  printed52, rules3110.1–3110.3. The verified frozen version distinguishes
+  gilt/non-gilt date equality; it does not certify current regulatory compliance
+  or the library's generic quotation operator.
+
 <a id="iso-8601"></a>
 
 ### ISO 8601
@@ -158,6 +178,21 @@ and implementation and validation evidence.
   reference for SOFR floating-rate conventions, including in-arrears
   compounding, observation shifts, lookbacks, and payment lags.
 
+<a id="fixing-publication-timing"></a>
+
+### Fixing Publication Timing and Revisions
+
+- New York Fed, [Additional Information about Reference Rates](https://www.newyorkfed.org/markets/reference-rates/additional-information-about-reference-rates),
+  checked2026-11-09: “Calculation Methodology for the SOFR Averages and Index”
+  distinguishes SOFR value date from its next-business-day publication;
+  “Details on Publication and Revisions for the Treasury Repo Reference Rates”
+  distinguishes morning publication and possible same-day afternoon revisions.
+- ECB, [Euro Foreign Exchange Reference Rates](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html),
+  checked2026-11-09: the usual concertation and publication times differ, EUR is
+  the base currency, and the reference rates have an informational purpose.
+  These are source-specific knowledge/quotation examples, not authority for a
+  universal realized-forward scenario policy, date window or conflict tolerance.
+
 <a id="ecb-estr-methodology"></a>
 
 ### ECB ESTR Methodology
@@ -200,8 +235,23 @@ and implementation and validation evidence.
 ### SIFMA MBS Standard Formulas
 
 - SIFMA. *Standard Formulas for the Analysis of Mortgage-Backed Securities
-  and Other Related Securities* (2010 ed.). Weighted-average-life and related
-  MBS time metrics (actual/365).
+  and Other Related Securities*. General reference for weighted-average-life
+  and related MBS time metrics; specific uses require their owning clauses.
+- [SIFMA-hosted chapter SF](https://www.sifma.org/wp-content/uploads/2017/08/chsf.pdf),
+  The Bond Market Association: sectionB.2(a)–(c), printedSF5–7, for mortality
+  conversion, PSA and AGE/MONTH; sectionB.4, printedSF13–14, for ABS. These formula
+  pages are dated02/01/99; the PDF includes later page updates, so neither a
+  uniform whole-edition date nor the prior generic2010 attribution is verified
+  for this source. SectionC.4–C.5, printedSF20–22, supplies SDA profile, final
+  liquidation-window and collateral-applicability boundaries for CASHFLOWS-011.
+  Page-level support for010/011 does not qualify every calculation named
+  elsewhere in this register or the complete product cashflow models.
+- For average life, G.1(a), printedSF48, defines receipt time on30/360; G.1(c),
+  SF49, uses actual receipt of principal. E.2, SF44, discusses actual cash delay.
+  H.1, SF56–57, distinguishes signed principal payments for GPM/ARM from
+  positive-payment Z-bond treatment. These product clauses do not establish
+  universal ACT/365F economic-date WAL and are not primary authority for the
+  explicitly selected house repayment-life clock in CASHFLOWS-014.
 
 <a id="sifma-tba-good-delivery"></a>
 
@@ -328,6 +378,14 @@ and implementation and validation evidence.
 - Hull, J. C., and White, A. "Valuing Credit Default Swaps I: No Counterparty
   Default Risk." *Journal of Derivatives*, 8(1), 29-40. Reduced-form CDS
   pricing without counterparty default.
+- Verified version: [April2000 author working paper hosted by NYU Stern](https://w4.stern.nyu.edu/finance/docs/WP/2000/pdf/wpa00021.pdf).
+  Section1/equations2–5 specifies claim/recovery and default-time
+  loss assumptions; section2/equation9 prices CDS payoff/accrual under
+  stated independence and no-counterparty-default assumptions. Its q(t) is
+  unconditional default density, not hazard intensity. These clauses do not
+  establish cashflow-kind credit treatment, inferred opening exposure or FIFO
+  scheduled-payment recovery as generic reporting conventions. Verification
+  of this working-paper version does not certify every downstream credit model.
 
 <a id="sp-cds-indices-primer"></a>
 
@@ -711,12 +769,43 @@ and implementation and validation evidence.
 
 ## Volatility, Options, And Smile Models
 
+<a id="forward-option-formulas-and-numeraire"></a>
+
+### Forward Option Formulas and Numeraire
+
+- OpenGamma Strata [BlackFormulaRepository](https://strata.opengamma.io/apidocs/com/opengamma/strata/pricer/impl/option/BlackFormulaRepository.html)
+  and [NormalFormulaRepository](https://strata.opengamma.io/apidocs/com/opengamma/strata/pricer/impl/option/NormalFormulaRepository.html),
+  inspected2026-11-09, define forward/unit-numeraire prices and raw derivatives;
+  actual numeraire multiplication remains external to those formulas.
+- The official [shifted-Black caplet implementation](https://raw.githubusercontent.com/OpenGamma/Strata/main/modules/pricer/src/main/java/com/opengamma/strata/pricer/capfloor/ShiftedBlackIborCapletFloorletExpiryStrikeVolatilities.java)
+  delegates regular price/Greek formulas using shifted F/K at fixed displacement.
+  This supports formula comparison, not its surface/date conventions or numerical
+  thresholds, floors and reference substitutions.
+- [DiscountingSwapLegPricer.pvbp](https://strata.opengamma.io/apidocs/com/opengamma/strata/pricer/swap/DiscountingSwapLegPricer.html)
+  explicitly distinguishes its value-at-rate1/physical-annuity quantity from a
+  literal one-basis-point coupon value. Actual units and notional must be
+  qualified; a PV01 label alone does not determine the multiplier.
+
 <a id="black-1976"></a>
 
 ### Black 1976
 
 - Black, F. "The Pricing of Commodity Contracts." The standard reference for the
   Black (1976) forward-style option pricing model.
+
+<a id="bsm-formula-derivative-coordinates"></a>
+
+### BSM Formula and Derivative Coordinates
+
+- OpenGamma Strata, [BlackScholesFormulaRepository API](https://strata.opengamma.io/apidocs/com/opengamma/strata/pricer/impl/option/BlackScholesFormulaRepository.html)
+  and [official implementation](https://raw.githubusercontent.com/OpenGamma/Strata/main/modules/pricer/src/main/java/com/opengamma/strata/pricer/impl/option/BlackScholesFormulaRepository.java),
+  inspected2026-11-09 for regular interior price/derivative formulas. Its cost
+  of carry is b=r−q; domestic rho varies r and b together holding q fixed,
+  and dividend/foreign-rate rho is minus carryRho. Theta is minus the remaining-
+  time derivative. These coordinates support formula comparison, not adoption
+  of Strata's thresholds, reference-value substitutes, tail truncation or
+  a project-wide accuracy policy. MODELS-ANALYTIC-01 selects native derivative
+  units separately; historical paper citations below remain bibliographic.
 
 <a id="black-scholes-1973"></a>
 
@@ -739,6 +828,19 @@ and implementation and validation evidence.
 - Garman, M. B., and Kohlhagen, S. W. "Foreign Currency Option Values." FX
   option formula recovered by treating the foreign rate as a continuous yield.
 
+### FX delta smile construction and materialization
+
+- Reiswich and Wystup derive premium-unadjusted forward delta and its strike
+  inversion in sections 1.3–1.5. Table 3 gives the delta-neutral straddle
+  strike. Equations 31–32 define the arithmetic smile-strangle measure and
+  reconstruct wing quotes. Their market-strangle section gives the distinct
+  premium constraint. [Reiswich and Wystup working paper](https://www.mathfinance.com/wp-content/uploads/2025/04/FXVolatility-Smile-Construction_CPQF_Arbeits20_neu2.pdf)
+- The quote profile is governed by
+  [CORE-MARKET-15](decisions/financial/core-market/fx-delta-quotes.md#accepted-decision-one-explicit-fx-quote-profile-and-qualified-forward-inputs).
+  The selected direct interpolation, strict expiry boundary and exact-union
+  materialization are local model choices.
+  [Accepted record 17](decisions/financial/models-analytic/fx-delta-smiles.md#accepted-decision-for-checked-fx-delta-smiles-and-strike-materialization)
+
 <a id="merton-1976-jump"></a>
 
 ### Merton 1976 Jump Diffusion
@@ -755,6 +857,25 @@ and implementation and validation evidence.
   Option Pricing." Variance-gamma characteristic function used by the COS
   pricer.
 
+<a id="normalized-jump-characteristic-laws"></a>
+
+### Forward-normalized characteristic laws for COS
+
+- Merton gives the independent compound-Poisson model and expected relative
+  jump compensator in equations 2–3. Equations 16–19 give the conditional
+  mixture used for pricing.
+  The selected pricing inputs describe normal log jumps under the cash
+  measure. [Original paper](https://pages.stern.nyu.edu/~dbackus/Disasters/Merton%20jumps%20JFE%2076.pdf)
+- Madan, Carr and Chang give the Gamma-time mixture and the independent
+  Gamma difference in equations 5–8. Equation 22 gives the risk-neutral
+  compensator. The discussion after equation 25 relates the option formula
+  to a stock-weighted probability measure.
+  [Original paper](https://engineering.nyu.edu/sites/default/files/2018-09/CarrEuropeanFinReview1998.pdf)
+- The selected forward normalization, reflected share parameters and stable
+  centered formulas follow by applying the exponential tilt and subtracting
+  the selected mean. The sign, range and error contracts are specified in
+  the [accepted record 11](decisions/financial/models-analytic/jump-characteristic-laws.md#accepted-decision-for-checked-characteristic-laws).
+
 <a id="fang-oosterlee-2008"></a>
 
 ### Fang Oosterlee 2008
@@ -762,6 +883,24 @@ and implementation and validation evidence.
 - Fang, F., and Oosterlee, C. W. "A Novel Pricing Method for European Options
   Based on Fourier-Cosine Series Expansions." COS method used by the Fourier
   option primitives.
+
+<a id="cos-payoff-window-and-series"></a>
+
+### COS payoff window and series
+
+- Fang and Oosterlee derive the half-weighted expansion and analytic payoff
+  coefficients in equations 22–30. Section 4 distinguishes finite-window
+  and finite-series effects. Equation 49 gives the cumulant window heuristic,
+  and Remark 5.2 explains the bounded put payoff choice.
+  [Original paper](https://ir.cwi.nl/pub/13283/13283D.pdf)
+- Junike and Pankrashkin show that a narrow cumulant window can lead to a
+  materially wrong COS price even as the number of terms increases. See the
+  Merton example in Section 4.3.
+  [Precise option pricing by the COS method](https://arxiv.org/abs/2109.01030)
+- Joshi studies COS under a change of numeraire. The selected cash/share
+  payoff coordinates, reflection error and bounded term selection are
+  specified in the [accepted record 10](decisions/financial/models-analytic/cos-inversion.md#accepted-decision-for-checked-cos-pricing).
+  [Comparison of various variants of the COS method](https://doi.org/10.1016/j.orl.2017.01.006)
 
 <a id="andersen-2008-heston-qe"></a>
 
@@ -775,29 +914,49 @@ and implementation and validation evidence.
 
 ### Reiner Rubinstein 1991
 
-- Reiner, E., and Rubinstein, M. "Breaking Down the Barriers." Continuous-
-  monitoring barrier option formulae.
+- Reiner, E., and Rubinstein, M. *Breaking Down the Barriers*, Risk, 1991.
+  Equations [1]–[4] describe the direct and reflected payoff terms.
+  Equations [5]–[6] distinguish expiry survival cash and discounted
+  first-passage cash. [Original article](https://www.academia.edu/16585738/Breaking_down_the_barriers)
+- QuantLib's analytic barrier engine provides a second implementation of the
+  strike regimes and real-root at-hit formula. The finite-horizon treatment
+  of negative discriminants is a separate numerical choice in
+  [MODELS-ANALYTIC-05](decisions/financial/models-analytic/barriers-and-rebates.md#accepted-decision-for-continuous-barrier-premiums-and-cash).
+  [QuantLib source](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/pricingengines/barrier/analyticbarrierengine.cpp)
 
 <a id="kemna-vorst-1990"></a>
 
 ### Kemna Vorst 1990
 
-- Kemna, A. G. Z., and Vorst, A. C. F. "A Pricing Method for Options Based on
-  Average Asset Values." Exact geometric-average Asian option formula.
+- Kemna, A. G. Z., and Vorst, A. C. F.
+  [A Pricing Method for Options Based on Average Asset Values](https://doi.org/10.1016/0378-4266(90)90039-5).
+  Section 4 and Appendix B derive the geometric average's lognormal law.
+  The paper's discrete grid includes time zero. Apply the weights for the
+  actual grid. See also [QuantLib's discrete geometric engine](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/pricingengines/asian/analytic_discr_geom_av_price.cpp).
 
 <a id="turnbull-wakeman-1991"></a>
 
 ### Turnbull Wakeman 1991
 
-- Turnbull, S. M., and Wakeman, L. M. "A Quick Algorithm for Pricing European
-  Average Options." Moment-matching arithmetic-average Asian approximation.
+- Turnbull, S. M., and Wakeman, L. M.
+  [A Quick Algorithm for Pricing European Average Options](https://doi.org/10.2307/2331213).
+  Section II uses a two-moment lognormal baseline and higher-cumulant
+  Edgeworth terms. [MODELS-ANALYTIC-04](decisions/financial/models-analytic/asian-moments.md#accepted-decision-for-discrete-asian-pricing)
+  selects the baseline for the future contribution, with the known
+  contribution treated as a payoff shift. [QuantLib's moment engine](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/pricingengines/asian/turnbullwakemanasianengine.cpp)
+  provides a comparison for the moment and effective-strike formulas.
 
 <a id="conze-viswanathan-1991"></a>
 
 ### Conze Viswanathan 1991
 
-- Conze, A., and Viswanathan. "Path Dependent Options: The Case of Lookback
-  Options." Closed-form lookback option formulae.
+- Conze, A., and Viswanathan, R. *Path Dependent Options: The Case of Lookback
+  Options*. Historical reference for fixed-strike lookbacks. [Publisher record](https://doi.org/10.1111/j.1540-6261.1991.tb04648.x)
+- QuantLib's fixed engine separates locked payoff from the remaining maximum
+  or minimum premium. Its Gaussian terms and analytic zero-carry derivative
+  provide formula comparisons for [MODELS-ANALYTIC-06](decisions/financial/models-analytic/lookback-extrema.md#accepted-decision-for-continuous-lookback-premiums).
+  The record selects its own carry and numerical admission.
+  [QuantLib fixed lookback source](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/pricingengines/lookback/analyticcontinuousfixedlookback.cpp)
 
 <a id="goldman-sosin-gatto-1979"></a>
 
@@ -805,7 +964,13 @@ and implementation and validation evidence.
 
 - Goldman, M. B., Sosin, H. B., and Gatto, M. A. "Path Dependent Options: Buy
   at the Low, Sell at the High." *Journal of Finance*, 34(5), 1111-1127.
-  Continuous lookback option formulae.
+  Historical reference for continuous floating-strike options. [Publisher record](https://doi.org/10.1111/j.1540-6261.1979.tb00059.x)
+- QuantLib's floating engine supplies the signed formulas and zero-carry
+  derivative. [QuantLib floating lookback source](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/pricingengines/lookback/analyticcontinuousfloatinglookback.cpp)
+- Broadie, Glasserman and Kou, *Connecting Discrete and Continuous
+  Path-Dependent Options*, Section 2, give the lookback payoff definitions and
+  the relationship between the fixed-call and floating-put payoffs.
+  [Original paper](https://business.columbia.edu/sites/default/files-efs/pubfiles/1851/connecting.pdf)
 
 <a id="broadie-glasserman-kou-1997"></a>
 
@@ -862,6 +1027,17 @@ and implementation and validation evidence.
   to Know About Volatility Swaps." Goldman Sachs Quantitative Strategies
   Research Notes. Replication formula for variance swaps.
 
+### Checked variance replication and explicit Black wings
+
+- Demeterfi, Derman, Kamal and Zou derive the weighted put and call
+  strip and log payoff and discuss finite strike coverage and jumps
+  in section V. [More Than You Ever Wanted to Know About Volatility Swaps](https://emanuelderman.com/wp-content/uploads/1999/02/gs-volatility_swaps.pdf)
+- Cboe defines its quoted-strike selection and adjustment for its index.
+  The forward split, mesh comparison and positive integral of Black vega
+  for the selected full wings are model choices in
+  [accepted record 21](decisions/financial/models-analytic/variance-replication.md#accepted-decision-for-checked-variance-replication-and-explicit-black-wings).
+  [Cboe VIX methodology](https://cdn.cboe.com/resources/vix/VIX_Methodology.pdf)
+
 <a id="rebonato-2004-volatility-correlation"></a>
 
 ### Rebonato 2004 Volatility And Correlation
@@ -892,6 +1068,23 @@ and implementation and validation evidence.
 - Bachelier, L. *The Theory of Speculation*. Canonical reference for normal-model
   option pricing.
 
+<a id="implied-volatility-inversion-and-conditioning"></a>
+
+### Implied volatility inversion and conditioning
+
+- [QuantLib's official Black/normal implementation](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/pricingengines/blackformula.cpp),
+  inspected2026-11-09: Black inversion uses OTM parity and returns total standard
+  deviation; compare annual Black sigma after division by sqrt(T). The Bachelier
+  inverse returns annual normal volatility in underlying units. This supports
+  coordinate/normalization comparisons, not adoption of its iteration family,
+  displacement restrictions, approximation shortcuts or numerical bounds.
+- [Strata's official Black implementation](https://raw.githubusercontent.com/OpenGamma/Strata/main/modules/pricer/src/main/java/com/opengamma/strata/pricer/impl/option/BlackFormulaRepository.java),
+  inspected2026-11-09: the regular interior inverse-price adjoint is inverse vega. This supports
+  the low-vega conditioning qualification; it does not establish uniform IV
+  digits or validate this project's Brent/log-OTM acceptance profile.
+  The [accepted 03 decision](decisions/financial/models-analytic/implied-volatility-solvers.md#accepted-decision-explicit-bounded-model-inversion-and-paired-premium-acceptance)
+  separates strict model bounds, operational controls and paired premium gates.
+
 <a id="gatheral-volatility-surface"></a>
 
 ### Gatheral Volatility Surface
@@ -913,12 +1106,93 @@ and implementation and validation evidence.
 - Gatheral, J., and Jacquier, A. "Arbitrage-Free SVI Volatility Surfaces."
   Follow-on reference for SVI no-arbitrage conditions.
 
+### Raw SVI admission, density and calibration
+
+- Gatheral and Jacquier give the raw parameterization in section 3.1 and
+  the density-sign factor and vanishing right-call condition in equation
+  2.1 and Lemma 2.2. The continuous condition concerns all log-moneyness.
+  [Arbitrage-free SVI volatility surfaces](https://arxiv.org/pdf/1204.0646)
+- Lee derives the moment relations and weak slope ceilings. Martini and
+  Mingone give the strict right-wing boundary for a vanishing raw-SVI call
+  in Lemma 2.1 and discuss the left-wing zero-atom boundary in section 2.
+  [Lee's moment formula](https://math.uchicago.edu/~rogerlee/moment.pdf),
+  [No arbitrage SVI](https://arxiv.org/pdf/2005.03340)
+- The checked solver, quote-replay budget and finite density gate are local
+  fit choices. [Accepted record 18](decisions/financial/models-analytic/svi-fit-and-density.md#accepted-decision-for-checked-raw-svi-and-slice-fit-acceptance)
+
 <a id="hagan-2002-sabr"></a>
 
 ### Hagan 2002 SABR
 
 - Hagan, P. S., Kumar, D., Lesniewski, A., and Woodward, D. "Managing Smile
   Risk." Canonical SABR reference.
+
+<a id="sabr-cev-distance-and-time-corrections"></a>
+
+### SABR CEV distance and time corrections
+
+- Hagan, Kumar, Lesniewski and Woodward give the geometric-midpoint time
+  factors for Normal and Black in Appendix B, including equations B.69a
+  and B.69c. The selected profile retains these time factors.
+  [Managing Smile Risk](https://derivativesacademy.com/storage/uploads/files/modules/resources/1702213496_hagan_kumar_lesniewski_woodward_managing_smile_risk.pdf)
+- Obłój derives the corrected Black leading term in Table 1 and equation 3
+  and considers it with the Hagan time correction. The exact CEV distance
+  preserves the beta-to-one limit.
+  [Fine-tune your smile](https://arxiv.org/pdf/0708.0998)
+- Hagan, Lesniewski and Woodward give the corresponding normal leading
+  coordinate in Section 5.2. The shared skew identity, signed shift
+  admission and selected numerical limits are specified in the
+  [accepted record 13](decisions/financial/models-analytic/sabr-expansions.md#accepted-decision-for-explicit-checked-sabr-quotes).
+  [Probability Distribution in the SABR Model](https://lesniewski.us/papers/working/ProbDistrForSABR.pdf)
+
+<a id="sabr-atm-pin-and-fit-policy"></a>
+
+### SABR ATM conditioning and fit policy
+
+- West uses a fixed-beta SABR fit conditioned on ATM volatility. Sections
+  7–8, including equations 20–21, derive the Black ATM alpha equation and
+  discuss root selection. [Calibration of the SABR Model in Illiquid Markets](https://doi.org/10.1080/13504860500148672)
+- The [accepted record 14](decisions/financial/models-analytic/sabr-calibration.md#accepted-decision-for-explicit-checked-sabr-calibration)
+  applies the accepted record 13 Normal or Black quote and checks the
+  selected bracket for a unique increasing root. The weights, work,
+  start ordering and native quote gate are project decisions. The
+  [accepted LM](decisions/financial/core-numerics/levenberg-marquardt.md#accepted-decision-checked-damped-least-squares-and-outcomes)
+  and [accepted Brent](decisions/financial/core-numerics/brent-root.md#accepted-decision-checked-brent-solving-and-bounded-search)
+  records own the numerical kernels.
+
+<a id="sabr-delta-and-finite-strike-grid"></a>
+
+### SABR ATM delta and finite-strike call grids
+
+- Reiswich and Wystup give the premium-unadjusted forward delta in
+  Section 2, equation 16. Hagan and Lesniewski derive SABR hedge delta
+  conventions with smile sensitivities. The selected ATM proxy fixes
+  one volatility when solving the strike.
+  [FX volatility smile construction](https://www.deriscope.com/docs/FX_volatility_smile_construction_Reiswich_Wystup_2009.pdf),
+  [Bartlett's delta in the SABR model](https://arxiv.org/pdf/1704.03110)
+- Carr and Madan derive the bounded vertical payoff and unequal-strike
+  butterfly in Section 2. Davis and Hobson's Theorem 3.1 includes the
+  upper-strike conditions required for full single-expiry consistency.
+  [A note on sufficient conditions for no arbitrage](https://engineering.nyu.edu/sites/default/files/2018-09/CarrFinResearchLetters2005.pdf),
+  [The Range of Traded Option Prices](https://warwick.ac.uk/fac/sci/statistics/staff/academic-research/hobson/publications/range.pdf)
+- Cohen, Reisinger and Wang develop local discrete conditions and
+  constrained repair. The finite-grid objective, exact down-only
+  construction and repricing gates selected here are in the
+  [accepted record 15](decisions/financial/models-analytic/sabr-smile-repair.md#accepted-decision-for-checked-sabr-smile-and-finite-grid-repair).
+  [Detecting and repairing arbitrage in traded option prices](https://arxiv.org/pdf/2008.09454)
+
+### Volatility-source interpolation and materialization
+
+- Gatheral and Jacquier's Lemma 2.1 states the calendar criterion under
+  proportional dividends in terms of total variance at fixed forward
+  log-moneyness. The selected fixed-absolute-strike blend uses a different
+  coordinate and does not confer that guarantee.
+  [Arbitrage-free SVI volatility surfaces](https://arxiv.org/pdf/1204.0646)
+- The SABR expansion and its units follow
+  [the accepted quote kernel](decisions/financial/models-analytic/sabr-expansions.md#accepted-decision-for-explicit-checked-sabr-quotes).
+  The distinct interpolation, materialization and quote-comparison choices are
+  in [accepted record 16](decisions/financial/models-analytic/volatility-source-interpolation.md#accepted-decision-for-explicit-volatility-source-evaluation-and-materialization).
+  [Hagan et al., Managing Smile Risk](#hagan-2002-sabr)
 
 <a id="hagan-2003-cms-convexity"></a>
 
@@ -951,6 +1225,29 @@ and implementation and validation evidence.
 - El Euch, O., and Rosenbaum, M. "The characteristic function of rough Heston
   models." *Mathematical Finance*, 29(1), 3-38. Rough Heston dynamics and
   characteristic function.
+
+<a id="rough-heston-lewis-and-tail-comparison"></a>
+
+### Rough Heston Lewis inversion and tail comparison
+
+- El Euch and Rosenbaum derive the fractional Riccati equation and
+  fractional-integral coefficient and discuss product integration in
+  Section 5. The selected guarded fully implicit root is a numerical
+  decision in record 12. [Original paper](https://arxiv.org/pdf/1609.02108)
+- Abi Jaber, Larsson and Pulido give the affine Volterra moment strip,
+  stock martingale and real-part sign in Theorem 7.1, Lemmas 7.3–7.4 and
+  Example 7.2. Theorem C.2 supports the positive linear comparison in
+  the tail derivation. [Affine Volterra processes](https://arxiv.org/pdf/1708.08796)
+- Lewis uses the payoff transform and half contour in Section 3 and
+  Appendix B. The normalized minimum-payoff identity applies directly
+  to the admitted terminal law. [Original paper](https://www.maths.univ-evry.fr/pages_perso/crepey/Finance/ExpLevy.pdf)
+- Gerhold, Gerstenecker and Pinter give the scalar equilibrium comparison
+  in Lemma 2 and Proposition 5. Simon's Theorem 4, equation 6.8, bounds
+  the Mittag–Leffler relaxation function. The specific coarse attenuation
+  and dyadic cutoff enclosure follow by applying these to the half
+  contour in the [accepted record 12](decisions/financial/models-analytic/rough-heston-riccati.md#accepted-decision-for-checked-rough-heston-pricing).
+  [Moment explosions in the rough Heston model](https://arxiv.org/abs/1801.09458),
+  [Comparing Fréchet and positive stable laws](https://arxiv.org/pdf/1310.1888)
 
 <a id="bennedsen-lunde-pakkanen-2017"></a>
 
@@ -1053,6 +1350,45 @@ and implementation and validation evidence.
 - Heston, S. L. "A Closed-Form Solution for Options with Stochastic Volatility."
   Canonical Heston-model reference.
 
+<a id="heston-transform-branch-and-moments"></a>
+
+### Heston transform branch and moments
+
+- Heston's two option-probability transforms and affine coefficients are
+  given in equations 10 and 17 and the appendix. [Original paper](https://finance.martinsewell.com/stylized-facts/volatility/Heston1993.pdf)
+- Albrecher, Mayer, Schoutens and Tistaert describe the decaying formulation.
+  Lord and Kahl's formulation 2 and Theorem 3 establish the principal-log
+  choice for the admissible transform. The branch result supplies no
+  floating-point accuracy guarantee. [Little Heston Trap](https://www.ma.imperial.ac.uk/~ajacquie/IC_Num_Methods/IC_Num_Methods_Docs/Literature/HestonTrap.pdf) ·
+  [Lord–Kahl](https://www2.math.uni-wuppertal.de/~kahl/publications/complexlogarithmsheston.pdf)
+- Andersen and Piterbarg give the CIR accessibility condition and
+  maturity-specific moment explosion. Keller–Ressel, Corollary 2.7 and
+  Section 6.1, give the finite-horizon martingale criterion. These
+  distinguish the share contour from arbitrary higher moments.
+  [Andersen–Piterbarg](https://doi.org/10.1007/s00780-006-0011-7) ·
+  [Keller–Ressel](https://arxiv.org/pdf/0802.1823)
+- The selected real-frequency contours and numerical domain are in
+  [MODELS-ANALYTIC-08](decisions/financial/models-analytic/heston-characteristic-function.md#accepted-decision-for-the-checked-heston-transform).
+
+<a id="heston-fourier-price-and-tail"></a>
+
+### Heston Fourier price and tail
+
+- Heston, equations 10 and 18, gives the two-probability price and
+  the upper-probability inversion. [Original paper](https://finance.martinsewell.com/stylized-facts/volatility/Heston1993.pdf)
+- Kahl and Jäckel, Propositions 3.1–3.3, derive the large-frequency
+  decay slope and removable origin. The slope is asymptotic.
+  [Not-so-complex logarithms in the Heston model](https://www.maths.univ-evry.fr/pages_perso/crepey/Equities/heston%20log.pdf)
+- Broadie and Kaya, Section 3.3, give the conditional Gaussian
+  decomposition with orthogonal variance (1−rho²) times integrated
+  variance. The square-root affine Laplace equation uses the same
+  Riccati structure as Cox, Ingersoll and Ross, equation 23.
+  The rational lower envelope for the decay exponent and conservative
+  dyadic truncation bound are derived in the decision.
+  [Broadie–Kaya](https://www.columbia.edu/~mnb2/broadie/Assets/broadie_kaya_exact_sim_or_2006.pdf) ·
+  [CIR](https://pages.stern.nyu.edu/~dbackus/BCZ/discrete_time/CIR_Econometrica_85.pdf) ·
+  [MODELS-ANALYTIC-09](decisions/financial/models-analytic/heston-fourier-integration.md#accepted-decision-for-bounded-heston-fourier-pricing)
+
 <a id="merton-1974"></a>
 
 ### Merton 1974
@@ -1090,6 +1426,31 @@ and implementation and validation evidence.
 
 - Dupire, B. "Pricing with a Smile." Canonical local-volatility density reference.
 
+### Checked Dupire extraction and local-volatility grids
+
+- Gatheral derives local variance from total implied variance under deterministic
+  proportional carry, with the time derivative at fixed log-forward moneyness.
+  See chapter 1, equation 1.10. [The Volatility Surface](https://catalogimages.wiley.com/images/db/pdf/9780471792512.excerpt.pdf)
+- Fornberg derives interpolation-based finite differences on arbitrary grids.
+  The quadratic stencils, endpoint time secants and extraction boundaries
+  are the local choices in
+  [accepted record 19](decisions/financial/models-analytic/dupire-local-volatility.md#accepted-decision-for-checked-dupire-extraction-and-local-volatility-grids).
+  [Generation of Finite Difference Formulas on Arbitrarily Spaced Grids](https://doi.org/10.1090/S0025-5718-1988-0935077-0)
+
+### Checked surface-arbitrage diagnostics and coverage
+
+- Carr and Madan derive vertical and unequal-strike butterfly spread
+  inequalities. Davis and Hobson's Theorem 3.1 shows the additional role
+  of terminal-wing conditions for model existence.
+  [Carr and Madan](https://engineering.nyu.edu/sites/default/files/2018-09/CarrFinResearchLetters2005.pdf),
+  [Davis and Hobson](https://warwick.ac.uk/fac/sci/statistics/staff/academic-research/hobson/publications/range.pdf)
+- Gatheral and Jacquier's Lemma 2.1 uses fixed forward log-moneyness
+  under proportional dividends and Lemma 2.2 includes a right-tail
+  condition in addition to continuous nonnegative density. The sampled
+  coverage and report policy are choices in
+  [accepted record 20](decisions/financial/models-analytic/surface-arbitrage-diagnostics.md#accepted-decision-for-checked-surface-arbitrage-diagnostics-and-coverage).
+  [Arbitrage-free SVI volatility surfaces](https://arxiv.org/pdf/1204.0646)
+
 <a id="clark-fx-options"></a>
 
 ### Clark FX Options
@@ -1103,6 +1464,25 @@ and implementation and validation evidence.
 
 - Wystup, U. *FX Options and Structured Products*. Reference for delta-based FX
   volatility quoting and smile construction.
+
+<a id="fixed-conversion-quanto-pricing"></a>
+
+### Fixed conversion quanto pricing
+
+- Reiner, E. *Quanto Mechanics*, case 3, defines the fixed contractual
+  exchange rate applied to the foreign equity payoff and the domestic
+  currency per foreign currency FX quote. [Original article](https://www.academia.edu/16585801/Quanto_mechanics)
+- Haugh, M. *Foreign Exchange, ADRs and Quanto-Securities*, Sections 1, 3
+  and 4, derives the domestic-measure drift and fixed-conversion option
+  premium. With a foreign-price strike, the domestic premium per unit is
+  the fixed conversion times the domestic-discounted Black premium.
+  [Author's notes](https://www.columbia.edu/~mh2078/ContinuousFE/FX_Quanto.pdf)
+- QuantLib's effective yield corroborates the drift sign under matched
+  constant inputs. Its term-vol implementation supplies no general
+  integrated-covariance identity. [QuantLib source](https://github.com/lballabio/QuantLib/blob/master/ql/termstructures/yield/quantotermstructure.hpp#L112-L121)
+  [MODELS-ANALYTIC-07](decisions/financial/models-analytic/quanto-drift.md#accepted-decision-for-fixed-conversion-quanto-premiums)
+  selects the checked terminal law and keeps contractual conversion with the
+  payout owner.
 
 ## Numerical Methods, Statistics, And Randomness
 

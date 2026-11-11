@@ -152,6 +152,23 @@ convention.
 | [Cashflows: resolved term observations and exact rate controls](cashflows/06-floating-rate-projection.md#accepted-decision-resolved-term-observations-exact-rate-controls-and-strict-failures) | Complete index-specific factor/qualified-fixing resolution, explicit ordinary-floater controls, one bounded Decimal-rate stage and shared get_rate/provenance without generic failure substitutes or date/tenor/preset inference. Accepted 2026-11-08; runtime/caller/host and independent qualification remain open. |
 | [Cashflows: overnight blocks, cumulative growth and parent allocation](cashflows/07-overnight-compounding.md#accepted-decision-resolved-overnight-blocks-cumulative-growth-and-parent-allocation) | Complete actual quote intervals, explicit paired carry/shift/cutoff geometry, frozen-quote stable model replay, fixed parent bridge and compound-rate/reference-cap limits with truthful monetary/state domains. Accepted 2026-11-09; runtime/caller/host and independent qualification remain open. |
 | [Cashflows: parent-bound floating replay and full settlement](cashflows/08-floating-replay.md#accepted-decision-parent-bound-replay-exact-full-settlement-and-explicit-timing-ownership) | Complete immutable parent/state authority, independent exact principal capture and qualified observation progress, shared full-parent amount, removal of partial/segment monetary paths and explicit forecast/information/event timing boundaries. Accepted2026-11-09; runtime/caller/host and independent complete-path qualification remain open. |
+| [Cashflows: explicit fee parents, exact amounts and literal tier selection](cashflows/09-fees.md#accepted-decision-explicit-fee-parents-exact-amounts-and-literal-tier-selection) | Complete explicit limited fee grids, Opening/Integrated parent-prefix bases, one exact final Money amount, per-interval undrawn clipping, literal fixed cash and strict nullable tiers with coordinated caller/host boundaries. Accepted2026-11-09; runtime/caller/host and independent complete-path qualification remain open. |
+| [Cashflows: checked mortality and prepayment assumptions](cashflows/10-prepayment-and-mortality.md#accepted-decision-checked-monthly-mortality-explicit-model-clocks-and-benchmark-boundaries) | Complete stable survival conversion, immutable whole-model admission, one-based monthly assumptions, primary PSA cap/preserved survival and exact ABS depletion with explicit lockout/vector/terminal boundaries. Accepted2026-11-09; runtime/caller/host and independent complete-path qualification remain open. |
+| [Cashflows: explicit default targets, strict capacity and recovery authority](cashflows/11-default-and-recovery-assumptions.md#accepted-decision-explicit-default-targets-strict-capacity-and-one-recovery-authority) | Complete guarded conditional/target interfaces, direct original-reference increments, strict represented capacity, normalized timing, SdaAge limits and exclusive recovery primary/vintage authority with actual caller/host boundaries. Accepted2026-11-09; runtime/caller/host and independent complete-path qualification remain open. |
+| [Cashflows: complete schedules, balances and explicit cash views](cashflows/12-schedule-lifecycle.md#accepted-decision-validated-complete-schedules-explicit-balances-and-separate-cash-views) | Complete immutable source schedules, optional dated principal coverage, exact closing replay and separate explicit settlement views, removing residual rewrites, ambiguous scaling, fictional per-row balances and lossy ingress. Accepted2026-11-09; runtime/caller/host and independent complete-path qualification remain open. |
+| [Cashflows: cash-coupon quotation and inclusive first-ex boundaries](cashflows/13-accrued-interest.md#accepted-decision-original-parent-cash-quotation-and-inclusive-first-ex-dates) | Complete original-parent linear cash quotation, explicit currency/Money and first-ex boundary, one final restoration and qualified source/earning/PIK/product boundaries without flat-row inference or generic compounding. Accepted2026-11-09; runtime/caller/host and independent complete-path qualification remain open. |
+| [Cashflows: exact nominal reporting and explicit repayment life](cashflows/14-aggregation-and-life.md#accepted-decision-exact-nominal-reporting-and-explicit-repayment-life) | Complete exact Money/retained PeriodPlan reporting, typed native cash ladders with separately qualified owner PV, and explicit nullable ACT/365F repayment-stream weighting with product-specific clocks preserved. Accepted2026-11-09; runtime/caller/host and independent complete-path qualification remain open. |
+| [Cashflows: product-owned credit valuation and qualified PV reporting](cashflows/15-credit-adjusted-pv.md#accepted-decision-product-owned-credit-valuation-and-qualified-pv-reporting) | Complete removal of generic cashflow-kind/FIFO credit valuation and schedule PV shortcuts, retaining core016 discounting/014 exact reporting, actual owner claim/source/attribution authority, unsupported decomposition and canonical-price reconciliation. Accepted2026-11-09; runtime/caller/host and independent complete-path qualification remain open. |
+| [Cashflows: qualified hypothetical fixing materialization](cashflows/16-fixing-materialization.md#accepted-decision-qualified-hypothetical-fixing-materialization) | Complete explicit required-key/frozen-source realization, checked raw observations and exact conflicts, persistent paired market/model-role authority, configured series and atomic merge with actual consumer/host/state reconciliation. Accepted2026-11-09; all16 cashflow records are accepted, with runtime and independent complete-path qualification open. |
+| [Analytic models: checked spot BSM prices and native Greeks](models-analytic/spot-vanilla-and-greeks.md#accepted-decision-checked-spot-prices-native-derivatives-and-explicit-composite-results) | Complete checked constant-coefficient spot pricing, explicit boundary price/whole-Greek availability, native derivative units and stable error semantics, guarded state and explicit composite calculation with actual product/host/UI reconciliation. Accepted2026-11-09; runtime and independent complete-path qualification remain open. |
+| [Analytic models: unit forward prices and native model Greeks](models-analytic/forward-normal-shifted.md#accepted-decision-unit-forward-prices-and-native-model-greek-bundles) | Complete common unit-price/Greek scale for Black, normal and shifted models, preserved original displacement/payoff, checked singular availability and output-range limits, with product-owned multipliers and actual consumer/calibration/host/UI reconciliation. Accepted2026-11-09; runtime and independent complete-path qualification remain open. |
+| [Analytic models: explicit bounded volatility inversion](models-analytic/implied-volatility-solvers.md#accepted-decision-explicit-bounded-model-inversion-and-paired-premium-acceptance) | One checked model inverse with native premium units, strict bounds, explicit Brent controls, two final premium checks and coordinated consumer reconciliation. Accepted 2026-11-10. Runtime and independent qualification remain open. |
+| [Analytic models: discrete Asian pricing](models-analytic/asian-moments.md#accepted-decision-for-discrete-asian-pricing) | Checked observed and projected fixing slots, prepared expectations and independent payment discount, exact geometric pricing and future-only arithmetic moment matching with dated consumer reconciliation. Accepted 2026-11-10. Runtime and independent qualification remain open. |
+| [Analytic models: continuous barrier premiums and cash](models-analytic/barriers-and-rebates.md#accepted-decision-for-continuous-barrier-premiums-and-cash) | Checked direct hit/survival premiums, independent tails, explicit conditional cash timing and scaled bounded first-passage integration with dated history and outstanding cash ownership. Accepted 2026-11-10. Runtime and independent qualification remain open. |
+| [Analytic models: continuous lookback premiums](models-analytic/lookback-extrema.md#accepted-decision-for-continuous-lookback-premiums) | Checked fixed/floating payoffs with qualified extrema, explicit net carry and independent discount, positive reflection assembly and exact carry limits with dated consumer reconciliation. Accepted 2026-11-10. Runtime and independent qualification remain open. |
+| [Analytic models: fixed-conversion quanto pricing](models-analytic/quanto-drift.md#accepted-decision-for-fixed-conversion-quanto-premiums) | Checked prepared foreign carry and payout discount, explicit ordered FX orientation and scaled covariance, pre-conversion premium and dated cash ownership. Accepted 2026-11-10. Runtime and independent qualification remain open. |
+| [Analytic models: checked Heston transform](models-analytic/heston-characteristic-function.md#accepted-decision-for-the-checked-heston-transform) | Immutable checked Heston parameters, inclusive Feller diagnostic, two normalized real-frequency contours, decaying affine logarithm and exact limits. Accepted 2026-11-10. Runtime and independent qualification remain open. |
+| [Analytic models: bounded Heston Fourier pricing](models-analytic/heston-fourier-integration.md#accepted-decision-for-bounded-heston-fourier-pricing) | Checked scalar expiry, deterministic and stochastic prices with normalized OTM inversion, analytic truncation enclosure, bounded mesh work and explicit time-value resolution. Accepted 2026-11-10. Runtime and independent qualification remain open. |
 | [Analytics: explicit frequency](analytics/01-panels-windows-and-wire.md#accepted-decision-explicit-observation-frequency) | Caller-supplied observation frequency for annualized risk; no date-index inference. |
 | [Analytics: explicit tail confidence](analytics/01-panels-windows-and-wire.md#accepted-decision-explicit-tail-confidence) | Caller-supplied finite `0.5 < c < 1` for tail metrics and affected summaries, without an implicit 95% default. |
 | [Analytics: panels, windows, wire and summary](analytics/01-panels-windows-and-wire.md#accepted-decision-panels-windows-wire-and-summary) | Complete actual valuation-grid admission, explicit context/unit selection, atomic active windows, validated state/wire and fixed-summary inputs, provenance and result/failure contract. |
@@ -368,12 +385,119 @@ has complete scoped acceptance as of2026-11-09 for immutable parent-bound state,
 independent qualified observation/exact principal capture, shared full-parent
 settlement, removal of generic partial/segment monetary paths and explicit
 information/event timing ownership.
-[Cashflows record009](cashflows/09-fees.md#proposed-decision-explicit-fee-parents-exact-amounts-and-literal-tier-selection)
-has a complete package proposed on2026-11-09 for explicit limited fee grids,
+[Cashflows record009](cashflows/09-fees.md#accepted-decision-explicit-fee-parents-exact-amounts-and-literal-tier-selection)
+has complete scoped acceptance as of2026-11-09 for explicit limited fee grids,
 opening/integrated original-parent bases, exact whole-parent amounts, literal
-fixed cash and strict nullable tier selection.009 adoption is pending; the other7
-cashflow records remain Draft. Runtime/caller/host/state reconciliation and
-independent qualification remain pending.
+fixed cash and strict nullable tier selection.
+[Cashflows record010](cashflows/10-prepayment-and-mortality.md#accepted-decision-checked-monthly-mortality-explicit-model-clocks-and-benchmark-boundaries)
+has complete scoped acceptance as of2026-11-09 for checked survival conversion,
+whole-model admission, one-based monthly assumptions and explicit PSA/ABS/
+lockout/vector boundaries, with actual consumer clocks and host reconciliation.
+[Cashflows record011](cashflows/11-default-and-recovery-assumptions.md#accepted-decision-explicit-default-targets-strict-capacity-and-one-recovery-authority)
+has complete scoped acceptance as of2026-11-09 for explicit conditional/target
+interfaces, direct original-reference demand, strict represented capacity,
+normalized timing and one recovery authority with truthful source/vintage limits.
+[Cashflows record012](cashflows/12-schedule-lifecycle.md#accepted-decision-validated-complete-schedules-explicit-balances-and-separate-cash-views)
+has complete scoped acceptance as of2026-11-09 for complete immutable source
+schedules, explicit opening/through principal scope, exact closing replay and
+separate native cash views without implicit residual normalization. Restricted
+composition and actual product/export/host reconstruction retain their owners.
+[Cashflows record013](cashflows/13-accrued-interest.md#accepted-decision-original-parent-cash-quotation-and-inclusive-first-ex-dates)
+has complete scoped acceptance as of2026-11-09 for original-parent linear cash
+quotation, explicit native Money/currency, inclusive first-ex boundaries and one
+final restoration, removing generic compounding/PIK/configuration and inference.
+[Cashflows record014](cashflows/14-aggregation-and-life.md#accepted-decision-exact-nominal-reporting-and-explicit-repayment-life)
+has complete scoped acceptance as of2026-11-09 for exact native Money/PeriodPlan
+reporting, typed cash-year ladders with separately owned qualified PV, and an
+explicit ACT/365F repayment-stream statistic with owner-selected weights/dates.
+Its correction of universal SIFMA WAL attribution does not adopt product WAL.
+[Cashflows record015](cashflows/15-credit-adjusted-pv.md#accepted-decision-product-owned-credit-valuation-and-qualified-pv-reporting)
+has complete scoped acceptance as of2026-11-09 removing generic credit-kind/FIFO
+recovery valuation and schedule PV shortcuts. Actual product owners supply
+qualified value attribution; existing core016 discounting/014 aggregation,
+explicit unsupported outcomes and canonical-price reconciliation remain.
+[Cashflows record016](cashflows/16-fixing-materialization.md#accepted-decision-qualified-hypothetical-fixing-materialization)
+has complete scoped acceptance as of2026-11-09 for explicit required observations,
+qualified frozen-forward candidates, exact conflicts and persistent hypothetical
+source/role state, replacing date-window and unqualified history insertion.
+All16 cashflow records are Accepted; the whole-file cashflow review is complete.
+[Analytic-model record01](models-analytic/spot-vanilla-and-greeks.md#accepted-decision-checked-spot-prices-native-derivatives-and-explicit-composite-results)
+has complete scoped acceptance as of2026-11-09 for checked spot BSM pricing,
+raw derivative units, explicit singular Greek availability and composite
+calculation behavior. [Analytic-model record02](models-analytic/forward-normal-shifted.md#accepted-decision-unit-forward-prices-and-native-model-greek-bundles)
+has complete scoped acceptance as of2026-11-09 for common unit-forward pricing and
+native Greek bundles, checked exact boundaries and original displacement identity,
+with external product multipliers and explicit unit-output range limits.
+[Analytic-model record03](models-analytic/implied-volatility-solvers.md#accepted-decision-explicit-bounded-model-inversion-and-paired-premium-acceptance)
+was accepted on 2026-11-10 with one explicit model inverse, five required controls,
+strict bounds/identifiable time, bounded core Brent with stable OTM objectives and
+paired original-premium/time-value acceptance. Its complete24-point package
+retains caller normalization, real product objectives and truthful failures.
+[Analytic-model record 04](models-analytic/asian-moments.md#accepted-decision-for-discrete-asian-pricing)
+was accepted on 2026-11-10 for one discrete Asian pricing API with prepared
+fixing levels and independent payment discount. The decision covers the exact
+geometric law, arithmetic moment matching on the future contribution, and
+seasoned equity and commodity reconciliation.
+[Analytic-model record 05](models-analytic/barriers-and-rebates.md#accepted-decision-for-continuous-barrier-premiums-and-cash)
+was accepted on 2026-11-10 for checked continuous barrier premiums,
+independent first-passage tails and explicit hit/no-hit cash timing with
+bounded numerical work.
+[Analytic-model record 06](models-analytic/lookback-extrema.md#accepted-decision-for-continuous-lookback-premiums)
+was accepted on 2026-11-10 for checked inclusive continuous lookbacks with
+qualified extrema, independent carry and discount, positive payoff components
+and exact carry limits.
+[Analytic-model record 07](models-analytic/quanto-drift.md#accepted-decision-for-fixed-conversion-quanto-premiums)
+was accepted on 2026-11-10 for one checked normalized quanto price,
+explicit payout-per-asset FX orientation and signed covariance, with
+contractual conversion and quantity at the dated owner.
+[Analytic-model record 08](models-analytic/heston-characteristic-function.md#accepted-decision-for-the-checked-heston-transform)
+was accepted on 2026-11-10 for checked parameters, normalized cash and
+share contours, the decaying affine logarithm and exact boundary laws.
+[Analytic-model record 09](models-analytic/heston-fourier-integration.md#accepted-decision-for-bounded-heston-fourier-pricing)
+was accepted on 2026-11-10 for one checked Heston price, exact singular
+payoffs, stable OTM inversion, conservative tail enclosure and bounded mesh work.
+[Analytic-model record 10](models-analytic/cos-inversion.md#accepted-decision-for-checked-cos-pricing)
+was accepted on 2026-11-10 for direct bounded COS payoffs with explicit premium tolerance,
+separate window and series bounds, and capped work.
+[Analytic-model record 11](models-analytic/jump-characteristic-laws.md#accepted-decision-for-checked-characteristic-laws)
+was accepted on 2026-11-10 for checked forward-normalized Black, Merton and variance-gamma
+laws with selected contours, exact moment domains and support.
+[Analytic-model record 12](models-analytic/rough-heston-riccati.md#accepted-decision-for-checked-rough-heston-pricing)
+was accepted on 2026-11-10 for checked rough Heston Lewis pricing with explicit tolerances,
+an analytic tail enclosure, separate time and mesh checks, and bounded work.
+[Analytic-model record 13](models-analytic/sabr-expansions.md#accepted-decision-for-explicit-checked-sabr-quotes)
+was accepted on 2026-11-10 for explicit SABR quote conventions, canonical parameter admission,
+exact CEV distance, stable skew and Hagan midpoint time correction.
+[Analytic-model record 14](models-analytic/sabr-calibration.md#accepted-decision-for-explicit-checked-sabr-calibration)
+was accepted on 2026-11-10 for explicit SABR fitting, native quote-error acceptance,
+literal shifts and an observed-ATM pin with a checked alpha bracket.
+[Analytic-model record 15](models-analytic/sabr-smile-repair.md#accepted-decision-for-checked-sabr-smile-and-finite-grid-repair)
+was accepted on 2026-11-10 for the checked ATM delta proxy, unit call grid diagnostics
+and exact down-only repair with move and repricing gates.
+[Analytic-model record 16](models-analytic/volatility-source-interpolation.md#accepted-decision-for-explicit-volatility-source-evaluation-and-materialization)
+was accepted on 2026-11-10 for typed source evaluation, exact support and explicit boundaries,
+native sigma and total-variance interpolation, qualified SABR cube modes,
+strict materialization and native-unit reference moves.
+[Analytic-model record 17](models-analytic/fx-delta-smiles.md#accepted-decision-for-checked-fx-delta-smiles-and-strike-materialization)
+was accepted on 2026-11-10 for checked FX delta strikes and labelled pillars, strict-expiry quote
+evaluation and explicit strike wings, plus exact-union materialization
+with qualified row forwards.
+[Analytic-model record 18](models-analytic/svi-fit-and-density.md#accepted-decision-for-checked-raw-svi-and-slice-fit-acceptance)
+was accepted on 2026-11-10 for checked raw SVI, exact shape and wing boundaries, a finite density
+scan, one seeded checked fit and separate annual-volatility and sampled-density
+acceptance.
+[Analytic-model record 19](models-analytic/dupire-local-volatility.md#accepted-decision-for-checked-dupire-extraction-and-local-volatility-grids)
+was accepted on 2026-11-10 for checked fixed-moneyness Dupire stencils, explicit extraction
+support and smoothing, and checked local sigma grids and simulation
+consumption.
+[Analytic-model record 20](models-analytic/surface-arbitrage-diagnostics.md#accepted-decision-for-checked-surface-arbitrage-diagnostics-and-coverage)
+was accepted on 2026-11-10 for checked sampled call-price, common-support calendar and Dupire
+sign checks, with explicit coverage and unfiltered status.
+[Analytic-model record 21](models-analytic/variance-replication.md#accepted-decision-for-checked-variance-replication-and-explicit-black-wings)
+was accepted on 2026-11-10 for checked forward-split variance replication, an explicit mesh
+gate and selected finite-strip or full flat-Black wings. The other
+seven records are Draft.
+Runtime/caller/host/state reconciliation and independent qualification remain pending.
 
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the

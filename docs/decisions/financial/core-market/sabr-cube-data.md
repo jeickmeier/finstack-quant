@@ -21,7 +21,7 @@ A parameter model is different from a grid of volatility observations.
 [swaption calibration publication](../calibration-targets/14-swaption-cube.md),
 [underlying forwards](../calibration-targets/13-swaption-forwards.md)
 and [option pricing](../valuations-rates/07-european-swaptions.md) retain their
-remaining Draft methods. This source contract does not adopt their full
+separately stated decision statuses. This source contract does not adopt their full
 expansion, interpolation, tail, fit, settlement, smile-dynamics or aging policies.
 
 ## Foundational findings

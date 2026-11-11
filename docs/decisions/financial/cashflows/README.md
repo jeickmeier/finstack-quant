@@ -18,13 +18,27 @@ is **Accepted on 2026-11-08** after complete whole-record review.
 is **Accepted on 2026-11-09** after complete whole-record review.
 [CASHFLOWS-008 — Parent-bound replay, exact full settlement and timing ownership](08-floating-replay.md#accepted-decision-parent-bound-replay-exact-full-settlement-and-explicit-timing-ownership)
 is **Accepted on 2026-11-09** after complete whole-record review.
-[CASHFLOWS-009 — Explicit fee parents, exact amounts and literal tier selection](09-fees.md#proposed-decision-explicit-fee-parents-exact-amounts-and-literal-tier-selection)
-is **Proposed on 2026-11-09** for complete whole-record review;
-**7 other records remain Draft**.
+[CASHFLOWS-009 — Explicit fee parents, exact amounts and literal tier selection](09-fees.md#accepted-decision-explicit-fee-parents-exact-amounts-and-literal-tier-selection)
+is **Accepted on 2026-11-09** after complete whole-record review.
+[CASHFLOWS-010 — Checked mortality and prepayment assumptions](10-prepayment-and-mortality.md#accepted-decision-checked-monthly-mortality-explicit-model-clocks-and-benchmark-boundaries)
+is **Accepted on 2026-11-09** after complete whole-record review.
+[CASHFLOWS-011 — Explicit default targets, strict capacity and recovery authority](11-default-and-recovery-assumptions.md#accepted-decision-explicit-default-targets-strict-capacity-and-one-recovery-authority)
+is **Accepted on 2026-11-09** after complete whole-record review.
+[CASHFLOWS-012 — Validated schedules, balances and explicit cash views](12-schedule-lifecycle.md#accepted-decision-validated-complete-schedules-explicit-balances-and-separate-cash-views)
+is **Accepted on 2026-11-09** after complete whole-record review.
+[CASHFLOWS-013 — Cash-coupon quotation and entitlement boundaries](13-accrued-interest.md#accepted-decision-original-parent-cash-quotation-and-inclusive-first-ex-dates)
+is **Accepted on 2026-11-09** after complete whole-record review;
+[CASHFLOWS-014 — Exact nominal reporting and explicit repayment life](14-aggregation-and-life.md#accepted-decision-exact-nominal-reporting-and-explicit-repayment-life)
+is **Accepted on2026-11-09** after complete whole-record review;
+[CASHFLOWS-015 — Product-owned credit valuation and qualified PV reporting](15-credit-adjusted-pv.md#accepted-decision-product-owned-credit-valuation-and-qualified-pv-reporting)
+is **Accepted on2026-11-09** after complete whole-record review;
+[CASHFLOWS-016 — Qualified hypothetical fixing materialization](16-fixing-materialization.md#accepted-decision-qualified-hypothetical-fixing-materialization)
+is **Accepted on2026-11-09** after complete whole-record review.
+**All16 records are Accepted; none remain Proposed or Draft.**
 Implementation status is **Observed within the defined file scope**; runtime
 reconciliation and independent qualification remain pending. Production validation
 is **Evidence inspected/located, not executed**; independent reference examples
-are reported separately in records001–009. Existing code/tests establish observed
+are reported separately in records001–016. Existing code/tests establish observed
 behavior, not financial adoption or universal correctness. Outstanding work is
 tracked in the [cashflow follow-ups](../FOLLOW_UPS.md#cashflows).
 
@@ -105,13 +119,75 @@ Actual builder/bond/host handoffs are identified without adopting exercise,
 entitlement or lifecycle rules. The package is accepted; runtime and independent
 complete-path qualification remain pending.
 
-The complete proposed009 package selects the limited periodic-fee grid explicitly,
+The complete accepted009 package selects the limited periodic-fee grid explicitly,
 renames balance methods Opening/Integrated, uses each fee parent's original
 accrual weights and one complete exact Money restoration, and defines static
 undrawn clipping before weighting. It retains literal fixed cash/date/currency,
 signed/enabled zero rows and strict nullable tier lookup without automatic
-product policy. Existing builder/product/host handoffs are identified; adoption,
-runtime reconciliation and independent complete-path qualification remain pending.
+product policy. Existing builder/product/host handoffs are identified; runtime reconciliation and independent complete-path qualification remain pending.
+
+The complete accepted010 package selects strict stable monthly/annual mortality
+conversion, immutable whole-model admission and one-based applied-month queries.
+It adopts primary PSA saturation with preserved near-cap survival, removes ABS's
+epsilon depletion and its original-dollar guarantee, and names Lockout/annual
+CPR vector assumptions explicitly. Generic clamping and unchecked PSA helpers
+are removed, with actual product/host/clock reconciliation identified. Default/
+recovery models and asset cashflow ordering retain their owners. Runtime reconciliation and independent complete-path qualification remain pending.
+
+The complete accepted011 package separates conditional rates from original-
+reference targets, requires explicit actual-capacity context and selects strict
+represented-model feasibility instead of hidden clipping. It defines SdaAge,
+normalized annual timing weights and direct target increments, with cumulative
+views kept separate. Exclusive recovery sources preserve the primary rate/
+severity and economic-default vintage while actual Money/date/queue owners retain
+their rules. Existing consumer/host/parity reconciliation and precise primary
+source limits are identified; runtime reconciliation and independent
+complete-path qualification remain pending.
+
+The complete accepted012 package preserves complete source schedules and removes
+implicit residual rewriting, separating explicit native settlement views from
+principal replay. It uses optional dated opening/through coverage, exact atomic
+economic-date closing stock and guarded immutable construction, while removing
+fictional per-row balances, generic scaling, placeholder success and lossy ingress.
+Restricted native collection merge and actual product-owned composition retain
+truthful context without invented scalar principal. Runtime/caller/host
+reconciliation and independent complete-path qualification remain pending.
+
+The complete accepted013 package selects linear cash-coupon quotation from the
+actual original-parent authority, explicit currency and owner-qualified full cash
+amount. Inclusive per-parent first-ex dates define full-claim subtraction even
+before accrual starts; earning, PIK and actual settlement remain separately owned.
+It removes generic compounding/configuration, flattened-row inference and offset
+helpers, using one final Money restoration and matching one-shot/index/host paths.
+Primary product-clause scope and actual accounting/exercise/quote consumers are
+identified; runtime reconciliation and independent complete-path
+qualification remain pending.
+
+The complete accepted014 package uses exact native Money sums and the existing
+validated PeriodPlan, retaining full calendar context with sparse ordered totals.
+It separates typed payment-year cash ladders from qualified native-PV reporting
+at the valuation owner. It replaces generic WAL with explicit dated par weights,
+ACT/365F and same-day/nullable rules, correcting SIFMA attribution while preserving
+product-specific clocks and classification. Actual consumer/host/state
+reconciliation and independent qualification remain pending; the complete package is accepted.
+
+The complete accepted015 package removes cashflow-kind credit valuation,
+inferred FIFO recovery and schedule PV shortcuts. Ordinary qualified cash
+reuses core016 discounting; product owners supply meaningful native PV
+attribution for014's existing exact aggregation. Strict source/expectation/
+claim/date authority, explicit unsupported decomposition, local probability
+annotations and canonical-price reconciliation retain their actual owners.
+Runtime/caller/host reconciliation and independent qualification remain pending;
+the complete015 package is accepted.
+
+The complete accepted016 package selects explicit owner-qualified hypothetical
+observations instead of an observation-date window, with separate required keys
+and finite raw candidates, exact conflicts and qualified existing-data precedence.
+It preserves the market together with all retained model-observation/source roles,
+requires configured series/policies and stages a strict atomic merge. Actual
+publication/model/dependency preparation, successive roll support and host/state
+qualification retain their owners. The complete016 package is accepted; runtime and
+independent complete-path qualification remain pending.
 
 ## Scope and completeness
 
@@ -151,25 +227,25 @@ The [crate manifest](../../../../finstack-quant/cashflows/Cargo.toml) was also i
 | Incremental overnight replay | Replace partial carry factor; cache same fixing; monotone transactional advance | Reusable accumulator | [007](07-overnight-compounding.md) | Weekend checkpoint formula inspected; atomicity tests located |
 | Floating coupon state and settlement | Fix rate separately from capturing notional; require complete replay; split finite amount | CompiledFloatingCoupon | [CASHFLOWS-008](08-floating-replay.md) | State/domain evidence located; full parent-bound/exact package accepted2026-11-09 |
 | Replay accrued amount | Stored notional × elapsed fraction × replayed/fixed all-in rate | Explicit compiled-coupon method | [008](08-floating-replay.md) | Observed guard/context inspected; generic monetary method removal accepted2026-11-09 |
-| Fixed/periodic fee amount | Raw dated fixed amount; annual bp on drawn or floored undrawn balance | FeeSpec; PointInTime default/TWA explicit | [CASHFLOWS-009](09-fees.md) | Observed formula inspected; complete explicit fee-parent package proposed2026-11-09 |
-| Fee tier selection | Inclusive greatest threshold; whole-input rate; zero below first | evaluate_fee_tiers | [009](09-fees.md) | Observed ordering evidence; strict domain/nullable selection proposed2026-11-09 |
-| CPR/CDR ↔ monthly mortality | Survival-equivalent power via expm1/log; checked and explicit clamped APIs | Shared helper selected by caller | [CASHFLOWS-010](10-prepayment-and-mortality.md) | Boundary/roundtrip tests located; interleaved helper inspected |
-| Prepayment assumption curves | Constant CPR, PSA ramp, CMBS inclusive lockout, ABS depletion, annual-CPR vector | Explicit PrepaymentModelSpec | [010](10-prepayment-and-mortality.md) | Piecewise formulas and indexing read; PSA examples inspected |
-| Conditional default curves | Constant/vector CDR and SDA ramp/plateau/decline | Explicit DefaultModelSpec | [CASHFLOWS-011](11-default-and-recovery-assumptions.md) | SDA landmark examples inspected |
-| Original-balance default targets | Cumulative loss/severity or annual timing shares; divide increment by surviving balance | CumulativeLoss/Timing; optional actual survival | [011](11-default-and-recovery-assumptions.md) | Par-build test inspected; whole-curve validation located |
-| Recovery-rate assumptions | Constant rate or one-minus-severity vector; tail hold; direct clamp/fallback | RecoveryModelSpec; lag stored for consumer | [011](11-default-and-recovery-assumptions.md) | Evaluation and validation branches read |
-| Schedule canonicalization/validation | Total row order; separate structural/economic validation; principal tolerances | Constructors, serde, explicit validate | [CASHFLOWS-012](12-schedule-lifecycle.md) | Full lifecycle and mutation paths inspected |
-| Outstanding principal replay | Economic-date order; explicit delta overrides inferred kind; skip initial funding once | Schedule balance views | [012](12-schedule-lifecycle.md) | Date/delta/rounding tests located |
-| Public remaining-cashflow view | Rebase movements before as_of; preserve pending cash or economic-only rows; include on-date cash | Non-overridable provider normalization | [012](12-schedule-lifecycle.md) | Normalization cases and registration inspected |
-| Schedule merge/scale | Union rows/calendars; conservative representation precedence; agreed metadata only; scale cash/deltas | Explicit utility calls | [012](12-schedule-lifecycle.md) | All branches read; mixed-currency/canonical tests located |
-| Schedule accrued interest | Metadata buckets; actual balance segments; linear or fractional compounded growth | Linear/include-PIK defaults; explicit frequency | [CASHFLOWS-013](13-accrued-interest.md) | Context, bucket, finite-domain branches read |
-| Ex-coupon entitlement | Calendar/business-day subtraction; strict date-after-ex rule; rebate every coupon segment | Optional ExCouponRule, max 366 days | [013](13-accrued-interest.md) | Boundary and multisegment tests located |
-| Nominal period aggregation | Half-open windows, sparse buckets, currency separation, Neumaier sums | Explicit periods; no FX | [CASHFLOWS-014](14-aggregation-and-life.md) | Boundary/order/currency branches inspected |
-| Calendar-year cash/PV ladder | Group all rows by cash year; principal/nonprincipal classification; caller PVs | Free arrays or single-currency schedule wrapper | [014](14-aggregation-and-life.md) | Kind/length/finite checks inspected |
-| Weighted average life | Future positive principal weighted ACT/365F; schedule uses par delta/economic date | WAL helper/schedule method | [014](14-aggregation-and-life.md) | Par/cash-date cases located |
-| Survival-adjusted cash PV | Relative discount and conditional survival; on/past-date/noncash zero; post-default cash unweighted | Optional hazard; curve IDs resolved by caller | [CASHFLOWS-015](15-credit-adjusted-pv.md) | Full row/period formula inspected |
-| Estimated principal recovery PV | FIFO funded lots; default mass over funded interval; recovery at repayment date | Positive optional recovery; hazard required | [015](15-credit-adjusted-pv.md) | Independent interval formula inspected |
-| Realized-forward fixing roll | Existing exact fixings win; inclusive crossed endpoints; raw projections; conflict tolerance | materialize_fixings | [CASHFLOWS-016](16-fixing-materialization.md) | Normalization and immutable merge read; roll tests located |
+| Fixed/periodic fee amount | Raw dated fixed amount; annual bp on drawn or floored undrawn balance | FeeSpec; PointInTime default/TWA explicit | [CASHFLOWS-009](09-fees.md) | Observed formula inspected; complete explicit fee-parent package accepted2026-11-09 |
+| Fee tier selection | Inclusive greatest threshold; whole-input rate; zero below first | evaluate_fee_tiers | [009](09-fees.md) | Observed ordering evidence; strict domain/nullable selection accepted2026-11-09 |
+| CPR/CDR ↔ monthly mortality | Survival-equivalent power via expm1/log; checked and explicit clamped APIs | Shared helper selected by caller | [CASHFLOWS-010](10-prepayment-and-mortality.md) | Observed boundary/roundtrip evidence; strict stable conversion/removal package accepted2026-11-09 |
+| Prepayment assumption curves | Constant CPR, PSA ramp, CMBS inclusive lockout, ABS depletion, annual-CPR vector | Explicit PrepaymentModelSpec | [010](10-prepayment-and-mortality.md) | Observed formulas/indexing inspected; complete primary-backed prepayment package accepted2026-11-09 |
+| Conditional default curves | Constant/vector CDR and SDA ramp/plateau/decline | Explicit DefaultModelSpec | [CASHFLOWS-011](11-default-and-recovery-assumptions.md) | Observed landmarks inspected; complete explicit default/recovery package accepted2026-11-09 |
+| Original-balance default targets | Cumulative loss/severity or annual timing shares; divide increment by surviving balance | CumulativeLoss/Timing; optional actual survival | [011](11-default-and-recovery-assumptions.md) | Observed par-build/validation evidence; direct targets and strict capacity accepted2026-11-09 |
+| Recovery-rate assumptions | Constant rate or one-minus-severity vector; tail hold; direct clamp/fallback | RecoveryModelSpec; lag stored for consumer | [011](11-default-and-recovery-assumptions.md) | Observed branches read; full strict recovery package accepted2026-11-09 |
+| Schedule canonicalization/validation | Total row order; separate structural/economic validation; principal tolerances | Constructors, serde, explicit validate | [CASHFLOWS-012](12-schedule-lifecycle.md) | Observed lifecycle paths inspected; full immutable/explicit-view package accepted2026-11-09 |
+| Outstanding principal replay | Economic-date order; explicit delta overrides inferred kind; skip initial funding once | Schedule balance views | [012](12-schedule-lifecycle.md) | Observed replay evidence; dated exact closing authority accepted2026-11-09 |
+| Public remaining-cashflow view | Rebase movements before as_of; preserve pending cash or economic-only rows; include on-date cash | Non-overridable provider normalization | [012](12-schedule-lifecycle.md) | Observed normalization inspected; deletion/separate cash view accepted2026-11-09 |
+| Schedule merge/scale | Union rows/calendars; conservative representation precedence; agreed metadata only; scale cash/deltas | Explicit utility calls | [012](12-schedule-lifecycle.md) | Observed composition inspected; restricted merge/scaling removal accepted2026-11-09 |
+| Schedule accrued interest | Metadata buckets; actual balance segments; linear or fractional compounded growth | Linear/include-PIK defaults; explicit frequency | [CASHFLOWS-013](13-accrued-interest.md) | Observed branches read; explicit cash-quotation/parent/Money package accepted2026-11-09 |
+| Ex-coupon entitlement | Calendar/business-day subtraction; strict date-after-ex rule; rebate every coupon segment | Optional ExCouponRule, max 366 days | [013](13-accrued-interest.md) | Observed boundary evidence; inclusive owner first-ex/full-coupon subtraction accepted2026-11-09 |
+| Nominal period aggregation | Half-open windows, sparse buckets, currency separation, Neumaier sums | Explicit periods; no FX | [CASHFLOWS-014](14-aggregation-and-life.md) | Observed boundary/order/currency branches; complete exact Money/PeriodPlan package accepted2026-11-09 |
+| Calendar-year cash/PV ladder | Group all rows by cash year; principal/nonprincipal classification; caller PVs | Free arrays or single-currency schedule wrapper | [014](14-aggregation-and-life.md) | Observed array checks; typed native cash/separate owner PV package accepted2026-11-09 |
+| Weighted average life | Future positive principal weighted ACT/365F; schedule uses par delta/economic date | WAL helper/schedule method | [014](14-aggregation-and-life.md) | Observed par/date cases; explicit repayment_life/owner-clock package accepted2026-11-09 |
+| Survival-adjusted cash PV | Relative discount and conditional survival; on/past-date/noncash zero; post-default cash unweighted | Optional hazard; curve IDs resolved by caller | [CASHFLOWS-015](15-credit-adjusted-pv.md) | Observed row/period formulas; generic credit/PV shortcut removal and qualified owner reporting accepted2026-11-09 |
+| Estimated principal recovery PV | FIFO funded lots; default mass over funded interval; recovery at repayment date | Positive optional recovery; hazard required | [015](15-credit-adjusted-pv.md) | Observed interval formula; inferred FIFO recovery removal/product claim ownership accepted2026-11-09 |
+| Realized-forward fixing roll | Existing exact fixings win; inclusive crossed endpoints; raw projections; conflict tolerance | materialize_fixings | [CASHFLOWS-016](16-fixing-materialization.md) | Observed normalization/window/merge; explicit required keys/exact conflicts/persistent hypothetical authority accepted2026-11-09 |
 
 ## Evidence limits
 

@@ -1351,6 +1351,777 @@ source errors. Lifecycle, exercise and accrued-interest entitlement retain their
 owning records. Runtime and independent complete-path qualification remain open.
 [Clause map M163–M166](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
 
+### 1.42 Explicit fee parents, exact amounts and literal tier selection
+
+The [accepted fee contract](docs/decisions/financial/cashflows/09-fees.md#accepted-decision-explicit-fee-parents-exact-amounts-and-literal-tier-selection)
+requires explicit periodic base/quote/frequency/day-count/payment-calendar/BDC/
+stub/balance-method inputs. Its selected limited recipe uses a Natural grid,
+unadjusted accrual, no EOM and zero payment lag over issue→raw maturity. Preserve
+each original fee parent's context, independent grid and declared termination;
+coupon cuts do not reset fees, and fee dates do not determine amortization cadence.
+
+Opening uses covered post-phase stock at S; Integrated uses covered stock over
+[S,E_fee) and exact differences of admitted original-fee-parent accrual prefixes.
+Do not require unused future stock for Opening or substitute live closing stock.
+Keep full ICMA/ACT365L context, nonadditive/OneOne consequences and legitimate
+zero weights. Undrawn uses exact static same-currency K>=0 and max(K-B,0) per
+sampled interval before weighting; this is not a credit-limit admission policy.
+
+Keep signed fractional annual Decimal bp. Evaluate the complete transient exact
+base*bp/10000*weight sum and restore Money once, with final overflow/nonzero-zero
+underflow errors, without intermediate bounded rate/base/contribution requirements
+or float Money detours. Emit one Fee cash row per parent including enabled zero,
+with no principal effect, truthful owner provenance and optional slice metadata.
+Fixed cash retains literal date/currency/signed Money/zero/duplicate identity,
+including pre-issue/post-maturity dates, without implicit FX, BDC, lag or history.
+
+Tier lookup requires literal Decimal utilization/thresholds in[0,1], strict supplied
+threshold ordering, whole-input inclusive selection and complete validation.
+Return None for no match, distinct from Some(0); product owners select actual
+no-fee/missing-coverage behavior. No default balance method, old-name alias,
+automatic tier-to-periodic link, dynamic commitment or product fee floor is implied.
+Keep fee admission/build publication locally atomic and reconcile existing actual
+term-loan/revolver/spec/host/schema/parity callers, including conversion errors.
+Runtime and independent complete-path qualification remain open.
+[Clause map M167–M170](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.43 Checked monthly mortality and explicit benchmark boundaries
+
+The [accepted mortality/prepayment contract](docs/decisions/financial/cashflows/10-prepayment-and-mortality.md#accepted-decision-checked-monthly-mortality-explicit-model-clocks-and-benchmark-boundaries)
+uses strict finite binary64 conditional probabilities and twelve-step survival
+equivalence. Annual/monthly conversions use stable log1p/expm1, exact0/1 and
+positive zero, validate before endpoints and reject invalid inputs or lost positive
+zero results. Final upper-endpoint rounding is an approximation, not exact
+certainty, an exact inverse or a portable accuracy guarantee. Remove permissive
+clamped conversion and public unchecked psa_cpr.
+
+Admit one immutable complete model through guarded constructors/restoration,
+including future lockout parameters and every vector entry. Require positive
+one-based applied months1..=u32::MAX, with actual date/loan-age/pool mapping owned
+by the product. Constant CPR remains explicit; Lockout replaces CMBS-named legal
+claims, and annual_cpr vectors retain input order and a disclosed hold-last tail.
+
+PSA uses its published annual cap min(speed*min(month,30)/500,1), with finite
+nonnegative speed and an exact represented-input cap comparison. Preserve stable
+positive pre-cap annual survival through the private conversion instead of
+rounding derived CPR to1 first. ABS is a loan-age/count benchmark; exact month*p
+selects terminal depletion without epsilon or rounded-product repair. Use stable
+checked pre-terminal denominator/division and an explicit absorbing-one extension;
+neither this nor the benchmark promises constant original-pool-dollar cash.
+
+Return model probabilities without selecting principal, default/prepayment/
+amortization/interest order, recovery cash dates, shocks, irregular-period scaling
+or extra product caps. Shared CDR/MDR conversion follows the scalar contract;
+011 default/recovery models retain their own status. Reconcile actual PAC/MBS/
+credit-pool clocks and error transport, guarded Rust/host/schema/parity state and
+validating host constructor twins without obsolete aliases or error-to-zero paths.
+Retain precise source/configuration provenance. Runtime and independent complete-
+path numerical/host/product qualification remain open.
+[Clause map M171–M174](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.44 Explicit default targets, strict capacity and recovery authority
+
+The [accepted default/recovery contract](docs/decisions/financial/cashflows/11-default-and-recovery-assumptions.md#accepted-decision-explicit-default-targets-strict-capacity-and-one-recovery-authority)
+separates conditional Constant/SdaAge/annual-CDR vector models from original-
+reference CumulativeLoss/Timing targets. Guard complete immutable input state.
+Applied MDR/default-vintage months are positive; cumulative get_target retains0
+as the true origin and returns None for conditional models. Use one canonical
+mdr(month,available_fraction), requiring None for conditional variants and actual
+Some(S) for targets, without inferred survival or mdr_with_survival.
+
+SdaAge uses the selected primary age profile with exact global3*speed<=500 and
+preserved annual survival, without claiming full SDA maturity/liquidation rules.
+CumulativeLoss uses original loss percentages/reference severity; F may exceed1.
+Timing uses exact positive-total annual_weights normalization and checked complete-
+year reach. Compute monthly demand directly from admitted original inputs, not
+rounded cumulative differences. Require represented-model demand<=actual supplied
+eligible/reference S, with zero/zero no-op and strict shortfall errors; no epsilon,
+clipping, hidden backlog or catch-up. Query-only numerical checks retain complete
+expressions through the requested result. Ratio rounding can make a boundary
+unavailable without certifying insufficient actual Money collateral.
+
+Recovery has exclusive Constant rate or Vector severity authority and explicit
+lag_months. Keep checked primary/complement getters, full input validation and
+hold-last default-vintage selection. Remove dormant fallback rates, clamps and
+infallible queries. Preserve the primary before complement rounding; later Money
+use still requires core012's fallible admission and owned allocation rules.
+Reference loss-conversion severity is not automatically actual recovery, so gross
+default targets do not guarantee realized net-loss attainment/timing.
+
+Actual fixed reference, eligible exposure, event phase, recovery dates/calendar/
+queue/terminal tails and full asset allocation remain product-owned. Preserve
+errors and economic default vintage rather than reconstructing baselines or
+backdating from receipt dates. Reconcile existing Rust/spec/host/schema/parity and
+validating constructors without aliases or new frameworks. Runtime and independent
+complete-path numerical/host/product qualification remain open.
+[Clause map M175–M178](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.45 Complete schedules, explicit balances and separate cash views
+
+The [accepted schedule contract](docs/decisions/financial/cashflows/12-schedule-lifecycle.md#accepted-decision-validated-complete-schedules-explicit-balances-and-separate-cash-views)
+publishes immutable complete source rows/metadata with explicit optional principal
+opening/through coverage. None declares untracked native events, never inferred
+zero/USD stock; Some carries exact nonnegative opening Money and validates every
+nonzero effect in its single currency/range. Retain foreign cash and literal zero
+effects, while scalar queries require actual tracked context. Remove inception
+recipes, representative day-count authority, funding/sign inference and validation
+bypasses. Full constructors/restoration validate before publishing or filtering.
+
+Canonical row order is presentation only and retains zeros/duplicates. Replay
+explicit principal deltas in exact economic-date batches, requiring nonnegative
+representable closing stock without tolerance/floor/display cleanup. Include the
+opening-date closing point and later nonzero-effect dates; range-check sorted
+queries including duplicates.003 producer phases remain separately validated;
+remove fictional per-row balance pairs and unguarded float lookup.
+
+Providers return complete validated source schedules without normalize_public,
+rebasing, delta rewrites, synthetic events or cash-date history loss. Canonical
+get_settlements has explicit cutoff/inclusion and uses the core015 cash whitelist,
+retaining native signed/zero cash. Source information date, cash selection and
+economic movement remain distinct; no settlement/claim-retirement/zero-value
+proof follows from date filters. Remove successful Placeholder state/default tags;
+NoResidual requires an explicitly empty represented scope.
+
+Changes use complete owner reconstruction rather than editing bypasses or generic
+scale_amounts. Generic merge only accepts compatible untracked Contractual/
+NoResidual native collections; actual tracked/Projected/signed-leg owners retain
+composition authority. Preserve parent/observation metadata and exact Money, remove
+invented adapter inputs and lossy DataFrame reconstruction, and reconcile actual
+product/export/host/schema/parity callers without new lifecycle frameworks.
+Runtime and independent complete-path qualification remain open.
+[Clause map M179–M182](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.46 Original-parent cash quotation and inclusive first-ex dates
+
+The [accepted cash-quotation contract](docs/decisions/financial/cashflows/13-accrued-interest.md#accepted-decision-original-parent-cash-quotation-and-inclusive-first-ex-dates)
+selects linear allocation of an actual005 full cash component using the same001
+parent/context authority, explicit currency assertion and qualified immutable
+source references. It is quotation, not actual earning/accounting/termination.
+Remove generic Compounded/AccrualMethod/AccrualConfig/include_pik/global frequency,
+flat-row period/factor/principal guesses and ExCouponRule offset helpers.
+
+Require S<E<=P, complete original-parent admitted prefixes A(t), and explicit
+optional inclusive first_ex_date X<=P. None deliberately selects cum treatment,
+not unknown entitlement. For t<P, f is0 before/at S, A(t)/A_E inside and1 at/after E;
+contribution is C*(f-I_ex), with I_ex=1 when X exists and X<=t. At/after P reset
+quotation to0. Pre-start detached cash therefore contributes-C. A_E=0/C=0 is a
+validated zero case; nonzero C with A_E=0 is unsupported. Preserve signed cash,
+full-coupon subtraction in the active ex window and distinct parent identities.
+
+Compute the complete exact same-currency expression and restore Money once,
+without intermediate fraction/ordinary-accrual/rebate/per-parent rounding, float
+money sums or implicit minor-unit rounding. Keep one-shot accrued_interest and
+immutable AccrualIndex::get_accrued on one authority, returning Rust Money including
+explicit-currency empty zero. Preserve known/projected status through the same
+parent owners; no future007 C/q knowledge follows from a date or stored path.
+
+Actual coupon entitlement, principal/redemption, PIK claims, nonlinear earning,
+statement recognition and exercise/payoff remain owner-selected. Reconcile bond/
+loan/LSMC/statements and exact Rust/host/schema/parity paths without aliases or a
+parallel coupon/provenance framework. Verified DMO and frozen LSE clauses support
+specific product mappings, not a universal ex-date or settlement convention.
+Runtime and independent complete-path qualification remain open.
+[Clause map M183–M186](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.47 Exact nominal reporting and explicit repayment life
+
+The [accepted nominal-reporting and repayment-life contract](docs/decisions/financial/cashflows/14-aggregation-and-life.md#accepted-decision-exact-nominal-reporting-and-explicit-repayment-life)
+uses exact whole-Money addition with wide cancelling intermediates and exactly
+representable final totals, without float sums, transform Q or implicit currency
+rounding. Period reporting takes the existing validated nonempty contiguous
+PeriodPlan, retaining its one calendar/fiscal authority and flags, with half-open
+selection and full-input validation. Preserve duplicate/zero contributions,
+plan/currency order and sparse absent-versus-contributed-zero totals. Retain the
+full plan once; guard construction, strict restoration and typed in-plan lookups
+without Default, map-only state or raw-map Deref. cash_total requires explicit
+currency over all inputs and returns that currency's zero for empty input.
+
+Calendar ladders accept typed cash-only rows, rejecting supplied noncash events;
+schedule wrappers validate their full source before preparing cash views. Group
+literal signed cash by payment Gregorian year and native currency, returning
+exact principal_cash/other_cash without par substitution, inferred cutoffs or
+single-currency proof. Preserve contributed zero rows and guard supported years,
+ordered unique keys and exact Money state. Qualified native-PV year reporting
+stays separately labelled at the actual valuation owner, retaining selected-row,
+currency, valuation-date and source association with genuine errors, never
+nominal/zero fallbacks.
+
+Remove generic WAL inference and CashFlowSchedule::wal. Rust-only repayment_life
+takes owner-selected dated nonnegative exact par weights, as_of, currency and
+include_as_of, validating all weights before filtering. None means no eligible
+positive repayments; Some(0) means included positive repayments all today. Compute
+sum(P*actual_days)/(365*sum(P)) with exact transient weights and one checked
+nearest-even binary64 restoration; intermediate totals need not fit Money.
+ACT/365F is the disclosed house statistic, not universal SIFMA WAL. Product
+repayment/date/sign/completeness and path-estimator conventions retain owners.
+Reconcile actual export/product/host/schema/parity consumers without aliases or
+new frameworks. Runtime and independent complete-path qualification remain open.
+[Clause map M187–M190](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.48 Product-owned credit valuation and qualified PV reporting
+
+The [accepted credit/reporting boundary](docs/decisions/financial/cashflows/15-credit-adjusted-pv.md#accepted-decision-product-owned-credit-valuation-and-qualified-pv-reporting)
+removes generic cashflow-kind survival weighting, inferred opening/FIFO funded
+recovery, automatic hazard recovery and schedule/private pv_by_period shortcuts.
+Actual product/model owners qualify expectation, contingency, signed obligations,
+unpaid recoverable claims, overlap, recovery basis/timing and value attribution.
+Cashflow kinds, optional tracked principal and remaining repayments do not prove
+those claims. Preserve signed cash and supported sign reversal on the same
+admitted computation, without universal monetary linearity or nonlinear-price
+antisymmetry. Introduce no replacement generic credit or exposure framework.
+
+Reuse accepted core016 literally for ordinary qualified cash, including explicit
+as_of/include_today, whole-input and required positive dated factor admission,
+source clocks and checked Money arithmetic. Require actual native-currency
+sources and coherent selected model/market snapshots, without foreign-curve or
+first-dependency inference. Credit owners use accepted market04 local conditional
+and interval probabilities; remove absolute-survival/default inference,
+endpoint-ratio/clamp/previous-row and context-free clock annotations.
+
+Keep actual source cash/events distinct from expected amounts and PV attribution.
+Preserve admitted native PV Money without float round trips; aggregate values
+once through014's existing exact PeriodPlan authority using qualified owner report
+dates, not invented repayment dates or additional credit/discount factors.
+Do not fabricate cash/recovery rows, zero contributions, residual plugs or rescale
+values to force total agreement. Require explicitly supported product/model
+attribution through existing export admission, defaulting unsupported otherwise,
+while preserving canonical pricing and qualified native-PV reports.
+
+Retain comparison to the same canonical model/date/currency/snapshot and applicable
+scenario/reporting view; failed or incomplete attribution cannot report successful
+reconciliation. Total agreement alone does not prove allocation or adopt the
+observed tolerance. Reconcile actual export/product/Rust/host/schema/parity and
+removed defaults/members without aliases. Runtime and independent complete-path
+qualification remain open.
+[Clause map M191–M194](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.49 Qualified hypothetical fixing materialization
+
+The [accepted fixing-materialization contract](docs/decisions/financial/cashflows/16-fixing-materialization.md#accepted-decision-qualified-hypothetical-fixing-materialization)
+selects one hypothetical frozen-forward realization policy, never actual
+publication by date advancement or FIXING: insertion. Retain only successful
+qualified raw finite projections, before coupon controls, with actual observed
+IndexId/interval/units/currency/CMS benchmark/FX direction and frozen pre-roll
+source/information authority. Remove nullable placeholders, fallback repair,
+series-string identity and FX notional-ratio reconstruction.
+
+Take a qualified paired source, explicit required observation keys and candidate
+projections. Remove observation-date windows and equal-date shortcuts; actual
+owners select required knowledge, including publication-lagged value dates.
+Each key needs eligible retained data or a genuine projection, otherwise error;
+reject unrequested candidates. Explicitly known empty dependencies differ from
+unsupported discovery or fake empty payoff schedules. Validate all inputs before
+precedence or identity, normalize signed zero, collapse only exact consistent
+observations and reject distinct values or contradictory provenance. Preserve
+qualified retained exact values without overwrite; mere presence is insufficient.
+
+Return the market paired with complete retained hypothetical observation/role/
+source records, including earlier realizations. Preserve and consume that
+qualification through actual owner requests, reports/envelopes, state and later
+rolls; missing provenance never implies Published. Require configured target
+series with explicit policies, genuine exact-lookup failures and one complete
+staged immutable merge. Failures leave original market/data/provenance unchanged;
+new hypotheses are distinct datasets, not publication revisions.
+
+Empty/idempotent calls still prove required-key completeness. Limit partition
+invariance to compatible fixed authority and globally consistent unions; no
+whole-scenario rollback or product-value/carry guarantee follows. Reconcile actual
+rate/overnight/CMS/FX, structured-credit, scenario/horizon/theta/metric and host/
+schema/parity consumers without aliases or new generic registries. Broader
+publication, scenario-ordering and transaction policies retain their owners.
+Runtime and independent complete-path qualification remain open.
+[Clause map M195–M198](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.50 Checked spot BSM pricing and native Greek bundles
+
+The [accepted spot BSM contract](docs/decisions/financial/models-analytic/spot-vanilla-and-greeks.md#accepted-decision-checked-spot-prices-native-derivatives-and-explicit-composite-results)
+selects constant-coefficient European per-unit pricing with coherent scalar
+price/rate/relative-volatility/model-year inputs. Validate finite positive S/K,
+signed r/q and nonnegative T/sigma before exact-expiry or deterministic identities.
+Keep the checked expiry-payoff helper's separate zero-spot domain. Use stable
+log/scaled m and total-standard-deviation geometry, OTM Gaussian tails, parity,
+ATM and deterministic positive differences, without unrequested-intermediate
+range gates, price floors or false-zero repair. Lost known-positive outputs,
+unresolved geometry/cancellation and nonfinite computations error; no all-finite-
+input or universal accuracy guarantee is implied.
+
+Keep independent bs_price and bs_greeks Result<Option<BsGreeks>>, with None only
+for valid T0 or sigma0 after full validation. Regular inputs compute a complete
+bundle or error. Use native partials delta=V_S, gamma=V_SS, vega=V_sigma,
+theta=-V_T and separate r/q rhos holding other scalar parameters fixed. Remove
+/100, theta-day denominators/defaults and fabricated singular Greeks. Model theta
+is not dated carry; delta is unadjusted spot risk with no universal magnitude1
+bound. Scale complete Gaussian products before tail loss; theta can round to0
+through signed cancellation. Guard immutable/restored regular bundles with finite
+fields, positive gamma/vega and coherent nonzero delta/rho signs, without Default
+or unchecked mutations. Valid state does not certify formula provenance.
+
+Expose checked kernels and needed fallible shared geometry only, removing public
+unchecked paths. Retain option_calculation explicitly as price/IV-plus-Greeks:
+vol echoes supplied or solved volatility, whole Greeks are nullable under the
+model's authority and regular computation failure fails the composite. Price-only
+callers use bs_price. Forward02/inverse03 laws retain their own adoption.
+
+Actual equity/FX/dividend/smile/curve/lifecycle and replication/tree owners retain
+model/position/payment and risk-chain-rule selection, preserving public report
+units by explicit Rust conversion. Reconcile parameter/result state, actual
+Rust/product/Python/WASM/UI/schema/parity surfaces without aliases, host finance
+logic or numerical fallback. Runtime and independent complete-path qualification
+remain open.
+[Clause map M199–M202](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.51 Unit forward option prices and native Greek bundles
+
+The [accepted forward-model contract](docs/decisions/financial/models-analytic/forward-normal-shifted.md#accepted-decision-unit-forward-prices-and-native-model-greek-bundles)
+selects explicit Black76, arithmetic-normal and fixed shifted-Black scalar laws
+on one UNIT-numeraire price/Greek scale. Remove Black-only df, unchecked annuity
+and raw/scalar sibling APIs. Actual product owners apply their qualified discount
+OR annuity and notional once, distinguishing per-unit-rate annuity from a genuine
+one-bp amount on the same notional basis; unit partials do not supply curve/smile
+or multiplier chain rules.
+
+Validate complete finite domains before exact T0/vol0 intrinsic: positive Black
+coordinates, signed normal F/K, nonnegative model time/volatility and finite signed
+shift with mathematical transformed coordinates in(0,MAX]. Preserve original F/K/s
+through shifted admission/geometry and F−K payoff/parity, without requiring exact
+one-f64 sums or silently substituting a rounded contract. Normal volatility has
+actual underlying units; relative volatility and clocks retain their own meaning.
+Use stable scaled/log/tail calculations or explicit refusal, not tiny-volatility
+intrinsic switches, negative-time clamps, floors, NaN or false-zero repair.
+
+Keep independent checked unit prices and Result<Option<ForwardGreeks>> bundles.
+None means valid zero time/volatility only; regular requests compute native forward
+delta/gamma/actual-volatility vega or error. Guard immutable/restored bundles with
+finite nonzero |delta|<=1 and positive gamma/vega. Preserve original-coordinate
+parity and appropriate Black/shifted bounds, without a normal F/K upper cap.
+The requested unit output must fit even if a later external multiplier could
+rescue a mathematical final PV; unrequested intermediate overflow need not fail
+when the requested unit output is resolvable. No arbitrary final-PV guarantee.
+
+Reconcile shared calculator/target-price unit normalization, fallible needed Black
+geometry and complete shifted bundle, leaving inverse03 solver laws separate.
+Update actual cap/floor/CMS/replication/commodity/listed/range-accrual and calibration/
+IV users with real errors and explicit owner report conversions. Propagate exact
+names, nullable bundles and removed fields/defaults across Rust/host/UI/schema/
+parity without compatibility or host financial logic. Runtime and independent
+complete-path qualification remain open.
+[Clause map M203–M206](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.52 Explicit bounded volatility inversion
+
+**Detailed decision:** [MODELS-ANALYTIC-03](docs/decisions/financial/models-analytic/implied-volatility-solvers.md#accepted-decision-explicit-bounded-model-inversion-and-paired-premium-acceptance) was accepted on 2026-11-10.
+
+Use one fallible scalar inverse with explicit spot BSM, Black76, Bachelier or
+shifted Black terms and a frozen input request. Accept original spot or unit
+forward premiums in their native units. Require positive time and literal
+model bounds in the original geometry. Check the exclusive Black upper bound
+first. Exact lower equality selects zero IV and all interior requests require
+positive returned IV. Unresolved comparisons raise computation errors.
+
+Require immutable, validated maximum volatility, annual volatility tolerance,
+iteration budget, absolute native premium tolerance and relative premium
+tolerance. Run the accepted Brent method on the supplied annual-volatility
+interval [0,max_vol], using the bounded objective from the checked same-law log
+OTM premium. Keep the original OTM target and propagate numerical errors.
+The core stopping criterion governs solver work. On every exit validate the
+actual returned volatility and both original premium and independently
+evaluated OTM time-value residuals. Computed residuals bound neither input or
+model error nor volatility error under poor conditioning.
+
+Use the same API and required controls in the composite with its accepted Greek
+availability. Preserve actual product inverse objectives and normalization.
+Reconcile existing Rust, Python, WASM, UI, schema and parity surfaces and retire
+obsolete inverse routes. Runtime and independent complete-path qualification
+remain open. [Clause map M207–M210](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.53 Discrete Asian fixing and payment laws
+
+**Detailed decision:** [MODELS-ANALYTIC-04](docs/decisions/financial/models-analytic/asian-moments.md#accepted-decision-for-discrete-asian-pricing) was accepted on 2026-11-10.
+
+Use one checked scalar price with explicit averaging and equal-weight fixing
+slots. Preserve finite observed levels and positive prepared expectations in a
+common payment measure. Geometric history is positive. Arithmetic history can
+be signed. Require positive ordered projected model times at or before payment,
+preserve exact ties, and use the separate positive payment discount once for the
+discounted per-unit result. Dated owners establish chronology, eligibility and
+history coverage. Retire count sentinels and implicit averaging.
+
+Price the full seasoned geometric lognormal marginal using positive interval
+sums. For arithmetic, retain the deterministic observed contribution in the
+payoff and match the first two moments of the positive future contribution
+using the covariance sum. Preserve exact support, deterministic and shared
+Brownian-time reductions, shifted bounds and parity. The two-moment fit has
+limited price accuracy at distinct stochastic times.
+
+Keep stable scaled geometry through final discounting and report unresolved
+variance, sign or premium as computation errors. Reuse the laws for actual
+equity and commodity inputs, matching the MC control to the sampled payoff.
+Keep payment and observation evidence with the dated owner and reconcile
+existing Rust, host, schema and parity surfaces. Runtime and independent
+complete-path qualification remain open.
+[Clause map M211–M214](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.54 Continuous barrier premiums and first-passage cash
+
+**Detailed decision:** [MODELS-ANALYTIC-05](docs/decisions/financial/models-analytic/barriers-and-rebates.md#accepted-decision-for-continuous-barrier-premiums-and-cash) was accepted on 2026-11-10.
+
+Admit checked explicit flat GBM inputs with continuous inclusive monitoring
+on the remaining model interval. The dated owner qualifies the current
+observation and earlier history. Preserve exact singleton and deterministic
+crossing, and compute the requested hit or surviving option premium from the
+reflection law. Preserve structural zeros, direct positive values and
+no-rebate in/out parity.
+
+Use the strike-free first-passage law for reported touch and conditional cash.
+Select hit-at-hit, hit-at-expiry or no-hit-at-expiry explicitly. Preserve
+independent hit and survival tails and final amount/discount scale. Use the
+real-root formula when its discriminant is nonnegative. For a negative
+discriminant use the same expectation with the selected discount coordinate,
+scaled estimator budget and bounded core Simpson work. Propagate precision
+and convergence failures.
+
+Dated asset and FX owners retain active monitoring, relevant terminal
+observations, quantity, currency and separate outstanding payment evidence.
+Reconcile actual FX touch and asset/FX barrier callers, and keep the checked
+existing host price route. Runtime and independent complete-path
+qualification remain open.
+[Clause map M215–M218](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.55 Continuous lookback premiums and extrema
+
+**Detailed decision:** [MODELS-ANALYTIC-06](docs/decisions/financial/models-analytic/lookback-extrema.md#accepted-decision-for-continuous-lookback-premiums) was accepted on 2026-11-10.
+
+Use one checked continuous lookback price with explicit fixed or floating
+terms and a qualified relevant extremum through the eligible current
+observation. Fixed call and floating put require a maximum at least spot.
+Fixed put and floating call require a minimum at most spot. Require explicit
+net carry and an independent payment discount. Return the discounted
+per-underlying-unit result. Preserve the exact singleton and deterministic
+path payoffs after complete admission.
+
+Assemble all four regular prices from positive vanilla and reflection terms
+and the fixed locked payoff where applicable. Use the analytic derivative
+only at exact zero carry. Preserve original signed nonzero carry in a checked
+divided difference and keep final-price scale. Propagate unresolved precision
+and avoid floors, sentinels and silent repair.
+
+Dated owners qualify history, eligible observations and actual payment state,
+resolve known claims from their required terminal facts and preserve native
+currency and quantity. Separate payoff terms from volatility lookup and
+scenario observation treatment. Reconcile the live asset pricer and existing
+host surfaces. Runtime and independent complete-path qualification remain open.
+[Clause map M219–M222](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.56 Fixed-conversion quanto pricing
+
+**Detailed decision:** [MODELS-ANALYTIC-07](docs/decisions/financial/models-analytic/quanto-drift.md#accepted-decision-for-fixed-conversion-quanto-premiums) was accepted on 2026-11-10.
+
+Use one checked European quanto terminal law with positive underlying and
+strike, prepared foreign log carry, independent payout discount and common
+asset/FX variance horizon. FX is payout currency per unit of asset currency.
+Reciprocal log shocks reverse the correlation. Subtract the signed total
+covariance rho sigma_asset sigma_FX T once from foreign log carry.
+
+Keep exact zero-time, zero-asset-volatility and zero-covariance distinctions.
+Use stable log-forward, covariance and discounted Black arithmetic in the
+requested pre-conversion scale. Preserve parity, positivity and the actual
+dependence of drift on asset volatility, and propagate numerical failures.
+
+Return the domestic-discounted scalar in foreign payoff units per underlying
+unit. The product applies literal contractual conversion and quantity once.
+Dated owners retain source orientation, clocks, fixing, outstanding payments,
+sizing and quote/curve risk. Reconcile actual Rust and host callers. Runtime
+and independent complete-path qualification remain open.
+[Clause map M223–M226](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.57 Checked Heston probability transforms
+
+**Detailed decision:** [MODELS-ANALYTIC-08](docs/decisions/financial/models-analytic/heston-characteristic-function.md#accepted-decision-for-the-checked-heston-transform) was accepted on 2026-11-10.
+
+Use immutable validated pricing-measure Heston state and the existing strict
+pricing wrapper. Admit nonnegative initial variance and vol-of-vol, positive
+mean reversion and long-run variance, and open correlation endpoints. Use
+inclusive exact Feller comparison as a diagnostic. Preserve other algorithms'
+positive-parameter requirements until their owners qualify broader inputs.
+
+Use the two typed real-frequency cash and share contours of carry-normalized
+log spot. Preserve finite-horizon share tilting for either sign of its variance
+drift, exact zero-time and zero-frequency normalization, and exact integrated
+deterministic variance at zero vol-of-vol.
+
+Use one checked affine logarithm from the decaying principal-log branch
+without the g ratio. Preserve scaled discriminant, origin and small-time
+remainders and representable components. Reject unresolved arithmetic and
+phase without zero sentinels, clipping or magnitude cutoffs. Fourier weights,
+truncation and price acceptance remain with record 09.
+
+Reconcile actual pricing, market state, PDE, MC, rough and host consumers
+without inferring their broader financial or numerical domains. Runtime and
+independent complete-path qualification remain open.
+[Clause map M227–M230](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.58 Bounded Heston Fourier pricing
+
+**Detailed decision:** [MODELS-ANALYTIC-09](docs/decisions/financial/models-analytic/heston-fourier-integration.md#accepted-decision-for-bounded-heston-fourier-pricing) was accepted on 2026-11-10.
+
+Use one checked scalar Heston price with explicit payoff choice. Validate the
+whole request before side-specific expiry intrinsic or exact deterministic
+variance pricing. For positive vol-of-vol, integrate the selected OTM time
+value with the checked cash and share logarithms and scaled discounted legs.
+Preserve positive resolved time value, payoff bounds and final monetary scale.
+
+Use the conditional integrated-variance envelope with conservative
+arithmetic to select the cutoff. Then refine order-16 Gauss–Legendre meshes
+at fixed cutoff. Require the selected consecutive raw-probability, relative
+time-value and upper-margin gates within the cumulative work budget. The
+analytic envelope bounds truncation. Mesh and arithmetic checks provide
+operational resolution only. An unresolved wing can also prevent an ITM
+price from qualifying.
+
+Preserve actual numerical errors. Keep one production scalar route and
+coordinate the existing host price calls. Dated equity owners retain actual
+expiry, fixing, outstanding cash, parameter sources, clocks and quantity.
+Runtime and independent complete-path qualification remain open.
+[Clause map M231–M234](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.59 Checked COS pricing
+
+**Detailed decision:** [MODELS-ANALYTIC-10](docs/decisions/financial/models-analytic/cos-inversion.md#accepted-decision-for-checked-cos-pricing) was accepted on 2026-11-10.
+
+Use one checked COS engine for the three named scalar Black, Merton and
+variance-gamma pricing calls. Require initial terms, initial window multiplier
+and absolute discounted per-unit premium tolerance. Validate the full
+request before exact expiry, deterministic and support payoffs.
+
+Evaluate the requested bounded payoff under the cash measure for a put or
+the reflected share measure for a call. Preserve original payoff geometry,
+centered coefficients, compensated summation and final native scale.
+
+Use cumulants only to seed the window. Select the window by a conservative
+omitted-mass bound and the term count by a separate conservative series
+bound. Evaluate one final spectrum of at most 65,536 terms. Require the
+pre-rounding premium budget, raw payoff bounds and positive numerical
+resolution. Propagate range and work failures without price clipping.
+
+Reconcile the actual scalar hosts, schema and notebooks. Record 11 owns the
+underlying law and contour inputs. Production enclosures, pricing and
+complete-path qualification remain open.
+[Clause map M235–M238](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.60 Checked characteristic laws for COS
+
+**Detailed decision:** [MODELS-ANALYTIC-11](docs/decisions/financial/models-analytic/jump-characteristic-laws.md#accepted-decision-for-checked-characteristic-laws) was accepted on 2026-11-10.
+
+Use private validated Black, Merton and variance-gamma laws to prepare
+the cash put or reflected share call distribution of forward-normalized
+log return. Keep deterministic carry and discount with the scalar price.
+Validate the exact model domains before expiry and inactive-jump reductions.
+
+Preserve total variance, selected tilted parameters, centered cumulants,
+log moments, real-frequency transforms and model-specific COS envelopes.
+Use stable compensation and remainder formulas and conservative moment
+bounds. Preserve atoms and lattice support for Merton and strict
+variance-gamma martingale and moment-domain signs from original inputs.
+Propagate unresolved geometry, phase, range and enclosure errors.
+
+Retire public raw CF state and standalone schema registrations. Reconcile
+the actual scalar engine, benchmark, hosts and notebooks. Record 10 retains
+pricing work and premium acceptance. Production numerical and complete-path
+qualification remain open.
+[Clause map M239–M242](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.61 Checked rough Heston pricing
+
+**Detailed decision:** [MODELS-ANALYTIC-12](docs/decisions/financial/models-analytic/rough-heston-riccati.md#accepted-decision-for-checked-rough-heston-pricing) was accepted on 2026-11-10.
+
+Use the checked positive stochastic rough domain and fractional model
+clock. Admit the complete scalar market, explicit payoff and two
+premium tolerances before evaluating exact zero-time intrinsic. Keep
+one private fractional Riccati solver and normalized Lewis half contour.
+
+Use stable positive product-integration weights, a guarded implicit
+root, checked residuals and both affine time integrals. Enclose the
+continuous omitted tail analytically and check time and frequency
+discretization separately at common cutoffs. Bound cumulative work
+and accept raw time value only within the selected resolution gates.
+Propagate hard, convergence and range failures.
+
+Reconcile the actual equity model configuration and product path.
+Retire the standalone arbitrary solver, transform and unused inverse.
+Keep the direct scalar model helper Rust-only. Independent finite-H
+price, production enclosure and complete-path qualification remain open.
+[Clause map M243–M246](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.62 Checked SABR asymptotic quotes
+
+**Detailed decision:** [MODELS-ANALYTIC-13](docs/decisions/financial/models-analytic/sabr-expansions.md#accepted-decision-for-explicit-checked-sabr-quotes) was accepted on 2026-11-10.
+
+Use immutable canonical SABR parameters with literal beta and open
+correlation. Require an explicit Normal, Black or shifted Black quote,
+qualified model time and matching displacement. Exact beta-zero Normal
+uses signed original coordinates. All other cases require positive
+admitted effective coordinates and preserve the original strike gap.
+
+Use the exact CEV distance and one checked skew factor for the selected
+short-time leading term. Apply the stated Hagan midpoint time correction.
+Preserve exact ATM and constant-volatility limits, and propagate unresolved
+correction, output and range failures without floors or retagging.
+
+Use the same checked formula and convention in prepared evaluation, fits,
+smiles and product sources. Reconcile existing schema and hosts. Calibration,
+smile repair and off-grid policies retain their owners. Production quote,
+fit and complete-path qualification remain open.
+[Clause map M247–M250](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.63 Checked SABR calibration
+
+**Detailed decision:** [MODELS-ANALYTIC-14](docs/decisions/financial/models-analytic/sabr-calibration.md#accepted-decision-for-explicit-checked-sabr-calibration) was accepted on 2026-11-10.
+
+Fit one expiry at literal beta with explicit quote, displacement and
+mode. Keep original strike identity and the accepted SABR expansion.
+Use vega-weighted relative-volatility residuals and a separate native
+absolute error cap for every original quote.
+
+Require checked solver controls and fit intervals. Use nine ordered
+starts and literal diagnostics. A selected ATM pin requires an
+observed K=F quote, an increasing supplied alpha bracket, checked
+Brent and a returned-quote residual check. Reprice each final candidate
+and rank only candidates that pass every native gate.
+
+Preserve actual work, fit failures, quote and displacement provenance
+and the actual equity, swaption, schema and host contracts. Production
+solver, independent market and publication qualification remain open.
+[Clause map M251–M254](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.64 Checked SABR smile and finite-grid repair
+
+**Detailed decision:** [MODELS-ANALYTIC-15](docs/decisions/financial/models-analytic/sabr-smile-repair.md#accepted-decision-for-checked-sabr-smile-and-finite-grid-repair) was accepted on 2026-11-10.
+
+Bind one checked quote convention for the immutable smile. Use the
+selected ATM-volatility forward-delta proxy and check the actual
+returned strike and smaller delta tail. Use unit forward call prices
+for sampled bounds, both vertical inequalities and unequal-grid
+convexity, including the applicable exact Black support anchor.
+
+Use the greatest exact down-only sampled price grid and a native
+per-node move cap. Preserve unchanged quotes and exact intrinsic.
+Use the accepted inverse for changed interior targets and reprice
+the actual returned quotes before accepting the sampled result.
+
+Keep repair opt-in and retain the immutable source state. Reconcile
+the actual Python, WASM and cube-slice UI consumers. Production
+inverse, arithmetic and complete-path qualification remain open.
+[Clause map M255–M258](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.65 Checked volatility-source evaluation and materialization
+
+**Detailed decision:** [MODELS-ANALYTIC-16](docs/decisions/financial/models-analytic/volatility-source-interpolation.md#accepted-decision-for-explicit-volatility-source-evaluation-and-materialization) was accepted on 2026-11-10.
+
+Resolve the selected source and its specific inputs, then return the checked
+annual sigma, exact convention, source clock and evaluated coordinates.
+Use explicit strict or flat grid boundaries, exact active support and
+checked native sigma or total-variance interpolation. Shifted quote blends
+require a common displacement.
+
+SABR ParameterSpace blends a common-beta stencil with consistent shift
+presence. TotalVariance evaluates active expiry rows at the common absolute
+strike and their own construction forwards. Pricing qualifies the forward
+basis and actual quote domain.
+
+Materialize strict samples with explicit output interpolation, source
+clock and provenance. Compare explicit, compatible reference quotes in
+native sigma units. Runtime, host and independent qualification remain open.
+[Clause map M259–M262](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.66 Checked FX delta smiles and strike materialization
+
+**Detailed decision:** [MODELS-ANALYTIC-17](docs/decisions/financial/models-analytic/fx-delta-smiles.md#accepted-decision-for-checked-fx-delta-smiles-and-strike-materialization) was accepted on 2026-11-10.
+
+Use the accepted ordered-pair FX quote profile and qualified delivery
+forward. Check the smaller forward-delta tail at each returned strike
+and require strict semantic pillar order. Preserve all supplied labels.
+
+Direct evaluation uses strict expiry support and complete affine ATM,
+RR and BF reconstruction at the requested expiry and forward. Use linear
+strike interpolation with an explicit strict or flat strike boundary.
+
+Materialize the exact union of original strikes with qualified row forwards,
+explicit output interpolation and construction provenance. Reconcile active
+pricing, risk, host and state routes. Independent qualification remains open.
+[Clause map M263–M266](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.67 Checked raw SVI and slice fit acceptance
+
+**Detailed decision:** [MODELS-ANALYTIC-18](docs/decisions/financial/models-analytic/svi-fit-and-density.md#accepted-decision-for-checked-raw-svi-and-slice-fit-acceptance) was accepted on 2026-11-10.
+
+Use immutable raw SVI with exact nonnegative minimum, left slope at
+most two and right slope below two. Evaluate requested variance or
+annual sigma with checked complete-result arithmetic. Use analytic
+Durrleman g where defined and report finite sampled coverage.
+
+Use explicit seeded checked LM on unweighted total variance, with the
+analytic flat case for equal volatilities. Replay every quote in native
+annual Black sigma and require both the per-quote cap and the supplied
+finite density scan including quote coordinates. Preserve actual work.
+
+The fitted slice and published strike grid have separate replay and
+acceptance. Reconcile the equity target and existing host and state
+paths. Independent qualification remains open.
+[Clause map M267–M270](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.68 Checked Dupire extraction and local-volatility grids
+
+**Detailed decision:** [MODELS-ANALYTIC-19](docs/decisions/financial/models-analytic/dupire-local-volatility.md#accepted-decision-for-checked-dupire-extraction-and-local-volatility-grids) was accepted on 2026-11-10.
+
+Use a qualified Black strike surface under deterministic proportional
+carry. Choose explicit extraction coordinates, fixed-moneyness support
+and smoothing. Use actual unequal-grid interior time derivatives, adjacent
+time endpoint secants and local quadratics in log-moneyness.
+
+Require positive center variance and density with nonnegative sampled
+time slope. Evaluate the complete scaled local sigma and publish the
+whole requested grid with source and forward provenance.
+
+Use an immutable local sigma grid on elapsed time and absolute spot
+with explicit strict or flat boundaries. Reconcile simulation clocks,
+carry, host state and checked lookup. Independent extraction, vanilla
+replay and simulation qualification remain open.
+[Clause map M271–M274](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.69 Checked surface-arbitrage diagnostics and coverage
+
+**Detailed decision:** [MODELS-ANALYTIC-20](docs/decisions/financial/models-analytic/surface-arbitrage-diagnostics.md#accepted-decision-for-checked-surface-arbitrage-diagnostics-and-coverage) was accepted on 2026-11-10.
+
+Use explicit diagnostic selection, qualified row forwards and native
+thresholds. Check sampled Black calls with the exact support anchor.
+Compare adjacent expiries at the union of both rows' fixed-moneyness
+knots on common support. Check the two Dupire signs independently.
+
+Report tested scope, unavailable coverage and all native findings.
+Any breach fails the selected criteria. Passing requires complete
+selected coverage and zero breaches. Display selection leaves the
+native verdict intact. Reconcile actual hosts and the pricing
+workbench. Independent qualification remains open.
+[Clause map M275–M278](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.70 Checked variance replication and explicit Black wings
+
+**Detailed decision:** [MODELS-ANALYTIC-21](docs/decisions/financial/models-analytic/variance-replication.md#accepted-decision-for-checked-variance-replication-and-explicit-black-wings) was accepted on 2026-11-10.
+
+Use a qualified forward, horizon and two-sided Black strike strip. Use
+checked volatility samples, checked undiscounted OTM premiums and the
+exact forward split with one ATM premium. Require explicit midpoint
+refinement acceptance in annual-variance units.
+
+Choose finite-strip coverage or full flat-Black wings. Compute modeled
+wings through the positive finite-domain identity with bounded quadrature.
+Preserve exact zero, checked errors, native contributions and actual work.
+
+Reconcile equity and FX product callers and preserve their dated,
+observation and settlement ownership. Independent numerical and product
+qualification remain open.
+[Clause map M279–M282](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
 ## 2. Determinism and floating point
 
 **Authority:** [ADR 0021](docs/decisions/standards/0021-reproducibility-guarantees.md)

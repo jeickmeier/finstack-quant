@@ -1,6 +1,6 @@
 # CASHFLOWS-009 — Fixed, periodic and utilization-tier fees
 
-- Decision status: **Proposed — complete explicit fee-parent, amount and tier package, 2026-11-09; adoption pending**.
+- Decision status: **Accepted — complete explicit fee-parent, amount and tier package, 2026-11-09**.
 - Implementation status: **Observed; reconciliation pending**, scoped to fee specs/compiler/emission and their actual consumers.
 - Validation status: **Production evidence inspected/located, not executed**. Independent bounded exact examples and read-only source/consumer reviews are reported below; these do not establish contractual applicability or production qualification.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
@@ -9,9 +9,10 @@
 
 The builder supports fixed dated amounts and periodic annual-basis-point fees on drawn or undrawn principal. Observed PointInTime is the default accrual basis; observed TimeWeightedAverage integrates economic balance changes using direct segment day counts. Tier evaluation is a standalone rate selector, used by a revolving-credit product but not automatically connected to periodic builder emission. The replacement below selects explicit fee-parent economics without adopting every product fee clause.
 
-## Proposed decision: explicit fee parents, exact amounts and literal tier selection
+## Accepted decision: explicit fee parents, exact amounts and literal tier selection
 
-Proposed on **2026-11-09** for complete whole-record review. Inherit accepted
+Accepted on **2026-11-09** after complete whole-record review. Runtime/caller/host
+reconciliation and independent complete-path qualification remain pending. Inherit accepted
 [001's periods and complete day-count context](01-schedule-periods.md#accepted-decision-contractual-periods-calendars-and-day-count-context),
 [003's covered economic stock and event phases](03-principal-and-emission-order.md#accepted-decision-dated-opening-principal-signed-cash-and-atomic-event-phases),
 [005's original-parent prefix/amount pattern](05-coupon-cash-and-pik.md#accepted-decision-parent-coupon-accrual-exact-splits-and-capitalization)

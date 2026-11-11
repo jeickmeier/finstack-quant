@@ -15,9 +15,10 @@ and the [explicit generic unit boundary](scalar-series-and-fixings.md#accepted-d
 The clock package remains optional for pure numeric sources and requires actual
 source mapping at dated use; this proposal does not reopen that decision.
 
-[Model interpolation](../models-analytic/volatility-source-interpolation.md),
-[Black/normal/shifted pricing](../models-analytic/forward-normal-shifted.md),
-[surface diagnostics](../models-analytic/surface-arbitrage-diagnostics.md),
+Accepted [model interpolation](../models-analytic/volatility-source-interpolation.md#accepted-decision-for-explicit-volatility-source-evaluation-and-materialization)
+and [Black/normal/shifted pricing](../models-analytic/forward-normal-shifted.md)
+own their respective evaluation and pricing rules.
+[Surface diagnostics](../models-analytic/surface-arbitrage-diagnostics.md),
 [calibrated materialization](../calibration-targets/10-total-variance-materialization.md),
 [calibration acceptance](../calibration-framework/17-surface-validation.md),
 and [scenario diagnostics](../scenarios/09-volatility-surface-shocks.md) retain
