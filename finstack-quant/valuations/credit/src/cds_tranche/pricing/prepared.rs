@@ -297,7 +297,10 @@ impl CdsTranchePricer {
                     cashflow: CashFlow::new(
                         payment_date,
                         None,
-                        Money::from_model_value(premium_amount * premium_sign, tranche.notional.currency())?,
+                        Money::from_model_value(
+                            premium_amount * premium_sign,
+                            tranche.notional.currency(),
+                        )?,
                         CFKind::Fixed,
                         accrual_period,
                         Some(coupon),

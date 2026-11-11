@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **603 review items across 33 source scopes with open items**
+This backlog consolidates **600 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -19,16 +19,16 @@ evidence with the owning entry instead of duplicating task lists in records.
 
 The labels distinguish the work required:
 
-- **Observed** (159): a static implementation, contract, dispatch or
+- **Observed** (157): a static implementation, contract, dispatch or
   documentation difference. Its financial impact is not necessarily reproduced.
 - **Investigate** (49): a source-derived numerical or economic concern
   requiring targeted reproduction, an independent reference or convergence
   study before a defect conclusion.
 - **Decision** (236): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (96): implementation and verification work against an
+- **Reconciliation** (93): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
-- **Evidence** (63): a particular primary-reference, empirical-calibration,
+- **Evidence** (65): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
 
 These categories are not severity rankings. A decision can expose implementation
