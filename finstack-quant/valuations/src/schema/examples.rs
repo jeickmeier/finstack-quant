@@ -393,7 +393,7 @@ fn tranche_cashflows_value(tranche_id: &str) -> Value {
             "date": "2025-04-15",
             "reset_date": null,
             "amount": usd("3750000"),
-            "kind": "float_reset",
+            "kind": "floating",
             "accrual_factor": 0.25,
             "rate": 0.06
         }],

@@ -1779,7 +1779,7 @@ export interface D_5Fdd6C8Cd626De8799Fe {
    */
   kind:
     | "fixed"
-    | "float_reset"
+    | "floating"
     | "inflation_coupon"
     | "fee"
     | "commitment_fee"
@@ -1796,6 +1796,7 @@ export interface D_5Fdd6C8Cd626De8799Fe {
     | "defaulted_notional"
     | "recovery"
     | "accrued_on_default"
+    | "protection_payment"
     | "stub"
     | "initial_margin_post"
     | "initial_margin_return"

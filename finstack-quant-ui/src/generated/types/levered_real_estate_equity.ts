@@ -3702,7 +3702,7 @@ export interface D_561C56F793Cc06Bf015E {
    */
   kind:
     | "fixed"
-    | "float_reset"
+    | "floating"
     | "inflation_coupon"
     | "fee"
     | "commitment_fee"
@@ -3719,6 +3719,7 @@ export interface D_561C56F793Cc06Bf015E {
     | "defaulted_notional"
     | "recovery"
     | "accrued_on_default"
+    | "protection_payment"
     | "stub"
     | "initial_margin_post"
     | "initial_margin_return"

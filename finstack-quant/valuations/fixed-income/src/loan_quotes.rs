@@ -218,7 +218,7 @@ pub fn all_in_rate_from_schedule(
         .filter(|cf| cf.date > as_of)
         .filter_map(|cf| match cf.kind {
             CFKind::Fixed
-            | CFKind::FloatReset
+            | CFKind::Floating
             | CFKind::Stub
             | CFKind::Fee
             | CFKind::CommitmentFee
@@ -325,7 +325,7 @@ impl OidEirSchedule {
 /// cashflow schedule plus extra dated flows (an upfront fee or OID the
 /// schedule itself does not carry).
 ///
-/// Flows are bucketed by date: interest (`Fixed`, `FloatReset`, `Stub`),
+/// Flows are bucketed by date: interest (`Fixed`, `Floating`, `Stub`),
 /// fees when `include_fees`, amortization, and notional funding legs. The
 /// effective rate is the XIRR of the bucket totals on `day_count`; the
 /// opening carrying amount is the first bucket's notional funding, and each
@@ -370,7 +370,7 @@ pub fn oid_eir_schedule_from_flows(
     for cf in schedule.get_flows() {
         let amount = cf.amount.amount();
         match cf.kind {
-            CFKind::Fixed | CFKind::FloatReset | CFKind::Stub => {
+            CFKind::Fixed | CFKind::Floating | CFKind::Stub => {
                 let b = buckets.entry(cf.date).or_default();
                 b.total += amount;
                 b.interest += amount;

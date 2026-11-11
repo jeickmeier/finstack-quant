@@ -1315,7 +1315,7 @@ export default [
   {
     "path": "#/$defs/d_c1062118d66ed5ee9642",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CFKind",
-    "description": "Enumeration of cash-flow kinds for classification and ordering.\n\nUsed to distinguish between different types of cashflows for\nproper sequencing, risk calculation, and accounting treatment.\n\n# Sign Convention\n\nThe enum itself is **view agnostic**: individual instruments are\nresponsible for mapping these kinds into a holder or issuer view.\nBy convention in this crate:\n\n| Kind | Holder View (Long) | Issuer View (Short) |\n|------|-------------------|---------------------|\n| Interest (Fixed/Float) | Positive (receive) | Negative (pay) |\n| Notional (initial) | Negative (pay) | Positive (receive) |\n| Notional (final) | Positive (receive) | Negative (pay) |\n| Amortization | Positive (receive) | Negative (pay) |\n| PIK | Increases notional | Increases liability |\n| Fee | Negative (pay) | Positive (receive) |\n\nWhen constructing cashflow schedules, instruments should apply the appropriate\nsign based on the economic perspective being represented.\n\n# Cashflow Categories\n\nVariants are grouped by category:\n- **Interest**: `Fixed`, `FloatReset`, `Stub`\n- **Inflation**: `InflationCoupon`\n- **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`, `LcFee`, `FrontingFee`\n- **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`\n- **Revolving**: `RevolvingDraw`, `RevolvingRepayment`\n- **Credit Events**: `DefaultedNotional`, `Recovery`\n- **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.\n\n# Labels\n\n`Display`, `FromStr`, and serde share one snake_case label per kind\n(`\"fixed\"`, `\"float_reset\"`, `\"pre_payment\"`). `FromStr` is ASCII\ncase-insensitive and ignores surrounding whitespace; serde accepts only\nthe canonical label."
+    "description": "Enumeration of cash-flow kinds for classification and ordering.\n\nUsed to distinguish between different types of cashflows for\nproper sequencing, risk calculation, and accounting treatment.\n\n# Sign Convention\n\nThe enum itself is **view agnostic**: individual instruments are\nresponsible for mapping these kinds into a holder or issuer view.\nBy convention in this crate:\n\n| Kind | Holder View (Long) | Issuer View (Short) |\n|------|-------------------|---------------------|\n| Interest (Fixed/Float) | Positive (receive) | Negative (pay) |\n| Notional (initial) | Negative (pay) | Positive (receive) |\n| Notional (final) | Positive (receive) | Negative (pay) |\n| Amortization | Positive (receive) | Negative (pay) |\n| PIK | Increases notional | Increases liability |\n| Fee | Negative (pay) | Positive (receive) |\n\nWhen constructing cashflow schedules, instruments should apply the appropriate\nsign based on the economic perspective being represented.\n\n# Cashflow Categories\n\nVariants are grouped by category:\n- **Interest**: `Fixed`, `Floating`, `Stub`\n- **Inflation**: `InflationCoupon`\n- **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`, `LcFee`, `FrontingFee`\n- **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`\n- **Revolving**: `RevolvingDraw`, `RevolvingRepayment`\n- **Credit Events**: `DefaultedNotional`, `Recovery`\n- **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.\n\n# Labels\n\n`Display`, `FromStr`, and serde share one snake_case label per kind\n(`\"fixed\"`, `\"floating\"`, `\"pre_payment\"`). `FromStr` is ASCII\ncase-insensitive and ignores surrounding whitespace; serde accepts only\nthe canonical label."
   },
   {
     "path": "#/$defs/d_c1062118d66ed5ee9642/oneOf/0",
@@ -1326,8 +1326,8 @@ export default [
   {
     "path": "#/$defs/d_c1062118d66ed5ee9642/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CFKind/oneOf/1",
-    "const": "float_reset",
-    "description": "Floating-rate coupon cash-flow (or index fixing event).\n\nInterest payment based on a reference rate (e.g., SOFR, EURIBOR) plus spread.\nThe `reset_date` field on [`CashFlow`] indicates when the rate was fixed.\nThe `rate` field stores the all-in rate (index + spread) if known."
+    "const": "floating",
+    "description": "Floating-rate coupon cash settlement.\n\nInterest payment based on a reference rate (e.g., SOFR, EURIBOR) plus\nspread; never a standalone fixing event. The `reset_date` field on\n[`CashFlow`] is the index observation date (metadata, not the payment\ndate). The `rate` field stores the all-in rate (index + spread) if known."
   },
   {
     "path": "#/$defs/d_c1062118d66ed5ee9642/oneOf/10",
@@ -1380,14 +1380,14 @@ export default [
   {
     "path": "#/$defs/d_c1062118d66ed5ee9642/oneOf/18",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CFKind/oneOf/18",
-    "const": "stub",
-    "description": "Irregular stub period interest.\n\nInterest payment for a non-standard accrual period at the beginning (front stub)\nor end (back stub) of a schedule. May be short stub (< regular period) or\nlong stub (> regular period). Accrual factor reflects actual period length."
+    "const": "protection_payment",
+    "description": "Credit protection payment.\n\nActual cash paid by the protection seller on a credit event (for\nexample a CDS default leg settlement). Distinct from asset recovery\ncash ([`Self::Recovery`]) and from a noncash principal write-down\n([`Self::DefaultedNotional`])."
   },
   {
     "path": "#/$defs/d_c1062118d66ed5ee9642/oneOf/19",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CFKind/oneOf/19",
-    "const": "initial_margin_post",
-    "description": "Initial margin posting (collateral transfer out to counterparty).\n\nRepresents the posting of initial margin collateral under CSA or clearing\nhouse rules. The amount is typically calculated using SIMM, schedule-based,\nor haircut methodologies."
+    "const": "stub",
+    "description": "Irregular stub period interest.\n\nInterest payment for a non-standard accrual period at the beginning (front stub)\nor end (back stub) of a schedule. May be short stub (< regular period) or\nlong stub (> regular period). Accrual factor reflects actual period length."
   },
   {
     "path": "#/$defs/d_c1062118d66ed5ee9642/oneOf/2",
@@ -1398,36 +1398,42 @@ export default [
   {
     "path": "#/$defs/d_c1062118d66ed5ee9642/oneOf/20",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CFKind/oneOf/20",
-    "const": "initial_margin_return",
-    "description": "Initial margin return (collateral returned from counterparty).\n\nRepresents the return of previously posted initial margin when exposure\ndecreases or trade is terminated."
+    "const": "initial_margin_post",
+    "description": "Initial margin posting (collateral transfer out to counterparty).\n\nRepresents the posting of initial margin collateral under CSA or clearing\nhouse rules. The amount is typically calculated using SIMM, schedule-based,\nor haircut methodologies."
   },
   {
     "path": "#/$defs/d_c1062118d66ed5ee9642/oneOf/21",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CFKind/oneOf/21",
-    "const": "variation_margin_receive",
-    "description": "Variation margin received (positive VM payment to us).\n\nDaily or periodic mark-to-market payment received when exposure moves\nin our favor. Governed by CSA threshold, MTA, and rounding rules."
+    "const": "initial_margin_return",
+    "description": "Initial margin return (collateral returned from counterparty).\n\nRepresents the return of previously posted initial margin when exposure\ndecreases or trade is terminated."
   },
   {
     "path": "#/$defs/d_c1062118d66ed5ee9642/oneOf/22",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CFKind/oneOf/22",
-    "const": "variation_margin_pay",
-    "description": "Variation margin paid (negative VM payment from us).\n\nDaily or periodic mark-to-market payment made when exposure moves\nagainst us. Governed by CSA threshold, MTA, and rounding rules."
+    "const": "variation_margin_receive",
+    "description": "Variation margin received (positive VM payment to us).\n\nDaily or periodic mark-to-market payment received when exposure moves\nin our favor. Governed by CSA threshold, MTA, and rounding rules."
   },
   {
     "path": "#/$defs/d_c1062118d66ed5ee9642/oneOf/23",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CFKind/oneOf/23",
-    "const": "margin_interest",
-    "description": "Interest accrued on posted margin collateral.\n\nRepresents interest paid or received on cash collateral posted as margin.\nRate typically defined in CSA (e.g., Fed Funds, EONIA, SONIA)."
+    "const": "variation_margin_pay",
+    "description": "Variation margin paid (negative VM payment from us).\n\nDaily or periodic mark-to-market payment made when exposure moves\nagainst us. Governed by CSA threshold, MTA, and rounding rules."
   },
   {
     "path": "#/$defs/d_c1062118d66ed5ee9642/oneOf/24",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CFKind/oneOf/24",
-    "const": "collateral_substitution_in",
-    "description": "Collateral substitution inflow (replacement collateral received).\n\nWhen a counterparty substitutes one form of eligible collateral for another,\nthis represents the incoming replacement asset."
+    "const": "margin_interest",
+    "description": "Interest accrued on posted margin collateral.\n\nRepresents interest paid or received on cash collateral posted as margin.\nRate typically defined in CSA (e.g., Fed Funds, EONIA, SONIA)."
   },
   {
     "path": "#/$defs/d_c1062118d66ed5ee9642/oneOf/25",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CFKind/oneOf/25",
+    "const": "collateral_substitution_in",
+    "description": "Collateral substitution inflow (replacement collateral received).\n\nWhen a counterparty substitutes one form of eligible collateral for another,\nthis represents the incoming replacement asset."
+  },
+  {
+    "path": "#/$defs/d_c1062118d66ed5ee9642/oneOf/26",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CFKind/oneOf/26",
     "const": "collateral_substitution_out",
     "description": "Collateral substitution outflow (original collateral returned).\n\nWhen a counterparty substitutes collateral, this represents the return\nof the original collateral being replaced."
   },

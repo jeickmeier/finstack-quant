@@ -265,7 +265,7 @@ fn cashflows_json_bridge_builds_floating_schedule_with_market_json() {
         .as_array()
         .unwrap()
         .iter()
-        .filter(|flow| flow["kind"] == "float_reset")
+        .filter(|flow| flow["kind"] == "floating")
         .collect();
 
     assert!(!float_flows.is_empty());
@@ -316,7 +316,7 @@ fn cashflows_json_bridge_builds_fixed_to_float_and_explicit_windows() {
         .filter_map(|flow| flow["kind"].as_str())
         .collect();
     assert!(kinds.contains("fixed"));
-    assert!(kinds.contains("float_reset"));
+    assert!(kinds.contains("floating"));
 
     let explicit_windows = canonical_program_spec_json(
         serde_json::json!([

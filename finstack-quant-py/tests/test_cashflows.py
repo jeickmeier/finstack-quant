@@ -173,7 +173,7 @@ def test_cashflows_builds_floating_schedule_with_market_json() -> None:
     schedule_json = build_cashflow_schedule_json(_floating_cashflow_spec(), _floating_market_json())
     schedule = json.loads(schedule_json)
 
-    float_flows = [flow for flow in schedule["flows"] if flow["kind"] == "float_reset"]
+    float_flows = [flow for flow in schedule["flows"] if flow["kind"] == "floating"]
     assert float_flows
     assert all(flow["rate"] > 0.015 for flow in float_flows)
 
@@ -245,7 +245,7 @@ def test_cashflows_builds_fixed_to_float_and_explicit_windows() -> None:
         ],
     }
     built = json.loads(build_cashflow_schedule_json(json.dumps(fixed_to_float)))
-    assert {flow["kind"] for flow in built["flows"]} >= {"fixed", "float_reset"}
+    assert {flow["kind"] for flow in built["flows"]} >= {"fixed", "floating"}
 
     explicit_windows = {
         **base,
@@ -265,7 +265,7 @@ def test_cashflows_builds_fixed_to_float_and_explicit_windows() -> None:
         ],
     }
     built = json.loads(build_cashflow_schedule_json(json.dumps(explicit_windows)))
-    assert {flow["kind"] for flow in built["flows"]} >= {"fixed", "float_reset"}
+    assert {flow["kind"] for flow in built["flows"]} >= {"fixed", "floating"}
 
 
 def test_cashflows_reports_overlapping_payment_windows() -> None:

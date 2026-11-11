@@ -19,7 +19,7 @@ use finstack_quant_core::types::CurveId;
 /// additions and sorts them after all known variants.
 fn kind_rank(kind: CFKind) -> u8 {
     match kind {
-        CFKind::Fixed | CFKind::Stub | CFKind::FloatReset | CFKind::InflationCoupon => 0,
+        CFKind::Fixed | CFKind::Stub | CFKind::Floating | CFKind::InflationCoupon => 0,
         CFKind::Fee
         | CFKind::CommitmentFee
         | CFKind::UsageFee
@@ -609,7 +609,7 @@ impl CashFlowSchedule {
                 let interest_bearing = matches!(
                     flow.kind,
                     CFKind::Fixed
-                        | CFKind::FloatReset
+                        | CFKind::Floating
                         | CFKind::InflationCoupon
                         | CFKind::Pik
                         | CFKind::Stub
@@ -687,8 +687,8 @@ impl CashFlowSchedule {
 
     /// Get an iterator over interest-like coupon cashflows.
     ///
-    /// Filters the schedule via [`CFKind::is_interest_like`] — currently
-    /// `Fixed`, `FloatReset`, `InflationCoupon`, and `Stub`. PIK, fees,
+    /// Filters the schedule via [`CFKind::is_coupon`] — currently
+    /// `Fixed`, `Floating`, `InflationCoupon`, and `Stub`. PIK, fees,
     /// amortization, recovery, and notional flows are excluded.
     ///
     /// # Examples
@@ -718,7 +718,7 @@ impl CashFlowSchedule {
     /// assert_eq!(coupons[0].kind, CFKind::Fixed);
     /// ```
     pub fn coupons(&self) -> impl Iterator<Item = &CashFlow> {
-        self.flows.iter().filter(|cf| cf.kind.is_interest_like())
+        self.flows.iter().filter(|cf| cf.kind.is_coupon())
     }
 
     /// Weighted Average Life (WAL) in years from `as_of`.
@@ -763,7 +763,7 @@ impl CashFlowSchedule {
         weighted_average_life_from_principal(
             self.flows
                 .iter()
-                .filter(|cf| cf.kind.is_principal_repayment())
+                .filter(|cf| cf.kind.is_repayment_like())
                 .map(|cf| {
                     let amount = match cf.principal_delta {
                         Some(delta) => delta.checked_neg(),
@@ -1468,7 +1468,7 @@ mod tests {
     fn canonical_order_distinguishes_kinds_with_shared_economic_ranks() {
         let date = Date::from_calendar_date(2025, Month::June, 15).expect("date");
         for (first, second) in [
-            (CFKind::Fixed, CFKind::FloatReset),
+            (CFKind::Fixed, CFKind::Floating),
             (CFKind::Fee, CFKind::CommitmentFee),
             (CFKind::Recovery, CFKind::AccruedOnDefault),
             (CFKind::Notional, CFKind::RevolvingDraw),
@@ -1967,7 +1967,7 @@ mod tests {
             CashFlowMeta::default(),
         );
         let projected = CashFlowSchedule::from_flows_unchecked(
-            vec![flow(date, 1.0, CFKind::FloatReset)],
+            vec![flow(date, 1.0, CFKind::Floating)],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
             CashFlowMeta {

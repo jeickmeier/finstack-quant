@@ -127,7 +127,7 @@ class PortfolioCashflows:
 
         Columns: ``position_id``, ``instrument_id``, ``instrument_type``,
         ``date`` (ISO 8601 string), ``amount`` (position-scaled), ``currency``,
-        ``kind`` (``"fixed"``, ``"float_reset"``, ``"notional"``, ...),
+        ``kind`` (``"fixed"``, ``"floating"``, ``"notional"``, ...),
         ``reset_date`` (ISO 8601 string, ``None`` outside floating coupons),
         ``accrual_factor``, ``rate`` (``None`` when the event carries no rate).
 

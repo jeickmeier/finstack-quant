@@ -358,7 +358,7 @@ const cases = {
       parse: ['fixed', 'pre_payment', 'collateral_substitution_out'].map((name) =>
         core.cfKindParse(name)
       ),
-      interest_like: ['fixed', 'float_reset', 'fee', 'notional'].map((kind) =>
+      interest_like: ['fixed', 'floating', 'fee', 'notional'].map((kind) =>
         core.cfKindIsInterestLike(kind)
       ),
       principal_like: ['fixed', 'pik', 'amortization', 'recovery'].map((kind) =>
@@ -807,7 +807,7 @@ test('explicit observation cutoff requires and consumes post-anchor fixings', ()
   assert.throws(() => builder().buildAsOf(market, '2025-02-01'), /fixing|FIXING/);
   market.insertSeries(new core.ScalarTimeSeries('FIXING:USD-SOFR-3M', [['2025-01-15', 0.06]]));
   const result = builder().buildAsOf(market, '2025-02-01');
-  const coupon = result.getFlows().find((flow) => flow.kind === 'float_reset');
+  const coupon = result.getFlows().find((flow) => flow.kind === 'floating');
   assert.ok(coupon);
   assert.ok(Math.abs(coupon.rate - 0.06) < 1e-12);
   assert.ok(Math.abs(Number(coupon.amount.amount) - 15000) < 1e-8);

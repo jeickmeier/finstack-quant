@@ -710,7 +710,7 @@ pub(crate) fn emit_float_coupons_on(
                             period.payment_date,
                             Some(reset_date),
                             Money::from_model_value(settlement.cash_amount, ccy)?,
-                            CFKind::FloatReset,
+                            CFKind::Floating,
                             segment.year_fraction,
                             Some(settlement.all_in_rate),
                         )

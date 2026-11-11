@@ -2961,7 +2961,7 @@ export interface DCe740Ebb40B6A9A3Bc22 {
    */
   kind:
     | "fixed"
-    | "float_reset"
+    | "floating"
     | "inflation_coupon"
     | "fee"
     | "commitment_fee"
@@ -2978,6 +2978,7 @@ export interface DCe740Ebb40B6A9A3Bc22 {
     | "defaulted_notional"
     | "recovery"
     | "accrued_on_default"
+    | "protection_payment"
     | "stub"
     | "initial_margin_post"
     | "initial_margin_return"

@@ -531,7 +531,7 @@ fn bounded_split_pik_capitalizes_net_coupon_on_one_contractual_boundary() {
             .sum();
         let cash: f64 = schedule
             .coupons()
-            .filter(|flow| flow.kind == CFKind::FloatReset)
+            .filter(|flow| flow.kind == CFKind::Floating)
             .map(|flow| flow.amount.amount())
             .sum();
         close(cash + pik, expected_interest);

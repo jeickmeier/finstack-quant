@@ -134,7 +134,7 @@ pub(crate) fn pv_mtm_reset_raw(
 /// The emitted flows are, in order:
 /// 1. Initial principal exchange at `T_0` with amount `sign * N_0^R` (kind `Notional`).
 /// 2. For each future coupon period `[T_j, T_{j+1}]`: a floating coupon at the payment
-///    date with amount `sign * N_j^R * (R + s) * τ` (kind `FloatReset`). The notional
+///    date with amount `sign * N_j^R * (R + s) * τ` (kind `Floating`). The notional
 ///    `N_j^R` captures the per-period mark.
 /// 3. For each interior reset `T_j` (j ≥ 1): a rebalancing flow with amount
 ///    `sign * (N_j^R - N_{j-1}^R)` (kind `Notional`). The constant leg has no
@@ -302,7 +302,7 @@ fn project_mtm_cashflows(
                 constant_leg.side.sign() * projected.unsigned_coupon(n_c, spread_c),
                 constant_leg.notional.currency(),
             )?,
-            CFKind::FloatReset,
+            CFKind::Floating,
             projected.year_fraction,
             Some(all_in),
         ));
@@ -381,7 +381,7 @@ fn project_mtm_cashflows(
                 period.payment_date,
                 projected_r.fixing_date.or(period.reset_date),
                 Money::from_model_value(coupon_amount, resetting_leg.notional.currency())?,
-                CFKind::FloatReset,
+                CFKind::Floating,
                 projected_r.year_fraction,
                 Some(projected_r.all_in_rate(spread_decimal)),
             ));

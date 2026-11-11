@@ -41,7 +41,7 @@ pub(crate) struct DistPoint {
 ///
 /// | CFKind                    | Treatment              |
 /// |---------------------------|------------------------|
-/// | `Fixed`, `FloatReset`, `Stub` | Cash coupon (counted) |
+/// | `Fixed`, `Floating`, `Stub` | Cash coupon (counted) |
 /// | `Amortization`            | Cash; reduces outstanding |
 /// | `Notional`                | Excluded from cash; draws/repayments change outstanding |
 /// | `PIK`                     | Excluded from cash; increases outstanding |
@@ -88,7 +88,7 @@ pub(crate) fn realized_distributions(
         while j < flows.len() && flows[j].date == d {
             let cf = &flows[j];
             match cf.kind {
-                CFKind::Fixed | CFKind::FloatReset | CFKind::Stub => {
+                CFKind::Fixed | CFKind::Floating | CFKind::Stub => {
                     coupon_at_d += cf.amount.amount().max(0.0);
                 }
                 CFKind::Amortization => {
@@ -249,7 +249,7 @@ pub(crate) fn lower_return_floor(
         }
         if matches!(
             flow.kind,
-            CFKind::Fixed | CFKind::FloatReset | CFKind::Stub | CFKind::Amortization
+            CFKind::Fixed | CFKind::Floating | CFKind::Stub | CFKind::Amortization
         ) {
             *distributions.entry(flow.date).or_default() += flow.amount.amount().max(0.0);
         }

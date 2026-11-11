@@ -12,7 +12,7 @@ use finstack_quant_core::money::Money;
 fn is_rebuildable_interest(kind: CFKind) -> bool {
     matches!(
         kind,
-        CFKind::Fixed | CFKind::Stub | CFKind::FloatReset | CFKind::Pik
+        CFKind::Fixed | CFKind::Stub | CFKind::Floating | CFKind::Pik
     )
 }
 

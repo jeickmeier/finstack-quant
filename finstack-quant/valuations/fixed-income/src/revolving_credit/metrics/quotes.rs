@@ -56,7 +56,7 @@ pub(crate) fn accrued_interest(
     let interest: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.date == period.payment_date && cf.kind.is_interest_like())
+        .filter(|cf| cf.date == period.payment_date && cf.kind.is_coupon())
         .map(|cf| cf.amount.amount())
         .sum();
     if interest == 0.0 {

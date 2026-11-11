@@ -175,7 +175,7 @@ fn test_roundtrip_all_business_day_conventions() {
 fn test_roundtrip_all_cfkinds() {
     let kinds = vec![
         CFKind::Fixed,
-        CFKind::FloatReset,
+        CFKind::Floating,
         CFKind::Notional,
         CFKind::Pik,
         CFKind::Amortization,

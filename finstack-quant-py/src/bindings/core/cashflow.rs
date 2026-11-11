@@ -49,7 +49,7 @@ cf_kind_classattrs! {
     /// Fixed-rate coupon cash-flow.
     FIXED => Fixed,
     /// Floating-rate coupon cash-flow (or index fixing event).
-    FLOAT_RESET => FloatReset,
+    FLOATING => Floating,
     /// Inflation-linked coupon cash-flow.
     INFLATION_COUPON => InflationCoupon,
     /// Up-front fee or cost paid at inception.
@@ -82,6 +82,8 @@ cf_kind_classattrs! {
     RECOVERY => Recovery,
     /// Accrued-on-default interest (ISDA standard for CDS).
     ACCRUED_ON_DEFAULT => AccruedOnDefault,
+    /// Credit protection payment (cash paid by the protection seller).
+    PROTECTION_PAYMENT => ProtectionPayment,
     /// Irregular stub period interest.
     STUB => Stub,
     /// Initial margin posting (collateral transfer out).
@@ -117,9 +119,9 @@ impl PyCFKind {
         self.inner.to_string()
     }
 
-    /// Whether this kind is interest-bearing (Fixed/FloatReset/InflationCoupon/Stub).
-    fn is_interest_like(&self) -> bool {
-        self.inner.is_interest_like()
+    /// Whether this kind is interest-bearing (Fixed/Floating/InflationCoupon/Stub).
+    fn is_coupon(&self) -> bool {
+        self.inner.is_coupon()
     }
 
     /// Whether this kind changes principal balance (notional, PIK, amortization, …).

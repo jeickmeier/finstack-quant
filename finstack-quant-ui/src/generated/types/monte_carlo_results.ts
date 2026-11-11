@@ -82,7 +82,7 @@ export type DCf776B61125046D84B45 =
                */
               cashflow_kind:
                 | "fixed"
-                | "float_reset"
+                | "floating"
                 | "inflation_coupon"
                 | "fee"
                 | "commitment_fee"
@@ -99,6 +99,7 @@ export type DCf776B61125046D84B45 =
                 | "defaulted_notional"
                 | "recovery"
                 | "accrued_on_default"
+                | "protection_payment"
                 | "stub"
                 | "initial_margin_post"
                 | "initial_margin_return"

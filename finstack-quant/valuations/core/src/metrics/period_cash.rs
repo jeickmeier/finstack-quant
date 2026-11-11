@@ -28,7 +28,7 @@ pub struct PeriodCash {
 /// # Period-cash policy
 ///
 /// Included (signed):
-/// - Coupons and stub interest: [`CFKind::Fixed`], [`CFKind::FloatReset`],
+/// - Coupons and stub interest: [`CFKind::Fixed`], [`CFKind::Floating`],
 ///   [`CFKind::InflationCoupon`], [`CFKind::Stub`], [`CFKind::AccruedOnDefault`]
 /// - Fees: [`CFKind::Fee`], [`CFKind::CommitmentFee`], [`CFKind::UsageFee`],
 ///   [`CFKind::FacilityFee`], [`CFKind::LcFee`], [`CFKind::FrontingFee`],
@@ -146,7 +146,7 @@ pub(crate) fn period_cash_by_date_cached(
 fn is_period_income(kind: CFKind) -> bool {
     match kind {
         CFKind::Fixed
-        | CFKind::FloatReset
+        | CFKind::Floating
         | CFKind::InflationCoupon
         | CFKind::Stub
         | CFKind::Fee

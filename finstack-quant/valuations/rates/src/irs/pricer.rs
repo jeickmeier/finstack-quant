@@ -164,7 +164,7 @@ impl InterestRateSwap {
 
         let mut acc = NeumaierAccumulator::new();
         for flow in float_sched.get_flows() {
-            if flow.kind != CFKind::FloatReset {
+            if flow.kind != CFKind::Floating {
                 continue;
             }
             let payment_date = flow.date;

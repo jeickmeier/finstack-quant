@@ -131,7 +131,7 @@ pub(super) fn floating_bullet(
         close(fixing.value.expect("projected raw fixing"), 0.045, 1e-11);
     }
     for (index, flow) in schedule.coupons().enumerate() {
-        assert_eq!(flow.kind, CFKind::FloatReset);
+        assert_eq!(flow.kind, CFKind::Floating);
         let accrual = flow.accrual.as_ref().expect("floating accrual");
         assert_eq!(accrual.day_count, DayCount::Act360);
         assert_eq!(

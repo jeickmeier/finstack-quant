@@ -614,7 +614,7 @@ impl CmsSwap {
                     payment_date,
                     Some(fixing_date),
                     Money::from_model_value(signed_amount, self.notional.currency())?,
-                    CFKind::FloatReset,
+                    CFKind::Floating,
                     accrual_fraction,
                     Some(coupon_rate),
                 )
@@ -683,7 +683,7 @@ impl CmsSwap {
                     (
                         index_rate + spread_bp.as_f64() / 10_000.0,
                         Some(index_rate),
-                        CFKind::FloatReset,
+                        CFKind::Floating,
                         Some(period.reset_date),
                     )
                 }
@@ -1001,7 +1001,7 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .filter(|flow| flow.kind == CFKind::FloatReset)
+                .filter(|flow| flow.kind == CFKind::Floating)
                 .count(),
             swap.payment_dates.len()
         );

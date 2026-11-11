@@ -89,7 +89,7 @@ pub fn build_node_coupons(
     }
 
     for cf in inputs.schedule.get_flows() {
-        if cf.kind != CFKind::FloatReset {
+        if cf.kind != CFKind::Floating {
             continue;
         }
         // Future observation only: a published fixing (reset on or before

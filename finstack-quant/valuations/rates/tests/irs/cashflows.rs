@@ -123,7 +123,7 @@ fn test_irs_cashflows_have_no_notional_exchange() {
         schedule.get_flows().iter().any(|cf| matches!(
             cf.kind,
             finstack_quant_core::cashflow::CFKind::Fixed
-                | finstack_quant_core::cashflow::CFKind::FloatReset
+                | finstack_quant_core::cashflow::CFKind::Floating
         )),
         "coupon flows must remain without retain_flows"
     );
@@ -284,7 +284,7 @@ fn test_irs_value_matches_combined_signed_schedule() {
                     swap.fixed_leg.payment_lag_days,
                     swap.fixed_leg.calendar_id.as_deref(),
                 )?,
-                finstack_quant_core::cashflow::CFKind::FloatReset => add_payment_delay(
+                finstack_quant_core::cashflow::CFKind::Floating => add_payment_delay(
                     flow.date,
                     swap.float_leg.payment_lag_days,
                     swap.float_leg.calendar_id.as_deref(),
@@ -484,7 +484,7 @@ fn test_irs_full_schedule_with_cfkind() {
     let has_float = sched
         .get_flows()
         .iter()
-        .any(|cf| cf.kind == CFKind::FloatReset);
+        .any(|cf| cf.kind == CFKind::Floating);
 
     assert!(has_fixed || has_float, "Should have classified cashflows");
 }
@@ -944,7 +944,7 @@ fn test_irs_explicit_zero_reset_lag_preserved() {
     let first_reset = full_schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
+        .find(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Floating)
         .and_then(|cf| cf.reset_date)
         .expect("reset date");
     // With reset_lag_days: 0, reset date should equal accrual start (spot reset)
@@ -981,7 +981,7 @@ fn test_irs_receive_fixed_cashflow_signs() {
                     "Fixed leg should be positive for Receive"
                 );
             }
-            CFKind::FloatReset => {
+            CFKind::Floating => {
                 // Pay floating: should be negative
                 assert!(
                     cf.amount.amount() < 0.0,
@@ -1023,7 +1023,7 @@ fn test_irs_pay_fixed_cashflow_signs() {
                     "Fixed leg should be negative for Pay"
                 );
             }
-            CFKind::FloatReset => {
+            CFKind::Floating => {
                 // Receive floating: should be positive
                 assert!(
                     cf.amount.amount() > 0.0,
@@ -1103,7 +1103,7 @@ fn test_irs_npv_parity_at_par_rate() {
     let float_sum: f64 = full_schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .map(|cf| cf.amount.amount())
         .sum();
 

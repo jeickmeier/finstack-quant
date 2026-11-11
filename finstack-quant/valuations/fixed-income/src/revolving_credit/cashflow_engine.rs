@@ -596,7 +596,7 @@ impl<'a> CashflowEngine<'a> {
                     total_interest,
                     match &self.facility.rate {
                         RateSpec::Fixed { .. } => CFKind::Fixed,
-                        RateSpec::Floating(_) => CFKind::FloatReset,
+                        RateSpec::Floating(_) => CFKind::Floating,
                     },
                     total_accrual,
                     avg_interest_rate,
@@ -1013,7 +1013,7 @@ impl<'a> CashflowEngine<'a> {
                         interest,
                         match &self.facility.rate {
                             RateSpec::Fixed { .. } => CFKind::Fixed,
-                            RateSpec::Floating(_) => CFKind::FloatReset,
+                            RateSpec::Floating(_) => CFKind::Floating,
                         },
                         accrual,
                         (accrual > 0.0).then(|| weighted_rate / accrual),
@@ -1378,7 +1378,7 @@ mod tests {
             let coupon = schedule
                 .get_flows()
                 .iter()
-                .find(|flow| flow.kind == CFKind::FloatReset)
+                .find(|flow| flow.kind == CFKind::Floating)
                 .expect("floating coupon");
             assert!((coupon.amount.amount() - expected).abs() < 1e-7);
             assert!(schedule.get_meta().projected_fixings.iter().all(|fixing| {
@@ -1418,7 +1418,7 @@ mod tests {
                         .schedule
                         .get_flows()
                         .iter()
-                        .find(|flow| flow.kind == CFKind::FloatReset)
+                        .find(|flow| flow.kind == CFKind::Floating)
                         .expect("floating path coupon");
                     let expected = expected
                         + if observed {
@@ -1557,7 +1557,7 @@ mod tests {
                     let coupons: Vec<_> = schedule
                         .get_flows()
                         .iter()
-                        .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::FloatReset))
+                        .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Floating))
                         .collect();
                     assert_eq!(coupons.len(), 1);
                     assert!(

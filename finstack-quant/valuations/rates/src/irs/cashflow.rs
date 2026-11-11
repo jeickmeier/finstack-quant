@@ -302,7 +302,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
             period.payment_date,
             None,
             Money::new(coupon_amount, irs.notional.currency())?,
-            CFKind::FloatReset,
+            CFKind::Floating,
             accrual_year_fraction,
             Some(all_in_rate),
         ));
@@ -395,7 +395,7 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
 ///
 /// # Returns
 ///
-/// A `CashFlowSchedule` containing all floating leg cashflows with `CFKind::FloatReset`
+/// A `CashFlowSchedule` containing all floating leg cashflows with `CFKind::Floating`
 /// classifications.
 ///
 /// # Errors
@@ -581,7 +581,7 @@ mod tests {
         let coupon = schedule
             .get_flows()
             .iter()
-            .find(|cf| cf.kind == CFKind::FloatReset)
+            .find(|cf| cf.kind == CFKind::Floating)
             .expect("coupon");
         assert!(
             (coupon.amount.amount() - 150_000.0).abs() < 1e-6,
@@ -686,7 +686,7 @@ mod tests {
             let expected = &full.get_flows()[0];
             assert_eq!(actual.date, date!(2025 - 01 - 14));
             assert_eq!(actual.date, expected.date);
-            assert_eq!(actual.kind, CFKind::FloatReset);
+            assert_eq!(actual.kind, CFKind::Floating);
             assert_eq!(actual.kind, expected.kind);
             assert_eq!(actual.amount.currency(), Currency::USD);
             assert_eq!(actual.amount.currency(), expected.amount.currency());
@@ -764,7 +764,7 @@ mod tests {
             float
                 .get_flows()
                 .iter()
-                .all(|cf| cf.kind == CFKind::FloatReset),
+                .all(|cf| cf.kind == CFKind::Floating),
             "float_leg_schedule should be coupon-only"
         );
     }

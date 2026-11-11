@@ -325,7 +325,7 @@ fn intra_period_resets_refix_the_coupon_in_both_engines() {
     let first = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::FloatReset)
+        .find(|cf| cf.kind == CFKind::Floating)
         .expect("first coupon");
     let expected = 10_000_000.0 * (0.02 * t_feb + 0.04 * (t_mar - t_feb) + 0.06 * (t_apr - t_mar));
     let period_start_only = 10_000_000.0 * 0.02 * t_apr;
@@ -361,13 +361,13 @@ fn intra_period_resets_refix_the_coupon_in_both_engines() {
         .cashflows
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .map(|cf| cf.amount.amount())
         .collect();
     let det_coupons: Vec<f64> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .map(|cf| cf.amount.amount())
         .collect();
     assert_eq!(path_coupons.len(), det_coupons.len());
@@ -437,7 +437,7 @@ fn stochastic_hull_white_rates_keep_the_index_basis() {
                 .cashflows
                 .get_flows()
                 .iter()
-                .find(|cf| cf.kind == CFKind::FloatReset)
+                .find(|cf| cf.kind == CFKind::Floating)
                 .and_then(|cf| cf.rate)
                 .expect("first coupon rate")
         };

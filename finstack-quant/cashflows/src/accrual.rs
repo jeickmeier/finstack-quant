@@ -441,7 +441,7 @@ fn coupon_day_count_context(
 
 /// Check if a cashflow kind is a coupon that should be included in accrual.
 fn is_coupon_kind(kind: CFKind, include_pik: bool) -> bool {
-    kind.is_interest_like() || (include_pik && kind == CFKind::Pik)
+    kind.is_coupon() || (include_pik && kind == CFKind::Pik)
 }
 
 fn derive_horizon_start(

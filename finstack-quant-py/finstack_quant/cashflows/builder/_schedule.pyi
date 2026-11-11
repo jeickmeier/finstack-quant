@@ -309,7 +309,7 @@ class CashFlowSchedule:
         Returns
         -------
         list[CashFlow]
-            Flows whose kind is Fixed, FloatReset, InflationCoupon, or
+            Flows whose kind is Fixed, Floating, InflationCoupon, or
             Stub, in schedule order.
 
         Notes

@@ -386,7 +386,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
         let projection = self.project(context, as_of)?;
         let mut flows: Vec<CashFlow> = Vec::new();
         let interest_kind = match self.rate {
-            RateSpec::Floating(_) => CFKind::FloatReset,
+            RateSpec::Floating(_) => CFKind::Floating,
             RateSpec::Fixed { .. } => CFKind::Fixed,
         };
         for (date, amount) in &projection.facility.interest_flows {

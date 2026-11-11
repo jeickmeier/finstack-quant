@@ -467,7 +467,7 @@ fn seasoned_mtm_schedule_uses_resetting_leg_fixing() {
         .get_flows()
         .iter()
         .find(|flow| {
-            flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset
+            flow.kind == finstack_quant_core::cashflow::CFKind::Floating
                 && flow.amount.currency() == Currency::EUR
         })
         .expect("EUR resetting coupon");
@@ -478,7 +478,7 @@ fn seasoned_mtm_schedule_uses_resetting_leg_fixing() {
         .get_flows()
         .iter()
         .find(|flow| {
-            flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset
+            flow.kind == finstack_quant_core::cashflow::CFKind::Floating
                 && flow.amount.currency() == Currency::USD
         })
         .expect("USD constant coupon");
@@ -555,7 +555,7 @@ fn mtm_constant_leg_spread_changes_pv_and_schedule_rate() {
         .get_flows()
         .iter()
         .find(|flow| {
-            flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset
+            flow.kind == finstack_quant_core::cashflow::CFKind::Floating
                 && flow.amount.currency() == Currency::EUR
         })
         .expect("EUR constant coupon");
@@ -587,7 +587,7 @@ fn mtm_schedule_applies_leg_specific_coupon_frequencies() {
         .get_flows()
         .iter()
         .filter(|flow| {
-            flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset
+            flow.kind == finstack_quant_core::cashflow::CFKind::Floating
                 && flow.amount.currency() == Currency::EUR
         })
         .count();
@@ -595,7 +595,7 @@ fn mtm_schedule_applies_leg_specific_coupon_frequencies() {
         .get_flows()
         .iter()
         .filter(|flow| {
-            flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset
+            flow.kind == finstack_quant_core::cashflow::CFKind::Floating
                 && flow.amount.currency() == Currency::USD
         })
         .count();

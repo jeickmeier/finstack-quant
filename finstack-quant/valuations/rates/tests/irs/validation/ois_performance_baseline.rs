@@ -309,7 +309,7 @@ fn check_reference(
     let floating: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::FloatReset)
+        .filter(|flow| flow.kind == CFKind::Floating)
         .collect();
     assert_eq!(floating.len(), reference.coupons.len());
     for (flow, coupon) in floating.iter().zip(&reference.coupons) {
@@ -473,7 +473,7 @@ fn check_compact(
         CashflowRepresentation::Projected
     );
     assert_eq!(before.get_flows().len(), 2);
-    for kind in [CFKind::Stub, CFKind::FloatReset] {
+    for kind in [CFKind::Stub, CFKind::Floating] {
         assert_eq!(
             before
                 .get_flows()
@@ -514,7 +514,7 @@ fn check_compact(
                 );
                 close("fixed coupon rate", flow.rate.unwrap(), 0.04, FACTOR_BOUND);
             }
-            CFKind::FloatReset => {
+            CFKind::Floating => {
                 close(
                     "signed floating coupon",
                     flow.amount.amount(),
@@ -593,7 +593,7 @@ fn ois_baseline_compact_export_and_inclusive_fixing_roll() {
         spread_schedule.get_meta().projected_fixings
     );
     for (base, shifted) in schedule.get_flows().iter().zip(spread_schedule.get_flows()) {
-        let expected_change = if base.kind == CFKind::FloatReset {
+        let expected_change = if base.kind == CFKind::Floating {
             NOTIONAL * 0.01 * 8.0 / 360.0
         } else {
             0.0

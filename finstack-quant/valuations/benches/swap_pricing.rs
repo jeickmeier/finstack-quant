@@ -788,7 +788,7 @@ fn assert_ois_schedule(schedule: &CashFlowSchedule) {
         schedule
             .get_flows()
             .iter()
-            .filter(|flow| flow.kind == CFKind::FloatReset)
+            .filter(|flow| flow.kind == CFKind::Floating)
             .count(),
         5
     );

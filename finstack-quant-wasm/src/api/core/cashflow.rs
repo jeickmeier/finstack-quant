@@ -15,7 +15,7 @@ use wasm_bindgen::prelude::*;
 /// Parsed by Rust `CFKind::from_str`: the canonical snake_case wire string,
 /// ignoring surrounding whitespace and ASCII case.
 ///
-/// @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
+/// @param name - Kind label such as `"fixed"`, `"floating"` or `"pre_payment"`.
 /// @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.
 /// @throws If `name` is not a string (kind `invalid_type`) or names no cashflow kind (kind `validation`).
 #[wasm_bindgen(js_name = cfKindParse, unchecked_return_type = "generated.cashflows.CFKind")]
@@ -34,10 +34,10 @@ pub fn cf_kind_parse(
 /// @returns `true` for coupon-type kinds; fees, principal and margin kinds are `false`.
 /// @throws If `kind` is not a `CFKind` wire string (kind `validation`).
 #[wasm_bindgen(js_name = cfKindIsInterestLike)]
-pub fn cf_kind_is_interest_like(
+pub fn cf_kind_is_coupon(
     #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CFKind")] kind: JsValue,
 ) -> Result<bool, JsValue> {
-    Ok(js_wire::<CFKind>(&kind, "kind")?.is_interest_like())
+    Ok(js_wire::<CFKind>(&kind, "kind")?.is_coupon())
 }
 
 /// Whether a cashflow kind changes or returns principal.

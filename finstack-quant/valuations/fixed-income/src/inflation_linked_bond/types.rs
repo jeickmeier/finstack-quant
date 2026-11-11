@@ -522,7 +522,7 @@ impl InflationLinkedBond {
         let coupons = schedule
             .get_flows()
             .iter()
-            .filter(|flow| flow.kind.is_interest_like())
+            .filter(|flow| flow.kind.is_coupon())
             .map(|flow| {
                 let (start, end) = flow
                     .accrual

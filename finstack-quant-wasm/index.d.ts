@@ -1616,7 +1616,7 @@ export interface CoreNamespace {
    * Parsed by Rust `CFKind::from_str`: the canonical snake_case wire string,
    * ignoring surrounding whitespace and ASCII case.
    *
-   * @param name - Kind label such as `"fixed"`, `"float_reset"` or `"pre_payment"`.
+   * @param name - Kind label such as `"fixed"`, `"floating"` or `"pre_payment"`.
    * @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.
    * @throws If `name` is not a string (kind `invalid_type`) or names no cashflow kind (kind `validation`).
    */

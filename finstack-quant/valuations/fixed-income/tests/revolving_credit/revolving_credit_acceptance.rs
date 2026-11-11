@@ -352,7 +352,7 @@ fn test_reset_frequency_mismatch() {
         .get_flows()
         .iter()
         .find(|cf| {
-            cf.date == end && matches!(cf.kind, finstack_quant_core::cashflow::CFKind::FloatReset)
+            cf.date == end && matches!(cf.kind, finstack_quant_core::cashflow::CFKind::Floating)
         })
         .expect("Should have floating interest flow");
 
@@ -515,7 +515,7 @@ fn test_as_of_filtering() {
             matches!(
                 cf.kind,
                 finstack_quant_core::cashflow::CFKind::Fixed
-                    | finstack_quant_core::cashflow::CFKind::FloatReset
+                    | finstack_quant_core::cashflow::CFKind::Floating
                     | finstack_quant_core::cashflow::CFKind::Fee
             )
         })

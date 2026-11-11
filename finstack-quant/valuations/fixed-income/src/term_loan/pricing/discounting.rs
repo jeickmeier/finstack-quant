@@ -134,7 +134,7 @@ impl TermLoanDiscountingPricer {
     ///
     /// PIK (payment-in-kind) interest is capitalized into outstanding principal and excluded
     /// from PV calculation. Only cash flows are discounted:
-    /// - Coupons (Fixed, FloatReset, Stub)
+    /// - Coupons (Fixed, Floating, Stub)
     /// - Amortization
     /// - Redemptions (Notional)
     /// - Fees
@@ -408,7 +408,7 @@ impl TermLoanDiscountingPricer {
         }
 
         let has_past_reset = schedule.get_flows().iter().any(|flow| {
-            flow.kind == CFKind::FloatReset && flow.reset_date.is_some_and(|date| date < as_of)
+            flow.kind == CFKind::Floating && flow.reset_date.is_some_and(|date| date < as_of)
         });
         if !has_past_reset {
             return Ok(());
@@ -447,7 +447,7 @@ impl TermLoanDiscountingPricer {
         };
 
         schedule.try_update_flows(|flow| {
-            if flow.kind != CFKind::FloatReset {
+            if flow.kind != CFKind::Floating {
                 return Ok(());
             }
             let reset_date = match flow.reset_date {
@@ -681,21 +681,19 @@ mod tests {
         let schedule = TermLoanDiscountingPricer::pricing_schedule(&loan, &market, as_of)
             .expect("complete fixing history");
 
-        // Check that FloatReset flows with reset_date < as_of use the fixing rate.
+        // Check that Floating flows with reset_date < as_of use the fixing rate.
         // Fixing rate = 0.02, spread = 300 bp = 0.03 => all_in = 0.05 (with gearing=1).
         let fixing_rate_expected = 0.02 + 0.03; // 5% all-in (but from 2% fixing + 300 bp)
 
         let past_float_flows: Vec<_> = schedule
             .get_flows()
             .iter()
-            .filter(|cf| {
-                cf.kind == CFKind::FloatReset && cf.reset_date.is_some_and(|rd| rd < as_of)
-            })
+            .filter(|cf| cf.kind == CFKind::Floating && cf.reset_date.is_some_and(|rd| rd < as_of))
             .collect();
 
         assert!(
             !past_float_flows.is_empty(),
-            "should have past FloatReset flows"
+            "should have past Floating flows"
         );
 
         for flow in &past_float_flows {
@@ -763,9 +761,7 @@ mod tests {
         let current_coupon = schedule
             .get_flows()
             .iter()
-            .find(|flow| {
-                flow.kind == CFKind::FloatReset && flow.reset_date == Some(date(2025, 4, 1))
-            })
+            .find(|flow| flow.kind == CFKind::Floating && flow.reset_date == Some(date(2025, 4, 1)))
             .expect("current reset coupon");
         let rate = current_coupon.rate.expect("all-in rate");
         assert!(

@@ -1484,7 +1484,7 @@ export type OvernightIndexConstraintApplication = "daily" | "period";
  * # Cashflow Categories
  *
  * Variants are grouped by category:
- * - **Interest**: `Fixed`, `FloatReset`, `Stub`
+ * - **Interest**: `Fixed`, `Floating`, `Stub`
  * - **Inflation**: `InflationCoupon`
  * - **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`, `LcFee`, `FrontingFee`
  * - **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`
@@ -1495,13 +1495,13 @@ export type OvernightIndexConstraintApplication = "daily" | "period";
  * # Labels
  *
  * `Display`, `FromStr`, and serde share one snake_case label per kind
- * (`"fixed"`, `"float_reset"`, `"pre_payment"`). `FromStr` is ASCII
+ * (`"fixed"`, `"floating"`, `"pre_payment"`). `FromStr` is ASCII
  * case-insensitive and ignores surrounding whitespace; serde accepts only
  * the canonical label.
  */
 export type CFKind =
   | "fixed"
-  | "float_reset"
+  | "floating"
   | "inflation_coupon"
   | "fee"
   | "commitment_fee"
@@ -1518,6 +1518,7 @@ export type CFKind =
   | "defaulted_notional"
   | "recovery"
   | "accrued_on_default"
+  | "protection_payment"
   | "stub"
   | "initial_margin_post"
   | "initial_margin_return"
@@ -7179,7 +7180,7 @@ export interface CashFlow {
    */
   amount: Money;
   /**
-   * Payment date (or payment date for principal/fee, or reset date for `CFKind::FloatReset`).
+   * Payment date (or payment date for principal/fee, or reset date for `CFKind::Floating`).
    */
   date: DateWire;
   /**

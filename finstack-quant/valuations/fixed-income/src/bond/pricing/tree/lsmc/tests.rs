@@ -574,7 +574,7 @@ fn floating_pik_uses_accrual_boundaries_with_lagged_and_early_cash_dates() {
             .get_flows()
             .iter()
             .find(|flow| {
-                flow.kind == CFKind::FloatReset && flow.date == first.compiled.period().payment_date
+                flow.kind == CFKind::Floating && flow.date == first.compiled.period().payment_date
             })
             .expect("first cash coupon")
             .amount

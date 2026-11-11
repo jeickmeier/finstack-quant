@@ -28,7 +28,7 @@ pub(crate) fn bond_coupon_dates(bond: &Bond) -> Result<Vec<(Date, Date, Date)>> 
     if let Some(schedule) = &bond.custom_cashflows {
         let mut periods = Vec::new();
         for flow in schedule.get_flows() {
-            if !(flow.kind.is_interest_like() || flow.kind == CFKind::Pik) {
+            if !(flow.kind.is_coupon() || flow.kind == CFKind::Pik) {
                 continue;
             }
             let accrual = flow.accrual.as_ref().ok_or_else(|| {
@@ -172,7 +172,7 @@ pub(crate) fn bond_model_schedule(bond: &Bond, as_of: Date) -> Result<BondModelS
     let ex_coupon = bond.accrual_config().ex_coupon;
     let mut coupon_flows: Vec<(Date, f64)> = Vec::new();
     for cf in schedule.get_flows() {
-        if cf.date <= as_of || !(cf.kind.is_interest_like() || cf.kind == CFKind::Pik) {
+        if cf.date <= as_of || !(cf.kind.is_coupon() || cf.kind == CFKind::Pik) {
             continue;
         }
         if let Some(rule) = &ex_coupon
@@ -351,7 +351,7 @@ mod tests {
             .full_cashflow_schedule(&MarketContext::new())
             .expect("custom source");
         custom.update_flows(|flow| {
-            if flow.kind.is_interest_like() {
+            if flow.kind.is_coupon() {
                 flow.date = bond.maturity;
             }
         });

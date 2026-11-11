@@ -231,7 +231,7 @@ pub(super) fn expected_linear(schedule: &CashFlowSchedule, date: Date, include_p
     schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind.is_interest_like() || (include_pik && flow.kind == CFKind::Pik))
+        .filter(|flow| flow.kind.is_coupon() || (include_pik && flow.kind == CFKind::Pik))
         .map(|flow| {
             let accrual = flow.accrual.as_ref().expect("contractual accrual");
             if date < accrual.start || date >= flow.date {
@@ -277,8 +277,8 @@ pub(super) fn queries(schedule: &CashFlowSchedule, cfg: &AccrualConfig, dates: &
                 .iter()
                 .enumerate()
                 .filter_map(|(row, flow)| {
-                    let eligible = flow.kind.is_interest_like()
-                        || (cfg.include_pik && flow.kind == CFKind::Pik);
+                    let eligible =
+                        flow.kind.is_coupon() || (cfg.include_pik && flow.kind == CFKind::Pik);
                     let accrual = flow.accrual.as_ref()?;
                     (eligible && accrual.start <= date && date < flow.date).then_some(row)
                 })

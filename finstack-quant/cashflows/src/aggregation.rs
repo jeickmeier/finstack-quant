@@ -756,7 +756,7 @@ where
 }
 
 fn principal_repayment_amount(cf: &CashFlow, base: Date) -> finstack_quant_core::Result<f64> {
-    if !cf.kind.is_principal_repayment() || cf.amount.amount() <= 0.0 {
+    if !cf.kind.is_repayment_like() || cf.amount.amount() <= 0.0 {
         return Ok(0.0);
     }
     if cf.get_balance_date() < base {

@@ -333,7 +333,7 @@ mod tests {
         let (mut floating, mut fixed): (Vec<_>, Vec<_>) = schedule
             .get_flows()
             .iter()
-            .partition(|flow| matches!(flow.kind, CFKind::FloatReset));
+            .partition(|flow| matches!(flow.kind, CFKind::Floating));
         fixed.sort_by_key(|flow| flow.date);
         floating.sort_by_key(|flow| flow.date);
 

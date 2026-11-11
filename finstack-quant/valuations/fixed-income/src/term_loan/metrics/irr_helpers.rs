@@ -287,7 +287,7 @@ pub(super) fn exercisable_call_candidates(
                 matches!(
                     cf.kind,
                     finstack_quant_core::cashflow::CFKind::Fixed
-                        | finstack_quant_core::cashflow::CFKind::FloatReset
+                        | finstack_quant_core::cashflow::CFKind::Floating
                         | finstack_quant_core::cashflow::CFKind::Stub
                 )
             })

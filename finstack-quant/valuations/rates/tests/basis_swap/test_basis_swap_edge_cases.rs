@@ -72,7 +72,7 @@ fn basis_swap_cashflows_have_no_notional_exchange() {
         schedule
             .get_flows()
             .iter()
-            .any(|cf| cf.kind == CFKind::FloatReset),
+            .any(|cf| cf.kind == CFKind::Floating),
         "coupon flows must remain without retain_flows"
     );
 }

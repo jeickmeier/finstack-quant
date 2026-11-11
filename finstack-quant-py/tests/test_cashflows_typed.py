@@ -19,11 +19,11 @@ class TestPrimitives:
         from finstack_quant.core.cashflow import CFKind
 
         assert CFKind.parse("fixed") == CFKind.FIXED
-        assert CFKind.FLOAT_RESET.name == "float_reset"
+        assert CFKind.FLOATING.name == "floating"
         assert str(CFKind.AMORTIZATION) == "amortization"
         assert CFKind.PIK != CFKind.FIXED
-        assert CFKind.FIXED.is_interest_like()
-        assert not CFKind.FEE.is_interest_like()
+        assert CFKind.FIXED.is_coupon()
+        assert not CFKind.FEE.is_coupon()
         assert CFKind.NOTIONAL.is_principal_like()
         assert not CFKind.FIXED.is_principal_like()
         assert CFKind.parse("lc_fee") == CFKind.LC_FEE
@@ -756,7 +756,7 @@ class TestCashFlowBuilder:
             .floating_cf(spec)
             .build(market)
         )
-        floats = [f for f in schedule.get_flows() if f.kind == CFKind.FLOAT_RESET]
+        floats = [f for f in schedule.get_flows() if f.kind == CFKind.FLOATING]
         assert len(floats) == 4
         assert all(f.amount.amount > 0.0 for f in floats)
 
@@ -795,7 +795,7 @@ class TestCashFlowBuilder:
         )
         kinds = {f.kind for f in schedule.get_flows()}
         assert CFKind.FIXED in kinds
-        assert CFKind.FLOAT_RESET in kinds
+        assert CFKind.FLOATING in kinds
 
     def test_float_margin_steps_are_effective_from(self) -> None:
         from decimal import Decimal
@@ -826,7 +826,7 @@ class TestCashFlowBuilder:
             .build(None)
         )
         floats = sorted(
-            (f for f in schedule.get_flows() if f.kind == CFKind.FLOAT_RESET),
+            (f for f in schedule.get_flows() if f.kind == CFKind.FLOATING),
             key=lambda f: f.date,
         )
         # Spread-only fallback (no market): coupon = 1M x spread x days/360.
@@ -1674,7 +1674,7 @@ def test_build_as_of_uses_fixings_after_curve_anchor() -> None:
         builder().build_as_of(market, dt.date(2025, 2, 1))
     market.insert_series(ScalarTimeSeries("FIXING:USD-SOFR-3M", [(dt.date(2025, 1, 13), 0.06)]))
     schedule = builder().build_as_of(market, dt.date(2025, 2, 1))
-    coupon = next(flow for flow in schedule.get_flows() if flow.kind == CFKind.FLOAT_RESET)
+    coupon = next(flow for flow in schedule.get_flows() if flow.kind == CFKind.FLOATING)
     assert coupon.rate == pytest.approx(0.06, abs=1e-12)
     assert coupon.amount.amount == pytest.approx(15_000.0, abs=1e-8)
 

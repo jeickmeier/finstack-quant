@@ -316,7 +316,7 @@ pub(super) fn check(fixture: &Fixture, schedule: &CashFlowSchedule) -> Reference
         raw_fixings: BTreeMap::new(),
     };
     for (quarter, flow) in schedule.coupons().enumerate() {
-        assert_eq!(flow.kind, CFKind::FloatReset);
+        assert_eq!(flow.kind, CFKind::Floating);
         assert_eq!(flow.amount.currency(), Currency::USD);
         let start = issue().add_months(quarter as i32 * 3).unwrap();
         let end = issue().add_months((quarter as i32 + 1) * 3).unwrap();

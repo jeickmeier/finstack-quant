@@ -210,7 +210,7 @@ fn test_json_bridge_build_validate_flows_and_accrual() {
     assert!(schedule.get_flows().iter().any(|flow| matches!(
         flow.kind,
         finstack_quant_core::cashflow::CFKind::Fixed
-            | finstack_quant_core::cashflow::CFKind::FloatReset
+            | finstack_quant_core::cashflow::CFKind::Floating
             | finstack_quant_core::cashflow::CFKind::Stub
             | finstack_quant_core::cashflow::CFKind::InflationCoupon
     )));
@@ -687,7 +687,7 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
     let first_coupon = schedule
         .get_flows()
         .iter()
-        .find(|flow| matches!(flow.kind, finstack_quant_core::cashflow::CFKind::FloatReset))
+        .find(|flow| matches!(flow.kind, finstack_quant_core::cashflow::CFKind::Floating))
         .expect("schedule has a floating coupon");
 
     // First coupon (accrues 2025-01-15 -> 2025-04-15): 4.0% fixing + 100 bp

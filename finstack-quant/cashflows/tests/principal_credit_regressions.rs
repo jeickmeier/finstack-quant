@@ -49,7 +49,7 @@ fn cds_front_accrual_replays_pre_issue_and_later_balance_changes() {
         let first_coupon: f64 = schedule
             .get_flows()
             .iter()
-            .filter(|flow| flow.kind.is_interest_like() && flow.date.to_string() == "2024-03-20")
+            .filter(|flow| flow.kind.is_coupon() && flow.date.to_string() == "2024-03-20")
             .map(|flow| flow.amount.amount())
             .sum();
         let expected = if pre_issue_draw {

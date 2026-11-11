@@ -82,7 +82,7 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
             .get_flows()
             .iter()
             .filter(|flow| flow.date >= period.start && flow.date < period.end)
-            .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub | CFKind::FloatReset))
+            .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub | CFKind::Floating))
             .map(|flow| flow.amount.amount())
             .sum();
         assert!(net != 0.0, "fixture must produce a net payment or receipt");
@@ -229,7 +229,7 @@ fn canonical_negative_debt_coupons_are_income() {
         .get_flows()
         .iter()
         .filter(|flow| flow.date >= period.start && flow.date < period.end)
-        .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub | CFKind::FloatReset))
+        .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub | CFKind::Floating))
         .map(|flow| flow.amount.amount())
         .sum();
     assert!(

@@ -267,7 +267,7 @@ export type D_76Adf23Abc095Fd56514 =
                */
               cashflow_kind:
                 | "fixed"
-                | "float_reset"
+                | "floating"
                 | "inflation_coupon"
                 | "fee"
                 | "commitment_fee"
@@ -284,6 +284,7 @@ export type D_76Adf23Abc095Fd56514 =
                 | "defaulted_notional"
                 | "recovery"
                 | "accrued_on_default"
+                | "protection_payment"
                 | "stub"
                 | "initial_margin_post"
                 | "initial_margin_return"

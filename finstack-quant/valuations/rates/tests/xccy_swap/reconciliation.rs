@@ -19,7 +19,7 @@ use super::fixtures::*;
 
 const EURUSD_SPOT: f64 = 1.10;
 
-/// Discount the schedule's coupon (`FloatReset`) flows per currency on that
+/// Discount the schedule's coupon (`Floating`) flows per currency on that
 /// currency's discount curve and convert to USD at the valuation-date spot.
 fn coupon_pv_from_schedule(
     swap: &XccySwap,
@@ -34,7 +34,7 @@ fn coupon_pv_from_schedule(
 
     let mut pv_usd = 0.0;
     for flow in schedule.get_flows() {
-        if flow.kind != CFKind::FloatReset || flow.date <= as_of {
+        if flow.kind != CFKind::Floating || flow.date <= as_of {
             continue;
         }
         match flow.amount.currency() {

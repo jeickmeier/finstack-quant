@@ -445,7 +445,7 @@ pub(crate) fn settlement_asw_components(
         .iter()
         .filter(|flow| flow.date > settlement && flow.kind != CFKind::Pik)
     {
-        if flow.kind.is_interest_like() {
+        if flow.kind.is_coupon() {
             if let Some(rule) = &ex_coupon
                 && rule.is_ex_coupon(flow.date, settlement)?
             {

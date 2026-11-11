@@ -91,7 +91,7 @@ fn term_coupon_uses_the_actual_reset_date_fixing() {
     let first_float = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::FloatReset)
+        .find(|cf| cf.kind == CFKind::Floating)
         .expect("expected a floating coupon");
     let reset_date = first_float
         .reset_date
@@ -153,7 +153,7 @@ fn term_index_rate_is_invariant_to_payment_frequency() {
     let first_float = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::FloatReset)
+        .find(|cf| cf.kind == CFKind::Floating)
         .expect("expected at least one floating coupon");
 
     let reset_date = first_float
@@ -219,16 +219,16 @@ fn test_floating_rate_fallback_spread_only_no_curve() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert!(
         !float_flows.is_empty(),
-        "Should have at least one FloatReset flow"
+        "Should have at least one Floating flow"
     );
 
     for cf in &float_flows {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - 0.02).abs() < 1e-10,
             "Rate should be 0.02 (spread-only), got {}",
@@ -263,17 +263,17 @@ fn test_floating_rate_fallback_fixed_rate() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert!(
         !float_flows.is_empty(),
-        "Should have at least one FloatReset flow"
+        "Should have at least one Floating flow"
     );
 
     // rate = (0.045 + 0.02) * 1.0 = 0.065
     for cf in &float_flows {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - 0.065).abs() < 1e-10,
             "Rate should be 0.065 (fixed index 4.5% + 200bp spread), got {}",
@@ -308,17 +308,17 @@ fn test_floating_rate_fallback_fixed_rate_with_floor_cap() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert!(
         !float_flows.is_empty(),
-        "Should have at least one FloatReset flow"
+        "Should have at least one Floating flow"
     );
 
     // Uncapped rate would be 0.065, but all-in cap = 5% = 0.05
     for cf in &float_flows {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - 0.05).abs() < 1e-10,
             "Rate should be capped at 0.05 (all-in cap 500bp), got {}",
@@ -356,16 +356,16 @@ fn test_floating_rate_default_fallback_with_curve() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert!(
         !float_flows.is_empty(),
-        "Should have FloatReset flows when curve is present"
+        "Should have Floating flows when curve is present"
     );
 
     for cf in &float_flows {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         let index_rate = cf
             .accrual
             .as_ref()
@@ -434,11 +434,11 @@ fn test_pik_flow_metadata() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
     assert!(
         float_flows.is_empty(),
-        "100% PIK coupon should have no FloatReset (cash) flows"
+        "100% PIK coupon should have no Floating (cash) flows"
     );
 }
 
@@ -486,20 +486,20 @@ fn test_floating_rate_golden_sofr_200bp() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert_eq!(
         float_flows.len(),
         4,
-        "Expected 4 quarterly FloatReset flows, got {}",
+        "Expected 4 quarterly Floating flows, got {}",
         float_flows.len()
     );
 
     let expected_rate = 0.065; // 4.5% index + 2.0% spread
 
     for (i, cf) in float_flows.iter().enumerate() {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - expected_rate).abs() < RATE_TOLERANCE,
             "Flow {}: rate should be {} (SOFR 4.5% + 200bp), got {}",
@@ -552,20 +552,20 @@ fn test_floating_rate_golden_zero_spread() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert_eq!(
         float_flows.len(),
         4,
-        "Expected 4 quarterly FloatReset flows, got {}",
+        "Expected 4 quarterly Floating flows, got {}",
         float_flows.len()
     );
 
     let expected_rate = 0.045; // Index rate only, no spread
 
     for (i, cf) in float_flows.iter().enumerate() {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - expected_rate).abs() < RATE_TOLERANCE,
             "Flow {}: rate should be exactly {} (index only, zero spread), got {}",
@@ -612,13 +612,13 @@ fn test_floating_rate_golden_gearing_includes_spread() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert_eq!(
         float_flows.len(),
         4,
-        "Expected 4 quarterly FloatReset flows, got {}",
+        "Expected 4 quarterly Floating flows, got {}",
         float_flows.len()
     );
 
@@ -627,7 +627,7 @@ fn test_floating_rate_golden_gearing_includes_spread() {
     let expected_rate = 0.0975;
 
     for (i, cf) in float_flows.iter().enumerate() {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - expected_rate).abs() < RATE_TOLERANCE,
             "Flow {}: rate should be {} (1.5 * (4.5% + 2%)), got {}",
@@ -673,13 +673,13 @@ fn test_floating_rate_golden_gearing_excludes_spread() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert_eq!(
         float_flows.len(),
         4,
-        "Expected 4 quarterly FloatReset flows, got {}",
+        "Expected 4 quarterly Floating flows, got {}",
         float_flows.len()
     );
 
@@ -688,7 +688,7 @@ fn test_floating_rate_golden_gearing_excludes_spread() {
     let expected_rate = 0.0875;
 
     for (i, cf) in float_flows.iter().enumerate() {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - expected_rate).abs() < RATE_TOLERANCE,
             "Flow {}: rate should be {} (1.5 * 4.5% + 2%), got {}",
@@ -746,19 +746,19 @@ fn test_floating_rate_index_floor_zero() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert!(
         !float_flows.is_empty(),
-        "Should have at least one FloatReset flow"
+        "Should have at least one Floating flow"
     );
 
     // Index = -0.4%, floored at 0% -> eff_index = 0%
     // all-in = (0% + 3%) * 1.0 = 3% = 0.03
     let expected_rate = 0.03;
     for (i, cf) in float_flows.iter().enumerate() {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - expected_rate).abs() < RATE_TOLERANCE,
             "Flow {}: rate should be {} (index floored at 0% + 300bp spread), got {}",
@@ -793,19 +793,19 @@ fn test_floating_rate_index_cap() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert!(
         !float_flows.is_empty(),
-        "Should have at least one FloatReset flow"
+        "Should have at least one Floating flow"
     );
 
     // Index = 6%, capped at 5% -> eff_index = 5%
     // all-in = (5% + 2%) * 1.0 = 7% = 0.07
     let expected_rate = 0.07;
     for (i, cf) in float_flows.iter().enumerate() {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - expected_rate).abs() < RATE_TOLERANCE,
             "Flow {}: rate should be {} (index capped at 5% + 200bp spread), got {}",
@@ -840,18 +840,18 @@ fn test_floating_rate_all_in_cap() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert!(
         !float_flows.is_empty(),
-        "Should have at least one FloatReset flow"
+        "Should have at least one Floating flow"
     );
 
     // Uncapped = 6% + 2% = 8%, but all-in cap at 7% -> rate = 0.07
     let expected_rate = 0.07;
     for (i, cf) in float_flows.iter().enumerate() {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - expected_rate).abs() < RATE_TOLERANCE,
             "Flow {}: rate should be {} (all-in capped at 7%), got {}",
@@ -885,19 +885,19 @@ fn test_floating_rate_negative_index_no_floor() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert!(
         !float_flows.is_empty(),
-        "Should have at least one FloatReset flow"
+        "Should have at least one Floating flow"
     );
 
     // No floor: index = -0.4%, spread = 3%
     // all-in = (-0.004 + 0.03) * 1.0 = 0.026
     let expected_rate = 0.026;
     for (i, cf) in float_flows.iter().enumerate() {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - expected_rate).abs() < RATE_TOLERANCE,
             "Flow {}: rate should be {} (negative index -0.4% + 300bp spread, no floor), got {}",
@@ -932,18 +932,18 @@ fn test_floating_rate_all_in_floor() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert!(
         !float_flows.is_empty(),
-        "Should have at least one FloatReset flow"
+        "Should have at least one Floating flow"
     );
 
     // Unfloored = -2% + 2% = 0%, but all-in floor at 1% -> rate = 0.01
     let expected_rate = 0.01;
     for (i, cf) in float_flows.iter().enumerate() {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - expected_rate).abs() < RATE_TOLERANCE,
             "Flow {}: rate should be {} (all-in floored at 1%), got {}",
@@ -1026,13 +1026,13 @@ fn test_overnight_compounding_flat_curve() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert_eq!(
         float_flows.len(),
         4,
-        "Expected 4 quarterly FloatReset flows, got {}",
+        "Expected 4 quarterly Floating flows, got {}",
         float_flows.len()
     );
 
@@ -1041,7 +1041,7 @@ fn test_overnight_compounding_flat_curve() {
     // Allow a small tolerance for compounding effects on flat curve.
     let expected_rate = 0.065;
     for (i, cf) in float_flows.iter().enumerate() {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - expected_rate).abs() < 0.001,
             "Flow {}: overnight compounded rate should be ~{} (flat 4.5% + 200bp), got {}",
@@ -1090,13 +1090,13 @@ fn test_overnight_simple_average_flat() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert_eq!(
         float_flows.len(),
         4,
-        "Expected 4 quarterly FloatReset flows, got {}",
+        "Expected 4 quarterly Floating flows, got {}",
         float_flows.len()
     );
 
@@ -1104,7 +1104,7 @@ fn test_overnight_simple_average_flat() {
     // All-in = 4.5% + 2% = 6.5%.
     let expected_rate = 0.065;
     for (i, cf) in float_flows.iter().enumerate() {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - expected_rate).abs() < 0.001,
             "Flow {}: simple average rate should be ~{} (flat 4.5% + 200bp), got {}",
@@ -1141,20 +1141,20 @@ fn test_overnight_lockout_flat_curve() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert_eq!(
         float_flows.len(),
         4,
-        "Expected 4 quarterly FloatReset flows, got {}",
+        "Expected 4 quarterly Floating flows, got {}",
         float_flows.len()
     );
 
     // Lockout on a flat curve has no effect — rate is still ~4.5% + 2% = 6.5%.
     let expected_rate = 0.065;
     for (i, cf) in float_flows.iter().enumerate() {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - expected_rate).abs() < 0.001,
             "Flow {}: lockout rate should be ~{} (flat 4.5% + 200bp), got {}",
@@ -1223,20 +1223,20 @@ fn test_overnight_observation_shift_samples_pre_accrual_window() {
     let arrears_rates: Vec<f64> = arrears_schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
-        .map(|cf| cf.rate.expect("FloatReset has a rate"))
+        .filter(|cf| cf.kind == CFKind::Floating)
+        .map(|cf| cf.rate.expect("Floating has a rate"))
         .collect();
     let shifted_rates: Vec<f64> = shifted_schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
-        .map(|cf| cf.rate.expect("FloatReset has a rate"))
+        .filter(|cf| cf.kind == CFKind::Floating)
+        .map(|cf| cf.rate.expect("Floating has a rate"))
         .collect();
 
     assert_eq!(
         arrears_rates.len(),
         shifted_rates.len(),
-        "both schedules produce the same number of FloatReset flows"
+        "both schedules produce the same number of Floating flows"
     );
     assert!(
         !arrears_rates.is_empty(),
@@ -1318,14 +1318,14 @@ fn test_overnight_lookback_samples_pre_accrual_rates() {
     let arrears_rates: Vec<f64> = arrears_schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
-        .map(|cf| cf.rate.expect("FloatReset has a rate"))
+        .filter(|cf| cf.kind == CFKind::Floating)
+        .map(|cf| cf.rate.expect("Floating has a rate"))
         .collect();
     let lookback_rates: Vec<f64> = lookback_schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
-        .map(|cf| cf.rate.expect("FloatReset has a rate"))
+        .filter(|cf| cf.kind == CFKind::Floating)
+        .map(|cf| cf.rate.expect("Floating has a rate"))
         .collect();
 
     assert_eq!(arrears_rates.len(), lookback_rates.len(), "same schedule");
@@ -1398,14 +1398,14 @@ fn test_overnight_compounding_no_curve_spread_only_fallback() {
     let float_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
-    assert!(!float_flows.is_empty(), "Should have FloatReset flows");
+    assert!(!float_flows.is_empty(), "Should have Floating flows");
 
     // SpreadOnly: index=0, all-in = spread = 200bp = 0.02
     for cf in &float_flows {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - 0.02).abs() < 1e-10,
             "Rate should be 0.02 (spread-only), got {}",
@@ -1447,12 +1447,12 @@ fn test_overnight_vs_term_rate_flat_curve_equivalence() {
     let overnight_flows: Vec<_> = overnight_schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
     let term_flows: Vec<_> = term_schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert_eq!(
@@ -1562,12 +1562,12 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
     let sat_floats: Vec<_> = sat_schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
     let mon_floats: Vec<_> = mon_schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .collect();
 
     assert!(
@@ -1581,7 +1581,7 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
 
     // Both should produce ~5% rate on a flat curve
     for cf in &sat_floats {
-        let rate = cf.rate.expect("FloatReset should have a rate");
+        let rate = cf.rate.expect("Floating should have a rate");
         assert!(
             (rate - 0.05).abs() < 0.002,
             "Saturday-start overnight rate should be ~5%, got {:.6}",
@@ -1680,7 +1680,7 @@ fn test_weekend_only_stub_requires_and_carries_preceding_fixing() {
     let coupon = projected
         .get_flows()
         .iter()
-        .find(|flow| flow.kind == CFKind::FloatReset)
+        .find(|flow| flow.kind == CFKind::Floating)
         .expect("one weekend coupon");
     assert!((coupon.amount.amount() - 1_000_000.0 * 0.06 / 360.0).abs() < 1e-7);
 }
@@ -1738,7 +1738,7 @@ fn test_seasoned_coupon_before_curve_base_uses_fixed_rate_fallback() {
     let rates: Vec<(Date, f64)> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .map(|cf| (cf.date, cf.rate.expect("rate")))
         .collect();
     assert_eq!(rates.len(), 4, "quarterly coupons over one year");
@@ -1803,7 +1803,7 @@ fn test_overnight_sampling_uses_fixing_calendar() {
     let first_rate = |s: &CashFlowSchedule| {
         s.get_flows()
             .iter()
-            .find(|cf| cf.kind == CFKind::FloatReset)
+            .find(|cf| cf.kind == CFKind::Floating)
             .and_then(|cf| cf.rate)
             .expect("first floating coupon rate")
     };
@@ -1850,7 +1850,7 @@ fn expected_compounded(rates_weights: &[(f64, u32)], total_days: u32) -> f64 {
 }
 
 /// Helper: single-period overnight schedule [issue, maturity) and the emitted
-/// FloatReset rate.
+/// Floating rate.
 fn build_single_overnight_coupon(
     method: FloatingLegCompounding,
     issue: Date,
@@ -1872,9 +1872,9 @@ fn build_single_overnight_coupon(
     Ok(schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::FloatReset)
+        .find(|cf| cf.kind == CFKind::Floating)
         .and_then(|cf| cf.rate)
-        .expect("single overnight FloatReset coupon with a rate"))
+        .expect("single overnight Floating coupon with a rate"))
 }
 
 /// Partially seasoned compounded-in-arrears coupon: the curve is based
@@ -2297,7 +2297,7 @@ fn test_seasoned_term_reset_resolves_from_exact_fixing_with_spread_and_gearing()
     let rates: Vec<f64> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .map(|cf| cf.rate.expect("rate"))
         .collect();
     assert_eq!(rates.len(), 4, "quarterly coupons over one year");
@@ -2343,7 +2343,7 @@ fn test_term_reset_before_curve_base_uses_fixing_when_accrual_starts_on_base() {
     let first_float = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::FloatReset)
+        .find(|cf| cf.kind == CFKind::Floating)
         .expect("floating coupon");
     assert_eq!(first_float.reset_date, Some(reset_date));
     let rate = first_float.rate.expect("rate");
@@ -2394,7 +2394,7 @@ fn test_overnight_index_floor_defaults_to_daily_fixing_application() {
     let rate = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::FloatReset)
+        .find(|cf| cf.kind == CFKind::Floating)
         .and_then(|cf| cf.rate)
         .expect("rate");
 
@@ -2427,7 +2427,7 @@ fn test_term_reset_on_curve_base_projects_without_same_day_fixing() {
     let rate = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::FloatReset)
+        .find(|cf| cf.kind == CFKind::Floating)
         .and_then(|cf| cf.rate)
         .expect("floating rate");
     assert!(
@@ -2518,7 +2518,7 @@ fn overnight_projection_is_invariant_to_the_curve_day_count_clock() {
         let coupon = schedule
             .get_flows()
             .iter()
-            .find(|cf| cf.kind == CFKind::FloatReset)
+            .find(|cf| cf.kind == CFKind::Floating)
             .expect("one floating coupon");
         assert!(
             (coupon.rate.expect("coupon rate") - 0.045).abs() < RATE_TOLERANCE,
@@ -2575,17 +2575,17 @@ fn overnight_basis_none_inherits_act365f() {
     let inferred_cf = inferred_sched
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::FloatReset)
+        .find(|cf| cf.kind == CFKind::Floating)
         .expect("float coupon");
     let act365_cf = act365_sched
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::FloatReset)
+        .find(|cf| cf.kind == CFKind::Floating)
         .expect("float coupon");
     let act360_cf = act360_sched
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::FloatReset)
+        .find(|cf| cf.kind == CFKind::Floating)
         .expect("float coupon");
 
     assert!(
@@ -2626,14 +2626,14 @@ fn overnight_basis_none_inherits_act360() {
     let inferred_cf = build(inferred)
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::FloatReset)
+        .find(|cf| cf.kind == CFKind::Floating)
         .expect("float coupon")
         .amount
         .amount();
     let explicit_cf = build(explicit)
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::FloatReset)
+        .find(|cf| cf.kind == CFKind::Floating)
         .expect("float coupon")
         .amount
         .amount();

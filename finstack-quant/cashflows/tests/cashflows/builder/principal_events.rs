@@ -988,7 +988,7 @@ fn margin_step_coupons(steps: &[(Date, Decimal)]) -> finstack_quant_core::Result
     let mut flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .map(|cf| (cf.date, cf.amount.amount()))
         .collect();
     flows.sort_by_key(|flow| flow.0);

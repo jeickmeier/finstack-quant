@@ -605,7 +605,7 @@ impl ReplayTemplate {
         let mut dynamic_flow_indices = BTreeSet::new();
         if let Some(spec) = floating_spec {
             for (flow_index, flow) in schedule.get_flows().iter().enumerate() {
-                if !matches!(flow.kind, CFKind::FloatReset | CFKind::Pik) {
+                if !matches!(flow.kind, CFKind::Floating | CFKind::Pik) {
                     continue;
                 }
                 let Some(accrual) = &flow.accrual else {
@@ -1138,7 +1138,7 @@ impl ReplayTemplate {
             if let Some(accrual) = flow
                 .accrual
                 .as_ref()
-                .filter(|_| matches!(flow.kind, CFKind::Fixed | CFKind::FloatReset | CFKind::Pik))
+                .filter(|_| matches!(flow.kind, CFKind::Fixed | CFKind::Floating | CFKind::Pik))
                 .filter(|accrual| flow.date >= as_of || accrual.end >= as_of)
             {
                 static_accruals.push(AccrualClaim {

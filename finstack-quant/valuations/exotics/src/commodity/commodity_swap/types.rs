@@ -342,7 +342,7 @@ impl CommoditySwap {
     ) -> Result<CashFlow> {
         Ok(CashFlow::new(
             period.payment_date,
-            (kind == CFKind::FloatReset).then_some(period.accrual_start),
+            (kind == CFKind::Floating).then_some(period.accrual_start),
             Money::new(amount, self.underlying.currency)?,
             kind,
             period.accrual_year_fraction,
@@ -434,7 +434,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommoditySwap {
             flows.push(self.classified_flow(
                 &period,
                 -fixed_sign * self.quantity * floating_price,
-                CFKind::FloatReset,
+                CFKind::Floating,
             )?);
         }
         let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
@@ -770,7 +770,7 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .filter(|flow| flow.kind == CFKind::FloatReset)
+                .filter(|flow| flow.kind == CFKind::Floating)
                 .count(),
             3
         );

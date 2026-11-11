@@ -737,7 +737,7 @@
           "amount": "13798.611111111111",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25,
         "rate": 0.05519444444444444,
         "accrual": {
@@ -757,7 +757,7 @@
           "amount": "14267.9012345679",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25277777777777777,
         "rate": 0.05644444444444444,
         "accrual": {
@@ -777,7 +777,7 @@
           "amount": "14747.685185185184",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25555555555555554,
         "rate": 0.057708333333333334,
         "accrual": {
@@ -797,7 +797,7 @@
           "amount": "15074.228395061726",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25555555555555554,
         "rate": 0.05898611111111111,
         "accrual": {
@@ -817,7 +817,7 @@
           "amount": "15032.98611111111",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25,
         "rate": 0.06013194444444444,
         "accrual": {
@@ -837,7 +837,7 @@
           "amount": "15358.005401234566",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25277777777777777,
         "rate": 0.06075694444444444,
         "accrual": {
@@ -857,7 +857,7 @@
           "amount": "15688.27160493827",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25555555555555554,
         "rate": 0.06138888888888889,
         "accrual": {
@@ -877,7 +877,7 @@
           "amount": "15851.543209876541",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25555555555555554,
         "rate": 0.06202777777777778,
         "accrual": {
@@ -1055,7 +1055,7 @@
           "amount": "15032.98611111111",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25,
         "rate": 0.06013194444444444,
         "accrual": {
@@ -1075,7 +1075,7 @@
           "amount": "15358.005401234566",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25277777777777777,
         "rate": 0.06075694444444444,
         "accrual": {
@@ -1095,7 +1095,7 @@
           "amount": "15688.27160493827",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25555555555555554,
         "rate": 0.06138888888888889,
         "accrual": {
@@ -1115,7 +1115,7 @@
           "amount": "15851.543209876541",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25555555555555554,
         "rate": 0.06202777777777778,
         "accrual": {
@@ -1198,7 +1198,7 @@
             "amount": "13798.611111111111",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25,
           "rate": 0.05519444444444444,
           "accrual": {
@@ -1218,7 +1218,7 @@
             "amount": "14267.9012345679",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25277777777777777,
           "rate": 0.05644444444444444,
           "accrual": {
@@ -1238,7 +1238,7 @@
             "amount": "14747.685185185184",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25555555555555554,
           "rate": 0.057708333333333334,
           "accrual": {
@@ -1258,7 +1258,7 @@
             "amount": "15074.228395061726",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25555555555555554,
           "rate": 0.05898611111111111,
           "accrual": {
@@ -1278,7 +1278,7 @@
             "amount": "17532.98611111111",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25,
           "rate": 0.07013194444444444,
           "accrual": {
@@ -1298,7 +1298,7 @@
             "amount": "17885.783179012345",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25277777777777777,
           "rate": 0.07075694444444444,
           "accrual": {
@@ -1318,7 +1318,7 @@
             "amount": "18243.827160493827",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25555555555555554,
           "rate": 0.07138888888888889,
           "accrual": {
@@ -1338,7 +1338,7 @@
             "amount": "18407.098765432096",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25555555555555554,
           "rate": 0.07202777777777777,
           "accrual": {
@@ -1440,7 +1440,7 @@
             "amount": "13798.611111111111",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25,
           "rate": 0.05519444444444444,
           "accrual": {
@@ -1460,7 +1460,7 @@
             "amount": "14267.9012345679",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25277777777777777,
           "rate": 0.05644444444444444,
           "accrual": {
@@ -1480,7 +1480,7 @@
             "amount": "14747.685185185184",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25555555555555554,
           "rate": 0.057708333333333334,
           "accrual": {
@@ -1500,7 +1500,7 @@
             "amount": "15074.228395061726",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25555555555555554,
           "rate": 0.05898611111111111,
           "accrual": {
@@ -1520,7 +1520,7 @@
             "amount": "15032.98611111111",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25,
           "rate": 0.06013194444444444,
           "accrual": {
@@ -1540,7 +1540,7 @@
             "amount": "15358.005401234566",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25277777777777777,
           "rate": 0.06075694444444444,
           "accrual": {
@@ -1560,7 +1560,7 @@
             "amount": "15688.27160493827",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25555555555555554,
           "rate": 0.06138888888888889,
           "accrual": {
@@ -1580,7 +1580,7 @@
             "amount": "15851.543209876541",
             "currency": "USD"
           },
-          "kind": "float_reset",
+          "kind": "floating",
           "accrual_factor": 0.25555555555555554,
           "rate": 0.06202777777777778,
           "accrual": {
@@ -2489,7 +2489,7 @@
           "amount": "13798.611111111111",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25,
         "rate": 0.05519444444444444,
         "accrual": {
@@ -2509,7 +2509,7 @@
           "amount": "14267.9012345679",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25277777777777777,
         "rate": 0.05644444444444444,
         "accrual": {
@@ -2529,7 +2529,7 @@
           "amount": "14747.685185185184",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25555555555555554,
         "rate": 0.057708333333333334,
         "accrual": {
@@ -2549,7 +2549,7 @@
           "amount": "15074.228395061726",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25555555555555554,
         "rate": 0.05898611111111111,
         "accrual": {
@@ -2569,7 +2569,7 @@
           "amount": "15032.98611111111",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25,
         "rate": 0.06013194444444444,
         "accrual": {
@@ -2589,7 +2589,7 @@
           "amount": "15358.005401234566",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25277777777777777,
         "rate": 0.06075694444444444,
         "accrual": {
@@ -2609,7 +2609,7 @@
           "amount": "15688.27160493827",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25555555555555554,
         "rate": 0.06138888888888889,
         "accrual": {
@@ -2629,7 +2629,7 @@
           "amount": "15851.543209876541",
           "currency": "USD"
         },
-        "kind": "float_reset",
+        "kind": "floating",
         "accrual_factor": 0.25555555555555554,
         "rate": 0.06202777777777778,
         "accrual": {

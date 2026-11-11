@@ -724,9 +724,9 @@ fn price_is_the_npv_of_the_lender_flows_including_draws() {
 }
 
 /// A facility with an index pays floating coupons: its schedule tags the
-/// interest `FloatReset`; a fixed-rate facility keeps `Fixed`.
+/// interest `Floating`; a fixed-rate facility keeps `Fixed`.
 #[test]
-fn floating_facility_interest_is_tagged_float_reset() {
+fn floating_facility_interest_is_tagged_floating() {
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
@@ -769,7 +769,7 @@ fn floating_facility_interest_is_tagged_float_reset() {
     };
     let floating_kinds = kinds(&floating);
     assert!(!floating_kinds.is_empty());
-    assert!(floating_kinds.iter().all(|k| *k == CFKind::FloatReset));
+    assert!(floating_kinds.iter().all(|k| *k == CFKind::Floating));
     assert!(kinds(&fixed).iter().all(|k| *k == CFKind::Fixed));
 }
 

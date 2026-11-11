@@ -54,7 +54,7 @@ where
 /// # Cashflow Categories
 ///
 /// Variants are grouped by category:
-/// - **Interest**: `Fixed`, `FloatReset`, `Stub`
+/// - **Interest**: `Fixed`, `Floating`, `Stub`
 /// - **Inflation**: `InflationCoupon`
 /// - **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`, `LcFee`, `FrontingFee`
 /// - **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`
@@ -65,7 +65,7 @@ where
 /// # Labels
 ///
 /// `Display`, `FromStr`, and serde share one snake_case label per kind
-/// (`"fixed"`, `"float_reset"`, `"pre_payment"`). `FromStr` is ASCII
+/// (`"fixed"`, `"floating"`, `"pre_payment"`). `FromStr` is ASCII
 /// case-insensitive and ignores surrounding whitespace; serde accepts only
 /// the canonical label.
 #[non_exhaustive]
@@ -81,12 +81,13 @@ pub enum CFKind {
     /// The `rate` field on [`CashFlow`] stores the coupon rate used.
     Fixed,
 
-    /// Floating-rate coupon cash-flow (or index fixing event).
+    /// Floating-rate coupon cash settlement.
     ///
-    /// Interest payment based on a reference rate (e.g., SOFR, EURIBOR) plus spread.
-    /// The `reset_date` field on [`CashFlow`] indicates when the rate was fixed.
-    /// The `rate` field stores the all-in rate (index + spread) if known.
-    FloatReset,
+    /// Interest payment based on a reference rate (e.g., SOFR, EURIBOR) plus
+    /// spread; never a standalone fixing event. The `reset_date` field on
+    /// [`CashFlow`] is the index observation date (metadata, not the payment
+    /// date). The `rate` field stores the all-in rate (index + spread) if known.
+    Floating,
 
     /// Inflation-linked coupon cash-flow.
     ///
@@ -195,6 +196,14 @@ pub enum CFKind {
     /// the accrued premium from the last payment date to the default date.
     AccruedOnDefault,
 
+    /// Credit protection payment.
+    ///
+    /// Actual cash paid by the protection seller on a credit event (for
+    /// example a CDS default leg settlement). Distinct from asset recovery
+    /// cash ([`Self::Recovery`]) and from a noncash principal write-down
+    /// ([`Self::DefaultedNotional`]).
+    ProtectionPayment,
+
     /// Irregular stub period interest.
     ///
     /// Interest payment for a non-standard accrual period at the beginning (front stub)
@@ -241,7 +250,7 @@ pub enum CFKind {
     CollateralSubstitutionOut,
 }
 
-/// Writes the snake_case serde label (`fixed`, `float_reset`, ...).
+/// Writes the snake_case serde label (`fixed`, `floating`, ...).
 impl std::fmt::Display for CFKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
@@ -261,16 +270,16 @@ impl std::str::FromStr for CFKind {
 }
 
 impl CFKind {
-    /// Returns `true` for interest-bearing cashflow kinds.
+    /// Returns `true` for the four ordinary coupon kinds: fixed, floating,
+    /// inflation-linked and stub coupons (record CORE-CONVENTIONS-015 #3).
     ///
-    /// Covers fixed coupons, floating resets, inflation-linked coupons,
-    /// and irregular stub periods. Use this predicate wherever you need
-    /// to distinguish interest flows from principal, fees, and credit-event flows.
+    /// A classification, not a measure of all interest: PIK, accrued on
+    /// default and margin interest need their owner's explicit selection.
     #[must_use]
-    pub fn is_interest_like(self) -> bool {
+    pub fn is_coupon(self) -> bool {
         matches!(
             self,
-            CFKind::Fixed | CFKind::FloatReset | CFKind::InflationCoupon | CFKind::Stub
+            CFKind::Fixed | CFKind::Floating | CFKind::InflationCoupon | CFKind::Stub
         )
     }
 
@@ -293,15 +302,16 @@ impl CFKind {
         )
     }
 
-    /// Returns `true` for kinds that repay principal to the lender: amortization,
-    /// prepayment, revolver repayment, and notional (redemption when positive).
+    /// Returns `true` for kinds that can carry a principal repayment:
+    /// amortization, prepayment, revolver repayment, and notional.
     ///
-    /// Narrower than [`Self::is_principal_like`], which also counts PIK
-    /// capitalization, revolver draws and defaulted notional. Callers that
-    /// weigh repayments (weighted average life, principal-repaid totals) also
-    /// require a positive amount, since a negative notional row is a funding.
+    /// A classification, not proof that a repayment occurred (record
+    /// CORE-CONVENTIONS-015 #3). Narrower than [`Self::is_principal_like`],
+    /// which also counts PIK capitalization, revolver draws and defaulted
+    /// notional. A notional row is a repayment only when it actually reduces
+    /// principal; a funding row is not.
     #[must_use]
-    pub fn is_principal_repayment(self) -> bool {
+    pub fn is_repayment_like(self) -> bool {
         matches!(
             self,
             CFKind::Amortization
@@ -315,10 +325,39 @@ impl CFKind {
     ///
     /// [`CFKind::Pik`] is a capitalization event and
     /// [`CFKind::DefaultedNotional`] is a write-down; neither should be emitted
-    /// by APIs whose contract is dated cash.
+    /// by APIs whose contract is dated cash. Every kind is listed explicitly,
+    /// so a new kind cannot silently become cash (record CORE-CONVENTIONS-015
+    /// #2).
     #[must_use]
     pub const fn is_cash_settlement(self) -> bool {
-        !matches!(self, CFKind::Pik | CFKind::DefaultedNotional)
+        match self {
+            CFKind::Pik | CFKind::DefaultedNotional => false,
+            CFKind::Fixed
+            | CFKind::Floating
+            | CFKind::InflationCoupon
+            | CFKind::Fee
+            | CFKind::CommitmentFee
+            | CFKind::UsageFee
+            | CFKind::FacilityFee
+            | CFKind::LcFee
+            | CFKind::FrontingFee
+            | CFKind::Notional
+            | CFKind::Amortization
+            | CFKind::PrePayment
+            | CFKind::RevolvingDraw
+            | CFKind::RevolvingRepayment
+            | CFKind::Recovery
+            | CFKind::AccruedOnDefault
+            | CFKind::ProtectionPayment
+            | CFKind::Stub
+            | CFKind::InitialMarginPost
+            | CFKind::InitialMarginReturn
+            | CFKind::VariationMarginReceive
+            | CFKind::VariationMarginPay
+            | CFKind::MarginInterest
+            | CFKind::CollateralSubstitutionIn
+            | CFKind::CollateralSubstitutionOut => true,
+        }
     }
 }
 
@@ -372,7 +411,7 @@ pub struct CashFlowAccrual {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CashFlow {
-    /// Payment date (or payment date for principal/fee, or reset date for `CFKind::FloatReset`).
+    /// Payment date (or payment date for principal/fee, or reset date for `CFKind::Floating`).
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub date: Date,
     /// Optional index reset date (for floating coupons).
@@ -818,14 +857,31 @@ mod tests {
     }
 
     #[test]
-    fn cfkind_is_interest_like_classifies_coupon_flows_only() {
+    fn cfkind_labels_retire_float_reset_and_classify_protection_payment() {
+        // Record CORE-CONVENTIONS-015 #2: `float_reset` is retired without an
+        // alias; protection cash is its own cash-capable kind.
+        assert!("float_reset".parse::<CFKind>().is_err());
+        assert!(serde_json::from_str::<CFKind>("\"float_reset\"").is_err());
+        assert_eq!("floating".parse::<CFKind>().unwrap(), CFKind::Floating);
+        assert_eq!(
+            serde_json::to_string(&CFKind::ProtectionPayment).unwrap(),
+            "\"protection_payment\""
+        );
+        let protection = CFKind::ProtectionPayment;
+        assert!(protection.is_cash_settlement());
+        assert!(!protection.is_coupon() && !protection.is_principal_like());
+        assert!(!protection.is_repayment_like());
+    }
+
+    #[test]
+    fn cfkind_is_coupon_classifies_coupon_flows_only() {
         for kind in [
             CFKind::Fixed,
-            CFKind::FloatReset,
+            CFKind::Floating,
             CFKind::InflationCoupon,
             CFKind::Stub,
         ] {
-            assert!(kind.is_interest_like(), "{kind:?} should be interest-like");
+            assert!(kind.is_coupon(), "{kind:?} should be a coupon");
         }
 
         for kind in [
@@ -836,10 +892,7 @@ mod tests {
             CFKind::Recovery,
             CFKind::MarginInterest,
         ] {
-            assert!(
-                !kind.is_interest_like(),
-                "{kind:?} should not be interest-like"
-            );
+            assert!(!kind.is_coupon(), "{kind:?} should not be interest-like");
         }
     }
 
@@ -1008,7 +1061,7 @@ mod tests {
     fn cfkind_display_roundtrip() {
         let all = [
             CFKind::Fixed,
-            CFKind::FloatReset,
+            CFKind::Floating,
             CFKind::InflationCoupon,
             CFKind::Fee,
             CFKind::CommitmentFee,

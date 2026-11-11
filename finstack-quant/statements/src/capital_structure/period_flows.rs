@@ -31,7 +31,7 @@ use finstack_quant_valuations::pricer::InstrumentType;
 /// True when `kind` is a cash-interest flow (the legs a swap nets).
 #[inline]
 pub(crate) fn is_cash_interest_kind(kind: CFKind) -> bool {
-    matches!(kind, CFKind::Fixed | CFKind::Stub | CFKind::FloatReset)
+    matches!(kind, CFKind::Fixed | CFKind::Stub | CFKind::Floating)
 }
 
 /// Principal established by a funding flow, independently of cash proceeds.
@@ -87,9 +87,8 @@ pub(crate) fn period_snapshot_date(period: &Period) -> Date {
 
 /// Whether a flow returns principal to the lender: amortization, prepayment,
 /// revolver repayment, or a positive notional (redemption) row.
-fn is_principal_repayment(flow: &CashFlow) -> bool {
-    flow.kind.is_principal_repayment()
-        && (flow.kind != CFKind::Notional || flow.amount.amount() > 0.0)
+fn is_repayment_like(flow: &CashFlow) -> bool {
+    flow.kind.is_repayment_like() && (flow.kind != CFKind::Notional || flow.amount.amount() > 0.0)
 }
 
 /// Preserve the cash and economic dates of this period's principal claims.
@@ -101,7 +100,7 @@ pub(crate) fn period_principal_claims(
         .get_flows()
         .iter()
         .filter(|flow| flow.date >= period.start && flow.date < period.end)
-        .filter(|flow| is_principal_repayment(flow))
+        .filter(|flow| is_repayment_like(flow))
         .filter(|flow| flow.amount.amount() != 0.0)
         .map(|flow| crate::capital_structure::PrincipalClaim {
             payment_date: flow.date,
@@ -317,7 +316,7 @@ pub fn calculate_period_flows(
                 kind if is_cash_interest_kind(kind) => {
                     net_interest_cash += cf.amount.amount() * scale;
                 }
-                _ if is_principal_repayment(cf) => {
+                _ if is_repayment_like(cf) => {
                     breakdown.principal_payment =
                         breakdown.principal_payment.checked_add(scaled_abs_value)?;
                 }
@@ -435,7 +434,7 @@ pub fn calculate_period_flows(
                 .get_flows()
                 .iter()
                 .filter(economic_in_period)
-                .filter(|cf| is_principal_repayment(cf))
+                .filter(|cf| is_repayment_like(cf))
                 .map(|cf| cf.amount.amount().abs())
                 .sum();
             let capitalized: f64 = full_schedule
@@ -663,7 +662,7 @@ mod tests {
                     pay_date,
                     None,
                     Money::from((53_000_i64, Currency::USD)),
-                    CFKind::FloatReset,
+                    CFKind::Floating,
                     0.25,
                     None,
                 ),
@@ -950,7 +949,7 @@ mod tests {
                     pay_date,
                     None,
                     Money::from((10_000_i64, Currency::USD)),
-                    CFKind::FloatReset,
+                    CFKind::Floating,
                     0.25,
                     None,
                 ),

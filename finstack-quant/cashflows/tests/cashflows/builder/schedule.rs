@@ -290,7 +290,7 @@ fn fixed_to_float_window_has_fresh_front_stub_at_switch() {
     let first_float = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::FloatReset)
+        .find(|cf| cf.kind == CFKind::Floating)
         .expect("post-switch coupon");
     let accrual = first_float.accrual.as_ref().expect("float coupon accrual");
     assert_eq!(
@@ -350,7 +350,7 @@ fn ordering_invariants_within_date() {
     for (_d, kinds) in by_date {
         let mut sorted = kinds.clone();
         sorted.sort_by_key(|k| match k {
-            CFKind::Fixed | CFKind::Stub | CFKind::FloatReset => 0,
+            CFKind::Fixed | CFKind::Stub | CFKind::Floating => 0,
             CFKind::Fee => 1,
             CFKind::Amortization => 2,
             CFKind::Pik => 3,
@@ -1467,7 +1467,7 @@ fn lagged_redemption_matches_final_coupon_on_weekend_maturity() {
     let last_coupon_date = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .filter(|cf| cf.kind == CFKind::Floating)
         .map(|cf| cf.date)
         .max()
         .expect("coupon flows");

@@ -330,9 +330,7 @@ def _primitives() -> Any:
     accrual = CashFlowAccrual(dt.date(2025, 1, 15), dt.date(2025, 7, 15), DayCount.THIRTY_360)
     return {
         "parse": [CFKind.parse(name).name for name in ("fixed", "pre_payment", "collateral_substitution_out")],
-        "interest_like": [
-            CFKind.parse(kind).is_interest_like() for kind in ("fixed", "float_reset", "fee", "notional")
-        ],
+        "interest_like": [CFKind.parse(kind).is_coupon() for kind in ("fixed", "floating", "fee", "notional")],
         "principal_like": [
             CFKind.parse(kind).is_principal_like() for kind in ("fixed", "pik", "amortization", "recovery")
         ],

@@ -1434,7 +1434,7 @@ fn bucket_flows(
                     rate: cf.rate,
                 });
             }
-            CFKind::FloatReset => {
+            CFKind::Floating => {
                 let index_rate = cf.reset_date.and_then(|reset| {
                     fixings
                         .iter()

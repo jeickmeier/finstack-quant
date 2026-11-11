@@ -377,7 +377,7 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
     let first_coupon_date = full_schedule
         .get_flows()
         .iter()
-        .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::FloatReset | CFKind::Stub))
+        .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Floating | CFKind::Stub))
         .map(|cf| cf.date)
         .filter(|d| *d > issue)
         .min()
@@ -588,17 +588,17 @@ fn test_bond_frn_dated_cashflows_uses_builder() {
 
     let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
 
-    // Get full schedule to verify it includes FloatReset CFKind
+    // Get full schedule to verify it includes Floating CFKind
     let full_schedule = frn
         .full_cashflow_schedule(&market)
         .expect("Full schedule retrieval should succeed in test");
     let has_floating = full_schedule
         .get_flows()
         .iter()
-        .any(|cf| matches!(cf.kind, CFKind::FloatReset));
+        .any(|cf| matches!(cf.kind, CFKind::Floating));
     assert!(
         has_floating,
-        "Full schedule should include CFKind::FloatReset for FRN"
+        "Full schedule should include CFKind::Floating for FRN"
     );
 
     // The holder-view dated cashflow projection should flatten the canonical schedule.

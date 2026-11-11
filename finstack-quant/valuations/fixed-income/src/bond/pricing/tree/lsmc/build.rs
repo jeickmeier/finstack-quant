@@ -320,7 +320,7 @@ pub(super) fn is_holder_distribution(flow: &CashFlow) -> bool {
     flow.amount.amount() > 0.0
         && matches!(
             flow.kind,
-            CFKind::Fixed | CFKind::FloatReset | CFKind::Stub | CFKind::Amortization
+            CFKind::Fixed | CFKind::Floating | CFKind::Stub | CFKind::Amortization
         )
 }
 

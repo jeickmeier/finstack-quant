@@ -795,7 +795,7 @@ mod margin_stepup_period_semantics {
         )> = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind.is_interest_like())
+            .filter(|cf| cf.kind.is_coupon())
             .map(|cf| {
                 let accrual = cf
                     .accrual
@@ -843,7 +843,7 @@ mod margin_stepup_period_semantics {
             let mut flows: Vec<(finstack_quant_core::dates::Date, f64)> = schedule
                 .get_flows()
                 .iter()
-                .filter(|cf| cf.kind.is_interest_like())
+                .filter(|cf| cf.kind.is_coupon())
                 .map(|cf| {
                     let accrual = cf
                         .accrual
@@ -890,7 +890,7 @@ mod margin_stepup_period_semantics {
             let mut flows: Vec<(finstack_quant_core::dates::Date, f64)> = schedule
                 .get_flows()
                 .iter()
-                .filter(|cf| cf.kind.is_interest_like())
+                .filter(|cf| cf.kind.is_coupon())
                 .map(|cf| (cf.date, cf.amount.amount()))
                 .collect();
             flows.sort_by_key(|flow| flow.0);
@@ -942,11 +942,7 @@ mod margin_stepup_period_semantics {
         let schedule = fixed
             .cashflow_schedule(&market, date!(2025 - 01 - 01))
             .unwrap();
-        for cf in schedule
-            .get_flows()
-            .iter()
-            .filter(|cf| cf.kind.is_interest_like())
-        {
+        for cf in schedule.get_flows().iter().filter(|cf| cf.kind.is_coupon()) {
             let accrual = cf
                 .accrual
                 .as_ref()

@@ -693,7 +693,7 @@ impl XccySwap {
                 period.payment_date,
                 projected.fixing_date.or(period.reset_date),
                 Money::from_model_value(amount, leg.notional.currency())?,
-                finstack_quant_core::cashflow::CFKind::FloatReset,
+                finstack_quant_core::cashflow::CFKind::Floating,
                 projected.year_fraction,
                 Some(all_in),
             ));

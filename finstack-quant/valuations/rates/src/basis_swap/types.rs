@@ -662,7 +662,7 @@ impl BasisSwap {
                 period.payment_date,
                 period.reset_date,
                 Money::from_model_value(coupon_amount, self.notional.currency())?,
-                CFKind::FloatReset,
+                CFKind::Floating,
                 projection.accrual_year_fraction,
                 Some(all_in_rate),
             ));
@@ -1608,7 +1608,7 @@ mod tests {
         let first = schedule
             .get_flows()
             .iter()
-            .find(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
+            .find(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Floating)
             .expect("overnight coupon");
         let calendar = calendar_by_id_strict("usny").expect("usny");
         let periods = finstack_quant_cashflows::builder::build_periods(
@@ -1728,7 +1728,7 @@ mod tests {
         let first = schedule
             .get_flows()
             .iter()
-            .find(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
+            .find(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Floating)
             .expect("overnight coupon");
         let calendar = calendar_by_id_strict("weekends_only").expect("fixing calendar");
         let periods = finstack_quant_cashflows::builder::build_periods(

@@ -492,7 +492,7 @@ export interface D_674830A94Dacf97E7Ac8 {
    */
   kind:
     | "fixed"
-    | "float_reset"
+    | "floating"
     | "inflation_coupon"
     | "fee"
     | "commitment_fee"
@@ -509,6 +509,7 @@ export interface D_674830A94Dacf97E7Ac8 {
     | "defaulted_notional"
     | "recovery"
     | "accrued_on_default"
+    | "protection_payment"
     | "stub"
     | "initial_margin_post"
     | "initial_margin_return"

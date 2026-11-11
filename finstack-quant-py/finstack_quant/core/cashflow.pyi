@@ -45,7 +45,7 @@ class CFKind:
 
     Each class attribute is a singleton instance for one Rust enum variant.
     Instances compare and hash by the underlying kind, and round-trip through
-    their snake_case ``Display``/``FromStr`` label (e.g. ``"float_reset"``).
+    their snake_case ``Display``/``FromStr`` label (e.g. ``"floating"``).
 
     Examples
     --------
@@ -57,7 +57,7 @@ class CFKind:
     """
 
     FIXED: CFKind
-    FLOAT_RESET: CFKind
+    FLOATING: CFKind
     INFLATION_COUPON: CFKind
     FEE: CFKind
     COMMITMENT_FEE: CFKind
@@ -74,6 +74,7 @@ class CFKind:
     DEFAULTED_NOTIONAL: CFKind
     RECOVERY: CFKind
     ACCRUED_ON_DEFAULT: CFKind
+    PROTECTION_PAYMENT: CFKind
     STUB: CFKind
     INITIAL_MARGIN_POST: CFKind
     INITIAL_MARGIN_RETURN: CFKind
@@ -91,7 +92,7 @@ class CFKind:
         Parameters
         ----------
         name : str
-            Snake_case label such as ``"fixed"``, ``"float_reset"``, or
+            Snake_case label such as ``"fixed"``, ``"floating"``, or
             ``"pre_payment"``; the same string as :attr:`name` and the
             ``kind`` field of serialized cashflows. Surrounding whitespace and
             ASCII case are normalized; aliases are rejected.
@@ -122,7 +123,7 @@ class CFKind:
         Returns
         -------
         str
-            The Rust ``Display`` label, such as ``"float_reset"`` or
+            The Rust ``Display`` label, such as ``"floating"`` or
             ``"defaulted_notional"``.
 
         Notes
@@ -131,13 +132,14 @@ class CFKind:
         """
         ...
 
-    def is_interest_like(self) -> bool:
+    def is_coupon(self) -> bool:
         """
-        Return whether this kind is interest-bearing.
+        Return whether this kind is one of the four ordinary coupon kinds.
 
-        Covers ``FIXED``, ``FLOAT_RESET``, ``INFLATION_COUPON``, and ``STUB``;
+        Covers ``FIXED``, ``FLOATING``, ``INFLATION_COUPON``, and ``STUB``;
         all other kinds (principal, fees, credit events, margin) return
-        ``False``.
+        ``False``. A classification, not a measure of all interest: PIK,
+        accrued-on-default and margin interest are selected by their owners.
 
         Returns
         -------
@@ -351,7 +353,7 @@ class CashFlow:
         Parameters
         ----------
         date : datetime.date
-            Payment date (or reset date for ``CFKind.FLOAT_RESET`` fixing
+            Payment date (or reset date for ``CFKind.FLOATING`` fixing
             events).
         amount : Money
             Monetary amount including its currency.
@@ -384,7 +386,7 @@ class CashFlow:
         Returns
         -------
         datetime.date
-            The payment (or reset, for ``FLOAT_RESET``) date of this flow.
+            The payment (or reset, for ``FLOATING``) date of this flow.
 
         Notes
         -----

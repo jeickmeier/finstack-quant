@@ -387,7 +387,7 @@ impl TermLoanValuator {
 
             match cf.kind {
                 CFKind::Fixed
-                | CFKind::FloatReset
+                | CFKind::Floating
                 | CFKind::Stub
                 | CFKind::Fee
                 | CFKind::CommitmentFee
@@ -548,7 +548,7 @@ impl TermLoanValuator {
         let schedule = &self.schedule;
         let disc = market.get_discount(&self.loan.discount_curve_id)?;
 
-        // PIK first: a 100% PIK floating leg emits no cash FloatReset flows
+        // PIK first: a 100% PIK floating leg emits no cash Floating flows
         // at all, so an empty descriptor list must not be read as "nothing
         // stochastic here" — the capitalized amounts themselves are
         // node-dependent.

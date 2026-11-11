@@ -372,7 +372,7 @@ impl Bond {
             if !(after_boundary && Self::is_holder_cashflow(cf)) {
                 continue;
             }
-            if cf.kind.is_interest_like()
+            if cf.kind.is_coupon()
                 && let Some(rule) = &ex_coupon
                 && rule.is_ex_coupon(cf.date, entitlement_date)?
             {

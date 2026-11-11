@@ -167,7 +167,7 @@ fn single_revolver_pool_reproduces_the_standalone_schedule() {
             matches!(
                 cf.kind,
                 CFKind::Fixed
-                    | CFKind::FloatReset
+                    | CFKind::Floating
                     | CFKind::Fee
                     | CFKind::CommitmentFee
                     | CFKind::UsageFee
@@ -646,7 +646,7 @@ fn stepped_revolver_pool_reproduces_the_standalone_schedule() {
             matches!(
                 cf.kind,
                 CFKind::Fixed
-                    | CFKind::FloatReset
+                    | CFKind::Floating
                     | CFKind::Fee
                     | CFKind::CommitmentFee
                     | CFKind::UsageFee

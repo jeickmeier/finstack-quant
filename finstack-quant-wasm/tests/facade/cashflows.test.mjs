@@ -278,7 +278,7 @@ test('cashflows facade builds fixed-to-float and preserves Rust window errors', 
   const built = JSON.parse(cashflows.buildCashflowScheduleJson(fixedToFloat, null));
   const kinds = new Set(built.flows.map((flow) => flow.kind));
   assert.ok(kinds.has('fixed'));
-  assert.ok(kinds.has('float_reset'));
+  assert.ok(kinds.has('floating'));
 
   const overlapping = JSON.stringify({
     ...base,
@@ -447,7 +447,7 @@ test('cashflows nonbinding overnight period cap preserves changing-balance inter
   );
   const interest = (schedule) =>
     schedule.flows
-      .filter((flow) => flow.kind === 'float_reset')
+      .filter((flow) => flow.kind === 'floating')
       .reduce((sum, flow) => sum + Number(flow.amount.amount), 0);
   assert.ok(Math.abs(interest(unbounded) - (1000000 * 0.1) / 360) < 1e-8);
   assert.ok(Math.abs(interest(capped) - interest(unbounded)) < 1e-8);

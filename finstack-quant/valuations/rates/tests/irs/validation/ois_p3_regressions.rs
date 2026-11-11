@@ -382,7 +382,7 @@ fn check_price(
     let floating: Vec<_> = before
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::FloatReset)
+        .filter(|flow| flow.kind == CFKind::Floating)
         .collect();
     assert_eq!(floating.len(), oracle.coupons.len());
     let spread = swap.float_leg.spread_bp.to_f64().unwrap() * 1e-4;
@@ -1121,7 +1121,7 @@ fn ois_control_holiday_adjusted_spread_matches_full_export() {
     let floating = schedule
         .get_flows()
         .iter()
-        .find(|flow| flow.kind == CFKind::FloatReset)
+        .find(|flow| flow.kind == CFKind::Floating)
         .unwrap();
     close(
         "holiday actual spread cash",
