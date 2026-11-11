@@ -180,7 +180,7 @@ fn projected_schedule_contains_premium_and_default_rows() {
         schedule
             .get_flows()
             .iter()
-            .any(|cf| cf.kind == CFKind::DefaultedNotional)
+            .any(|cf| cf.kind == CFKind::ProtectionPayment)
     );
 }
 
@@ -919,7 +919,7 @@ fn test_pv_decomposition_consistency() {
         .discount_projected_rows(
             &projected_rows
                 .iter()
-                .filter(|row| row.cashflow.kind == CFKind::DefaultedNotional)
+                .filter(|row| row.cashflow.kind == CFKind::ProtectionPayment)
                 .cloned()
                 .collect::<Vec<_>>(),
             discount_curve.as_ref(),
@@ -2360,7 +2360,7 @@ fn seasoned_first_period_default_timing_starts_at_valuation_date() {
         .expect("projected rows");
     let default_row = rows
         .iter()
-        .find(|row| row.cashflow.kind == CFKind::DefaultedNotional)
+        .find(|row| row.cashflow.kind == CFKind::ProtectionPayment)
         .expect("default row");
 
     let DiscountAt::WithinPeriod {
@@ -2548,7 +2548,7 @@ fn seasoned_aod_reduces_only_the_remaining_day_of_accrual() {
     );
     let loss = rows
         .iter()
-        .find(|r| r.cashflow.kind == CFKind::DefaultedNotional)
+        .find(|r| r.cashflow.kind == CFKind::ProtectionPayment)
         .expect("loss");
     assert!(
         matches!(loss.discount_at, DiscountAt::WithinPeriod { start, end, .. }

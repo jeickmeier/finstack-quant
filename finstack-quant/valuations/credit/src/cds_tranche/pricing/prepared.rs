@@ -319,7 +319,7 @@ impl CdsTranchePricer {
                             default_amount * protection_sign,
                             tranche.notional.currency(),
                         )?,
-                        CFKind::DefaultedNotional,
+                        CFKind::ProtectionPayment,
                         0.0,
                         None,
                     ),

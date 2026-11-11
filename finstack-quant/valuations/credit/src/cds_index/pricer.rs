@@ -662,7 +662,7 @@ fn project_cds_flows(
                             * protection_sign,
                         cds.notional.currency(),
                     )?,
-                    CFKind::DefaultedNotional,
+                    CFKind::ProtectionPayment,
                     0.0,
                     None,
                 ));
@@ -818,8 +818,22 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .any(|cf| cf.kind == CFKind::DefaultedNotional)
+                .any(|cf| cf.kind == CFKind::ProtectionPayment)
         );
+        // Protection is settlement cash, so the cash ladder counts it.
+        let amounts: Vec<f64> = schedule
+            .get_flows()
+            .iter()
+            .map(|cf| cf.amount.amount())
+            .collect();
+        let ladder_total: f64 = schedule
+            .calendar_year_ladder(&amounts)
+            .expect("ladder")
+            .iter()
+            .map(|row| row.non_principal + row.principal)
+            .sum();
+        let cash_total: f64 = amounts.iter().sum();
+        assert!((ladder_total - cash_total).abs() < 1e-6);
     }
 
     #[test]

@@ -38,6 +38,7 @@ pub struct PeriodCash {
 ///   [`CFKind::Amortization`], [`CFKind::PrePayment`],
 ///   [`CFKind::RevolvingDraw`], [`CFKind::RevolvingRepayment`],
 ///   [`CFKind::Recovery`]
+/// - Credit protection cash: [`CFKind::ProtectionPayment`]
 ///
 /// Excluded (not instrument cash income):
 /// - [`CFKind::Pik`] (capitalized, not paid)
@@ -173,6 +174,7 @@ fn is_period_economic_cash(kind: CFKind) -> bool {
                 | CFKind::RevolvingDraw
                 | CFKind::RevolvingRepayment
                 | CFKind::Recovery
+                | CFKind::ProtectionPayment
         )
 }
 

@@ -731,9 +731,10 @@ logged under Needs review.
     `Schedule.warnings` (an E3a leftover) and built standard IMM from an
     off-cycle start; both fixed. Benches are outside the gate.
 - **G5 (run in gated commits after E3b).**
-  - **G5-1 kinds.** `FloatReset` became `Floating`; CDS-style protection
-    rows get `ProtectionPayment`; `is_coupon` / `is_repayment_like` added and
-    `is_cash_settlement` made exhaustive. No values moved.
+  - **G5-1 kinds.** `FloatReset` became `Floating`; the `ProtectionPayment`
+    kind was added (producers still emitted `DefaultedNotional` until G5-3a);
+    `is_coupon` / `is_repayment_like` added and `is_cash_settlement` made
+    exhaustive. No values moved.
   - **G5-2 explicit deltas, cash unchanged.** Fixed and floating PIK emission
     now sets `principal_delta` to the capitalized amount, and structured-credit
     and asset-backed-facility `DefaultedNotional` rows set a negative
@@ -760,6 +761,20 @@ logged under Needs review.
     (`finstack-quant-wasm/tests/facade/golden/cashflows_parity.json`) was
     regenerated with its documented command; it only gained the PIK rows'
     `principal_delta` (equal to their cash amounts), no value moved.
+  - **G5-3a protection cash.** CDS index and CDS tranche projected
+    protection rows are now `ProtectionPayment` (they were mislabeled
+    `DefaultedNotional`, so G5-2's cash-only ladders briefly dropped them).
+    Period economic cash now includes `ProtectionPayment` (it excluded the
+    old label as a write-down); credit-adjusted PV discounts it without
+    survival like `Recovery`; `recovery_rate` is rejected alongside it as with
+    explicit write-downs. The CDS index schedule test now asserts the ladder
+    counts protection cash.
+  - **Margin substitution (Needs review).** Record 015 #2 and #11 say
+    substitution kinds carry only genuine monetary transfers, never a marked
+    collateral value; margin record 20 (Draft, observed only) describes the
+    repo conversion emitting the call's marked amount as
+    `CollateralSubstitutionOut`. Record 015 governs; handled in a later G5-3
+    commit.
 - **Dependency added (G2).** `indexmap` (already a workspace dependency, used
   by core and structured credit) was added to `finstack-quant-models` so the
   rating-factor table keeps a deterministic order once `CreditRating` lost

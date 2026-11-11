@@ -564,8 +564,12 @@ fn credit_adjusted_period_pv(cf: &CashFlow, df: f64, sp: f64, base: Date) -> f64
         return 0.0;
     }
 
-    // Recovery / AccruedOnDefault are already post-default; discount without survival.
-    if matches!(cf.kind, CFKind::Recovery | CFKind::AccruedOnDefault) {
+    // Recovery / AccruedOnDefault / ProtectionPayment are already post-default;
+    // discount without survival.
+    if matches!(
+        cf.kind,
+        CFKind::Recovery | CFKind::AccruedOnDefault | CFKind::ProtectionPayment
+    ) {
         return cf.amount.amount() * df;
     }
 
@@ -689,12 +693,15 @@ fn validate_recovery(
             ));
         }
         if rate > 0.0
-            && cashflows
-                .iter()
-                .any(|cf| cf.kind == CFKind::DefaultedNotional)
+            && cashflows.iter().any(|cf| {
+                matches!(
+                    cf.kind,
+                    CFKind::DefaultedNotional | CFKind::ProtectionPayment
+                )
+            })
         {
             return Err(finstack_quant_core::Error::Validation(
-                "schedule contains explicit DefaultedNotional flows; pass recovery_rate=None \
+                "schedule contains explicit DefaultedNotional or ProtectionPayment flows; pass recovery_rate=None \
                  (or 0.0) to avoid double-counting recovery from explicit events and the hazard curve"
                     .into(),
             ));
