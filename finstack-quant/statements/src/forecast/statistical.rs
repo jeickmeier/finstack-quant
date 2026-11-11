@@ -15,9 +15,25 @@ use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
 use indexmap::IndexMap;
 
+/// Build the generator for one node's shocks.
+///
+/// `seed` is the node-mixed seed. On a Monte Carlo path (`stream_id` set)
+/// both the starting state and the increment are hashed from the
+/// `(seed, stream_id)` pair, so every node on every path owns its own PCG
+/// sequence. Giving all nodes of a path one increment and distinct states
+/// instead puts them on a single sequence at a fixed offset from each other,
+/// which left fixed node pairs correlated at about 0.07.
 fn build_rng(seed: u64, stream_id: Option<u64>) -> Pcg64Rng {
+    const GOLDEN_GAMMA: u64 = 0x9E37_79B9_7F4A_7C15;
     match stream_id {
-        Some(stream_id) => Pcg64Rng::new_with_stream(seed, stream_id),
+        Some(stream_id) => {
+            let node = splitmix64_finalize(seed.wrapping_add(GOLDEN_GAMMA));
+            let path = splitmix64_finalize(stream_id.wrapping_add(GOLDEN_GAMMA.wrapping_mul(2)));
+            let state = splitmix64_finalize(node ^ path);
+            let increment =
+                splitmix64_finalize(node.wrapping_add(path.rotate_left(32)) ^ GOLDEN_GAMMA);
+            Pcg64Rng::new_with_stream(state, increment)
+        }
         None => Pcg64Rng::new(seed),
     }
 }
@@ -599,7 +615,9 @@ pub(crate) fn monte_carlo_correlated_series(
         }
     };
 
-    let mut rng = Pcg64Rng::new_with_stream(seed ^ stable_hash_u64(node_id), seed_offset);
+    // The same generator an uncorrelated node would use, so a zero
+    // correlation reproduces the uncorrelated draws exactly.
+    let mut rng = build_rng(super::mix_node_seed(seed, node_id), Some(seed_offset));
     let mut values = IndexMap::new();
     let mut z_out = IndexMap::new();
     let mut prev = base_value;

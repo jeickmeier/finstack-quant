@@ -349,3 +349,110 @@ fn direct_shocks_have_identical_serial_and_parallel_wire_results() {
     };
     assert_eq!(run(1), run(4));
 }
+
+fn pearson(x: &[f64], y: &[f64]) -> f64 {
+    let n = x.len() as f64;
+    let (mean_x, mean_y) = (x.iter().sum::<f64>() / n, y.iter().sum::<f64>() / n);
+    let (mut sxy, mut sxx, mut syy) = (0.0, 0.0, 0.0);
+    for (a, b) in x.iter().zip(y) {
+        sxy += (a - mean_x) * (b - mean_y);
+        sxx += (a - mean_x) * (a - mean_x);
+        syy += (b - mean_y) * (b - mean_y);
+    }
+    sxy / (sxx * syy).sqrt()
+}
+
+/// Stochastic nodes with no configured correlation are independent on every
+/// path. Sharing one RNG increment across the nodes of a path left fixed
+/// node pairs correlated at about 0.07 (`ebitda`/`tax` at step 5).
+#[test]
+fn uncorrelated_nodes_draw_independent_shocks_on_each_path() {
+    let names = [
+        "ebitda",
+        "tax",
+        "sga",
+        "utilities",
+        "arr",
+        "wages",
+        "capex",
+        "revenue",
+        "cogs",
+        "opex",
+    ];
+    let paths = 20_000_usize;
+    // Five standard errors: with 675 comparisons per run a false alarm has
+    // probability below 1e-3.
+    let bound = 5.0 / (paths as f64).sqrt();
+    for (config_seed, distinct_node_seeds) in [(7, false), (2024, false), (7, true), (2024, true)] {
+        let mut builder = ModelBuilder::new("mc-independence");
+        builder.periods("2025Q1..2028Q4", Some("2025Q1")).unwrap();
+        for (index, id) in names.iter().copied().enumerate() {
+            let node_seed = if distinct_node_seeds {
+                1000 + 17 * index as u64
+            } else {
+                42
+            };
+            builder.value(id, &[(quarter(1), 0.0.into())]);
+            // Full reversion to zero with unit volatility: the level is the shock.
+            builder.forecast(id, ForecastSpec::mean_reverting(0.0, 1.0, 1.0, node_seed));
+        }
+        let results = Evaluator::new()
+            .evaluate_monte_carlo(
+                &builder.build().unwrap(),
+                &MonteCarloConfig::new(paths, config_seed).with_path_data(true),
+            )
+            .unwrap();
+        let series: Vec<Vec<f64>> = names
+            .iter()
+            .map(|name| metric_paths(&results, name))
+            .collect();
+        let steps = series[0].len() / paths;
+        assert_eq!(steps, 15);
+        for first in 0..names.len() {
+            for second in first + 1..names.len() {
+                for step in 0..steps {
+                    let at_step = |values: &[f64]| -> Vec<f64> {
+                        values.iter().skip(step).step_by(steps).copied().collect()
+                    };
+                    let r = pearson(&at_step(&series[first]), &at_step(&series[second]));
+                    assert!(
+                        r.abs() < bound,
+                        "seed {config_seed}, distinct node seeds {distinct_node_seeds}: \
+                         {}/{} step {} correlation {r:.4}",
+                        names[first],
+                        names[second],
+                        step + 1
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// A zero correlation leaves a node's paths exactly as they are without any
+/// configured correlation.
+#[test]
+fn zero_correlation_keeps_the_uncorrelated_draws() {
+    let model = |correlated: bool| {
+        let mut node = ForecastSpec::normal(0.0, 1.0, 19);
+        if correlated {
+            node.params.insert("correlation_with".into(), json!("peer"));
+            node.params.insert("correlation".into(), json!(0.0));
+        }
+        let mut builder = ModelBuilder::new("zero-correlation");
+        builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+        builder.value("node", &[(quarter(1), 100.0.into())]);
+        builder.forecast("node", node);
+        builder.value("peer", &[(quarter(1), 100.0.into())]);
+        builder.forecast("peer", ForecastSpec::normal(0.0, 1.0, 42));
+        builder.build().unwrap()
+    };
+    let config = MonteCarloConfig::new(64, 7).with_path_data(true);
+    let paths = |correlated: bool| {
+        let results = Evaluator::new()
+            .evaluate_monte_carlo(&model(correlated), &config)
+            .unwrap();
+        metric_paths(&results, "node")
+    };
+    assert_eq!(paths(true), paths(false));
+}
