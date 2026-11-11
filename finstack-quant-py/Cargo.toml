@@ -52,5 +52,32 @@ time = { workspace = true }
 strum = { workspace = true }
 rust_decimal = { workspace = true }
 
+# Build-graph alignment, not used by the binding's code. `maturin develop`
+# builds this crate alone, while `rust-test` and `gen-write` build the rest of
+# the workspace with its dev-dependencies. Cargo compiles a crate again whenever
+# its features, or those of anything below it, differ between the two, so one
+# stray feature under finstack-quant-core rebuilt the whole stack for Python.
+# These entries turn on, for the extension build, exactly the features the
+# workspace build already has; scripts/tests/test_build_feature_alignment.py
+# fails when the two graphs drift apart again.
+finstack-quant-valuations-core = { path = "../finstack-quant/valuations/core", version = "0.11.0-dev.202610210600" }
+finstack-quant-valuations-rates = { path = "../finstack-quant/valuations/rates", version = "0.11.0-dev.202610210600" }
+finstack-quant-valuations-credit = { path = "../finstack-quant/valuations/credit", version = "0.11.0-dev.202610210600" }
+finstack-quant-valuations-fixed-income = { path = "../finstack-quant/valuations/fixed-income", version = "0.11.0-dev.202610210600" }
+finstack-quant-valuations-equity = { path = "../finstack-quant/valuations/equity", version = "0.11.0-dev.202610210600" }
+finstack-quant-valuations-fx = { path = "../finstack-quant/valuations/fx", version = "0.11.0-dev.202610210600" }
+finstack-quant-valuations-exotics = { path = "../finstack-quant/valuations/exotics", version = "0.11.0-dev.202610210600" }
+finstack-quant-valuations-structured-credit = { path = "../finstack-quant/valuations/structured-credit", version = "0.11.0-dev.202610210600" }
+rand = { version = "0.9.3", default-features = false, features = ["std", "os_rng"] }
+either = { version = "1", default-features = false, features = ["use_std"] }
+fastrand = "2"
+bit-set = "0.8"
+bit-vec = "0.8"
+
+[build-dependencies]
+# Same alignment for the proc-macro side: serde_derive and thiserror are built
+# against syn, and the WASM binding's macros enable these features on it.
+syn = { version = "3", features = ["extra-traits", "full", "visit", "visit-mut"] }
+
 [lints]
 workspace = true

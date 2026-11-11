@@ -149,10 +149,12 @@ def lint_command(paths: list[str]) -> list[str]:
 
     Returns:
         pre-commit on the changed files, or the full `pre-commit-run` task when
-        a file was deleted, since no remaining file would trigger its hooks.
+        the hooks' file filters would miss the change: a deleted file, a build
+        input or a Cargo manifest triggers no Rust hook by its own name.
     """
     existing = [path for path in paths if (ROOT / path).exists()]
-    if len(existing) < len(paths):
+    widened = any(path.endswith("Cargo.toml") or stages_for(path) == tuple(STAGES) for path in paths)
+    if widened or len(existing) < len(paths):
         return ["mise", "run", "pre-commit-run"]
     return ["uv", "run", "--no-sync", "pre-commit", "run", "--files", *existing]
 

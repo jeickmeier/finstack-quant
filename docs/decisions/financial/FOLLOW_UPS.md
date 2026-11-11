@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **600 review items across 33 source scopes with open items**
+This backlog consolidates **603 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -19,14 +19,14 @@ evidence with the owning entry instead of duplicating task lists in records.
 
 The labels distinguish the work required:
 
-- **Observed** (160): a static implementation, contract, dispatch or
+- **Observed** (159): a static implementation, contract, dispatch or
   documentation difference. Its financial impact is not necessarily reproduced.
 - **Investigate** (49): a source-derived numerical or economic concern
   requiring targeted reproduction, an independent reference or convergence
   study before a defect conclusion.
 - **Decision** (236): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (92): implementation and verification work against an
+- **Reconciliation** (96): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (63): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -52,7 +52,7 @@ product consequences remain in their product scope.
 | [Core numerics](#core-numerics) | 17 |
 | [Core market data](#core-market-data) | 22 |
 | [Cashflows](#cashflows) | 18 |
-| [Analytic models](#analytic-models) | 24 |
+| [Analytic models](#analytic-models) | 27 |
 | [Trees and finite differences](#trees-and-finite-differences) | 15 |
 | [Monte Carlo models](#monte-carlo-models) | 23 |
 | [Credit models and valuations](#credit-models-and-valuations) | 18 |
@@ -258,7 +258,7 @@ product consequences remain in their product scope.
 
 [Scope inventory](models-analytic/README.md).
 
-- **Observed — Issuer LSMC sparse-training fallback uses future path values.** At active samples<=basis+2, continuation falls back to pathwise future payoff, introducing foresight and defeating the fitted-policy meaning of out-of-sample valuation. Exercise times are membership-checked but not sorted/deduplicated despite ordered mapping. Agree sparse/date policy, qualify the stated callable-value bias bracket and reproduce targeted cases. Require an explicit ordering/uniqueness decision and correction or qualification of the bias-bound language; add independent callable benchmarks, exercise-convergence checks and out-of-sample low-training-count cases. Records: [26](models-analytic/hw1f-issuer-lsmc.md).
+- **Reconciliation — Accepted issuer-call LSMC policy training and pricing.** [Record 26’s 28 decisions were accepted on 2026-11-10](models-analytic/hw1f-issuer-lsmc.md#accepted-decision-for-checked-issuer-call-policy-training-and-pricing). Reconcile actual dated branch cash and exact decision order, eligible state and full-rank regression, strict sparse-fit errors and independent pricing of the frozen policy. Independent cash, exercise, valuation, risk and host qualification remain open.
 
 - **Reconciliation — Accepted raw SVI and slice fit acceptance.** [Record 18’s 26 decisions were accepted on 2026-11-10](models-analytic/svi-fit-and-density.md#accepted-decision-for-checked-raw-svi-and-slice-fit-acceptance). Reconcile immutable raw parameters, exact minimum and wing bounds, stable arithmetic and checked finite density scans. Use explicit seeded LM on total variance, analytic flat quotes, native annual quote replay and required finite density acceptance. Reconcile equity, publication and host paths. Independent end-to-end qualification remains open.
 
@@ -294,9 +294,15 @@ product consequences remain in their product scope.
 
 - **Reconciliation — Accepted variance replication and explicit Black wings.** [Record 21’s 26 decisions were accepted on 2026-11-10](models-analytic/variance-replication.md#accepted-decision-for-checked-variance-replication-and-explicit-black-wings). Reconcile the qualified two-sided Black strip, checked OTM pricing and exact forward split, midpoint refinement with an annual-variance mesh gate, and explicit finite-strip or full flat-Black wings with bounded quadrature. Reconcile equity and FX variance callers. Independent source, numerical and product qualification remain open.
 
-- **Decision — Hull–White analytic kernels, clock and integration assumptions.** [Record 23 proposes 28 decisions](models-analytic/hull-white-analytic-kernels.md#proposed-decision-for-checked-hullwhite-analytic-kernels-and-payment-measures) for checked scheduled Gaussian moments and affine prices, explicit term and continuous accumulation payment measures, exact simple futures bias and the price-equivalent term ATM Normal quote. Qualify irregular sigma schedules, signed strikes and actual valuation, calibration and host paths. [Record 24](models-analytic/rate-clock-and-projection.md) owns model-date mapping, monthly theta, fractional-date interpolation and projection policy. [Record 25](models-analytic/hw1f-monte-carlo-discounting.md) owns bank-account error budgets, simulation defaults, seed overrides and pair-based confidence intervals. Compare discount moments against analytic bond values on nonflat curves and irregular events.
+- **Reconciliation — Accepted Hull–White analytic kernels and payment measures.** [Record 23’s 28 decisions were accepted on 2026-11-10](models-analytic/hull-white-analytic-kernels.md#accepted-decision-for-checked-hullwhite-analytic-kernels-and-payment-measures). Reconcile scheduled Gaussian moments, affine bonds and options, explicit term and continuous accumulation measures, exact simple futures bias and the price-equivalent term ATM Normal quote. Independent numerical, valuation, calibration and host qualification remain open.
 
-- **Observed — Empirical yield models lack several validity gates.** VAR stability and observation spacing are unchecked; confidence bands omit parameter and cross-sectional residual uncertainty. Constant-series R² is one regardless of residual sum. PCA clamps all negative eigenvalues, does not validate variance threshold and does not annualize. Define statistical contracts and obtain out-of-sample qualification. Set minimum sample size and confidence-band interpretation. For PCA, adopt covariance scaling/observation intervals, size-based negative-eigenvalue repair policy, threshold domain and synthetic-tenor metadata; add independent decomposition comparisons and near-repeated-eigenvalue stability tests. Records: [27](models-analytic/diebold-li-var.md), [28](models-analytic/yield-pca.md).
+- **Reconciliation — Accepted Hull–White rate clocks, curve fit and term projection.** [Record 24’s 28 decisions were accepted on 2026-11-10](models-analytic/rate-clock-and-projection.md#accepted-decision-for-checked-model-clocks-curve-fit-and-term-projection). Reconcile exact dated clock composition, the shifted Gaussian curve fit, contractual term-period reconstruction and coherent active fitted state. Independent numerical, valuation, calibration, risk and host qualification remain open.
+
+- **Reconciliation — Accepted Hull–White joint paths and sampling.** [Record 25’s 28 decisions were accepted on 2026-11-10](models-analytic/hw1f-monte-carlo-discounting.md#accepted-decision-for-exact-joint-hullwhite-paths-and-sampling). Reconcile exact joint state and bank increments, explicit grid and Philox controls, pathwise cash discounting and checked pair-based uncertainty. Independent numerical, product, risk and host qualification remain open.
+
+- **Decision — Nelson–Siegel factors and stable VAR forecasts.** [Record 27](models-analytic/diebold-li-var.md#proposed-decision-for-checked-nelsonsiegel-factors-and-var-forecasts) proposes explicit one-step cadence, checked fixed-decay factor extraction and VAR fitting, strict stability, positive residual degrees of freedom and conditional marginal fitted-yield intervals. Qualify forecasts and coverage on dated out-of-sample histories.
+
+- **Observed — Yield-change PCA validation and reconstruction.** [Record 28](models-analytic/yield-pca.md) observes eigenvalue clipping, an unchecked variance threshold and no annualization. Review covariance and observation intervals, numerical treatment of eigenvalues, threshold domain and synthetic-tenor metadata. Qualify independent decomposition and near-repeated eigenspaces.
 
 - **Reconciliation — Accepted continuous barrier premiums and first-passage cash.** [Record 05’s 23 decisions were accepted on 2026-11-10](models-analytic/barriers-and-rebates.md#accepted-decision-for-continuous-barrier-premiums-and-cash). Select checked flat GBM and inclusive monitoring on the remaining window, explicit rate and carry, exact deterministic crossing and direct requested hit/surviving payoff expectations. Preserve independent probability tails through final cash scaling, distinct hit and no-hit cash timings, the real-root at-hit branch and scale-aware bounded adaptive Simpson for the same expectation at negative discriminant. Retire raw sentinels, clamping and generic expiry cash inference. Reconcile asset and FX option/touch scaling, dated history and outstanding payments, and the existing host price route. Runtime and independent complete-path qualification remains open.
 

@@ -240,12 +240,14 @@ def _runtime(module: str, qualname: str) -> Any:
     return obj
 
 
-CASES = sorted(
-    (module, qualname)
+# Each stub is parsed once here, not once per case.
+EXPECTED = {
+    (module, qualname): doc
     for module, owners in CONVERTED.items()
-    for qualname in _stub_docstrings(module)
+    for qualname, doc in _stub_docstrings(module).items()
     if _selected(qualname, owners) and not qualname.endswith(".__init__")
-)
+}
+CASES = sorted(EXPECTED)
 
 
 @pytest.mark.parametrize(("module", "qualname"), CASES, ids=[f"{m}:{q}" for m, q in CASES])
@@ -253,8 +255,7 @@ def test_runtime_doc_is_the_stub_docstring(module: str, qualname: str) -> None:
     runtime = _runtime(module, qualname)
     if isinstance(runtime, _SLOT_TYPES):
         pytest.skip("type slot: CPython owns its __doc__")
-    expected = _stub_docstrings(module)[qualname]
-    assert inspect.cleandoc(runtime.__doc__ or "") == expected
+    assert inspect.cleandoc(runtime.__doc__ or "") == EXPECTED[module, qualname]
 
 
 @pytest.mark.parametrize("module", sorted(m for m, owners in CONVERTED.items() if owners is None))

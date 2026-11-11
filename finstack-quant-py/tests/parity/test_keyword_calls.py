@@ -10,6 +10,7 @@ and assert the failure, if any, is not "unexpected keyword argument".
 from __future__ import annotations
 
 import ast
+import functools
 import importlib
 import inspect
 from pathlib import Path
@@ -105,6 +106,8 @@ def _import(module: str) -> ModuleType | None:
         return None
 
 
+# One lookup and one signature per callable, shared by its parameter cases.
+@functools.cache
 def _resolve(module: str, func: str, cls: str | None) -> Any:
     mod = _import(module)
     if mod is None:
@@ -117,6 +120,15 @@ def _resolve(module: str, func: str, cls: str | None) -> Any:
     if func == "__init__":
         return klass
     return getattr(klass, func, None)
+
+
+@functools.cache
+def _runtime_names(module: str, func: str, cls: str | None) -> frozenset[str] | ValueError:
+    """Runtime parameter names of a resolved callable, or the error ``inspect`` raised."""
+    try:
+        return frozenset(inspect.signature(_resolve(module, func, cls)).parameters)
+    except ValueError as exc:
+        return exc
 
 
 _CASES = _collect_cases()
@@ -137,15 +149,13 @@ def test_documented_keyword_is_accepted(module: str, func: str, cls: str | None,
         pytest.skip("variadic")
     # 1. The runtime signature must parse (a Rust parameter named after a Python
     #    keyword such as ``from`` makes ``text_signature`` unparseable).
-    try:
-        sig = inspect.signature(target)
-    except ValueError as exc:
-        pytest.fail(f"{module}.{cls or ''}.{func}: runtime signature invalid: {exc}")
+    runtime_names = _runtime_names(module, func, cls)
+    if isinstance(runtime_names, ValueError):
+        pytest.fail(f"{module}.{cls or ''}.{func}: runtime signature invalid: {runtime_names}")
     # 2. The documented name must be present in the runtime signature.
-    runtime_names = set(sig.parameters)
     if runtime_names and param not in runtime_names and "kwargs" not in runtime_names:
         pytest.fail(
-            f"{module}.{cls or ''}.{func}: stub parameter {param!r} not in runtime signature {list(runtime_names)}"
+            f"{module}.{cls or ''}.{func}: stub parameter {param!r} not in runtime signature {sorted(runtime_names)}"
         )
     # 3. Calling by keyword must not be rejected (catches text_signature overrides
     #    that disagree with the Rust parameter name).

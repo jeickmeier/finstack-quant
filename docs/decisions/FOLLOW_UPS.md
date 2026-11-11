@@ -966,11 +966,25 @@ gate and selected finite-strip or full flat-Black wings.
 was accepted on 2026-11-10 for literal at-the-forward conversion using checked analytic
 pricing, direct inversion and premium replay in the smaller boundary
 component.
-[Analytic-model record 23](financial/models-analytic/hull-white-analytic-kernels.md#proposed-decision-for-checked-hullwhite-analytic-kernels-and-payment-measures)
-proposes checked scheduled Hull–White moments and affine bonds, explicit
-payment-measure caplets and coupons, exact simple futures bias and an
-ATM Normal quote on the actual term-period law. The other five records
-are Draft.
+[Analytic-model record 23](financial/models-analytic/hull-white-analytic-kernels.md#accepted-decision-for-checked-hullwhite-analytic-kernels-and-payment-measures)
+was accepted on 2026-11-10 for checked scheduled Hull–White moments
+and affine bonds, explicit payment-measure caplets and coupons,
+exact simple futures bias and a price-equivalent term ATM Normal quote.
+[Analytic-model record 24](financial/models-analytic/rate-clock-and-projection.md#accepted-decision-for-checked-model-clocks-curve-fit-and-term-projection)
+was accepted on 2026-11-10 for checked dated clock mapping, an exact
+deterministic curve shift, contractual term-period reconstruction and
+active fitted-state rules.
+[Analytic-model record 25](financial/models-analytic/hw1f-monte-carlo-discounting.md#accepted-decision-for-exact-joint-hullwhite-paths-and-sampling)
+was accepted on 2026-11-10 for exact joint Hull–White state and log-bank
+steps, explicit event and stream controls, and pair-based sampling
+uncertainty.
+[Analytic-model record 26](financial/models-analytic/hw1f-issuer-lsmc.md#accepted-decision-for-checked-issuer-call-policy-training-and-pricing)
+was accepted on 2026-11-10 for dated issuer-call cash, checked
+continuation regression and independent pricing of a frozen policy.
+[Analytic-model record 27](financial/models-analytic/diebold-li-var.md#proposed-decision-for-checked-nelsonsiegel-factors-and-var-forecasts)
+proposes explicit observation cadence, checked Nelson–Siegel factor
+extraction, stable VAR dynamics and marginal fitted-yield forecasts.
+Record 28 remains Draft.
 Runtime/caller/host/state reconciliation and independent qualification remain pending.
 Other unadopted choices retain their stated Proposed or Draft status. Acceptance does not certify
 observed implementations.

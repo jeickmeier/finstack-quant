@@ -921,6 +921,10 @@ name = "finstack-quant-py"
 version = "0.11.0"
 dependencies = [
  "arrow",
+ "bit-set",
+ "bit-vec",
+ "either",
+ "fastrand",
  "finstack-quant",
  "finstack-quant-analytics",
  "finstack-quant-arrow",
@@ -938,14 +942,24 @@ dependencies = [
  "finstack-quant-statements",
  "finstack-quant-statements-analytics",
  "finstack-quant-valuations",
+ "finstack-quant-valuations-core",
+ "finstack-quant-valuations-credit",
+ "finstack-quant-valuations-equity",
+ "finstack-quant-valuations-exotics",
+ "finstack-quant-valuations-fixed-income",
+ "finstack-quant-valuations-fx",
+ "finstack-quant-valuations-rates",
+ "finstack-quant-valuations-structured-credit",
  "indexmap",
  "nalgebra",
  "numpy",
  "pyo3",
+ "rand 0.9.5",
  "rust_decimal",
  "serde",
  "serde_json",
  "strum",
+ "syn 3.0.3",
  "time",
 ]
 
@@ -1017,6 +1031,7 @@ dependencies = [
 name = "finstack-quant-test-utils"
 version = "0.11.0"
 dependencies = [
+ "num-integer",
  "serde",
  "serde_json",
  "thiserror",

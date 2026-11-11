@@ -2137,6 +2137,60 @@ smaller-component tolerances. Propagate unresolved range or precision
 and reconcile existing Python and WASM paths.
 [Clause map M283–M286](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
 
+### 1.72 Checked Hull–White analytic kernels and payment measures
+
+**Detailed decision:** [MODELS-ANALYTIC-23](docs/decisions/financial/models-analytic/hull-white-analytic-kernels.md#accepted-decision-for-checked-hullwhite-analytic-kernels-and-payment-measures) was accepted on 2026-11-10.
+
+Use one checked Gaussian law for constant or scheduled volatility,
+with exact Ho–Lee and deterministic limits. Preserve scale through
+conditional moments, affine bonds and original-leg bond options.
+
+Require explicit term fixing, accrual and payment geometry. Use the
+deterministic multiplicative projection basis and signed payment
+shift, and price on gross accumulation with exact support limits.
+The continuous short-rate accumulation law has its own payment
+adjustment. Contractual discrete overnight schedules require their
+own qualified model or explicit approximation.
+
+Use the exact quote-dependent standalone simple-rate futures bias
+and the price-equivalent term ATM Normal quote with actual-sigma
+replay. Reconcile valuation, calibration and existing host callers.
+[Clause map M287–M290](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.73 Checked Hull–White clocks, curve fit and term projection
+
+**Detailed decision:** [MODELS-ANALYTIC-24](docs/decisions/financial/models-analytic/rate-clock-and-projection.md#accepted-decision-for-checked-model-clocks-curve-fit-and-term-projection) was accepted on 2026-11-10.
+
+Use the explicit ACT/365F model origin and exact dated coordinates.
+Compose each curve's own signed clock and context, rebase the admitted
+discount source and use the actual one-sided composed derivative.
+
+Fit the centered Gaussian model with the exact deterministic shift and
+its checked interval integral. Use the equivalent centered conditional
+bond law and the actual term fixing and index accrual with the
+deterministic multiplicative gross basis. Preserve known fixings as rates.
+
+Select coherent active parameters, preserve exact dated sigma knots and
+qualify schedule rolling and scenario replay. Reconcile valuation,
+calibration, risk and existing hosts.
+[Clause map M291–M294](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.74 Exact joint Hull–White paths and sampling
+
+**Detailed decision:** [MODELS-ANALYTIC-25](docs/decisions/financial/models-analytic/hw1f-monte-carlo-discounting.md#accepted-decision-for-exact-joint-hullwhite-paths-and-sampling) was accepted on 2026-11-10.
+
+Step the centered rate and integrated short rate with the same joint
+Gaussian law. Use checked scheduled covariance roots and accumulate
+the bank in log units. Discount path cash at its actual payment time.
+
+Preserve exact grid and event identities. Require explicit Philox
+controls and keep both ordered shocks together for each antithetic
+partner. Use one observation per pricing base group, checked Student-t
+sampling uncertainty and actual work counts. Reconcile valuation, risk
+and existing hosts, with correlated driver and exercise policy choices
+owned by their respective records.
+[Clause map M295–M298](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
 ## 2. Determinism and floating point
 
 **Authority:** [ADR 0021](docs/decisions/standards/0021-reproducibility-guarantees.md)

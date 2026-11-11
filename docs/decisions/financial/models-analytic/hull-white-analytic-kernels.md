@@ -1,14 +1,14 @@
 # MODELS-ANALYTIC-23: Hull–White affine bonds, caplets and covariance corrections
 
-**Decision status:** Proposed (complete package, adoption pending).
+**Decision status:** Accepted (complete package, 2026-11-10).
 
 **Implementation status:** Observed in the source scope identified below; discrepancies are identified explicitly.
 
-**Validation status:** Source and caller paths inspected. Independent scalar, high-precision and Gaussian checks support the proposed distinctions. Production and end-to-end qualification remain pending.
+**Validation status:** Source and caller paths inspected. Independent scalar, high-precision and Gaussian checks support the accepted distinctions. Production and end-to-end qualification remain pending.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Proposed decision for checked Hull–White analytic kernels and payment measures
+## Accepted decision for checked Hull–White analytic kernels and payment measures
 
 1. **Use the one-factor Gaussian short-rate law.** The centered state
    follows `dx = -kappa x dt + sigma(t) dW` with deterministic
@@ -20,11 +20,12 @@
 
 2. **Use one immutable checked pricing state.** Build scalar sigma as
    the constant case of the same validated scheduled model. Use the
-   accepted nonnegative, right-continuous, flat-final coefficient
-   schedule in CORE-NUMERICS-21. Apply the same validation on
+   accepted nonnegative, right-continuous schedule with flat tail.
+   Apply the same validation on
    restoration. Remove public mutable model fields, unchecked
    parameter paths and generic model defaults. A compact fit record
    can retain fitted values under its calibration contract.
+   [CORE-NUMERICS-21](../core-numerics/piecewise-coefficients.md#accepted-decision-checked-piecewise-coefficients-and-exponential-integration)
 
 3. **Require an explicit common model clock and curve roles.** Model
    times are finite elapsed years on one qualified origin and clock.
@@ -54,7 +55,9 @@
    schedule through the same calculation. At kappa=0 this is
    the sum of sigma-squared durations. A zero interval or
    zero supported sigma gives exact zero. Retain scale for
-   downstream loading, variance and square-root products.
+   downstream loading, variance and square-root products. A
+   standalone variance can be outside binary64 range even when
+   a downstream price or standard deviation is representable.
 
 7. **Check the complete covariance domain.** Conditional on the
    state at v, the covariance for times t,u≥v is
@@ -107,8 +110,8 @@
     evaluate original-leg intrinsic. A positive q uses the
     same Black law at every supported scale. Remove small-q
     intrinsic shortcuts, zero clipping and NaN sentinels.
-    A positive requested time value lost by the calculation
-    must be resolved or produce a computation error.
+    Preserve representable positive OTM time value. Propagate a
+    computation error when the requested positive premium is lost.
 
 14. **Admit explicit term caplet periods.** Require
     0≤v≤f≤S<E, payment P≥S, finite tau>0 and finite signed
@@ -124,7 +127,8 @@
     multiplicative basis. Its basis factor is G_0 divided
     by the initial discount bond ratio. The model uses the
     same Gaussian loading for both, with separate payment
-    discounting `P_d(v,P)`.
+    discounting `P_d(v,P)`. Require a finite positive payment
+    factor on the same model clock.
 
 16. **Use stable fixing and payment loadings.** Set
     `L = exp(-kappa(S-f)) B(S,E)` and
@@ -165,8 +169,9 @@
     `exp(integral_S^E r(u) du)`, require
     0≤v≤S<E≤P. Its payment log multiplier is
     `-B(E,P) [B(S,E) exp(-kappa(E-S)) V(v,S) + J(S,E)]`.
-    Multiply the qualified end-measure accumulation mean
-    by its exponential. No fixing input is needed.
+    Multiply the discount-ratio mean P_d(v,S)/P_d(v,E) by
+    its exponential. Any projection-basis multiplier requires
+    the owner's explicit model. This law has no fixing input.
     Payment at E has exact multiplier one.
 
 21. **Keep contractual overnight schedules with their owners.**
@@ -185,7 +190,8 @@
     the futures-implied simple rate is the money-market
     measure expectation for the same ratio underlying the
     accrual-end forward. Admit finite signed futures rate R_f
-    with positive gross accumulation 1+tau R_f.
+    with strictly positive mathematical gross accumulation
+    1+tau R_f. A nonpositive gross accumulation is a domain error.
 
 23. **Use the checked quote-dependent adjustment.** Set
     `b = B(S,E)` and
@@ -198,15 +204,19 @@
     VALUATIONS-RATES-10.
 
 24. **Return a price-equivalent term caplet ATM Normal quote.**
-    Require positive time to fixing. From the same term
-    period law return ATM strike `(G_P-1)/tau` and annual
-    Normal sigma
+    Require positive time to fixing. Use the mathematical
+    payment-measure ATM rate `(G_P-1)/tau` as the reference
+    strike. Return annual Normal sigma
     `(G_P/tau) sqrt(2 pi/(f-v)) erf(q/(2 sqrt(2)))`.
-    Use the checked ATM premium law of record 22 with
-    complete scaling. The common payment discount cancels.
-    Preserve zero from exact q=0. Retire the proxy that
-    drops the gross accumulation level and substitutes
-    contractual accrual for model duration.
+    Use complete scaling and record 22's checked ATM replay.
+    Compare `tau sigma_N sqrt(f-v)/sqrt(2 pi)` at the actual
+    returned sigma with `G_P erf(q/(2 sqrt(2)))`. Require an
+    explicit absolute tolerance in undiscounted premium per
+    unit notional and an explicit relative tolerance against
+    that same Black premium. The payment discount cancels.
+    Preserve zero from exact q=0 after validation. Retire
+    the old log-ratio standard-deviation proxy.
+    [Record 22](atm-volatility-conversion.md#accepted-decision-for-checked-price-equivalent-atm-volatility-conversion)
 
 25. **Preserve explicit parameter identifiers and active inputs.**
     Keep separate generic HW and cap/floor fitted keys,
@@ -247,7 +257,8 @@
 | kappa=1e−12, duration 1e12 | The state variance time factor is about 0.43233236 times the duration. A kappa-only Ho–Lee shortcut uses the whole duration. |
 | kappa=0, sigma 1e−200, unit noise interval and bond loading | Standalone variance would round to zero. The total bond log standard deviation is representable at 1e−200. |
 | kappa=0.18, sigma knots (0,0.4,1.7,3.1) with sigmas (0.006,0.022,0.011,0.016), t=2,T=6, flat f0=−0.003, r_t=0.014 | The conditional discount bond is about 0.96225337199. The affine expression agrees with the independent conditional integrated-rate Gaussian law. |
-| kappa=0.07, sigma 0.025, fixing/start/end=(2,2.02,2.52), payment at 2.50/2.52/2.72 | The term payment multipliers are about 1.000010324, 1 and 0.999897559. |
+| kappa=0.07, sigma 0.025, v=0, fixing/start/end=(2,2.02,2.52), payment at 2.50/2.52/2.72 | The term payment multipliers are about 1.000010324, 1 and 0.999897559. |
+| Bond-option legs both 1 and total log standard deviation 5e−16 | The unit ATM premium is about 1.9947114e−16. The existing small-volatility intrinsic shortcut returns zero. |
 | Same kappa and sigma, continuous period S=2.02,E=2.52,P=2.72,v=0.5, compared with two equal discrete reset intervals | The continuous payment log correction is about −0.00009561814. The discrete correction is about −0.00008806059. |
 | kappa=0.03, sigma 0.015, S=5,E=5.25,tau=0.25, futures rate 0.06 | The exact bias is about 0.00269634, giving forward 0.05730366. The leading adjustment is about 0.00265738. |
 | kappa=0.05, sigma 0.012, f=S=4,E=P=5,tau=1,G_P=1.04 | The ATM Normal quote is about 0.01105123. The log-ratio standard-deviation proxy is about 0.01062638. |
@@ -262,35 +273,47 @@ remain pending.
 
 One-factor Gaussian rate kernels with constant κ and scalar/piecewise-constant σ. Scalar calibration params require κ,σ>0; scheduled model requires κ>0 and delegates schedule validation to core PiecewiseConstantCurve. Some standalone kernels permit κ=0.
 
-## Choice and rationale
+### Choice and rationale
 
 Affine bond coefficients and integrated Gaussian variance price zero-coupon options and caplets; deterministic multi-curve ratios and payment-measure covariance adjust projection. Futures convexity helper is a leading low-rate/small-variance approximation, not the full quote-dependent bias.
 
-## Algorithm
+### Algorithm
 
 Bκ(t,T)=−expm1[−κ(T−t)]/κ with exact zero-product limit T−t. State variance is ∫σ²(u)exp[−2κ(t−u)]du; covariance=Var(earlier)exp[−κ|Δt|]. Bond vol=B(expiry,maturity)√integrated variance. ln A=ln P0(T)−ln P0(t)+B f0(t)−σ²(1−exp(−2κt))B²/(4κ), with Ho–Lee limit. ZCB option applies Black to P0(maturity),K P0(expiry),total bond vol,unit time; <1e−15 vol uses intrinsic. Simple caplet uses bond strike1/(1+τK), opposite bond option direction and multiplier (Pd(pay)/Pf(pay))(1+τK). If1+τK≤0, cap is linear and floor zero. Scheduled term caplet prices ratio Pf(start)/Pf(end) adjusted by exp[−Var(xfix)×ratio_loading×payment_loading]; ratio loading=B(fix,end)−B(fix,start), payment loading=B(fix,pay)−B(fix,end), total ratio vol=abs(bondvol(end)−bondvol(start)). Discount by Pd(pay). Cap/floor sums period prices.
 
-## Selection and controls
+### Selection and controls
 
 Futures adjustment=.5σ²(Bsettle,end/τ) × (B0,2settle×Bsettle,end+B0,settle²). Delayed compounded coupon multiplier=exp[−Bend,pay×(Bstart,end exp(−κΔ)Var(xstart)+.5σ²Bstart,end²)]. Term multiplier uses fixing-state variance times differences of B. Approximate normal caplet vol=σ B0,τ/τ ×√[(1−exp(−2κtfix))/(2κtfix)], with small-κ limit. Market scalar-key helpers distinguish generic HW from cap/floor calibration, and expose a cap/floor σ-schedule key.
 
-## Conventions
+### Conventions
 
 κ inverse years, σ absolute decimal short-rate units/√year, τ contractual accrual fraction distinct from model-year intervals; bond vol is total log standard deviation. Pf projects and Pd discounts. No stochastic basis factor is modeled.
 
-## Limitations, failure and fallback
+### Limitations, failure and fallback
 
 Low-level scalar helpers have unequal validation; bad arithmetic may return NaN or clamped intrinsic while Result variants validate schedules/times. Payment time is allowed between start/end; beyond-end is not mandatory. `state_covariance` returns zero when earlier time≤0 before complete time-domain checking. Convexity approximation must not be represented as exact futures bias.
 
-## Alternatives and tradeoffs
+### Alternatives and tradeoffs
 
 Constant and piecewise σ variants are supported. Full quote-dependent futures convexity and stochastic multi-curve basis are outside these helper formulas.
 
-## Implementation and validation evidence
+### Implementation and validation evidence
 
 [hull_white.rs](../../../../finstack-quant/models/src/rates/hull_white.rs). `delayed_term_caplet_matches_independent_payment_measure_integral` integrates Gaussian loading covariance independently; scalar/schedule equivalence and put/call parity are internal invariants. `convexity_matches_quantlib_low_rate_small_variance_expansion` distinguishes approximation from full bias. References: [Hull–White](../../../REFERENCES.md#hull-white-1990-pricing-ird), [Brigo–Mercurio](../../../REFERENCES.md#brigo-mercurio-2006-interest-rate-models).
 
+Term cap/floor pricing and fitting already consume the scheduled
+period kernel. Swaption coupon preparation calls the current adjustment
+with its aggregate period fields. The generic futures and Normal-volatility
+helpers are public through the model hosts. Actual term and overnight
+futures pricing has a separate product owner. See the
+[cap/floor pricer](../../../../finstack-quant/valuations/rates/src/cap_floor/hw_pricer.rs),
+[calibration pricing](../../../../finstack-quant/calibration/src/hull_white/pricing.rs),
+[swaption valuation cash flows](../../../../finstack-quant/valuations/rates/src/swaption/pricing/hw_cashflows.rs),
+[contractual swaption fit](../../../../finstack-quant/calibration/src/hull_white/contractual_swaption.rs),
+[Python kernels](../../../../finstack-quant-py/src/bindings/models/rates/hull_white.rs)
+and [WASM kernels](../../../../finstack-quant-wasm/src/api/models/rates/hull_white.rs).
+
 ## Follow-up tracking
 
-Adoption questions and implementation or validation work are tracked in the
+Implementation and validation work are tracked in the
 [analytic-model follow-ups](../FOLLOW_UPS.md#analytic-models).

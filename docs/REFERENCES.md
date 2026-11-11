@@ -108,6 +108,76 @@ and implementation and validation evidence.
   by itself qualify CORE-NUMERICS-21's finite-range step-kernel implementation,
   schedule conventions or model/financial error budget.
 
+### Checked Hull–White analytic kernels and payment measures
+
+- Hull and White give the extended Vasicek bond and bond-option law.
+  The scheduled variance and exact zero-mean-reversion conventions are
+  local model choices in
+  [accepted record 23](decisions/financial/models-analytic/hull-white-analytic-kernels.md#accepted-decision-for-checked-hullwhite-analytic-kernels-and-payment-measures).
+  [Pricing Interest-Rate-Derivative Securities](https://doi.org/10.1093/rfs/3.4.573)
+- Henrard's Theorems 2 and 3 derive separate delayed-payment adjustments
+  for continuous accumulation and discrete resets in one-factor HJM.
+  [Overnight indexed swaps and floating coupons](https://econwpa.ub.uni-muenchen.de/econ-wp/fin/papers/0402/0402008.pdf)
+- Kirikos and Novak give the futures bias derivation. QuantLib implements
+  the quote-dependent constant-sigma benchmark with accrual equal to its
+  time gap. The selected model takes contractual accrual explicitly.
+  [Convexity Conundrums](https://www.powerfinance.com/convexity/),
+  [QuantLib Hull–White implementation](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/models/shortrate/onefactormodels/hullwhite.cpp)
+- The term caplet's ATM Normal quote uses the analytic price equivalence in
+  Choi et al., section 4.2. [A Black–Scholes user's guide to the Bachelier model](https://arxiv.org/pdf/2104.08686)
+
+### Hull–White rate clock, curve fit and term projection
+
+- QuantLib's Hull–White dynamics separate the centered OU state from
+  the deterministic shift. Its constant-sigma fitting parameter gives
+  the corresponding instantaneous-forward and variance correction.
+  [QuantLib Hull–White dynamics and fitting parameter](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/models/shortrate/onefactormodels/hullwhite.hpp)
+- Henrard describes the absolutely continuous discount function and
+  the one-factor Gaussian bond law. The local schedule and integral
+  in [record 24](decisions/financial/models-analytic/rate-clock-and-projection.md#accepted-decision-for-checked-model-clocks-curve-fit-and-term-projection)
+  use the same integrated Gaussian law.
+  [Efficient swaptions price in Hull–White one factor model](https://arxiv.org/abs/0901.1776)
+- Henrard defines the index period with its own fixing, effective and
+  maturity dates and contractual accrual. Definitions 1–3 give the
+  multiplicative gross spread. Record 24 selects its deterministic
+  case with the projection factor source of CORE-MARKET-02.
+  [Multi-curves Framework with Stochastic Spread](https://quant.opengamma.io/Multi-Curves-Stochastic-Spread-STIR-Futures-Options-OpenGamma.pdf)
+
+### Exact joint Hull–White paths and sampling
+
+- Ostrovski derives the conditional Gaussian law of the centered
+  endpoint and integrated state, with the deterministic curve
+  shift in the discount factor. The scheduled square-root
+  composition and event dispatch in
+  [record 25](decisions/financial/models-analytic/hw1f-monte-carlo-discounting.md#accepted-decision-for-exact-joint-hullwhite-paths-and-sampling)
+  extend the constant-sigma law to the accepted coefficient schedule.
+  [Efficient and Exact Simulation of the Hull-White Model](https://www.researchgate.net/publication/262336369_Efficient_and_Exact_Simulation_of_the_Hull-White_Model)
+- Salmon et al. specify Philox's counter-based construction. The
+  local stream, midpoint uniform and ordered two-normal assignment
+  are recorded in the proposal.
+  [Parallel Random Numbers: As Easy as 1, 2, 3](https://www.thesalmons.org/john/random123/papers/random123sc11.pdf)
+- Glasserman, section 4.2, derives the antithetic estimator as
+  the mean of independent pair averages. The record selects
+  the core Student-t mean interval on those pricing observations.
+  [Monte Carlo Methods in Financial Engineering](https://doi.org/10.1007/978-0-387-21617-1)
+
+### Checked issuer-call policy training and pricing
+
+- Longstaff and Schwartz estimate conditional continuation by
+  regression on decision-time state, then apply the fitted rules
+  to independent paths in their sample comparison. Their
+  path-dependent cancellable swap includes current notional in
+  the state. [Valuing American Options by Simulation](https://people.math.ethz.ch/~hjfurrer/teaching/LongstaffSchwartzAmericanOptionsLeastSquareMonteCarlo.pdf)
+- Andersen and Broadie, equation (3), give the population
+  inequality for an admissible maximizing stopping policy.
+  [Record 26](decisions/financial/models-analytic/hw1f-issuer-lsmc.md#accepted-decision-for-checked-issuer-call-policy-training-and-pricing)
+  applies the same argument to issuer minimization of holder
+  cash. [Primal-Dual Simulation Algorithm](https://business.columbia.edu/sites/default/files-efs/pubfiles/1234/1234.pdf)
+- Glasserman and Yu analyze the dependence of regression
+  accuracy on sample count and basis size. Record 26's eligible
+  base-group and numerical rank gates are local admission rules.
+  [Number of Paths Versus Number of Basis Functions](https://arxiv.org/pdf/math/0503556)
+
 <a id="ou-state-variance-kernel"></a>
 
 ### OU state variance kernel

@@ -1,6 +1,6 @@
 # Analytic model methodology inventory
 
-**Decision status:** MODELS-ANALYTIC-01 through 22 Accepted. MODELS-ANALYTIC-23 Proposed. The other five detailed records are Draft.
+**Decision status:** MODELS-ANALYTIC-01 through 26 Accepted. MODELS-ANALYTIC-27 Proposed. Record 28 is Draft.
 
 **Implementation scope:** All **58 assigned Rust source files** in models `closed_form`, `fourier`, `rates` and `volatility`: **47 algorithm-bearing**, **9 support**, **2 test-only**, **0 generated**. Runtime implementations, material domain/default/dispatch decisions and interleaved test-helper boundaries were inspected. The exact one-file-one-entry ledger is [coverage.json](coverage.json).
 
@@ -146,10 +146,31 @@ was accepted on **2026-11-10** for literal at-the-forward conversion with positi
 shifted levels, analytic inversion and replay of the actual target
 volatility against absolute premium and relative boundary controls.
 
-[MODELS-ANALYTIC-23](hull-white-analytic-kernels.md#proposed-decision-for-checked-hullwhite-analytic-kernels-and-payment-measures)
-proposes one checked constant or scheduled Gaussian law, stable affine
-and bond-option pricing, explicit term and continuous payment measures,
-exact simple futures bias and a price-equivalent term ATM Normal quote.
+[MODELS-ANALYTIC-23](hull-white-analytic-kernels.md#accepted-decision-for-checked-hullwhite-analytic-kernels-and-payment-measures)
+was accepted on **2026-11-10** for one checked constant or scheduled Gaussian
+law, stable affine and bond-option pricing, explicit term and continuous
+payment measures, exact simple futures bias and a price-equivalent term ATM
+Normal quote.
+
+[MODELS-ANALYTIC-24](rate-clock-and-projection.md#accepted-decision-for-checked-model-clocks-curve-fit-and-term-projection)
+was accepted on **2026-11-10** for a dated ACT/365F model clock mapped to
+source-owned curve clocks, an exact shifted Gaussian curve fit, checked
+projection on the actual index period and coherent fitted-state selection.
+
+[MODELS-ANALYTIC-25](hw1f-monte-carlo-discounting.md#accepted-decision-for-exact-joint-hullwhite-paths-and-sampling)
+was accepted on **2026-11-10** for exact joint centered-rate and log-bank
+steps, explicit event and Philox controls, checked pathwise discounting
+and pair-based sampling uncertainty.
+
+[MODELS-ANALYTIC-26](hw1f-issuer-lsmc.md#accepted-decision-for-checked-issuer-call-policy-training-and-pricing)
+was accepted on **2026-11-10** for actual dated issuer-call cash and
+exact decision order, checked state-based continuation regression, and
+independent pricing of a frozen admissible policy.
+
+[MODELS-ANALYTIC-27](diebold-li-var.md#proposed-decision-for-checked-nelsonsiegel-factors-and-var-forecasts)
+proposes explicit observation cadence, checked full-rank Nelson–Siegel
+and VAR fits, strict stationarity and marginal fitted-yield prediction
+intervals.
 
 | Calculation / supported instruments | Implemented method / material variants | Actual selection | Decision record | Implementation / validation | Scope and evidence limits |
 |---|---|---|---|---|---|
@@ -186,15 +207,15 @@ exact simple futures bias and a price-equivalent term ATM Normal quote.
 | Surface arbitrage report | Butterfly/calendar/Dupire scans, severity and filtered pass flag | Three checks on by default; forwards required | [MODELS-ANALYTIC-20](surface-arbitrage-diagnostics.md) | Observed behavior and independent scalar checks | Sampled call constraints, strict calendar support, independent Dupire signs and complete verdict accepted 2026-11-10 |
 | Variance replication | OTM trapezoids, log-anchor adjustment, fixed flat-vol tails | User strike grid/callbacks | [MODELS-ANALYTIC-21](variance-replication.md) | Observed behavior and independent scalar checks | Exact-forward split, checked Black prices, mesh gate and explicit wings accepted 2026-11-10 |
 | ATM convention conversion | Source price then Brent target solve, scale seed | Explicit source/target convention | [MODELS-ANALYTIC-22](atm-volatility-conversion.md) | Observed behavior and independent scalar checks | Positive expiry, exact shifts, analytic inverse and actual sigma replay accepted 2026-11-10 |
-| HW affine bonds/options | Stable B, integrated scheduled variance, affine A, Black ZCB option | Scalar/scheduled params; caller curves | [MODELS-ANALYTIC-23](hull-white-analytic-kernels.md) | Observed behavior and independent Gaussian checks | Proposed common model state, exact limits and scaled original-leg pricing |
-| HW caplets/payment measure | Bond-option transform or ratio loading with delayed-pay covariance | Explicit periods; deterministic projection basis | [MODELS-ANALYTIC-23](hull-white-analytic-kernels.md) | Observed behavior and independent scalar checks | Proposed explicit term periods and separate continuous accumulation scope |
-| HW convexity/normal vol | Leading futures adjustment, coupon covariance factors, normal-vol proxy | Explicit helpers | [MODELS-ANALYTIC-23](hull-white-analytic-kernels.md) | Observed behavior and independent scalar checks | Proposed exact quote-dependent bias and price-equivalent term ATM Normal quote |
-| Rate clock/curve fit | Actual-days/365 to source convention, rebasing, monthly theta setup | Explicit as_of/source curve/horizon | [MODELS-ANALYTIC-24](rate-clock-and-projection.md) | Observed; source and evidence links in record; not executed | Date/derivative/grid resolution |
-| Conditional period projection | Affine bond ratio to simple forward plus additive basis | Explicit coeffs or flat-rate representation | [MODELS-ANALYTIC-24](rate-clock-and-projection.md) | Observed; source and evidence links in record; not executed | Clamped times and denominator floor |
-| HW MC paths/discount | Exact rate marginal, Philox antithetics, event grid, trapezoid bank | 10000 streams/seed42/4 minimum substeps defaults | [MODELS-ANALYTIC-25](hw1f-monte-carlo-discounting.md) | Observed; source and evidence links in record; not executed | Discount discretization bias |
-| HW estimate statistics | Average antithetic pairs then independent-estimator stats | Optional held-out odd streams | [MODELS-ANALYTIC-25](hw1f-monte-carlo-discounting.md) | Observed; source and evidence links in record; not executed | Sampling CI excludes numerical/model error |
-| Issuer exercise regression | Backward continuation, coupon separation, polynomial bases | Optional OOS; issuer minimizes amount vs continuation | [MODELS-ANALYTIC-26](hw1f-issuer-lsmc.md) | Observed; source and evidence links in record; not executed | Sparse look-ahead and exercise ordering |
-| Historical NS/VAR | Fixed-lambda OLS factors, VAR(1), Gaussian marginal bands | lambda=.7308 inverse years default | [MODELS-ANALYTIC-27](diebold-li-var.md) | Observed; source and evidence links in record; not executed | Stationarity, sampling interval, degenerate R2 |
+| HW affine bonds/options | Stable B, integrated scheduled variance, affine A, Black ZCB option | Scalar/scheduled params; caller curves | [MODELS-ANALYTIC-23](hull-white-analytic-kernels.md) | Observed behavior and independent Gaussian checks | Common model state, exact limits and scaled original-leg pricing accepted on 2026-11-10 |
+| HW caplets/payment measure | Bond-option transform or ratio loading with delayed-pay covariance | Explicit periods; deterministic projection basis | [MODELS-ANALYTIC-23](hull-white-analytic-kernels.md) | Observed behavior and independent scalar checks | Explicit term periods and separate continuous accumulation accepted on 2026-11-10 |
+| HW convexity/normal vol | Leading futures adjustment, coupon covariance factors, normal-vol proxy | Explicit helpers | [MODELS-ANALYTIC-23](hull-white-analytic-kernels.md) | Observed behavior and independent scalar checks | Exact quote-dependent bias and price-equivalent term ATM Normal quote accepted on 2026-11-10 |
+| Rate clock/curve fit | Actual-days/365 to source convention, rebasing, monthly theta setup | Explicit as_of/source curve/horizon | [MODELS-ANALYTIC-24](rate-clock-and-projection.md) | Observed behavior and independent scalar and Gaussian checks | Source-owned clock composition and exact deterministic shift accepted on 2026-11-10 |
+| Conditional period projection | Affine bond ratio to simple forward plus additive basis | Explicit coeffs or flat-rate representation | [MODELS-ANALYTIC-24](rate-clock-and-projection.md) | Observed behavior and independent scalar and Gaussian checks | Actual fixing and index dates, checked gross basis and literal known fixings accepted on 2026-11-10 |
+| HW MC paths/discount | Exact rate marginal, Philox antithetics, event grid, trapezoid bank | 10000 streams/seed42/4 minimum substeps defaults | [MODELS-ANALYTIC-25](hw1f-monte-carlo-discounting.md) | Observed behavior and independent Gaussian checks | Exact joint Gaussian transitions and checked log-bank discounting accepted on 2026-11-10 |
+| HW estimate statistics | Average antithetic pairs then independent-estimator stats | Optional held-out odd streams | [MODELS-ANALYTIC-25](hw1f-monte-carlo-discounting.md) | Observed behavior and independent sampling checks | Explicit Philox controls and complete pair estimates with checked Student-t uncertainty accepted on 2026-11-10 |
+| Issuer exercise regression | Backward continuation, coupon separation, polynomial bases | Optional OOS; issuer minimizes amount vs continuation | [MODELS-ANALYTIC-26](hw1f-issuer-lsmc.md) | Observed behavior and independent cash and policy checks | Dated branch cash, checked full-rank fit and independent frozen-policy pricing accepted on 2026-11-10 |
+| Historical NS/VAR | Fixed-lambda OLS factors, VAR(1), Gaussian marginal bands | lambda=.7308 inverse years default | [MODELS-ANALYTIC-27](diebold-li-var.md) | Observed behavior and independent scalar and VAR checks | Proposed explicit observation cadence, strict stationarity and conditional marginal intervals |
 | Yield-change PCA | Centered sample covariance, clamped eigenvalues, sign normalization | All components retained; explicit truncation | [MODELS-ANALYTIC-28](yield-pca.md) | Observed; source and evidence links in record; not executed | Negative eigenvalue and repeated-space stability |
 | PCA scenarios/reconstruction | SD-scaled loading shocks; score reconstruction+mean | Explicit component shocks/count | [MODELS-ANALYTIC-28](yield-pca.md) | Observed; source and evidence links in record; not executed | No annualization; synthetic tenor metadata |
 

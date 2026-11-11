@@ -119,11 +119,14 @@ def test_ui_check_builds_the_wasm_packages_unless_wasm_test_does() -> None:
     assert after_wasm == [["mise", "run", "ui-check"]]
 
 
-def test_lint_runs_the_hooks_on_changed_files_or_everywhere_after_a_delete() -> None:
-    """Hooks see the changed files; a deletion falls back to the full Lint stage."""
-    existing = ["mise.toml", "AGENTS.md"]
+def test_lint_runs_the_hooks_on_changed_files_or_everywhere_when_they_would_miss() -> None:
+    """Hooks see the changed files; a deletion, build input or manifest runs the full Lint stage."""
+    existing = ["AGENTS.md", "scripts/check_loc.py"]
+    full = ["mise", "run", "pre-commit-run"]
     assert slice_gate.lint_command(existing)[-3:] == ["--files", *existing]
-    assert slice_gate.lint_command([*existing, "no/such/file.rs"]) == ["mise", "run", "pre-commit-run"]
+    assert slice_gate.lint_command([*existing, "no/such/file.rs"]) == full
+    assert slice_gate.lint_command([*existing, "mise.toml"]) == full
+    assert slice_gate.lint_command([*existing, "finstack-quant-py/Cargo.toml"]) == full
 
 
 def test_the_gate_never_regenerates() -> None:
