@@ -15603,6 +15603,18 @@ export type WeightingMethod =
       required_metrics: MetricId[];
     };
 /**
+ * Annual basis of an effective-rate quote.
+ *
+ * A rate `q` on a basis with `B` days per year grows one unit to
+ * `(1 + q)^(days / B)` over `days` calendar days. ACT/365F and ACT/360 are
+ * the supported bases because each is exactly days over a constant, which
+ * makes the conversion from the canonical ACT/365F rate exact.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "YieldBasis".
+ */
+export type YieldBasis = "act_365f" | "act_360";
+/**
  * Time-varying PIK schedule for the MC engine.
  *
  * Controls per-coupon PIK behavior, either uniformly or as a step
@@ -16953,6 +16965,7 @@ export interface SharedDefs {
   WeightingMethod?: WeightingMethod;
   XccySwap?: XccySwap;
   XccySwapLeg?: XccySwapLeg2;
+  YieldBasis?: YieldBasis;
   YoYInflationSwap?: YoYInflationSwap;
   [k: string]: unknown;
 }
@@ -23735,11 +23748,6 @@ export interface Money16 {
  */
 export interface ReturnFloorSpec {
   /**
-   * Day count convention for XIRR discounting. Defaults to Act/365F
-   * (matching `core::cashflow::xirr`) when `None`. Ignored for MOIC floors.
-   */
-  day_count?: DayCount5 | null;
-  /**
    * Issue price = invested capital `V0` (amount funded at issue). Default: par.
    */
   issue_price?:
@@ -23970,6 +23978,13 @@ export interface RevolvingCredit {
    * Defaults to `ShortFront` for maximum flexibility with unaligned dates.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
+  /**
+   * Annual basis of this loan's yield quotes (yield to maturity, call and
+   * worst) and of its effective-interest-rate accretion, separate from the
+   * coupon accrual `day_count` (resolution O11, record
+   * CORE-CONVENTIONS-017 #12). Required: there is no default basis.
+   */
+  yield_basis: "act_365f" | "act_360";
 }
 /**
  * Attributes for scenario selection and tagging
@@ -26228,6 +26243,13 @@ export interface TermLoan {
    * `notional_limit`).
    */
   upfront_fee?: UpfrontFee | null;
+  /**
+   * Annual basis of this loan's yield quotes (yield to maturity, call and
+   * worst) and of its effective-interest-rate accretion, separate from the
+   * coupon accrual `day_count` (resolution O11, record
+   * CORE-CONVENTIONS-017 #12). Required: there is no default basis.
+   */
+  yield_basis: "act_365f" | "act_360";
 }
 /**
  * Attributes for tagging and scenarios

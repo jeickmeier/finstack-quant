@@ -44,6 +44,7 @@ fn test_builder_fixed_rate_facility() {
         .maturity(date!(2028 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.05 }) // 5%
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -69,6 +70,7 @@ fn test_builder_floating_rate_facility() {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Floating(floating_rate_spec("USD-SOFR-3M", 250.0)))
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(30.0, 15.0, 8.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -93,6 +95,7 @@ fn test_builder_with_tiered_fees() {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.055 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees {
             upfront_fee: None,
@@ -137,6 +140,7 @@ fn test_validation_maturity_after_commitment() {
         .maturity(date!(2025 - 01 - 01)) // Before commitment!
         .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -159,6 +163,7 @@ fn test_validation_drawn_within_commitment() {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))

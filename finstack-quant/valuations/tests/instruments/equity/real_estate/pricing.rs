@@ -490,6 +490,7 @@ fn test_levered_real_estate_equity_value_is_asset_minus_debt() {
         .rate(RateSpec::Fixed { rate: 0.05 }) // 5%
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(None)
         .stub(StubKind::None)
@@ -567,6 +568,7 @@ fn test_levered_real_estate_equity_custom_metrics_compute() {
         .rate(RateSpec::Fixed { rate: 0.06 }) // 6%
         .frequency(Tenor::annual())
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(None)
         .stub(StubKind::None)
@@ -651,6 +653,7 @@ fn test_levered_real_estate_sensitivities_metrics_compute() {
         .rate(RateSpec::Fixed { rate: 0.06 }) // 6%
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(None)
         .stub(StubKind::None)
@@ -852,6 +855,7 @@ fn test_dscr_min_excludes_balloon_principal_at_maturity() {
         .rate(RateSpec::Fixed { rate: 0.06 }) // 6% => ~42/yr interest
         .frequency(Tenor::annual())
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(None)
         .stub(StubKind::None)

@@ -233,7 +233,7 @@ impl MetricCalculator for YtmCalculator {
         let as_of = context.as_of;
         let settlement = facility.settlement_date(as_of)?;
         let target = target_price(facility, &schedule, context, settlement)?;
-        crate::loan_quotes::ytm_from_schedule(&schedule, settlement, -target, facility.day_count)
+        crate::loan_quotes::ytm_from_schedule(&schedule, settlement, -target, facility.yield_basis)
     }
 }
 

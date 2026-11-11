@@ -3883,11 +3883,6 @@ export interface Money4 {
  */
 export interface D_7C31Ba12F69Da3273650 {
   /**
-   * Day count convention for XIRR discounting. Defaults to Act/365F
-   * (matching `core::cashflow::xirr`) when `None`. Ignored for MOIC floors.
-   */
-  day_count?: DayCount2 | null;
-  /**
    * Issue price = invested capital `V0` (amount funded at issue). Default: par.
    */
   issue_price?:

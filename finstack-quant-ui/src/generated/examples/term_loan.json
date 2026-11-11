@@ -36,7 +36,8 @@
       },
       "settlement_days": 2,
       "stub": "none",
-      "upfront_fee": null
+      "upfront_fee": null,
+      "yield_basis": "act_360"
     },
     "type": "term_loan"
   },

@@ -705,13 +705,9 @@ pub fn calculate_equity_metrics(
         cash_on_cash.push((*date, (invested > 0.0).then(|| cash / invested)));
     }
     let irr = if invested > 0.0 {
-        finstack_quant_core::cashflow::xirr(
-            &flows,
-            finstack_quant_core::dates::DayCount::Act365F,
-            None,
-        )
-        .ok()
-        .filter(|irr| irr.is_finite())
+        finstack_quant_core::cashflow::xirr(&flows)
+            .ok()
+            .filter(|irr| irr.is_finite())
     } else {
         None
     };

@@ -564,7 +564,7 @@ pub fn chi_squared_quantile(p: f64, df: f64) -> crate::Result<f64> {
     let log_quantile = BrentSolver::new()
         .with_tolerance(1e-13)
         .with_max_iterations(256)
-        .solve_in_bracket(residual, log_min, log_max)
+        .solve_in_bracket(|x| Ok(residual(x)), log_min, log_max)
         .map_err(|error| {
             crate::Error::Validation(format!(
                 "Chi-squared quantile inversion failed for p={p}, df={df}: {error}"

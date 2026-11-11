@@ -41,7 +41,8 @@
           },
           "settlement_days": 2,
           "stub": "none",
-          "upfront_fee": null
+          "upfront_fee": null,
+          "yield_basis": "act_360"
         },
         "type": "term_loan"
       },
@@ -1631,6 +1632,10 @@
             }
           ],
           "description": "Upfront (arrangement or OID) fee paid on `issue_date`, as an amount or\na fraction of the commitment (the DDTL `commitment`, else\n`notional_limit`)."
+        },
+        "yield_basis": {
+          "$ref": "#/$defs/d_6ce775a1c4375afe89b8",
+          "description": "Annual basis of this loan's yield quotes (yield to maturity, call and\nworst) and of its effective-interest-rate accretion, separate from the\ncoupon accrual `day_count` (resolution O11, record\nCORE-CONVENTIONS-017 #12). Required: there is no default basis."
         }
       },
       "required": [
@@ -1642,6 +1647,7 @@
         "rate",
         "frequency",
         "day_count",
+        "yield_basis",
         "discount_curve_id",
         "amortization",
         "attributes"
@@ -1730,6 +1736,21 @@
         "delta_bp"
       ],
       "type": "object"
+    },
+    "d_6ce775a1c4375afe89b8": {
+      "description": "Annual basis of an effective-rate quote.\n\nA rate `q` on a basis with `B` days per year grows one unit to\n`(1 + q)^(days / B)` over `days` calendar days. ACT/365F and ACT/360 are\nthe supported bases because each is exactly days over a constant, which\nmakes the conversion from the canonical ACT/365F rate exact.",
+      "oneOf": [
+        {
+          "const": "act_365f",
+          "description": "Actual days over a 365-day year (the canonical XIRR clock).",
+          "type": "string"
+        },
+        {
+          "const": "act_360",
+          "description": "Actual days over a 360-day year.",
+          "type": "string"
+        }
+      ]
     },
     "d_780b68ee5d41351b65ca": {
       "description": "Barrier monitoring type for default determination.",

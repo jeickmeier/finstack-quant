@@ -1963,6 +1963,25 @@ class TermLoan:
         """
         ...
     @property
+    def yield_basis(self) -> str:
+        """
+        Annual basis of the yield quotes and effective-interest-rate accretion.
+
+        Separate from the accrual ``day_count`` (resolution O11): yields to
+        maturity, call and worst are effective annual rates on this basis.
+
+        Returns
+        -------
+        str
+            ``"act_365f"`` or ``"act_360"``.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+    @property
     def business_day_convention(self) -> str:
         """
         Business day convention (serde string).
@@ -2299,6 +2318,7 @@ class TermLoanBuilder:
     ...     .rate(0.06)
     ...     .frequency(Tenor.quarterly())
     ...     .day_count(DayCount.ACT_360)
+    ...     .yield_basis("act_360")
     ...     .discount_curve_id("USD-OIS")
     ...     .amortization({"percent_of_remaining_per_period": {"pct": 0.025}})
     ...     .build()
@@ -2473,6 +2493,30 @@ class TermLoanBuilder:
         ------
         ValueError
             If the builder was already consumed by ``build()``, or a string ``value`` is not a recognized day-count name.
+        """
+        ...
+    def yield_basis(self, value: str) -> TermLoanBuilder:
+        """
+        Set the required annual basis of yield quotes and EIR accretion.
+
+        The basis is independent of the accrual day count (resolution O11);
+        there is no default, so ``build()`` raises until it is set.
+
+        Parameters
+        ----------
+        value : str
+            ``"act_365f"`` or ``"act_360"``.
+
+        Returns
+        -------
+        TermLoanBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not a supported basis or the builder was already
+            consumed by ``build()``.
         """
         ...
     def business_day_convention(self, value: str) -> TermLoanBuilder:

@@ -637,6 +637,13 @@ export interface D_2D9B65Cc4D957Fd6344E {
    * Defaults to `ShortFront` for maximum flexibility with unaligned dates.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
+  /**
+   * Annual basis of this loan's yield quotes (yield to maturity, call and
+   * worst) and of its effective-interest-rate accretion, separate from the
+   * coupon accrual `day_count` (resolution O11, record
+   * CORE-CONVENTIONS-017 #12). Required: there is no default basis.
+   */
+  yield_basis: "act_365f" | "act_360";
 }
 /**
  * Attributes for scenario selection and tagging

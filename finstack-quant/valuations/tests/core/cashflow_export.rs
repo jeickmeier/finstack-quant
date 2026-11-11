@@ -77,6 +77,7 @@ fn revolving_credit_credit_risk_export_fails_instead_of_returning_false_reconcil
         .maturity(maturity)
         .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act365F)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
         .frequency(Tenor::annual())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))

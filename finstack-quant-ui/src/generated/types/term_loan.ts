@@ -925,6 +925,13 @@ export interface D_5F6Cd145395C86Ce73B6 {
    * `notional_limit`).
    */
   upfront_fee?: DA089Be1189A5Bdf5F0E1 | null;
+  /**
+   * Annual basis of this loan's yield quotes (yield to maturity, call and
+   * worst) and of its effective-interest-rate accretion, separate from the
+   * coupon accrual `day_count` (resolution O11, record
+   * CORE-CONVENTIONS-017 #12). Required: there is no default basis.
+   */
+  yield_basis: "act_365f" | "act_360";
 }
 /**
  * Target remaining principal at the end of the amortization schedule.

@@ -50,6 +50,7 @@ fn test_pricing_recovery_consistency() {
         .maturity(maturity)
         .rate(RateSpec::Fixed { rate: 0.07 }) // 7% Coupon
         .day_count(DayCount::Act365F)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
         .frequency(Tenor::annual()) // Single payment at end
         .fees(RevolvingCreditFees::default()) // No extra fees
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![])) // No changes
@@ -123,6 +124,7 @@ fn test_floating_rcf_declares_forward_dependency() {
         .maturity(maturity)
         .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -158,6 +160,7 @@ fn test_floating_rcf_declares_forward_dependency() {
             },
         ))
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -215,6 +218,7 @@ fn test_floating_rcf_dv01_bumps_forward_curve() {
             },
         ))
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -286,6 +290,7 @@ fn test_upfront_fee_excluded_after_commitment() {
         .maturity(maturity)
         .rate(RateSpec::Fixed { rate: 0.0 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees({
             let mut fees = RevolvingCreditFees::flat(0.0, 0.0, 0.0).unwrap();

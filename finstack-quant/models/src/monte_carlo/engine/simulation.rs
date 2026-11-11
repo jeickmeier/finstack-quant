@@ -302,14 +302,6 @@ impl McEngine {
 
         simulated_path.set_final_value(payoff_value * discount_factor);
 
-        let cashflow_amounts = simulated_path.extract_cashflow_amounts();
-        if cashflow_amounts.len() >= 2 {
-            // Use periodic IRR approximation (assumes roughly equal spacing)
-            if let Ok(rate) = finstack_quant_core::cashflow::irr(&cashflow_amounts, None) {
-                simulated_path.set_irr(rate);
-            }
-        }
-
         Ok((payoff_value, simulated_path))
     }
 

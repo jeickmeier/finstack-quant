@@ -615,7 +615,7 @@ pub(crate) fn build_oid_eir_schedule(
         &schedule,
         &[],
         None,
-        loan.day_count,
+        loan.yield_basis,
         loan.currency,
         spec.include_fees,
     )

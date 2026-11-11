@@ -3,7 +3,7 @@
 use crate::instruments::equity::real_estate::{RealEstateAsset, pricer};
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::Error;
-use finstack_quant_core::cashflow::xirr;
+use finstack_quant_valuations_core::metrics::returns::{YieldBasis, xirr_on_basis};
 use std::collections::BTreeMap;
 
 fn build_unlevered_cashflow_map(
@@ -49,7 +49,7 @@ impl MetricCalculator for UnleveredIrr {
         let flows = build_unlevered_cashflow_map(asset, context.as_of)?;
         let flows_vec: Vec<(finstack_quant_core::dates::Date, f64)> = flows.into_iter().collect();
 
-        xirr(&flows_vec, asset.day_count, None)
+        xirr_on_basis(&flows_vec, YieldBasis::try_from(asset.day_count)?)
     }
 }
 

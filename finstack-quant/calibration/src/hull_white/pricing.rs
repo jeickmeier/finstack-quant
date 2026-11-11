@@ -122,7 +122,7 @@ pub(crate) fn scheduled_cap_floor_implied_normal_vol(
     }
     BrentSolver::new()
         .with_tolerance(1e-14)
-        .solve_in_bracket(residual, 0.0, hi)
+        .solve_in_bracket(|x| Ok(residual(x)), 0.0, hi)
 }
 
 /// Caplet periods `(t_start, t_end, accrual)` for a spot-start cap quote.

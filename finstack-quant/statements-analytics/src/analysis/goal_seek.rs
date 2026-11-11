@@ -538,7 +538,7 @@ where
     // smooth objectives while retaining the robustness of bisection.
     let solver = BrentSolver::new().with_tolerance(TOLERANCE);
     solver
-        .solve_in_bracket(f, lower, upper)
+        .solve_in_bracket(|x| Ok(f(x)), lower, upper)
         .map_err(|e| Error::eval(format!("Goal seek failed within bounds: {}", e)))
 }
 

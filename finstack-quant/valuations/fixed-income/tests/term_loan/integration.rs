@@ -37,6 +37,7 @@ fn build_simple_term_loan(as_of: Date, maturity: Date) -> TermLoan {
         .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.06 }) // 6%
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(
             finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
         )
@@ -207,6 +208,7 @@ fn test_floating_rate_term_loan_yield_and_dm() {
         }))
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(None)
         .stub(StubKind::None)

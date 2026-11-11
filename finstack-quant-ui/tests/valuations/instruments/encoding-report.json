@@ -1829,8 +1829,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/13",
-          "#/$defs/ReturnFloorSpec/properties/day_count/anyOf/1"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -2638,10 +2637,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/ReturnFloorSpec/properties/day_count",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/InstrumentExerciseOverride/properties/call",
             "keyword": "anyOf"
           },
@@ -2890,6 +2885,7 @@
           { "pointer": "#/$defs/d_ec4e993309e09fe83294", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_f80f2b90e7af690c5898", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_b556bbeb1ecf96c44c5a", "keyword": "oneOf" },
+          { "pointer": "#/$defs/YieldBasis", "keyword": "oneOf" },
           { "pointer": "#/$defs/CommitmentFeeBase", "keyword": "oneOf" }
         ]
       }
@@ -4577,7 +4573,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12",
           "#/$defs/d_c0401254ec268b317b65/oneOf/13",
-          "#/$defs/ReturnFloorSpec/properties/day_count/anyOf/1",
           "#/$defs/PaymentCalculation/oneOf/1/properties/percentage_of_collateral/properties/day_count/anyOf/1",
           "#/$defs/PaymentCalculation/oneOf/2/properties/percentage_of_special_serviced/properties/day_count/anyOf/1"
         ],
@@ -5753,10 +5748,6 @@
           },
           {
             "pointer": "#/$defs/Bond/properties/return_floor",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/ReturnFloorSpec/properties/day_count",
             "keyword": "anyOf"
           },
           {
@@ -7057,6 +7048,7 @@
           { "pointer": "#/$defs/IndexationMethod", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_be98333e68c25ab5ae57", "keyword": "oneOf" },
           { "pointer": "#/$defs/CommitmentFeeBase", "keyword": "oneOf" },
+          { "pointer": "#/$defs/YieldBasis", "keyword": "oneOf" },
           { "pointer": "#/$defs/AgencyProgram", "keyword": "oneOf" },
           { "pointer": "#/$defs/PoolType", "keyword": "oneOf" },
           { "pointer": "#/$defs/SifmaSettlementClass", "keyword": "oneOf" },
@@ -7618,8 +7610,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/13",
-          "#/$defs/d_e19dd3057abfdc658580/properties/day_count/anyOf/1"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -8045,10 +8036,6 @@
           {
             "pointer": "#/$defs/d_67c3f0fee95f47938ab4/properties/return_floor",
             "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/d_e19dd3057abfdc658580/properties/day_count",
-            "keyword": "anyOf"
           }
         ],
         "object-array": [
@@ -8336,8 +8323,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/13",
-          "#/$defs/d_7c31ba12f69da3273650/properties/day_count/anyOf/1"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -8790,10 +8776,6 @@
           },
           {
             "pointer": "#/$defs/d_0e4f6595f5e014bbb86a/properties/return_floor",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/d_7c31ba12f69da3273650/properties/day_count",
             "keyword": "anyOf"
           },
           {
@@ -16271,7 +16253,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12",
           "#/$defs/d_c0401254ec268b317b65/oneOf/13",
-          "#/$defs/ReturnFloorSpec/properties/day_count/anyOf/1",
           "#/$defs/PaymentCalculation/oneOf/1/properties/percentage_of_collateral/properties/day_count/anyOf/1",
           "#/$defs/PaymentCalculation/oneOf/2/properties/percentage_of_special_serviced/properties/day_count/anyOf/1"
         ],
@@ -17447,10 +17428,6 @@
           },
           {
             "pointer": "#/$defs/Bond/properties/return_floor",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/ReturnFloorSpec/properties/day_count",
             "keyword": "anyOf"
           },
           {
@@ -18751,6 +18728,7 @@
           { "pointer": "#/$defs/IndexationMethod", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_be98333e68c25ab5ae57", "keyword": "oneOf" },
           { "pointer": "#/$defs/CommitmentFeeBase", "keyword": "oneOf" },
+          { "pointer": "#/$defs/YieldBasis", "keyword": "oneOf" },
           { "pointer": "#/$defs/AgencyProgram", "keyword": "oneOf" },
           { "pointer": "#/$defs/PoolType", "keyword": "oneOf" },
           { "pointer": "#/$defs/SifmaSettlementClass", "keyword": "oneOf" },
@@ -31396,8 +31374,7 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/10",
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12",
-          "#/$defs/d_c0401254ec268b317b65/oneOf/13",
-          "#/$defs/d_f6867bdc53b436c37092/properties/day_count/anyOf/1"
+          "#/$defs/d_c0401254ec268b317b65/oneOf/13"
         ],
         "decimal": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
         "decimal-or-pattern-string": ["#/$defs/d_18f3ba1ec18ab2be13b2"],
@@ -31920,10 +31897,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_f6867bdc53b436c37092/properties/day_count",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/d_b0a7458b7623f012eb4b/properties/calendar_id",
             "keyword": "anyOf"
           },
@@ -32104,6 +32077,7 @@
           { "pointer": "#/$defs/d_5d3b2fe5bfb0a465788c", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_c4eed25a797cbd4d05c6", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_d7ea5e015b061765bb21", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_d5d2fe7bfaaa3204370c", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_b50737fd2bed29cae7f3", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_bd95aa2706e04e0c4d79", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_3200b3e061bb81c15eb3", "keyword": "oneOf" },
@@ -36225,7 +36199,8 @@
           { "pointer": "#/$defs/d_f80f2b90e7af690c5898", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_b556bbeb1ecf96c44c5a", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_edf4a85fa3137e4f2226", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_1022b3cdd456b3d8cd38", "keyword": "oneOf" }
+          { "pointer": "#/$defs/d_1022b3cdd456b3d8cd38", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_c76679ff2bc35eada3e4", "keyword": "oneOf" }
         ]
       }
     },
@@ -36865,7 +36840,6 @@
           "#/$defs/d_c0401254ec268b317b65/oneOf/11",
           "#/$defs/d_c0401254ec268b317b65/oneOf/12",
           "#/$defs/d_c0401254ec268b317b65/oneOf/13",
-          "#/$defs/ReturnFloorSpec/properties/day_count/anyOf/1",
           "#/$defs/PaymentCalculation/oneOf/1/properties/percentage_of_collateral/properties/day_count/anyOf/1",
           "#/$defs/PaymentCalculation/oneOf/2/properties/percentage_of_special_serviced/properties/day_count/anyOf/1"
         ],
@@ -37837,10 +37811,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/ReturnFloorSpec/properties/day_count",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/InstrumentExerciseOverride/properties/call",
             "keyword": "anyOf"
           },
@@ -38215,6 +38185,7 @@
           { "pointer": "#/$defs/RollRule", "keyword": "oneOf" },
           { "pointer": "#/$defs/CFKind", "keyword": "oneOf" },
           { "pointer": "#/$defs/CashflowRepresentation", "keyword": "oneOf" },
+          { "pointer": "#/$defs/YieldBasis", "keyword": "oneOf" },
           { "pointer": "#/$defs/CommitmentFeeBase", "keyword": "oneOf" },
           { "pointer": "#/$defs/TriggerConsequence", "keyword": "oneOf" },
           { "pointer": "#/$defs/TrancheSeniority", "keyword": "oneOf" },
@@ -39698,7 +39669,8 @@
           { "pointer": "#/$defs/d_f80f2b90e7af690c5898", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_b556bbeb1ecf96c44c5a", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_388080c95408ddde3010", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_0a8ecc33dee1b52f07ec", "keyword": "oneOf" }
+          { "pointer": "#/$defs/d_0a8ecc33dee1b52f07ec", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_6ce775a1c4375afe89b8", "keyword": "oneOf" }
         ]
       }
     },

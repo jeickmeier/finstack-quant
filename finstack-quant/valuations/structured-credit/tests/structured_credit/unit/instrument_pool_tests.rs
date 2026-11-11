@@ -41,6 +41,7 @@ pub(crate) fn fixed_revolver(issue_date: Date, maturity: Date) -> RevolvingCredi
         .maturity(maturity)
         .rate(RateSpec::Fixed { rate: 0.06 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).expect("fees"))
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![

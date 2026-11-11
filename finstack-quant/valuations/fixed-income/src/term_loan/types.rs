@@ -148,6 +148,12 @@ pub struct TermLoan {
     /// Day count convention
     pub day_count: DayCount,
 
+    /// Annual basis of this loan's yield quotes (yield to maturity, call and
+    /// worst) and of its effective-interest-rate accretion, separate from the
+    /// coupon accrual `day_count` (resolution O11, record
+    /// CORE-CONVENTIONS-017 #12). Required: there is no default basis.
+    pub yield_basis: finstack_quant_valuations_core::metrics::returns::YieldBasis,
+
     /// Business day convention
     #[builder(default = BusinessDayConvention::ModifiedFollowing)]
     #[serde(default = "finstack_quant_valuations_core::serde_defaults::bdc_modified_following")]
@@ -622,6 +628,7 @@ impl TermLoan {
             .rate(RateSpec::Fixed { rate: 0.06 })
             .frequency(Tenor::quarterly())
             .day_count(DayCount::Act360)
+            .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
             .calendar_id_opt(None)
             .stub(StubKind::None)
@@ -705,6 +712,7 @@ impl TermLoan {
             .rate(RateSpec::Floating(floating_rate))
             .frequency(Tenor::quarterly())
             .day_count(DayCount::Act360)
+            .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
             .calendar_id_opt(None)
             .stub(StubKind::ShortFront)
@@ -765,6 +773,7 @@ impl TermLoan {
             .rate(RateSpec::Fixed { rate: 0.045 })
             .frequency(Tenor::semi_annual())
             .day_count(DayCount::Thirty360)
+            .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
             .calendar_id_opt(None)
             .stub(StubKind::None)

@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use crate::term_loan::TermLoan;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_core::cashflow::{CFKind, xirr};
+use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::metrics::MetricContext;
@@ -174,7 +174,10 @@ pub(super) fn solve_irr_to_exercise(
     // Add explicit redemption at exercise date
     flows.push((exercise_date, redemption.amount()));
 
-    xirr(flows.as_slice(), loan.day_count, None)
+    finstack_quant_valuations_core::metrics::returns::xirr_on_basis(
+        flows.as_slice(),
+        loan.yield_basis,
+    )
 }
 
 /// Exercise date of the hold-to-maturity leg: the final scheduled payment

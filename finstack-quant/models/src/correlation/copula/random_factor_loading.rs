@@ -262,7 +262,7 @@ impl RandomFactorLoadingCopula {
         // scale since the loading standard deviation is at most 0.5.
         let tail = 40.0 * self.loading_volatility;
         let result = BrentSolver::new().with_tolerance(1e-13).solve_in_bracket(
-            |location| self.clipped_second_moment(location) - correlation,
+            |location| Ok(self.clipped_second_moment(location) - correlation),
             -tail,
             1.0 + tail,
         );

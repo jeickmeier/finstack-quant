@@ -315,7 +315,7 @@ pub fn mwr_xirr(cashflows: &[DatedCashflow]) -> finstack_quant_core::Result<f64>
         .iter()
         .map(|flow| (flow.date, flow.amount))
         .collect();
-    finstack_quant_core::cashflow::xirr(&flows, finstack_quant_core::dates::DayCount::Act365F, None)
+    finstack_quant_core::cashflow::xirr(&flows)
 }
 #[cfg(test)]
 mod tests {

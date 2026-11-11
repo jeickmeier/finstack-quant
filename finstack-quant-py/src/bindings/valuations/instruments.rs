@@ -694,6 +694,9 @@ crate::bindings::macros::py_getters!(PyTermLoan |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "TermLoan.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "TermLoan.yield_basis")]
+    yield_basis -> PyResult<String> = enum_to_py_string(&s.inner.yield_basis);
+
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "TermLoan.business_day_convention")]
     business_day_convention -> PyResult<String> =
         enum_to_py_string(&s.inner.business_day_convention);
@@ -827,6 +830,21 @@ impl PyTermLoanBuilder {
             day_count,
             day_count.to_string(),
             |b: TermLoanBuilder| b.day_count(day_count)
+        )
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "TermLoanBuilder.yield_basis")]
+    #[pyo3(text_signature = "($self, value)")]
+    fn yield_basis<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &str,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let basis = super::convert::yield_basis_from_str(value, "yield_basis")?;
+        builder_set!(
+            slf,
+            yield_basis,
+            format!("{value:?}"),
+            |b: TermLoanBuilder| b.yield_basis(basis)
         )
     }
 

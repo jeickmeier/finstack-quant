@@ -4681,7 +4681,8 @@
       "scenarioPricingOverrides",
       "settlementDays",
       "stub",
-      "upfrontFee"
+      "upfrontFee",
+      "yieldBasis"
     ]
   },
   "valuations.instruments.RevolvingCredit": {
@@ -4729,7 +4730,8 @@
       "scenarioPricingOverrides",
       "scheduledFees",
       "settlementDays",
-      "stub"
+      "stub",
+      "yieldBasis"
     ]
   },
   "valuations.instruments.AssetBackedFacility": {
@@ -5480,7 +5482,8 @@
       "scenarioPricingOverrides",
       "settlementDays",
       "stub",
-      "upfrontFee"
+      "upfrontFee",
+      "yieldBasis"
     ],
     "getters": []
   },
@@ -5518,7 +5521,8 @@
       "scenarioPricingOverrides",
       "scheduledFees",
       "settlementDays",
-      "stub"
+      "stub",
+      "yieldBasis"
     ],
     "getters": []
   },

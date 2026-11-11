@@ -117,6 +117,12 @@ pub struct RevolvingCredit {
     /// Day count convention for interest accrual.
     pub day_count: DayCount,
 
+    /// Annual basis of this loan's yield quotes (yield to maturity, call and
+    /// worst) and of its effective-interest-rate accretion, separate from the
+    /// coupon accrual `day_count` (resolution O11, record
+    /// CORE-CONVENTIONS-017 #12). Required: there is no default basis.
+    pub yield_basis: finstack_quant_valuations_core::metrics::returns::YieldBasis,
+
     /// Payment frequency for interest and fees.
     pub frequency: Tenor,
 
@@ -282,6 +288,7 @@ impl RevolvingCredit {
             .maturity(end)
             .rate(base_rate)
             .day_count(DayCount::Act360)
+            .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
             .fees(fees)
             .draw_repay_spec(draw_repay)

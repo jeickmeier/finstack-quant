@@ -184,10 +184,10 @@ pub(crate) fn protection_window_bounds(
 /// which may be below the target — this is call protection, not a maturity
 /// guarantee.
 ///
-/// The XIRR floor is defined on an Act/365F basis (matching
-/// `core::cashflow::xirr`) unless `spec.day_count` overrides it; the XIRR
-/// verification metric MUST discount on the same basis for the guarantee to
-/// hold exactly.
+/// The XIRR floor is defined on the fixed ACT/365F basis of
+/// `core::cashflow::xirr` (record CORE-CONVENTIONS-017, resolution O11); the
+/// XIRR verification metric discounts on the same basis, so the guarantee
+/// holds exactly.
 ///
 /// # MOIC floor
 ///
@@ -225,9 +225,9 @@ pub(crate) fn lower_return_floor(
     let schedule = bond.full_cashflow_schedule(curves)?;
     let accrual_index =
         finstack_quant_cashflows::accrual::AccrualIndex::build(&schedule, &bond.accrual_config())?;
-    // The XIRR floor discounts on the same basis as the verification metric
-    // (`core::cashflow::xirr`, Act/365F) so the guarantee holds exactly.
-    let day_count = spec.day_count.unwrap_or(DayCount::Act365F);
+    // The XIRR floor discounts on the verification metric's fixed basis
+    // (`core::cashflow::xirr`, ACT/365F) so the guarantee holds exactly.
+    let day_count = DayCount::Act365F;
 
     // Resolve the kind once so the loop is a single O(N) pass. For XIRR we carry a
     // running PV of coupons discounted from issue, accumulated one date at a time,
@@ -609,12 +609,7 @@ mod tests {
             (date!(2024 - 07 - 15), 5.0),
             (date!(2025 - 01 - 15), 5.0 + redemption),
         ];
-        let realized = finstack_quant_core::cashflow::xirr(
-            &flows,
-            finstack_quant_core::dates::DayCount::Act365F,
-            None,
-        )
-        .unwrap();
+        let realized = finstack_quant_core::cashflow::xirr(&flows).unwrap();
         assert!(
             (realized - 0.12).abs() < 1e-4,
             "realized XIRR {realized} != 12% (redemption {redemption})"
@@ -709,12 +704,7 @@ mod tests {
             (bond.issue_date, -bond.notional.amount()),
             (exercise_date, call.price_pct_of_par + accrued),
         ];
-        let realized = finstack_quant_core::cashflow::xirr(
-            &flows,
-            finstack_quant_core::dates::DayCount::Act365F,
-            None,
-        )
-        .unwrap();
+        let realized = finstack_quant_core::cashflow::xirr(&flows).unwrap();
         assert!(
             (realized - target).abs() < 1.0e-10,
             "realized XIRR {realized} must equal target {target}; clean={}, accrued={accrued}",
@@ -1112,12 +1102,8 @@ mod tests {
                     .expect("call-date accrued");
             flows.push((call.start, distribution_on_call + redemption));
 
-            let realized = finstack_quant_core::cashflow::xirr(
-                &flows,
-                finstack_quant_core::dates::DayCount::Act365F,
-                None,
-            )
-            .unwrap_or_else(|e| panic!("XIRR solver failed at call date {}: {e}", call.start));
+            let realized = finstack_quant_core::cashflow::xirr(&flows)
+                .unwrap_or_else(|e| panic!("XIRR solver failed at call date {}: {e}", call.start));
 
             assert!(
                 realized >= xirr_target - 1e-6,

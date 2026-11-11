@@ -1732,15 +1732,15 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/equity-tranche.json",
-      "sha256": "fb143d6f3e0a630aa22e35ff4567e726ea1b5ac651c837f891a80e5630b4cdaf"
+      "sha256": "f41279383d20e7802e65180b3ef5a2c7361f1a2c5baee165fbf7afbafcd51347"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "009ea19b5997e3dbe9b2ff27cae0ba75f76dcc2566a49c138b49ed12ad639221"
+      "sha256": "310d69f726fc65e148d90a4d121b459af2172f91486dfde3817f09764365170d"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/loan-yield/cases.json",
-      "sha256": "a05b1667131ebf14ceb0eb38953bc357da346fd50e997e6db67381739d1bdc60"
+      "sha256": "d7b390dd888578db39bd74737cc67a836728957736bc4106f19bb8c39572f678"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/bond-credit/cases.json",
@@ -1848,7 +1848,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/returns/cases.json",
-      "sha256": "342cb9c4a9c6280db0853a5b9e41de5917b121cbc8a6b3ff790a4c33b2d7b875"
+      "sha256": "3f48516864dd11e113b9cb66a10eae459a0c9b734d07c0ac41213641c8235693"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/brinson/cases.json",
@@ -1868,7 +1868,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-model.json",
-      "sha256": "55df45de7744674a22ba8277dfc7334e68942999f88d23408298327b7fc475f5"
+      "sha256": "2051df6aa5dddc44518633a15d64e0d257df9e93bb2aa1db644e12a9f037fe77"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-checks.json",

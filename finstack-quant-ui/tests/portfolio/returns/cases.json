@@ -109,7 +109,7 @@
             "amount": 1400000
           }
         ],
-        "result": 0.0615779210908761
+        "result": 0.06157792109107111
       }
     }
   },
@@ -182,7 +182,7 @@
         "error": {
           "name": "FinstackError",
           "kind": "validation",
-          "message": "Validation error: IRR requires exactly one sign change after netting; found 2. Nonconventional cashflows can have multiple or repeated roots"
+          "message": "Validation error: IRR requires exactly one sign change after netting; found 2"
         }
       },
       "oneFlow": {
@@ -195,7 +195,7 @@
         "error": {
           "name": "FinstackError",
           "kind": "validation",
-          "message": "Validation error: Cashflows must contain at least two cashflows"
+          "message": "At least two data points are required"
         }
       }
     }

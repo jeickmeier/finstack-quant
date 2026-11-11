@@ -153,6 +153,10 @@ impl PeFundWaterfallSpec {
             !self.tranches.is_empty(),
             finstack_quant_core::InputError::TooFewPoints,
         )?;
+        // LP IRR and hurdle compounding share this annual basis; only bases
+        // with an exact conversion from canonical XIRR are admitted
+        // (record CORE-CONVENTIONS-017 #12).
+        finstack_quant_valuations_core::metrics::returns::YieldBasis::try_from(self.day_count)?;
 
         for tranche in &self.tranches {
             match tranche {

@@ -258,7 +258,7 @@
           "tranche_id": "EQUITY",
           "currency": "USD",
           "invested": 15000000,
-          "irr": 0.09338935355656515,
+          "irr": 0.09338935355691519,
           "moic": 1.752689754985699,
           "nav_pct": 143.3056753377453,
           "cash_on_cash": [
@@ -528,7 +528,7 @@
           "tranche_id": "EQUITY",
           "currency": "USD",
           "invested": 9000000,
-          "irr": 0.2113734245896592,
+          "irr": 0.21137342458991137,
           "moic": 2.921149591642832,
           "nav_pct": 143.3056753377453,
           "cash_on_cash": [

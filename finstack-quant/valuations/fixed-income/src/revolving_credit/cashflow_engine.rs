@@ -1330,6 +1330,7 @@ mod tests {
                 delta_bp: Decimal::from(100),
             }])
             .day_count(DayCount::Act360)
+            .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
             .business_day_convention(BusinessDayConvention::Unadjusted)
             .fees(RevolvingCreditFees::default())
@@ -1501,6 +1502,9 @@ mod tests {
                         delta_bp: Decimal::from(100),
                     }])
                     .day_count(DayCount::Act365L)
+                    .yield_basis(
+                        finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F,
+                    )
                     .frequency(frequency)
                     .stub(stub)
                     .business_day_convention(BusinessDayConvention::Unadjusted)
@@ -1583,6 +1587,7 @@ mod tests {
             .maturity(maturity)
             .rate(RateSpec::Fixed { rate: 0.05 })
             .day_count(DayCount::Act365F)
+            .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
             .frequency(Tenor::annual())
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))

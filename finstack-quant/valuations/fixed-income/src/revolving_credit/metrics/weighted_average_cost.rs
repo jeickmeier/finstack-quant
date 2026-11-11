@@ -144,6 +144,7 @@ mod tests {
             .maturity(end)
             .rate(RateSpec::Fixed { rate: 0.04 })
             .day_count(DayCount::Act360)
+            .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
             .business_day_convention(BusinessDayConvention::Unadjusted)
             .fees(RevolvingCreditFees::default())

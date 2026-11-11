@@ -691,7 +691,7 @@ pub fn calibrate_lognormal_mean(ctx: &ForwardCdsContext) -> Result<f64> {
         )));
     };
     let solver = BrentSolver::new().with_tolerance(1e-12);
-    let log_m = solver.solve_in_bracket(f, bracket_lo, bracket_hi)?;
+    let log_m = solver.solve_in_bracket(|x| Ok(f(x)), bracket_lo, bracket_hi)?;
     Ok(log_m.exp())
 }
 

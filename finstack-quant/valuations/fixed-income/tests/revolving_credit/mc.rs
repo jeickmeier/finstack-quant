@@ -39,6 +39,7 @@ fn test_mc_pricer_stochastic_utilization() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.05 }) // 5% interest
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
@@ -119,6 +120,7 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.055 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 50.0, 0.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
@@ -163,6 +165,7 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.055 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 50.0, 0.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
@@ -216,6 +219,7 @@ fn test_mc_pricer_deterministic_reproducibility() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.04 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(20.0, 5.0, 3.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
@@ -276,6 +280,7 @@ fn test_mc_pricer_convergence() {
             .maturity(maturity_date)
             .rate(RateSpec::Fixed { rate: 0.06 })
             .day_count(DayCount::Act360)
+            .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::flat(30.0, 15.0, 10.0).unwrap())
             .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
@@ -332,6 +337,7 @@ fn test_mc_utilization_mean_reversion() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
@@ -372,6 +378,7 @@ fn test_mc_utilization_mean_reversion() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
@@ -480,6 +487,7 @@ fn test_mc_stochastic_floating_rate_index_cap() {
             .maturity(maturity_date)
             .rate(RateSpec::Floating(make_float_spec(all_in_cap_bp)))
             .day_count(DayCount::Act360)
+            .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
@@ -597,6 +605,7 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
             .maturity(maturity_date)
             .rate(RateSpec::Floating(float_spec.clone()))
             .day_count(DayCount::Act360)
+            .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
@@ -668,6 +677,7 @@ fn stochastic_utilization_coupon_integral_converges_to_independent_ou_mean() {
                 .maturity(end)
                 .rate(RateSpec::Fixed { rate: 0.04 })
                 .day_count(DayCount::Act365F)
+                .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
                 .frequency(frequency)
                 .fees(RevolvingCreditFees::default())
                 .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(

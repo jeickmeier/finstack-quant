@@ -86,7 +86,8 @@
       "recovery_rate": 0.0,
       "scheduled_fees": [],
       "settlement_days": 0,
-      "stub": "short_front"
+      "stub": "short_front",
+      "yield_basis": "act_360"
     },
     "type": "revolving_credit"
   },

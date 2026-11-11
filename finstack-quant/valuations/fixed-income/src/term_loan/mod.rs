@@ -42,7 +42,7 @@
 //!     .maturity(date!(2030 - 01 - 15))
 //!     .rate(RateSpec::Fixed { rate: 0.06 })
 //!     .frequency(Tenor::quarterly())
-//!     .day_count(DayCount::Act360)
+//!     .day_count(DayCount::Act360).yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
 //!     .discount_curve_id(CurveId::new("USD-CREDIT"))
 //!     .amortization(AmortizationSpec::None)
 //!     .attributes(Default::default())

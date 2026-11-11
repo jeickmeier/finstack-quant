@@ -4605,11 +4605,6 @@ export interface Money4 {
  */
 export interface DF6867Bdc53B436C37092 {
   /**
-   * Day count convention for XIRR discounting. Defaults to Act/365F
-   * (matching `core::cashflow::xirr`) when `None`. Ignored for MOIC floors.
-   */
-  day_count?: DayCount3 | null;
-  /**
    * Issue price = invested capital `V0` (amount funded at issue). Default: par.
    */
   issue_price?:
@@ -4858,6 +4853,13 @@ export interface DB0A7458B7623F012Eb4B {
    * `notional_limit`).
    */
   upfront_fee?: DF8Cc3E84589384Dc0202 | null;
+  /**
+   * Annual basis of this loan's yield quotes (yield to maturity, call and
+   * worst) and of its effective-interest-rate accretion, separate from the
+   * coupon accrual `day_count` (resolution O11, record
+   * CORE-CONVENTIONS-017 #12). Required: there is no default basis.
+   */
+  yield_basis: "act_365f" | "act_360";
 }
 /**
  * Attributes for tagging and scenarios
@@ -6422,6 +6424,13 @@ export interface DBef55Fa450B231D7B330 {
    * Defaults to `ShortFront` for maximum flexibility with unaligned dates.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
+  /**
+   * Annual basis of this loan's yield quotes (yield to maturity, call and
+   * worst) and of its effective-interest-rate accretion, separate from the
+   * coupon accrual `day_count` (resolution O11, record
+   * CORE-CONVENTIONS-017 #12). Required: there is no default basis.
+   */
+  yield_basis: "act_365f" | "act_360";
 }
 /**
  * Attributes for scenario selection and tagging

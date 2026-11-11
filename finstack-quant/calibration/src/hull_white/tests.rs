@@ -209,7 +209,7 @@ fn piecewise_cap_floor_bootstrap_recovers_synthetic_segments() {
                 .with_tolerance(1.0e-12)
                 .solve_in_bracket(
                     |vol| {
-                        bachelier_cap_floor_price(
+                        Ok(bachelier_cap_floor_price(
                             &discount,
                             &forward,
                             maturity,
@@ -217,7 +217,7 @@ fn piecewise_cap_floor_bootstrap_recovers_synthetic_segments() {
                             vol,
                             true,
                             SwapFrequency::Quarterly,
-                        ) - target
+                        ) - target)
                     },
                     1.0e-8,
                     1.0,

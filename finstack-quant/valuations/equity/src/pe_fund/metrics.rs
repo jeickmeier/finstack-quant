@@ -197,7 +197,10 @@ pub(crate) fn calculate_irr(
     day_count: DayCount,
 ) -> finstack_quant_core::Result<f64> {
     let dated: Vec<(Date, f64)> = flows.iter().map(|(d, m)| (*d, m.amount())).collect();
-    finstack_quant_core::cashflow::xirr(&dated, day_count, None)
+    finstack_quant_valuations_core::metrics::returns::xirr_on_basis(
+        &dated,
+        finstack_quant_valuations_core::metrics::returns::YieldBasis::try_from(day_count)?,
+    )
 }
 
 /// Register all private markets fund metrics.

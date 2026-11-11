@@ -60,6 +60,7 @@ fn test_upfront_fee_sign() {
         .maturity(end)
         .rate(RateSpec::Fixed { rate: 0.0 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees({
             let mut fees = RevolvingCreditFees::flat(0.0, 0.0, 0.0).unwrap();
@@ -126,6 +127,7 @@ fn test_mid_period_draw_accrual() {
         .maturity(end)
         .rate(RateSpec::Fixed { rate: 0.05 }) // 5% annual
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![DrawRepayEvent {
@@ -219,6 +221,7 @@ fn test_floating_vs_margin_only() {
             },
         ))
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -310,6 +313,7 @@ fn test_reset_frequency_mismatch() {
             },
         ))
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly()) // Quarterly payments
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -393,6 +397,7 @@ fn test_utilization_tier() {
         .maturity(end)
         .rate(RateSpec::Fixed { rate: 0.0 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees({
             let mut fees = RevolvingCreditFees::flat(0.0, 0.0, 0.0).unwrap();
@@ -413,6 +418,7 @@ fn test_utilization_tier() {
         .maturity(end)
         .rate(RateSpec::Fixed { rate: 0.0 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees({
             let mut fees = RevolvingCreditFees::flat(0.0, 0.0, 0.0).unwrap();
@@ -481,6 +487,7 @@ fn test_as_of_filtering() {
         .maturity(end)
         .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))

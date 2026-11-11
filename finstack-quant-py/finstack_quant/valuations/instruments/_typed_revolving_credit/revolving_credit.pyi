@@ -432,6 +432,25 @@ class RevolvingCredit:
         """
         ...
     @property
+    def yield_basis(self) -> str:
+        """
+        Annual basis of the yield quotes and effective-interest-rate accretion.
+
+        Separate from the accrual ``day_count`` (resolution O11): yields to
+        maturity, call and worst are effective annual rates on this basis.
+
+        Returns
+        -------
+        str
+            ``"act_365f"`` or ``"act_360"``.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+    @property
     def frequency(self) -> Tenor:
         """
         Payment frequency for interest and fees.
@@ -835,6 +854,7 @@ class RevolvingCreditBuilder:
     ...     .maturity(datetime.date(2027, 1, 15))
     ...     .rate(0.06)
     ...     .day_count("act_360")
+    ...     .yield_basis("act_360")
     ...     .frequency("3M")
     ...     .fees({
     ...         "commitment_fee_tiers": [{"threshold": "0", "bp": "25"}],
@@ -999,6 +1019,30 @@ class RevolvingCreditBuilder:
             If the name is unknown or the builder was already consumed.
         TypeError
             If ``value`` is neither ``DayCount`` nor ``str``.
+        """
+        ...
+    def yield_basis(self, value: str) -> RevolvingCreditBuilder:
+        """
+        Set the required annual basis of yield quotes and EIR accretion.
+
+        The basis is independent of the accrual day count (resolution O11);
+        there is no default, so ``build()`` raises until it is set.
+
+        Parameters
+        ----------
+        value : str
+            ``"act_365f"`` or ``"act_360"``.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not a supported basis or the builder was already
+            consumed by ``build()``.
         """
         ...
     def frequency(self, value: Tenor | str) -> RevolvingCreditBuilder:

@@ -202,6 +202,9 @@ crate::bindings::macros::py_getters!(PyRevolvingCredit |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.yield_basis")]
+    yield_basis -> PyResult<String> = enum_to_py_string(&s.inner.yield_basis);
+
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
@@ -351,6 +354,22 @@ impl PyRevolvingCreditBuilder {
             day_count,
             format!("{day_count:?}"),
             |b: RevolvingCreditBuilder| b.day_count(day_count)
+        )
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.yield_basis")]
+    #[pyo3(text_signature = "($self, value)")]
+    fn yield_basis<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &str,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let basis =
+            crate::bindings::valuations::convert::yield_basis_from_str(value, "yield_basis")?;
+        builder_set!(
+            slf,
+            yield_basis,
+            format!("{value:?}"),
+            |b: RevolvingCreditBuilder| b.yield_basis(basis)
         )
     }
 

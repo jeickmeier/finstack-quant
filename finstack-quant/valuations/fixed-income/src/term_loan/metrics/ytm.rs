@@ -46,7 +46,7 @@ impl MetricCalculator for YtmCalculator {
             &schedule,
             settlement_date,
             price_leg.amount(),
-            loan.day_count,
+            loan.yield_basis,
         )
     }
 }

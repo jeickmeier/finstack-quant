@@ -138,6 +138,7 @@ def term_loan(idx: int) -> tuple[str, dict]:
                 }
             },
             "day_count": "act_360",
+            "yield_basis": "act_360",
             "frequency": {"count": 3, "unit": "months"},
             "business_day_convention": "modified_following",
             "calendar_id": None,
@@ -164,6 +165,7 @@ def revolver(idx: int) -> tuple[str, dict]:
             "maturity": f"{mat_year}-01-01",
             "discount_curve_id": "USD-OIS",
             "day_count": "act_360",
+            "yield_basis": "act_360",
             "frequency": {"count": 3, "unit": "months"},
             "stub": "short_front",
             "calendar_id": "usny",

@@ -5015,10 +5015,6 @@ export interface SimulatedPath {
    */
   final_value: number;
   /**
-   * Internal rate of return inferred from the captured cashflow amounts, if calculable.
-   */
-  irr?: number | null;
-  /**
    * Path identifier (0-indexed)
    */
   path_id: number;

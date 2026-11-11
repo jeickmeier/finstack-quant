@@ -73,7 +73,7 @@
 //!
 //! // Initial investment followed by 4 quarterly returns (20% total return)
 //! let cash_flows = vec![-10000.0, 3000.0, 3000.0, 3000.0, 3000.0];
-//! let rate = irr(&cash_flows, None)?;
+//! let rate = irr(&cash_flows)?;
 //! assert!(rate > 0.0); // Positive return
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```

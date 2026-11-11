@@ -192,6 +192,7 @@ fn term_loan(maturity: Date) -> TermLoan {
         .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(None)
         .stub(StubKind::None)
@@ -235,6 +236,7 @@ fn revolving_credit_floating(maturity: Date) -> RevolvingCredit {
             },
         ))
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 0.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))

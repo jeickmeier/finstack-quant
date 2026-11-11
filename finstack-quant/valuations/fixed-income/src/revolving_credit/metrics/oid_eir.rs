@@ -30,7 +30,7 @@ fn origination_schedule(context: &MetricContext) -> finstack_quant_core::Result<
         &schedule,
         &extra,
         opening_funding,
-        facility.day_count,
+        facility.yield_basis,
         facility.commitment.currency(),
         spec.include_fees,
     )

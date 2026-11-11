@@ -572,6 +572,7 @@
           "unit": "months"
         },
         "day_count": "act_360",
+        "yield_basis": "act_360",
         "stub": "none",
         "discount_curve_id": "USD-CORP",
         "credit_curve_id": "ACME-HZD",

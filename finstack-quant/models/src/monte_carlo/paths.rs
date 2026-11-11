@@ -177,9 +177,6 @@ pub struct SimulatedPath {
     /// This is the path-level amount after the engine applies the run's
     /// `discount_factor`.
     pub final_value: f64,
-    /// Internal rate of return inferred from the captured cashflow amounts, if calculable.
-    #[serde(default)]
-    pub irr: Option<f64>,
 }
 
 impl SimulatedPath {
@@ -189,7 +186,6 @@ impl SimulatedPath {
             path_id,
             points: Vec::new(),
             final_value: 0.0,
-            irr: None,
         }
     }
 
@@ -199,7 +195,6 @@ impl SimulatedPath {
             path_id,
             points: Vec::with_capacity(capacity),
             final_value: 0.0,
-            irr: None,
         }
     }
 
@@ -211,11 +206,6 @@ impl SimulatedPath {
     /// Set the final discounted path value.
     pub fn set_final_value(&mut self, value: f64) {
         self.final_value = value;
-    }
-
-    /// Store the inferred internal rate of return.
-    pub fn set_irr(&mut self, irr: f64) {
-        self.irr = Some(irr);
     }
 
     /// Return the number of captured points in the path.

@@ -330,7 +330,6 @@ fn check_captured_reference(result: &MonteCarloResult, case: Case, seed: u64) ->
             let path = &paths.paths[path_id];
             assert_eq!(path.path_id, path_id);
             assert_eq!(path.points.len(), case.steps + 1);
-            assert!(path.irr.is_none());
             let mut spot = 100.0;
             let mut sum = 0.0;
             let mut compensation = 0.0;

@@ -61,6 +61,7 @@ pub(crate) mod ids;
 pub(crate) mod period_cash;
 pub(crate) mod registration_macro;
 pub(crate) mod registry;
+pub mod returns;
 pub mod risk;
 #[doc(hidden)]
 pub mod sensitivities;

@@ -31,6 +31,7 @@ use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::math::z_spread_discount_factor;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations_core::metrics::returns::{YieldBasis, xirr_on_basis};
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 
@@ -60,7 +61,7 @@ pub(crate) fn cached_schedule<T: 'static>(
     Ok(schedule)
 }
 
-/// Yield to maturity on `day_count`: the IRR of the price leg
+/// Yield to maturity quoted on `basis`: the IRR of the price leg
 /// `(settlement, price_leg)` (negative: the purchase outflow) and every cash
 /// settlement flow of `schedule` dated after `settlement` (PIK excluded).
 ///
@@ -71,7 +72,7 @@ pub(crate) fn ytm_from_schedule(
     schedule: &CashFlowSchedule,
     settlement: Date,
     price_leg: f64,
-    day_count: DayCount,
+    basis: YieldBasis,
 ) -> Result<f64> {
     let mut flows = vec![(settlement, price_leg)];
     flows.extend(
@@ -81,7 +82,7 @@ pub(crate) fn ytm_from_schedule(
             .filter(|cf| cf.date > settlement && cf.kind.is_cash_settlement())
             .map(|cf| (cf.date, cf.amount.amount())),
     );
-    finstack_quant_core::cashflow::xirr(&flows, day_count, None)
+    xirr_on_basis(&flows, basis)
 }
 
 /// Contractual floating margin of `spec` as a decimal (`spread_bp × 1e-4`).
@@ -339,7 +340,8 @@ impl OidEirSchedule {
 /// * `opening_funding` - Optional notional funding leg `(date, amount)` the
 ///   schedule does not carry (negative for a lender funding at the anchor);
 ///   it sets the opening carrying amount.
-/// * `day_count` - Day count for the XIRR and the period accretion.
+/// * `basis` - Annual basis of the effective rate; period accretion uses the
+///   same clock.
 /// * `currency` - Currency of the reported money amounts.
 /// * `include_fees` - Whether fee flows enter the effective yield.
 ///
@@ -351,7 +353,7 @@ pub fn oid_eir_schedule_from_flows(
     schedule: &CashFlowSchedule,
     extra_fees: &[(Date, f64)],
     opening_funding: Option<(Date, f64)>,
-    day_count: DayCount,
+    basis: YieldBasis,
     currency: finstack_quant_core::currency::Currency,
     include_fees: bool,
 ) -> Result<OidEirSchedule> {
@@ -412,7 +414,7 @@ pub fn oid_eir_schedule_from_flows(
         .map(|(d, b)| (*d, b.total))
         .filter(|(_, amt)| amt.abs() > 0.0)
         .collect();
-    let effective_rate = finstack_quant_core::cashflow::xirr(flows.as_slice(), day_count, None)?;
+    let effective_rate = xirr_on_basis(flows.as_slice(), basis)?;
 
     let mut periods = Vec::new();
     let mut iter = buckets.iter();
@@ -424,7 +426,7 @@ pub fn oid_eir_schedule_from_flows(
     let mut opening_balance = -start_bucket.total;
     let mut prev = *start_date;
     for (date, bucket) in iter {
-        let yf = day_count.year_fraction(prev, *date, DayCountContext::default())?;
+        let yf = basis.year_fraction(prev, *date);
         let interest_income = opening_balance * ((1.0 + effective_rate).powf(yf) - 1.0);
         let closing_balance = opening_balance + interest_income - bucket.total;
         let oid_amortization = interest_income - bucket.interest;

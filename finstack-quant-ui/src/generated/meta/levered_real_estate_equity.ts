@@ -4548,7 +4548,7 @@ export default [
   {
     "path": "#/$defs/d_9ef403ac41e0477109eb/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/ReturnFloorKind/oneOf/1",
-    "description": "Minimum annualized internal rate of return.\n\nOn an early issuer-called redemption at time `t`, the redemption price is\ncomputed so that the XIRR of all cashflows from issue equals the target\nrate. The floor binds only on early redemptions, not at maturity. Day\ncount defaults to Act/365F (matching `core::cashflow::xirr`) unless\noverridden via [`ReturnFloorSpec::day_count`]."
+    "description": "Minimum annualized internal rate of return.\n\nOn an early issuer-called redemption at time `t`, the redemption price is\ncomputed so that the XIRR of all cashflows from issue equals the target\nrate. The floor binds only on early redemptions, not at maturity. The\ntarget is an effective annual rate on the fixed ACT/365F basis of\n`core::cashflow::xirr`; there is no day-count override."
   },
   {
     "path": "#/$defs/d_9ef403ac41e0477109eb/oneOf/1/properties/xirr",
@@ -5099,6 +5099,13 @@ export default [
   {
     "path": "#/$defs/d_b0a7458b7623f012eb4b/properties/upfront_fee/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/TermLoan/properties/upfront_fee/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_b0a7458b7623f012eb4b/properties/yield_basis",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/TermLoan/properties/yield_basis",
+    "description": "Annual basis of this loan's yield quotes (yield to maturity, call and\nworst) and of its effective-interest-rate accretion, separate from the\ncoupon accrual `day_count` (resolution O11, record\nCORE-CONVENTIONS-017 #12). Required: there is no default basis.",
+    "ref": "#/$defs/YieldBasis",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/YieldBasis"
   },
   {
     "path": "#/$defs/d_b428938e56e618c85c20",
@@ -7834,6 +7841,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/StubKind"
   },
   {
+    "path": "#/$defs/d_bef55fa450b231d7b330/properties/yield_basis",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/RevolvingCredit/properties/yield_basis",
+    "description": "Annual basis of this loan's yield quotes (yield to maturity, call and\nworst) and of its effective-interest-rate accretion, separate from the\ncoupon accrual `day_count` (resolution O11, record\nCORE-CONVENTIONS-017 #12). Required: there is no default basis.",
+    "ref": "#/$defs/YieldBasis",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/YieldBasis"
+  },
+  {
     "path": "#/$defs/d_bffef9e684ff0c351c83",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcOverride",
     "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`].",
@@ -8515,6 +8529,23 @@ export default [
     "description": "Brownian-bridge correction for continuous monitoring between steps."
   },
   {
+    "path": "#/$defs/d_d5d2fe7bfaaa3204370c",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/YieldBasis",
+    "description": "Annual basis of an effective-rate quote.\n\nA rate `q` on a basis with `B` days per year grows one unit to\n`(1 + q)^(days / B)` over `days` calendar days. ACT/365F and ACT/360 are\nthe supported bases because each is exactly days over a constant, which\nmakes the conversion from the canonical ACT/365F rate exact."
+  },
+  {
+    "path": "#/$defs/d_d5d2fe7bfaaa3204370c/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/YieldBasis/oneOf/0",
+    "const": "act_365f",
+    "description": "Actual days over a 365-day year (the canonical XIRR clock)."
+  },
+  {
+    "path": "#/$defs/d_d5d2fe7bfaaa3204370c/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/YieldBasis/oneOf/1",
+    "const": "act_360",
+    "description": "Actual days over a 360-day year."
+  },
+  {
     "path": "#/$defs/d_d760eef55c5bd7d5b1f6",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/MertonMcCalibrationSpec",
     "description": "Calibration settings for MC-to-market matching.\n\nWhen set on [`MertonMcConfig::calibration`], the pricer runs a low-path\nbisection to solve for a structural parameter so that the cash base-case\nMC price matches the target market quote, then re-prices with full paths."
@@ -8969,21 +9000,6 @@ export default [
     "path": "#/$defs/d_f6867bdc53b436c37092",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/ReturnFloorSpec",
     "description": "Guaranteed minimum-return call protection on a bond or loan.\n\nAttaching this spec declares that on any early issuer-called or prepaid\nredemption within the protection window, the redemption price will be\nfloored so the investor's realized return meets the target. This is the\nstandard private-credit loan model (often called a \"prepayment premium\" or\n\"call protection\" in credit agreements). The floor is anchored at the issue\ndate and issue price `V0`. The spec is lowered into a concrete call schedule\ndeterministically or evaluated path by path by the rates-credit LSMC engine.\n\n**Call-protection only**: the floor applies to EARLY issuer redemptions\nwithin the [`ProtectionWindow`] and never at maturity. The held-to-maturity\npath is unfloored. Use [`finstack_quant_valuations_core::metrics::MetricId::MoicToWorst`] /\n[`finstack_quant_valuations_core::metrics::MetricId::XirrToWorst`] to see the honest worst-case\nreturn across all paths including the unfloored maturity path.\n\n# Mathematical Foundation\n\nLet:\n- `V0` = invested capital (issue price).\n- `t` = early-redemption date.\n- `cash_through(t)` = sum of positive cashflows received by the holder in\n  the half-open interval `(issue, t]` (coupons and amortization; excludes\n  the redemption itself).\n- `yf(a, b)` = year fraction from date `a` to date `b` under `Act/365F`.\n\n**MOIC floor** — minimum money-on-invested-capital multiple `m`:\n\n```text\ndirty_required(t) = m · V0 − cash_through(t)\n```\n\nThe clean redemption amount is `dirty_required(t) − accrued(t)`, floored by\nthe contractual clean call amount and par. The exercise engine adds\n`accrued(t)` exactly once, so the holder's total cash meets the target when\nthe return floor binds.\n\n**XIRR floor** — minimum annualized IRR `r`:\n\n```text\ndirty_required(t) = (1 + r)^yf(issue, t)\n                    · (V0 − Σ_{q ≤ t} coupon_q / (1 + r)^yf(issue, q))\n```\n\nThe day-count convention for `yf` defaults to `Act/365F`, matching\n[`finstack_quant_core::cashflow::xirr`] so the verification metrics\nreproduce the floor target exactly.\n\nFor both floors, accrued interest is subtracted before the clean redemption\nis clamped at par and divided by outstanding notional. Accrued is added once\nto the exercise proceeds by the pricing kernel.\n\n# Pricing behavior\n\n- Deterministic pricing produces a daily concrete call schedule.\n- Stochastic factors use pathwise cash and PIK state in the bond LSMC engine,\n  including term-reset and overnight floating coupons.\n- Contractual make-whole calls compose with the floor: every issuer exercise\n  amount is the greater of the return floor and that call's effective amount.\n- **`min_moic` / `min_xirr` shortcuts** set\n  [`ProtectionWindow::Full`] (prepayable across the bond's entire life).\n  Narrow the window via [`ReturnFloorSpec::window`] if a no-call period\n  applies.\n\n# Invariants\n\n- MOIC multiple must be positive (`> 0`).\n- XIRR rate must be finite and greater than `-1` (i.e., `-100%`).\n- A [`ProtectionWindow::Between`] window must have `start < end`.\n\n# References\n\n- **MOIC**: Standard private-equity and private-credit return metric.\n  MOIC = total distributions / invested capital. See e.g. Rosenbaum, J. &\n  Pearl, J. (2013). *Investment Banking: Valuation, Leveraged Buyouts, and\n  Mergers & Acquisitions* (2nd ed.). Wiley Finance. `docs/REFERENCES.md#rosenbaum-pearl-2020`\n- **XIRR / IRR**: Internal rate of return. See Brealey, R. A., Myers, S.\n  C. & Allen, F. (2023). *Principles of Corporate Finance* (14th ed.).\n  McGraw-Hill. Chapter 5 (\"Net Present Value and Other Investment Criteria\").\n- **Call-protection / prepayment premiums**: Standard private-credit\n  agreement term. LSTA (Loan Syndications and Trading Association).\n  *The Handbook of Loan Syndications and Trading* (2nd ed.). Chapter on\n  loan documentation and call protection.\n- **Act/365F day count**: ISDA 2006 Definitions, Section 4.16(f). `docs/REFERENCES.md#isda-2006-definitions`\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_fixed_income::bond::{\n    ReturnFloorSpec, IssuePrice,\n};\nuse finstack_quant_core::types::Rate;\n\n// 1.20× MOIC floor at par, full protection window\nlet spec = ReturnFloorSpec::moic(1.20);\nassert!(spec.validate().is_ok());\n\n// 10% XIRR floor with 98 OID, validated\nlet spec = ReturnFloorSpec::xirr(Rate::from_percent(10.0).expect(\"valid rate fixture\"))\n    .issue_price(IssuePrice::PctOfPar(98.0));\nassert!(spec.validate().is_ok());\n```\n\nAttach to a bond using the fluent builder:\n\n```rust\nuse finstack_quant_valuations_fixed_income::bond::{\n    Bond, ReturnFloorSpec, ProtectionWindow,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::Rate;\nuse time::macros::date;\n\n// 5-year loan with 1.25× MOIC floor active after a 2-year no-call period.\nlet loan = Bond::fixed(\n    \"LOAN-001\",\n    Money::from((1_000_000_i64, Currency::USD)),\n    Rate::from_percent(10.0).expect(\"valid rate fixture\"),\n    date!(2025 - 01 - 01),\n    date!(2030 - 01 - 01),\n    finstack_quant_core::dates::StubKind::None,\n    \"USD-OIS\",\n)?\n.with_return_floor(\n    ReturnFloorSpec::moic(1.25)\n        .window(ProtectionWindow::From(date!(2027 - 01 - 01))),\n);\n# Ok::<(), Box<dyn std::error::Error>>(())\n```"
-  },
-  {
-    "path": "#/$defs/d_f6867bdc53b436c37092/properties/day_count",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/ReturnFloorSpec/properties/day_count",
-    "description": "Day count convention for XIRR discounting. Defaults to Act/365F\n(matching `core::cashflow::xirr`) when `None`. Ignored for MOIC floors."
-  },
-  {
-    "path": "#/$defs/d_f6867bdc53b436c37092/properties/day_count/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/ReturnFloorSpec/properties/day_count/anyOf/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_f6867bdc53b436c37092/properties/day_count/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/ReturnFloorSpec/properties/day_count/anyOf/1"
   },
   {
     "path": "#/$defs/d_f6867bdc53b436c37092/properties/issue_price",

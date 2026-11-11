@@ -136,7 +136,7 @@ impl MetricCalculator for ImpliedVolCalculator {
             VolatilityConvention::Normal => 1.0,
             _ => 5.0,
         };
-        let implied_vol = solver.solve_in_bracket(objective, 0.0, upper)?;
+        let implied_vol = solver.solve_in_bracket(|x| Ok(objective(x)), 0.0, upper)?;
 
         // Sanity check result
         if implied_vol >= 0.0 && implied_vol <= upper {

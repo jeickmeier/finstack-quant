@@ -91,7 +91,8 @@
           "recovery_rate": 0,
           "scheduled_fees": [],
           "settlement_days": 0,
-          "stub": "short_front"
+          "stub": "short_front",
+          "yield_basis": "act_360"
         },
         "type": "revolving_credit"
       },
@@ -1093,6 +1094,10 @@
           "$ref": "#/$defs/d_1022b3cdd456b3d8cd38",
           "default": "short_front",
           "description": "Stub rule for schedule generation when dates don't align with frequency.\n\nDetermines how to handle partial periods at the start or end of the schedule:\n- `ShortFront`: Short stub at the beginning (most common for RCFs)\n- `ShortBack`: Short stub at the end\n- `LongFront`: Long stub at the beginning\n- `LongBack`: Long stub at the end\n- `None`: No stub allowed (dates must align exactly)\n\nDefaults to `ShortFront` for maximum flexibility with unaligned dates."
+        },
+        "yield_basis": {
+          "$ref": "#/$defs/d_c76679ff2bc35eada3e4",
+          "description": "Annual basis of this loan's yield quotes (yield to maturity, call and\nworst) and of its effective-interest-rate accretion, separate from the\ncoupon accrual `day_count` (resolution O11, record\nCORE-CONVENTIONS-017 #12). Required: there is no default basis."
         }
       },
       "required": [
@@ -1103,6 +1108,7 @@
         "maturity",
         "rate",
         "day_count",
+        "yield_basis",
         "frequency",
         "fees",
         "draw_repay_spec",
@@ -4445,6 +4451,21 @@
             "linear_decline"
           ],
           "type": "object"
+        }
+      ]
+    },
+    "d_c76679ff2bc35eada3e4": {
+      "description": "Annual basis of an effective-rate quote.\n\nA rate `q` on a basis with `B` days per year grows one unit to\n`(1 + q)^(days / B)` over `days` calendar days. ACT/365F and ACT/360 are\nthe supported bases because each is exactly days over a constant, which\nmakes the conversion from the canonical ACT/365F rate exact.",
+      "oneOf": [
+        {
+          "const": "act_365f",
+          "description": "Actual days over a 365-day year (the canonical XIRR clock).",
+          "type": "string"
+        },
+        {
+          "const": "act_360",
+          "description": "Actual days over a 360-day year.",
+          "type": "string"
         }
       ]
     },

@@ -362,6 +362,7 @@ fn delayed_draw_loan() -> TermLoan {
     loan.notional_limit = Money::from((1_200_000_i64, Currency::USD));
     loan.frequency = Tenor::quarterly();
     loan.day_count = DayCount::Act360;
+    loan.yield_basis = finstack_quant_valuations::metrics::returns::YieldBasis::Act360;
     loan.business_day_convention = BusinessDayConvention::Unadjusted;
     loan.stub = StubKind::None;
     loan.rate = RateSpec::Fixed { rate: 0.05 };
@@ -443,6 +444,8 @@ fn m28_model_yield_does_not_repeat_settlement_carry() {
     loan.ddtl = None;
     loan.amortization = AmortizationSpec::None;
     loan.day_count = DayCount::Act365F;
+    // The yield is quoted on the matching ACT/365F basis (resolution O11).
+    loan.yield_basis = finstack_quant_valuations::metrics::returns::YieldBasis::Act365F;
     loan.rate = RateSpec::Fixed { rate: 0.0 };
     loan.calendar_id = None;
     loan.settlement_days = 7;
@@ -475,6 +478,8 @@ fn m28_coupon_date_purchase_uses_balance_after_settled_amortization() {
     loan.notional_limit = Money::from((1_000_000_i64, Currency::USD));
     loan.amortization = AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.25 };
     loan.day_count = DayCount::Act365F;
+    // The yield is quoted on the matching ACT/365F basis (resolution O11).
+    loan.yield_basis = finstack_quant_valuations::metrics::returns::YieldBasis::Act365F;
     loan.calendar_id = None;
     loan.settlement_days = 2;
     loan.instrument_pricing_overrides

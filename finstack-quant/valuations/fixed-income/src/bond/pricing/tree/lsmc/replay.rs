@@ -371,7 +371,8 @@ impl ReplayTemplate {
                     kind: spec.kind,
                     issue_price: spec.issue_price.resolve(bond.notional)?,
                     issue_date: bond.issue_date,
-                    day_count: spec.day_count.unwrap_or(DayCount::Act365F),
+                    // XIRR floors are on the fixed ACT/365F clock (record 017).
+                    day_count: DayCount::Act365F,
                 })
             })
             .transpose()?;

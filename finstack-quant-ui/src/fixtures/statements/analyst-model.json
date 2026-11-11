@@ -580,6 +580,7 @@
             "credit_curve_id": null,
             "currency": "USD",
             "day_count": "act_360",
+            "yield_basis": "act_360",
             "ddtl": null,
             "discount_curve_id": "USD-OIS",
             "frequency": {
@@ -620,6 +621,7 @@
             "commitment_steps": [],
             "credit_curve_id": null,
             "day_count": "act_360",
+            "yield_basis": "act_360",
             "discount_curve_id": "USD-OIS",
             "draw_repay_spec": {
               "deterministic": []

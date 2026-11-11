@@ -43,7 +43,8 @@ export default [
             },
             "settlement_days": 2,
             "stub": "none",
-            "upfront_fee": null
+            "upfront_fee": null,
+            "yield_basis": "act_360"
           },
           "type": "term_loan"
         },
@@ -1711,6 +1712,13 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/TermLoan/properties/upfront_fee/anyOf/1"
   },
   {
+    "path": "#/$defs/d_5f6cd145395c86ce73b6/properties/yield_basis",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/TermLoan/properties/yield_basis",
+    "description": "Annual basis of this loan's yield quotes (yield to maturity, call and\nworst) and of its effective-interest-rate accretion, separate from the\ncoupon accrual `day_count` (resolution O11, record\nCORE-CONVENTIONS-017 #12). Required: there is no default basis.",
+    "ref": "#/$defs/YieldBasis",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/YieldBasis"
+  },
+  {
     "path": "#/$defs/d_6347b87cc04573a369d9",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/CreditStateVariable",
     "description": "Which credit metric drives the toggle decision."
@@ -1797,6 +1805,23 @@ export default [
     "description": "Change in margin, in basis points (`100` = 1%); negative steps down.",
     "ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_6ce775a1c4375afe89b8",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/YieldBasis",
+    "description": "Annual basis of an effective-rate quote.\n\nA rate `q` on a basis with `B` days per year grows one unit to\n`(1 + q)^(days / B)` over `days` calendar days. ACT/365F and ACT/360 are\nthe supported bases because each is exactly days over a constant, which\nmakes the conversion from the canonical ACT/365F rate exact."
+  },
+  {
+    "path": "#/$defs/d_6ce775a1c4375afe89b8/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/YieldBasis/oneOf/0",
+    "const": "act_365f",
+    "description": "Actual days over a 365-day year (the canonical XIRR clock)."
+  },
+  {
+    "path": "#/$defs/d_6ce775a1c4375afe89b8/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/term_loan.schema.json#/$defs/YieldBasis/oneOf/1",
+    "const": "act_360",
+    "description": "Actual days over a 360-day year."
   },
   {
     "path": "#/$defs/d_780b68ee5d41351b65ca",

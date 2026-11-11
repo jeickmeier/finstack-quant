@@ -1,9 +1,9 @@
 //! XIRR metrics: to-maturity and to-worst-exit.
 //!
 //! XIRR is the annualized internal rate of return of the investor's cashflow
-//! stream, computed from the issue date forward using `Act/365F` unless an XIRR
-//! return floor specifies another day-count convention. The metric and floor
-//! lowering therefore use the same annualization basis.
+//! stream, computed from the issue date forward on core XIRR's fixed ACT/365F
+//! clock (record CORE-CONVENTIONS-017 #3). XIRR return floors are defined on
+//! the same clock, so the metric and floor lowering share one basis.
 //!
 //! # Floor scope (important)
 //!
@@ -28,19 +28,9 @@
 use super::moic::{ExitPaths, cost_basis, exit_paths, lifetime_dated_cashflows};
 use crate::bond::Bond;
 use finstack_quant_core::cashflow::xirr;
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
-
-fn day_count(bond: &Bond) -> DayCount {
-    bond.return_floor
-        .as_ref()
-        .and_then(|spec| match spec.kind {
-            crate::bond::ReturnFloorKind::Xirr(_) => spec.day_count,
-            crate::bond::ReturnFloorKind::Moic(_) => None,
-        })
-        .unwrap_or(DayCount::Act365F)
-}
 
 /// XIRR if the bond is held to maturity.
 ///
@@ -62,11 +52,7 @@ impl MetricCalculator for XirrCalculator {
         let bond: &Bond = ctx.instrument_as()?;
         let (t0, v0) = cost_basis(bond)?;
         let flows = lifetime_dated_cashflows(bond, &ctx.curves)?;
-        xirr(
-            &held_to_maturity_path(&flows, t0, v0),
-            day_count(bond),
-            None,
-        )
+        xirr(&held_to_maturity_path(&flows, t0, v0))
     }
 }
 
@@ -113,7 +99,6 @@ pub(crate) struct XirrToWorstCalculator;
 
 impl MetricCalculator for XirrToWorstCalculator {
     fn calculate(&self, ctx: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let day_count = day_count(ctx.instrument_as()?);
         let ExitPaths {
             t0,
             v0,
@@ -121,7 +106,7 @@ impl MetricCalculator for XirrToWorstCalculator {
             exits,
         } = exit_paths(ctx)?;
 
-        let mut worst = xirr(&held_to_maturity_path(&flows, t0, v0), day_count, None)?;
+        let mut worst = xirr(&held_to_maturity_path(&flows, t0, v0))?;
 
         // Each call/put candidate path.
         for (exit_date, redemption) in exits {
@@ -135,7 +120,7 @@ impl MetricCalculator for XirrToWorstCalculator {
             // and must be included exactly once in the realized return path.
             path.push((exit_date, redemption));
 
-            if let Ok(r) = xirr(&path, day_count, None) {
+            if let Ok(r) = xirr(&path) {
                 worst = worst.min(r);
             }
         }
@@ -274,13 +259,12 @@ mod tests {
                 .map(|(date, amount)| (*date, amount.amount())),
         );
         expected_path.push((call_date, 0.90 * outstanding));
-        let expected = xirr(&expected_path, DayCount::Act365F, None)
-            .expect("independent outstanding-principal XIRR");
+        let expected = xirr(&expected_path).expect("independent outstanding-principal XIRR");
 
         let mut initial_notional_path = expected_path[..expected_path.len() - 1].to_vec();
         initial_notional_path.push((call_date, 0.90 * bond.notional.amount()));
-        let initial_notional_result = xirr(&initial_notional_path, DayCount::Act365F, None)
-            .expect("initial-notional comparison XIRR");
+        let initial_notional_result =
+            xirr(&initial_notional_path).expect("initial-notional comparison XIRR");
 
         let mut ctx = MetricContext::new(
             Arc::new(bond.clone()),

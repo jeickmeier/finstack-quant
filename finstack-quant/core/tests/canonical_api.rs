@@ -7,7 +7,7 @@
 //!
 //! Tests are organized by module:
 //! - **NPV**: Tests for `npv()` with various discount curves
-//! - **IRR**: Tests for `irr()` and `irr_with_daycount()`
+//! - **IRR**: Tests for `irr()` and `xirr()`
 //! - **Quadrature**: Tests for `GaussHermiteQuadrature::new()`
 
 use finstack_quant_core::cashflow::{irr, npv, xirr};
@@ -159,20 +159,15 @@ mod npv_tests {
 mod irr_tests {
     use super::*;
 
-    /// Test that periodic IRR works correctly for evenly-spaced flows.
+    /// Periodic IRR takes no guess (record 017 #7): a par-like stream
+    /// returns its coupon rate.
     #[test]
     fn periodic_irr_is_canonical() {
         let flows = [-100.0, 10.0, 10.0, 10.0, 110.0];
-
-        let irr1 = irr(&flows, None).unwrap();
-        let irr2 = irr(&flows, Some(0.05)).unwrap();
-
-        // Different initial guesses should converge to the same rate
+        let rate = irr(&flows).unwrap();
         assert!(
-            (irr1 - irr2).abs() < IRR_TOLERANCE,
-            "Periodic IRR should be guess-independent: irr(None)={}, irr(Some(0.05))={}",
-            irr1,
-            irr2
+            (rate - 0.10).abs() < IRR_TOLERANCE,
+            "par stream should return its 10% coupon: {rate}"
         );
     }
 
@@ -195,29 +190,18 @@ mod irr_tests {
         ];
 
         for flows in test_cases {
-            let rate = xirr(&flows, DayCount::Act365F, None).unwrap();
+            let rate = xirr(&flows).unwrap();
             // All test cases have positive returns
             assert!(rate > 0.0, "IRR should be positive for these flows");
         }
     }
 
-    /// Test that different day counts produce different IRR results.
+    /// XIRR has one clock, ACT/365F (record 017 #3): 182 days are 182/365.
     #[test]
-    fn irr_day_count_affects_result() {
+    fn xirr_clock_is_fixed_act365f() {
         let flows: Vec<(Date, f64)> = vec![(d(2024, 1, 1), -100_000.0), (d(2024, 7, 1), 102_500.0)];
-
-        let irr_365f = xirr(&flows, DayCount::Act365F, None).unwrap();
-        let irr_360 = xirr(&flows, DayCount::Act360, None).unwrap();
-
-        // Different day counts should produce different rates
-        assert!(
-            (irr_365f - irr_360).abs() > 1e-4,
-            "Different day counts should produce different IRRs"
-        );
-
-        // Both should be positive for this profitable trade
-        assert!(irr_365f > 0.0);
-        assert!(irr_360 > 0.0);
+        let rate = xirr(&flows).unwrap();
+        assert!((rate - (1.025_f64.powf(365.0 / 182.0) - 1.0)).abs() < 1e-10);
     }
 }
 

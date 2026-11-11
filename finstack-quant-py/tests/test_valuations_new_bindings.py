@@ -169,6 +169,7 @@ def _revolving_credit_json(*, gearing: str | None = None, credit_curve: bool = F
                 }
             ),
             "day_count": "act_360",
+            "yield_basis": "act_360",
             "frequency": {"count": 3, "unit": "months"},
             "fees": {
                 "commitment_fee_tiers": [{"threshold": "0", "bp": "25"}],

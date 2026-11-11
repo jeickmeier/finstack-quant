@@ -440,29 +440,44 @@ impl BrentSolver {
     /// than a hand-rolled bisection loop because it uses inverse quadratic
     /// interpolation with Brent's classical safeguards.
     ///
+    /// The objective is fallible (record CORE-NUMERICS-05 #2): an `Err` from
+    /// `f` at an endpoint or interior point is propagated unchanged instead
+    /// of being turned into a residual. Infallible objectives wrap their value
+    /// in `Ok`.
+    ///
     /// # Arguments
     ///
-    /// * `f` - Function to find the root of (where `f(x) = 0`)
+    /// * `f` - Fallible objective whose root is sought (where `f(x) = 0`)
     /// * `a` - One finite bracket endpoint; the endpoints may be given in either order
     /// * `b` - The other finite bracket endpoint, with `f(a)` and `f(b)` of opposite sign
     ///
     /// # Errors
     ///
-    /// Returns an error if the bracket is invalid (same-sign endpoints,
-    /// non-finite evaluations) or Brent's method fails to converge within
-    /// `max_iterations`.
+    /// Returns the objective's error, or an error if the bracket is invalid
+    /// (same-sign endpoints, non-finite evaluations) or Brent's method fails to
+    /// converge within `max_iterations`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_core::math::solver::BrentSolver;
+    ///
+    /// let root = BrentSolver::new().solve_in_bracket(|x| Ok(x * x - 2.0), 0.0, 2.0)?;
+    /// assert!((root - 2.0_f64.sqrt()).abs() < 1e-10);
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
     pub fn solve_in_bracket<Func>(&self, mut f: Func, a: f64, b: f64) -> Result<f64>
     where
-        Func: FnMut(f64) -> f64,
+        Func: FnMut(f64) -> Result<f64>,
     {
         let (lo, hi) = if a <= b { (a, b) } else { (b, a) };
-        let flo = f(lo);
+        let flo = f(lo)?;
         let fhi = if lo.to_bits() == hi.to_bits() {
             flo
         } else {
-            f(hi)
+            f(hi)?
         };
-        self.brent_method(|x| Ok(f(x)), [(lo, flo), (hi, fhi)], false)
+        self.brent_method(f, [(lo, flo), (hi, fhi)], false)
     }
 
     /// Solve an already evaluated bracket, requiring residual-space convergence.
@@ -745,7 +760,7 @@ mod tests {
     #[test]
     fn test_brent_solve_in_bracket_reorders_and_accepts_endpoint_roots() {
         let solver = BrentSolver::new();
-        let f = |x: f64| x - 2.0;
+        let f = |x: f64| Ok(x - 2.0);
 
         let reversed = solver
             .solve_in_bracket(f, 3.0, 1.0)
@@ -767,10 +782,37 @@ mod tests {
     }
 
     #[test]
+    fn solve_in_bracket_propagates_objective_errors() {
+        let solver = BrentSolver::new();
+        let at_endpoint = solver
+            .solve_in_bracket(
+                |_| Err(crate::Error::Validation("endpoint".into())),
+                0.0,
+                1.0,
+            )
+            .expect_err("endpoint error propagates");
+        assert_eq!(at_endpoint, crate::Error::Validation("endpoint".into()));
+        let interior = solver
+            .solve_in_bracket(
+                |x| {
+                    if x == 0.0 || x == 2.0 {
+                        Ok(x - 1.0)
+                    } else {
+                        Err(crate::Error::Validation("interior".into()))
+                    }
+                },
+                0.0,
+                2.0,
+            )
+            .expect_err("interior error propagates");
+        assert_eq!(interior, crate::Error::Validation("interior".into()));
+    }
+
+    #[test]
     fn test_brent_solve_in_bracket_rejects_same_sign_endpoints() {
         let solver = BrentSolver::new();
         let err = solver
-            .solve_in_bracket(|x| x * x + 1.0, -1.0, 1.0)
+            .solve_in_bracket(|x| Ok(x * x + 1.0), -1.0, 1.0)
             .expect_err("same-sign endpoints are not a valid bracket");
 
         assert!(
@@ -1034,7 +1076,7 @@ mod tests {
             }
         };
 
-        let result = solver.solve_in_bracket(f, 0.0, 2.0);
+        let result = solver.solve_in_bracket(|x| Ok(f(x)), 0.0, 2.0);
         assert!(
             result.is_err(),
             "Brent should reject non-finite values encountered during iteration"

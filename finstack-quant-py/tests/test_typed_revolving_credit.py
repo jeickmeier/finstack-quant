@@ -81,6 +81,7 @@ def builder(draw_repay_spec: dict[str, object] | None = None, *, credit: bool = 
         .maturity(MATURITY)
         .rate(RevolvingCredit.example().rate)
         .day_count("act_360")
+        .yield_basis("act_360")
         .frequency("3M")
         .fees({
             "commitment_fee_tiers": [{"threshold": "0", "bp": "25"}],

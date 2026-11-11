@@ -60,6 +60,23 @@ pub(crate) fn money_to_py(value: finstack_quant_core::money::Money) -> PyMoney {
 ///
 /// * `value` - Enum value whose serde representation is a JSON string
 ///   (`"pay"`, `"modified_following"`, `"isda_na"`, …).
+/// Parse a yield basis label (`"act_365f"` or `"act_360"`).
+///
+/// # Arguments
+///
+/// * `value` - Serde label of the basis.
+/// * `what` - Field name used in the error message.
+pub(crate) fn yield_basis_from_str(
+    value: &str,
+    what: &str,
+) -> PyResult<finstack_quant_valuations::metrics::returns::YieldBasis> {
+    serde_json::from_value(serde_json::Value::String(value.to_string())).map_err(|_| {
+        pyo3::exceptions::PyValueError::new_err(format!(
+            "{what} must be \"act_365f\" or \"act_360\", got {value:?}"
+        ))
+    })
+}
+
 pub(crate) fn enum_to_py_string<T: serde::Serialize>(value: &T) -> PyResult<String> {
     let json = serde_json::to_value(value).map_err(crate::errors::display_to_py)?;
     match json {

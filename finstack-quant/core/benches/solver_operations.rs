@@ -5,7 +5,7 @@
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::cashflow::{irr, xirr};
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::solver_multi::{
     LevenbergMarquardtSolver, LmSolution, LmTerminationReason,
@@ -193,7 +193,7 @@ fn benchmark_xirr_performance(c: &mut Criterion) {
             assert_eq!(flows.len(), if complex { 6 } else { 2 });
             let objective = |rate| dated_npv(&flows, 365.0, rate);
             let expected = reference_root(objective);
-            let checked = xirr(&flows, DayCount::Act365F, None).expect("XIRR preflight converges");
+            let checked = xirr(&flows).expect("XIRR preflight converges");
             check_root(
                 checked,
                 expected,
@@ -201,41 +201,7 @@ fn benchmark_xirr_performance(c: &mut Criterion) {
                 flows.iter().map(|(_, amount)| amount.abs()).sum(),
             );
             b.iter(|| {
-                let root =
-                    xirr(black_box(&flows), DayCount::Act365F, None).expect("XIRR converges");
-                assert!(root.is_finite());
-                black_box(root)
-            });
-        });
-    }
-    group.finish();
-}
-
-fn benchmark_xirr_daycount_variants(c: &mut Criterion) {
-    let mut group = c.benchmark_group("xirr_daycount");
-    for (label, day_count, basis) in [
-        ("act365f", DayCount::Act365F, 365.0),
-        ("act360", DayCount::Act360, 360.0),
-    ] {
-        group.bench_function(label, |b| {
-            let flows = vec![
-                (date(2024, Month::January, 1), -100_000.0),
-                (date(2024, Month::July, 1), 102_500.0),
-            ];
-            let days = (flows[1].0 - flows[0].0).whole_days() as f64;
-            assert_eq!(days, 182.0);
-            let expected = (102_500.0_f64 / 100_000.0).powf(basis / days) - 1.0;
-            let checked =
-                xirr(&flows, day_count, None).expect("XIRR day-count preflight converges");
-            check_root(
-                checked,
-                expected,
-                dated_npv(&flows, basis, checked),
-                202_500.0,
-            );
-            b.iter(|| {
-                let root =
-                    xirr(black_box(&flows), black_box(day_count), None).expect("XIRR converges");
+                let root = xirr(black_box(&flows)).expect("XIRR converges");
                 assert!(root.is_finite());
                 black_box(root)
             });
@@ -283,7 +249,7 @@ fn benchmark_irr_periodic(c: &mut Criterion) {
                     .sum()
             };
             let expected = reference_root(objective);
-            let checked = irr(&amounts, None).expect("IRR preflight converges");
+            let checked = irr(&amounts).expect("IRR preflight converges");
             check_root(
                 checked,
                 expected,
@@ -291,7 +257,7 @@ fn benchmark_irr_periodic(c: &mut Criterion) {
                 amounts.iter().map(|amount| amount.abs()).sum(),
             );
             b.iter(|| {
-                let root = irr(black_box(&amounts), None).expect("IRR converges");
+                let root = irr(black_box(&amounts)).expect("IRR converges");
                 assert!(root.is_finite());
                 black_box(root)
             });
@@ -381,7 +347,6 @@ fn benchmark_lm_global_sizes(c: &mut Criterion) {
 criterion_group!(
     benches,
     benchmark_xirr_performance,
-    benchmark_xirr_daycount_variants,
     benchmark_brent,
     benchmark_irr_periodic,
     benchmark_lm_global_sizes,

@@ -1813,6 +1813,15 @@ export type UpfrontFee =
       fraction_of_commitment: number;
     };
 /**
+ * Annual basis of an effective-rate quote.
+ *
+ * A rate `q` on a basis with `B` days per year grows one unit to
+ * `(1 + q)^(days / B)` over `days` calendar days. ACT/365F and ACT/360 are
+ * the supported bases because each is exactly days over a constant, which
+ * makes the conversion from the canonical ACT/365F rate exact.
+ */
+export type YieldBasis = "act_365f" | "act_360";
+/**
  * Draw and repayment specification.
  *
  * Determines whether the facility uses a known (deterministic) schedule
@@ -7421,11 +7430,6 @@ export interface Notional {
  */
 export interface ReturnFloorSpec {
   /**
-   * Day count convention for XIRR discounting. Defaults to Act/365F
-   * (matching `core::cashflow::xirr`) when `None`. Ignored for MOIC floors.
-   */
-  day_count?: DayCount | null;
-  /**
    * Issue price = invested capital `V0` (amount funded at issue). Default: par.
    */
   issue_price?: IssuePrice;
@@ -7938,6 +7942,13 @@ export interface TermLoan {
    * `notional_limit`).
    */
   upfront_fee?: UpfrontFee | null;
+  /**
+   * Annual basis of this loan's yield quotes (yield to maturity, call and
+   * worst) and of its effective-interest-rate accretion, separate from the
+   * coupon accrual `day_count` (resolution O11, record
+   * CORE-CONVENTIONS-017 #12). Required: there is no default basis.
+   */
+  yield_basis: YieldBasis;
 }
 /**
  * Complete call schedule for callable term loans.
@@ -8374,6 +8385,13 @@ export interface RevolvingCredit {
    * Defaults to `ShortFront` for maximum flexibility with unaligned dates.
    */
   stub?: StubKind;
+  /**
+   * Annual basis of this loan's yield quotes (yield to maturity, call and
+   * worst) and of its effective-interest-rate accretion, separate from the
+   * coupon accrual `day_count` (resolution O11, record
+   * CORE-CONVENTIONS-017 #12). Required: there is no default basis.
+   */
+  yield_basis: YieldBasis;
 }
 /**
  * A single draw or repayment event.

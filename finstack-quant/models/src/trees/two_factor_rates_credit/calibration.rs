@@ -693,7 +693,7 @@ impl RatesCreditTree {
             guard += 1;
         }
         BrentSolver::new()
-            .solve_in_bracket(|theta| survival_at(theta) - target, lo, hi)
+            .solve_in_bracket(|theta| Ok(survival_at(theta) - target), lo, hi)
             .unwrap_or(0.5 * (lo + hi))
     }
 

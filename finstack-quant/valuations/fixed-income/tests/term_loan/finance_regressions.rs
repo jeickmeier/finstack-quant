@@ -27,6 +27,9 @@ fn base_loan() -> TermLoan {
     loan.settlement_days = 0;
     loan.frequency = Tenor::semi_annual();
     loan.day_count = DayCount::Thirty360;
+    // 30/360 accrual has no exact annual-effective quote basis; yields are
+    // quoted on ACT/365F (resolution O11).
+    loan.yield_basis = finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F;
     loan.business_day_convention = BusinessDayConvention::Unadjusted;
     loan.calendar_id = Some("weekends_only".into());
     loan.stub = StubKind::None;
@@ -277,7 +280,9 @@ fn make_whole_yields_use_reference_redemption() {
         )
         .expect("yield metrics");
     let first_receipt = 50_000.0 + 1_050_000.0 * (-0.0025_f64 * 184.0 / 365.0).exp();
-    let expected = (first_receipt / 1_000_000.0).powi(2) - 1.0;
+    // ACT/365F quote over the 181 actual days from issue to the call date.
+    let days = (date!(2025 - 07 - 01) - loan.issue_date).whole_days() as f64;
+    let expected = (first_receipt / 1_000_000.0).powf(365.0 / days) - 1.0;
     assert!(
         (value.measures["ytc"] - expected).abs() < 1e-8,
         "{:?}",
@@ -303,7 +308,9 @@ fn mid_coupon_make_whole_yield_includes_accrued_exactly_once() {
             PricingOptions::default(),
         )
         .expect("mid-coupon yield");
-    let expected = (1_225_000.0_f64 / 1_000_000.0).powi(4) - 1.0;
+    // ACT/365F quote over the 90 actual days from issue to the call date.
+    let days = (date!(2025 - 04 - 01) - loan.issue_date).whole_days() as f64;
+    let expected = (1_225_000.0_f64 / 1_000_000.0).powf(365.0 / days) - 1.0;
     assert!(
         (value.measures["ytc"] - expected).abs() < 1e-8,
         "{:?}",

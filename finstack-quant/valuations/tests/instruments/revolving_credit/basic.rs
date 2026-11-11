@@ -44,6 +44,7 @@ fn test_revolving_credit_basic_pricing() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees({
             let mut fees = RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap();
@@ -95,6 +96,7 @@ fn test_revolving_credit_with_draws_and_repayments() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.04 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(20.0, 0.0, 0.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![
@@ -143,6 +145,7 @@ fn test_revolving_credit_utilization_metrics() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -201,6 +204,7 @@ fn test_revolving_credit_standard_metrics() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.06 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(30.0, 15.0, 10.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -295,6 +299,7 @@ fn test_revolving_credit_cs01_z_spread_fallback_without_credit_curve() {
         .maturity(date!(2030 - 01 - 01)) // 5y
         .rate(RateSpec::Fixed { rate: 0.06 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -350,6 +355,7 @@ fn test_revolving_credit_cs01_stochastic_without_credit_curve_errors() {
         .maturity(date!(2028 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.06 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
@@ -404,6 +410,7 @@ fn test_revolving_credit_bucketed_dv01() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.055 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -447,6 +454,7 @@ fn test_revolving_credit_helpers() {
         .maturity(date!(2026 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -524,6 +532,7 @@ fn test_term_forward_with_floor() {
             },
         ))
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -560,6 +569,7 @@ fn test_term_forward_with_floor() {
             },
         ))
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -596,6 +606,7 @@ fn test_overdraw_validation() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![DrawRepayEvent {
@@ -636,6 +647,7 @@ fn test_deterministic_with_credit_risk() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act365F)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(50.0, 0.0, 0.0).unwrap()) // 50bp commitment fee
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -654,6 +666,7 @@ fn test_deterministic_with_credit_risk() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act365F)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(50.0, 0.0, 0.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -736,6 +749,7 @@ fn test_deterministic_stochastic_convergence_with_credit_risk() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.055 }) // 5.5% fixed
         .day_count(DayCount::Act365F)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(50.0, 0.0, 0.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -779,6 +793,7 @@ fn test_deterministic_stochastic_convergence_with_credit_risk() {
         .maturity(maturity_date)
         .rate(RateSpec::Fixed { rate: 0.055 })
         .day_count(DayCount::Act365F)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(50.0, 0.0, 0.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(stoch_spec)))

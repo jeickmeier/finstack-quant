@@ -27,6 +27,7 @@ fn test_theta_reflects_time_decay() {
         .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::semi_annual())
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .calendar_id_opt(None)
         .stub(StubKind::None)

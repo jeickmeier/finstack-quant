@@ -33,7 +33,7 @@
 //! assert!(matches!(xirr_floor.issue_price, IssuePrice::PctOfPar(_)));
 //! ```
 
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Rate;
 
@@ -58,9 +58,9 @@ pub enum ReturnFloorKind {
     ///
     /// On an early issuer-called redemption at time `t`, the redemption price is
     /// computed so that the XIRR of all cashflows from issue equals the target
-    /// rate. The floor binds only on early redemptions, not at maturity. Day
-    /// count defaults to Act/365F (matching `core::cashflow::xirr`) unless
-    /// overridden via [`ReturnFloorSpec::day_count`].
+    /// rate. The floor binds only on early redemptions, not at maturity. The
+    /// target is an effective annual rate on the fixed ACT/365F basis of
+    /// `core::cashflow::xirr`; there is no day-count override.
     Xirr(#[cfg_attr(feature = "json-schema", schemars(with = "f64"))] Rate),
 }
 
@@ -306,10 +306,6 @@ pub struct ReturnFloorSpec {
     /// Protection window. Default: [`ProtectionWindow::Full`].
     #[serde(default = "default_window")]
     pub window: ProtectionWindow,
-    /// Day count convention for XIRR discounting. Defaults to Act/365F
-    /// (matching `core::cashflow::xirr`) when `None`. Ignored for MOIC floors.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub day_count: Option<DayCount>,
 }
 
 fn default_issue_price() -> IssuePrice {
@@ -342,7 +338,6 @@ impl ReturnFloorSpec {
             kind: ReturnFloorKind::Moic(multiple),
             issue_price: default_issue_price(),
             window: default_window(),
-            day_count: None,
         }
     }
 
@@ -368,7 +363,6 @@ impl ReturnFloorSpec {
             kind: ReturnFloorKind::Xirr(rate.into()),
             issue_price: default_issue_price(),
             window: default_window(),
-            day_count: None,
         }
     }
 
@@ -401,23 +395,6 @@ impl ReturnFloorSpec {
     #[must_use]
     pub fn window(mut self, window: ProtectionWindow) -> Self {
         self.window = window;
-        self
-    }
-
-    /// Set the XIRR discounting day count convention.
-    ///
-    /// Has no effect on MOIC floors.
-    ///
-    /// # Returns
-    ///
-    /// `self` with `day_count` updated (fluent builder).
-    ///
-    /// # Arguments
-    ///
-    /// * `day_count` - Day-count convention used to convert calendar dates into year fractions.
-    #[must_use]
-    pub fn day_count(mut self, day_count: DayCount) -> Self {
-        self.day_count = Some(day_count);
         self
     }
 
@@ -492,7 +469,19 @@ mod tests {
         assert!(matches!(spec.kind, ReturnFloorKind::Moic(m) if (m - 1.25).abs() < 1e-12));
         assert!(matches!(spec.issue_price, IssuePrice::Par));
         assert!(matches!(spec.window, ProtectionWindow::Full));
-        assert!(spec.day_count.is_none());
+    }
+
+    #[test]
+    fn xirr_floor_has_no_day_count_override() {
+        // Record 017 / O11: XIRR floors are ACT/365F only; the retired
+        // override field is rejected rather than ignored.
+        let mut json = serde_json::to_value(ReturnFloorSpec::xirr(
+            Rate::from_percent(6.0).expect("valid rate fixture"),
+        ))
+        .expect("spec JSON");
+        assert!(json.get("day_count").is_none());
+        json["day_count"] = serde_json::json!("act_360");
+        assert!(serde_json::from_value::<ReturnFloorSpec>(json).is_err());
     }
 
     #[test]

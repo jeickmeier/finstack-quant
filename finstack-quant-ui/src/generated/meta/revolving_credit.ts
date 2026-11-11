@@ -93,7 +93,8 @@ export default [
             "recovery_rate": 0,
             "scheduled_fees": [],
             "settlement_days": 0,
-            "stub": "short_front"
+            "stub": "short_front",
+            "yield_basis": "act_360"
           },
           "type": "revolving_credit"
         },
@@ -1175,6 +1176,13 @@ export default [
     "description": "Stub rule for schedule generation when dates don't align with frequency.\n\nDetermines how to handle partial periods at the start or end of the schedule:\n- `ShortFront`: Short stub at the beginning (most common for RCFs)\n- `ShortBack`: Short stub at the end\n- `LongFront`: Long stub at the beginning\n- `LongBack`: Long stub at the end\n- `None`: No stub allowed (dates must align exactly)\n\nDefaults to `ShortFront` for maximum flexibility with unaligned dates.",
     "ref": "#/$defs/StubKind",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/StubKind"
+  },
+  {
+    "path": "#/$defs/d_2d9b65cc4d957fd6344e/properties/yield_basis",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/RevolvingCredit/properties/yield_basis",
+    "description": "Annual basis of this loan's yield quotes (yield to maturity, call and\nworst) and of its effective-interest-rate accretion, separate from the\ncoupon accrual `day_count` (resolution O11, record\nCORE-CONVENTIONS-017 #12). Required: there is no default basis.",
+    "ref": "#/$defs/YieldBasis",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/YieldBasis"
   },
   {
     "path": "#/$defs/d_2e0bc1103181d92528ce",
@@ -4720,6 +4728,23 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/DynamicRecoveryModel/oneOf/4/properties/linear_decline/properties/sensitivity",
     "description": "Sensitivity of recovery to leverage increase (`beta`).",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_c76679ff2bc35eada3e4",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/YieldBasis",
+    "description": "Annual basis of an effective-rate quote.\n\nA rate `q` on a basis with `B` days per year grows one unit to\n`(1 + q)^(days / B)` over `days` calendar days. ACT/365F and ACT/360 are\nthe supported bases because each is exactly days over a constant, which\nmakes the conversion from the canonical ACT/365F rate exact."
+  },
+  {
+    "path": "#/$defs/d_c76679ff2bc35eada3e4/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/YieldBasis/oneOf/0",
+    "const": "act_365f",
+    "description": "Actual days over a 365-day year (the canonical XIRR clock)."
+  },
+  {
+    "path": "#/$defs/d_c76679ff2bc35eada3e4/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/YieldBasis/oneOf/1",
+    "const": "act_360",
+    "description": "Actual days over a 360-day year."
   },
   {
     "path": "#/$defs/d_cc8ed166abbb10ad4451",

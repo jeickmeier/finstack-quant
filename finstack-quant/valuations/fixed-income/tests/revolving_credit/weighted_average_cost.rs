@@ -34,6 +34,7 @@ fn facility(maturity: Date) -> RevolvingCredit {
         .maturity(maturity)
         .rate(RateSpec::Floating(floating_spec()))
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).expect("fees"))
         .draw_repay_spec(DrawRepaySpec::Deterministic(Vec::new()))

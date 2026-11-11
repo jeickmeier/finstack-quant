@@ -487,7 +487,7 @@ impl EquityOption {
             upper *= 2.0;
         }
         let sigma = BrentSolver::new().with_tolerance(1e-12).solve_in_bracket(
-            |sigma| price(sigma).map_or(f64::NAN, |pv| pv - target),
+            |sigma| Ok(price(sigma).map_or(f64::NAN, |pv| pv - target)),
             lower,
             upper,
         )?;

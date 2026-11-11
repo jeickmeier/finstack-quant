@@ -739,6 +739,9 @@ getters!(JsTermLoan, "TermLoan", |i| {
         /// Accrual day-count convention.
         /// @returns The day count.
         day_count as dayCount: "DayCount" => day_count(i.day_count),
+        /// Annual basis of the yield quotes and EIR accretion (resolution O11), separate from accrual.
+        /// @returns `"act_365f"` or `"act_360"`.
+        yield_basis as yieldBasis: "generated.valuations.TermLoan['yield_basis']" => json(i.yield_basis),
         /// Business day convention (serde string).
         /// @returns `"modified_following"` unless overridden.
         business_day_convention as businessDayConvention: "NonNullable< generated.valuations.TermLoan['business_day_convention'] >" => json(i.business_day_convention),
@@ -840,6 +843,11 @@ setters!(JsTermLoanBuilder, "TermLoanBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         business_day_convention as businessDayConvention: "NonNullable<generated.valuations.TermLoan['business_day_convention']>" => js_wire,
+        /// Set the required annual basis of yield quotes and EIR accretion (resolution O11).
+        /// @param value - `"act_365f"` or `"act_360"`; independent of the accrual day count. `build()` throws when it is not set.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it is not a supported basis or the builder was already consumed by `build()`.
+        yield_basis as yieldBasis: "generated.valuations.TermLoan['yield_basis']" => js_wire,
         /// Set the holiday calendar identifier (e.g. `"usny"`).
         /// @param value - Holiday calendar identifier (e.g. `"usny"`).
         /// @returns The builder, for chaining.
@@ -948,6 +956,9 @@ getters!(JsRevolvingCredit, "RevolvingCredit", |i| {
         /// Interest accrual day count.
         /// @returns The accrual convention.
         day_count as dayCount: "DayCount" => day_count(i.day_count),
+        /// Annual basis of the yield quotes and EIR accretion (resolution O11), separate from accrual.
+        /// @returns `"act_365f"` or `"act_360"`.
+        yield_basis as yieldBasis: "generated.valuations.RevolvingCredit['yield_basis']" => json(i.yield_basis),
         /// Payment frequency for interest and fees.
         /// @returns The payment tenor.
         frequency as frequency: "Tenor" => tenor(i.frequency),
@@ -1119,6 +1130,11 @@ setters!(JsRevolvingCreditBuilder, "RevolvingCreditBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         business_day_convention as businessDayConvention: "NonNullable<generated.valuations.RevolvingCredit['business_day_convention']>" => js_wire,
+        /// Set the required annual basis of yield quotes and EIR accretion (resolution O11).
+        /// @param value - `"act_365f"` or `"act_360"`; independent of the accrual day count. `build()` throws when it is not set.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it is not a supported basis or the builder was already consumed by `build()`.
+        yield_basis as yieldBasis: "generated.valuations.RevolvingCredit['yield_basis']" => js_wire,
         /// Set the holiday calendar used for payment, fixing and settlement rolls.
         /// @param value - Calendar identifier such as `"usny"`; `null` (the default) adjusts for weekends only. An unknown identifier fails at `build()`.
         /// @returns The builder, for chaining.

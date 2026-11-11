@@ -29,6 +29,7 @@
       },
       "issue_date": "2024-01-01",
       "day_count": "act_360",
+      "yield_basis": "act_360",
       "discount_curve_id": "USD-OIS",
       "draw_repay_spec": {
         "deterministic": [
@@ -88,6 +89,7 @@
       "coupon_type": "cash",
       "currency": "USD",
       "day_count": "act_360",
+      "yield_basis": "act_360",
       "discount_curve_id": "USD-OIS",
       "frequency": {
         "count": 3,

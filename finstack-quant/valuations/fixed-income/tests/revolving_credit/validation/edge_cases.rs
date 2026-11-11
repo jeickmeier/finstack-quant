@@ -25,6 +25,7 @@ fn test_very_short_commitment_period() {
         .maturity(date!(2025 - 07 - 01)) // 6 months
         .rate(RateSpec::Fixed { rate: 0.05 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
@@ -55,6 +56,7 @@ fn test_very_long_commitment_period() {
         .maturity(date!(2040 - 01 - 01)) // 15 years
         .rate(RateSpec::Fixed { rate: 0.06 })
         .day_count(DayCount::Act360)
+        .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
         .fees(RevolvingCreditFees::flat(30.0, 12.0, 8.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))

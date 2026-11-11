@@ -107,7 +107,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 22 | E3 | **E3a committed** (`E3a:` in git log); **E3b not attempted (run budget; plan sized L)** | E3a: workspace rust-lint; gen-write; workspace rust-test; core doctests; python-test; python-lint; wasm-test; wasm-lint; ui-check; notebooks schedule_building and dates_calendars_schedules | 008 entry: removed policies/warnings recorded; record 008 partly reconciled | E3a: removed `ScheduleErrorPolicy`, `ScheduleWarning`, `GracefulEmpty`, the missing-calendar warning, `warnings`/`has_warnings`/`used_graceful_fallback`, the builder/host `error_policy` and the monotonic/drop repair (now a strictness error) across Rust, Python, WASM, parity ledger, stubs and notebooks |
 | 23 | E4 | skipped (dep E3: E3b not executed) | | | CDS-mode removal needs the explicit schedule spec/grid modes |
 | 24 | E4b | skipped (dep E4) | | | O7 decision not recorded in this run |
-| 25 | G1 | skipped (dep B3) | | | |
+| 25 | G1 | committed (`G1:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16,366 (16,365 + the mid-coupon make-whole re-expectation, re-run 19/19); python-test 14,008 / 112 skip; wasm-test 1,087; ui-check 1,527; doctests and the Linux run skipped by owner request | 017 entry: runtime reconciliation recorded (qualification remains); context-free-XIRR entry removed; record 017 status updated | Guess-free `irr`/`xirr`, fixed ACT/365F clock, canonical per-date net, full log bracket via fallible shared `solve_in_bracket`, one acceptance gate; `YieldBasis` (ACT/365F, ACT/360) with explicit loan `yield_basis` (O11); bond floor `day_count` removed; MC path IRR removed; see Needs review |
 | 26 | G2 | committed (`G2:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16358; core doctests 285; python-test 13988; python-lint; wasm-test 1085; wasm-lint; ui-check | 019 entry: CreditRating part recorded; record 019 partly reconciled | `D` = 21 and `NR` off the ladder; no `Ord`, hand-written `PartialOrd` (`NR` incomparable with rated values, equal to itself); `ladder_position()`; `notches_to`/`to_moodys_string -> Result` (`NR` arithmetic and Moody's `D` error); finite canonical/Moody's/status alias tables replace suffix stripping; the models rating-factor table and the structured-credit `rating_haircuts` move from `BTreeMap` to `IndexMap` (ladder order / wire order); Python ordering of `NR` against a rated value raises `TypeError` |
 | 27 | G3 | not attempted (run budget; plan sized M/L) | | | See Needs review: classify validation and embedded-data retirement must land together |
 | 28 | G4 | skipped (dep B3) | | | |
@@ -292,6 +292,51 @@ logged under Needs review.
     matches them.
   - **WASM gate:** the WASM figure (1085) is from `wasm-test-built`, after
     one full `wasm-test` build.
+- **G1.**
+  - **Shared Brent (partial CORE-NUMERICS-05).** `solve_in_bracket` now
+    takes `FnMut(f64) -> Result<f64>` and propagates objective errors (05
+    #2). Its 12 other callers wrap their objective in `Ok(...)` unchanged;
+    moving them onto genuine error propagation, deleting `solve_fallible`
+    and the rest of record 05 belong to that record's slice.
+  - **One commit, not G1a/G1b.** The interim plan to derive the loan basis
+    from the accrual day count failed two tests on a 30/360 loan, so the
+    explicit field landed in the same commit.
+  - **Loan `yield_basis` is a required field (O11).** Term loans and
+    revolvers carry `yield_basis: YieldBasis` (`act_365f` | `act_360`),
+    separate from `day_count`; YTM, YTC/YTW and the EIR use it, and EIR
+    accretion uses its clock (actual days over 365 or 360). Every builder
+    chain, struct literal, JSON fixture, Python dict, notebook and host
+    builder (Python/WASM `yield_basis` setters and getters) was given the
+    basis matching its accrual day count; ACT/360 and ACT/365F loans keep
+    their values (equal growth). Accruals with no exact conversion (the
+    30/360 test loan, an ACT/365L revolver fixture) quote on ACT/365F, so
+    their yields moved: the two make-whole YTC tests now expect
+    `G^(365/181) - 1` and `G^(365/90) - 1` instead of the 30/360
+    `G^2 - 1` and `G^4 - 1`.
+  - **Real estate and PE beyond O11.** O11 names loans and bonds only.
+    Real-estate (unlevered/levered) IRR and PE LP IRR keep their configured
+    `day_count` as the quote basis, but only ACT/365F or ACT/360 (named
+    error otherwise; every fixture and default is ACT/365F). The PE waterfall
+    validates this up front, so `calculate_lp_irr_to_date`'s `.ok()` cannot
+    hide a basis error.
+  - **Swallowed solver failures left as owner policy.** Bond XIRR-to-worst
+    skips non-converging exit paths (documented; candidate-selection policy
+    is the open "collateral exercise policies" register entry), and
+    structured-credit equity IRR and PE LP IRR-to-date map failures to
+    "unavailable" (`.ok()`). Record 017 #12 asks for owner-documented
+    meanings; these were not changed.
+  - **Retired-behaviour tests replaced.** Tests pinning a guess, a
+    day-count argument (ACT/360 vs ACT/365F XIRR, 30/360 netting) or the
+    removed bench group were replaced by record 017's boundary rows
+    (leap-day clock, zero spacing, origin shift, both directions, signed
+    zero, explicit failures). `xirr` with a 99% loss now must converge
+    without a hint (it was allowed to fail).
+  - **Value moves.** Structured-credit equity IRR in the cross-host golden
+    moved in the 15th digit (new solver path); the bond floor, portfolio and
+    structured-credit paths already used ACT/365F.
+  - **Not done.** Doctests were not run (owner request; nightly tier),
+    which includes the new `irr`/`xirr`/`solve_in_bracket`/`YieldBasis`
+    examples. No independent qualification of 017's numerical targets.
 - **B5.**
   - **"Python `__index__` on `Currency`" (plan line, no further detail).**
     `Currency` had no `__index__`. Strictest reading under 012 #12 (identity

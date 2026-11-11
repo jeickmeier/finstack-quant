@@ -1196,15 +1196,6 @@
           "format": "double",
           "type": "number"
         },
-        "irr": {
-          "default": null,
-          "description": "Internal rate of return inferred from the captured cashflow amounts, if calculable.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "path_id": {
           "description": "Path identifier (0-indexed)",
           "format": "uint",
