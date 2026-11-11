@@ -1999,27 +1999,6 @@
       }
     },
     {
-      "date": "2025-07-15",
-      "amount": {
-        "amount": "1000000",
-        "currency": "USD"
-      }
-    },
-    {
-      "date": "2026-01-15",
-      "amount": {
-        "amount": "1000000",
-        "currency": "USD"
-      }
-    },
-    {
-      "date": "2026-07-15",
-      "amount": {
-        "amount": "1000000",
-        "currency": "USD"
-      }
-    },
-    {
       "date": "2027-01-15",
       "amount": {
         "amount": "0",
@@ -3308,7 +3287,7 @@
     "interest_like": [true, true, false, false],
     "principal_like": [false, true, true, false],
     "cash_settlement": [true, false, false, true],
-    "balance_date": ["2025-07-15", "2025-07-11"],
+    "balance_date": [null, "2025-07-11"],
     "with_accrual": {
       "date": "2025-07-15",
       "reset_date": null,

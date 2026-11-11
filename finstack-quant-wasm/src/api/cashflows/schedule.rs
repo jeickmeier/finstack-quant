@@ -281,10 +281,11 @@ impl JsCashFlowSchedule {
     /// Outstanding principal balance after each unique balance date.
     ///
     /// Principal flows (amortization, PIK, draws and repayments) are replayed
-    /// from the initial notional.
+    /// from the initial notional by their explicit deltas; rows that move no
+    /// principal contribute no entry.
     ///
-    /// @returns `{ date, amount }` entries in date order; `amount` is the outstanding balance after that date's flows.
-    /// @throws If `meta.issue_date` is unset or principal flows mix currencies (kind `validation`).
+    /// @returns `{ date, amount }` entries in balance-date order; `amount` is the outstanding balance after that date's principal rows.
+    /// @throws If principal flows mix currencies (kind `validation`).
     #[wasm_bindgen(js_name = outstandingByDate, unchecked_return_type = "DatedFlowJson[]")]
     pub fn outstanding_by_date(&self) -> Result<JsValue, JsValue> {
         dated_flows_wire(self.inner.outstanding_by_date().map_err(to_js_err)?)

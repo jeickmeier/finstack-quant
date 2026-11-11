@@ -1740,7 +1740,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/loan-yield/cases.json",
-      "sha256": "a72ec81dc4949d8dd11ccee8c9e5289fdc7915f65b99acb03ca4d62626d4aae2"
+      "sha256": "cfde358519139b324dc6eaf4f74ee51f61e3393b9c99f694d0a32104ed732b54"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/bond-credit/cases.json",
@@ -1748,7 +1748,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/convertible/cases.json",
-      "sha256": "3e52a11a2f2e370613b0d029dee2417db3cfc480d65f9ebced44e263a9d14a73"
+      "sha256": "017ded16d3a6e67491eb157e3b72647dfbb437e30c792484f6c611e3ce6fc1a5"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/workout-ladder/cases.json",

@@ -111,10 +111,14 @@ pub(crate) fn period_principal_claims(
         .filter(|flow| flow.date >= period.start && flow.date < period.end)
         .filter(|flow| is_repayment_like(flow))
         .filter(|flow| flow.amount.amount() != 0.0)
-        .map(|flow| crate::capital_structure::PrincipalClaim {
-            payment_date: flow.date,
-            balance_date: flow.get_balance_date(),
-            amount: flow.amount.abs(),
+        // A repayment row carries its explicit balance date.
+        .filter_map(|flow| {
+            flow.get_balance_date()
+                .map(|balance_date| crate::capital_structure::PrincipalClaim {
+                    payment_date: flow.date,
+                    balance_date,
+                    amount: flow.amount.abs(),
+                })
         })
         .collect()
 }
@@ -243,8 +247,9 @@ pub fn calculate_period_flows(
                     flow.amount.currency(),
                 ));
             }
-            let funding_date = flow.get_balance_date();
-            if funding_date >= period.start && funding_date < period.end {
+            if flow.get_balance_date().is_some_and(|funding_date| {
+                funding_date >= period.start && funding_date < period.end
+            }) {
                 net_new_funding += principal.amount();
             }
         }
@@ -437,8 +442,8 @@ pub fn calculate_period_flows(
             // neighbouring period still moves the balance in the period it
             // is economically effective.
             let economic_in_period = |cf: &&CashFlow| {
-                let effective = cf.get_balance_date();
-                effective >= period.start && effective < period.end
+                cf.get_balance_date()
+                    .is_some_and(|effective| effective >= period.start && effective < period.end)
             };
             let repayments: f64 = full_schedule
                 .get_flows()

@@ -366,7 +366,10 @@ pub(super) fn scheduled_outstanding_after(
     final_redemption_date: Option<Date>,
 ) -> Result<f64> {
     let mut outstanding = bond.notional.amount();
-    for flow in flows.iter().filter(|flow| flow.get_balance_date() <= date) {
+    for flow in flows.iter().filter(|flow| {
+        flow.get_balance_date()
+            .is_some_and(|balance| balance <= date)
+    }) {
         if is_opening_funding(flow, bond.issue_date) {
             continue;
         }

@@ -518,10 +518,13 @@ impl CashFlow {
         self
     }
 
-    /// Return the balance-effective date, using payment date when unspecified.
+    /// Return the explicit balance-effective date of a principal row.
+    ///
+    /// `None` for a row that moves no principal; there is no payment-date
+    /// fallback (record CORE-CONVENTIONS-015 #6).
     #[must_use]
-    pub fn get_balance_date(&self) -> Date {
-        self.principal_date.unwrap_or(self.date)
+    pub fn get_balance_date(&self) -> Option<Date> {
+        self.principal_date
     }
 
     /// Attach contractual accrual metadata to this flow.

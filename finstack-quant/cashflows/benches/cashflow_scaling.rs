@@ -178,7 +178,12 @@ fn check_amortizing_monthly(schedule: &CashFlowSchedule, base: Date, coupons: us
         assert_eq!((accrual.start, accrual.end), (start, end));
         assert_eq!(coupon.date, end);
         assert_eq!(principal.date, end);
-        assert_eq!(principal.get_balance_date(), end);
+        assert_eq!(
+            principal
+                .get_balance_date()
+                .expect("principal row balance date"),
+            end
+        );
         let opening = 1_000_000.0 * (coupons - i) as f64 / coupons as f64;
         let expected_coupon = opening * 0.06 * (end - start).whole_days() as f64 / 365.0;
         checks::close(coupon.amount.amount(), expected_coupon, 1e-6);

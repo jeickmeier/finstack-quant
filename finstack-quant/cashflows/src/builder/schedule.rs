@@ -640,10 +640,10 @@ impl CashFlowSchedule {
             let order =
                 self.balance_replay_order(|flow| flow.amount.currency() == initial.currency());
             let mut pending_principal = Vec::new();
-            for index in order {
+            for (index, balance_date) in order {
                 let flow = &mut self.flows[index];
                 let delta = flow.principal_delta;
-                if flow.get_balance_date() < as_of {
+                if balance_date < as_of {
                     if let Some(delta) = delta {
                         balance = balance.checked_add(delta)?;
                         // The cash can still be pending after its economic
@@ -657,7 +657,7 @@ impl CashFlowSchedule {
                 {
                     // Cash settled before its economic boundary. Keep the
                     // future balance movement without paying that cash again.
-                    let date = flow.get_balance_date();
+                    let date = balance_date;
                     pending_principal.push(
                         CashFlow::new(
                             date,
@@ -768,10 +768,11 @@ impl CashFlowSchedule {
             .filter(|cf| cf.kind.is_repayment_like())
             .map(|cf| {
                 cf.principal_delta
-                    .map(|delta| (cf.get_balance_date(), delta.checked_neg()))
+                    .zip(cf.get_balance_date())
+                    .map(|(delta, date)| (date, delta.checked_neg()))
                     .ok_or_else(|| {
                         finstack_quant_core::Error::Validation(format!(
-                            "{} row on {} has no principal_delta",
+                            "{} row on {} has no principal_delta or principal_date",
                             cf.kind, cf.date
                         ))
                     })
@@ -912,9 +913,8 @@ impl CashFlowSchedule {
         let order = self.balance_replay_order(|_| true);
         let mut outstanding = self.notional.initial;
         let mut closing: Vec<(Date, Money)> = Vec::new();
-        for idx in order {
+        for (idx, date) in order {
             apply_flow_to_outstanding(&mut outstanding, &self.flows[idx])?;
-            let date = self.flows[idx].get_balance_date();
             match closing.last_mut() {
                 Some((last_date, last_balance)) if *last_date == date => {
                     *last_balance = outstanding;
@@ -950,13 +950,13 @@ impl CashFlowSchedule {
         let mut outstanding = self.notional.initial;
         let mut balances = vec![(outstanding, outstanding); self.flows.len()];
         let mut path: Vec<(Date, Money)> = Vec::new();
-        for index in self.balance_replay_order(|_| true) {
+        for (index, balance_date) in self.balance_replay_order(|_| true) {
             let flow = &self.flows[index];
             let before = outstanding;
             apply_flow_to_outstanding(&mut outstanding, flow)?;
             balances[index] = (before, outstanding);
             if outstanding != before {
-                path.push((flow.get_balance_date(), outstanding));
+                path.push((balance_date, outstanding));
             }
         }
         for (flow, balance) in self.flows.iter().zip(&mut balances) {
@@ -982,17 +982,22 @@ impl CashFlowSchedule {
         Ok(balances)
     }
 
-    /// Indices of the flows `keep` selects, in balance-replay order (economic
-    /// balance date, then schedule order).
-    fn balance_replay_order(&self, keep: impl Fn(&CashFlow) -> bool) -> Vec<usize> {
-        let mut order: Vec<usize> = (0..self.flows.len())
-            .filter(|&index| keep(&self.flows[index]))
+    /// The principal rows `keep` selects with their explicit balance dates, in
+    /// balance-replay order (balance date, then schedule order). Rows that move
+    /// no principal have no balance date and take no part in replay (record
+    /// CORE-CONVENTIONS-015 #6, #11).
+    fn balance_replay_order(&self, keep: impl Fn(&CashFlow) -> bool) -> Vec<(usize, Date)> {
+        let mut order: Vec<(usize, Date)> = self
+            .flows
+            .iter()
+            .enumerate()
+            .filter(|(_, flow)| keep(flow))
+            .filter_map(|(index, flow)| flow.get_balance_date().map(|date| (index, date)))
             .collect();
-        order.sort_by(|&left, &right| {
-            let (left, right) = (&self.flows[left], &self.flows[right]);
-            left.get_balance_date()
-                .cmp(&right.get_balance_date())
-                .then_with(|| compare_flows(left, right))
+        order.sort_by(|&(left, left_date), &(right, right_date)| {
+            left_date
+                .cmp(&right_date)
+                .then_with(|| compare_flows(&self.flows[left], &self.flows[right]))
         });
         order
     }

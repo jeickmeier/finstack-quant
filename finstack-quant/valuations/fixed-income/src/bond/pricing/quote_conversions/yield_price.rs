@@ -529,7 +529,7 @@ impl<'a> RedemptionBasis<'a> {
                 .get_flows()
                 .iter()
                 .filter(|flow| {
-                    flow.get_balance_date() == exercise_date
+                    flow.get_balance_date() == Some(exercise_date)
                         && flow.kind == CFKind::Notional
                         && flow.amount.amount() > 0.0
                 })
@@ -562,7 +562,7 @@ impl<'a> RedemptionBasis<'a> {
             .get_flows()
             .iter()
             .filter(|flow| {
-                flow.get_balance_date() == maturity
+                flow.get_balance_date() == Some(maturity)
                     && flow.kind == CFKind::Notional
                     && flow.amount.amount() > 0.0
             })

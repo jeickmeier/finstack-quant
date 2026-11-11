@@ -549,11 +549,10 @@ impl ReplayTemplate {
         // then applies same-day PIK/amortization before exercise while leaving
         // a same-day final redemption available as the holder's terminal claim.
         let mut initial_outstanding = bond.notional.amount();
-        for flow in schedule
-            .get_flows()
-            .iter()
-            .filter(|flow| flow.get_balance_date() < as_of)
-        {
+        for flow in schedule.get_flows().iter().filter(|flow| {
+            flow.get_balance_date()
+                .is_some_and(|balance| balance < as_of)
+        }) {
             if is_opening_funding(flow, bond.issue_date) {
                 continue;
             }
@@ -611,7 +610,9 @@ impl ReplayTemplate {
                     flow.date > as_of || (flow.date == as_of && include_as_of_option_cash);
                 if !dynamic {
                     if flow.kind == CFKind::Pik
-                        && flow.get_balance_date() >= as_of
+                        && flow
+                            .get_balance_date()
+                            .is_some_and(|balance| balance >= as_of)
                         && spec
                             .rate_spec
                             .compounding
@@ -635,10 +636,9 @@ impl ReplayTemplate {
                             .any(|source| matches!(source, OvernightRateSource::Conditional(_)))
                         {
                             return Err(Error::Validation(format!(
-                                "Bond '{}' overnight coupon paid {} still requires unobserved fixings after payment for PIK capitalization on {}",
+                                "Bond '{}' overnight PIK capitalizing on {} still requires unobserved fixings",
                                 bond.id.as_str(),
                                 flow.date,
-                                flow.get_balance_date(),
                             )));
                         }
                     }
@@ -1097,7 +1097,10 @@ impl ReplayTemplate {
             let terminal_redemption = is_terminal_redemption(flow, final_redemption_date);
             if flow.kind == CFKind::Pik
                 && final_redemption_date.is_some_and(|redemption| {
-                    flow.date <= redemption && flow.get_balance_date() > redemption
+                    flow.date <= redemption
+                        && flow
+                            .get_balance_date()
+                            .is_some_and(|balance| balance > redemption)
                 })
             {
                 static_redemption_pik += static_balance_delta(flow, false).unwrap_or(0.0);
@@ -1129,10 +1132,11 @@ impl ReplayTemplate {
                     });
                 }
             }
-            if flow.get_balance_date() >= as_of
+            if let Some(balance_date) = flow.get_balance_date()
+                && balance_date >= as_of
                 && let Some(delta) = static_balance_delta(flow, terminal_redemption)
             {
-                let balance_step = exact_grid_step(times, as_of, flow.get_balance_date())?;
+                let balance_step = exact_grid_step(times, as_of, balance_date)?;
                 balance_events[balance_step].push(BalanceEvent { delta });
             }
             if flow.date >= as_of && is_holder_distribution(flow) {

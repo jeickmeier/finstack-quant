@@ -1566,13 +1566,14 @@ export interface CoreNamespace {
    */
   readonly neumaierSum: typeof wasm.neumaierSum;
   /**
-   * Date on which a cashflow changes the outstanding balance.
+   * Date on which a principal row changes the outstanding balance.
    *
-   * Mirrors Rust `CashFlow::get_balance_date`: the flow's `principal_date`
-   * when set, otherwise its payment `date`.
+   * Mirrors Rust `CashFlow::get_balance_date`: the flow's explicit
+   * `principal_date`; `undefined` for a row that moves no principal. There is
+   * no payment-date fallback.
    *
    * @param flow - `CashFlow` wire object.
-   * @returns ISO-8601 balance date.
+   * @returns ISO-8601 balance date, or `undefined` for a non-principal row.
    * @throws If `flow` is not a `CashFlow` (kind `validation`).
    */
   readonly cashFlowGetBalanceDate: typeof wasm.cashFlowGetBalanceDate;

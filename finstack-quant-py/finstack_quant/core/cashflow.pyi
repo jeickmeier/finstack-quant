@@ -507,17 +507,19 @@ class CashFlow:
         Returns
         -------
         datetime.date or None
-            Date on which principal changes; None uses the payment date. Access does not raise.
+            Date on which principal changes; None for a row that moves no principal.
+            Access does not raise.
         """
         ...
 
-    def get_balance_date(self) -> datetime.date:
-        """Resolve the economic date of the principal movement.
+    def get_balance_date(self) -> datetime.date | None:
+        """Return the explicit balance-effective date of a principal row.
 
         Returns
         -------
-        datetime.date
-            Explicit principal date, otherwise payment date. Resolution does not raise.
+        datetime.date or None
+            The row's ``principal_date``; None for a row that moves no principal.
+            There is no payment-date fallback. Access does not raise.
         """
         ...
 

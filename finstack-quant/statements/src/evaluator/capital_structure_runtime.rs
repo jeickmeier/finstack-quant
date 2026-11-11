@@ -213,7 +213,7 @@ pub(crate) fn resolve_opening_balance(
     // still use face value below.
     let funding_at_start = schedule.get_meta().issue_date == Some(period_start)
         && schedule.get_flows().iter().any(|flow| {
-            flow.get_balance_date() == period_start
+            flow.get_balance_date() == Some(period_start)
                 && crate::capital_structure::period_flows::funding_principal(flow)
                     .is_some_and(|principal| principal.amount() > 0.0)
         });

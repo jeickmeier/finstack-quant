@@ -587,7 +587,7 @@ impl BondValuator {
                         .get_flows()
                         .iter()
                         .filter(|flow| {
-                            flow.get_balance_date() == date
+                            flow.get_balance_date() == Some(date)
                                 && flow.kind == CFKind::Notional
                                 && flow.amount.amount() > 0.0
                         })

@@ -63,7 +63,11 @@ pub(crate) fn quoted_dirty_from_clean_px(
     let pending_principal: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.get_balance_date() <= settlement && flow.date > settlement)
+        .filter(|flow| {
+            flow.get_balance_date()
+                .is_some_and(|balance| balance <= settlement)
+                && flow.date > settlement
+        })
         // The pending par is the explicit principal decrease.
         .map(|flow| {
             flow.principal_delta

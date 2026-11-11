@@ -888,6 +888,34 @@ logged under Needs review.
       moved; the cashflows UI fixture gained the FX swap rows' deltas.
     - Doc examples building principal rows were updated; doctests were not
       run (nightly tier).
+  - **G5-3d3 balance date without fallback.** `CashFlow::get_balance_date`
+    returns the explicit `principal_date` (`Option`), with no payment-date
+    fallback (record 015 #6); Python returns `date | None` and WASM
+    `cashFlowGetBalanceDate` returns the date or `undefined`.
+    - **Replay is principal-rows only.** Balance replay visits rows with a
+      balance date, so `outstanding_by_date` lists principal balance dates
+      and no longer repeats the balance on coupon-only or recovery dates.
+      Step-function lookups (`outstanding_at_dates`) are unchanged.
+    - **Callers.** Filters on balance date (LSMC, term-loan pending
+      principal, convertible terminal claim, yield/price redemption,
+      statements period and funding lookups, recovery funding lots) now
+      select principal rows explicitly. The statements residual rebuild's
+      ordering uses a documented `economic_date`: a principal row's balance
+      date, or a non-principal row's own payment date.
+    - **Fallback relied on (fixed).** `recovery_principal_path` cleared cash
+      principal rows' balance dates to fall back to the payment date; it now
+      sets them to the cash date explicitly.
+    - **Regression noise (traced).** The convertible and loan-yield UI
+      fixtures moved by at most 1.5e-10 relative (price 5e-16; one near-zero
+      Greek 4.7e-10 to 2.3e-10 absolute): the hazard pricer integrates over
+      the intervals between recovery-path events, and with coupon-only dates
+      gone adjacent equal-balance intervals merge, so the same integral is
+      summed in fewer pieces.
+    - Tests: the default-notional path test, the cashflows parity golden
+      (path entries and a coupon's `null` balance date) and the WASM schedule
+      twin test follow the principal-only path; stub and JSDoc for
+      `outstanding_by_date` no longer cite the removed issue-date
+      requirement.
 - **Notebooks broken by earlier slices (found during G5, fixed in `NB:`).**
   A full run (`run_all_notebooks.py --timeout 120`) after G5-3b passed 92 of
   101; none of the 9 failures involved PIK or write-down rows, and slice

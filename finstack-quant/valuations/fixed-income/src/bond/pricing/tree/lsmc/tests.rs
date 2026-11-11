@@ -314,8 +314,14 @@ fn early_overnight_payment_rejects_unknown_fixings_after_payment() {
         .iter()
         .find(|flow| flow.kind == CFKind::Pik)
         .expect("PIK coupon");
-    assert_eq!(pik.date, pik.get_balance_date());
-    assert_eq!(pik.get_balance_date(), time::macros::date!(2024 - 03 - 31));
+    assert_eq!(
+        pik.date,
+        pik.get_balance_date().expect("principal row balance date")
+    );
+    assert_eq!(
+        pik.get_balance_date().expect("principal row balance date"),
+        time::macros::date!(2024 - 03 - 31)
+    );
     let cash = schedule
         .get_flows()
         .iter()
@@ -363,8 +369,14 @@ fn past_overnight_payment_retains_only_fully_determined_pending_pik() {
             .iter()
             .find(|flow| flow.kind == CFKind::Pik)
             .expect("PIK coupon");
-        assert_eq!(pik.date, pik.get_balance_date());
-        assert_eq!(pik.get_balance_date(), maturity);
+        assert_eq!(
+            pik.date,
+            pik.get_balance_date().expect("principal row balance date")
+        );
+        assert_eq!(
+            pik.get_balance_date().expect("principal row balance date"),
+            maturity
+        );
         // The pending PIK share capitalizes after the origin, so it is replayed
         // with its unpublished Friday fixing simulated, never frozen.
         let template = ReplayTemplate::new(&tree, &bond, &market, as_of)
@@ -605,7 +617,8 @@ fn floating_pik_uses_accrual_boundaries_with_lagged_and_early_cash_dates() {
             .iter()
             .find(|flow| {
                 flow.kind == CFKind::Pik
-                    && flow.get_balance_date() == first.compiled.period().accrual_end
+                    && flow.get_balance_date().expect("principal row balance date")
+                        == first.compiled.period().accrual_end
             })
             .expect("first PIK")
             .principal_delta
@@ -739,7 +752,10 @@ fn scheduled_amortization_reduces_balance_before_lagged_cash_settlement() {
     let repayment = schedule
         .get_flows()
         .iter()
-        .find(|flow| flow.kind == CFKind::Amortization && flow.get_balance_date() == effective)
+        .find(|flow| {
+            flow.kind == CFKind::Amortization
+                && flow.get_balance_date().expect("principal row balance date") == effective
+        })
         .expect("first repayment");
     assert!(repayment.date > effective);
     let effective_step =

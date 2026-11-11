@@ -405,7 +405,7 @@ impl PyCashFlow {
     fn principal_delta(&self) -> Option<PyMoney> {
         self.inner.principal_delta.map(PyMoney::from_inner)
     }
-    /// Explicit economic principal date, or None when payment date applies.
+    /// Explicit economic principal date, or None for a row that moves no principal.
     #[getter]
     fn principal_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
@@ -414,9 +414,12 @@ impl PyCashFlow {
             .transpose()
     }
 
-    /// Return the economic principal date, using payment date when unspecified.
-    fn get_balance_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        date_to_py(py, self.inner.get_balance_date())
+    /// Return the explicit balance date, or None for a row that moves no principal.
+    fn get_balance_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .get_balance_date()
+            .map(|date| date_to_py(py, date))
+            .transpose()
     }
 
     /// Return a copy with the supplied economic principal date.

@@ -167,7 +167,9 @@ impl ConvertibleBondValuator {
                 cf.kind.is_principal_like()
                     && cf.kind.is_cash_settlement()
                     && cf.amount.amount() > 0.0
-                    && cf.get_balance_date() >= bond.maturity
+                    && cf
+                        .get_balance_date()
+                        .is_some_and(|balance| balance >= bond.maturity)
             })
             .map(|cf| cf.amount.amount())
             .sum();

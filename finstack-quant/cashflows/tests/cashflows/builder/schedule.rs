@@ -711,17 +711,20 @@ fn outstanding_by_date_includes_defaulted_notional() {
     )
     .expect("valid cashflow rows");
 
+    // Only principal rows replay: the recovery cash has no balance date
+    // (record CORE-CONVENTIONS-015 #6, #11).
     let outstanding = schedule.outstanding_by_date().unwrap();
-    assert_eq!(outstanding.len(), 2, "expected default and recovery dates");
+    assert_eq!(outstanding.len(), 1, "only the default moves principal");
     assert!(
         (outstanding[0].1.amount() - 700.0).abs() < 1e-10,
         "defaulted notional should reduce outstanding from 1000 to 700, got {}",
         outstanding[0].1.amount()
     );
+    let at_recovery = schedule.outstanding_at_dates(&[recovery_date]).unwrap();
     assert!(
-        (outstanding[1].1.amount() - 700.0).abs() < 1e-10,
+        (at_recovery[0].amount() - 700.0).abs() < 1e-10,
         "recovery should not restore outstanding, got {}",
-        outstanding[1].1.amount()
+        at_recovery[0].amount()
     );
 }
 

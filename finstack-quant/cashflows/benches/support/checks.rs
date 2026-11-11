@@ -45,7 +45,11 @@ pub(super) fn fixed_amounts(schedule: &CashFlowSchedule) {
         assert!(accrual.start < accrual.end);
         let mut principal = schedule.get_notional().initial.amount();
         for movement in schedule.get_flows() {
-            if movement.kind == CFKind::Amortization && movement.get_balance_date() <= accrual.start
+            if movement.kind == CFKind::Amortization
+                && movement
+                    .get_balance_date()
+                    .expect("principal row balance date")
+                    <= accrual.start
             {
                 principal -= movement.amount.amount();
             }

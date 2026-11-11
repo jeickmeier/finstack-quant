@@ -221,7 +221,8 @@ pub(crate) fn quote_dirty_at_as_of(
 /// Replay principal claims on cash dates, retaining economic PIK/default dates.
 ///
 /// Recovery exposure runs until actual cash repayment, so amortization,
-/// prepayment, notional and revolving rows drop their economic principal date.
+/// prepayment, notional and revolving rows move the claim on their cash
+/// settlement date instead of their economic principal date.
 pub(crate) fn recovery_principal_path(schedule: &CashFlowSchedule) -> Result<Vec<(Date, Money)>> {
     let mut cash_schedule = schedule.clone();
     cash_schedule.update_flows(|flow| {
@@ -233,7 +234,7 @@ pub(crate) fn recovery_principal_path(schedule: &CashFlowSchedule) -> Result<Vec
                 | CFKind::RevolvingDraw
                 | CFKind::RevolvingRepayment
         ) {
-            flow.principal_date = None;
+            flow.principal_date = Some(flow.date);
         }
     });
     cash_schedule.outstanding_by_date()

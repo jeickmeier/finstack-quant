@@ -49,9 +49,9 @@ class CashFlowMeta:
             Facility limit / commitment for revolving structures.
             Informational: no Rust engine reads it.
         issue_date : datetime.date or str, optional
-            Instrument issue date. Accrual and the ``outstanding_*`` methods
-            raise ``ValueError`` without it; validation falls back to the
-            first flow date.
+            Instrument issue date. Accrual raises ``ValueError`` without it;
+            balance replay does not need it, since every principal row states
+            its own delta and balance date.
         maturity : datetime.date or str, optional
             Contractual maturity date.
         projected_fixings : list[ProjectedFixing], optional
@@ -132,8 +132,8 @@ class CashFlowMeta:
         Returns
         -------
         datetime.date, optional
-            The issue date, which accrual and the ``outstanding_*`` methods
-            require as the first coupon period start, or ``None`` when unset.
+            The issue date, which accrual requires as the first coupon period
+            start, or ``None`` when unset.
 
         Notes
         -----
@@ -460,13 +460,13 @@ class CashFlowSchedule:
         -------
         list[tuple[datetime.date, Money]]
             ``(date, outstanding_balance)`` pairs in economic principal-date
-            order, one per distinct balance-effective date.
+            order, one per distinct balance date of a principal row; rows that
+            move no principal (coupons, fees) contribute no entry.
 
         Raises
         ------
         ValueError
-            If ``meta.issue_date`` is unset, or a currency mismatch is
-            found between flows and the notional.
+            If a currency mismatch is found between flows and the notional.
         """
         ...
 
@@ -621,8 +621,8 @@ class CashFlowSchedule:
         Raises
         ------
         ValueError
-            If ``outstanding=True`` and ``meta.issue_date`` is missing or
-            principal flows mix currencies with the notional.
+            If ``outstanding=True`` and principal flows mix currencies with
+            the notional.
         """
         ...
 

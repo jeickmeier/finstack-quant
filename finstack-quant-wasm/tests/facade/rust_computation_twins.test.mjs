@@ -156,13 +156,14 @@ test('cashflows.absToSmm matches the Rust ABS kernel', () => {
 test('cashflows schedule analytics match the typed Python CashFlowSchedule methods', () => {
   const schedule = cashflows.buildCashflowSchedule(CASHFLOW_SPEC);
   assert.equal(schedule.wal('2024-08-31'), 1);
+  // The path lists principal balance dates only; the lagged coupon payment
+  // moves no principal (record CORE-CONVENTIONS-015 #6).
   const balances = schedule.outstandingByDate();
   assert.deepEqual(
     balances.map((row) => [row.date, Number(row.amount.amount)]),
     [
       ['2024-08-31', 1000000],
       ['2025-08-31', 0],
-      ['2025-09-01', 0],
     ]
   );
   const flows = JSON.parse(schedule.toJson()).flows;

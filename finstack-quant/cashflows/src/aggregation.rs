@@ -774,7 +774,10 @@ fn principal_repayment_amount(cf: &CashFlow, base: Date) -> finstack_quant_core:
     if !cf.kind.is_repayment_like() || cf.amount.amount() <= 0.0 {
         return Ok(0.0);
     }
-    if cf.get_balance_date() < base {
+    let balance_date = cf
+        .get_balance_date()
+        .ok_or_else(|| missing_principal_delta(cf))?;
+    if balance_date < base {
         return Ok(cf.amount.amount());
     }
     Ok(match cf.principal_delta {
@@ -793,11 +796,11 @@ fn principal_repayment_amount(cf: &CashFlow, base: Date) -> finstack_quant_core:
     })
 }
 
-/// A principal row without its explicit delta: nothing is inferred from its
-/// cash or kind (record CORE-CONVENTIONS-015 #4).
+/// A principal row without its explicit delta or balance date: nothing is
+/// inferred from its cash or kind (record CORE-CONVENTIONS-015 #4).
 fn missing_principal_delta(cf: &CashFlow) -> finstack_quant_core::Error {
     finstack_quant_core::Error::Validation(format!(
-        "{} row on {} has no principal_delta",
+        "{} row on {} has no principal_delta or principal_date",
         cf.kind, cf.date
     ))
 }
@@ -841,21 +844,27 @@ fn funded_principal(
         let mut opening = NeumaierAccumulator::new();
         for &index in &indices {
             let cf = &cashflows[index];
-            if cf.get_balance_date() > base {
+            // Only principal rows carry a balance date and fund principal.
+            let Some(balance_date) = cf.get_balance_date() else {
+                continue;
+            };
+            if balance_date > base {
                 let increase = principal_increase(cf)?;
                 if increase > 0.0 {
                     if cf.kind == CFKind::Pik || cf.amount.amount() == 0.0 {
-                        *capitalizations.entry(cf.get_balance_date()).or_default() += increase;
+                        *capitalizations.entry(balance_date).or_default() += increase;
                     } else {
-                        increases.push((cf.get_balance_date(), increase));
+                        increases.push((balance_date, increase));
                     }
                 }
             }
         }
         for index in indices {
             let cf = &cashflows[index];
+            let Some(balance_date) = cf.get_balance_date() else {
+                continue;
+            };
             let mut repayment = principal_repayment_amount(cf, base)?;
-            let balance_date = cf.get_balance_date();
             // An early payment of capitalized interest extinguishes that
             // same-date capitalization, even when other funded principal is
             // available. Economic-only residual replay rows retain this pairing

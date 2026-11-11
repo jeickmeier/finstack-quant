@@ -253,7 +253,10 @@ fn b14_midperiod_draw_accrues_from_its_event_date() {
         .find(|flow| flow.amount.amount() < 0.0)
         .expect("draw cashflow");
     assert_eq!(draw.date, date("2025-02-03"));
-    assert_eq!(draw.get_balance_date(), date("2025-02-01"));
+    assert_eq!(
+        draw.get_balance_date().expect("principal row balance date"),
+        date("2025-02-01")
+    );
 }
 
 #[test]

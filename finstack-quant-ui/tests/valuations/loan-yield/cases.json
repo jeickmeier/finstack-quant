@@ -243,7 +243,7 @@
           "metric": "all_in_rate",
           "value": {
             "ok": true,
-            "value": 0.08186565174819765
+            "value": 0.08186565174819767
           }
         },
         {
@@ -518,7 +518,7 @@
           "metric": "all_in_rate",
           "value": {
             "ok": true,
-            "value": 0.08186565174819765
+            "value": 0.08186565174819767
           }
         },
         {
@@ -801,7 +801,7 @@
           "metric": "all_in_rate",
           "value": {
             "ok": true,
-            "value": 0.08186565174819765
+            "value": 0.08186565174819767
           }
         },
         {

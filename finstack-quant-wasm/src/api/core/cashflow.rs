@@ -67,21 +67,25 @@ pub fn cf_kind_is_cash_settlement(
     Ok(js_wire::<CFKind>(&kind, "kind")?.is_cash_settlement())
 }
 
-/// Date on which a cashflow changes the outstanding balance.
+/// Date on which a principal row changes the outstanding balance.
 ///
-/// Mirrors Rust `CashFlow::get_balance_date`: the flow's `principal_date`
-/// when set, otherwise its payment `date`.
+/// Mirrors Rust `CashFlow::get_balance_date`: the flow's explicit
+/// `principal_date`; `undefined` for a row that moves no principal. There is
+/// no payment-date fallback.
 ///
 /// @param flow - `CashFlow` wire object.
-/// @returns ISO-8601 balance date.
+/// @returns ISO-8601 balance date, or `undefined` for a non-principal row.
 /// @throws If `flow` is not a `CashFlow` (kind `validation`).
-#[wasm_bindgen(js_name = cashFlowGetBalanceDate, unchecked_return_type = "generated.core.DateWire")]
+#[wasm_bindgen(
+    js_name = cashFlowGetBalanceDate,
+    unchecked_return_type = "generated.core.DateWire | undefined"
+)]
 pub fn cash_flow_get_balance_date(
     #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CashFlow")] flow: JsValue,
-) -> Result<String, JsValue> {
-    Ok(date_to_iso(
-        js_wire::<CashFlow>(&flow, "flow")?.get_balance_date(),
-    ))
+) -> Result<Option<String>, JsValue> {
+    Ok(js_wire::<CashFlow>(&flow, "flow")?
+        .get_balance_date()
+        .map(date_to_iso))
 }
 
 /// Check a cashflow's invariants.

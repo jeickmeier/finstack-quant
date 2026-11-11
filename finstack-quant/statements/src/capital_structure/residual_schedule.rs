@@ -128,7 +128,7 @@ pub(crate) fn rebuild_residual_interest(
                 .as_ref()
                 .map_or(flow.date, |accrual| accrual.end)
         } else {
-            flow.get_balance_date()
+            economic_date(flow)
         };
         // Capitalize the final PIK coupon before sizing redemption, even when
         // their payment dates differ. Other repayments retain schedule order.
@@ -143,7 +143,7 @@ pub(crate) fn rebuild_residual_interest(
     });
     for original in economic_order {
         let mut replacement = vec![original.clone()];
-        let principal_is_future = original.get_balance_date() > from_date;
+        let principal_is_future = economic_date(original) > from_date;
         let cash_is_future = original.date > from_date;
         if is_rebuildable_interest(original.kind)
             && if original.kind == CFKind::Pik {
@@ -301,7 +301,7 @@ pub(crate) fn rebuild_residual_interest(
             // Paid advances and cash arrears retain their economic reductions.
             // Earlier future installments cannot consume that reserved face.
             let reservation = reserved
-                .get_mut(&(original.date, original.get_balance_date()))
+                .get_mut(&(original.date, economic_date(original)))
                 .map_or(0.0, |remaining| {
                     let amount = remaining.min(original.amount.amount());
                     *remaining -= amount;
@@ -326,7 +326,7 @@ pub(crate) fn rebuild_residual_interest(
         }
         let change = revised_delta - original_delta;
         if change != 0.0 {
-            *changes.entry(original.get_balance_date()).or_default() += change;
+            *changes.entry(economic_date(original)).or_default() += change;
         }
         flows.extend(replacement);
     }
@@ -357,6 +357,17 @@ fn interest_value(flow: &CashFlow) -> Result<f64> {
                 flow.date
             ))
         })
+}
+
+/// The date a row takes economic effect: a principal row's explicit balance
+/// date, or, for a row that moves no principal, its own payment date. A
+/// principal row always states its balance date (record CORE-CONVENTIONS-015
+/// #4, #6), so nothing is inferred for principal.
+fn economic_date(flow: &CashFlow) -> Date {
+    match flow.get_balance_date() {
+        Some(balance_date) => balance_date,
+        None => flow.date,
+    }
 }
 
 /// The explicit principal delta of a row; a non-principal row moves nothing.
