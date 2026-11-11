@@ -883,25 +883,14 @@ impl ModelBuilder {
     /// Add every metric from a loaded registry to the model, qualifying
     /// same-namespace references in the generated formulas.
     fn add_all_metrics_from_registry_in_place(&mut self, registry: &crate::registry::Registry) {
-        let mut namespace_cache: IndexMap<String, IndexSet<String>> = IndexMap::new();
+        let mut namespace_cache = IndexMap::new();
         for (qualified_id, stored_metric) in registry.all_metrics() {
             // A user node with a built-in metric's id wins, as documented.
             if self.nodes.contains_key(qualified_id) {
                 continue;
             }
-            let namespace = qualified_id.split('.').next().unwrap_or("");
-            let formula = if namespace.is_empty() {
-                stored_metric.definition.formula.clone()
-            } else {
-                let metrics_in_namespace = namespace_cache
-                    .entry(namespace.to_string())
-                    .or_insert_with(|| Self::metric_ids_in_namespace(registry, namespace));
-                crate::utils::formula::qualify_identifiers(
-                    &stored_metric.definition.formula,
-                    metrics_in_namespace,
-                    namespace,
-                )
-            };
+            let formula =
+                Self::qualified_metric_formula(registry, stored_metric, &mut namespace_cache);
             self.insert_metric_node(qualified_id, stored_metric, formula);
         }
     }
@@ -957,40 +946,18 @@ impl ModelBuilder {
     ) -> Result<&mut Self> {
         let dependencies = registry.get_dependencies(qualified_id)?;
 
-        let namespace = qualified_id
-            .split('.')
-            .next()
-            .ok_or_else(|| Error::registry(format!(
-                "Invalid qualified ID '{}'. Expected format: 'namespace.metric_id' (e.g., 'fin.gross_margin')",
-                qualified_id
-            )))?;
-        let metrics_in_namespace = Self::metric_ids_in_namespace(registry, namespace);
-
+        let mut namespace_cache = IndexMap::new();
         let mut pending = Vec::new();
-        for dep_id in dependencies {
-            if !self.nodes.contains_key(dep_id.as_str()) {
-                let dep_metric = registry.get(&dep_id)?;
-
-                let formula = crate::utils::formula::qualify_identifiers(
-                    &dep_metric.definition.formula,
-                    &metrics_in_namespace,
-                    namespace,
-                );
-
-                pending.push((dep_id, dep_metric, formula));
+        for id in dependencies
+            .into_iter()
+            .chain(std::iter::once(qualified_id.to_string()))
+        {
+            if !self.nodes.contains_key(id.as_str()) {
+                let metric = registry.get(&id)?;
+                let formula =
+                    Self::qualified_metric_formula(registry, metric, &mut namespace_cache);
+                pending.push((id, metric, formula));
             }
-        }
-
-        if !self.nodes.contains_key(qualified_id) {
-            let stored_metric = registry.get(qualified_id)?;
-
-            let formula = crate::utils::formula::qualify_identifiers(
-                &stored_metric.definition.formula,
-                &metrics_in_namespace,
-                namespace,
-            );
-
-            pending.push((qualified_id.to_string(), stored_metric, formula));
         }
 
         for (id, metric, formula) in pending {
@@ -999,7 +966,28 @@ impl ModelBuilder {
         Ok(self)
     }
 
-    /// Replace unqualified metric references with qualified ones in a formula.
+    /// A registry metric's formula with references to the other metrics of
+    /// its own namespace qualified.
+    ///
+    /// The namespace is the one the metric was registered under, not a prefix
+    /// of its qualified id: a namespace may itself contain dots (`fin.adj`).
+    fn qualified_metric_formula(
+        registry: &crate::registry::Registry,
+        metric: &StoredMetric,
+        namespace_cache: &mut IndexMap<String, IndexSet<String>>,
+    ) -> String {
+        let namespace = metric.namespace.as_str();
+        let metrics_in_namespace = namespace_cache
+            .entry(namespace.to_string())
+            .or_insert_with(|| Self::metric_ids_in_namespace(registry, namespace));
+        crate::utils::formula::qualify_identifiers(
+            &metric.definition.formula,
+            metrics_in_namespace,
+            namespace,
+        )
+    }
+
+    /// Unqualified ids of the metrics registered under `namespace`.
     fn metric_ids_in_namespace(
         registry: &crate::registry::Registry,
         namespace: &str,

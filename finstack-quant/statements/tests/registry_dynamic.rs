@@ -400,3 +400,71 @@ fn test_mixed_dependencies() {
     assert!(deps.contains(&"test.gross_profit".to_string()));
     assert!(deps.contains(&"test.ebitda".to_string()));
 }
+
+/// A metric in a dotted namespace refers to its own siblings. The builder
+/// used to take the text before the first dot as the namespace, so
+/// `fin.adj.ebitda_margin` read `fin.ebitda` (0.30) instead of
+/// `fin.adj.ebitda` (0.40).
+#[test]
+fn dotted_namespaces_qualify_references_to_their_own_metrics() {
+    use finstack_quant_core::dates::PeriodId;
+    use finstack_quant_statements::builder::ModelBuilder;
+    use finstack_quant_statements::evaluator::Evaluator;
+
+    let adjusted = r#"{"namespace":"fin.adj","schema_version":1,"metrics":[
+        {"id":"ebitda","name":"Adjusted EBITDA","formula":"revenue - cogs - opex + addbacks"},
+        {"id":"ebitda_margin","name":"Adjusted EBITDA margin","formula":"ebitda / revenue"}]}"#;
+    let period = PeriodId::quarter(2025, 1).expect("valid quarter");
+    let inputs = [
+        ("revenue", 100.0),
+        ("cogs", 40.0),
+        ("opex", 30.0),
+        ("addbacks", 10.0),
+    ];
+
+    // One metric at a time, next to the built-in `fin.ebitda`.
+    let mut registry = Registry::with_builtins().expect("built-in metrics");
+    registry
+        .load_from_json_str(adjusted)
+        .expect("adjusted metrics");
+    let mut builder = ModelBuilder::new("dotted-namespace");
+    builder.periods("2025Q1..Q1", None).expect("valid periods");
+    for (node, value) in inputs {
+        builder.value(node, &[(period, value.into())]);
+    }
+    builder
+        .add_metric_from_registry("fin.ebitda", &registry)
+        .expect("built-in metric");
+    builder
+        .add_metric_from_registry("fin.adj.ebitda_margin", &registry)
+        .expect("adjusted metric");
+    let model = builder.build().expect("model");
+    assert_eq!(
+        model
+            .get_node("fin.adj.ebitda_margin")
+            .and_then(|node| node.formula_text.as_deref()),
+        Some("fin.adj.ebitda / revenue")
+    );
+    let result = Evaluator::new().evaluate(&model).expect("evaluation");
+    assert_eq!(result.get("fin.ebitda", &period), Some(30.0));
+    assert_eq!(result.get("fin.adj.ebitda_margin", &period), Some(0.4));
+
+    // Every metric at once, from a registry holding only the dotted namespace.
+    let mut registry = Registry::new();
+    registry
+        .load_from_json_str(adjusted)
+        .expect("adjusted metrics");
+    let mut builder = ModelBuilder::new("dotted-namespace-only");
+    builder.periods("2025Q1..Q1", None).expect("valid periods");
+    for (node, value) in inputs {
+        builder.value(node, &[(period, value.into())]);
+    }
+    for (qualified_id, _) in registry.all_metrics() {
+        builder
+            .add_metric_from_registry(qualified_id, &registry)
+            .expect("adjusted metric");
+    }
+    let model = builder.build().expect("model");
+    let result = Evaluator::new().evaluate(&model).expect("evaluation");
+    assert_eq!(result.get("fin.adj.ebitda_margin", &period), Some(0.4));
+}
