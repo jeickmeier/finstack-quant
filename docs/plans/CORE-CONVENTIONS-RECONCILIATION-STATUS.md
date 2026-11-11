@@ -122,7 +122,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 34 | F6 | committed (`F6:` in git log) | lint, rust-test, python-test, wasm-test, all-audit (slice-gate; after gen-write) | 013 entry: config/policy items recorded as reconciled; record 013 status updated; STATEMENTS-CAPITAL-09 observed text updated | Required `pivot_currency: Option<Currency>`; no FX config/matrix/policy defaults; explicit pivots at ~165 Rust and ~60 host sites (`None` unless a deliberate hub); `PeriodAverage` removed; required host `rate` policy; calibration `fx: Option<FxConfig>`; statements `PeriodEnd` fallback removed; see Needs review |
 | 35 | F7 | committed (`F7:` in git log) | lint, gen-check, rust-test, python-test, wasm-test, ui-check (slice-gate; after gen-write) | 013 entry: resolution items recorded as reconciled, state/shock items remain for F8; record 013 status updated | Pin > global > provider; identity quotes rejected; literal ordered cache; NotFound-only routing with preserved leg causes; checked revisions; one-call limit for revisionless providers; single fallible `FxProvider::snapshot` hook with validated capture; see Needs review |
 | 36 | F8 | committed (`F8:` in git log) | lint, gen-check, rust-test, python-test, wasm-test, ui-check (slice-gate; after gen-write) | 013 entry and the non-atomic-merge entry removed (598 items; Observed 156, Reconciliation 92; Core conventions 17); record 013 status and core-conventions inventory updated | `load_from_state` removed; fresh `try_from_state` with repeated-key rejection; frozen quote-only `with_bumped_rate(reference, b)`; `MarketBump::FxPct.policy`; validated `FxRateResult` deserialization; see Needs review |
-| 37 | G5 | skipped (dep G4) | | | |
+| 37 | G5 | in progress (G5-1, G5-2 committed) | lint, rust-test, python-test, wasm-test, ui-check (slice-gate; after gen-write) | | Kinds (`Floating`, `ProtectionPayment`); PIK/write-down producers fill explicit deltas and PIK readers read them; cash-only calendar-year ladders; see Needs review |
 | 38 | E5 | not started (dep E3 met) | | | |
 | 39 | E6 | skipped (dep G5, CASHFLOWS-001) | | | |
 | 40 | H1 | not attempted (run budget) | | | Data slice; needs primary sources fetched in-run |
@@ -730,6 +730,36 @@ logged under Needs review.
   - **Bench.** `core/benches/schedule_generation.rs` asserted the removed
     `Schedule.warnings` (an E3a leftover) and built standard IMM from an
     off-cycle start; both fixed. Benches are outside the gate.
+- **G5 (run in gated commits after E3b).**
+  - **G5-1 kinds.** `FloatReset` became `Floating`; CDS-style protection
+    rows get `ProtectionPayment`; `is_coupon` / `is_repayment_like` added and
+    `is_cash_settlement` made exhaustive. No values moved.
+  - **G5-2 explicit deltas, cash unchanged.** Fixed and floating PIK emission
+    now sets `principal_delta` to the capitalized amount, and structured-credit
+    and asset-backed-facility `DefaultedNotional` rows set a negative
+    `principal_delta` plus `principal_date`. Every PIK reader (coupon periods,
+    statements PIK expense and capitalization, residual rebuild, term-loan call
+    claims, bond LSMC accrual claims, structured-credit balance replay and
+    period buckets) reads the delta and errors when it is missing. PIK rows
+    still carry the same cash amount until G5-3 sets it to zero.
+  - **Write-down sign.** The old fallback derived a defaulted-notional
+    balance change of `+amount` (an increase) when no delta was set; the
+    explicit delta is `-amount`. The balance-path readers that handled the
+    kind took the correct sign by kind, so no structured-credit test or golden
+    moved; the UI scenario-table fixtures gained the explicit fields.
+  - **Cash-only ladders (owner decision "Cash only").** Calendar-year ladders
+    (aggregation, `CashFlowSchedule`, instrument envelopes, Python and WASM)
+    skip rows that are not `is_cash_settlement`. The cashflows UI fixture's
+    PIK note ladder moved: its 2024 principal changed from -9,536,346.67 to
+    -10,000,000 and the PIK-only years dropped out. Portfolio date netting sums
+    cash `amount`, so it becomes cash-only once G5-3 zeroes non-cash rows;
+    its JSON form takes opaque kind labels and was not filtered by kind.
+  - **Fixtures.** Four hand-built PIK rows in tests (cashflows normalize and
+    performance accrual, statements effective-date PIK, bond seasoned PIK)
+    gained the explicit delta. The cross-host cashflows parity golden
+    (`finstack-quant-wasm/tests/facade/golden/cashflows_parity.json`) was
+    regenerated with its documented command; it only gained the PIK rows'
+    `principal_delta` (equal to their cash amounts), no value moved.
 - **Dependency added (G2).** `indexmap` (already a workspace dependency, used
   by core and structured credit) was added to `finstack-quant-models` so the
   rating-factor table keeps a deterministic order once `CreditRating` lost

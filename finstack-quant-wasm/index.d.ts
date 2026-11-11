@@ -3255,7 +3255,10 @@ export interface CashflowsNamespace {
   /**
    * Group dated cashflows into a calendar-year non-principal / principal / PV ladder.
    *
-   * The four arrays are parallel: entry `i` of each describes flow `i`.
+   * The four arrays are parallel: entry `i` of each describes flow `i`. The
+   * ladder counts cash only: non-cash rows (`"pik"` capitalization,
+   * `"defaulted_notional"` write-down) are validated but excluded from every
+   * column, so a year with only such rows has no row.
    *
    * @param dates - ISO-8601 flow dates; the calendar year of each date is its bucket.
    * @param kinds - Canonical cashflow kind labels (`"fixed"`, `"notional"`, `"pre_payment"`), with surrounding whitespace and ASCII case ignored; principal-like kinds go to `principal`, all others to `non_principal`.

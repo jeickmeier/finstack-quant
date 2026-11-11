@@ -55,6 +55,19 @@ pub(crate) fn funding_principal(flow: &CashFlow) -> Option<Money> {
     None
 }
 
+/// Capitalized amount of a PIK row: the magnitude of its explicit principal
+/// delta, never its cash amount (record CORE-CONVENTIONS-015 #1, #4).
+fn pik_capitalized(cf: &CashFlow) -> Result<f64> {
+    cf.principal_delta
+        .map(|delta| delta.amount().abs())
+        .ok_or_else(|| {
+            crate::error::Error::capital_structure(format!(
+                "PIK row on {} has no principal_delta; its capitalized amount must be explicit",
+                cf.date
+            ))
+        })
+}
+
 /// Whether the declared financial-statement instrument carries borrowing principal.
 ///
 /// # Arguments
@@ -338,9 +351,10 @@ pub fn calculate_period_flows(
                     breakdown.fees = breakdown.fees.checked_add(scaled_abs_value)?;
                 }
                 CFKind::Pik => {
-                    breakdown.interest_expense_pik = breakdown
-                        .interest_expense_pik
-                        .checked_add(scaled_abs_value)?;
+                    let capitalized =
+                        Money::new(pik_capitalized(cf)? * scale, cf.amount.currency())?;
+                    breakdown.interest_expense_pik =
+                        breakdown.interest_expense_pik.checked_add(capitalized)?;
                 }
                 CFKind::Notional | CFKind::RevolvingDraw => {
                     // Funding / draw events are not treated as scheduled principal payments in statements.
@@ -442,8 +456,8 @@ pub fn calculate_period_flows(
                 .iter()
                 .filter(economic_in_period)
                 .filter(|cf| cf.kind == CFKind::Pik)
-                .map(|cf| cf.amount.amount().abs() * scale)
-                .sum();
+                .map(|cf| pik_capitalized(cf).map(|value| value * scale))
+                .sum::<Result<f64>>()?;
             Money::new(
                 (net_new_funding + capitalized - repayments).max(0.0),
                 currency,

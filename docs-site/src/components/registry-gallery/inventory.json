@@ -1716,7 +1716,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/tranche-analytics.json",
-      "sha256": "e4b48ce29b521a1c8ceca139c6662496cbb139535c703c36d2863b584c7738e6"
+      "sha256": "aef7c9682bca5f410f43876df5f1188490fba653d1a6869c56fd1f370f17ba98"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/pool-report.json",
@@ -1724,11 +1724,11 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/waterfall-report.json",
-      "sha256": "d470d1e54390b1536fecdb1a31701d387458202a3c63596e4176a0ec68003b66"
+      "sha256": "2fc812320acd1ebde4044436f954477def1cb6dfc34bfba42a0bac6712fe77f5"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/deal-charts.json",
-      "sha256": "3aaef67aa751df3b04b5f364b566117f232b480ecf5491366e27ac283b9631f9"
+      "sha256": "8868d09871b58e49f5cf389b9c4a326e390f0582e5e6a7354707a1bdd8feb7f5"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/equity-tranche.json",
@@ -1736,7 +1736,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "d852d44f61df746ce6a7b2de9623f3904e2c79b6246793b9df4a7b1404a22f1e"
+      "sha256": "ce272a768a40e4457e098f78db4f7d85d1d23d619a5903fdd77dffb47f91e586"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/loan-yield/cases.json",

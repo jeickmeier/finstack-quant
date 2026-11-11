@@ -1283,6 +1283,7 @@ fn newly_funded_balance_capitalizes_pik_on_its_effective_date() {
             0.0,
             None,
         )
+        .with_principal_delta(Money::new(5.0, Currency::USD).expect("valid PIK delta"))
         .with_principal_date(date!(2025 - 03 - 31)),
         CashFlow::new(
             date!(2027 - 01 - 01),

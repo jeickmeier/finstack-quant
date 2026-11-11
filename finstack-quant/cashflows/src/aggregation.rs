@@ -439,6 +439,11 @@ pub struct CalendarYearLadderRow {
 /// classified kind that is not [`CFKind::is_principal_like`] (interest, fees,
 /// recovery, accrued-on-default, …).
 ///
+/// The ladder is a cash ladder: rows whose kind is not
+/// [`CFKind::is_cash_settlement`] (PIK capitalization, defaulted-notional
+/// write-down) are validated but contribute to no column, so a year holding
+/// only such rows has no ladder row (record CORE-CONVENTIONS-015 #1).
+///
 /// # Errors
 ///
 /// Returns [`finstack_quant_core::Error::Validation`] when the four slices
@@ -522,6 +527,9 @@ pub(crate) fn calendar_year_ladder_rows(
             )));
         }
         let kind = kind?;
+        if !kind.is_cash_settlement() {
+            continue;
+        }
         let slot = by_year.entry(date.year()).or_insert_with(|| {
             [
                 NeumaierAccumulator::new(),
@@ -1864,6 +1872,23 @@ mod calendar_year_ladder_tests {
         assert_eq!(rows[1].year, 2034);
         assert!((rows[1].principal - 10_000_000.0).abs() < 1e-9);
         assert!((rows[1].pv - 7_100_000.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn calendar_year_ladder_counts_only_cash_settlement() {
+        let dates = [d(2027, 1, 1), d(2027, 6, 1), d(2028, 1, 1)];
+        let rows = calendar_year_ladder(
+            &dates,
+            &["fixed", "pik", "defaulted_notional"],
+            &[10.0, 5.0, 40.0],
+            &[9.0, 4.0, 30.0],
+        )
+        .expect("ladder");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].year, 2027);
+        assert_eq!(rows[0].non_principal, 10.0);
+        assert_eq!(rows[0].principal, 0.0);
+        assert_eq!(rows[0].pv, 9.0);
     }
 
     #[test]

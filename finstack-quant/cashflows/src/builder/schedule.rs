@@ -1312,6 +1312,9 @@ impl CashFlowSchedule {
     /// and the supplied present values per year. Amounts are taken in native
     /// currency units without FX conversion. Every row must use the same
     /// currency; mixed-currency schedules are rejected before aggregation.
+    /// The ladder counts cash only: rows that are not
+    /// [`CFKind::is_cash_settlement`] (PIK capitalization, defaulted-notional
+    /// write-down) contribute to no column.
     ///
     /// # Arguments
     ///
@@ -1641,6 +1644,7 @@ mod tests {
             0.5,
             Some(0.12),
         )
+        .with_principal_delta(Money::from((6_i64, Currency::USD)))
         .with_accrual(CashFlowAccrual {
             start: issue,
             end: maturity,

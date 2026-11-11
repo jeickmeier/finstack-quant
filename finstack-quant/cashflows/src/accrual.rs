@@ -470,6 +470,19 @@ fn build_coupon_periods(
         .iter()
         .filter(|cf| is_coupon_kind(cf.kind, cfg.include_pik))
     {
+        // A PIK row's coupon value is its explicit capitalization (principal
+        // delta), not its cash amount (record CORE-CONVENTIONS-015 #1, #4).
+        let (cash_value, pik_value) = if cf.kind == CFKind::Pik {
+            let delta = cf.principal_delta.ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "PIK row on {} has no principal_delta; its capitalized amount must be explicit",
+                    cf.date
+                ))
+            })?;
+            (0.0, delta.amount())
+        } else {
+            (cf.amount.amount(), 0.0)
+        };
         let accrual = cf.accrual.as_ref();
         let true_period = accrual.map(|accrual| (accrual.start, accrual.end));
         let calendar_id = accrual.and_then(|accrual| accrual.calendar_id.clone());
@@ -495,11 +508,8 @@ fn build_coupon_periods(
                     && bucket.end_is_termination_date == end_is_termination_date
             });
         if let Some(bucket) = matching_bucket {
-            if cf.kind == CFKind::Pik {
-                bucket.pik_amount += cf.amount.amount();
-            } else {
-                bucket.cash_amount += cf.amount.amount();
-            }
+            bucket.pik_amount += pik_value;
+            bucket.cash_amount += cash_value;
             if bucket.accrual_factor.is_none() {
                 bucket.accrual_factor = cf_af;
             }
@@ -514,16 +524,8 @@ fn build_coupon_periods(
             calendar_id,
             coupon_period,
             end_is_termination_date,
-            cash_amount: if cf.kind == CFKind::Pik {
-                0.0
-            } else {
-                cf.amount.amount()
-            },
-            pik_amount: if cf.kind == CFKind::Pik {
-                cf.amount.amount()
-            } else {
-                0.0
-            },
+            cash_amount: cash_value,
+            pik_amount: pik_value,
             accrual_factor: cf_af,
         });
     }

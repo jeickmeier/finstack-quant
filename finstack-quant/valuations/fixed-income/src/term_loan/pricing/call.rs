@@ -54,8 +54,19 @@ impl<'a> ExerciseClaims<'a> {
                     && flow.get_balance_date() <= exercise
                     && exercise < flow.date
             })
-            .map(|flow| flow.amount.amount())
-            .sum();
+            // The capitalized amount is the explicit principal delta, not
+            // the row's cash amount (record CORE-CONVENTIONS-015 #1, #4).
+            .map(|flow| {
+                flow.principal_delta
+                    .map(|delta| delta.amount())
+                    .ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(format!(
+                            "PIK row on {} has no principal_delta",
+                            flow.date
+                        ))
+                    })
+            })
+            .sum::<Result<f64>>()?;
         Ok((principal + total - cash - capitalized_pending, cash))
     }
 }

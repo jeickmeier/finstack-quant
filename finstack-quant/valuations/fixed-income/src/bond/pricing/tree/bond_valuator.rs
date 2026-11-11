@@ -1496,7 +1496,8 @@ mod tests {
                     CFKind::Pik,
                     0.0,
                     None,
-                ),
+                )
+                .with_principal_delta(money(50.0)),
                 CashFlow::new(maturity, None, money(850.0), CFKind::Notional, 0.0, None),
             ],
             Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),

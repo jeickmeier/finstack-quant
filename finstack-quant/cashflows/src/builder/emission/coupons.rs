@@ -55,14 +55,19 @@ fn add_pik_flow_if_nonzero(
         )));
     }
     if pik_amt > 0.0 {
-        flows.push(CashFlow::new(
-            date,
-            None,
-            Money::new(pik_amt, ccy)?,
-            CFKind::Pik,
-            accrual_factor,
-            rate,
-        ));
+        // The capitalized amount is an explicit balance increase
+        // (record CORE-CONVENTIONS-015 #4).
+        flows.push(
+            CashFlow::new(
+                date,
+                None,
+                Money::new(pik_amt, ccy)?,
+                CFKind::Pik,
+                accrual_factor,
+                rate,
+            )
+            .with_principal_delta(Money::new(pik_amt, ccy)?),
+        );
         Ok(pik_amt)
     } else {
         Ok(0.0)
@@ -729,6 +734,7 @@ pub(crate) fn emit_float_coupons_on(
                             segment.year_fraction,
                             Some(settlement.all_in_rate),
                         )
+                        .with_principal_delta(Money::from_model_value(settlement.pik_amount, ccy)?)
                         .with_principal_date(period.accrual_end)
                         .with_accrual(accrual),
                     );

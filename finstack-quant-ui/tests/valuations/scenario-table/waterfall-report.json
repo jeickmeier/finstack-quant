@@ -352,7 +352,12 @@
                   "currency": "USD"
                 },
                 "kind": "defaulted_notional",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-78246780.0249779",
+                  "currency": "USD"
+                },
+                "principal_date": "2026-01-02"
               }
             ],
             "accrual_periods": [
@@ -1669,7 +1674,12 @@
                   "currency": "USD"
                 },
                 "kind": "defaulted_notional",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-99000000",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-01-01"
               }
             ],
             "accrual_periods": [],

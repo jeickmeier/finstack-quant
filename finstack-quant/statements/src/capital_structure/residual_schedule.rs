@@ -207,13 +207,16 @@ pub(crate) fn rebuild_residual_interest(
                 .rev()
                 .find(|(date, _)| *date <= accrual.start)
                 .map_or(initial, |(_, balance)| balance.amount());
+            // A PIK row's interest is its explicit capitalization, not its
+            // cash amount (record CORE-CONVENTIONS-015 #1, #4).
+            let original_value = interest_value(original)?;
             let rate = if principal == 0.0 {
                 // A previous rebuild can zero a whole component without
                 // extinguishing its coupon terms. Rebuilt rows retain the
                 // signed component rate for a subsequent balance increase.
                 original.rate.unwrap_or(f64::NAN)
             } else {
-                original.amount.amount() / principal / original.accrual_factor
+                original_value / principal / original.accrual_factor
             };
             if !rate.is_finite()
                 || original.rate.is_some_and(|rate| !rate.is_finite())
@@ -246,9 +249,9 @@ pub(crate) fn rebuild_residual_interest(
                 )? / total;
                 let balance_delta: f64 = changes.range(..=bounds[0]).map(|(_, delta)| delta).sum();
                 let factor = original.accrual_factor * fraction;
-                let amount = original.amount.amount() * fraction + balance_delta * rate * factor;
+                let value = original_value * fraction + balance_delta * rate * factor;
                 let mut flow = original.clone();
-                flow.amount = Money::new(amount, currency).map_err(|error| {
+                flow.amount = Money::new(value, currency).map_err(|error| {
                     Error::capital_structure(format!(
                         "cannot rebuild {:?} interest on {}: {error}",
                         flow.kind, flow.date
@@ -266,14 +269,16 @@ pub(crate) fn rebuild_residual_interest(
                     end: bounds[1],
                     ..accrual.clone()
                 });
-                // Explicit PIK deltas follow the reprojected interest, split in
-                // the same proportions as the original principal capitalization.
-                if let Some(principal) = original.principal_delta {
+                // A PIK row capitalizes exactly its reprojected interest; any
+                // other explicit delta splits with the reprojected cash.
+                if original.kind == CFKind::Pik {
+                    flow.principal_delta = Some(Money::new(value, currency)?);
+                } else if let Some(principal) = original.principal_delta {
                     flow.principal_delta = Some(Money::new(
                         if original.amount.amount() == 0.0 {
                             principal.amount() * fraction
                         } else {
-                            principal.amount() * amount / original.amount.amount()
+                            principal.amount() * value / original.amount.amount()
                         },
                         currency,
                     )?);
@@ -334,6 +339,22 @@ pub(crate) fn rebuild_residual_interest(
         schedule.get_day_count(),
         schedule.get_meta().clone(),
     )?)
+}
+
+/// Interest a rebuildable row carries: a PIK row's explicit capitalization,
+/// any other row's cash amount.
+fn interest_value(flow: &CashFlow) -> Result<f64> {
+    if flow.kind != CFKind::Pik {
+        return Ok(flow.amount.amount());
+    }
+    flow.principal_delta
+        .map(|delta| delta.amount())
+        .ok_or_else(|| {
+            Error::capital_structure(format!(
+                "PIK row on {} has no principal_delta; its capitalized amount must be explicit",
+                flow.date
+            ))
+        })
 }
 
 fn principal_change(flow: &CashFlow) -> f64 {

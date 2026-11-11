@@ -314,6 +314,7 @@ fn pik_records() -> Vec<Value> {
         181.0 / 365.0,
     );
     pik.kind = CFKind::Pik;
+    pik.principal_delta = Some(pik.amount);
     let schedule = hand_schedule(
         vec![cash, pik],
         "2025-01-01",

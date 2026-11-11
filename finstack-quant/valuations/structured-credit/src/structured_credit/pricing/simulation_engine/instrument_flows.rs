@@ -1103,7 +1103,7 @@ fn build_schedule(
     let (kind, schedule, opening_balance, maturity) = match held {
         CollateralInstrument::Bond(bond) => {
             let schedule = bond.raw_cashflow_schedule(context, as_of)?;
-            let opening = bond.notional.amount() + past_principal_delta(&schedule, as_of, false);
+            let opening = bond.notional.amount() + past_principal_delta(&schedule, as_of, false)?;
             (
                 CollateralKind::Bond,
                 schedule,
@@ -1113,7 +1113,7 @@ fn build_schedule(
         }
         CollateralInstrument::TermLoan(loan) => {
             let schedule = loan.raw_cashflow_schedule(context, as_of)?;
-            let opening = past_principal_delta(&schedule, as_of, true);
+            let opening = past_principal_delta(&schedule, as_of, true)?;
             (
                 CollateralKind::TermLoan,
                 schedule,
@@ -1135,7 +1135,7 @@ fn build_schedule(
         }
     };
 
-    let periods = bucket_flows(&schedule, as_of, period_dates);
+    let periods = bucket_flows(&schedule, as_of, period_dates)?;
 
     // Exercise terms.
     let (calls, puts): (Vec<ExerciseWindow>, Vec<ExerciseWindow>) = match held {
@@ -1361,13 +1361,30 @@ fn utilization_terms(
     })
 }
 
+/// Capitalized amount of a PIK row: its explicit principal delta, never its
+/// cash amount (record CORE-CONVENTIONS-015 #1, #4).
+fn pik_delta(cf: &finstack_quant_core::cashflow::CashFlow) -> Result<f64> {
+    cf.principal_delta
+        .map(|delta| delta.amount())
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "PIK row on {} has no principal_delta",
+                cf.date
+            ))
+        })
+}
+
 /// Net principal change implied by flows dated on or before `as_of`.
 ///
 /// Principal kinds carry lender-perspective signs: draws and initial funding
 /// are negative (balance up), repayments positive (balance down); PIK
 /// capitalization raises the balance. `include_funding` replays the initial
 /// funding flow (term loans); bonds start from their notional instead.
-fn past_principal_delta(schedule: &CashFlowSchedule, as_of: Date, include_funding: bool) -> f64 {
+fn past_principal_delta(
+    schedule: &CashFlowSchedule,
+    as_of: Date,
+    include_funding: bool,
+) -> Result<f64> {
     let mut delta = 0.0;
     for cf in schedule.get_flows() {
         if cf.date > as_of {
@@ -1385,11 +1402,11 @@ fn past_principal_delta(schedule: &CashFlowSchedule, as_of: Date, include_fundin
                 }
                 delta -= amount;
             }
-            CFKind::Pik => delta += amount,
+            CFKind::Pik => delta += pik_delta(cf)?,
             _ => {}
         }
     }
-    delta
+    Ok(delta)
 }
 
 /// Balance a rate-based flow accrued on: `amount / (rate × accrual)`.
@@ -1408,7 +1425,7 @@ fn bucket_flows(
     schedule: &CashFlowSchedule,
     as_of: Date,
     period_dates: &[Date],
-) -> Vec<PeriodBucket> {
+) -> Result<Vec<PeriodBucket>> {
     let mut periods: Vec<PeriodBucket> = (0..period_dates.len())
         .map(|_| PeriodBucket::default())
         .collect();
@@ -1480,11 +1497,11 @@ fn bucket_flows(
                     bucket.repayment += amount;
                 }
             }
-            CFKind::Pik => bucket.pik += amount,
+            CFKind::Pik => bucket.pik += pik_delta(cf)?,
             _ => {}
         }
     }
-    periods
+    Ok(periods)
 }
 
 fn fixed_coupon_of(spec: &CashflowSpec) -> Result<Option<f64>> {

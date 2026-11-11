@@ -962,14 +962,20 @@ impl<'a> SimulationState<'a> {
             // classified as DefaultedNotional (negative = loss to holder).
             for (date, amount) in &res.writedown_flows {
                 if amount.amount() > 0.0 {
-                    res.detailed_flows.push(CashFlow::new(
-                        *date,
-                        None,
-                        amount.checked_neg(),
-                        CFKind::DefaultedNotional,
-                        0.0,
-                        None,
-                    ));
+                    res.detailed_flows.push(
+                        CashFlow::new(
+                            *date,
+                            None,
+                            amount.checked_neg(),
+                            CFKind::DefaultedNotional,
+                            0.0,
+                            None,
+                        )
+                        // The write-down is an explicit balance decrease on its event
+                        // date (record CORE-CONVENTIONS-015 #4, #6).
+                        .with_principal_delta(amount.checked_neg())
+                        .with_principal_date(*date),
+                    );
                 }
             }
             for (draw_tranche_id, date, amount) in &diagnostics.tranche_draws {

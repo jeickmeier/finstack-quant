@@ -472,6 +472,10 @@
           "coupon_period": ["2025-01-15", "2025-07-15"],
           "end_is_termination_date": false
         },
+        "principal_delta": {
+          "amount": "20000",
+          "currency": "USD"
+        },
         "principal_date": "2025-07-15"
       },
       {
@@ -491,6 +495,10 @@
           "calendar_id": "weekends_only",
           "coupon_period": ["2025-07-15", "2026-01-15"],
           "end_is_termination_date": false
+        },
+        "principal_delta": {
+          "amount": "20400",
+          "currency": "USD"
         },
         "principal_date": "2026-01-15"
       },
@@ -531,6 +539,10 @@
           "coupon_period": ["2026-01-15", "2026-07-15"],
           "end_is_termination_date": false
         },
+        "principal_delta": {
+          "amount": "20808",
+          "currency": "USD"
+        },
         "principal_date": "2026-07-15"
       },
       {
@@ -569,6 +581,10 @@
           "calendar_id": "weekends_only",
           "coupon_period": ["2026-07-15", "2027-01-15"],
           "end_is_termination_date": true
+        },
+        "principal_delta": {
+          "amount": "21224.16",
+          "currency": "USD"
         },
         "principal_date": "2027-01-15"
       },
@@ -630,6 +646,10 @@
           "coupon_period": ["2025-01-15", "2025-07-15"],
           "end_is_termination_date": false
         },
+        "principal_delta": {
+          "amount": "30000",
+          "currency": "USD"
+        },
         "principal_date": "2025-07-15"
       },
       {
@@ -649,6 +669,10 @@
           "calendar_id": "weekends_only",
           "coupon_period": ["2025-07-15", "2026-01-15"],
           "end_is_termination_date": false
+        },
+        "principal_delta": {
+          "amount": "30900",
+          "currency": "USD"
         },
         "principal_date": "2026-01-15"
       },

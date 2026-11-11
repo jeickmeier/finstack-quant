@@ -120,7 +120,8 @@ impl InstrumentCashflowEnvelope {
     /// The ladders follow the first appearance of each currency in `flows`, and
     /// each one reads [`CashflowRow::native_pv`], the row-currency PV before FX
     /// conversion and any scenario price shock, because a ladder's PVs are in the
-    /// units of its amounts.
+    /// units of its amounts. Ladders count cash only: PIK capitalization and
+    /// defaulted-notional write-down rows contribute to no column.
     ///
     /// # Errors
     ///

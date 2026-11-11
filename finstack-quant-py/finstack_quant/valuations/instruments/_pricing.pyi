@@ -1495,7 +1495,9 @@ class InstrumentCashflowEnvelope:
 
         Currencies never mix. Ladders follow the first appearance of each
         currency in ``flows``, and each reads ``native_pv``, the row-currency PV
-        before FX conversion and any scenario price shock.
+        before FX conversion and any scenario price shock. Ladders count cash
+        only: PIK capitalization and defaulted-notional write-down rows are
+        excluded from every column.
 
         Returns
         -------

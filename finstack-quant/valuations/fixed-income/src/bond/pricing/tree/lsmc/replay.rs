@@ -1158,7 +1158,20 @@ impl ReplayTemplate {
                         coupon_period: accrual.coupon_period,
                         end_is_termination_date: Some(accrual.end_is_termination_date),
                     },
-                    amount: flow.amount.amount(),
+                    // A PIK claim is its explicit capitalization, not its cash
+                    // amount (record CORE-CONVENTIONS-015 #1, #4).
+                    amount: if flow.kind == CFKind::Pik {
+                        flow.principal_delta
+                            .ok_or_else(|| {
+                                finstack_quant_core::Error::Validation(format!(
+                                    "PIK row on {} has no principal_delta",
+                                    flow.date
+                                ))
+                            })?
+                            .amount()
+                    } else {
+                        flow.amount.amount()
+                    },
                     pik: flow.kind == CFKind::Pik,
                 });
             }
