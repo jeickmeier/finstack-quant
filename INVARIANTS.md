@@ -2191,6 +2191,22 @@ and existing hosts, with correlated driver and exercise policy choices
 owned by their respective records.
 [Clause map M295–M298](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
 
+### 1.75 Checked issuer-call policy training and pricing
+
+**Detailed decision:** [MODELS-ANALYTIC-26](docs/decisions/financial/models-analytic/hw1f-issuer-lsmc.md#accepted-decision-for-checked-issuer-call-policy-training-and-pricing) was accepted on 2026-11-10.
+
+Use exact ordered decisions, owner-supplied eligibility and actual
+dated branch cash. Minimize holder value in decision-time units,
+retain common cash once and continue at equality.
+
+Fit checked full-rank continuation on eligible decision-time
+training state. Fail sparse live fits. Freeze the backward-trained
+policy and price it forward on independent groups, keeping antithetic
+partners together. Report the fixed policy's value, sampling
+uncertainty and actual work. Reconcile callable range accrual, risk
+and existing host routes.
+[Clause map M299–M302](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
 ## 2. Determinism and floating point
 
 **Authority:** [ADR 0021](docs/decisions/standards/0021-reproducibility-guarantees.md)
