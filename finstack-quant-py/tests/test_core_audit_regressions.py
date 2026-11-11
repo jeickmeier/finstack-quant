@@ -106,7 +106,9 @@ def test_schedule_builder_cds_imm_later_frequency_wins_and_to_spec_matches_build
 
 @pytest.mark.parametrize("mode", ["cds_imm", "imm"])
 def test_schedule_builder_imm_modes_report_quarterly_short_back(mode: str) -> None:
-    builder = getattr(Schedule.builder("2025-01-15", "2026-01-15").frequency("1M"), mode)()
+    # A standard IMM grid is anchored on an IMM start (record CORE-CONVENTIONS-008 #6).
+    start = "2025-03-19" if mode == "imm" else "2025-01-15"
+    builder = getattr(Schedule.builder(start, "2026-01-15").frequency("1M"), mode)()
     spec = builder.to_spec()
     assert spec["frequency"] == {"count": 3, "unit": "months"}
     assert spec["stub"] == "short_back"

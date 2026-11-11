@@ -154,7 +154,8 @@ test('cashflows CDS roll conserves interest across an unchanged payment election
 
 test('cashflows IMM coupons cover the contractual off-roll maturity', () => {
   const spec = JSON.parse(cashflowSpec);
-  spec.issue_date = '2025-01-15';
+  // A back-stub IMM leg starts on the IMM lattice (record CORE-CONVENTIONS-008 #6).
+  spec.issue_date = '2025-03-19';
   spec.maturity = '2025-12-31';
   Object.assign(spec.coupon_program[0].spec, {
     rate: '0.05',
@@ -168,7 +169,7 @@ test('cashflows IMM coupons cover the contractual off-roll maturity', () => {
   const coupons = schedule.flows.filter((flow) => flow.kind === 'fixed' || flow.kind === 'stub');
   assert.equal(coupons.at(-1).accrual.end, spec.maturity);
   const total = coupons.reduce((amount, flow) => amount + Number(flow.amount.amount), 0);
-  assert.ok(Math.abs(total - (1000000 * 0.05 * 350) / 360) < 1e-8);
+  assert.ok(Math.abs(total - (1000000 * 0.05 * 287) / 360) < 1e-8);
 });
 
 test('cashflows conserves exact decimal custom repayments through the JSON bridge', () => {

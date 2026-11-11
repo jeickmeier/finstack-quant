@@ -463,11 +463,13 @@ class ScheduleBuilder:
         Parameters
         ----------
         eom : bool
-            Whether to enable end-of-month rolling. Requires a month/year tenor
-            and a regular schedule rule; ``build`` raises ``ValueError`` for
-            day/week tenors or IMM/CDS modes. With ``StubKind.NONE``, maturity
-            must lie on the generated month-end roll grid; otherwise an
-            explicit stub rule is required.
+            Whether to use the calendar month-end grid. Requires a month/year
+            tenor and a regular schedule rule, and the regular anchor (``start``
+            for no-stub and back-stub rules, ``end`` for front-stub rules) must
+            itself be a month-end; ``build`` raises ``ValueError`` otherwise,
+            and for day/week tenors or IMM/CDS modes. Only the declared stub
+            side may be off the grid; with ``StubKind.NONE`` both endpoints
+            must be on it.
 
         Returns
         -------
@@ -517,11 +519,10 @@ class ScheduleBuilder:
         IMM mode on and CDS IMM mode off. A later ``frequency`` or ``stub_rule``
         call wins. ``build()`` keeps ``start`` and ``end`` as the first and last
         dates and lays the regular periods on IMM dates at the frequency, which
-        must be a whole number of quarters: forward from the first IMM date on
-        or after ``start`` for back-stub rules, backward from the last IMM date
-        on or before ``end`` for front-stub rules. With no IMM date strictly
-        between ``start`` and ``end`` the schedule is the single period
-        ``[start, end]``.
+        must be a whole number of quarters: forward from ``start`` for
+        back-stub rules, backward from ``end`` for front-stub rules. That
+        regular anchor must itself be an IMM date; no replacement anchor is
+        searched and only the declared stub side may be off-cycle.
 
         Returns
         -------
@@ -532,15 +533,15 @@ class ScheduleBuilder:
         -----
         This method does not raise; it returns the same instance for chaining.
         ``build()`` raises ``ValueError`` when the frequency is not a whole
-        number of quarters, or when the stub rule is ``none`` and ``start`` or
-        ``end`` is not an IMM date.
+        number of quarters, when the regular anchor is not an IMM date, or when
+        the stub rule is ``none`` and ``start`` or ``end`` is not an IMM date.
 
         Examples
         --------
         >>> from finstack_quant.core.dates import Schedule
-        >>> dates = Schedule.builder("2025-01-15", "2025-12-31").imm().build().dates
+        >>> dates = Schedule.builder("2025-03-19", "2025-12-31").imm().build().dates
         >>> [d.isoformat() for d in dates]
-        ['2025-01-15', '2025-03-19', '2025-06-18', '2025-09-17', '2025-12-17', '2025-12-31']
+        ['2025-03-19', '2025-06-18', '2025-09-17', '2025-12-17', '2025-12-31']
         """
         ...
 

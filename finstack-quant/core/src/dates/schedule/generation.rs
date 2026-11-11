@@ -1,21 +1,32 @@
 //! Schedule anchor generation.
 
 use super::*;
-use crate::dates::imm::{imm_on_or_after, imm_on_or_before, is_imm_date};
+use crate::dates::imm::is_imm_date;
 
 pub(super) type Buffer = SmallVec<[Date; 32]>;
 
-pub(super) const MAX_SCHEDULE_ANCHORS: usize = 100_000;
+/// Most final grid dates a schedule may hold, both endpoints included
+/// (record CORE-CONVENTIONS-008 #11). A resource limit, not a financial rule.
+pub(super) const MAX_SCHEDULE_DATES: usize = 100_000;
 
 fn schedule_too_large_error() -> crate::Error {
     crate::Error::Validation(format!(
-        "schedule generation exceeded {MAX_SCHEDULE_ANCHORS} anchors; \
-         check date range and tenor frequency"
+        "schedule exceeds {MAX_SCHEDULE_DATES} grid dates; check date range and tenor frequency"
     ))
 }
 
-fn check_anchor_count(len: usize) -> crate::Result<()> {
-    if len > MAX_SCHEDULE_ANCHORS {
+/// Bound a working buffer during generation. A long stub may hold one
+/// boundary it later merges away, which must not consume final capacity.
+fn check_working_count(len: usize) -> crate::Result<()> {
+    if len > MAX_SCHEDULE_DATES + 1 {
+        return Err(schedule_too_large_error());
+    }
+    Ok(())
+}
+
+/// Enforce the ceiling on the final grid.
+pub(super) fn check_final_count(len: usize) -> crate::Result<()> {
+    if len > MAX_SCHEDULE_DATES {
         return Err(schedule_too_large_error());
     }
     Ok(())
@@ -81,13 +92,81 @@ impl BuilderInternal {
         if self.start >= self.end {
             return Err(crate::InputError::InvalidDateRange.into());
         }
-        match self.stub {
+        self.check_grid_anchor()?;
+        let dates = match self.stub {
             StubKind::ShortFront => self.gen_short_front(),
             StubKind::LongFront => self.gen_long_front(),
             StubKind::LongBack => self.gen_long_back(),
             StubKind::None => self.gen_forward(true),
             StubKind::ShortBack => self.gen_forward(false),
+        }?;
+        check_final_count(dates.len())?;
+        Ok(dates)
+    }
+
+    /// Whether the stub policy generates backward from `end`.
+    fn is_front_stub(self) -> bool {
+        matches!(self.stub, StubKind::ShortFront | StubKind::LongFront)
+    }
+
+    /// Require the regular anchor side to lie on the selected grid
+    /// (record CORE-CONVENTIONS-008 #5-#6): `start` for no-stub and back-stub
+    /// policies, `end` for front-stub policies, and both for `None`. Only the
+    /// declared stub side may be off-grid; no replacement anchor is searched.
+    fn check_grid_anchor(self) -> crate::Result<()> {
+        let (name, on_grid): (&str, fn(Date) -> bool) = match self.roll {
+            RollDay::Natural => return Ok(()),
+            RollDay::EndOfMonth => {
+                if !matches!(
+                    self.frequency.unit(),
+                    crate::dates::TenorUnit::Months | crate::dates::TenorUnit::Years
+                ) {
+                    return Err(crate::Error::Validation(
+                        "an end-of-month grid requires a month or year frequency".to_string(),
+                    ));
+                }
+                ("calendar month-end", |date: Date| {
+                    date == date.end_of_month()
+                })
+            }
+            RollDay::ThirdWednesday => {
+                let whole_quarters = match self.frequency.unit() {
+                    crate::dates::TenorUnit::Months => self.frequency.count().is_multiple_of(3),
+                    crate::dates::TenorUnit::Years => true,
+                    crate::dates::TenorUnit::Weeks | crate::dates::TenorUnit::Days => false,
+                };
+                if !whole_quarters {
+                    return Err(crate::InputError::InvalidTenor {
+                        tenor: self.frequency.to_string(),
+                        reason: "IMM schedules roll on the quarterly IMM cycle, so the \
+                                 frequency must be a whole number of quarters"
+                            .to_string(),
+                    }
+                    .into());
+                }
+                (
+                    "quarterly IMM (third Wednesday of Mar/Jun/Sep/Dec)",
+                    is_imm_date,
+                )
+            }
+        };
+        let mut anchors = Vec::with_capacity(2);
+        if self.stub == StubKind::None || !self.is_front_stub() {
+            anchors.push(("start", self.start));
         }
+        if self.stub == StubKind::None || self.is_front_stub() {
+            anchors.push(("end", self.end));
+        }
+        for (side, date) in anchors {
+            if !on_grid(date) {
+                return Err(crate::Error::Validation(format!(
+                    "schedule {side} {date} is not a {name} date; with stub {} the {side} \
+                     anchors the regular grid",
+                    self.stub
+                )));
+            }
+        }
+        Ok(())
     }
 
     /// The `n`-th roll date from a fixed `anchor` (`n` may be negative for
@@ -143,7 +222,9 @@ impl BuilderInternal {
         };
         match tenor.unit() {
             crate::dates::TenorUnit::Months => add_months(checked_mul_i32(n, count_i32)?),
-            crate::dates::TenorUnit::Years => add_months(checked_mul_i32(n, count_i32 * 12)?),
+            crate::dates::TenorUnit::Years => {
+                add_months(checked_mul_i32(n, checked_mul_i32(count_i32, 12)?)?)
+            }
             crate::dates::TenorUnit::Weeks => add_days(checked_mul_i64(
                 checked_mul_i64(i64::from(n), i64::from(tenor.count()))?,
                 7,
@@ -166,78 +247,6 @@ impl BuilderInternal {
             .transpose()
     }
 
-    /// Standard IMM schedule: a regular grid on the quarterly IMM cycle
-    /// (third Wednesday of Mar/Jun/Sep/Dec) at `frequency`, between the
-    /// contractual `start` and `end`, which are always kept.
-    ///
-    /// This is the IMM roll convention (FpML `RollConventionEnum` `IMM`)
-    /// applied to an ordinary schedule:
-    ///
-    /// - `frequency` must be a whole number of quarters (3M, 6M, 1Y, ...).
-    /// - Back-stub kinds (`ShortBack`, `LongBack`, `None`) anchor the grid on
-    ///   the first IMM date on or after `start` and generate forward, so an
-    ///   off-cycle `end` closes a final stub. Front-stub kinds (`ShortFront`,
-    ///   `LongFront`) anchor on the last IMM date on or before `end` and
-    ///   generate backward, so an off-cycle `start` opens an initial stub.
-    /// - An off-cycle endpoint on the anchor side becomes a short stub to the
-    ///   nearest IMM date, because the regular periods must start and end on
-    ///   IMM dates. With quarterly frequency every IMM date inside the range
-    ///   is a roll date, so both directions give the same dates.
-    /// - A range with no IMM date strictly inside it is a single period.
-    /// - `StubKind::None` requires `start` and `end` on IMM dates and a whole
-    ///   number of periods between them.
-    pub(super) fn generate_imm(self) -> crate::Result<Vec<Date>> {
-        if self.start >= self.end {
-            return Err(crate::InputError::InvalidDateRange.into());
-        }
-        let whole_quarters = match self.frequency.unit() {
-            crate::dates::TenorUnit::Months => self.frequency.count().is_multiple_of(3),
-            crate::dates::TenorUnit::Years => true,
-            crate::dates::TenorUnit::Weeks | crate::dates::TenorUnit::Days => false,
-        };
-        if !whole_quarters {
-            return Err(crate::InputError::InvalidTenor {
-                tenor: self.frequency.to_string(),
-                reason: "IMM schedules roll on the quarterly IMM cycle, so the frequency \
-                         must be a whole number of quarters"
-                    .to_string(),
-            }
-            .into());
-        }
-        if self.stub == StubKind::None && !(is_imm_date(self.start) && is_imm_date(self.end)) {
-            return Err(crate::Error::Validation(format!(
-                "an IMM schedule without stubs needs start ({}) and end ({}) on IMM dates",
-                self.start, self.end
-            )));
-        }
-        let grid = |start: Date, end: Date| BuilderInternal { start, end, ..self }.generate();
-        if matches!(self.stub, StubKind::ShortFront | StubKind::LongFront) {
-            let Some(last_roll) = imm_on_or_before(self.end)
-                .ok()
-                .filter(|&roll| roll > self.start)
-            else {
-                return Ok(vec![self.start, self.end]);
-            };
-            let mut dates = grid(self.start, last_roll)?;
-            if self.end > last_roll {
-                dates.push(self.end);
-            }
-            Ok(dates)
-        } else {
-            let Some(first_roll) = imm_on_or_after(self.start)
-                .ok()
-                .filter(|&roll| roll < self.end)
-            else {
-                return Ok(vec![self.start, self.end]);
-            };
-            let mut dates = grid(first_roll, self.end)?;
-            if self.start < first_roll {
-                dates.insert(0, self.start);
-            }
-            Ok(dates)
-        }
-    }
-
     /// Forward roll grid from `start`, closed by `end`; with `aligned`
     /// (`StubKind::None`), a grid that overshoots or runs out before `end` is
     /// an error. Alignment is against the actual roll grid, including EOM; a
@@ -254,12 +263,12 @@ impl BuilderInternal {
                         return Err(crate::InputError::NonIntegerScheduleTenor.into());
                     }
                     push_if_new(&mut buf, self.end);
-                    check_anchor_count(buf.len())?;
+                    check_working_count(buf.len())?;
                     break;
                 }
             };
             push_if_new(&mut buf, dt);
-            check_anchor_count(buf.len())?;
+            check_working_count(buf.len())?;
             i = next_roll_index(i)?;
         }
         Ok(buf.into_vec())
@@ -275,13 +284,13 @@ impl BuilderInternal {
                 Some(dt) if dt > self.start => dt,
                 _ => {
                     push_if_new(&mut buf, self.start);
-                    check_anchor_count(buf.len())?;
+                    check_working_count(buf.len())?;
                     break;
                 }
             };
             if dt < self.end {
                 push_if_new(&mut buf, dt);
-                check_anchor_count(buf.len())?;
+                check_working_count(buf.len())?;
             }
             i = next_roll_index(i)?;
         }
@@ -302,7 +311,7 @@ impl BuilderInternal {
                 break dt == self.start;
             }
             anchors.push(dt);
-            check_anchor_count(anchors.len())?;
+            check_working_count(anchors.len())?;
             i = next_roll_index(i)?;
         };
         // Long front stub: merge the residual short stub with the first
@@ -330,24 +339,24 @@ impl BuilderInternal {
         loop {
             let Some(next) = self.rolled(anchor, i)? else {
                 push_if_new(&mut buf, self.end);
-                check_anchor_count(buf.len())?;
+                check_working_count(buf.len())?;
                 break;
             };
             // An aligned contractual end needs no successor for comparison.
             if next >= self.end {
                 push_if_new(&mut buf, self.end);
-                check_anchor_count(buf.len())?;
+                check_working_count(buf.len())?;
                 break;
             }
             let next_after = self.rolled(anchor, next_roll_index(i)?)?;
             if next_after.is_none_or(|date| date > self.end) {
                 push_if_new(&mut buf, self.end);
-                check_anchor_count(buf.len())?;
+                check_working_count(buf.len())?;
                 break;
             }
             if next < self.end {
                 push_if_new(&mut buf, next);
-                check_anchor_count(buf.len())?;
+                check_working_count(buf.len())?;
             }
             i = next_roll_index(i)?;
         }

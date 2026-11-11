@@ -13,7 +13,7 @@ use super::*;
 /// - **Frequency**: Monthly, quarterly, annual, or day-based intervals
 /// - **Stub handling**: Short/long stubs at front or back
 /// - **Business day adjustment**: Following, Modified Following, Preceding
-/// - **End-of-month**: Snap to last day of month for month-based frequencies
+/// - **End-of-month**: Calendar month-end grid from a month-end anchor
 /// - **IMM mode**: Standard IMM quarterly schedule (third Wednesday of Mar/Jun/Sep/Dec)
 /// - **CDS IMM mode**: CDS quarterly schedule (20th of Mar/Jun/Sep/Dec)
 ///
@@ -73,15 +73,15 @@ use super::*;
 /// use finstack_quant_core::dates::Schedule;
 /// use time::{Date, Month};
 ///
-/// let start = Date::from_calendar_date(2025, Month::January, 15)?;
+/// let start = Date::from_calendar_date(2025, Month::March, 19)?; // an IMM date
 /// let end = Date::from_calendar_date(2025, Month::December, 31)?;
 ///
 /// let schedule = Schedule::builder(start, end)?
 ///     .imm()  // Quarterly rolls on the third Wednesday of Mar/Jun/Sep/Dec
 ///     .build()?;
-/// // Jan-15, then Mar-19, Jun-18, Sep-17, Dec-17, then Dec-31: the
-/// // contractual start and end bound a short initial and final stub.
-/// assert_eq!(schedule.dates.len(), 6);
+/// // Mar-19, Jun-18, Sep-17, Dec-17, then the declared short final stub to
+/// // Dec-31.
+/// assert_eq!(schedule.dates.len(), 5);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
@@ -182,14 +182,15 @@ impl ScheduleBuilder {
         self
     }
 
-    /// Enable End-of-Month (EOM) convention.
+    /// Enable the End-of-Month (EOM) grid.
     ///
-    /// When enabled, computed intermediate roll dates are snapped to the
-    /// last day of their month. The user-provided start and end dates are
-    /// contractual and are never snapped.
-    /// With [`StubKind::None`], maturity must lie on the resulting EOM roll
-    /// grid. Use an explicit stub rule for a maturity between roll dates.
-    /// EOM requires a month/year tenor and cannot be combined with IMM or CDS IMM.
+    /// Regular rolls are the last calendar day of each target month, computed
+    /// from the regular anchor: `start` for no-stub and back-stub rules,
+    /// `end` for front-stub rules. That anchor must itself be a calendar
+    /// month-end, or [`build`](Self::build) errors; it is never snapped. Only
+    /// the declared stub side may be off the grid, and with
+    /// [`StubKind::None`] both endpoints must be on it. EOM requires a
+    /// month/year tenor and cannot be combined with IMM or CDS IMM.
     ///
     /// # Arguments
     ///
@@ -233,14 +234,15 @@ impl ScheduleBuilder {
     ///
     /// - keeps the contractual `start` and `end` as the first and last dates;
     /// - lays the regular periods on the IMM cycle at `frequency`, which must
-    ///   be a whole number of quarters (3M, 6M, 1Y, ...);
-    /// - generates forward from the first IMM date on or after `start` for
-    ///   back-stub rules, or backward from the last IMM date on or before `end`
-    ///   for front-stub rules. An off-cycle `start` or `end` becomes a stub
-    ///   period, so a schedule can have both an initial and a final stub;
-    /// - returns the single period `[start, end]` when no IMM date lies
-    ///   strictly between them;
-    /// - with [`StubKind::None`], requires `start` and `end` on IMM dates.
+    ///   be a whole number of quarters (3M, 6M, 1Y, ...), snapping each roll to
+    ///   the third Wednesday of its month;
+    /// - generates forward from `start` for back-stub rules, or backward from
+    ///   `end` for front-stub rules. That regular anchor must itself be an IMM
+    ///   date, or the build errors; no replacement anchor is searched and the
+    ///   opposite endpoint is never turned into an extra stub. Only the
+    ///   declared stub side may be off-cycle;
+    /// - with [`StubKind::None`], requires `start` and `end` on IMM dates and
+    ///   a whole number of periods between them.
     ///
     /// Unlike [`cds_imm()`](Self::cds_imm), which uses the 20th of quarterly
     /// months and accrues from the roll date before `start`, standard IMM
@@ -252,7 +254,7 @@ impl ScheduleBuilder {
     /// use time::{Date, Month};
     ///
     /// let date = |y, m, d| Date::from_calendar_date(y, m, d);
-    /// let start = date(2025, Month::January, 15)?;
+    /// let start = date(2025, Month::March, 19)?; // an IMM date
     /// let end = date(2025, Month::December, 31)?;
     ///
     /// let quarterly = Schedule::builder(start, end)?.imm().build()?;
@@ -260,7 +262,6 @@ impl ScheduleBuilder {
     ///     quarterly.dates,
     ///     vec![
     ///         start,
-    ///         date(2025, Month::March, 19)?,
     ///         date(2025, Month::June, 18)?,
     ///         date(2025, Month::September, 17)?,
     ///         date(2025, Month::December, 17)?,
@@ -268,15 +269,17 @@ impl ScheduleBuilder {
     ///     ]
     /// );
     ///
-    /// // A semi-annual leg generated backward from the last IMM date.
-    /// let semi_annual = Schedule::builder(start, end)?
+    /// // A semi-annual leg generated backward from an on-cycle maturity.
+    /// let front = date(2025, Month::January, 15)?;
+    /// let maturity = date(2026, Month::March, 18)?; // an IMM date
+    /// let semi_annual = Schedule::builder(front, maturity)?
     ///     .imm()
     ///     .frequency(Tenor::semi_annual())
     ///     .stub_rule(StubKind::ShortFront)
     ///     .build()?;
     /// assert_eq!(
     ///     semi_annual.dates,
-    ///     vec![start, date(2025, Month::June, 18)?, date(2025, Month::December, 17)?, end]
+    ///     vec![front, date(2025, Month::March, 19)?, date(2025, Month::September, 17)?, maturity]
     /// );
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -427,7 +430,7 @@ impl ScheduleBuilder {
                 stub: self.spec.stub,
                 roll: RollDay::ThirdWednesday,
             }
-            .generate_imm()?
+            .generate()?
         } else if self.spec.cds_imm_mode {
             // CDS IMM: 20th of quarterly months (unadjusted; any business-day
             // adjustment configured on the builder is applied separately below).

@@ -216,13 +216,15 @@ fn schedule_spec_imm_setters_match_builder_semantics() {
     assert_eq!(built, expected);
     assert!(built.len() > 6, "monthly CDS schedule, got {built:?}");
 
-    // Standard IMM: quarterly/ShortBack, same dates as the builder.
-    let spec = ScheduleSpec::new(start, end).unwrap().with_imm();
+    // Standard IMM: quarterly/ShortBack from an on-cycle start, same dates
+    // as the builder.
+    let imm_start = Date::from_calendar_date(2025, Month::March, 19).unwrap();
+    let spec = ScheduleSpec::new(imm_start, end).unwrap().with_imm();
     assert!(spec.imm_mode && !spec.cds_imm_mode);
     assert_eq!(spec.frequency, Tenor::quarterly());
     assert_eq!(
         ScheduleBuilder::from(spec).build().unwrap().dates,
-        Schedule::builder(start, end)
+        Schedule::builder(imm_start, end)
             .unwrap()
             .imm()
             .build()

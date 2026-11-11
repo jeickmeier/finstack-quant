@@ -11,14 +11,14 @@
 //! - **Business day adjustment**: payment dates only (Following, Modified
 //!   Following, Preceding, Modified Preceding, Nearest); accrual dates stay
 //!   on the unadjusted roll grid
-//! - **End-of-month**: Snap intermediate roll dates to month-end for
-//!   month-based frequencies (user-provided start/end are never snapped)
-//! - **IMM mode**: Standard IMM quarterly schedules (third Wednesday of Mar/Jun/Sep/Dec)
+//! - **End-of-month**: a calendar month-end grid for month/year frequencies,
+//!   anchored on a month-end regular endpoint (an off-grid anchor is an error)
+//! - **IMM mode**: a quarterly IMM grid (third Wednesday of Mar/Jun/Sep/Dec),
+//!   anchored on an IMM regular endpoint (an off-grid anchor is an error)
 //! - **CDS IMM mode**: Credit default swap quarterly schedules (20th of Mar/Jun/Sep/Dec)
 //! - **Payment / fixing lag**: optional business-day offsets from each period end
 //!   (payments) or period start (fixings)
 //! - **Deterministic**: Same inputs always produce identical outputs
-//! - **Deduplication**: Automatically removes duplicate dates from EOM/stub handling
 //!
 //! # Quick Example
 //!
@@ -62,16 +62,17 @@
 //! use finstack_quant_core::dates::Schedule;
 //! use time::{Date, Month};
 //!
-//! let start = Date::from_calendar_date(2025, Month::January, 15)?;
+//! let start = Date::from_calendar_date(2025, Month::March, 19)?; // an IMM date
 //! let end = Date::from_calendar_date(2025, Month::December, 31)?;
 //!
 //! let sched = Schedule::builder(start, end)?
-//!     .imm()  // Regular periods on IMM dates; start and end are kept
+//!     .imm()  // Regular periods on IMM dates from the on-cycle start
 //!     .build()?;
 //!
 //! let dates: Vec<_> = sched.into_iter().collect();
-//! // Jan-15, Mar-19, Jun-18, Sep-17, Dec-17 (2025 third Wednesdays), Dec-31
-//! assert_eq!(dates.len(), 6);
+//! // Mar-19, Jun-18, Sep-17, Dec-17 (2025 third Wednesdays), then the
+//! // declared short final stub to Dec-31
+//! assert_eq!(dates.len(), 5);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!

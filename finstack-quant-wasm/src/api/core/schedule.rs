@@ -306,12 +306,13 @@ impl JsScheduleBuilder {
     ///
     /// # Arguments
     ///
-    /// * `eom` - `true` keeps period ends on the last day of the month when
-    ///   the anchor date is a month end.
+    /// * `eom` - `true` selects the calendar month-end grid; the regular anchor
+    ///   (`start` for no-stub and back-stub rules, `end` for front-stub rules)
+    ///   must be a month end, or `build` throws.
     ///
     /// @returns This builder, updated in place.
     /// @throws `TypeError` if `eom` is not a boolean.
-    /// @param eom - `true` keeps period ends on the last day of the month when the anchor date is a month end.
+    /// @param eom - `true` selects the calendar month-end grid; the regular anchor must be a month end, or `build` throws.
     #[wasm_bindgen(js_name = endOfMonth)]
     pub fn end_of_month(
         &mut self,
@@ -341,10 +342,10 @@ impl JsScheduleBuilder {
     /// `frequency` or `stubRule` call wins. `build()` keeps `start` and `end`
     /// as the first and last dates and lays the regular periods on IMM dates
     /// at the frequency, which must be a whole number of quarters: forward
-    /// from the first IMM date on or after `start` for back-stub rules,
-    /// backward from the last IMM date on or before `end` for front-stub
-    /// rules. With no IMM date strictly between `start` and `end` the schedule
-    /// is the single period `[start, end]`.
+    /// from `start` for back-stub rules, backward from `end` for front-stub
+    /// rules. That regular anchor must itself be an IMM date, or `build`
+    /// throws; no replacement anchor is searched and only the declared stub
+    /// side may be off-cycle.
     ///
     /// @returns This builder, with standard IMM mode on and CDS IMM mode off.
     #[wasm_bindgen(js_name = imm)]

@@ -30,7 +30,8 @@ def test_default_frequency_is_monthly() -> None:
 def test_eom_regular_schedule_uses_the_month_end_roll_grid() -> None:
     schedule = Schedule.builder(date(2025, 2, 28), date(2025, 8, 31)).frequency("3M").end_of_month(True).build()
     assert schedule.dates == [date(2025, 2, 28), date(2025, 5, 31), date(2025, 8, 31)]
-    with pytest.raises(ValueError, match="requires the tenor to divide evenly"):
+    # Without a stub both endpoints must be on the month-end grid.
+    with pytest.raises(ValueError, match="month-end"):
         Schedule.builder(date(2025, 2, 28), date(2025, 8, 28)).frequency("3M").end_of_month(True).build()
 
 
@@ -77,7 +78,7 @@ def test_aligned_long_stubs_preserve_boundary_anchors(stub: str, expected: list[
 
 
 def test_imm_modes_use_last_call_wins() -> None:
-    start = date(2025, 1, 15)
+    start = date(2025, 3, 19)  # on the IMM lattice
     end = date(2025, 9, 30)
 
     cds_builder = Schedule.builder(start, end)

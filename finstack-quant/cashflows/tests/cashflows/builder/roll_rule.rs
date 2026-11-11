@@ -105,8 +105,13 @@ fn cds_imm_roll_rule_start_on_roll_date_has_no_front_accrual() {
 
 #[test]
 fn imm_roll_rule_pins_third_wednesday_grid() {
-    // 2025 third Wednesdays: Mar-19, Jun-18, Sep-17, Dec-17.
-    let periods = build_periods(roll_params(d(2025, 1, 15), d(2025, 12, 31), RollRule::Imm))
+    // 2025 third Wednesdays: Mar-19, Jun-18, Sep-17, Dec-17. A back-stub IMM
+    // leg is anchored on its on-cycle start (record CORE-CONVENTIONS-008 #6).
+    assert!(
+        build_periods(roll_params(d(2025, 1, 15), d(2025, 12, 31), RollRule::Imm)).is_err(),
+        "an off-cycle start cannot anchor the IMM grid"
+    );
+    let periods = build_periods(roll_params(d(2025, 3, 19), d(2025, 12, 31), RollRule::Imm))
         .expect("IMM schedule builds");
 
     let starts: Vec<Date> = periods.iter().map(|p| p.accrual_start).collect();
@@ -114,18 +119,16 @@ fn imm_roll_rule_pins_third_wednesday_grid() {
     assert_eq!(
         starts,
         vec![
-            d(2025, 1, 15),
             d(2025, 3, 19),
             d(2025, 6, 18),
             d(2025, 9, 17),
             d(2025, 12, 17)
         ],
-        "IMM grid starts with the contractual start then third Wednesdays"
+        "IMM grid rolls on third Wednesdays from the on-cycle start"
     );
     assert_eq!(
         ends,
         vec![
-            d(2025, 3, 19),
             d(2025, 6, 18),
             d(2025, 9, 17),
             d(2025, 12, 17),
@@ -172,13 +175,16 @@ fn coupon_total(schedule: &CashFlowSchedule) -> f64 {
 
 #[test]
 fn imm_coupons_accrue_through_off_grid_maturity() {
+    // A back-stub IMM leg starts on the IMM lattice; its maturity may be
+    // off-grid (the declared stub side).
     let mut params = ScheduleParams::quarterly_act360();
     params.roll_rule = RollRule::Imm;
+    params.stub = StubKind::ShortBack;
     params.business_day_convention = BusinessDayConvention::Unadjusted;
     for (start, end) in [
-        (d(2025, 1, 15), d(2025, 12, 31)),
-        // A coupon horizon need not contain a futures roll at all.
-        (d(2025, 10, 1), d(2025, 11, 1)),
+        (d(2025, 3, 19), d(2025, 12, 31)),
+        // A coupon horizon need not contain another futures roll at all.
+        (d(2025, 9, 17), d(2025, 11, 1)),
     ] {
         let schedule = fixed_schedule(start, end, params.clone(), None);
         let expected = 1_000_000.0 * 0.05 * (end - start).whole_days() as f64 / 360.0;
@@ -210,16 +216,16 @@ fn imm_coupons_accrue_through_off_grid_maturity() {
 
 #[test]
 fn imm_roll_rule_honours_the_leg_frequency_and_stub() {
-    // A semi-annual leg rolled on IMM dates, generated backward from the last
-    // IMM date before maturity: regular periods run IMM to IMM six months
-    // apart, and only the off-cycle start and maturity open stub periods.
+    // A semi-annual leg rolled on IMM dates, generated backward from its
+    // on-cycle maturity: regular periods run IMM to IMM six months apart and
+    // only the declared front stub opens an irregular period.
     let mut params = ScheduleParams::quarterly_act360();
     params.frequency = Tenor::semi_annual();
     params.stub = StubKind::ShortFront;
     params.roll_rule = RollRule::Imm;
     params.business_day_convention = BusinessDayConvention::Unadjusted;
     let start = d(2025, 1, 15);
-    let end = d(2026, 2, 10);
+    let end = d(2026, 3, 18);
 
     let periods = build_periods(BuildPeriodsParams::from_schedule(&params, start, end, None))
         .expect("semi-annual IMM periods");
@@ -230,9 +236,9 @@ fn imm_roll_rule_honours_the_leg_frequency_and_stub() {
     assert_eq!(
         bounds,
         vec![
-            (start, d(2025, 6, 18)),
-            (d(2025, 6, 18), d(2025, 12, 17)),
-            (d(2025, 12, 17), end),
+            (start, d(2025, 3, 19)),
+            (d(2025, 3, 19), d(2025, 9, 17)),
+            (d(2025, 9, 17), end),
         ]
     );
 
@@ -243,7 +249,7 @@ fn imm_roll_rule_honours_the_leg_frequency_and_stub() {
         .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub))
         .map(|flow| flow.kind)
         .collect();
-    assert_eq!(kinds, vec![CFKind::Stub, CFKind::Fixed, CFKind::Stub]);
+    assert_eq!(kinds, vec![CFKind::Stub, CFKind::Fixed, CFKind::Fixed]);
 }
 
 #[test]

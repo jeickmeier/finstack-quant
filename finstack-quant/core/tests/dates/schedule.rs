@@ -534,7 +534,12 @@ fn monthly_stubs_preserve_contractual_boundary_endpoints_with_eom() {
     let minimum = time::Date::MIN;
     for eom in [false, true] {
         for stub in [StubKind::ShortBack, StubKind::LongBack] {
-            let start = make_date(maximum.year(), 12, 1);
+            // An EOM back-stub grid is anchored on a month-end start.
+            let start = if eom {
+                make_date(maximum.year(), 11, 30)
+            } else {
+                make_date(maximum.year(), 12, 1)
+            };
             let schedule = Schedule::builder(start, maximum)
                 .unwrap()
                 .frequency(Tenor::monthly())
@@ -608,9 +613,9 @@ fn boundary_rolls_keep_noninteger_and_invalid_tenor_errors() {
 
 #[test]
 fn test_end_of_month_convention() {
-    // EOM snaps INTERMEDIATE roll dates to month-end; the user-provided
-    // start and end dates are contractual and emitted verbatim.
-    let start = make_date(2025, 1, 15);
+    // EOM rolls from a month-end anchor to each later month-end; the declared
+    // back-stub end is contractual and emitted verbatim.
+    let start = make_date(2025, 1, 31);
     let end = make_date(2025, 4, 15);
 
     let dates: Vec<_> = Schedule::builder(start, end)
@@ -624,10 +629,41 @@ fn test_end_of_month_convention() {
         .collect();
 
     assert_eq!(dates.len(), 4);
-    assert_eq!(dates[0], make_date(2025, 1, 15)); // start unchanged
-    assert_eq!(dates[1], make_date(2025, 2, 28)); // Feb 15 -> Feb 28
-    assert_eq!(dates[2], make_date(2025, 3, 31)); // Mar 15 -> Mar 31
-    assert_eq!(dates[3], make_date(2025, 4, 15)); // end unchanged
+    assert_eq!(dates[0], make_date(2025, 1, 31));
+    assert_eq!(dates[1], make_date(2025, 2, 28));
+    assert_eq!(dates[2], make_date(2025, 3, 31));
+    assert_eq!(dates[3], make_date(2025, 4, 15)); // declared back stub
+}
+
+#[test]
+fn eom_rejects_an_off_month_end_regular_anchor() {
+    // Record CORE-CONVENTIONS-008 #5: no forced EOM from a mid-month anchor.
+    for (start, end, stub) in [
+        (
+            make_date(2025, 1, 15),
+            make_date(2025, 4, 15),
+            StubKind::ShortBack,
+        ),
+        (
+            make_date(2025, 1, 31),
+            make_date(2025, 4, 15),
+            StubKind::ShortFront,
+        ),
+        (
+            make_date(2025, 1, 31),
+            make_date(2025, 4, 15),
+            StubKind::None,
+        ),
+    ] {
+        let error = Schedule::builder(start, end)
+            .unwrap()
+            .frequency(Tenor::monthly())
+            .stub_rule(stub)
+            .end_of_month(true)
+            .build()
+            .expect_err("off-grid regular anchor");
+        assert!(error.to_string().contains("month-end"), "{error}");
+    }
 }
 
 #[test]
@@ -646,8 +682,8 @@ fn stub_none_rejects_maturity_hidden_by_eom_snap() {
 
 #[test]
 fn test_end_of_month_with_leap_year() {
-    // Test EOM convention with leap year (intermediate snapping only)
-    let start = make_date(2024, 1, 15); // 2024 is a leap year
+    // EOM rolls through a leap-year February.
+    let start = make_date(2024, 1, 31); // 2024 is a leap year
     let end = make_date(2024, 3, 15);
 
     let dates: Vec<_> = Schedule::builder(start, end)
@@ -661,15 +697,15 @@ fn test_end_of_month_with_leap_year() {
         .collect();
 
     assert_eq!(dates.len(), 3);
-    assert_eq!(dates[0], make_date(2024, 1, 15)); // start unchanged
+    assert_eq!(dates[0], make_date(2024, 1, 31));
     assert_eq!(dates[1], make_date(2024, 2, 29)); // Feb 29 (leap year)
-    assert_eq!(dates[2], make_date(2024, 3, 15)); // end unchanged
+    assert_eq!(dates[2], make_date(2024, 3, 15)); // declared back stub
 }
 
 #[test]
 fn test_eom_with_stub_conventions() {
-    // EOM with stubs: intermediates snap, user start/end do not
-    let start = make_date(2025, 1, 15);
+    // EOM with a declared back stub: regular rolls are month-ends.
+    let start = make_date(2025, 1, 31);
     let end = make_date(2025, 5, 15);
 
     let dates: Vec<_> = Schedule::builder(start, end)
@@ -683,53 +719,49 @@ fn test_eom_with_stub_conventions() {
         .collect();
 
     assert_eq!(dates.len(), 3);
-    assert_eq!(dates[0], make_date(2025, 1, 15)); // start unchanged
+    assert_eq!(dates[0], make_date(2025, 1, 31));
     assert_eq!(dates[1], make_date(2025, 4, 30)); // Regular quarter -> Apr 30
-    assert_eq!(dates[2], make_date(2025, 5, 15)); // end unchanged
+    assert_eq!(dates[2], make_date(2025, 5, 15)); // declared back stub
 }
 
 #[test]
-fn test_eom_jan30_roll_to_feb_leap_year() {
-    // EOM: intermediate Feb roll snaps to month-end (Feb 29 in leap year)
-    let start = make_date(2024, 1, 30);
-    let end = make_date(2024, 3, 30);
-
-    let dates: Vec<_> = Schedule::builder(start, end)
+fn eom_rejects_a_jan30_anchor_leap_year() {
+    // Jan 30 is not a month-end, so it cannot anchor an EOM grid; the
+    // February month-end roll is covered from a Jan 31 anchor above.
+    let result = Schedule::builder(make_date(2024, 1, 30), make_date(2024, 3, 30))
         .unwrap()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::ShortBack)
         .end_of_month(true)
-        .build()
+        .build();
+    assert!(result.is_err());
+    let feb = Schedule::builder(make_date(2024, 1, 31), make_date(2024, 3, 31))
         .unwrap()
-        .into_iter()
-        .collect();
-
-    assert_eq!(dates.len(), 3);
-    assert_eq!(dates[0], make_date(2024, 1, 30)); // start unchanged
-    assert_eq!(dates[1], make_date(2024, 2, 29)); // Feb -> 29 (leap)
-    assert_eq!(dates[2], make_date(2024, 3, 30)); // end unchanged
+        .frequency(Tenor::monthly())
+        .end_of_month(true)
+        .build()
+        .unwrap();
+    assert_eq!(feb.dates[1], make_date(2024, 2, 29));
 }
 
 #[test]
-fn test_eom_jan30_roll_to_feb_non_leap() {
-    // EOM: intermediate Feb roll snaps to month-end, Feb 28 in non-leap year
-    let start = make_date(2025, 1, 30);
-    let end = make_date(2025, 3, 30);
-
-    let dates: Vec<_> = Schedule::builder(start, end)
+fn eom_rejects_a_jan30_anchor_non_leap_year() {
+    // Jan 30 is not a month-end, so it cannot anchor an EOM grid; the
+    // February month-end roll is covered from a Jan 31 anchor above.
+    let result = Schedule::builder(make_date(2025, 1, 30), make_date(2025, 3, 30))
         .unwrap()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::ShortBack)
         .end_of_month(true)
-        .build()
+        .build();
+    assert!(result.is_err());
+    let feb = Schedule::builder(make_date(2025, 1, 31), make_date(2025, 3, 31))
         .unwrap()
-        .into_iter()
-        .collect();
-
-    assert_eq!(dates.len(), 3);
-    assert_eq!(dates[0], make_date(2025, 1, 30)); // start unchanged
-    assert_eq!(dates[1], make_date(2025, 2, 28)); // Feb -> 28 (non-leap)
-    assert_eq!(dates[2], make_date(2025, 3, 30)); // end unchanged
+        .frequency(Tenor::monthly())
+        .end_of_month(true)
+        .build()
+        .unwrap();
+    assert_eq!(feb.dates[1], make_date(2025, 2, 28));
 }
 
 #[test]
@@ -810,32 +842,33 @@ fn imm_dates(start: time::Date, end: time::Date) -> Vec<time::Date> {
 
 #[test]
 fn imm_schedule_stops_at_last_representable_roll() {
-    let start = make_date(time::Date::MAX.year(), 1, 1);
+    let start =
+        finstack_quant_core::dates::third_wednesday(time::Month::March, time::Date::MAX.year())
+            .expect("March IMM date");
     let end = time::Date::MAX;
     let dates = imm_dates(start, end);
 
-    assert_eq!(dates.len(), 6);
+    assert_eq!(dates.len(), 5);
     assert_eq!(dates[0], start);
     assert_eq!(
-        dates[4],
+        dates[3],
         finstack_quant_core::dates::third_wednesday(time::Month::December, end.year())
             .expect("last IMM date")
     );
-    assert_eq!(dates[5], end);
+    assert_eq!(dates[4], end);
 }
 
 #[test]
 fn test_imm_schedule_basic() {
-    let start = make_date(2025, 1, 15);
+    let start = make_date(2025, 3, 19);
     let end = make_date(2025, 12, 31);
 
-    // Short initial stub to the March roll, quarterly IMM rolls, then a short
+    // Quarterly IMM rolls from the on-cycle start, then the declared short
     // final stub to the contractual end.
     assert_eq!(
         imm_dates(start, end),
         vec![
             start,
-            make_date(2025, 3, 19),
             make_date(2025, 6, 18),
             make_date(2025, 9, 17),
             make_date(2025, 12, 17),
@@ -856,14 +889,40 @@ fn test_imm_schedule_start_on_imm_date() {
 }
 
 #[test]
-fn test_imm_schedule_start_after_first_imm() {
-    let start = make_date(2025, 3, 20); // Day after March IMM
-    let end = make_date(2025, 9, 30);
-
-    assert_eq!(
-        imm_dates(start, end),
-        vec![start, make_date(2025, 6, 18), make_date(2025, 9, 17), end]
-    );
+fn imm_schedule_rejects_an_off_cycle_regular_anchor() {
+    // Record CORE-CONVENTIONS-008 #6: the regular anchor side must be on the
+    // IMM lattice; no replacement anchor is searched and no opposite stub
+    // is implied.
+    for (start, end, stub) in [
+        (
+            make_date(2025, 1, 15),
+            make_date(2025, 12, 31),
+            StubKind::ShortBack,
+        ),
+        (
+            make_date(2025, 3, 20),
+            make_date(2025, 9, 30),
+            StubKind::LongBack,
+        ),
+        (
+            make_date(2025, 3, 19),
+            make_date(2025, 12, 31),
+            StubKind::ShortFront,
+        ),
+        (
+            make_date(2025, 3, 19),
+            make_date(2025, 12, 31),
+            StubKind::LongFront,
+        ),
+    ] {
+        let error = Schedule::builder(start, end)
+            .unwrap()
+            .imm()
+            .stub_rule(stub)
+            .build()
+            .expect_err("off-cycle regular anchor");
+        assert!(error.to_string().contains("IMM"), "{error}");
+    }
 }
 
 #[test]
@@ -890,47 +949,30 @@ fn imm_schedule_on_cycle_endpoints_have_no_stubs() {
 
 #[test]
 fn imm_schedule_without_roll_inside_is_a_single_period() {
-    let start = make_date(2025, 3, 20); // day after the Mar 19 IMM date
+    let start = make_date(2025, 3, 19);
     let end = make_date(2025, 4, 30); // before the Jun 18 IMM date
 
     assert_eq!(imm_dates(start, end), vec![start, end]);
-    // An IMM date only at the far end is still a single period.
+    // Reaching the next roll exactly is one regular period.
     let to_roll = make_date(2025, 6, 18);
     assert_eq!(imm_dates(start, to_roll), vec![start, to_roll]);
 }
 
 #[test]
-fn test_imm_schedule_preserves_effective_date_front_anchor() {
-    let start = make_date(2025, 1, 15);
-    let end = make_date(2025, 6, 20);
-
-    assert_eq!(
-        imm_dates(start, end),
-        vec![start, make_date(2025, 3, 19), make_date(2025, 6, 18), end]
-    );
-}
-
-#[test]
 fn test_imm_schedule_year_rollover() {
-    let start = make_date(2025, 10, 1);
+    let start = make_date(2025, 12, 17);
     let end = make_date(2026, 6, 30);
 
     assert_eq!(
         imm_dates(start, end),
-        vec![
-            start,
-            make_date(2025, 12, 17),
-            make_date(2026, 3, 18),
-            make_date(2026, 6, 17),
-            end,
-        ]
+        vec![start, make_date(2026, 3, 18), make_date(2026, 6, 17), end,]
     );
 }
 
 #[test]
 fn imm_schedule_quarterly_direction_does_not_change_the_dates() {
-    let start = make_date(2025, 1, 15);
-    let end = make_date(2026, 2, 10);
+    let start = make_date(2025, 3, 19);
+    let end = make_date(2026, 3, 18);
     let build = |stub| {
         Schedule::builder(start, end)
             .unwrap()
@@ -946,9 +988,7 @@ fn imm_schedule_quarterly_direction_does_not_change_the_dates() {
 
 #[test]
 fn imm_schedule_honours_frequency_and_generation_direction() {
-    let start = make_date(2025, 1, 15);
-    let end = make_date(2026, 2, 10);
-    let semi_annual = |stub| {
+    let semi_annual = |start, end, stub| {
         Schedule::builder(start, end)
             .unwrap()
             .imm()
@@ -959,23 +999,25 @@ fn imm_schedule_honours_frequency_and_generation_direction() {
             .dates
     };
 
-    // Forward from the first IMM date on or after start (Mar 2025).
+    // Forward from the on-cycle start (Mar 2025), short final stub.
+    let start = make_date(2025, 3, 19);
+    let end = make_date(2026, 2, 10);
     assert_eq!(
-        semi_annual(StubKind::ShortBack),
-        vec![start, make_date(2025, 3, 19), make_date(2025, 9, 17), end,]
+        semi_annual(start, end, StubKind::ShortBack),
+        vec![start, make_date(2025, 9, 17), end]
     );
-    // Backward from the last IMM date on or before end (Dec 2025).
+    // Backward from the on-cycle end (Mar 2026), short initial stub.
+    let start = make_date(2025, 1, 15);
+    let end = make_date(2026, 3, 18);
     assert_eq!(
-        semi_annual(StubKind::ShortFront),
-        vec![start, make_date(2025, 6, 18), make_date(2025, 12, 17), end,]
+        semi_annual(start, end, StubKind::ShortFront),
+        vec![start, make_date(2025, 3, 19), make_date(2025, 9, 17), end]
     );
 }
 
 #[test]
 fn imm_schedule_long_stubs_merge_into_the_adjacent_regular_period() {
-    let start = make_date(2025, 3, 19);
-    let end = make_date(2026, 2, 10);
-    let semi_annual = |stub| {
+    let semi_annual = |start, end, stub| {
         Schedule::builder(start, end)
             .unwrap()
             .imm()
@@ -986,30 +1028,37 @@ fn imm_schedule_long_stubs_merge_into_the_adjacent_regular_period() {
             .dates
     };
 
-    // Short back: Mar-25, Sep-25, then a short final stub to Feb-26.
+    // Back stubs from Mar-25: a short final stub to Feb-26, or a long one
+    // folded into the last regular period.
+    let start = make_date(2025, 3, 19);
+    let end = make_date(2026, 2, 10);
     assert_eq!(
-        semi_annual(StubKind::ShortBack),
+        semi_annual(start, end, StubKind::ShortBack),
         vec![start, make_date(2025, 9, 17), end]
     );
-    // Long back folds that final stub into the last regular period.
-    assert_eq!(semi_annual(StubKind::LongBack), vec![start, end]);
-
-    // Backward from Dec-25: a short initial stub Mar-25 to Jun-25, or a long
-    // one folded into the first regular period.
     assert_eq!(
-        semi_annual(StubKind::ShortFront),
-        vec![start, make_date(2025, 6, 18), make_date(2025, 12, 17), end]
+        semi_annual(start, end, StubKind::LongBack),
+        vec![start, end]
+    );
+
+    // Front stubs back from Mar-26: a short initial stub Jan-25 to Mar-25,
+    // or a long one folded into the first regular period.
+    let start = make_date(2025, 1, 15);
+    let end = make_date(2026, 3, 18);
+    assert_eq!(
+        semi_annual(start, end, StubKind::ShortFront),
+        vec![start, make_date(2025, 3, 19), make_date(2025, 9, 17), end]
     );
     assert_eq!(
-        semi_annual(StubKind::LongFront),
-        vec![start, make_date(2025, 12, 17), end]
+        semi_annual(start, end, StubKind::LongFront),
+        vec![start, make_date(2025, 9, 17), end]
     );
 }
 
 #[test]
 fn imm_schedule_rejects_frequencies_off_the_quarterly_cycle() {
     let builder = || {
-        Schedule::builder(make_date(2025, 1, 15), make_date(2025, 12, 31))
+        Schedule::builder(make_date(2025, 3, 19), make_date(2025, 12, 31))
             .unwrap()
             .imm()
     };
@@ -1088,9 +1137,8 @@ fn test_cds_imm_schedule_start_on_roll_date_has_no_front_accrual() {
 
 #[test]
 fn test_imm_vs_cds_imm_difference() {
-    // Verify that IMM and CDS IMM produce different dates
-    // Use end date on a CDS roll date to avoid short back stub
-    let start = make_date(2025, 1, 15);
+    // Verify that IMM and CDS IMM produce different dates.
+    let start = make_date(2025, 3, 19); // on the IMM lattice
     let end = make_date(2025, 6, 20); // Exactly on CDS roll date
 
     let imm_dates: Vec<_> = Schedule::builder(start, end)
@@ -1109,12 +1157,9 @@ fn test_imm_vs_cds_imm_difference() {
         .into_iter()
         .collect();
 
-    // IMM keeps the effective date and maturity around its third-Wednesday
-    // rolls; CDS anchors at the prior roll for the standard front accrual.
-    assert_eq!(
-        imm_dates,
-        vec![start, make_date(2025, 3, 19), make_date(2025, 6, 18), end]
-    );
+    // IMM rolls on third Wednesdays to a short final stub; CDS anchors at
+    // the prior roll for the standard front accrual.
+    assert_eq!(imm_dates, vec![start, make_date(2025, 6, 18), end]);
     assert_eq!(
         cds_dates,
         vec![make_date(2024, 12, 20), make_date(2025, 3, 20), end]
@@ -1123,7 +1168,7 @@ fn test_imm_vs_cds_imm_difference() {
 
 #[test]
 fn imm_and_cds_imm_setters_use_last_call_wins() {
-    let start = make_date(2025, 1, 15);
+    let start = make_date(2025, 3, 19);
     let end = make_date(2025, 9, 30);
 
     let cds_dates = Schedule::builder(start, end)
