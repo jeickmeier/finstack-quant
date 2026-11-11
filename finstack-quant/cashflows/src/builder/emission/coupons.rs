@@ -268,8 +268,17 @@ pub(crate) fn emit_fixed_coupons_on(
                     );
                 }
 
-                let pik_added =
-                    add_pik_flow_if_nonzero(out_flows, d, pik_amt, ccy, Some(rate_f64), yf)?;
+                // A PIK row is dated at its capitalization, the parent's actual
+                // accrual end, not the cash payment date (record
+                // CORE-CONVENTIONS-015 #6; CASHFLOWS-005 #10).
+                let pik_added = add_pik_flow_if_nonzero(
+                    out_flows,
+                    period.accrual_end,
+                    pik_amt,
+                    ccy,
+                    Some(rate_f64),
+                    yf,
+                )?;
                 if pik_added > 0.0
                     && let Some(flow) = out_flows.last_mut()
                 {
@@ -728,8 +737,10 @@ pub(crate) fn emit_float_coupons_on(
                     // Signed rows allocate one non-negative contractual PIK
                     // coupon. Every row capitalizes on the same final boundary.
                     out_flows.push(
+                        // Dated at its capitalization boundary, not the cash
+                        // payment date (record CORE-CONVENTIONS-015 #6).
                         CashFlow::new(
-                            period.payment_date,
+                            period.accrual_end,
                             None,
                             Money::zero(ccy),
                             CFKind::Pik,

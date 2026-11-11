@@ -38623,7 +38623,7 @@
               "pv": 0
             },
             {
-              "date": "2028-01-03",
+              "date": "2028-01-01",
               "amount": 0,
               "currency": "USD",
               "kind": "pik",
@@ -38633,9 +38633,9 @@
               "accrual_day_count": "act_360",
               "accrual_notional": 12541381.59581469,
               "principal_delta": 192301.18446915856,
-              "year_fraction": 4.019178082191781,
+              "year_fraction": 4.013698630136986,
               "rate": 0.06,
-              "discount_factor": 0.8857623835889091,
+              "discount_factor": 0.8859084376664055,
               "discount_curve_id": "USD-OIS",
               "beginning_balance": 12541381.59581469,
               "ending_balance": 12733682.780283848,
@@ -38643,7 +38643,7 @@
               "pv": 0
             },
             {
-              "date": "2028-04-03",
+              "date": "2028-04-01",
               "amount": 0,
               "currency": "USD",
               "kind": "pik",
@@ -38653,9 +38653,9 @@
               "accrual_day_count": "act_360",
               "accrual_notional": 12733682.780283848,
               "principal_delta": 193127.52216763835,
-              "year_fraction": 4.2684931506849315,
+              "year_fraction": 4.263013698630137,
               "rate": 0.06,
-              "discount_factor": 0.8791423334589885,
+              "discount_factor": 0.8792872959510522,
               "discount_curve_id": "USD-OIS",
               "beginning_balance": 12733682.780283848,
               "ending_balance": 12926810.302451488,
@@ -38663,7 +38663,7 @@
               "pv": 0
             },
             {
-              "date": "2028-07-03",
+              "date": "2028-07-01",
               "amount": 0,
               "currency": "USD",
               "kind": "pik",
@@ -38673,9 +38673,9 @@
               "accrual_day_count": "act_360",
               "accrual_notional": 12926810.302451488,
               "principal_delta": 196056.6229205142,
-              "year_fraction": 4.517808219178082,
+              "year_fraction": 4.512328767123288,
               "rate": 0.06,
-              "discount_factor": 0.8725717605529086,
+              "discount_factor": 0.8727156396178792,
               "discount_curve_id": "USD-OIS",
               "beginning_balance": 12926810.302451488,
               "ending_balance": 13122866.925371999,
@@ -38683,7 +38683,7 @@
               "pv": 0
             },
             {
-              "date": "2028-10-02",
+              "date": "2028-10-01",
               "amount": 0,
               "currency": "USD",
               "kind": "pik",
@@ -38693,9 +38693,9 @@
               "accrual_day_count": "act_360",
               "accrual_notional": 13122866.925371999,
               "principal_delta": 201217.29285570397,
-              "year_fraction": 4.767123287671233,
+              "year_fraction": 4.764383561643836,
               "rate": 0.06,
-              "discount_factor": 0.866050295085603,
+              "discount_factor": 0.8661216940100892,
               "discount_curve_id": "USD-OIS",
               "beginning_balance": 13122866.925371999,
               "ending_balance": 13324084.218227705,

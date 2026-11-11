@@ -13,21 +13,19 @@ use finstack_quant_core::money::Money;
 /// Exercise-date claims on one loan schedule. The outstanding path and both
 /// accrual indexes are built once, so pricing every tree step or candidate
 /// exercise date does not rebuild them.
-pub(crate) struct ExerciseClaims<'a> {
-    schedule: &'a CashFlowSchedule,
+pub(crate) struct ExerciseClaims {
     outstanding: Vec<(Date, Money)>,
     cash: AccrualIndex,
     total: AccrualIndex,
 }
 
-impl<'a> ExerciseClaims<'a> {
-    pub(crate) fn new(loan: &TermLoan, schedule: &'a CashFlowSchedule) -> Result<Self> {
+impl ExerciseClaims {
+    pub(crate) fn new(loan: &TermLoan, schedule: &CashFlowSchedule) -> Result<Self> {
         let mut config = loan.accrual_config();
         let cash = AccrualIndex::build(schedule, &config)?;
         config.include_pik = true;
         let total = AccrualIndex::build(schedule, &config)?;
         Ok(Self {
-            schedule,
             outstanding: schedule.outstanding_by_date()?,
             cash,
             total,
@@ -43,31 +41,12 @@ impl<'a> ExerciseClaims<'a> {
             .take_while(|(date, _)| *date <= exercise)
             .last()
             .map_or(0.0, |(_, amount)| amount.amount());
+        // A PIK row is dated at its capitalization (record
+        // CORE-CONVENTIONS-015 #6), so earned PIK is either already in the
+        // outstanding path or still accruing in `total`, never both.
         let cash = self.cash.accrued_at(exercise)?;
         let total = self.total.accrued_at(exercise)?;
-        let capitalized_pending: f64 = self
-            .schedule
-            .get_flows()
-            .iter()
-            .filter(|flow| {
-                flow.kind == CFKind::Pik
-                    && flow.get_balance_date() <= exercise
-                    && exercise < flow.date
-            })
-            // The capitalized amount is the explicit principal delta, not
-            // the row's cash amount (record CORE-CONVENTIONS-015 #1, #4).
-            .map(|flow| {
-                flow.principal_delta
-                    .map(|delta| delta.amount())
-                    .ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(format!(
-                            "PIK row on {} has no principal_delta",
-                            flow.date
-                        ))
-                    })
-            })
-            .sum::<Result<f64>>()?;
-        Ok((principal + total - cash - capitalized_pending, cash))
+        Ok((principal + total - cash, cash))
     }
 }
 

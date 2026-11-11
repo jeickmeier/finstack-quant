@@ -786,6 +786,42 @@ logged under Needs review.
     cash amount record 015 #1 removes; it now asserts zero PIK cash, a
     positive delta and equal PV with and without the rows. PIK dates are
     unchanged (`date == principal_date` is the next commit).
+  - **G5-3c PIK event date.** Fixed, step-up and floating PIK rows are dated
+    at their capitalization, the parent's actual accrual end (record 015 #6;
+    CASHFLOWS-005 #10), instead of the cash payment date. No production
+    number or golden moved.
+    - **Reader fixed:** LSMC grouped floating rows by `(start, end, row
+      date)`, so a split coupon's PIK row split off into a phantom coupon
+      "paid" at accrual end. Groups are now keyed by the accrual interval,
+      and the cash row supplies the payment date.
+    - **Dead path removed:** the term-loan call claim's `capitalized_pending`
+      window (`balance_date <= exercise < date`) can no longer hold a row;
+      it and the claims struct's unused schedule borrow are gone.
+    - **Retired scenario (Needs review):** two LSMC tests covered a pure-PIK
+      overnight coupon "paid" early under Preceding before an unpublished
+      Friday fixing. A PIK share has no payment under the accepted records,
+      so they now use a 40/60 cash/PIK split: the early cash payment is still
+      rejected, and the pending PIK share is replayed with its fixing
+      simulated (the template carries it as a floating coupon). The fully
+      observed weekend case now replays dynamically (its PIK row is dated
+      after the Saturday origin) and matches the same independent growth
+      formula to 1e-10.
+    - **Date assertions:** the lagged-redemption test now expects the last
+      PIK on the unadjusted final accrual end, with only the redemption cash
+      on the lagged date.
+- **Notebooks broken by earlier slices (found during G5; not fixed yet).**
+  A full run (`run_all_notebooks.py --timeout 120`) after G5-3b: 92 of 101
+  pass. None of the 9 failures involves PIK or write-down rows:
+  - FX routing after F6/F7 (`core_types_and_money`, `market_data/fx_matrix`,
+    `market_data_and_curves`): cross requests without a pivot or quote.
+  - `bonds_and_fixed_income`: `ScheduleParams` omits
+    `business_day_convention` (no default since C3).
+  - `commodities`, `pricing_across_asset_classes`: CommodityForward requires
+    a `settlement_calendar_id`.
+  - `portfolio_construction_and_valuation`: `KeyError: 'mode'`.
+  - Both capstones: curve calibration builds an EOM grid whose end
+    2026-01-30 is not a month-end (E3b-1 strict anchors).
+  Slice gates do not run notebooks, so these went unnoticed.
   - **Margin substitution (Needs review).** Record 015 #2 and #11 say
     substitution kinds carry only genuine monetary transfers, never a marked
     collateral value; margin record 20 (Draft, observed only) describes the

@@ -296,10 +296,16 @@ fn early_overnight_payment_rejects_unknown_fixings_after_payment() {
     let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec else {
         unreachable!("floating coupon");
     };
-    // TARGET closes on Good Friday, so the payment rolls to Thursday while
-    // the explicitly weekends-only fixing calendar still requires Friday.
+    // TARGET closes on Good Friday, so the cash share pays on Thursday while
+    // the explicitly weekends-only fixing calendar still requires Friday. A
+    // PIK share has no payment: it is dated at its capitalization (record
+    // CORE-CONVENTIONS-015 #6), so only the cash payment can precede a fixing.
     spec.schedule.calendar_id = "target2".into();
     spec.schedule.business_day_convention = BusinessDayConvention::Preceding;
+    spec.coupon_type = CouponType::Split {
+        cash_fraction: Decimal::new(4, 1),
+        pik_fraction: Decimal::new(6, 1),
+    };
     let schedule = bond
         .full_cashflow_schedule(&market)
         .expect("preceding payment schedule");
@@ -308,8 +314,14 @@ fn early_overnight_payment_rejects_unknown_fixings_after_payment() {
         .iter()
         .find(|flow| flow.kind == CFKind::Pik)
         .expect("PIK coupon");
-    assert_eq!(pik.date, time::macros::date!(2024 - 03 - 28));
+    assert_eq!(pik.date, pik.get_balance_date());
     assert_eq!(pik.get_balance_date(), time::macros::date!(2024 - 03 - 31));
+    let cash = schedule
+        .get_flows()
+        .iter()
+        .find(|flow| flow.kind == CFKind::Floating)
+        .expect("cash coupon");
+    assert_eq!(cash.date, time::macros::date!(2024 - 03 - 28));
     let error = ReplayTemplate::new(&tree, &bond, &market, as_of)
         .err()
         .expect("unknown Friday fixing must reject early payment");
@@ -328,11 +340,16 @@ fn past_overnight_payment_retains_only_fully_determined_pending_pik() {
     let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec else {
         unreachable!("floating coupon");
     };
-    // TARGET pays on Thursday; the weekends-only index still needs a Friday
-    // fixing that is unpublished at either the Thursday payment origin or
-    // the Friday origin after payment.
+    // TARGET pays the cash share on Thursday; the weekends-only index still
+    // needs a Friday fixing that is unpublished at either the Thursday
+    // payment origin or the Friday origin after payment. The PIK share is
+    // dated at Sunday's capitalization (record CORE-CONVENTIONS-015 #6).
     spec.schedule.calendar_id = "target2".into();
     spec.schedule.business_day_convention = BusinessDayConvention::Preceding;
+    spec.coupon_type = CouponType::Split {
+        cash_fraction: Decimal::new(4, 1),
+        pik_fraction: Decimal::new(6, 1),
+    };
     for as_of in [
         time::macros::date!(2024 - 03 - 28),
         time::macros::date!(2024 - 03 - 29),
@@ -346,17 +363,13 @@ fn past_overnight_payment_retains_only_fully_determined_pending_pik() {
             .iter()
             .find(|flow| flow.kind == CFKind::Pik)
             .expect("PIK coupon");
-        assert_eq!(pik.date, time::macros::date!(2024 - 03 - 28));
+        assert_eq!(pik.date, pik.get_balance_date());
         assert_eq!(pik.get_balance_date(), maturity);
-        let error = ReplayTemplate::new(&tree, &bond, &market, as_of)
-            .err()
-            .expect("pending PIK must not freeze an unobserved rate after cash payment");
-        assert!(
-            error
-                .to_string()
-                .contains("unobserved fixings after payment"),
-            "{error}"
-        );
+        // The pending PIK share capitalizes after the origin, so it is replayed
+        // with its unpublished Friday fixing simulated, never frozen.
+        let template = ReplayTemplate::new(&tree, &bond, &market, as_of)
+            .expect("pending PIK replays its unobserved fixing");
+        assert_eq!(template.floating.len(), 1);
     }
 
     let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec else {
@@ -364,6 +377,7 @@ fn past_overnight_payment_retains_only_fully_determined_pending_pik() {
     };
     // Friday payment followed by a Saturday origin has only fully observed
     // Friday carry remaining before Sunday's economic capitalization.
+    spec.coupon_type = CouponType::Pik;
     spec.schedule.calendar_id = "weekends_only".into();
     spec.rate_spec.fallback = FloatingRateFallback::Error;
     let as_of = time::macros::date!(2024 - 03 - 30);
@@ -385,15 +399,31 @@ fn past_overnight_payment_retains_only_fully_determined_pending_pik() {
         )
         .expect("published business-day fixings"),
     );
+    // The PIK row is dated at Sunday's capitalization, after the Saturday
+    // origin (record CORE-CONVENTIONS-015 #6), so it replays as a floating
+    // coupon whose remaining carry is fully observed: every path capitalizes
+    // the same determined amount.
     let template = ReplayTemplate::new(&tree, &bond, &market, as_of)
-        .expect("fully determined weekend carry stays static pending PIK");
-    assert!(template.floating.is_empty());
-    let pik: f64 = template
-        .balance_events
-        .iter()
-        .flatten()
-        .map(|event| event.delta)
-        .sum();
+        .expect("fully determined weekend carry replays pending PIK");
+    assert_eq!(template.floating.len(), 1);
+    let coupon = &template.floating[0];
+    let config = BondLsmcConfig {
+        paths: 64,
+        antithetic: true,
+        seed: 23,
+        oas_bp: 0.0,
+        target_ci_half_width: None,
+    };
+    let mut sampled = Vec::new();
+    tree.sample_path_into(23, 0, false, &mut sampled)
+        .expect("factor path");
+    let mut cursor = ReplayCursor::new(&template).expect("cursor");
+    for step in 0..=coupon.effective_end_step {
+        cursor
+            .advance_step(&template, &bond, &sampled, &config, step)
+            .expect("replay through capitalization");
+    }
+    let pik = cursor.outstanding - 100.0;
     // Sixteen one-day weekday weights, four full Friday weekends, and the
     // last Friday's two-day carry, daily capped at 3%, plus a 2% spread.
     let growth = (1.0_f64 + 0.03 / 360.0).powi(16)

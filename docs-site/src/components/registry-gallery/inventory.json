@@ -1736,7 +1736,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "d9f160ddabaf44a8616e7e311302b34a51ce297c1f433c401301dd24df6ef562"
+      "sha256": "15b8b1ff660e31edc7e86ada47286c3c849d68837e410e69bba1fe55dd2ba226"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/loan-yield/cases.json",

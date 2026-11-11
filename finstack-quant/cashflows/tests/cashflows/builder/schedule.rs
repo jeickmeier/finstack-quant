@@ -1539,7 +1539,9 @@ fn pik_then_redemption_on_lagged_payment_date() {
         .find(|cf| cf.kind == CFKind::Notional && cf.amount.amount() > 0.0)
         .expect("redemption flow");
 
-    assert_eq!(last_pik_date, redemption_date);
+    // PIK capitalizes at the final accrual end (record CORE-CONVENTIONS-015
+    // #6); only the redemption cash settles on the lagged payment date.
+    assert_eq!(last_pik_date, maturity);
     assert_eq!(redemption.date, redemption_date);
     assert!(
         (redemption.amount.amount() - (init.amount() + pik_total)).abs()

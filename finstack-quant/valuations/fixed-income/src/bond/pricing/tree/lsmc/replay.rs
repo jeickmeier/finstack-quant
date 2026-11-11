@@ -601,7 +601,11 @@ impl ReplayTemplate {
         let grid_day_count = DayCount::Act365F;
         let terminal_step = times.len() - 1;
         let floating_spec = bond.cashflow_spec.floating_coupon_spec();
-        let mut dynamic_groups = BTreeMap::<(Date, Date, Date), FloatingBuild>::new();
+        // One group per accrual interval: a split coupon's cash row and its
+        // PIK row share the interval, and the PIK row is dated at its
+        // capitalization rather than the cash payment (record
+        // CORE-CONVENTIONS-015 #6).
+        let mut dynamic_groups = BTreeMap::<(Date, Date), FloatingBuild>::new();
         let mut dynamic_flow_indices = BTreeSet::new();
         if let Some(spec) = floating_spec {
             for (flow_index, flow) in schedule.get_flows().iter().enumerate() {
@@ -654,12 +658,16 @@ impl ReplayTemplate {
                 let reset = flow
                     .reset_date
                     .unwrap_or(contractual_reset_date(accrual.start, spec)?);
-                let key = (accrual.start, accrual.end, flow.date);
+                let key = (accrual.start, accrual.end);
                 let entry = dynamic_groups.entry(key).or_default();
                 entry.reset = Some(reset);
                 entry.start = Some(accrual.start);
                 entry.end = Some(accrual.end);
-                entry.payment = Some(flow.date);
+                // The cash row's date is the coupon payment; a PIK-only coupon
+                // has no cash settlement and pays nothing before capitalizing.
+                if flow.kind != CFKind::Pik || entry.payment.is_none() {
+                    entry.payment = Some(flow.date);
+                }
                 entry.day_count = Some(accrual.day_count);
                 entry.day_count_context = Some(DayCountContext {
                     calendar: Some(calendar_by_id_strict(
@@ -685,7 +693,7 @@ impl ReplayTemplate {
                 .is_some_and(|method| method.is_overnight())
         }) {
             let mut periods_by_payment = BTreeMap::<Date, usize>::new();
-            for &(_, _, payment) in dynamic_groups.keys() {
+            for payment in dynamic_groups.values().filter_map(|group| group.payment) {
                 *periods_by_payment.entry(payment).or_default() += 1;
             }
             if let Some((&payment, _)) = periods_by_payment.iter().find(|(_, count)| **count > 1) {
