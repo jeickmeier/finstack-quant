@@ -25,6 +25,12 @@ enforces, the task that runs it, and its tier.
 `all-audit`); `scripts/tests/test_gate_parity.py` keeps the two equal.
 Generated files are refreshed by one command, `mise run gen-write`.
 
+`mise run slice-gate` (`slice_gate.py`) is the per-slice subset of that gate: it
+maps the changed paths to the stages of `all` they can affect, runs those as the
+same tasks, cheapest first, and stops at the first failure. A path no rule
+recognises selects every stage. `scripts/tests/test_slice_gate.py` keeps its
+stage table equal to `all`.
+
 ## Running them
 
 `scripts/` is an importable package (`scripts/__init__.py`), so the multi-module

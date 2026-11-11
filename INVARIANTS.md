@@ -2122,6 +2122,21 @@ observation and settlement ownership. Independent numerical and product
 qualification remain open.
 [Clause map M279–M282](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
 
+### 1.71 Checked price-equivalent ATM volatility conversion
+
+**Detailed decision:** [MODELS-ANALYTIC-22](docs/decisions/financial/models-analytic/atm-volatility-conversion.md#accepted-decision-for-checked-price-equivalent-atm-volatility-conversion) was accepted on 2026-11-10.
+
+Match the original at-the-forward unit premium with complete validation
+at positive expiry. Preserve exact effective shifted levels and genuine
+zero or exact pricing-law identity. Invert Normal directly and Black
+using the smaller probability, with a strict mathematical cap.
+
+Preserve premium and cap-gap scale through the inverse and replay the
+actual returned sigma. Apply explicit absolute premium and relative
+smaller-component tolerances. Propagate unresolved range or precision
+and reconcile existing Python and WASM paths.
+[Clause map M283–M286](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
 ## 2. Determinism and floating point
 
 **Authority:** [ADR 0021](docs/decisions/standards/0021-reproducibility-guarantees.md)

@@ -1068,6 +1068,20 @@ and implementation and validation evidence.
 - Bachelier, L. *The Theory of Speculation*. Canonical reference for normal-model
   option pricing.
 
+### Checked price-equivalent ATM volatility conversion
+
+- Schachermayer and Teichmann give the exact ATM Normal price and
+  compare the Normal and Black pricing laws in section 2.1.
+  Choi et al. derive analytic at-the-forward volatility conversion in
+  section 4.2, equations 13–15.
+  [Bachelier versus Black–Scholes](https://arxiv.org/pdf/0711.1272),
+  [A Black–Scholes user's guide to the Bachelier model](https://arxiv.org/pdf/2104.08686)
+- NIST gives the inverse-error-function identities and expansions.
+  The selected domain, checked analytic inversion and two replay
+  controls are in
+  [accepted record 22](decisions/financial/models-analytic/atm-volatility-conversion.md#accepted-decision-for-checked-price-equivalent-atm-volatility-conversion).
+  [NIST DLMF, section 7.17](https://dlmf.nist.gov/7.17)
+
 <a id="implied-volatility-inversion-and-conditioning"></a>
 
 ### Implied volatility inversion and conditioning

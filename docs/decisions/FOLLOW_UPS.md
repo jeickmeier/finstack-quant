@@ -961,8 +961,16 @@ was accepted on 2026-11-10 for checked sampled call-price, common-support calend
 sign checks, with explicit coverage and unfiltered status.
 [Analytic-model record 21](financial/models-analytic/variance-replication.md#accepted-decision-for-checked-variance-replication-and-explicit-black-wings)
 was accepted on 2026-11-10 for checked forward-split variance replication, an explicit mesh
-gate and selected finite-strip or full flat-Black wings. The other
-seven records are Draft.
+gate and selected finite-strip or full flat-Black wings.
+[Analytic-model record 22](financial/models-analytic/atm-volatility-conversion.md#accepted-decision-for-checked-price-equivalent-atm-volatility-conversion)
+was accepted on 2026-11-10 for literal at-the-forward conversion using checked analytic
+pricing, direct inversion and premium replay in the smaller boundary
+component.
+[Analytic-model record 23](financial/models-analytic/hull-white-analytic-kernels.md#proposed-decision-for-checked-hullwhite-analytic-kernels-and-payment-measures)
+proposes checked scheduled Hull–White moments and affine bonds, explicit
+payment-measure caplets and coupons, exact simple futures bias and an
+ATM Normal quote on the actual term-period law. The other five records
+are Draft.
 Runtime/caller/host/state reconciliation and independent qualification remain pending.
 Other unadopted choices retain their stated Proposed or Draft status. Acceptance does not certify
 observed implementations.

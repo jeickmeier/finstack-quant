@@ -120,6 +120,24 @@ run = [
   ''',
 ]
 
+[tasks.slice-gate]
+# The per-slice gate: scripts/slice_gate.py picks the stages of `all` the diff
+# can affect, runs them cheapest first as the same tasks, stops at the first
+# failure and prints each stage's time. It never regenerates. `all` stays the
+# pre-PR gate; scripts/tests/test_slice_gate.py keeps the stage lists equal.
+description = "Run the stages of `all` the diff can affect, stopping at the first failure (--base REF widens the diff, --from STAGE resumes)"
+usage = '''
+flag "--base <ref>" default="HEAD" help="Diff base; HEAD checks only uncommitted work"
+flag "--from <stage>" help="Skip the selected stages before this one"
+flag "--dry-run" help="Print the selected stages without running them"
+'''
+run = '''
+set -- --base "${usage_base:-HEAD}"
+[ -n "${usage_from:-}" ] && set -- "$@" --from "$usage_from"
+[ "${usage_dry_run:-false}" = "true" ] && set -- "$@" --dry-run
+exec uv run --no-sync python scripts/slice_gate.py "$@"
+'''
+
 [tasks.all-build]
 description = "Build the Rust workspace, Python bindings and WASM package"
 depends = ["rust-build", "python-build", "wasm-build"]

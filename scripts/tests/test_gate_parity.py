@@ -2,7 +2,8 @@
 
 `all` is the one pre-PR gate. `checks.yml` runs the same stages split across
 runners, and `full-checks.yml` the `--full` tier. These tests fail when either
-side gains or loses a stage, so the two cannot drift apart.
+side gains or loses a stage, so the two cannot drift apart. `mise run slice-gate`
+runs a diff-selected subset of the same stages (`test_slice_gate.py`).
 """
 
 from __future__ import annotations

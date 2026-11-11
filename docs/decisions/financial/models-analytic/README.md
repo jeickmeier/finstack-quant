@@ -1,6 +1,6 @@
 # Analytic model methodology inventory
 
-**Decision status:** MODELS-ANALYTIC-01 through 21 Accepted. The other seven detailed records are Draft.
+**Decision status:** MODELS-ANALYTIC-01 through 22 Accepted. MODELS-ANALYTIC-23 Proposed. The other five detailed records are Draft.
 
 **Implementation scope:** All **58 assigned Rust source files** in models `closed_form`, `fourier`, `rates` and `volatility`: **47 algorithm-bearing**, **9 support**, **2 test-only**, **0 generated**. Runtime implementations, material domain/default/dispatch decisions and interleaved test-helper boundaries were inspected. The exact one-file-one-entry ledger is [coverage.json](coverage.json).
 
@@ -141,6 +141,16 @@ was accepted on **2026-11-10** for checked forward-split OTM pricing, one determ
 refinement and an explicit mesh gate. Wing policy is explicit, with
 optional full flat-Black continuation using bounded quadrature.
 
+[MODELS-ANALYTIC-22](atm-volatility-conversion.md#accepted-decision-for-checked-price-equivalent-atm-volatility-conversion)
+was accepted on **2026-11-10** for literal at-the-forward conversion with positive expiry, exact
+shifted levels, analytic inversion and replay of the actual target
+volatility against absolute premium and relative boundary controls.
+
+[MODELS-ANALYTIC-23](hull-white-analytic-kernels.md#proposed-decision-for-checked-hullwhite-analytic-kernels-and-payment-measures)
+proposes one checked constant or scheduled Gaussian law, stable affine
+and bond-option pricing, explicit term and continuous payment measures,
+exact simple futures bias and a price-equivalent term ATM Normal quote.
+
 | Calculation / supported instruments | Implemented method / material variants | Actual selection | Decision record | Implementation / validation | Scope and evidence limits |
 |---|---|---|---|---|---|
 | Spot European price | BSM direct call/put, deterministic/expiry branches | Explicit BlackScholes; checked or unchecked | [MODELS-ANALYTIC-01](spot-vanilla-and-greeks.md) | Observed; source and evidence links in record; not executed | Observed floor/domain; full checked/native-unit/availability package accepted2026-11-09 |
@@ -175,10 +185,10 @@ optional full flat-Black continuation using bounded quadrature.
 | Local-vol smoothing/query | Gaussian implied-vol smoothing, bilinear local-vol lookup | Explicit strike-unit bandwidth | [MODELS-ANALYTIC-19](dupire-local-volatility.md) | Observed behavior and independent scalar checks | Explicit smoothing and grid boundary with simulation reconciliation accepted 2026-11-10 |
 | Surface arbitrage report | Butterfly/calendar/Dupire scans, severity and filtered pass flag | Three checks on by default; forwards required | [MODELS-ANALYTIC-20](surface-arbitrage-diagnostics.md) | Observed behavior and independent scalar checks | Sampled call constraints, strict calendar support, independent Dupire signs and complete verdict accepted 2026-11-10 |
 | Variance replication | OTM trapezoids, log-anchor adjustment, fixed flat-vol tails | User strike grid/callbacks | [MODELS-ANALYTIC-21](variance-replication.md) | Observed behavior and independent scalar checks | Exact-forward split, checked Black prices, mesh gate and explicit wings accepted 2026-11-10 |
-| ATM convention conversion | Source price then Brent target solve, scale seed | Explicit source/target convention | [MODELS-ANALYTIC-22](atm-volatility-conversion.md) | Observed; source and evidence links in record; not executed | Nonfinite-time shortcut and zero-time units |
-| HW affine bonds/options | Stable B, integrated scheduled variance, affine A, Black ZCB option | Scalar/scheduled params; caller curves | [MODELS-ANALYTIC-23](hull-white-analytic-kernels.md) | Observed; source and evidence links in record; not executed | Domain/limit consistency |
-| HW caplets/payment measure | Bond-option transform or ratio loading with delayed-pay covariance | Explicit periods; deterministic projection basis | [MODELS-ANALYTIC-23](hull-white-analytic-kernels.md) | Observed; source and evidence links in record; not executed | Allowed payment ordering; no stochastic basis |
-| HW convexity/normal vol | Leading futures adjustment, coupon covariance factors, normal-vol proxy | Explicit helpers | [MODELS-ANALYTIC-23](hull-white-analytic-kernels.md) | Observed; source and evidence links in record; not executed | Approximation versus exact bias |
+| ATM convention conversion | Source price then Brent target solve, scale seed | Explicit source/target convention | [MODELS-ANALYTIC-22](atm-volatility-conversion.md) | Observed behavior and independent scalar checks | Positive expiry, exact shifts, analytic inverse and actual sigma replay accepted 2026-11-10 |
+| HW affine bonds/options | Stable B, integrated scheduled variance, affine A, Black ZCB option | Scalar/scheduled params; caller curves | [MODELS-ANALYTIC-23](hull-white-analytic-kernels.md) | Observed behavior and independent Gaussian checks | Proposed common model state, exact limits and scaled original-leg pricing |
+| HW caplets/payment measure | Bond-option transform or ratio loading with delayed-pay covariance | Explicit periods; deterministic projection basis | [MODELS-ANALYTIC-23](hull-white-analytic-kernels.md) | Observed behavior and independent scalar checks | Proposed explicit term periods and separate continuous accumulation scope |
+| HW convexity/normal vol | Leading futures adjustment, coupon covariance factors, normal-vol proxy | Explicit helpers | [MODELS-ANALYTIC-23](hull-white-analytic-kernels.md) | Observed behavior and independent scalar checks | Proposed exact quote-dependent bias and price-equivalent term ATM Normal quote |
 | Rate clock/curve fit | Actual-days/365 to source convention, rebasing, monthly theta setup | Explicit as_of/source curve/horizon | [MODELS-ANALYTIC-24](rate-clock-and-projection.md) | Observed; source and evidence links in record; not executed | Date/derivative/grid resolution |
 | Conditional period projection | Affine bond ratio to simple forward plus additive basis | Explicit coeffs or flat-rate representation | [MODELS-ANALYTIC-24](rate-clock-and-projection.md) | Observed; source and evidence links in record; not executed | Clamped times and denominator floor |
 | HW MC paths/discount | Exact rate marginal, Philox antithetics, event grid, trapezoid bank | 10000 streams/seed42/4 minimum substeps defaults | [MODELS-ANALYTIC-25](hw1f-monte-carlo-discounting.md) | Observed; source and evidence links in record; not executed | Discount discretization bias |

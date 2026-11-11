@@ -32,6 +32,12 @@ Add `--all-features` to `rust-lint-crate` / `rust-fix-crate` when touching featu
 - `mise run rust-bench` — all Criterion targets.
 - `mise run all` — the cross-language gate; it runs exactly what CI runs on a pull request.
 
+## Slice gate (before each slice commit)
+
+- `mise run slice-gate` — the stages of `mise run all` the uncommitted diff can affect, cheapest first, stopping at the first failure. Resume with `--from <stage>`; preview with `--dry-run`.
+- A non-test change under `finstack-quant/` selects every language stage, because the Python and WASM bindings depend on nearly every crate. Test-only, binding-only, UI-only and docs-only slices select less.
+- Do not write ad hoc scripts that run the full gate per slice.
+
 ## Path → package mapping
 
 | Changed path prefix | Cargo package |
