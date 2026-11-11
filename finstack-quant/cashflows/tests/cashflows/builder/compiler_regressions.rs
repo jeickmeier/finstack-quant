@@ -330,7 +330,7 @@ fn linear_between_full_payoff_includes_final_pik_and_principal_movements() {
         .get_flows()
         .iter()
         .filter(|flow| flow.kind == CFKind::Pik)
-        .map(|flow| flow.amount.amount())
+        .map(|flow| flow.principal_delta.expect("PIK delta").amount())
         .sum();
     close(principal_paid, 1_050_000.0 + pik);
 }
@@ -527,7 +527,7 @@ fn bounded_split_pik_capitalizes_net_coupon_on_one_contractual_boundary() {
             .get_flows()
             .iter()
             .filter(|flow| flow.kind == CFKind::Pik)
-            .map(|flow| flow.amount.amount())
+            .map(|flow| flow.principal_delta.expect("PIK delta").amount())
             .sum();
         let cash: f64 = schedule
             .coupons()
@@ -546,7 +546,8 @@ fn bounded_split_pik_capitalizes_net_coupon_on_one_contractual_boundary() {
             schedule
                 .get_flows()
                 .iter()
-                .any(|flow| flow.kind == CFKind::Pik && flow.amount.amount() < 0.0)
+                .any(|flow| flow.kind == CFKind::Pik
+                    && flow.principal_delta.expect("PIK delta").amount() < 0.0)
         );
         let repayment = schedule
             .get_flows()

@@ -568,7 +568,8 @@ fn floating_pik_uses_accrual_boundaries_with_lagged_and_early_cash_dates() {
                     && flow.get_balance_date() == first.compiled.period().accrual_end
             })
             .expect("first PIK")
-            .amount
+            .principal_delta
+            .expect("PIK delta")
             .amount();
         let first_cash = schedule
             .get_flows()
@@ -1201,7 +1202,8 @@ fn lagged_term_reset_uses_curve_tenor_and_captures_post_pik_start_balance() {
         .filter(|flow| flow.kind == CFKind::Pik)
         .min_by_key(|flow| flow.date)
         .expect("first PIK coupon")
-        .amount
+        .principal_delta
+        .expect("PIK delta")
         .amount();
     let expected_start_balance = 100.0 + first_pik;
     let mut sampled = Vec::new();

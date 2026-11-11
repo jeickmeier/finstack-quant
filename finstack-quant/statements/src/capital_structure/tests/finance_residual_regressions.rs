@@ -73,12 +73,22 @@ fn state_with_balance(schedule: CashFlowSchedule, balance: f64) -> CapitalStruct
     state
 }
 
+/// A row's economic value: a PIK row's explicit capitalization (it carries no
+/// cash), any other row's cash amount.
+fn value(flow: &CashFlow) -> f64 {
+    if flow.kind == CFKind::Pik {
+        flow.principal_delta.expect("PIK delta").amount()
+    } else {
+        flow.amount.amount()
+    }
+}
+
 fn amount_on(schedule: &CashFlowSchedule, kind: CFKind, payment_date: Date) -> f64 {
     schedule
         .get_flows()
         .iter()
         .filter(|flow| flow.kind == kind && flow.date == payment_date)
-        .map(|flow| flow.amount.amount())
+        .map(value)
         .sum()
 }
 
@@ -182,7 +192,7 @@ fn split_coupon_full_paydown_preserves_earned_cash_and_pik_interest() {
             .get_flows()
             .iter()
             .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Pik))
-            .all(|flow| flow.amount.amount() >= 0.0),
+            .all(|flow| value(flow) >= 0.0),
         "repayment must not create negative positive-rate coupons"
     );
     assert_matures_to_zero(rebuilt, maturity);
@@ -210,7 +220,7 @@ fn zeroed_split_coupon_retains_component_rates_when_closing_is_revised() {
                         .as_ref()
                         .is_some_and(|accrual| accrual.start == effective)
             })
-            .map(|flow| flow.amount.amount())
+            .map(value)
             .sum();
         assert_close(future_component, 0.0);
     }
@@ -235,7 +245,7 @@ fn zeroed_split_coupon_retains_component_rates_when_closing_is_revised() {
                         .as_ref()
                         .is_some_and(|accrual| accrual.end == effective)
             })
-            .map(|flow| flow.amount.amount())
+            .map(value)
             .sum();
         assert_close(earned_component, earned_interest * share);
         assert_close(

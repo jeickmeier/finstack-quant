@@ -58,10 +58,12 @@ fn add_pik_flow_if_nonzero(
         // The capitalized amount is an explicit balance increase
         // (record CORE-CONVENTIONS-015 #4).
         flows.push(
+            // PIK is a noncash balance event: zero cash, explicit capitalization
+            // (record CORE-CONVENTIONS-015 #1, #4).
             CashFlow::new(
                 date,
                 None,
-                Money::new(pik_amt, ccy)?,
+                Money::zero(ccy),
                 CFKind::Pik,
                 accrual_factor,
                 rate,
@@ -729,7 +731,7 @@ pub(crate) fn emit_float_coupons_on(
                         CashFlow::new(
                             period.payment_date,
                             None,
-                            Money::from_model_value(settlement.pik_amount, ccy)?,
+                            Money::zero(ccy),
                             CFKind::Pik,
                             segment.year_fraction,
                             Some(settlement.all_in_rate),

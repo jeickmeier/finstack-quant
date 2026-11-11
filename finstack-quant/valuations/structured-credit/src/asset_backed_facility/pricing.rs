@@ -419,12 +419,12 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
                     CashFlow::new(
                         *date,
                         None,
-                        amount.checked_neg(),
+                        Money::zero(amount.currency()),
                         CFKind::DefaultedNotional,
                         0.0,
                         None,
                     )
-                    // The write-down is an explicit balance decrease on its event
+                    // A noncash write-down: zero cash and an explicit balance decrease on its event
                     // date (record CORE-CONVENTIONS-015 #4, #6).
                     .with_principal_delta(amount.checked_neg())
                     .with_principal_date(*date),

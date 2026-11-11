@@ -127,7 +127,8 @@ fn same_date_flows_use_the_canonical_cashflow_order() {
     };
     let flows = vec![
         flow(CFKind::Notional, 5.0),
-        flow(CFKind::Pik, 10.0),
+        flow(CFKind::Pik, 0.0)
+            .with_principal_delta(Money::new(10.0, Currency::USD).expect("valid PIK delta")),
         flow(CFKind::Fee, 1.0),
         flow(CFKind::Notional, -30.0),
         flow(CFKind::Amortization, 20.0),

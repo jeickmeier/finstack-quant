@@ -446,7 +446,7 @@
                 "date": "2027-01-04",
                 "reset_date": null,
                 "amount": {
-                  "amount": "-15000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "kind": "defaulted_notional",
@@ -774,7 +774,7 @@
                 "date": "2027-01-04",
                 "reset_date": null,
                 "amount": {
-                  "amount": "-15000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "kind": "defaulted_notional",
@@ -1393,7 +1393,7 @@
                 "date": "2027-01-04",
                 "reset_date": null,
                 "amount": {
-                  "amount": "-49992673.79033325",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "kind": "defaulted_notional",
@@ -5675,7 +5675,7 @@
                 "date": "2026-01-02",
                 "reset_date": null,
                 "amount": {
-                  "amount": "-79137472.58946182",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "kind": "defaulted_notional",
@@ -6878,7 +6878,7 @@
                 "date": "2024-01-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "-99000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "kind": "defaulted_notional",
@@ -7355,7 +7355,7 @@
                 "date": "2024-04-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "-15000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "kind": "defaulted_notional",
@@ -7440,7 +7440,7 @@
                 "date": "2024-04-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "-15000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "kind": "defaulted_notional",
@@ -7547,7 +7547,7 @@
                 "date": "2024-04-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "-68485564.78428261",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "kind": "defaulted_notional",
@@ -8283,7 +8283,7 @@
                 "date": "2027-01-04",
                 "reset_date": null,
                 "amount": {
-                  "amount": "-15000000",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "kind": "defaulted_notional",
@@ -8673,7 +8673,7 @@
                 "date": "2027-01-04",
                 "reset_date": null,
                 "amount": {
-                  "amount": "-68942724.96547657",
+                  "amount": "0",
                   "currency": "USD"
                 },
                 "kind": "defaulted_notional",

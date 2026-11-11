@@ -512,14 +512,17 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
 
     let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
         vec![
+            // A noncash write-down: zero cash and an explicit balance decrease.
             CashFlow::new(
                 default_date,
                 None,
-                Money::new(500.0, Currency::USD).expect("valid money fixture"),
+                Money::zero(Currency::USD),
                 CFKind::DefaultedNotional,
                 0.0,
                 None,
-            ),
+            )
+            .with_principal_delta(Money::new(-500.0, Currency::USD).expect("valid money fixture"))
+            .with_principal_date(default_date),
             CashFlow::new(
                 recovery_date,
                 None,
@@ -576,14 +579,17 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
 
     let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
         vec![
+            // A noncash write-down: zero cash and an explicit balance decrease.
             CashFlow::new(
                 default_date,
                 None,
-                Money::new(500.0, Currency::USD).expect("valid money fixture"),
+                Money::zero(Currency::USD),
                 CFKind::DefaultedNotional,
                 0.0,
                 None,
-            ),
+            )
+            .with_principal_delta(Money::new(-500.0, Currency::USD).expect("valid money fixture"))
+            .with_principal_date(default_date),
             CashFlow::new(
                 recovery_date,
                 None,

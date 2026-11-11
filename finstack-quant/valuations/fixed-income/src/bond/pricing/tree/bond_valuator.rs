@@ -1492,7 +1492,7 @@ mod tests {
                 CashFlow::new(
                     date!(2024 - 12 - 01),
                     None,
-                    money(50.0),
+                    money(0.0),
                     CFKind::Pik,
                     0.0,
                     None,

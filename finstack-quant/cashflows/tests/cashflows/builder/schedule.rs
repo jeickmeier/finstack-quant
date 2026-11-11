@@ -683,14 +683,17 @@ fn outstanding_by_date_includes_defaulted_notional() {
     let recovery_date = Date::from_calendar_date(2025, Month::September, 15).unwrap();
     let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
         vec![
+            // A noncash write-down: zero cash and an explicit balance decrease.
             CashFlow::new(
                 default_date,
                 None,
-                Money::new(300.0, Currency::USD).expect("valid money fixture"),
+                Money::zero(Currency::USD),
                 CFKind::DefaultedNotional,
                 0.0,
                 None,
-            ),
+            )
+            .with_principal_delta(Money::new(-300.0, Currency::USD).expect("valid money fixture"))
+            .with_principal_date(default_date),
             CashFlow::new(
                 recovery_date,
                 None,
@@ -1521,7 +1524,7 @@ fn pik_then_redemption_on_lagged_payment_date() {
         .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Pik)
-        .map(|cf| cf.amount.amount())
+        .map(|cf| cf.principal_delta.expect("PIK delta").amount())
         .sum();
     let last_pik_date = schedule
         .get_flows()

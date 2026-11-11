@@ -612,7 +612,13 @@ fn february_rate_and_payment_boundaries_are_not_termination() {
             .iter()
             .find(|f| f.date == date("2025-02-28"))
             .expect("February coupon");
-        close(coupon.amount.amount(), 50_000.0);
+        // A PIK coupon's value is its explicit capitalization, not cash.
+        let value = if coupon.kind == finstack_quant_core::cashflow::CFKind::Pik {
+            coupon.principal_delta.expect("PIK delta").amount()
+        } else {
+            coupon.amount.amount()
+        };
+        close(value, 50_000.0);
         assert!(
             !coupon
                 .accrual

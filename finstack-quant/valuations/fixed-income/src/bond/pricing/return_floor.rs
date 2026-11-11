@@ -481,7 +481,8 @@ mod tests {
         let schedule = CashFlowSchedule::from_flows(
             vec![
                 CashFlow::new(issue, None, money(-1_000.0), CFKind::Notional, 0.0, None),
-                CashFlow::new(pik_date, None, money(50.0), CFKind::Pik, 0.0, None),
+                CashFlow::new(pik_date, None, money(0.0), CFKind::Pik, 0.0, None)
+                    .with_principal_delta(money(50.0)),
                 CashFlow::new(
                     negative_cash_date,
                     None,

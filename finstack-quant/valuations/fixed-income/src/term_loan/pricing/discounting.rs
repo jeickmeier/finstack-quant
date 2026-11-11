@@ -554,20 +554,32 @@ mod tests {
             "PIK loan should generate PIK cashflows"
         );
 
-        let pv_excluding =
-            TermLoanDiscountingPricer::price(&loan, &market, as_of).expect("pv excluding PIK");
-
-        let flows_including: Vec<(Date, Money)> = schedule
+        // PIK is a noncash balance event: zero cash, positive capitalization
+        // (record CORE-CONVENTIONS-015 #1), so it cannot add settlement PV.
+        for cf in schedule
+            .get_flows()
+            .iter()
+            .filter(|cf| cf.kind == CFKind::Pik)
+        {
+            assert_eq!(cf.amount.amount(), 0.0);
+            assert!(cf.principal_delta.expect("PIK delta").amount() > 0.0);
+        }
+        let all_flows: Vec<(Date, Money)> = schedule
             .get_flows()
             .iter()
             .map(|cf| (cf.date, cf.amount))
             .collect();
-        let pv_including = npv(&disc, as_of, &flows_including, false).expect("pv including PIK");
-
-        assert!(
-            pv_including.amount() > pv_excluding.amount(),
-            "Including PIK flows should increase PV (excluded by default)"
+        let cash_flows: Vec<(Date, Money)> = schedule
+            .get_flows()
+            .iter()
+            .filter(|cf| cf.kind != CFKind::Pik)
+            .map(|cf| (cf.date, cf.amount))
+            .collect();
+        assert_eq!(
+            npv(&disc, as_of, &all_flows, false).expect("pv of all rows"),
+            npv(&disc, as_of, &cash_flows, false).expect("pv of cash rows")
         );
+        TermLoanDiscountingPricer::price(&loan, &market, as_of).expect("pricer PV");
     }
 
     // Fixing support tests

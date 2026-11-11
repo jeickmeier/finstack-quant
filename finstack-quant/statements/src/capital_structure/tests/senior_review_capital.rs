@@ -1055,7 +1055,7 @@ fn contractual_pik_is_redeemed_at_maturity_and_capitalized_once() {
         .get_flows()
         .iter()
         .filter(|flow| flow.kind == CFKind::Pik)
-        .map(|flow| flow.amount.amount().abs())
+        .map(|flow| flow.principal_delta.expect("PIK delta").amount().abs())
         .sum();
     let expected_principal = 100.0 + expected_pik;
     assert!(expected_pik > 0.0);
@@ -1278,7 +1278,7 @@ fn newly_funded_balance_capitalizes_pik_on_its_effective_date() {
         CashFlow::new(
             date!(2025 - 04 - 02),
             None,
-            Money::new(5.0, Currency::USD).expect("valid PIK amount"),
+            Money::zero(Currency::USD),
             CFKind::Pik,
             0.0,
             None,

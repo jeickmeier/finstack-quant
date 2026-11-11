@@ -769,6 +769,23 @@ logged under Needs review.
     survival like `Recovery`; `recovery_rate` is rejected alongside it as with
     explicit write-downs. The CDS index schedule test now asserts the ladder
     counts protection cash.
+  - **G5-3b zero-cash noncash rows.** PIK (fixed, step-up, floating) and
+    structured-credit / asset-backed-facility `DefaultedNotional` rows now
+    carry exact zero cash; their value is only the explicit delta. The
+    residual rebuild keeps a PIK row's zero cash and reprojects its delta.
+    `CashFlow::validate` rejects nonzero cash or a missing delta on either
+    kind (record 015 #1), so every schedule publication checks it. No
+    production number, Bloomberg/QuantLib golden or regression golden moved.
+    Tests that read a PIK or write-down value from `amount` now read the
+    delta: hand-built fixtures in cashflows (normalize, lifecycle provider,
+    classified flows, credit models, outstanding-with-default, performance
+    accrual), core, statements, bond seasoned/return-floor, revolving-credit
+    ordering; value reads in compiler, audit, residual, senior-capital, LSMC
+    and consumer-accrual tests. The term-loan "PIK excluded from PV" test
+    asserted that adding PIK rows raises PV, which relied on the duplicate
+    cash amount record 015 #1 removes; it now asserts zero PIK cash, a
+    positive delta and equal PV with and without the rows. PIK dates are
+    unchanged (`date == principal_date` is the next commit).
   - **Margin substitution (Needs review).** Record 015 #2 and #11 say
     substitution kinds carry only genuine monetary transfers, never a marked
     collateral value; margin record 20 (Draft, observed only) describes the

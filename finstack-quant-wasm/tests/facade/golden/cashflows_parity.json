@@ -458,7 +458,7 @@
         "date": "2025-07-15",
         "reset_date": null,
         "amount": {
-          "amount": "20000",
+          "amount": "0",
           "currency": "USD"
         },
         "kind": "pik",
@@ -482,7 +482,7 @@
         "date": "2026-01-15",
         "reset_date": null,
         "amount": {
-          "amount": "20400",
+          "amount": "0",
           "currency": "USD"
         },
         "kind": "pik",
@@ -525,7 +525,7 @@
         "date": "2026-07-15",
         "reset_date": null,
         "amount": {
-          "amount": "20808",
+          "amount": "0",
           "currency": "USD"
         },
         "kind": "pik",
@@ -568,7 +568,7 @@
         "date": "2027-01-15",
         "reset_date": null,
         "amount": {
-          "amount": "21224.16",
+          "amount": "0",
           "currency": "USD"
         },
         "kind": "pik",
@@ -632,7 +632,7 @@
         "date": "2025-07-15",
         "reset_date": null,
         "amount": {
-          "amount": "30000",
+          "amount": "0",
           "currency": "USD"
         },
         "kind": "pik",
@@ -656,7 +656,7 @@
         "date": "2026-01-15",
         "reset_date": null,
         "amount": {
-          "amount": "30900",
+          "amount": "0",
           "currency": "USD"
         },
         "kind": "pik",

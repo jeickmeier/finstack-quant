@@ -14749,7 +14749,7 @@
                     "date": "2035-01-03",
                     "reset_date": null,
                     "amount": {
-                      "amount": "-3301848.0142277153",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "kind": "defaulted_notional",
@@ -18046,7 +18046,7 @@
                     "date": "2030-10-02",
                     "reset_date": null,
                     "amount": {
-                      "amount": "-37119303.59306971",
+                      "amount": "0",
                       "currency": "USD"
                     },
                     "kind": "defaulted_notional",
@@ -20877,7 +20877,7 @@
                   "date": "2026-01-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "-78246780.0249779",
+                    "amount": "0",
                     "currency": "USD"
                   },
                   "kind": "defaulted_notional",
@@ -22201,7 +22201,7 @@
                   "date": "2024-01-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "-99000000",
+                    "amount": "0",
                     "currency": "USD"
                   },
                   "kind": "defaulted_notional",
@@ -22856,7 +22856,7 @@
                   "date": "2027-01-04",
                   "reset_date": null,
                   "amount": {
-                    "amount": "-15000000",
+                    "amount": "0",
                     "currency": "USD"
                   },
                   "kind": "defaulted_notional",
@@ -23184,7 +23184,7 @@
                   "date": "2027-01-04",
                   "reset_date": null,
                   "amount": {
-                    "amount": "-15000000",
+                    "amount": "0",
                     "currency": "USD"
                   },
                   "kind": "defaulted_notional",
@@ -23803,7 +23803,7 @@
                   "date": "2027-01-04",
                   "reset_date": null,
                   "amount": {
-                    "amount": "-49992673.79033325",
+                    "amount": "0",
                     "currency": "USD"
                   },
                   "kind": "defaulted_notional",
@@ -28085,7 +28085,7 @@
                   "date": "2026-01-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "-79137472.58946182",
+                    "amount": "0",
                     "currency": "USD"
                   },
                   "kind": "defaulted_notional",
@@ -29288,7 +29288,7 @@
                   "date": "2024-01-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "-99000000",
+                    "amount": "0",
                     "currency": "USD"
                   },
                   "kind": "defaulted_notional",
@@ -29765,7 +29765,7 @@
                   "date": "2024-04-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "-15000000",
+                    "amount": "0",
                     "currency": "USD"
                   },
                   "kind": "defaulted_notional",
@@ -29850,7 +29850,7 @@
                   "date": "2024-04-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "-15000000",
+                    "amount": "0",
                     "currency": "USD"
                   },
                   "kind": "defaulted_notional",
@@ -29957,7 +29957,7 @@
                   "date": "2024-04-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "-68485564.78428261",
+                    "amount": "0",
                     "currency": "USD"
                   },
                   "kind": "defaulted_notional",
@@ -30693,7 +30693,7 @@
                   "date": "2027-01-04",
                   "reset_date": null,
                   "amount": {
-                    "amount": "-15000000",
+                    "amount": "0",
                     "currency": "USD"
                   },
                   "kind": "defaulted_notional",
@@ -31083,7 +31083,7 @@
                   "date": "2027-01-04",
                   "reset_date": null,
                   "amount": {
-                    "amount": "-68942724.96547657",
+                    "amount": "0",
                     "currency": "USD"
                   },
                   "kind": "defaulted_notional",
@@ -38324,7 +38324,7 @@
             },
             {
               "date": "2024-04-01",
-              "amount": 151666.66666666666,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25277777777777777,
@@ -38344,7 +38344,7 @@
             },
             {
               "date": "2024-07-01",
-              "amount": 153966.94444444444,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25277777777777777,
@@ -38364,7 +38364,7 @@
             },
             {
               "date": "2024-10-01",
-              "amount": 158019.71537037037,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25555555555555554,
@@ -38384,7 +38384,7 @@
             },
             {
               "date": "2025-01-01",
-              "amount": 160442.68433938271,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25555555555555554,
@@ -38404,7 +38404,7 @@
             },
             {
               "date": "2025-04-01",
-              "amount": 159361.44016231297,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25,
@@ -38424,7 +38424,7 @@
             },
             {
               "date": "2025-07-01",
-              "amount": 163549.10467324484,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25277777777777777,
@@ -38444,7 +38444,7 @@
             },
             {
               "date": "2025-10-01",
-              "amount": 167854.1005200651,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25555555555555554,
@@ -38464,7 +38464,7 @@
             },
             {
               "date": "2026-01-01",
-              "amount": 170427.86339470613,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25555555555555554,
@@ -38484,7 +38484,7 @@
             },
             {
               "date": "2026-04-01",
-              "amount": 169279.32779356788,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25,
@@ -38504,7 +38504,7 @@
             },
             {
               "date": "2026-07-01",
-              "amount": 173727.61235169886,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25277777777777777,
@@ -38524,7 +38524,7 @@
             },
             {
               "date": "2026-10-01",
-              "amount": 178300.53038231903,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25555555555555554,
@@ -38544,7 +38544,7 @@
             },
             {
               "date": "2027-01-01",
-              "amount": 181034.47184818127,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25555555555555554,
@@ -38564,7 +38564,7 @@
             },
             {
               "date": "2027-04-01",
-              "amount": 179814.4569292044,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25,
@@ -38584,7 +38584,7 @@
             },
             {
               "date": "2027-07-01",
-              "amount": 184539.5812696218,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25277777777777777,
@@ -38604,7 +38604,7 @@
             },
             {
               "date": "2027-10-01",
-              "amount": 189397.09566890204,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25555555555555554,
@@ -38624,7 +38624,7 @@
             },
             {
               "date": "2028-01-03",
-              "amount": 192301.18446915856,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25555555555555554,
@@ -38644,7 +38644,7 @@
             },
             {
               "date": "2028-04-03",
-              "amount": 193127.52216763835,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25277777777777777,
@@ -38664,7 +38664,7 @@
             },
             {
               "date": "2028-07-03",
-              "amount": 196056.6229205142,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25277777777777777,
@@ -38684,7 +38684,7 @@
             },
             {
               "date": "2028-10-02",
-              "amount": 201217.29285570397,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25555555555555554,
@@ -38704,7 +38704,7 @@
             },
             {
               "date": "2029-01-01",
-              "amount": 204302.62467949145,
+              "amount": 0,
               "currency": "USD",
               "kind": "pik",
               "accrual_factor": 0.25555555555555554,

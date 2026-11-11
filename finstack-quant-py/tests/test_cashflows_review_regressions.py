@@ -56,8 +56,11 @@ def test_dated_flows_preserves_cash_and_omits_state_rows() -> None:
     schedule = CashFlowSchedule.from_flows(
         [
             CashFlow(date, Money(10, "USD"), "fixed", 0.0),
-            CashFlow(date, Money(5, "USD"), "pik", 0.0),
-            CashFlow(date, Money(20, "USD"), "defaulted_notional", 0.0),
+            # Noncash balance events carry zero cash and an explicit delta.
+            CashFlow(date, Money(0, "USD"), "pik", 0.0).with_principal_delta(Money(5, "USD")),
+            CashFlow(date, Money(0, "USD"), "defaulted_notional", 0.0)
+            .with_principal_delta(Money(-20, "USD"))
+            .with_principal_date(date),
         ],
         Notional.par(100, "USD"),
         DayCount.ACT_360,

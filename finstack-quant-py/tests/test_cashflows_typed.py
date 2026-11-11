@@ -1355,7 +1355,10 @@ class TestTypedTwinsAndWire:
         dated = [(dt.date(2025, 6, 15), Money(100.0, "USD"))]
         s1 = schedule_from_dated_flows(dated, "fixed", DayCount.ACT_360)
         assert s1.get_flows()[0].kind == CFKind.FIXED
-        flow = CashFlow(dt.date(2025, 6, 15), Money(100.0, "USD"), CFKind.PIK, 0.0)
+        # A PIK row is a noncash balance event: zero cash, explicit capitalization.
+        flow = CashFlow(dt.date(2025, 6, 15), Money(0.0, "USD"), CFKind.PIK, 0.0).with_principal_delta(
+            Money(100.0, "USD")
+        )
         opts = ScheduleBuildOpts(notional_hint=Money(500.0, "USD"), meta=CashFlowMeta("projected"))
         s2 = schedule_from_classified_flows([flow], DayCount.ACT_360, opts)
         assert s2.get_notional().initial.amount == pytest.approx(500.0)
@@ -1364,7 +1367,8 @@ class TestTypedTwinsAndWire:
         s3 = CashFlowSchedule.from_flows([flow], Notional.par(1.0, "USD"), DayCount.ACT_360)
         assert pickle.loads(pickle.dumps(s3.get_meta())).representation == "contractual"  # noqa: S301 - trusted in-process round trip
         s4 = CashFlowSchedule.from_flows([flow], Notional.par(1.0, "USD"), DayCount.ACT_360, CashFlowMeta())
-        assert s4.get_flows()[0].amount.amount == 100.0
+        assert s4.get_flows()[0].amount.amount == 0.0
+        assert s4.get_flows()[0].principal_delta.amount == 100.0
 
     def test_from_flows_accepts_dataframe(self) -> None:
         pd = pytest.importorskip("pandas")

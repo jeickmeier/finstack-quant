@@ -2202,7 +2202,7 @@
                   "date": "2035-01-03",
                   "reset_date": null,
                   "amount": {
-                    "amount": "-3301848.0142277153",
+                    "amount": "0",
                     "currency": "USD"
                   },
                   "kind": "defaulted_notional",
@@ -5491,7 +5491,7 @@
                   "date": "2030-10-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "-37119303.59306971",
+                    "amount": "0",
                     "currency": "USD"
                   },
                   "kind": "defaulted_notional",

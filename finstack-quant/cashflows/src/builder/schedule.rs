@@ -1610,7 +1610,8 @@ mod tests {
             vec![
                 flow(issue, -98.0, CFKind::Notional)
                     .with_principal_delta(Money::from((100_i64, Currency::USD))),
-                flow(pik, 5.0, CFKind::Pik),
+                flow(pik, 0.0, CFKind::Pik)
+                    .with_principal_delta(Money::from((5_i64, Currency::USD))),
                 flow(maturity, 105.0, CFKind::Notional),
             ],
             Notional::par(0.0, Currency::USD).expect("notional"),
@@ -1625,7 +1626,14 @@ mod tests {
         schedule.validate().expect("preserved principal");
         assert_eq!(schedule.notional.initial.amount(), 100.0);
         assert_eq!(schedule.flows[0].kind, CFKind::Pik);
-        assert_eq!(schedule.flows[0].amount.amount(), 5.0);
+        assert_eq!(schedule.flows[0].amount.amount(), 0.0);
+        assert_eq!(
+            schedule.flows[0]
+                .principal_delta
+                .expect("PIK delta")
+                .amount(),
+            5.0
+        );
         let balances = schedule.outstanding_by_date().expect("balances");
         assert_eq!(balances[0].1.amount(), 105.0);
         assert_eq!(balances[1].1.amount(), 0.0);
@@ -1639,7 +1647,7 @@ mod tests {
         let pik = CashFlow::new(
             maturity,
             None,
-            Money::from((6_i64, Currency::USD)),
+            Money::zero(Currency::USD),
             CFKind::Pik,
             0.5,
             Some(0.12),

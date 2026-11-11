@@ -249,7 +249,13 @@ pub(super) fn expected_linear(schedule: &CashFlowSchedule, date: Date, include_p
                 ),
                 other => panic!("unsupported independent consumer convention {other:?}"),
             };
-            flow.amount.amount() * elapsed / total
+            // A PIK row's value is its explicit capitalization, not cash.
+            let value = if flow.kind == CFKind::Pik {
+                flow.principal_delta.expect("PIK delta").amount()
+            } else {
+                flow.amount.amount()
+            };
+            value * elapsed / total
         })
         .sum()
 }

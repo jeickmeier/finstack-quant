@@ -251,12 +251,15 @@ pub(crate) fn rebuild_residual_interest(
                 let factor = original.accrual_factor * fraction;
                 let value = original_value * fraction + balance_delta * rate * factor;
                 let mut flow = original.clone();
-                flow.amount = Money::new(value, currency).map_err(|error| {
-                    Error::capital_structure(format!(
-                        "cannot rebuild {:?} interest on {}: {error}",
-                        flow.kind, flow.date
-                    ))
-                })?;
+                // A PIK row keeps its zero cash; its value is the delta below.
+                if original.kind != CFKind::Pik {
+                    flow.amount = Money::new(value, currency).map_err(|error| {
+                        Error::capital_structure(format!(
+                            "cannot rebuild {:?} interest on {}: {error}",
+                            flow.kind, flow.date
+                        ))
+                    })?;
+                }
                 // Preserve this row's own cash/PIK share even if its amount
                 // becomes zero; a later rebuild must not recover the full
                 // unsplit rate from a zero principal denominator.

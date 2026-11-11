@@ -618,6 +618,24 @@ impl CashFlow {
                 actual: delta.currency(),
             });
         }
+        // PIK and DefaultedNotional are noncash balance events: exactly zero
+        // cash, with their value carried only by the explicit principal delta
+        // (record CORE-CONVENTIONS-015 #1).
+        if !self.kind.is_cash_settlement() {
+            if !self.amount.amount_decimal().is_zero() {
+                return Err(crate::Error::Validation(format!(
+                    "CashFlow: {} row on {} is a noncash balance event and must carry zero \
+                     cash; its value belongs in principal_delta",
+                    self.kind, self.date
+                )));
+            }
+            if self.principal_delta.is_none() {
+                return Err(crate::Error::Validation(format!(
+                    "CashFlow: {} row on {} requires an explicit principal_delta",
+                    self.kind, self.date
+                )));
+            }
+        }
         if let Some(accrual) = &self.accrual {
             if accrual
                 .coupon_period
@@ -812,15 +830,16 @@ mod tests {
         assert_eq!(fee.kind, CFKind::Fee);
         assert!(fee.validate().is_ok());
 
+        // PIK is a noncash balance event: zero cash, explicit capitalization.
         let pik = CashFlow {
             date,
             reset_date: None,
-            amount: amt,
+            amount: Money::zero(amt.currency()),
             kind: CFKind::Pik,
             accrual_factor: 0.0,
             rate: None,
             accrual: None,
-            principal_delta: None,
+            principal_delta: Some(amt),
             principal_date: None,
         };
         assert_eq!(pik.kind, CFKind::Pik);

@@ -400,14 +400,20 @@ mod tests {
         ]
         .into_iter()
         .map(|(kind, amount)| {
-            CashFlow::new(
-                date,
-                None,
-                Money::from((amount, Currency::USD)),
-                kind,
-                0.0,
-                None,
-            )
+            let value = Money::from((amount, Currency::USD));
+            if kind.is_cash_settlement() {
+                CashFlow::new(date, None, value, kind, 0.0, None)
+            } else {
+                // Noncash balance events carry zero cash and an explicit delta.
+                let delta = if kind == CFKind::Pik {
+                    value
+                } else {
+                    value.checked_neg()
+                };
+                CashFlow::new(date, None, Money::zero(Currency::USD), kind, 0.0, None)
+                    .with_principal_delta(delta)
+                    .with_principal_date(date)
+            }
         })
         .collect();
         let schedule = schedule_from_classified_flows(
@@ -500,11 +506,12 @@ mod tests {
                 CashFlow::new(
                     future,
                     None,
-                    Money::from((40_i64, Currency::USD)),
+                    Money::zero(Currency::USD),
                     CFKind::Pik,
                     0.0,
                     None,
-                ),
+                )
+                .with_principal_delta(Money::from((40_i64, Currency::USD))),
                 CashFlow::new(
                     past,
                     None,
@@ -524,11 +531,13 @@ mod tests {
                 CashFlow::new(
                     future,
                     None,
-                    Money::from((50_i64, Currency::USD)),
+                    Money::zero(Currency::USD),
                     CFKind::DefaultedNotional,
                     0.0,
                     None,
-                ),
+                )
+                .with_principal_delta(Money::from((-50_i64, Currency::USD)))
+                .with_principal_date(future),
             ];
             schedule_from_classified_flows(
                 flows,
@@ -566,7 +575,11 @@ mod tests {
             .iter()
             .find(|f| f.kind == CFKind::Pik)
             .expect("PIK principal movement");
-        assert_eq!(capitalization.amount.amount(), 40.0);
+        assert_eq!(capitalization.amount.amount(), 0.0);
+        assert_eq!(
+            capitalization.principal_delta.expect("PIK delta").amount(),
+            40.0
+        );
 
         let dated = instrument
             .dated_cashflows(&curves, as_of)
@@ -651,11 +664,13 @@ mod tests {
             CashFlow::new(
                 date,
                 None,
-                Money::from((-5_i64, Currency::USD)),
+                Money::zero(Currency::USD),
                 CFKind::DefaultedNotional,
                 0.0,
                 None,
-            ),
+            )
+            .with_principal_delta(Money::from((-5_i64, Currency::USD)))
+            .with_principal_date(date),
         ];
 
         let schedule = schedule_from_classified_flows(
