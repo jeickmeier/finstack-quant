@@ -615,6 +615,11 @@
           },
           "date": "2025-01-15",
           "kind": "notional",
+          "principal_date": "2025-01-15",
+          "principal_delta": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "reset_date": null
         },
         {
@@ -670,6 +675,10 @@
           "date": "2026-01-15",
           "kind": "notional",
           "principal_date": "2026-01-15",
+          "principal_delta": {
+            "amount": "-1000000",
+            "currency": "USD"
+          },
           "reset_date": null
         }
       ],

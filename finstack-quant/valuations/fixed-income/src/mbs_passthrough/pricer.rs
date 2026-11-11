@@ -275,24 +275,23 @@ fn schedule_from_projection(
             ));
         }
         if cf.scheduled_principal.abs() > f64::EPSILON {
-            flows.push(CashFlow::new(
-                cf.payment_date,
-                None,
-                Money::from_model_value(cf.scheduled_principal, mbs.current_face.currency())?,
-                CFKind::Amortization,
-                0.0,
-                None,
-            ));
+            flows.push({
+                // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+                let cash =
+                    Money::from_model_value(cf.scheduled_principal, mbs.current_face.currency())?;
+                CashFlow::new(cf.payment_date, None, cash, CFKind::Amortization, 0.0, None)
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(cf.payment_date)
+            });
         }
         if cf.prepayment.abs() > f64::EPSILON {
-            flows.push(CashFlow::new(
-                cf.payment_date,
-                None,
-                Money::from_model_value(cf.prepayment, mbs.current_face.currency())?,
-                CFKind::PrePayment,
-                0.0,
-                None,
-            ));
+            flows.push({
+                // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+                let cash = Money::from_model_value(cf.prepayment, mbs.current_face.currency())?;
+                CashFlow::new(cf.payment_date, None, cash, CFKind::PrePayment, 0.0, None)
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(cf.payment_date)
+            });
         }
     }
 

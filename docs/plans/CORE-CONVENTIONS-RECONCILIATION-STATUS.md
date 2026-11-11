@@ -816,6 +816,45 @@ logged under Needs review.
       origin (`pays_cash`, `capitalizes`); only those are scheduled for
       payment, capitalization and exercise-date accrued claims. The split
       test asserts the settled cash share is never scheduled again.
+  - **G5-3d1 explicit principal effects from every producer.** Each
+    production principal row now carries an explicit `principal_delta` and
+    `principal_date` equal to what replay used to infer, so no balance or
+    value moved. Producers: the cashflow builder (amortization, redemption,
+    issue funding), convertible settled claim, inflation-linked bond
+    principal (both schedules), MBS pass-through and CMO amortization and
+    prepayment, revolving credit (draws, repayments, commitment legs,
+    terminal repayment, quote opening leg), deposit and repo exchanges, MtM
+    XCCY exchanges and rebalances, asset-backed facility amortization and
+    draws, structured-credit tranche amortization and draws.
+    - **Opening balance versus inception delta (record 015 #5).** Where the
+      schedule's opening notional already holds the funded principal (the
+      builder's issue funding row, the deposit and repo start legs) the
+      funding row carries an explicit zero. Revolver and XCCY schedules open
+      from a zero or reporting notional, so their opening legs carry the
+      principal they establish.
+    - **Proof of no movement.** A temporary probe compared every explicit
+      delta with the old inference across the full Rust suite. The only
+      differences were rows that already carried explicit deltas before this
+      commit (statements prepayments, OID funding where face differs from
+      cash, XCCY principal events, normalization synthetics, one JSON-bridge
+      fixture whose meta issue date differs from its funding date); none came
+      from the new producers.
+    - **Delta-presence heuristics re-keyed.** Replay's issue-funding test and
+      LSMC's funding skip now also accept an explicit zero delta, and LSMC's
+      terminal redemption is the final positive notional redeemed at par
+      (delta absent or equal to minus its cash) rather than "no delta".
+    - **Display change (traced).** `balances_by_flow` showed the issue
+      funding row moving 0 to the opening notional while its delta is now an
+      explicit zero; record 015 #5 says that row adds no second increase, so
+      it now keeps the opening balance. The export test was renamed
+      `issue_funding_row_keeps_the_opening_balance`, and the cashflows UI
+      fixture's funding row opens at 1,000,000.
+    - **Cash versus par (Needs review, unchanged values).** Inflation-linked
+      principal is indexed cash (`notional * index ratio`); its delta keeps
+      today's minus-cash value rather than the face change. The convertible
+      settled claim, deposit, repo and revolver rows have cash equal to par.
+    - Fixtures: the cross-host cashflows and valuations parity goldens, the
+      schema golden and four UI fixtures gained the explicit fields.
 - **Notebooks broken by earlier slices (found during G5, fixed in `NB:`).**
   A full run (`run_all_notebooks.py --timeout 120`) after G5-3b passed 92 of
   101; none of the 9 failures involved PIK or write-down rows, and slice

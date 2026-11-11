@@ -267,14 +267,21 @@ pub(super) fn initialize_build_state(
 
     if principal_exchange == PrincipalExchange::InitialAndFinal && notional.initial.amount() != 0.0
     {
-        flows.push(CashFlow::new(
-            issue,
-            None,
-            notional.initial.checked_neg(),
-            CFKind::Notional,
-            0.0,
-            None,
-        ));
+        // The opening notional already holds the funded principal, so the
+        // funding cash carries an explicit zero delta (record
+        // CORE-CONVENTIONS-015 #5).
+        flows.push(
+            CashFlow::new(
+                issue,
+                None,
+                notional.initial.checked_neg(),
+                CFKind::Notional,
+                0.0,
+                None,
+            )
+            .with_principal_delta(Money::zero(notional.initial.currency()))
+            .with_principal_date(issue),
+        );
     }
 
     let mut outstanding = f64_to_decimal(notional.initial.amount())?;

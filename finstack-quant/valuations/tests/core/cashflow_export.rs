@@ -659,14 +659,17 @@ fn bullet_bond_balances_hold_until_redemption() {
 }
 
 #[test]
-fn issue_funding_row_opens_from_zero() {
+fn issue_funding_row_keeps_the_opening_balance() {
+    // The opening notional already holds the funded principal, so the funding
+    // cash moves nothing (record CORE-CONVENTIONS-015 #5).
     let as_of = Date::from_calendar_date(2025, Month::January, 15).expect("date");
     let envelope = export(&balance_bond("BOND-FUNDING"), as_of);
     let funding = &envelope.flows[0];
     assert_eq!(funding.kind, CFKind::Notional);
-    assert_eq!(funding.beginning_balance, Some(0.0));
+    assert_eq!(funding.principal_delta, Some(0.0));
+    assert_eq!(funding.beginning_balance, Some(1_000_000.0));
     assert_eq!(funding.ending_balance, Some(1_000_000.0));
-    assert_balances_roll(&envelope, 0.0, 0.0);
+    assert_balances_roll(&envelope, 1_000_000.0, 0.0);
 }
 
 #[test]

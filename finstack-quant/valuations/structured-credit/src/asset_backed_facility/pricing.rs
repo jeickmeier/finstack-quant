@@ -403,14 +403,13 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
         }
         for (date, amount) in &projection.facility.principal_flows {
             if amount.amount() > 0.0 {
-                flows.push(CashFlow::new(
-                    *date,
-                    None,
-                    *amount,
-                    CFKind::Amortization,
-                    0.0,
-                    None,
-                ));
+                flows.push({
+                    // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+                    let cash = *amount;
+                    CashFlow::new(*date, None, cash, CFKind::Amortization, 0.0, None)
+                        .with_principal_delta(cash.checked_neg())
+                        .with_principal_date(*date)
+                });
             }
         }
         for (date, amount) in &projection.facility.writedown_flows {
@@ -444,14 +443,13 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
         // Draws (scheduled and re-advances) are cash the lender pays out.
         for (date, amount) in &projection.draws {
             if amount.amount() > 0.0 {
-                flows.push(CashFlow::new(
-                    *date,
-                    None,
-                    amount.checked_neg(),
-                    CFKind::Notional,
-                    0.0,
-                    None,
-                ));
+                flows.push({
+                    // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+                    let cash = amount.checked_neg();
+                    CashFlow::new(*date, None, cash, CFKind::Notional, 0.0, None)
+                        .with_principal_delta(cash.checked_neg())
+                        .with_principal_date(*date)
+                });
             }
         }
         schedule_from_classified_flows(

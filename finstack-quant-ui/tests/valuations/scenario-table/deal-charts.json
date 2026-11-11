@@ -1157,7 +1157,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1514435.2157173879",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-04-01"
               },
               {
                 "date": "2024-07-01",
@@ -1177,7 +1182,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1479876.9193986163",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-07-01"
               },
               {
                 "date": "2024-10-01",
@@ -1197,7 +1207,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1806916.0326303034",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-10-01"
               },
               {
                 "date": "2025-01-02",
@@ -1217,7 +1232,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1790235.0206980405",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-01-02"
               },
               {
                 "date": "2025-04-01",
@@ -1237,7 +1257,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1789225.0661719139",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-04-01"
               },
               {
                 "date": "2025-07-01",
@@ -1257,7 +1282,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1748396.267834402",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-07-01"
               },
               {
                 "date": "2025-10-01",
@@ -1277,7 +1307,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1708499.1526066633",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-10-01"
               },
               {
                 "date": "2026-01-02",
@@ -1297,7 +1332,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1669512.4601662422",
+                  "currency": "USD"
+                },
+                "principal_date": "2026-01-02"
               },
               {
                 "date": "2026-04-01",
@@ -1317,7 +1357,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1631415.415335543",
+                  "currency": "USD"
+                },
+                "principal_date": "2026-04-01"
               },
               {
                 "date": "2026-07-01",
@@ -1337,7 +1382,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1594187.7170114089",
+                  "currency": "USD"
+                },
+                "principal_date": "2026-07-01"
               },
               {
                 "date": "2026-10-01",
@@ -1357,7 +1407,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1557809.5273467395",
+                  "currency": "USD"
+                },
+                "principal_date": "2026-10-01"
               },
               {
                 "date": "2027-01-04",
@@ -1377,7 +1432,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1522261.4611795605",
+                  "currency": "USD"
+                },
+                "principal_date": "2027-01-04"
               },
               {
                 "date": "2027-01-04",
@@ -1387,7 +1447,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-194555.95356992725",
+                  "currency": "USD"
+                },
+                "principal_date": "2027-01-04"
               },
               {
                 "date": "2027-01-04",
@@ -5569,7 +5634,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-5398504.028275879",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-04-01"
               },
               {
                 "date": "2024-07-01",
@@ -5589,7 +5659,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-5079868.21198447",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-07-01"
               },
               {
                 "date": "2024-10-01",
@@ -5609,7 +5684,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-4780039.232344828",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-10-01"
               },
               {
                 "date": "2025-01-02",
@@ -5629,7 +5709,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-4497907.053740233",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-01-02"
               },
               {
                 "date": "2025-04-01",
@@ -5639,7 +5724,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-302276.61643872136",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-04-01"
               },
               {
                 "date": "2025-07-01",
@@ -5649,7 +5739,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-284435.34857631364",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-07-01"
               },
               {
                 "date": "2025-10-01",
@@ -5659,7 +5754,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-267647.1255795272",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-10-01"
               },
               {
                 "date": "2026-01-02",
@@ -5669,7 +5769,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-251849.793598223",
+                  "currency": "USD"
+                },
+                "principal_date": "2026-01-02"
               },
               {
                 "date": "2026-01-02",
@@ -6872,7 +6977,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1000000",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-01-01"
               },
               {
                 "date": "2024-01-01",
@@ -7541,7 +7651,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1514435.2157173879",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-04-01"
               },
               {
                 "date": "2024-04-01",
@@ -8507,7 +8622,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-853527.4692890364",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-01-02"
               },
               {
                 "date": "2025-04-01",
@@ -8527,7 +8647,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1380862.0296911146",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-04-01"
               },
               {
                 "date": "2025-07-01",
@@ -8547,7 +8672,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1349351.7751076587",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-07-01"
               },
               {
                 "date": "2025-10-01",
@@ -8567,7 +8697,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1318560.5613281103",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-10-01"
               },
               {
                 "date": "2026-01-02",
@@ -8587,7 +8722,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1288471.9803708608",
+                  "currency": "USD"
+                },
+                "principal_date": "2026-01-02"
               },
               {
                 "date": "2026-04-01",
@@ -8607,7 +8747,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1259069.9986723582",
+                  "currency": "USD"
+                },
+                "principal_date": "2026-04-01"
               },
               {
                 "date": "2026-07-01",
@@ -8627,7 +8772,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1230338.9485431632",
+                  "currency": "USD"
+                },
+                "principal_date": "2026-07-01"
               },
               {
                 "date": "2026-10-01",
@@ -8647,7 +8797,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1202263.519818971",
+                  "currency": "USD"
+                },
+                "principal_date": "2026-10-01"
               },
               {
                 "date": "2027-01-04",
@@ -8667,7 +8822,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1174828.7517021508",
+                  "currency": "USD"
+                },
+                "principal_date": "2027-01-04"
               },
               {
                 "date": "2027-01-04",
@@ -9107,7 +9267,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1514435.2157173879",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-04-01"
               },
               {
                 "date": "2024-07-01",
@@ -9127,7 +9292,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1479876.9193986163",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-07-01"
               },
               {
                 "date": "2024-10-01",
@@ -9147,7 +9317,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1446107.2179514258",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-10-01"
               },
               {
                 "date": "2025-01-02",
@@ -9167,7 +9342,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-559580.64693257",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-01-02"
               }
             ],
             "accrual_periods": [

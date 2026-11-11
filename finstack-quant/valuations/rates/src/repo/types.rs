@@ -675,22 +675,35 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
             .checked_add(self.interest_between(adj_start, adj_maturity)?)?;
         let interest = total_repayment.checked_sub(self.cash_amount)?;
         let flows = vec![
-            finstack_quant_core::cashflow::CashFlow::new(
-                adj_start,
-                None,
-                cash_outflow,
-                finstack_quant_core::cashflow::CFKind::Notional,
-                0.0,
-                None,
-            ),
-            finstack_quant_core::cashflow::CashFlow::new(
-                adj_maturity,
-                None,
-                self.cash_amount,
-                finstack_quant_core::cashflow::CFKind::Notional,
-                0.0,
-                None,
-            ),
+            {
+                // The opening notional already holds this principal (record
+                // CORE-CONVENTIONS-015 #5), so its delta is an explicit zero.
+                let cash = cash_outflow;
+                finstack_quant_core::cashflow::CashFlow::new(
+                    adj_start,
+                    None,
+                    cash,
+                    finstack_quant_core::cashflow::CFKind::Notional,
+                    0.0,
+                    None,
+                )
+                .with_principal_delta(finstack_quant_core::money::Money::zero(cash.currency()))
+                .with_principal_date(adj_start)
+            },
+            {
+                // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+                let cash = self.cash_amount;
+                finstack_quant_core::cashflow::CashFlow::new(
+                    adj_maturity,
+                    None,
+                    cash,
+                    finstack_quant_core::cashflow::CFKind::Notional,
+                    0.0,
+                    None,
+                )
+                .with_principal_delta(cash.checked_neg())
+                .with_principal_date(adj_maturity)
+            },
             finstack_quant_core::cashflow::CashFlow::new(
                 adj_maturity,
                 None,

@@ -946,14 +946,13 @@ impl<'a> SimulationState<'a> {
             }
             for (date, amount) in &res.principal_flows {
                 if amount.amount() > 0.0 {
-                    res.detailed_flows.push(CashFlow::new(
-                        *date,
-                        None,
-                        *amount,
-                        CFKind::Amortization,
-                        0.0,
-                        None,
-                    ));
+                    res.detailed_flows.push({
+                        // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+                        let cash = *amount;
+                        CashFlow::new(*date, None, cash, CFKind::Amortization, 0.0, None)
+                            .with_principal_delta(cash.checked_neg())
+                            .with_principal_date(*date)
+                    });
                 }
             }
             // Include write-down flows in detailed_flows so NPV and
@@ -980,14 +979,13 @@ impl<'a> SimulationState<'a> {
             }
             for (draw_tranche_id, date, amount) in &diagnostics.tranche_draws {
                 if draw_tranche_id == tranche_id && amount.amount() > 0.0 {
-                    res.detailed_flows.push(CashFlow::new(
-                        *date,
-                        None,
-                        amount.checked_neg(),
-                        CFKind::Notional,
-                        0.0,
-                        None,
-                    ));
+                    res.detailed_flows.push({
+                        // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+                        let cash = amount.checked_neg();
+                        CashFlow::new(*date, None, cash, CFKind::Notional, 0.0, None)
+                            .with_principal_delta(cash.checked_neg())
+                            .with_principal_date(*date)
+                    });
                 }
             }
 

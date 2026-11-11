@@ -242,7 +242,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-5646824.625389965",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-04-01"
               },
               {
                 "date": "2024-07-01",
@@ -262,7 +267,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-5309657.501080659",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-07-01"
               },
               {
                 "date": "2024-10-01",
@@ -282,7 +292,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-4994665.110434837",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-10-01"
               },
               {
                 "date": "2025-01-02",
@@ -302,7 +317,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-4695863.853923886",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-01-02"
               },
               {
                 "date": "2025-04-01",
@@ -312,7 +332,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-302276.61643872136",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-04-01"
               },
               {
                 "date": "2025-07-01",
@@ -322,7 +347,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-284435.34857631364",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-07-01"
               },
               {
                 "date": "2025-10-01",
@@ -332,7 +362,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-267647.1255795272",
+                  "currency": "USD"
+                },
+                "principal_date": "2025-10-01"
               },
               {
                 "date": "2026-01-02",
@@ -342,7 +377,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-251849.793598223",
+                  "currency": "USD"
+                },
+                "principal_date": "2026-01-02"
               },
               {
                 "date": "2026-01-02",
@@ -1664,7 +1704,12 @@
                   "currency": "USD"
                 },
                 "kind": "amortization",
-                "accrual_factor": 0
+                "accrual_factor": 0,
+                "principal_delta": {
+                  "amount": "-1000000",
+                  "currency": "USD"
+                },
+                "principal_date": "2024-01-01"
               },
               {
                 "date": "2024-01-01",

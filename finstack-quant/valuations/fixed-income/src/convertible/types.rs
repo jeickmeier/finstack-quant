@@ -896,14 +896,20 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
                 ));
             }
             let flows = if claim.delivery_date > as_of && claim.cash.amount() > 0.0 {
-                vec![finstack_quant_core::cashflow::CashFlow::new(
-                    claim.delivery_date,
-                    None,
-                    claim.cash,
-                    finstack_quant_core::cashflow::CFKind::Notional,
-                    0.0,
-                    None,
-                )]
+                vec![{
+                    // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+                    let cash = claim.cash;
+                    finstack_quant_core::cashflow::CashFlow::new(
+                        claim.delivery_date,
+                        None,
+                        cash,
+                        finstack_quant_core::cashflow::CFKind::Notional,
+                        0.0,
+                        None,
+                    )
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(claim.delivery_date)
+                }]
             } else {
                 Vec::new()
             };

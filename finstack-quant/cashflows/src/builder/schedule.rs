@@ -926,8 +926,9 @@ impl CashFlowSchedule {
     ///
     /// Replays the same path as [`Self::outstanding_by_date`], one row at a
     /// time. An amortization, PIK, draw or repayment row moves the balance, in
-    /// replay order. The issue funding row, which the opening notional already
-    /// counts, goes from zero to that notional. A row that moves nothing keeps
+    /// replay order. The issue funding row, whose principal the opening
+    /// notional already holds, moves nothing (record CORE-CONVENTIONS-015 #5).
+    /// A row that moves nothing keeps
     /// the balance it sits at: for a coupon that is the balance just before its
     /// accrual end, so a coupon paid after a principal date on the accrual end
     /// still shows the principal it accrued on. A balance within half a minor
@@ -954,11 +955,7 @@ impl CashFlowSchedule {
         let mut path: Vec<(Date, Money)> = Vec::new();
         for (index, is_initial_funding) in self.balance_replay_order(issue, |_| true) {
             let flow = &self.flows[index];
-            let before = if is_initial_funding {
-                Money::from((0_i64, outstanding.currency()))
-            } else {
-                outstanding
-            };
+            let before = outstanding;
             apply_flow_to_outstanding(&mut outstanding, flow, is_initial_funding)?;
             balances[index] = (before, outstanding);
             if outstanding != before {
@@ -1178,7 +1175,9 @@ fn is_initial_funding_flow(
     initial_amount: f64,
     already_skipped: bool,
 ) -> bool {
-    cf.principal_delta.is_none()
+    // The opening notional already holds this principal: its delta is absent
+    // or an explicit zero (record CORE-CONVENTIONS-015 #5).
+    cf.principal_delta.is_none_or(|delta| delta.amount() == 0.0)
         && !already_skipped
         && cf.kind == CFKind::Notional
         && cf.amount.amount() < 0.0

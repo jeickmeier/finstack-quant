@@ -251,14 +251,20 @@ impl MetricCalculator for AllInRateCalculator {
         // facility's schedule starts at the anchor balance without one.
         if facility.issue_date <= context.as_of && facility.drawn.amount() > 0.0 {
             let mut flows = with_opening.get_flows().to_vec();
-            flows.push(finstack_quant_core::cashflow::CashFlow::new(
-                facility.issue_date,
-                None,
-                facility.drawn.checked_neg(),
-                CFKind::Notional,
-                0.0,
-                None,
-            ));
+            flows.push({
+                // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+                let cash = facility.drawn.checked_neg();
+                finstack_quant_core::cashflow::CashFlow::new(
+                    facility.issue_date,
+                    None,
+                    cash,
+                    CFKind::Notional,
+                    0.0,
+                    None,
+                )
+                .with_principal_delta(cash.checked_neg())
+                .with_principal_date(facility.issue_date)
+            });
             with_opening = finstack_quant_cashflows::schedule_from_classified_flows(
                 flows,
                 facility.day_count,

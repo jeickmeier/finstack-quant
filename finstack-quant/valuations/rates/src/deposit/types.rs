@@ -390,22 +390,35 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
         let redemption = self.notional.checked_mul_f64(1.0 + r * yf)?;
         let interest = redemption.checked_sub(self.notional)?;
         let flows = vec![
-            finstack_quant_core::cashflow::CashFlow::new(
-                effective_start,
-                None,
-                self.notional.checked_neg(),
-                finstack_quant_core::cashflow::CFKind::Notional,
-                0.0,
-                None,
-            ),
-            finstack_quant_core::cashflow::CashFlow::new(
-                effective_end,
-                None,
-                self.notional,
-                finstack_quant_core::cashflow::CFKind::Notional,
-                0.0,
-                None,
-            ),
+            {
+                // The opening notional already holds this principal (record
+                // CORE-CONVENTIONS-015 #5), so its delta is an explicit zero.
+                let cash = self.notional.checked_neg();
+                finstack_quant_core::cashflow::CashFlow::new(
+                    effective_start,
+                    None,
+                    cash,
+                    finstack_quant_core::cashflow::CFKind::Notional,
+                    0.0,
+                    None,
+                )
+                .with_principal_delta(finstack_quant_core::money::Money::zero(cash.currency()))
+                .with_principal_date(effective_start)
+            },
+            {
+                // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+                let cash = self.notional;
+                finstack_quant_core::cashflow::CashFlow::new(
+                    effective_end,
+                    None,
+                    cash,
+                    finstack_quant_core::cashflow::CFKind::Notional,
+                    0.0,
+                    None,
+                )
+                .with_principal_delta(cash.checked_neg())
+                .with_principal_date(effective_end)
+            },
             finstack_quant_core::cashflow::CashFlow::new(
                 effective_end,
                 None,

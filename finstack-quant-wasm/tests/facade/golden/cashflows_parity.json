@@ -9,7 +9,12 @@
           "currency": "USD"
         },
         "kind": "notional",
-        "accrual_factor": 0
+        "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "principal_date": "2025-01-15"
       },
       {
         "date": "2025-07-15",
@@ -96,6 +101,10 @@
         },
         "kind": "notional",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
         "principal_date": "2027-01-15"
       }
     ],
@@ -125,7 +134,12 @@
           "currency": "USD"
         },
         "kind": "notional",
-        "accrual_factor": 0
+        "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "principal_date": "2025-01-15"
       },
       {
         "date": "2025-07-15",
@@ -165,6 +179,10 @@
         },
         "kind": "amortization",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-150000",
+          "currency": "USD"
+        },
         "principal_date": "2025-07-15"
       },
       {
@@ -229,6 +247,10 @@
         },
         "kind": "amortization",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-150000",
+          "currency": "USD"
+        },
         "principal_date": "2026-01-15"
       },
       {
@@ -259,6 +281,10 @@
         },
         "kind": "amortization",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-150000",
+          "currency": "USD"
+        },
         "principal_date": "2026-07-15"
       },
       {
@@ -289,6 +315,10 @@
         },
         "kind": "amortization",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-50000",
+          "currency": "USD"
+        },
         "principal_date": "2027-01-15"
       },
       {
@@ -300,6 +330,10 @@
         },
         "kind": "notional",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-400000",
+          "currency": "USD"
+        },
         "principal_date": "2027-01-15"
       }
     ],
@@ -336,7 +370,12 @@
           "currency": "USD"
         },
         "kind": "notional",
-        "accrual_factor": 0
+        "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "principal_date": "2025-01-15"
       },
       {
         "date": "2025-07-15",
@@ -423,6 +462,10 @@
         },
         "kind": "notional",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
         "principal_date": "2027-01-15"
       }
     ],
@@ -452,7 +495,12 @@
           "currency": "USD"
         },
         "kind": "notional",
-        "accrual_factor": 0
+        "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "principal_date": "2025-01-15"
       },
       {
         "date": "2025-07-15",
@@ -597,6 +645,10 @@
         },
         "kind": "notional",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-1082432.16",
+          "currency": "USD"
+        },
         "principal_date": "2027-01-15"
       }
     ],
@@ -626,7 +678,12 @@
           "currency": "USD"
         },
         "kind": "notional",
-        "accrual_factor": 0
+        "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "principal_date": "2025-01-15"
       },
       {
         "date": "2025-07-15",
@@ -723,6 +780,10 @@
         },
         "kind": "notional",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-1060900",
+          "currency": "USD"
+        },
         "principal_date": "2027-01-15"
       }
     ],
@@ -752,7 +813,12 @@
           "currency": "USD"
         },
         "kind": "notional",
-        "accrual_factor": 0
+        "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "principal_date": "2025-01-15"
       },
       {
         "date": "2025-04-15",
@@ -923,6 +989,10 @@
         },
         "kind": "notional",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
         "principal_date": "2027-01-15"
       }
     ],
@@ -994,7 +1064,12 @@
           "currency": "USD"
         },
         "kind": "notional",
-        "accrual_factor": 0
+        "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "principal_date": "2025-01-15"
       },
       {
         "date": "2025-04-15",
@@ -1161,6 +1236,10 @@
         },
         "kind": "notional",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
         "principal_date": "2027-01-15"
       }
     ],
@@ -1213,7 +1292,12 @@
             "currency": "USD"
           },
           "kind": "notional",
-          "accrual_factor": 0
+          "accrual_factor": 0,
+          "principal_delta": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "principal_date": "2025-01-15"
         },
         {
           "date": "2025-04-15",
@@ -1384,6 +1468,10 @@
           },
           "kind": "notional",
           "accrual_factor": 0,
+          "principal_delta": {
+            "amount": "-1000000",
+            "currency": "USD"
+          },
           "principal_date": "2027-01-15"
         }
       ],
@@ -1455,7 +1543,12 @@
             "currency": "USD"
           },
           "kind": "notional",
-          "accrual_factor": 0
+          "accrual_factor": 0,
+          "principal_delta": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "principal_date": "2025-01-15"
         },
         {
           "date": "2025-04-15",
@@ -1626,6 +1719,10 @@
           },
           "kind": "notional",
           "accrual_factor": 0,
+          "principal_delta": {
+            "amount": "-1000000",
+            "currency": "USD"
+          },
           "principal_date": "2027-01-15"
         }
       ],
@@ -1698,7 +1795,12 @@
           "currency": "USD"
         },
         "kind": "notional",
-        "accrual_factor": 0
+        "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "principal_date": "2025-01-15"
       },
       {
         "date": "2025-07-15",
@@ -1785,6 +1887,10 @@
         },
         "kind": "notional",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
         "principal_date": "2027-01-15"
       }
     ],
@@ -1931,7 +2037,12 @@
           "currency": "USD"
         },
         "kind": "notional",
-        "accrual_factor": 0
+        "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "principal_date": "2025-01-15"
       },
       {
         "date": "2025-07-15",
@@ -2018,6 +2129,10 @@
         },
         "kind": "notional",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "250000",
+          "currency": "USD"
+        },
         "principal_date": "2027-01-15"
       }
     ],
@@ -2047,7 +2162,12 @@
           "currency": "USD"
         },
         "kind": "notional",
-        "accrual_factor": 0
+        "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "principal_date": "2025-01-15"
       },
       {
         "date": "2025-07-15",
@@ -2134,6 +2254,10 @@
         },
         "kind": "notional",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
         "principal_date": "2027-01-15"
       }
     ],
@@ -2163,7 +2287,12 @@
           "currency": "USD"
         },
         "kind": "notional",
-        "accrual_factor": 0
+        "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "principal_date": "2025-01-15"
       },
       {
         "date": "2025-07-15",
@@ -2250,6 +2379,10 @@
         },
         "kind": "notional",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
         "principal_date": "2027-01-15"
       }
     ],
@@ -2332,7 +2465,12 @@
             "currency": "USD"
           },
           "kind": "notional",
-          "accrual_factor": 0
+          "accrual_factor": 0,
+          "principal_delta": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "principal_date": "2025-01-15"
         },
         {
           "date": "2025-07-15",
@@ -2419,6 +2557,10 @@
           },
           "kind": "notional",
           "accrual_factor": 0,
+          "principal_delta": {
+            "amount": "-1000000",
+            "currency": "USD"
+          },
           "principal_date": "2027-01-15"
         }
       ],
@@ -2504,7 +2646,12 @@
           "currency": "USD"
         },
         "kind": "notional",
-        "accrual_factor": 0
+        "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "principal_date": "2025-01-15"
       },
       {
         "date": "2025-04-15",
@@ -2675,6 +2822,10 @@
         },
         "kind": "notional",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
         "principal_date": "2027-01-15"
       }
     ],
@@ -2865,7 +3016,12 @@
             "currency": "USD"
           },
           "kind": "notional",
-          "accrual_factor": 0
+          "accrual_factor": 0,
+          "principal_delta": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "principal_date": "2025-01-15"
         },
         {
           "date": "2025-07-15",
@@ -2931,7 +3087,12 @@
           "currency": "USD"
         },
         "kind": "notional",
-        "accrual_factor": 0
+        "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "principal_date": "2025-01-15"
       },
       {
         "date": "2025-06-30",
@@ -3028,6 +3189,10 @@
         },
         "kind": "notional",
         "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
         "principal_date": "2027-01-15"
       }
     ],

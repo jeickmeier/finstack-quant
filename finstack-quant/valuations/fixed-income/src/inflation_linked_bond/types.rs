@@ -455,14 +455,20 @@ impl InflationLinkedBond {
             );
         }
         if !periods.is_empty() {
-            flows.push(CashFlow::new(
-                self.principal_payment_date()?,
-                None,
-                self.notional,
-                CFKind::Notional,
-                0.0,
-                None,
-            ));
+            flows.push({
+                // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+                let cash = self.notional;
+                CashFlow::new(
+                    self.principal_payment_date()?,
+                    None,
+                    cash,
+                    CFKind::Notional,
+                    0.0,
+                    None,
+                )
+                .with_principal_delta(cash.checked_neg())
+                .with_principal_date(self.principal_payment_date()?)
+            });
         }
         finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
@@ -885,14 +891,20 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
                 as_of,
                 self.deflation_protection != DeflationProtection::None,
             )?;
-            detailed_flows.push(finstack_quant_core::cashflow::CashFlow::new(
-                principal_date,
-                None,
-                self.notional.checked_mul_f64(principal_ratio)?,
-                finstack_quant_core::cashflow::CFKind::Notional,
-                0.0,
-                None,
-            ));
+            detailed_flows.push({
+                // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+                let cash = self.notional.checked_mul_f64(principal_ratio)?;
+                finstack_quant_core::cashflow::CashFlow::new(
+                    principal_date,
+                    None,
+                    cash,
+                    finstack_quant_core::cashflow::CFKind::Notional,
+                    0.0,
+                    None,
+                )
+                .with_principal_delta(cash.checked_neg())
+                .with_principal_date(principal_date)
+            });
         }
 
         let schedule = finstack_quant_cashflows::schedule_from_classified_flows(

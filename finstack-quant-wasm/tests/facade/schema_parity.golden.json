@@ -1127,7 +1127,7 @@
             "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule.schema.json",
             "type_name": "CashFlowSchedule",
             "kind": "output",
-            "bytes": 33000
+            "bytes": 33251
           },
           {
             "path": "schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
@@ -3987,7 +3987,7 @@
             "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule.schema.json",
             "type_name": "CashFlowSchedule",
             "kind": "output",
-            "bytes": 33000
+            "bytes": 33251
           },
           {
             "domain": "cashflows",

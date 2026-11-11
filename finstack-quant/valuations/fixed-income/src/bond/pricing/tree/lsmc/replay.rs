@@ -344,11 +344,7 @@ impl ReplayTemplate {
         let final_redemption_date = schedule
             .get_flows()
             .iter()
-            .filter(|flow| {
-                flow.kind == CFKind::Notional
-                    && flow.amount.amount() > 0.0
-                    && flow.principal_delta.is_none()
-            })
+            .filter(|flow| is_par_redemption(flow))
             .map(|flow| flow.date)
             .max();
         let inputs = TemplateInputs {
@@ -558,11 +554,7 @@ impl ReplayTemplate {
             .iter()
             .filter(|flow| flow.get_balance_date() < as_of)
         {
-            if flow.kind == CFKind::Notional
-                && flow.date == bond.issue_date
-                && flow.amount.amount() < 0.0
-                && flow.principal_delta.is_none()
-            {
+            if is_opening_funding(flow, bond.issue_date) {
                 continue;
             }
             let terminal_redemption = is_terminal_redemption(flow, final_redemption_date);
@@ -1090,11 +1082,7 @@ impl ReplayTemplate {
             if dynamic_flow_indices.contains(&flow_index) {
                 continue;
             }
-            if flow.kind == CFKind::Notional
-                && flow.date == bond.issue_date
-                && flow.amount.amount() < 0.0
-                && flow.principal_delta.is_none()
-            {
+            if is_opening_funding(flow, bond.issue_date) {
                 // The replay starts with issued principal already outstanding;
                 // the negative inception exchange is an investor cashflow,
                 // not a second draw into the modeled balance.

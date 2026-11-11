@@ -99,16 +99,18 @@ impl CompiledCashFlowPlan {
             && self.principal_exchange == PrincipalExchange::InitialAndFinal
             && state.outstanding > Decimal::ZERO
         {
-            let outstanding_f64 = state.outstanding.as_f64();
+            // Redemption cash is the outstanding par it extinguishes.
+            let cash = Money::new(state.outstanding.as_f64(), self.notional.initial.currency())?;
             state.flows.push(
                 CashFlow::new(
                     self.redemption_date,
                     None,
-                    Money::new(outstanding_f64, self.notional.initial.currency())?,
+                    cash,
                     CFKind::Notional,
                     0.0,
                     None,
                 )
+                .with_principal_delta(cash.checked_neg())
                 .with_principal_date(d),
             );
             state.outstanding = Decimal::ZERO;

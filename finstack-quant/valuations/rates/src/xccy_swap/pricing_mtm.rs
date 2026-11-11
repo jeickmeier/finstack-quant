@@ -260,26 +260,28 @@ fn project_mtm_cashflows(
     };
 
     // Initial principal exchanges.
-    flows.push(CashFlow::new(
-        start_c,
-        None,
-        Money::new(
+    flows.push({
+        // The swap opens from the schedule notional, and the initial exchange
+        // is a principal movement equal to its cash (record
+        // CORE-CONVENTIONS-015 #4, #5).
+        let cash = Money::new(
             initial_principal_sign(constant_leg.side) * n_c,
             constant_leg.notional.currency(),
-        )?,
-        CFKind::Notional,
-        0.0,
-        None,
-    ));
+        )?;
+        CashFlow::new(start_c, None, cash, CFKind::Notional, 0.0, None)
+            .with_principal_delta(cash.checked_neg())
+            .with_principal_date(start_c)
+    });
     let cf_initial_amount = initial_principal_sign(resetting_leg.side) * n_r_initial;
-    flows.push(CashFlow::new(
-        start_r,
-        None,
-        Money::from_model_value(cf_initial_amount, resetting_leg.notional.currency())?,
-        CFKind::Notional,
-        0.0,
-        None,
-    ));
+    flows.push({
+        // The swap opens from the schedule notional, and the initial exchange
+        // is a principal movement equal to its cash (record
+        // CORE-CONVENTIONS-015 #4, #5).
+        let cash = Money::from_model_value(cf_initial_amount, resetting_leg.notional.currency())?;
+        CashFlow::new(start_r, None, cash, CFKind::Notional, 0.0, None)
+            .with_principal_delta(cash.checked_neg())
+            .with_principal_date(start_r)
+    });
 
     let spread_c = constant_leg.leg.spread_bp.as_f64() / 10_000.0;
     for period in &constant_periods {
@@ -392,14 +394,21 @@ fn project_mtm_cashflows(
             let delta_n_r = n_r_j - n_r_prev;
             let rebal_amount = initial_principal_sign(resetting_leg.side) * delta_n_r;
             if rebal_amount != 0.0 {
-                flows.push(CashFlow::new(
-                    period.accrual_start,
-                    None,
-                    Money::from_model_value(rebal_amount, resetting_leg.notional.currency())?,
-                    CFKind::Notional,
-                    0.0,
-                    None,
-                ));
+                flows.push({
+                    // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+                    let cash =
+                        Money::from_model_value(rebal_amount, resetting_leg.notional.currency())?;
+                    CashFlow::new(
+                        period.accrual_start,
+                        None,
+                        cash,
+                        CFKind::Notional,
+                        0.0,
+                        None,
+                    )
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(period.accrual_start)
+                });
             }
         }
 
@@ -407,26 +416,24 @@ fn project_mtm_cashflows(
     }
 
     // Final principal exchanges; the resetting leg uses its last marked notional.
-    flows.push(CashFlow::new(
-        end_c,
-        None,
-        Money::new(
+    flows.push({
+        // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+        let cash = Money::new(
             constant_leg.side.sign() * n_c,
             constant_leg.notional.currency(),
-        )?,
-        CFKind::Notional,
-        0.0,
-        None,
-    ));
+        )?;
+        CashFlow::new(end_c, None, cash, CFKind::Notional, 0.0, None)
+            .with_principal_delta(cash.checked_neg())
+            .with_principal_date(end_c)
+    });
     let cf_final_amount = resetting_leg.side.sign() * n_r_prev;
-    flows.push(CashFlow::new(
-        end_r,
-        None,
-        Money::from_model_value(cf_final_amount, resetting_leg.notional.currency())?,
-        CFKind::Notional,
-        0.0,
-        None,
-    ));
+    flows.push({
+        // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
+        let cash = Money::from_model_value(cf_final_amount, resetting_leg.notional.currency())?;
+        CashFlow::new(end_r, None, cash, CFKind::Notional, 0.0, None)
+            .with_principal_delta(cash.checked_neg())
+            .with_principal_date(end_r)
+    });
 
     Ok((
         flows,

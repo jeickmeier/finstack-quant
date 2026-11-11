@@ -25,16 +25,13 @@ fn emit_principal_repayment(
         return Ok(());
     }
 
+    // Amortization cash is par: the balance falls by the amount paid
+    // (record CORE-CONVENTIONS-015 #4, #5).
+    let cash = Money::new(pay.as_f64(), ccy)?;
     new_flows.push(
-        CashFlow::new(
-            payment_date,
-            None,
-            Money::new(pay.as_f64(), ccy)?,
-            CFKind::Amortization,
-            0.0,
-            None,
-        )
-        .with_principal_date(d),
+        CashFlow::new(payment_date, None, cash, CFKind::Amortization, 0.0, None)
+            .with_principal_delta(cash.checked_neg())
+            .with_principal_date(d),
     );
     *outstanding -= pay;
     Ok(())
