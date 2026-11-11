@@ -98,19 +98,19 @@ impl JsSchedule {
     /// Unadjusted accrual grid as epoch days: the period start plus each period end.
     #[wasm_bindgen(getter, js_name = dates)]
     pub fn dates(&self) -> Box<[i32]> {
-        epoch_day_array(&self.inner.dates)
+        epoch_day_array(self.inner.get_dates())
     }
 
     /// Payment date of each accrual period as epoch days (one per period end).
     #[wasm_bindgen(getter, js_name = paymentDates)]
     pub fn payment_dates(&self) -> Box<[i32]> {
-        epoch_day_array(&self.inner.payment_dates)
+        epoch_day_array(self.inner.get_payment_dates())
     }
 
     /// Fixing date of each accrual period as epoch days; empty when no fixing lag is set.
     #[wasm_bindgen(getter, js_name = fixingDates)]
     pub fn fixing_dates(&self) -> Box<[i32]> {
-        epoch_day_array(&self.inner.fixing_dates)
+        epoch_day_array(self.inner.get_fixing_dates())
     }
 
     /// Serialize to the canonical JSON wire form shared with Python `Schedule.to_json`.
@@ -131,7 +131,11 @@ impl JsSchedule {
     ///
     /// @returns The parsed `Schedule`.
     /// @throws `TypeError` if `json` is not a JSON string or plain object;
-    /// `FinstackError` (kind `validation`) if it does not match the schema.
+    /// `FinstackError` (kind `validation`) if it does not match the schema
+    /// (all three arrays are required) or its shape is invalid: fewer than 2
+    /// or more than 100,000 grid dates, grid dates not strictly increasing,
+    /// not exactly one payment date per period, or a non-empty fixing series
+    /// of the wrong length.
     /// @param json - Schedule JSON text or plain object with ISO `dates`, `payment_dates` and `fixing_dates`.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(

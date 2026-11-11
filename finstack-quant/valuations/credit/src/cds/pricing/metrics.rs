@@ -62,19 +62,23 @@ impl CdsPricer {
         if let Some(calendar_id) = cds.premium_leg.calendar_id.as_deref() {
             builder = builder.adjust_with(cds.premium_leg.business_day_convention, calendar_id);
         }
-        let mut schedule = builder.build()?;
+        let schedule = builder.build()?;
         // The standard grid includes the previous roll date. The explicit
-        // premium start remains the contractual first accrual boundary.
-        if let Some(first) = schedule.dates.first_mut() {
-            *first = cds.premium_leg.start;
-        }
-        Ok(schedule)
+        // premium start remains the contractual first accrual boundary; the
+        // replaced grid is revalidated rather than mutated in place.
+        let mut dates = schedule.get_dates().to_vec();
+        dates[0] = cds.premium_leg.start;
+        Schedule::try_new(
+            dates,
+            schedule.get_payment_dates().to_vec(),
+            schedule.get_fixing_dates().to_vec(),
+        )
     }
 
     pub(crate) fn generate_isda_schedule(&self, cds: &CreditDefaultSwap) -> Result<Vec<Date>> {
         let schedule = self.premium_schedule(cds)?;
         let mut dates = vec![cds.premium_leg.start];
-        dates.extend(schedule.payment_dates);
+        dates.extend(schedule.get_payment_dates());
         Ok(dates)
     }
 
@@ -89,14 +93,14 @@ impl CdsPricer {
         let schedule = self.premium_schedule(cds)?;
         let adjusted = cds.uses_adjusted_premium_accrual_dates();
         Ok(schedule
-            .dates
+            .get_dates()
             .windows(2)
             .enumerate()
             .map(|(idx, dates)| {
-                let payment_date = schedule.payment_dates[idx];
+                let payment_date = schedule.get_payment_dates()[idx];
                 CouponPeriod {
                     accrual_start: if adjusted && idx > 0 {
-                        schedule.payment_dates[idx - 1]
+                        schedule.get_payment_dates()[idx - 1]
                     } else {
                         dates[0]
                     },
@@ -104,7 +108,7 @@ impl CdsPricer {
                     // determines payment only. Preserve the explicit QuantLib
                     // parity schedule separately.
                     accrual_end: if adjusted
-                        && (idx + 1 < schedule.payment_dates.len()
+                        && (idx + 1 < schedule.get_payment_dates().len()
                             || cds.valuation_convention.act360_includes_last_day())
                     {
                         payment_date
@@ -112,7 +116,7 @@ impl CdsPricer {
                         dates[1]
                     },
                     payment_date,
-                    is_final: idx + 1 == schedule.payment_dates.len(),
+                    is_final: idx + 1 == schedule.get_payment_dates().len(),
                 }
             })
             .collect())

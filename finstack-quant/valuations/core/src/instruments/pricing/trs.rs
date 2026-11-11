@@ -313,9 +313,9 @@ fn for_each_financing_period(
         collect_fixings,
     };
 
-    for i in 1..period_schedule.dates.len() {
-        let period_start = period_schedule.dates[i - 1];
-        let period_end = period_schedule.dates[i];
+    for i in 1..period_schedule.get_dates().len() {
+        let period_start = period_schedule.get_dates()[i - 1];
+        let period_end = period_schedule.get_dates()[i];
         let payment_date = schedule.payment_date_for(period_end)?;
 
         if payment_date <= as_of {
@@ -512,9 +512,9 @@ impl TrsEngine {
         let mut flows = Vec::new();
         let currency = params.notional.currency();
 
-        for i in 1..period_schedule.dates.len() {
-            let period_start = period_schedule.dates[i - 1];
-            let period_end = period_schedule.dates[i];
+        for i in 1..period_schedule.get_dates().len() {
+            let period_start = period_schedule.get_dates()[i - 1];
+            let period_end = period_schedule.get_dates()[i];
             let payment_date = params.schedule.payment_date_for(period_end)?;
 
             if payment_date <= as_of {
@@ -1148,9 +1148,9 @@ mod tests {
         let mut naive = 0.0;
         let ctx_day_count = DayCountContext::default();
 
-        for i in 1..period_schedule.dates.len() {
-            let _period_start = period_schedule.dates[i - 1];
-            let period_end = period_schedule.dates[i];
+        for i in 1..period_schedule.get_dates().len() {
+            let _period_start = period_schedule.get_dates()[i - 1];
+            let period_end = period_schedule.get_dates()[i];
             let df = disc.df_between_dates(as_of, period_end).expect("df");
             let t_end = schedule
                 .params
@@ -1234,9 +1234,9 @@ mod tests {
         let mut curve_accrual_pv = 0.0;
         let ctx_day_count = DayCountContext::default();
 
-        for i in 1..period_schedule.dates.len() {
-            let period_start = period_schedule.dates[i - 1];
-            let period_end = period_schedule.dates[i];
+        for i in 1..period_schedule.get_dates().len() {
+            let period_start = period_schedule.get_dates()[i - 1];
+            let period_end = period_schedule.get_dates()[i];
             // Use financing.day_count for accrual (matches engine after fix)
             let yf = financing
                 .day_count

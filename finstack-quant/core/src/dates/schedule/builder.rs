@@ -484,11 +484,7 @@ impl ScheduleBuilder {
             self.spec.fixing_lag_business_days,
         )?;
 
-        Ok(Schedule {
-            dates,
-            payment_dates,
-            fixing_dates,
-        })
+        Schedule::try_new(dates, payment_dates, fixing_dates)
     }
 }
 

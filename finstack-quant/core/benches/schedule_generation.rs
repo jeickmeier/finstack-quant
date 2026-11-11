@@ -44,11 +44,19 @@ fn regular_dates(years: u32, months: usize, day: u8) -> Vec<Date> {
 }
 
 fn check_schedule(schedule: &Schedule, dates: &[Date], payments: &[Date]) {
-    assert_eq!(schedule.dates, dates);
-    assert_eq!(schedule.payment_dates, payments);
-    assert_eq!(schedule.payment_dates.len(), schedule.dates.len() - 1);
-    assert!(schedule.dates.windows(2).all(|pair| pair[0] < pair[1]));
-    assert!(schedule.fixing_dates.is_empty());
+    assert_eq!(schedule.get_dates(), dates);
+    assert_eq!(schedule.get_payment_dates(), payments);
+    assert_eq!(
+        schedule.get_payment_dates().len(),
+        schedule.get_dates().len() - 1
+    );
+    assert!(
+        schedule
+            .get_dates()
+            .windows(2)
+            .all(|pair| pair[0] < pair[1])
+    );
+    assert!(schedule.get_fixing_dates().is_empty());
 }
 
 fn bench_build(

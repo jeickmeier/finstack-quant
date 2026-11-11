@@ -154,19 +154,19 @@ impl PySchedule {
     /// Unadjusted accrual dates as a list of ``datetime.date``.
     #[getter]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        crate::bindings::pandas_utils::dates_to_pylist(py, &self.inner.dates)
+        crate::bindings::pandas_utils::dates_to_pylist(py, self.inner.get_dates())
     }
 
     /// Payment date for each accrual period (one per period end).
     #[getter]
     fn payment_dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        crate::bindings::pandas_utils::dates_to_pylist(py, &self.inner.payment_dates)
+        crate::bindings::pandas_utils::dates_to_pylist(py, self.inner.get_payment_dates())
     }
 
     /// Fixing dates for each accrual period. Empty when no fixing lag is set.
     #[getter]
     fn fixing_dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
-        crate::bindings::pandas_utils::dates_to_pylist(py, &self.inner.fixing_dates)
+        crate::bindings::pandas_utils::dates_to_pylist(py, self.inner.get_fixing_dates())
     }
 
     /// Accrual periods as a pandas DataFrame with ``datetime64`` columns
@@ -174,9 +174,11 @@ impl PySchedule {
     /// (``NaT`` when no fixing lag is configured); one row per period.
     #[pyo3(text_signature = "(self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let n = self.inner.dates.len().saturating_sub(1);
-        let starts = &self.inner.dates[..n];
-        let ends = self.inner.dates.get(1..).unwrap_or_default();
+        // A schedule always has at least two grid dates, so one period.
+        let dates = self.inner.get_dates();
+        let n = dates.len() - 1;
+        let starts = &dates[..n];
+        let ends = &dates[1..];
         let to_datetime = py.import("pandas")?.getattr("to_datetime")?;
         let column = |dates: &[finstack_quant_core::dates::Date]| -> PyResult<Bound<'py, PyAny>> {
             to_datetime.call1((crate::bindings::pandas_utils::dates_to_pylist(py, dates)?,))
@@ -184,12 +186,12 @@ impl PySchedule {
         let columns = PyDict::new(py);
         columns.set_item("period_start", column(starts)?)?;
         columns.set_item("period_end", column(ends)?)?;
-        columns.set_item("payment_date", column(&self.inner.payment_dates)?)?;
-        if self.inner.fixing_dates.is_empty() {
+        columns.set_item("payment_date", column(self.inner.get_payment_dates())?)?;
+        if self.inner.get_fixing_dates().is_empty() {
             let nones: Vec<Option<()>> = vec![None; n];
             columns.set_item("fixing_date", to_datetime.call1((nones,))?)?;
         } else {
-            columns.set_item("fixing_date", column(&self.inner.fixing_dates)?)?;
+            columns.set_item("fixing_date", column(self.inner.get_fixing_dates())?)?;
         }
         crate::bindings::pandas_utils::dict_to_dataframe(py, &columns, None)
     }
@@ -201,14 +203,17 @@ impl PySchedule {
 
     /// Number of dates in the schedule.
     fn __len__(&self) -> usize {
-        self.inner.dates.len()
+        self.inner.get_dates().len()
     }
 
     fn __repr__(&self) -> String {
-        match (self.inner.dates.first(), self.inner.dates.last()) {
+        match (
+            self.inner.get_dates().first(),
+            self.inner.get_dates().last(),
+        ) {
             (Some(first), Some(last)) => format!(
                 "Schedule('{first}'..'{last}', periods={})",
-                self.inner.dates.len().saturating_sub(1)
+                self.inner.get_dates().len().saturating_sub(1)
             ),
             _ => "Schedule(periods=0)".to_string(),
         }

@@ -46,23 +46,21 @@
   ],
   "properties": {
     "dates": {
-      "description": "Unadjusted accrual grid (period start plus each period end).\n\nThese dates are never business-day adjusted. Payment-date adjustment,\npayment lag, and fixing lag live on [`Self::payment_dates`] and\n[`Self::fixing_dates`].",
+      "description": "Unadjusted accrual grid (period start plus each period end).",
       "items": {
         "$ref": "#/$defs/DateWire"
       },
       "type": "array"
     },
     "fixing_dates": {
-      "default": [],
-      "description": "Fixing dates for each accrual period.\n\nEmpty when no fixing lag is configured; otherwise the same length as\n[`Self::payment_dates`].",
+      "description": "Fixing date for each accrual period, or empty when no fixing lag is\nconfigured.",
       "items": {
         "$ref": "#/$defs/DateWire"
       },
       "type": "array"
     },
     "payment_dates": {
-      "default": [],
-      "description": "Payment date for each accrual period (one per period end).\n\nLength is `dates.len().saturating_sub(1)`. Duplicate payment dates are\nretained so the series stays 1:1 with period ends.",
+      "description": "Payment date for each accrual period (one per period end).",
       "items": {
         "$ref": "#/$defs/DateWire"
       },
@@ -70,7 +68,9 @@
     }
   },
   "required": [
-    "dates"
+    "dates",
+    "payment_dates",
+    "fixing_dates"
   ],
   "title": "Schedule",
   "type": "object"

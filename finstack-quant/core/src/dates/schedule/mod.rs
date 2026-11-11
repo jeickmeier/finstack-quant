@@ -220,9 +220,17 @@ impl std::str::FromStr for StubKind {
 ///
 /// # Invariants
 ///
-/// - Generated dates are strictly increasing; a generated grid that is not
-///   is an error, never repaired by dropping dates
-/// - All dates are valid `time::Date` values
+/// Every `Schedule` (built, deserialized or constructed with
+/// [`Schedule::try_new`]) satisfies record CORE-CONVENTIONS-008 #13:
+///
+/// - 2 to 100,000 strictly increasing raw grid dates (both endpoints once);
+///   a grid that is not is an error, never repaired by dropping dates
+/// - exactly one payment date per period (`dates.len() - 1`)
+/// - either no fixing dates or exactly one per period
+///
+/// Payment and fixing collisions are kept, never deduplicated. Restoration
+/// validates this shape only; it does not rebuild against a calendar or
+/// prove consistency with a source specification.
 ///
 /// # Examples
 ///
@@ -237,6 +245,7 @@ impl std::str::FromStr for StubKind {
 ///     .frequency(Tenor::monthly())
 ///     .build()?;
 ///
+/// assert_eq!(schedule.get_dates().len(), 3);
 /// // Iterate over dates
 /// for date in schedule.into_iter() {
 ///     println!("Payment date: {}", date);
@@ -249,29 +258,131 @@ impl std::str::FromStr for StubKind {
 /// - [`ScheduleBuilder`] for constructing schedules
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "ScheduleWire")]
 pub struct Schedule {
     /// Unadjusted accrual grid (period start plus each period end).
-    ///
-    /// These dates are never business-day adjusted. Payment-date adjustment,
-    /// payment lag, and fixing lag live on [`Self::payment_dates`] and
-    /// [`Self::fixing_dates`].
     #[cfg_attr(feature = "json-schema", schemars(with = "Vec<crate::wire::DateWire>"))]
-    pub dates: Vec<Date>,
+    dates: Vec<Date>,
     /// Payment date for each accrual period (one per period end).
-    ///
-    /// Length is `dates.len().saturating_sub(1)`. Duplicate payment dates are
-    /// retained so the series stays 1:1 with period ends.
-    #[serde(default)]
     #[cfg_attr(feature = "json-schema", schemars(with = "Vec<crate::wire::DateWire>"))]
-    pub payment_dates: Vec<Date>,
-    /// Fixing dates for each accrual period.
-    ///
-    /// Empty when no fixing lag is configured; otherwise the same length as
-    /// [`Self::payment_dates`].
-    #[serde(default)]
+    payment_dates: Vec<Date>,
+    /// Fixing date for each accrual period, or empty when no fixing lag is
+    /// configured.
     #[cfg_attr(feature = "json-schema", schemars(with = "Vec<crate::wire::DateWire>"))]
-    pub fixing_dates: Vec<Date>,
+    fixing_dates: Vec<Date>,
+}
+
+/// Wire form of [`Schedule`]: all three arrays are required (an omitted
+/// fixing series is an empty array), and the shape is validated on
+/// conversion.
+#[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct ScheduleWire {
+    /// Unadjusted accrual grid (period start plus each period end).
+    #[cfg_attr(feature = "json-schema", schemars(with = "Vec<crate::wire::DateWire>"))]
+    dates: Vec<Date>,
+    /// Payment date for each accrual period (one per period end).
+    #[cfg_attr(feature = "json-schema", schemars(with = "Vec<crate::wire::DateWire>"))]
+    payment_dates: Vec<Date>,
+    /// Fixing date for each accrual period, or empty when no fixing lag is
+    /// configured.
+    #[cfg_attr(feature = "json-schema", schemars(with = "Vec<crate::wire::DateWire>"))]
+    fixing_dates: Vec<Date>,
+}
+
+impl TryFrom<ScheduleWire> for Schedule {
+    type Error = crate::Error;
+
+    fn try_from(wire: ScheduleWire) -> Result<Self, Self::Error> {
+        Self::try_new(wire.dates, wire.payment_dates, wire.fixing_dates)
+    }
+}
+
+impl Schedule {
+    /// Build a schedule from its three date series, validating its shape.
+    ///
+    /// Use this to restore a previously generated schedule; to generate one,
+    /// use [`Schedule::builder`]. No calendar or specification is consulted.
+    ///
+    /// # Arguments
+    ///
+    /// * `dates` - Unadjusted accrual grid: 2 to 100,000 strictly increasing
+    ///   dates, the first and last being the schedule's start and end.
+    /// * `payment_dates` - One payment date per period, `dates.len() - 1` in
+    ///   all, in period order; collisions are allowed.
+    /// * `fixing_dates` - Either empty (no fixing series) or one fixing date
+    ///   per period, in period order; collisions are allowed.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when any of those shape rules is violated.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::dates::Schedule;
+    /// use time::macros::date;
+    ///
+    /// let grid = vec![date!(2025 - 01 - 15), date!(2025 - 07 - 15)];
+    /// let schedule = Schedule::try_new(grid, vec![date!(2025 - 07 - 15)], vec![])?;
+    /// assert_eq!(schedule.get_payment_dates().len(), 1);
+    /// assert!(Schedule::try_new(vec![date!(2025 - 01 - 15)], vec![], vec![]).is_err());
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn try_new(
+        dates: Vec<Date>,
+        payment_dates: Vec<Date>,
+        fixing_dates: Vec<Date>,
+    ) -> crate::Result<Self> {
+        if dates.len() < 2 {
+            return Err(crate::Error::Validation(format!(
+                "a schedule needs at least two grid dates, got {}",
+                dates.len()
+            )));
+        }
+        check_final_count(dates.len())?;
+        require_strictly_increasing(&dates)?;
+        let periods = dates.len() - 1;
+        if payment_dates.len() != periods {
+            return Err(crate::Error::Validation(format!(
+                "a schedule with {periods} periods needs {periods} payment dates, got {}",
+                payment_dates.len()
+            )));
+        }
+        if !fixing_dates.is_empty() && fixing_dates.len() != periods {
+            return Err(crate::Error::Validation(format!(
+                "a schedule with {periods} periods needs no fixing dates or {periods}, got {}",
+                fixing_dates.len()
+            )));
+        }
+        Ok(Self {
+            dates,
+            payment_dates,
+            fixing_dates,
+        })
+    }
+
+    /// Unadjusted accrual grid (period start plus each period end).
+    ///
+    /// These dates are never business-day adjusted; payment adjustment and
+    /// lags live on [`Self::get_payment_dates`] and fixing lags on
+    /// [`Self::get_fixing_dates`].
+    pub fn get_dates(&self) -> &[Date] {
+        &self.dates
+    }
+
+    /// Payment date for each accrual period, one per period end and in
+    /// period order. Collisions are retained so the series stays 1:1 with
+    /// period ends.
+    pub fn get_payment_dates(&self) -> &[Date] {
+        &self.payment_dates
+    }
+
+    /// Fixing date for each accrual period, or an empty slice when no fixing
+    /// lag was configured.
+    pub fn get_fixing_dates(&self) -> &[Date] {
+        &self.fixing_dates
+    }
 }
 
 impl IntoIterator for Schedule {

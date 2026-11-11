@@ -18,7 +18,7 @@
             "$id": "https://finstack_quant.dev/schemas/dates/1/schedule.schema.json",
             "type_name": "Schedule",
             "kind": "output",
-            "bytes": 2197
+            "bytes": 1852
           },
           {
             "path": "schemas/dates/1/schedule_spec.schema.json",
@@ -4091,7 +4091,7 @@
             "$id": "https://finstack_quant.dev/schemas/dates/1/schedule.schema.json",
             "type_name": "Schedule",
             "kind": "output",
-            "bytes": 2197
+            "bytes": 1852
           },
           {
             "domain": "core",

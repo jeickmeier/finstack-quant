@@ -319,10 +319,24 @@ def test_thirty360_and_date_extension_free_functions() -> None:
     assert months_until("2020-01-15", "2022-03-10") == 25
 
 
-def test_empty_schedule_dataframe() -> None:
-    schedule = Schedule.from_json('{"dates":[],"payment_dates":[],"fixing_dates":[]}')
+def test_schedule_restore_validates_shape() -> None:
+    # Record CORE-CONVENTIONS-008 #13: no empty or malformed restored schedule.
+    for payload, message in [
+        ('{"dates":[],"payment_dates":[],"fixing_dates":[]}', "at least two grid dates"),
+        ('{"dates":["2025-01-15","2025-07-15"],"payment_dates":[],"fixing_dates":[]}', "payment dates"),
+        (
+            '{"dates":["2025-07-15","2025-01-15"],"payment_dates":["2025-07-15"],"fixing_dates":[]}',
+            "strictly increasing",
+        ),
+        ('{"dates":["2025-01-15","2025-07-15"],"payment_dates":["2025-07-15"]}', "fixing_dates"),
+    ]:
+        with pytest.raises(ValueError, match=message):
+            Schedule.from_json(payload)
+    schedule = Schedule.from_json(
+        '{"dates":["2025-01-15","2025-07-15"],"payment_dates":["2025-07-15"],"fixing_dates":[]}'
+    )
     frame = schedule.to_dataframe()
-    assert frame.empty
+    assert len(frame) == 1
     assert list(frame.columns) == ["period_start", "period_end", "payment_date", "fixing_date"]
 
 

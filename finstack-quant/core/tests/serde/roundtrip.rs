@@ -97,7 +97,7 @@ fn schedule_spec_builds_expected_dates() {
     assert!(!json.contains("\"allow_missing_calendar\""));
     let restored: ScheduleSpec = serde_json::from_str(&json).unwrap();
     let schedule = ScheduleBuilder::from(restored).build().unwrap();
-    assert_eq!(schedule.dates.len(), 7);
+    assert_eq!(schedule.get_dates().len(), 7);
 
     // Cross-check with builder directly
     let builder_schedule = Schedule::builder(start, end)
@@ -107,7 +107,7 @@ fn schedule_spec_builds_expected_dates() {
         .build()
         .unwrap();
 
-    assert_eq!(schedule.dates, builder_schedule.dates);
+    assert_eq!(schedule.get_dates(), builder_schedule.get_dates());
 }
 
 #[test]
@@ -198,21 +198,26 @@ fn schedule_spec_imm_setters_match_builder_semantics() {
     assert_eq!(spec.stub, StubKind::ShortBack);
     let builder = Schedule::builder(start, end).unwrap().cds_imm();
     assert_eq!(
-        ScheduleBuilder::from(spec).build().unwrap().dates,
-        builder.build().unwrap().dates
+        ScheduleBuilder::from(spec).build().unwrap().get_dates(),
+        builder.build().unwrap().get_dates()
     );
 
     // CDS IMM then monthly: the later frequency wins on both paths.
     let mut spec = ScheduleSpec::new(start, end).unwrap().with_cds_imm();
     spec.frequency = Tenor::monthly();
-    let built = ScheduleBuilder::from(spec).build().unwrap().dates;
+    let built = ScheduleBuilder::from(spec)
+        .build()
+        .unwrap()
+        .get_dates()
+        .to_vec();
     let expected = Schedule::builder(start, end)
         .unwrap()
         .cds_imm()
         .frequency(Tenor::monthly())
         .build()
         .unwrap()
-        .dates;
+        .get_dates()
+        .to_vec();
     assert_eq!(built, expected);
     assert!(built.len() > 6, "monthly CDS schedule, got {built:?}");
 
@@ -223,13 +228,13 @@ fn schedule_spec_imm_setters_match_builder_semantics() {
     assert!(spec.imm_mode && !spec.cds_imm_mode);
     assert_eq!(spec.frequency, Tenor::quarterly());
     assert_eq!(
-        ScheduleBuilder::from(spec).build().unwrap().dates,
+        ScheduleBuilder::from(spec).build().unwrap().get_dates(),
         Schedule::builder(imm_start, end)
             .unwrap()
             .imm()
             .build()
             .unwrap()
-            .dates
+            .get_dates()
     );
 }
 

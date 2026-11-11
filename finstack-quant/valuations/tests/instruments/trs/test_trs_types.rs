@@ -69,12 +69,12 @@ fn test_trs_schedule_spec_period_schedule_quarterly() {
     // Assert
     // 1 year quarterly = 4 periods, so 5 dates (start + 4 ends)
     assert_eq!(
-        schedule.dates.len(),
+        schedule.get_dates().len(),
         5,
         "Should have 5 dates for 4 quarterly periods"
     );
-    assert_eq!(schedule.dates[0], start);
-    assert_eq!(schedule.dates[4], end);
+    assert_eq!(schedule.get_dates()[0], start);
+    assert_eq!(schedule.get_dates()[4], end);
 }
 
 #[test]
@@ -101,12 +101,12 @@ fn test_trs_schedule_spec_period_schedule_semiannual() {
     // Assert
     // 1 year semiannual = 2 periods, so 3 dates
     assert_eq!(
-        schedule.dates.len(),
+        schedule.get_dates().len(),
         3,
         "Should have 3 dates for 2 semiannual periods"
     );
-    assert_eq!(schedule.dates[0], start);
-    assert_eq!(schedule.dates[2], end);
+    assert_eq!(schedule.get_dates()[0], start);
+    assert_eq!(schedule.get_dates()[2], end);
 }
 
 #[test]
@@ -133,12 +133,12 @@ fn test_trs_schedule_spec_period_schedule_monthly() {
     // Assert
     // 6 months monthly = 6 periods, so 7 dates
     assert_eq!(
-        schedule.dates.len(),
+        schedule.get_dates().len(),
         7,
         "Should have 7 dates for 6 monthly periods"
     );
-    assert_eq!(schedule.dates[0], start);
-    assert_eq!(schedule.dates[6], end);
+    assert_eq!(schedule.get_dates()[0], start);
+    assert_eq!(schedule.get_dates()[6], end);
 }
 
 #[test]
@@ -175,7 +175,7 @@ fn test_trs_schedule_spec_different_day_counts() {
     let sched2 = spec_30_360
         .period_schedule()
         .expect("Schedule should build");
-    assert_eq!(sched1.dates.len(), sched2.dates.len());
+    assert_eq!(sched1.get_dates().len(), sched2.get_dates().len());
 }
 
 #[test]
@@ -192,12 +192,12 @@ fn test_trs_schedule_spec_short_tenor() {
     // Assert
     // 3 months with quarterly frequency = 1 period, so 2 dates
     assert_eq!(
-        schedule.dates.len(),
+        schedule.get_dates().len(),
         2,
         "Should have 2 dates for 1 quarterly period"
     );
-    assert_eq!(schedule.dates[0], start);
-    assert_eq!(schedule.dates[1], end);
+    assert_eq!(schedule.get_dates()[0], start);
+    assert_eq!(schedule.get_dates()[1], end);
 }
 
 #[test]
@@ -214,12 +214,12 @@ fn test_trs_schedule_spec_long_tenor() {
     // Assert
     // 5 years quarterly = 20 periods, so 21 dates
     assert_eq!(
-        schedule.dates.len(),
+        schedule.get_dates().len(),
         21,
         "Should have 21 dates for 20 quarterly periods"
     );
-    assert_eq!(schedule.dates[0], start);
-    assert_eq!(schedule.dates[20], end);
+    assert_eq!(schedule.get_dates()[0], start);
+    assert_eq!(schedule.get_dates()[20], end);
 }
 
 #[test]

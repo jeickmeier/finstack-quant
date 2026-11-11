@@ -23,9 +23,9 @@ fn eom_rejects_incompatible_schedule_rules() {
         .frequency(Tenor::weekly())
         .build()
         .unwrap();
-    assert_eq!(weekly.dates.len(), 5);
+    assert_eq!(weekly.get_dates().len(), 5);
     let cds = builder().cds_imm().build().unwrap();
-    assert!(cds.dates.iter().all(|date| date.day() == 20));
+    assert!(cds.get_dates().iter().all(|date| date.day() == 20));
 }
 
 #[test]
@@ -37,7 +37,7 @@ fn schedule_calendar_setters_replace_the_previous_representation() {
         .build()
         .unwrap();
     assert_eq!(
-        replaced_id.payment_dates.last(),
+        replaced_id.get_payment_dates().last(),
         Some(&make_date(2025, 7, 4))
     );
     let replaced_calendar = builder()
@@ -46,7 +46,7 @@ fn schedule_calendar_setters_replace_the_previous_representation() {
         .build()
         .unwrap();
     assert_eq!(
-        replaced_calendar.payment_dates.last(),
+        replaced_calendar.get_payment_dates().last(),
         Some(&make_date(2025, 7, 7))
     );
     // Replacing an invalid deferred ID must discard its pending lookup too.
@@ -77,7 +77,7 @@ fn eom_roll_grid_accepts_regular_quarters_from_february() {
                 .build()
                 .unwrap();
             assert_eq!(
-                schedule.dates.as_slice(),
+                schedule.get_dates(),
                 [
                     make_date(year, 2, feb_end),
                     make_date(year, 5, 31),
@@ -226,13 +226,13 @@ fn test_schedule_with_business_day_adjustment() {
         .adjust_with(BusinessDayConvention::Following, "target2")
         .build()
         .unwrap();
-    let dates: Vec<_> = schedule.dates.clone();
+    let dates: Vec<_> = schedule.get_dates().to_vec();
 
     // Accrual grid stays unadjusted; payment dates are adjusted.
     assert_eq!(dates.len(), 2);
     assert_eq!(dates[0], make_date(2025, 1, 1));
     assert_eq!(dates[1], make_date(2025, 1, 8));
-    assert_eq!(schedule.payment_dates, vec![make_date(2025, 1, 8)]);
+    assert_eq!(schedule.get_payment_dates(), vec![make_date(2025, 1, 8)]);
 }
 
 #[test]
@@ -249,12 +249,12 @@ fn test_schedule_builder_with_adjustment() {
         .unwrap();
 
     // Accrual dates stay on the unadjusted roll grid.
-    assert_eq!(schedule.dates[0], make_date(2025, 1, 1));
-    assert_eq!(schedule.dates[1], make_date(2025, 2, 1));
-    assert_eq!(schedule.dates[2], make_date(2025, 3, 1));
+    assert_eq!(schedule.get_dates()[0], make_date(2025, 1, 1));
+    assert_eq!(schedule.get_dates()[1], make_date(2025, 2, 1));
+    assert_eq!(schedule.get_dates()[2], make_date(2025, 3, 1));
     // Period-end payments: Feb 1 (Sat) → Feb 3, Mar 1 (Sat) → Mar 3.
     assert_eq!(
-        schedule.payment_dates,
+        schedule.get_payment_dates(),
         vec![make_date(2025, 2, 3), make_date(2025, 3, 3)]
     );
 }
@@ -513,7 +513,7 @@ fn stub_schedules_terminate_at_finite_date_boundaries() {
                 .stub_rule(stub)
                 .build()
                 .expect("a back stub needs no unrepresentable successor");
-            assert_eq!(schedule.dates, vec![start, maximum]);
+            assert_eq!(schedule.get_dates(), vec![start, maximum]);
         }
         for stub in [StubKind::ShortFront, StubKind::LongFront] {
             let end = make_date(minimum.year(), 1, 2);
@@ -523,7 +523,7 @@ fn stub_schedules_terminate_at_finite_date_boundaries() {
                 .stub_rule(stub)
                 .build()
                 .expect("a front stub needs no unrepresentable predecessor");
-            assert_eq!(schedule.dates, vec![minimum, end]);
+            assert_eq!(schedule.get_dates(), vec![minimum, end]);
         }
     }
 }
@@ -547,7 +547,7 @@ fn monthly_stubs_preserve_contractual_boundary_endpoints_with_eom() {
                 .end_of_month(eom)
                 .build()
                 .unwrap();
-            assert_eq!(schedule.dates, vec![start, maximum]);
+            assert_eq!(schedule.get_dates(), vec![start, maximum]);
         }
         for stub in [StubKind::ShortFront, StubKind::LongFront] {
             let end = make_date(minimum.year(), 1, 31);
@@ -558,7 +558,7 @@ fn monthly_stubs_preserve_contractual_boundary_endpoints_with_eom() {
                 .end_of_month(eom)
                 .build()
                 .unwrap();
-            assert_eq!(schedule.dates, vec![minimum, end]);
+            assert_eq!(schedule.get_dates(), vec![minimum, end]);
         }
     }
 }
@@ -587,7 +587,7 @@ fn aligned_long_stubs_keep_regular_anchors_at_both_date_boundaries() {
                 .stub_rule(stub)
                 .build()
                 .expect("aligned schedules do not need another comparison roll");
-            assert_eq!(schedule.dates, expected);
+            assert_eq!(schedule.get_dates(), expected);
         }
     }
 }
@@ -741,7 +741,7 @@ fn eom_rejects_a_jan30_anchor_leap_year() {
         .end_of_month(true)
         .build()
         .unwrap();
-    assert_eq!(feb.dates[1], make_date(2024, 2, 29));
+    assert_eq!(feb.get_dates()[1], make_date(2024, 2, 29));
 }
 
 #[test]
@@ -761,7 +761,7 @@ fn eom_rejects_a_jan30_anchor_non_leap_year() {
         .end_of_month(true)
         .build()
         .unwrap();
-    assert_eq!(feb.dates[1], make_date(2025, 2, 28));
+    assert_eq!(feb.get_dates()[1], make_date(2025, 2, 28));
 }
 
 #[test]
@@ -802,7 +802,7 @@ fn test_adjustment_collision_keeps_maturity_date() {
         .unwrap();
 
     assert_eq!(
-        schedule.dates,
+        schedule.get_dates(),
         vec![
             make_date(2024, 12, 24),
             make_date(2024, 12, 25),
@@ -811,12 +811,12 @@ fn test_adjustment_collision_keeps_maturity_date() {
         ]
     );
     assert_eq!(
-        schedule.dates.last().copied(),
+        schedule.get_dates().last().copied(),
         Some(end),
         "maturity must survive"
     );
     assert_eq!(
-        schedule.payment_dates,
+        schedule.get_payment_dates(),
         vec![
             make_date(2024, 12, 27),
             make_date(2024, 12, 27),
@@ -837,7 +837,8 @@ fn imm_dates(start: time::Date, end: time::Date) -> Vec<time::Date> {
         .imm()
         .build()
         .unwrap()
-        .dates
+        .get_dates()
+        .to_vec()
 }
 
 #[test]
@@ -944,7 +945,7 @@ fn imm_schedule_on_cycle_endpoints_have_no_stubs() {
         .stub_rule(StubKind::None)
         .build()
         .unwrap();
-    assert_eq!(aligned.dates, expected);
+    assert_eq!(aligned.get_dates(), expected);
 }
 
 #[test]
@@ -980,7 +981,8 @@ fn imm_schedule_quarterly_direction_does_not_change_the_dates() {
             .stub_rule(stub)
             .build()
             .unwrap()
-            .dates
+            .get_dates()
+            .to_vec()
     };
 
     assert_eq!(build(StubKind::ShortFront), build(StubKind::ShortBack));
@@ -996,7 +998,8 @@ fn imm_schedule_honours_frequency_and_generation_direction() {
             .stub_rule(stub)
             .build()
             .unwrap()
-            .dates
+            .get_dates()
+            .to_vec()
     };
 
     // Forward from the on-cycle start (Mar 2025), short final stub.
@@ -1025,7 +1028,8 @@ fn imm_schedule_long_stubs_merge_into_the_adjacent_regular_period() {
             .stub_rule(stub)
             .build()
             .unwrap()
-            .dates
+            .get_dates()
+            .to_vec()
     };
 
     // Back stubs from Mar-25: a short final stub to Feb-26, or a long one
@@ -1177,14 +1181,16 @@ fn imm_and_cds_imm_setters_use_last_call_wins() {
         .cds_imm()
         .build()
         .expect("CDS IMM should win")
-        .dates;
+        .get_dates()
+        .to_vec();
     let imm_dates = Schedule::builder(start, end)
         .unwrap()
         .cds_imm()
         .imm()
         .build()
         .expect("IMM should win")
-        .dates;
+        .get_dates()
+        .to_vec();
 
     assert!(cds_dates.contains(&make_date(2025, 3, 20)));
     assert!(!cds_dates.contains(&make_date(2025, 3, 19)));
@@ -1311,14 +1317,16 @@ fn cds_imm_accrual_20ths_stay_unadjusted() {
         .unwrap();
 
     assert!(
-        schedule.dates.contains(&make_date(2025, 3, 20)),
+        schedule.get_dates().contains(&make_date(2025, 3, 20)),
         "CDS 20ths stay on the unadjusted accrual grid: {:?}",
-        schedule.dates
+        schedule.get_dates()
     );
     assert!(
-        schedule.payment_dates.contains(&make_date(2025, 3, 21)),
+        schedule
+            .get_payment_dates()
+            .contains(&make_date(2025, 3, 21)),
         "holiday 20th pays Following: {:?}",
-        schedule.payment_dates
+        schedule.get_payment_dates()
     );
 }
 
@@ -1335,8 +1343,8 @@ fn payment_lag_shifts_adjusted_period_ends() {
         .build()
         .unwrap();
 
-    assert_eq!(schedule.dates, vec![start, end]);
-    assert_eq!(schedule.payment_dates, vec![make_date(2025, 1, 13)]);
+    assert_eq!(schedule.get_dates(), vec![start, end]);
+    assert_eq!(schedule.get_payment_dates(), vec![make_date(2025, 1, 13)]);
 }
 
 #[test]
@@ -1352,7 +1360,7 @@ fn fixing_lag_is_t_minus_from_accrual_start() {
         .build()
         .unwrap();
 
-    assert_eq!(schedule.fixing_dates, vec![make_date(2024, 12, 31)]);
+    assert_eq!(schedule.get_fixing_dates(), vec![make_date(2024, 12, 31)]);
 }
 
 #[test]
@@ -1370,9 +1378,9 @@ fn nearest_payment_tie_rolls_following() {
         .build()
         .unwrap();
 
-    assert_eq!(schedule.dates.last().copied(), Some(end));
+    assert_eq!(schedule.get_dates().last().copied(), Some(end));
     assert_eq!(
-        schedule.payment_dates.last().copied(),
+        schedule.get_payment_dates().last().copied(),
         Some(make_date(2025, 1, 2))
     );
 }

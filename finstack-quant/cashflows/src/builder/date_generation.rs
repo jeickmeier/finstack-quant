@@ -416,11 +416,10 @@ pub(crate) fn generate_periods_with_adjustment(
     }
     .end_of_month(end_of_month);
     let cal = calendar_by_id_strict(calendar_id)?;
-    let dates = builder.build()?.dates;
-
-    if dates.len() < 2 {
-        return Ok(Vec::new());
-    }
+    // A built schedule always has at least two grid dates (record
+    // CORE-CONVENTIONS-008 #13), so there is no empty-period fallback.
+    let schedule = builder.build()?;
+    let dates = schedule.get_dates();
 
     // Share each BDC-adjusted anchor across adjacent periods; `dates[0]` is not a payment date.
     let mut adjusted: Vec<Date> = Vec::with_capacity(dates.len());

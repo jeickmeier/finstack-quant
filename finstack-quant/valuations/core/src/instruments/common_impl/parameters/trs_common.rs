@@ -76,12 +76,8 @@ impl TrsScheduleSpec {
             )));
         }
         finstack_quant_core::dates::calendar_by_id_strict(&self.params.calendar_id)?;
-        let schedule = self.period_schedule()?;
-        if schedule.dates.len() < 2 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "{context} schedule must contain at least one accrual period"
-            )));
-        }
+        // A schedule holds at least one accrual period by construction.
+        self.period_schedule()?;
         Ok(())
     }
 
@@ -101,11 +97,7 @@ impl TrsScheduleSpec {
             dates.extend(periods.iter().map(|period| period.accrual_end));
         }
         let payment_dates = periods.iter().map(|period| period.payment_date).collect();
-        Ok(Schedule {
-            dates,
-            payment_dates,
-            fixing_dates: Vec::new(),
-        })
+        Schedule::try_new(dates, payment_dates, Vec::new())
     }
 
     /// Computes the payment date for a given accrual end date.
@@ -148,7 +140,9 @@ mod tests {
                 date!(2024 - 07 - 02)
             };
             assert_eq!(
-                spec.period_schedule().expect("schedule").payment_dates,
+                spec.period_schedule()
+                    .expect("schedule")
+                    .get_payment_dates(),
                 vec![expected]
             );
             assert_eq!(

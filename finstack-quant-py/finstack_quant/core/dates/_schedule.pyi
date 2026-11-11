@@ -183,8 +183,8 @@ class Schedule:
         """
         Payment date for each accrual period (one per period end).
 
-        Length is ``len(dates) - 1`` for a non-empty schedule. Duplicate
-        payment dates are retained so the series stays 1:1 with period ends.
+        Length is always ``len(dates) - 1``. Duplicate payment dates are
+        retained so the series stays 1:1 with period ends.
 
         Returns
         -------
@@ -274,17 +274,23 @@ class Schedule:
         Parameters
         ----------
         json : str
-            JSON produced by :meth:`to_json`.
+            JSON produced by :meth:`to_json`: ``dates``, ``payment_dates`` and
+            ``fixing_dates`` arrays, all required (``fixing_dates`` may be
+            empty).
 
         Returns
         -------
         Schedule
-            The reconstructed schedule.
+            The reconstructed schedule. Only its shape is validated; it is not
+            rebuilt against a calendar or specification.
 
         Raises
         ------
         ValueError
-            If *json* is malformed.
+            If *json* is malformed, a field is missing or unknown, or the shape
+            is invalid: fewer than 2 or more than 100,000 grid dates, grid
+            dates not strictly increasing, ``len(dates) - 1`` payment dates not
+            given, or a non-empty fixing series of the wrong length.
         Examples
         --------
         >>> from finstack_quant.core.dates import Schedule

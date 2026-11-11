@@ -78,7 +78,6 @@ pub fn variance_observation_dates(
             .stub_rule(StubKind::ShortBack)
             .end_of_month(end_of_month)
             .build()?
-            .dates
             .into_iter()
             .map(|date| adjust(date, business_day_convention, calendar.0))
             .collect::<finstack_quant_core::Result<Vec<_>>>()?

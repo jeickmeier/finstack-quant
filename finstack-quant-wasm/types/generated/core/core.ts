@@ -1956,26 +1956,17 @@ export interface RatingLevel {
 export interface Schedule {
   /**
    * Unadjusted accrual grid (period start plus each period end).
-   *
-   * These dates are never business-day adjusted. Payment-date adjustment,
-   * payment lag, and fixing lag live on [`Self::payment_dates`] and
-   * [`Self::fixing_dates`].
    */
   dates: DateWire[];
   /**
-   * Fixing dates for each accrual period.
-   *
-   * Empty when no fixing lag is configured; otherwise the same length as
-   * [`Self::payment_dates`].
+   * Fixing date for each accrual period, or empty when no fixing lag is
+   * configured.
    */
-  fixing_dates?: DateWire[];
+  fixing_dates: DateWire[];
   /**
    * Payment date for each accrual period (one per period end).
-   *
-   * Length is `dates.len().saturating_sub(1)`. Duplicate payment dates are
-   * retained so the series stays 1:1 with period ends.
    */
-  payment_dates?: DateWire[];
+  payment_dates: DateWire[];
 }
 /**
  * Persisted inputs of a date schedule: range, frequency, stub, adjustment and lags.
