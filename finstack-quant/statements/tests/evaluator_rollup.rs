@@ -602,3 +602,76 @@ fn rollup_spec_wire_format_is_strict_snake_case() {
     );
     assert!(serde_json::from_str::<RollupSpec>(r#"{"frequency": "annual", "x": 1}"#).is_err());
 }
+
+/// The ratio metrics the crate ships declare `formula`, so a rolled-up margin
+/// or multiple is recomputed from rolled-up inputs instead of summed
+/// (a 40% quarterly margin used to roll up to 1.6).
+#[test]
+fn bundled_ratio_metrics_roll_up_as_ratios() {
+    use finstack_quant_statements::registry::Registry;
+    let registry = Registry::with_builtins().expect("built-in metrics");
+    let series = |values: [f64; 4]| -> Vec<(PeriodId, AmountOrScalar)> {
+        (1..=4_u8)
+            .zip(values)
+            .map(|(quarter, value)| (q(2025, quarter), AmountOrScalar::scalar(value)))
+            .collect()
+    };
+    let model = {
+        let mut builder = ModelBuilder::new("bundled-ratios");
+        builder.periods("2025Q1..Q4", None).expect("valid periods");
+        builder.value("revenue", &series([100.0, 110.0, 120.0, 130.0]));
+        builder.value("cogs", &series([60.0, 66.0, 72.0, 78.0]));
+        builder.value("opex", &series([20.0, 22.0, 24.0, 26.0]));
+        builder.value("total_debt", &series([400.0, 410.0, 420.0, 460.0]));
+        builder.value("total_equity", &series([200.0, 205.0, 210.0, 230.0]));
+        for balance in ["total_debt", "total_equity"] {
+            builder
+                .rollup(balance, RollupMethod::PeriodEnd)
+                .expect("declared balance");
+        }
+        for metric in [
+            "fin.gross_margin",
+            "fin.debt_to_equity",
+            "fin.debt_to_ebitda",
+        ] {
+            builder
+                .add_metric_from_registry(metric, &registry)
+                .expect("bundled metric");
+        }
+        builder.build().expect("model")
+    };
+    let quarterly = Evaluator::new().evaluate(&model).expect("evaluation");
+    let annual = quarterly
+        .rollup(&model, &empty_annual_spec())
+        .expect("annual rollup");
+    let year = PeriodId::annual(2025);
+    // Flows still sum.
+    close(annual.get("fin.gross_profit", &year), 184.0);
+    close(annual.get("fin.ebitda", &year), 92.0);
+    // Ratios are recomputed on the annual inputs.
+    close(annual.get("fin.gross_margin", &year), 184.0 / 460.0);
+    close(annual.get("fin.debt_to_equity", &year), 2.0);
+    close(annual.get("fin.debt_to_ebitda", &year), 460.0 / 92.0);
+}
+
+/// Every bundled metric that is not a currency flow declares how it rolls up.
+#[test]
+fn every_bundled_ratio_metric_declares_a_rollup_method() {
+    use finstack_quant_statements::registry::{Registry, UnitType};
+    let registry = Registry::with_builtins().expect("built-in metrics");
+    let mut ratios = 0;
+    for (id, metric) in registry.all_metrics() {
+        let definition = &metric.definition;
+        if definition.unit_type == Some(UnitType::Currency) {
+            assert_eq!(definition.rollup, None, "{id} is a flow and sums");
+        } else {
+            ratios += 1;
+            assert_eq!(
+                definition.rollup,
+                Some(RollupMethod::Formula),
+                "{id} is not a currency flow and must declare its rollup"
+            );
+        }
+    }
+    assert_eq!(ratios, 16);
+}

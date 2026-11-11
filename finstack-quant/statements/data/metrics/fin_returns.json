@@ -9,6 +9,7 @@
       "description": "Net income as percentage of shareholder equity. CONVENTION: `opex` excludes depreciation and amortization. Denominator is period-end equity; average beginning/ending equity externally if the balance moves materially within a period.",
       "category": "returns",
       "unit_type": "percentage",
+      "rollup": "formula",
       "requires": ["revenue", "cogs", "opex", "depreciation", "amortization", "interest_expense", "taxes", "total_equity"],
       "tags": ["returns", "profitability"]
     },
@@ -19,6 +20,7 @@
       "description": "Net income as percentage of total assets. CONVENTION: `opex` excludes depreciation and amortization. Denominator is period-end assets.",
       "category": "returns",
       "unit_type": "percentage",
+      "rollup": "formula",
       "requires": ["revenue", "cogs", "opex", "depreciation", "amortization", "interest_expense", "taxes", "total_assets"],
       "tags": ["returns", "profitability"]
     },
@@ -29,6 +31,7 @@
       "description": "NOPAT as percentage of invested capital. NOPAT is approximated as EBIT minus reported taxes (rather than EBIT times one minus a marginal tax rate). With a deductible interest expense and otherwise identical tax assumptions, this overstates operating ROIC by the interest tax shield divided by invested capital. CONVENTION: `opex` excludes depreciation and amortization.",
       "category": "returns",
       "unit_type": "percentage",
+      "rollup": "formula",
       "requires": ["revenue", "cogs", "opex", "depreciation", "amortization", "taxes", "total_debt", "total_equity"],
       "tags": ["returns", "profitability"]
     },
@@ -39,6 +42,7 @@
       "description": "EBIT as percentage of capital employed. CONVENTION: `opex` excludes depreciation and amortization.",
       "category": "returns",
       "unit_type": "percentage",
+      "rollup": "formula",
       "requires": ["revenue", "cogs", "opex", "depreciation", "amortization", "total_assets", "current_liabilities"],
       "tags": ["returns", "profitability"]
     }

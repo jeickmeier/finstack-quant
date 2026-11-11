@@ -79,6 +79,7 @@ mod tests {
             description: None,
             category: None,
             unit_type: None,
+            rollup: None,
             requires: vec![],
             tags: vec![],
             meta: IndexMap::new(),

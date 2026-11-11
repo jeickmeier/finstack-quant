@@ -75,6 +75,13 @@ pub struct MetricDefinition {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unit_type: Option<UnitType>,
 
+    /// How the metric combines over the source periods of a coarser period
+    /// when results are rolled up. A ratio or a multiple declares `formula`
+    /// so it is recomputed from the rolled-up inputs; a metric that leaves
+    /// this unset follows the rollup default and is summed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rollup: Option<crate::types::RollupMethod>,
+
     /// List of required node dependencies
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub requires: Vec<String>,
@@ -123,6 +130,7 @@ impl MetricDefinition {
     ///     description: None,
     ///     category: None,
     ///     unit_type: None,
+    ///     rollup: None,
     ///     requires: vec![],
     ///     tags: vec![],
     ///     meta: indexmap::IndexMap::new(),

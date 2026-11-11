@@ -9,6 +9,7 @@
       "description": "Gross profit as percentage of revenue",
       "category": "margins",
       "unit_type": "percentage",
+      "rollup": "formula",
       "requires": ["revenue", "gross_profit"],
       "tags": ["margins", "profitability"]
     },
@@ -19,6 +20,7 @@
       "description": "Operating income as percentage of revenue",
       "category": "margins",
       "unit_type": "percentage",
+      "rollup": "formula",
       "requires": ["revenue", "operating_income"],
       "tags": ["margins", "profitability"]
     },
@@ -29,6 +31,7 @@
       "description": "EBITDA as percentage of revenue",
       "category": "margins",
       "unit_type": "percentage",
+      "rollup": "formula",
       "requires": ["revenue", "ebitda"],
       "tags": ["margins", "profitability"]
     },
@@ -39,6 +42,7 @@
       "description": "Net income as percentage of revenue",
       "category": "margins",
       "unit_type": "percentage",
+      "rollup": "formula",
       "requires": ["revenue", "net_income"],
       "tags": ["margins", "profitability"]
     },
@@ -49,6 +53,7 @@
       "description": "Cost of goods sold as percentage of revenue",
       "category": "margins",
       "unit_type": "percentage",
+      "rollup": "formula",
       "requires": ["cogs", "revenue"],
       "tags": ["margins", "efficiency"]
     },
@@ -59,6 +64,7 @@
       "description": "Operating expenses as percentage of revenue",
       "category": "margins",
       "unit_type": "percentage",
+      "rollup": "formula",
       "requires": ["opex", "revenue"],
       "tags": ["margins", "efficiency"]
     }

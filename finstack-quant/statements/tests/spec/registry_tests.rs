@@ -540,6 +540,7 @@ fn test_metric_definition_qualified_id() {
         description: None,
         category: None,
         unit_type: None,
+        rollup: None,
         requires: vec![],
         tags: vec![],
         meta: IndexMap::new(),

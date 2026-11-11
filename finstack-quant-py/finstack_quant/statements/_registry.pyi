@@ -264,6 +264,29 @@ class MetricDefinition:
         ...
 
     @property
+    def rollup(self) -> str | None:
+        """
+        How the metric combines when results roll up to coarser periods.
+
+        ``"formula"`` recomputes the metric from the rolled-up inputs (ratios
+        and multiples), ``"period_end"`` takes the last source period and
+        ``"sum"`` adds the source periods. ``None`` means the metric declares
+        nothing and follows the rollup default, which sums.
+
+        Returns
+        -------
+        str | None
+            ``"sum"``, ``"period_end"`` or ``"formula"``, or ``None`` when the
+            metric declares no method.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
+        """
+        ...
+
+    @property
     def requires(self) -> list[str]:
         """
         Node ids the formula reads.

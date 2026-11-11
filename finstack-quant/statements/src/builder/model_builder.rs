@@ -351,9 +351,10 @@ impl ModelBuilder {
         formula: String,
     ) {
         let key = NodeId::new(qualified_id);
-        let node = NodeSpec::new(key.clone(), NodeType::Calculated)
+        let mut node = NodeSpec::new(key.clone(), NodeType::Calculated)
             .with_name(stored_metric.definition.name.clone())
             .with_formula(formula);
+        node.rollup = stored_metric.definition.rollup;
         self.put_node(key, node);
     }
 

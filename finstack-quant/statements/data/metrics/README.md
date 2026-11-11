@@ -35,6 +35,7 @@ Each file deserializes into `registry::MetricRegistry` with
       "description": "EBITDA as a percentage of revenue",
       "category": "margins",
       "unit_type": "percentage",
+      "rollup": "formula",
       "requires": ["ebitda", "revenue"],
       "tags": ["margins", "profitability"]
     }
@@ -47,6 +48,15 @@ Each file deserializes into `registry::MetricRegistry` with
 `meta` default to empty. `formula` is statements-DSL text. The registry object
 itself also accepts an optional top-level `meta` map. `unit_type` is metadata
 only — nothing in the evaluator converts or validates units from it.
+
+`rollup` is optional and is one of `sum`, `period_end`, `formula`. It is copied
+onto the model node and decides how the metric combines when results are rolled
+up to coarser periods. A metric that leaves it out follows the rollup default
+and is summed, which is only right for a flow. Every bundled ratio, margin and
+multiple declares `formula`, so its annual value is recomputed from the annual
+inputs. The inputs follow their own declarations: declare `period_end` on
+balances such as `total_debt` so a rolled-up leverage ratio reads the closing
+balance.
 
 Identifiers inside a formula are written unqualified. When a metric is inserted
 into a model, references to other metrics **in the same namespace** are rewritten

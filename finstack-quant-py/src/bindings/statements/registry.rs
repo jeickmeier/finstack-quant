@@ -69,6 +69,16 @@ impl PyMetricDefinition {
             .transpose()
     }
 
+    #[doc = pydoc!("finstack_quant.statements._registry", "MetricDefinition.rollup")]
+    #[getter]
+    fn rollup(&self) -> PyResult<Option<String>> {
+        self.inner
+            .rollup
+            .as_ref()
+            .map(crate::bindings::extract::label)
+            .transpose()
+    }
+
     /// Node identifiers the formula requires as inputs.
     #[getter]
     fn requires(&self) -> Vec<String> {
