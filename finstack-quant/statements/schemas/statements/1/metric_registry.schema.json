@@ -42,6 +42,17 @@
           },
           "type": "array"
         },
+        "rollup": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RollupMethod"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How the metric combines over the source periods of a coarser period\nwhen results are rolled up. A ratio or a multiple declares `formula`\nso it is recomputed from the rolled-up inputs; a metric that leaves\nthis unset follows the rollup default and is summed."
+        },
         "tags": {
           "description": "Tags for filtering/searching",
           "items": {
@@ -67,6 +78,26 @@
         "formula"
       ],
       "type": "object"
+    },
+    "RollupMethod": {
+      "description": "How one node's values combine over the source periods of a target period.",
+      "oneOf": [
+        {
+          "const": "sum",
+          "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nA missing source value leaves the target value missing.",
+          "type": "string"
+        },
+        {
+          "const": "period_end",
+          "description": "Take the last source period's value: balances such as cash, debt and\nequity, and trailing metrics such as last-twelve-month EBITDA.",
+          "type": "string"
+        },
+        {
+          "const": "formula",
+          "description": "Re-evaluate the node's formula (and `where` clause) on the rolled-up\nvalues: ratios such as margins, leverage and coverage. Time-series\nfunctions then run at the target frequency, so `lag(x, 1)` is the\nprior target period.",
+          "type": "string"
+        }
+      ]
     },
     "SchemaVersion": {
       "description": "Numeric schema revision for contracts whose sole supported revision is v1.",

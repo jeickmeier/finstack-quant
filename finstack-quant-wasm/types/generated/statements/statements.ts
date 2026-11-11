@@ -7384,6 +7384,13 @@ export interface MetricDefinition {
    */
   requires?: string[];
   /**
+   * How the metric combines over the source periods of a coarser period
+   * when results are rolled up. A ratio or a multiple declares `formula`
+   * so it is recomputed from the rolled-up inputs; a metric that leaves
+   * this unset follows the rollup default and is summed.
+   */
+  rollup?: RollupMethod | null;
+  /**
    * Tags for filtering/searching
    */
   tags?: string[];

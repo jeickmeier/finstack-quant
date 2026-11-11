@@ -2147,7 +2147,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
             "type_name": "MetricRegistry",
             "kind": "input",
-            "bytes": 4367
+            "bytes": 5807
           },
           {
             "path": "schemas/statements/1/monte_carlo_config.schema.json",
@@ -4792,7 +4792,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
             "type_name": "MetricRegistry",
             "kind": "input",
-            "bytes": 4367
+            "bytes": 5807
           },
           {
             "domain": "statements",

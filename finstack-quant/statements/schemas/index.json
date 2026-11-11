@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
-      "bytes": 4367,
+      "bytes": 5807,
       "kind": "input",
       "path": "schemas/statements/1/metric_registry.schema.json",
       "summary": "Namespaced catalog of reusable metric definitions.",

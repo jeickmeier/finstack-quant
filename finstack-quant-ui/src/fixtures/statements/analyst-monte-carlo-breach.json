@@ -1,5 +1,5 @@
 {
   "metric": "leverage",
   "threshold": 2.25,
-  "probability": 0.165
+  "probability": 0.14
 }
