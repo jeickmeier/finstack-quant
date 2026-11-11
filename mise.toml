@@ -483,10 +483,10 @@ run = [
   # The cross-host schema golden pins every published schema's identity and
   # byte size, computed through the WASM binding, which embeds the schemas
   # written above; the Python suite checks the same golden.
-  "UPDATE_SCHEMA_PARITY_GOLDEN=1 node --test finstack-quant-wasm/tests/facade/schema_parity.test.mjs",
+  "UPDATE_SCHEMA_PARITY_GOLDEN=1 node --test --test-timeout=60000 finstack-quant-wasm/tests/facade/schema_parity.test.mjs",
   "finstack-quant-wasm/node_modules/.bin/prettier --log-level warn --write finstack-quant-wasm/tests/facade/schema_parity.golden.json",
   # The test writes plain JSON.stringify output; Prettier gives the committed form.
-  "UPDATE_FACADE_SURFACE=1 node --test finstack-quant-wasm/tests/facade/surface.test.mjs",
+  "UPDATE_FACADE_SURFACE=1 node --test --test-timeout=60000 finstack-quant-wasm/tests/facade/surface.test.mjs",
   "finstack-quant-wasm/node_modules/.bin/prettier --log-level warn --write finstack-quant-wasm/facade-surface.json",
   "npm --prefix finstack-quant-ui run generate",
   { task = "ui-fixtures" },
@@ -520,7 +520,7 @@ run = '''
 set -eu
 cargo build --workspace --exclude finstack-quant-py --example generate_contracts
 "${CARGO_TARGET_DIR:-target}/debug/examples/generate_contracts" --check
-node --test finstack-quant-wasm/tests/scripts/prepare_schema.test.mjs
+node --test --test-timeout=60000 finstack-quant-wasm/tests/scripts/prepare_schema.test.mjs
 node finstack-quant-wasm/scripts/generate-contract-types.mjs --check
 uv run --no-sync python scripts/sync_generated_ts_index.py --check \
   || (echo 'Generated TypeScript index is out of date'; exit 1)

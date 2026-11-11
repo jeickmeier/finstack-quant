@@ -1,7 +1,8 @@
 [profile.default]
-# Report any test over 20 s as SLOW; the suite wall time is bounded by its
-# longest test, so a new one over this threshold should be split or looked at.
-slow-timeout = { period = "20s" }
+# Report any test over 20 s as SLOW and kill it at 60 s (3 x 20 s): a hung test
+# fails and the run moves on instead of blocking. The suite wall time is bounded
+# by its longest test, so a new one over 20 s should be split or looked at.
+slow-timeout = { period = "20s", terminate-after = 3 }
 # Match the `--no-fail-fast` the mise rust-test-* tasks pass.
 fail-fast = false
 
@@ -11,11 +12,10 @@ store-success-output = false
 store-failure-output = true
 
 [profile.ci]
-# Report a test as SLOW at 20 s and kill it at 180 s as a runaway guard. The
-# PR gate budget is 60 s per test, and the cap tightens to it once the slow
-# tests are measured on CI and moved to the `#[ignore]` slow suite, which the
+# Report a test as SLOW at 20 s and kill it at 60 s, the per-test budget of
+# the PR gate. Longer tests belong in the `#[ignore]` slow suite, which the
 # full tier runs.
-slow-timeout = { period = "20s", terminate-after = 9 }
+slow-timeout = { period = "20s", terminate-after = 3 }
 fail-fast = false
 
 [profile.ci.junit]
