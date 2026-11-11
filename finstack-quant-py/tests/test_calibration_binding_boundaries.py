@@ -174,6 +174,7 @@ def test_typed_market_data_feeds_the_envelope() -> None:
     plan = CalibrationPlan(
         [CalibrationStep.discount("USD-OIS", {"currency": "USD", "base_date": "2026-05-08"})],
         quote_sets={"USD-OIS": [quote.id for quote in quotes]},
+        settings={"fx": {"pivot_currency": None}},
     )
     data = [
         InflationQuote.inflation_swap("ZC5Y", "2031-05-08", 0.025, "USA-CPI-U", "USD"),

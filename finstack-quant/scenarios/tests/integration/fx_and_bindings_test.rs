@@ -24,7 +24,7 @@ fn test_fx_shock() {
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
         .expect("valid rate");
 
-    let fx_matrix = FxMatrix::new(fx_provider);
+    let fx_matrix = FxMatrix::new(fx_provider, None);
     let mut market = MarketContext::new().insert_fx(fx_matrix);
 
     // Setup empty model
@@ -66,7 +66,7 @@ fn test_fx_shock() {
         Currency::EUR,
         Currency::USD,
         base_date,
-        Default::default(),
+        finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
     );
     let rate = fx.rate(query).unwrap().rate;
 
@@ -89,7 +89,7 @@ fn test_fx_shock_preserves_other_quotes() {
         .set_quotes(&[(Currency::GBP, Currency::USD, 1.25)])
         .expect("valid rate");
 
-    let fx_matrix = FxMatrix::new(fx_provider);
+    let fx_matrix = FxMatrix::new(fx_provider, None);
     let mut market = MarketContext::new().insert_fx(fx_matrix);
     let mut model = FinancialModelSpec::new("test", vec![]);
 
@@ -125,7 +125,7 @@ fn test_fx_shock_preserves_other_quotes() {
         Currency::GBP,
         Currency::USD,
         base_date,
-        Default::default(),
+        finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
     );
     let gbp_rate = fx.rate(gbp_query).unwrap().rate;
     assert!(

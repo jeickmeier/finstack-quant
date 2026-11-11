@@ -32,7 +32,7 @@ class ConvertedMoney:
     --------
     >>> from finstack_quant.core.market_data import FxMatrix, MarketContext
     >>> from finstack_quant.core.money import Money
-    >>> fx = FxMatrix()
+    >>> fx = FxMatrix(None)
     >>> fx.set_quotes([("EUR", "USD", 1.1)])
     >>> converted = MarketContext().insert_fx(fx).convert_money(Money(10.0, "EUR"), "USD", "2025-01-02")
     >>> (str(converted.amount.currency), converted.rate.rate)
@@ -780,7 +780,7 @@ class MarketContext:
         --------
         >>> from finstack_quant.core.market_data import FxMatrix, MarketContext
         >>> from finstack_quant.core.money import Money
-        >>> fx = FxMatrix()
+        >>> fx = FxMatrix(None)
         >>> fx.set_quotes([("EUR", "USD", 1.1)])
         >>> ctx = MarketContext().insert_fx(fx)
         >>> converted = ctx.convert_money(Money(100.0, "EUR"), "USD", "2025-01-02")

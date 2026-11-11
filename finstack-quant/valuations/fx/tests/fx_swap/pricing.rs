@@ -340,7 +340,7 @@ fn test_cip_parity_forward_at_premium() {
         .build()
         .unwrap();
 
-    let fx_matrix = FxMatrix::new(Arc::new(UnitSpotProvider));
+    let fx_matrix = FxMatrix::new(Arc::new(UnitSpotProvider), None);
 
     let market = finstack_quant_core::market_data::context::MarketContext::new()
         .insert(usd_curve)

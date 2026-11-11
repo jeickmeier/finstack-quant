@@ -131,5 +131,5 @@ impl FxProvider for StaticFx {
 
 /// Build an FX matrix with a static rate provider.
 fn fx_matrix(rate: f64) -> FxMatrix {
-    FxMatrix::new(Arc::new(StaticFx { rate }))
+    FxMatrix::new(Arc::new(StaticFx { rate }), None)
 }

@@ -88,7 +88,7 @@ fn multi_currency_market_context() -> MarketContext {
         }
     }
 
-    let fx = FxMatrix::new(Arc::new(TestFxProvider));
+    let fx = FxMatrix::new(Arc::new(TestFxProvider), None);
     minimal_market_context()
         .insert_fx(fx)
         .insert_price("EUR_EQUITY", MarketScalar::Price(eur(100.0)))

@@ -27,11 +27,6 @@
             "validation_tolerance": 1e-8,
             "weighting_scheme": "sqrt_time"
           },
-          "fx": {
-            "cache_capacity": 256,
-            "enable_triangulation": true,
-            "pivot_currency": "USD"
-          },
           "hazard_curve": {
             "hazard_hard_max": 10,
             "hazard_hard_min": 0,
@@ -3643,7 +3638,7 @@
     },
     "d_82889f5b5a91a21407f1": {
       "additionalProperties": false,
-      "description": "Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour.\n\nControls triangulation and caching.",
+      "description": "Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour\n(record CORE-CONVENTIONS-013 #5, resolution O9).\n\nThe routing choice is explicit: there is no default pivot and no default\nconfiguration. `cache_capacity` may be omitted on the wire and then takes\nthe operational default.\n\n# Examples\n\n```rust\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::fx::FxConfig;\n\nassert_eq!(FxConfig::new(Some(Currency::USD)).pivot_currency, Some(Currency::USD));\nassert!(serde_json::from_str::<FxConfig>(\"{}\").is_err());\nlet direct: FxConfig = serde_json::from_str(r#\"{\"pivot_currency\": null}\"#)?;\nassert_eq!(direct.pivot_currency, None);\n# Ok::<(), serde_json::Error>(())\n```",
       "properties": {
         "cache_capacity": {
           "default": 256,
@@ -3652,17 +3647,21 @@
           "minimum": 0,
           "type": "integer"
         },
-        "enable_triangulation": {
-          "default": true,
-          "description": "Whether to enable automatic triangulation for missing rates.\n\nWhen enabled, the matrix will attempt `from -> pivot -> to` and will not\nsearch multi-hop paths or alternative pivots.",
-          "type": "boolean"
-        },
         "pivot_currency": {
-          "$ref": "#/$defs/d_be98333e68c25ab5ae57",
-          "default": "USD",
-          "description": "Pivot currency for triangulation fallback (typically USD).\n\nCurrent limitation: triangulation uses this single configured pivot only.\nIf a market convention requires a different routing currency for a given\npair, callers must seed that direct quote explicitly instead of relying on\nautomatic cross construction."
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_be98333e68c25ab5ae57"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Single pivot for `from -> pivot -> to` cross routing, or `None` for\ndirect quotes only. Required on the wire (`null` disables routing).\n\nOnly this one pivot is tried: no alternative pivot, multi-hop search or\nmarket-order inference. A pair whose market convention routes through\nanother currency needs its direct quote seeded explicitly."
         }
       },
+      "required": [
+        "pivot_currency"
+      ],
       "type": "object"
     },
     "d_83682026197086424468": {
@@ -5961,13 +5960,15 @@
           "description": "Forward-curve specific solver configuration."
         },
         "fx": {
-          "$ref": "#/$defs/d_82889f5b5a91a21407f1",
-          "default": {
-            "cache_capacity": 256,
-            "enable_triangulation": true,
-            "pivot_currency": "USD"
-          },
-          "description": "FX matrix runtime config (pivot currency, triangulation, cache capacity)."
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_82889f5b5a91a21407f1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "FX matrix config (explicit routing pivot and cache capacity) for a\nmarket built from FX spot quotes. `None` (the key omitted) supplies no\nFX configuration: building an FX matrix from quotes then errors rather\nthan inferring a pivot (record CORE-CONVENTIONS-013 #5)."
         },
         "hazard_curve": {
           "$ref": "#/$defs/d_a7e08397fba9e91716b7",
@@ -6128,11 +6129,6 @@
             "forward_curve": {
               "validation_tolerance": 1e-8,
               "weighting_scheme": "sqrt_time"
-            },
-            "fx": {
-              "cache_capacity": 256,
-              "enable_triangulation": true,
-              "pivot_currency": "USD"
             },
             "hazard_curve": {
               "hazard_hard_max": 10,

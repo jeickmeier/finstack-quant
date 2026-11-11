@@ -60,8 +60,8 @@ fn provider_cache_hits_refresh_recency_and_evict_the_least_recent_quote() {
     let matrix = FxMatrix::try_with_config(
         Arc::clone(&provider) as Arc<dyn FxProvider>,
         FxConfig {
+            pivot_currency: Some(Currency::USD),
             cache_capacity: 2,
-            ..Default::default()
         },
     )
     .expect("valid capacity");
@@ -70,7 +70,7 @@ fn provider_cache_hits_refresh_recency_and_evict_the_least_recent_quote() {
             Currency::EUR,
             Currency::USD,
             Date::from_calendar_date(2025, time::Month::January, day).expect("date"),
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         )
     };
     for day in [1, 2, 1, 3, 1] {
@@ -92,8 +92,13 @@ fn mutable_provider_refreshes_warmed_base_and_bumped_context_snapshots() {
     provider
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
         .expect("initial rate");
-    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>);
-    let query = FxQuery::new(Currency::EUR, Currency::USD, on, Default::default());
+    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>, None);
+    let query = FxQuery::new(
+        Currency::EUR,
+        Currency::USD,
+        on,
+        FxConversionPolicy::CashflowDate,
+    );
     assert_eq!(matrix.rate(query).expect("warm base").rate, 1.1);
     let bumped = matrix
         .with_bumped_rate(Currency::EUR, Currency::USD, 0.01, on)
@@ -117,7 +122,7 @@ fn mutable_provider_refreshes_warmed_base_and_bumped_context_snapshots() {
                     Currency::USD,
                     Currency::EUR,
                     on,
-                    Default::default(),
+                    FxConversionPolicy::CashflowDate,
                 ))
                 .expect("updated reciprocal");
             assert!((inverse.rate - 1.0 / expected).abs() < 1e-12);
@@ -136,7 +141,7 @@ fn mutable_provider_refresh_preserves_global_and_scoped_overrides_and_bumps() {
             (Currency::GBP, Currency::USD, 1.3),
         ])
         .expect("initial rates");
-    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>);
+    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>, None);
     matrix
         .set_quotes(&[(Currency::GBP, Currency::USD, 1.4)])
         .expect("global override");
@@ -155,7 +160,12 @@ fn mutable_provider_refresh_preserves_global_and_scoped_overrides_and_bumps() {
     let gbp_bumped = matrix
         .with_bumped_rate(Currency::GBP, Currency::USD, 0.01, on)
         .expect("bump global pair");
-    let live_query = FxQuery::new(Currency::EUR, Currency::USD, later, Default::default());
+    let live_query = FxQuery::new(
+        Currency::EUR,
+        Currency::USD,
+        later,
+        FxConversionPolicy::CashflowDate,
+    );
     for matrix in [&matrix, &eur_bumped, &gbp_bumped] {
         matrix.rate(live_query).expect("warm provider observation");
     }
@@ -178,7 +188,7 @@ fn mutable_provider_refresh_preserves_global_and_scoped_overrides_and_bumps() {
         for date in [on, later] {
             for policy in [
                 FxConversionPolicy::CashflowDate,
-                FxConversionPolicy::PeriodAverage,
+                FxConversionPolicy::PeriodEnd,
             ] {
                 let eur_expected = if date == on && policy == FxConversionPolicy::CashflowDate {
                     1.5
@@ -213,7 +223,10 @@ fn mutable_provider_refreshes_triangulated_crosses_and_preexisting_cross_bumps()
             (Currency::USD, Currency::GBP, 0.8),
         ])
         .expect("initial pivot legs");
-    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>);
+    let matrix = FxMatrix::new(
+        Arc::clone(&provider) as Arc<dyn FxProvider>,
+        Some(Currency::USD),
+    );
     let bumped = matrix
         .with_bumped_rate(Currency::EUR, Currency::GBP, 0.01, on)
         .expect("cross bump");
@@ -224,7 +237,7 @@ fn mutable_provider_refreshes_triangulated_crosses_and_preexisting_cross_bumps()
             (Currency::USD, Currency::EUR),
         ] {
             matrix
-                .rate(FxQuery::new(from, to, on, Default::default()))
+                .rate(FxQuery::new(from, to, on, FxConversionPolicy::CashflowDate))
                 .expect("warm cross and reciprocal");
         }
     }
@@ -238,7 +251,7 @@ fn mutable_provider_refreshes_triangulated_crosses_and_preexisting_cross_bumps()
                 Currency::EUR,
                 Currency::GBP,
                 on,
-                Default::default(),
+                FxConversionPolicy::CashflowDate,
             ))
             .expect("updated cross");
         let inverse = matrix
@@ -246,7 +259,7 @@ fn mutable_provider_refreshes_triangulated_crosses_and_preexisting_cross_bumps()
                 Currency::GBP,
                 Currency::EUR,
                 on,
-                Default::default(),
+                FxConversionPolicy::CashflowDate,
             ))
             .expect("updated inverse cross");
         assert!((cross.rate - expected).abs() < 1e-12);
@@ -257,7 +270,7 @@ fn mutable_provider_refreshes_triangulated_crosses_and_preexisting_cross_bumps()
                     Currency::USD,
                     Currency::EUR,
                     on,
-                    Default::default()
+                    FxConversionPolicy::CashflowDate
                 ))
                 .expect("updated inverse leg")
                 .rate
@@ -286,8 +299,13 @@ fn providers_without_revisions_do_not_cache_observations() {
     let on = Date::from_ordinal_date(2025, 1).expect("date");
     let provider = Arc::new(LiveFx(AtomicUsize::new(110)));
     assert_eq!(provider.get_revision(), None);
-    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>);
-    let query = FxQuery::new(Currency::EUR, Currency::USD, on, Default::default());
+    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>, None);
+    let query = FxQuery::new(
+        Currency::EUR,
+        Currency::USD,
+        on,
+        FxConversionPolicy::CashflowDate,
+    );
     assert_eq!(matrix.rate(query).expect("initial live rate").rate, 1.1);
     let bumped = matrix
         .with_bumped_rate(Currency::EUR, Currency::USD, 0.01, on)
@@ -328,9 +346,17 @@ fn provider_update_between_cross_legs_retries_the_complete_rate() {
         }
     }
 
-    let matrix = FxMatrix::new(Arc::new(PublishBetweenLegs(AtomicUsize::new(0))));
+    let matrix = FxMatrix::new(
+        Arc::new(PublishBetweenLegs(AtomicUsize::new(0))),
+        Some(Currency::USD),
+    );
     let on = Date::from_ordinal_date(2025, 1).expect("date");
-    let query = FxQuery::new(Currency::EUR, Currency::GBP, on, Default::default());
+    let query = FxQuery::new(
+        Currency::EUR,
+        Currency::GBP,
+        on,
+        FxConversionPolicy::CashflowDate,
+    );
     // Old market: 1.1 * 0.8 = 0.88. New market: 1.2 * 0.9 = 1.08.
     // The interleaved 1.1 * 0.9 = 0.99 must never escape as a valid cross.
     for _ in 0..2 {
@@ -382,7 +408,7 @@ fn provider_update_between_snapshot_hooks_retries_the_complete_snapshot() {
         }
     }
 
-    let matrix = FxMatrix::new(Arc::new(PublishBetweenHooks(AtomicUsize::new(0))));
+    let matrix = FxMatrix::new(Arc::new(PublishBetweenHooks(AtomicUsize::new(0))), None);
     let state = matrix.get_serializable_state().expect("coherent snapshot");
     assert_eq!(
         state.provider_quotes,
@@ -417,7 +443,7 @@ fn repeated_provider_updates_fail_rate_and_snapshot_after_bounded_retries() {
     }
 
     let provider = Arc::new(ChangingFx(AtomicUsize::new(0)));
-    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>);
+    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>, None);
     let on = Date::from_ordinal_date(2025, 1).expect("date");
     assert!(
         matrix
@@ -425,7 +451,7 @@ fn repeated_provider_updates_fail_rate_and_snapshot_after_bounded_retries() {
                 Currency::EUR,
                 Currency::USD,
                 on,
-                Default::default()
+                FxConversionPolicy::CashflowDate
             ))
             .is_err()
     );
@@ -452,7 +478,7 @@ fn unversioned_provider_snapshot_quotes_are_rejected() {
             vec![(Currency::EUR, Currency::USD, 1.2)]
         }
     }
-    let matrix = FxMatrix::new(Arc::new(UnversionedSnapshot));
+    let matrix = FxMatrix::new(Arc::new(UnversionedSnapshot), None);
     assert!(matrix.get_serializable_state().is_err());
 }
 
@@ -527,11 +553,7 @@ fn closure_check_matrix() {
             }
         }
     }
-    let cfg = FxConfig {
-        enable_triangulation: true,
-        pivot_currency: Currency::USD,
-        ..Default::default()
-    };
+    let cfg = FxConfig::new(Some(Currency::USD));
     let m = FxMatrix::try_with_config(Arc::new(Prov), cfg).expect("valid FxConfig");
     let d = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
 
@@ -541,7 +563,7 @@ fn closure_check_matrix() {
             Currency::USD,
             Currency::EUR,
             d,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
     assert!(!usd_eur.triangulated);
@@ -553,7 +575,7 @@ fn closure_check_matrix() {
             Currency::GBP,
             Currency::EUR,
             d,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
     assert!(gbp_eur.triangulated);
@@ -565,7 +587,7 @@ fn closure_check_matrix() {
             Currency::USD,
             Currency::GBP,
             d,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
     assert!(!usd_gbp.triangulated);
@@ -579,7 +601,7 @@ fn fx_quote_updates_invalidate_cached_crosses() {
     let other_date = Date::from_calendar_date(2025, time::Month::January, 3).unwrap();
     let policy = FxConversionPolicy::CashflowDate;
     for update in ["batch", "pinned"] {
-        let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
+        let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()), Some(Currency::USD));
         matrix
             .set_quotes(&[(Currency::GBP, Currency::USD, 1.25)])
             .unwrap();
@@ -600,7 +622,7 @@ fn fx_quote_updates_invalidate_cached_crosses() {
                     Currency::EUR,
                     Currency::GBP,
                     on,
-                    Default::default(),
+                    FxConversionPolicy::CashflowDate,
                 ))
                 .unwrap();
             assert!((before.rate - 0.88).abs() < 1e-12);
@@ -618,7 +640,12 @@ fn fx_quote_updates_invalidate_cached_crosses() {
             (Currency::GBP, Currency::EUR, 1.0 / 0.96),
         ] {
             let after = matrix
-                .rate(FxQuery::new(from, to, date, Default::default()))
+                .rate(FxQuery::new(
+                    from,
+                    to,
+                    date,
+                    FxConversionPolicy::CashflowDate,
+                ))
                 .unwrap();
             assert!((after.rate - expected).abs() < 1e-12, "{update}: {after:?}");
             assert!(after.triangulated);
@@ -628,7 +655,7 @@ fn fx_quote_updates_invalidate_cached_crosses() {
                 Currency::EUR,
                 Currency::GBP,
                 other_date,
-                Default::default(),
+                FxConversionPolicy::CashflowDate,
             ))
             .unwrap();
         let expected = if update == "pinned" { 0.88 } else { 0.96 };
@@ -639,7 +666,7 @@ fn fx_quote_updates_invalidate_cached_crosses() {
                     Currency::GBP,
                     Currency::USD,
                     date,
-                    Default::default()
+                    FxConversionPolicy::CashflowDate
                 ))
                 .unwrap()
                 .rate,
@@ -686,13 +713,21 @@ fn fx_quote_update_prevents_inflight_cross_from_repopulating_cache() {
 
     let entered = Arc::new(Barrier::new(2));
     let resume = Arc::new(Barrier::new(2));
-    let matrix = Arc::new(FxMatrix::new(Arc::new(BlockingFx {
-        entered: Arc::clone(&entered),
-        resume: Arc::clone(&resume),
-        calls: AtomicUsize::new(0),
-    })));
+    let matrix = Arc::new(FxMatrix::new(
+        Arc::new(BlockingFx {
+            entered: Arc::clone(&entered),
+            resume: Arc::clone(&resume),
+            calls: AtomicUsize::new(0),
+        }),
+        Some(Currency::USD),
+    ));
     let date = Date::from_calendar_date(2025, time::Month::January, 2).unwrap();
-    let query = FxQuery::new(Currency::EUR, Currency::GBP, date, Default::default());
+    let query = FxQuery::new(
+        Currency::EUR,
+        Currency::GBP,
+        date,
+        FxConversionPolicy::CashflowDate,
+    );
     matrix
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
         .unwrap();
@@ -733,8 +768,8 @@ fn fx_matrix_cache_distinguishes_query_date_and_policy() {
             match (on, policy) {
                 (d, FxConversionPolicy::CashflowDate) if d == jan_1 => Ok(1.10),
                 (d, FxConversionPolicy::CashflowDate) if d == jan_2 => Ok(1.20),
-                (d, FxConversionPolicy::PeriodAverage) if d == jan_1 => Ok(1.15),
-                (d, FxConversionPolicy::PeriodAverage) if d == jan_2 => Ok(1.25),
+                (d, FxConversionPolicy::PeriodEnd) if d == jan_1 => Ok(1.15),
+                (d, FxConversionPolicy::PeriodEnd) if d == jan_2 => Ok(1.25),
                 _ => Err(finstack_quant_core::InputError::NotFound {
                     id: format!("FX:{from}->{to}@{on:?}/{policy:?}"),
                 }
@@ -743,14 +778,8 @@ fn fx_matrix_cache_distinguishes_query_date_and_policy() {
         }
     }
 
-    let matrix = FxMatrix::try_with_config(
-        Arc::new(DatePolicyFx),
-        FxConfig {
-            enable_triangulation: false,
-            ..Default::default()
-        },
-    )
-    .expect("valid FxConfig");
+    let matrix = FxMatrix::try_with_config(Arc::new(DatePolicyFx), FxConfig::new(None))
+        .expect("valid FxConfig");
     let jan_1 = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
     let jan_2 = Date::from_calendar_date(2025, time::Month::January, 2).unwrap();
 
@@ -759,7 +788,7 @@ fn fx_matrix_cache_distinguishes_query_date_and_policy() {
             Currency::EUR,
             Currency::USD,
             jan_1,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
     let cashflow_jan_2 = matrix
@@ -767,21 +796,21 @@ fn fx_matrix_cache_distinguishes_query_date_and_policy() {
             Currency::EUR,
             Currency::USD,
             jan_2,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
-    let avg_jan_1 = matrix
+    let period_end_jan_1 = matrix
         .rate(FxQuery::new(
             Currency::EUR,
             Currency::USD,
             jan_1,
-            FxConversionPolicy::PeriodAverage,
+            FxConversionPolicy::PeriodEnd,
         ))
         .unwrap();
 
     assert!((cashflow_jan_1.rate - 1.10).abs() < 1e-12);
     assert!((cashflow_jan_2.rate - 1.20).abs() < 1e-12);
-    assert!((avg_jan_1.rate - 1.15).abs() < 1e-12);
+    assert!((period_end_jan_1.rate - 1.15).abs() < 1e-12);
 }
 
 #[test]
@@ -801,14 +830,8 @@ fn fx_matrix_set_quote_on_overrides_only_the_seeded_date() {
         }
     }
 
-    let matrix = FxMatrix::try_with_config(
-        Arc::new(RampFx),
-        FxConfig {
-            enable_triangulation: false,
-            ..Default::default()
-        },
-    )
-    .expect("valid FxConfig");
+    let matrix =
+        FxMatrix::try_with_config(Arc::new(RampFx), FxConfig::new(None)).expect("valid FxConfig");
     let jan_1 = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
     let jan_2 = Date::from_calendar_date(2025, time::Month::January, 2).unwrap();
 
@@ -829,7 +852,7 @@ fn fx_matrix_set_quote_on_overrides_only_the_seeded_date() {
             Currency::EUR,
             Currency::USD,
             jan_1,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
     let r2 = matrix
@@ -837,7 +860,7 @@ fn fx_matrix_set_quote_on_overrides_only_the_seeded_date() {
             Currency::EUR,
             Currency::USD,
             jan_2,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
 
@@ -878,9 +901,8 @@ fn fx_matrix_pinned_quote_survives_cache_pressure() {
     let matrix = FxMatrix::try_with_config(
         Arc::new(RampFx),
         FxConfig {
-            enable_triangulation: false,
+            pivot_currency: None,
             cache_capacity: 2,
-            ..Default::default()
         },
     )
     .expect("valid FxConfig");
@@ -904,7 +926,7 @@ fn fx_matrix_pinned_quote_survives_cache_pressure() {
                 Currency::EUR,
                 Currency::USD,
                 d,
-                Default::default(),
+                FxConversionPolicy::CashflowDate,
             ))
             .unwrap();
     }
@@ -915,7 +937,7 @@ fn fx_matrix_pinned_quote_survives_cache_pressure() {
             Currency::EUR,
             Currency::USD,
             jan_1,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
     assert!(
@@ -930,7 +952,7 @@ fn fx_matrix_pinned_quote_survives_cache_pressure() {
             Currency::USD,
             Currency::EUR,
             jan_1,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
     assert!(
@@ -970,9 +992,8 @@ fn fx_matrix_explicit_quote_survives_cache_pressure() {
     let matrix = FxMatrix::try_with_config(
         Arc::new(RampFx),
         FxConfig {
-            enable_triangulation: false,
+            pivot_currency: None,
             cache_capacity: 2,
-            ..Default::default()
         },
     )
     .expect("valid FxConfig");
@@ -990,7 +1011,7 @@ fn fx_matrix_explicit_quote_survives_cache_pressure() {
                 Currency::EUR,
                 Currency::USD,
                 d,
-                Default::default(),
+                FxConversionPolicy::CashflowDate,
             ))
             .unwrap();
     }
@@ -1002,7 +1023,7 @@ fn fx_matrix_explicit_quote_survives_cache_pressure() {
             Currency::EUR,
             Currency::USD,
             jan_1,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
     assert!(
@@ -1017,8 +1038,8 @@ fn fx_matrix_try_with_config_rejects_zero_capacity() {
     let err = FxMatrix::try_with_config(
         Arc::new(StaticFx { rate: 1.0 }),
         FxConfig {
+            pivot_currency: Some(Currency::USD),
             cache_capacity: 0,
-            ..Default::default()
         },
     )
     .err()
@@ -1045,7 +1066,7 @@ fn fx_matrix_set_quote_rejects_invalid_rates_without_mutating_state() {
         }
     }
 
-    let matrix = FxMatrix::new(Arc::new(MissingFx));
+    let matrix = FxMatrix::new(Arc::new(MissingFx), None);
 
     let err = matrix
         .set_quotes(&[(Currency::GBP, Currency::USD, 0.0)])
@@ -1057,7 +1078,7 @@ fn fx_matrix_set_quote_rejects_invalid_rates_without_mutating_state() {
         Currency::GBP,
         Currency::USD,
         jan_1,
-        Default::default(),
+        FxConversionPolicy::CashflowDate,
     ));
     assert!(
         lookup.is_err(),
@@ -1091,15 +1112,8 @@ fn with_bumped_rate_invalidates_cached_crosses() {
         }
     }
 
-    let matrix = FxMatrix::try_with_config(
-        Arc::new(PivotFx),
-        FxConfig {
-            enable_triangulation: true,
-            pivot_currency: Currency::USD,
-            ..Default::default()
-        },
-    )
-    .expect("valid FxConfig");
+    let matrix = FxMatrix::try_with_config(Arc::new(PivotFx), FxConfig::new(Some(Currency::USD)))
+        .expect("valid FxConfig");
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
 
     let original_cross = matrix
@@ -1107,7 +1121,7 @@ fn with_bumped_rate_invalidates_cached_crosses() {
             Currency::GBP,
             Currency::EUR,
             as_of,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap()
         .rate;
@@ -1119,7 +1133,7 @@ fn with_bumped_rate_invalidates_cached_crosses() {
             Currency::GBP,
             Currency::EUR,
             as_of,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap()
         .rate;
@@ -1144,12 +1158,12 @@ fn bumped_quote_providers_survive_context_snapshots_in_both_directions_and_cross
                 (Currency::GBP, Currency::USD, 1.3),
             ])
             .expect("snapshot quotes");
-        let matrix = FxMatrix::new(Arc::new(provider));
+        let matrix = FxMatrix::new(Arc::new(provider), Some(Currency::USD));
         let bumped = matrix
             .with_bumped_rate(from, to, 0.1, on)
             .expect("FX shock");
         let expected = bumped
-            .rate(FxQuery::new(from, to, on, Default::default()))
+            .rate(FxQuery::new(from, to, on, FxConversionPolicy::CashflowDate))
             .expect("rate")
             .rate;
         let context = MarketContext::new().insert_fx(bumped);
@@ -1158,17 +1172,27 @@ fn bumped_quote_providers_survive_context_snapshots_in_both_directions_and_cross
         let fx = restored.fx_required().expect("restored FX");
         for date in [on, Date::from_ordinal_date(2025, 182).expect("later date")] {
             assert!(
-                (fx.rate(FxQuery::new(from, to, date, Default::default()))
-                    .expect("rate")
-                    .rate
+                (fx.rate(FxQuery::new(
+                    from,
+                    to,
+                    date,
+                    FxConversionPolicy::CashflowDate
+                ))
+                .expect("rate")
+                .rate
                     - expected)
                     .abs()
                     < 1e-12
             );
             assert!(
-                (fx.rate(FxQuery::new(to, from, date, Default::default()))
-                    .expect("inverse")
-                    .rate
+                (fx.rate(FxQuery::new(
+                    to,
+                    from,
+                    date,
+                    FxConversionPolicy::CashflowDate
+                ))
+                .expect("inverse")
+                .rate
                     - 1.0 / expected)
                     .abs()
                     < 1e-12
@@ -1179,7 +1203,7 @@ fn bumped_quote_providers_survive_context_snapshots_in_both_directions_and_cross
                 Currency::GBP,
                 Currency::USD,
                 on,
-                Default::default()
+                FxConversionPolicy::CashflowDate
             ))
             .expect("untouched pair")
             .rate
@@ -1193,7 +1217,7 @@ fn bumped_quote_providers_survive_context_snapshots_in_both_directions_and_cross
         fx.set_quote_on(from, to, on, FxConversionPolicy::CashflowDate, 2.0)
             .expect("pinned fixing");
         assert!(
-            (fx.rate(FxQuery::new(from, to, on, Default::default()))
+            (fx.rate(FxQuery::new(from, to, on, FxConversionPolicy::CashflowDate))
                 .expect("pinned rate")
                 .rate
                 - 2.0)
@@ -1202,7 +1226,7 @@ fn bumped_quote_providers_survive_context_snapshots_in_both_directions_and_cross
         );
         fx.set_quotes(&[(from, to, 3.0)]).expect("global override");
         assert!(
-            (fx.rate(FxQuery::new(from, to, on, Default::default()))
+            (fx.rate(FxQuery::new(from, to, on, FxConversionPolicy::CashflowDate))
                 .expect("global rate")
                 .rate
                 - 3.0)
@@ -1224,7 +1248,7 @@ fn derived_bump_snapshot_respects_explicit_source_legs() {
             (Currency::GBP, Currency::USD, 1.3),
         ])
         .expect("provider quotes");
-    let matrix = FxMatrix::new(Arc::new(provider));
+    let matrix = FxMatrix::new(Arc::new(provider), Some(Currency::USD));
     matrix
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.2)])
         .expect("authoritative pivot leg");
@@ -1241,7 +1265,7 @@ fn derived_bump_snapshot_respects_explicit_source_legs() {
             Currency::EUR,
             Currency::GBP,
             on,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .expect("restored cross")
         .rate;
@@ -1258,7 +1282,7 @@ fn bumped_global_quotes_and_derived_crosses_survive_context_snapshots() {
         (Currency::USD, Currency::EUR),
         (Currency::EUR, Currency::GBP),
     ] {
-        let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
+        let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()), Some(Currency::USD));
         matrix
             .set_quotes(&[
                 (Currency::EUR, Currency::USD, 1.1),
@@ -1266,7 +1290,7 @@ fn bumped_global_quotes_and_derived_crosses_survive_context_snapshots() {
             ])
             .expect("authoritative quotes");
         let expected = matrix
-            .rate(FxQuery::new(from, to, on, Default::default()))
+            .rate(FxQuery::new(from, to, on, FxConversionPolicy::CashflowDate))
             .expect("rate")
             .rate
             * 1.1;
@@ -1276,7 +1300,7 @@ fn bumped_global_quotes_and_derived_crosses_survive_context_snapshots() {
         let restored: MarketContext = serde_json::from_str(&json).expect("restore");
         let fx = restored.fx_required().expect("FX");
         assert!(
-            (fx.rate(FxQuery::new(from, to, on, Default::default()))
+            (fx.rate(FxQuery::new(from, to, on, FxConversionPolicy::CashflowDate))
                 .expect("restored rate")
                 .rate
                 - expected)
@@ -1284,7 +1308,7 @@ fn bumped_global_quotes_and_derived_crosses_survive_context_snapshots() {
                 < 1e-12
         );
         assert!(
-            (fx.rate(FxQuery::new(to, from, on, Default::default()))
+            (fx.rate(FxQuery::new(to, from, on, FxConversionPolicy::CashflowDate))
                 .expect("inverse")
                 .rate
                 - 1.0 / expected)
@@ -1300,7 +1324,7 @@ fn global_cross_bump_persists_when_reference_date_has_a_direct_pinned_target() {
 
     let reference = Date::from_ordinal_date(2025, 1).expect("reference date");
     let later = Date::from_ordinal_date(2025, 182).expect("later date");
-    let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
+    let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()), Some(Currency::USD));
     matrix
         .set_quotes(&[
             (Currency::EUR, Currency::USD, 1.1),
@@ -1325,7 +1349,7 @@ fn global_cross_bump_persists_when_reference_date_has_a_direct_pinned_target() {
                 Currency::EUR,
                 Currency::GBP,
                 later,
-                Default::default()
+                FxConversionPolicy::CashflowDate
             ))
             .expect("live global cross")
             .rate
@@ -1340,7 +1364,6 @@ fn global_cross_bump_persists_when_reference_date_has_a_direct_pinned_target() {
         for policy in [
             FxConversionPolicy::CashflowDate,
             FxConversionPolicy::PeriodEnd,
-            FxConversionPolicy::PeriodAverage,
         ] {
             let expected = if on == reference && policy == FxConversionPolicy::CashflowDate {
                 2.2
@@ -1378,7 +1401,6 @@ fn bumped_pinned_crosses_retain_each_date_policy_and_quote_authority() {
     let policies = [
         FxConversionPolicy::CashflowDate,
         FxConversionPolicy::PeriodEnd,
-        FxConversionPolicy::PeriodAverage,
     ];
     for first_leg_source in ["global", "provider", "pinned", "direct_provider"] {
         for (from, to) in [
@@ -1399,7 +1421,7 @@ fn bumped_pinned_crosses_retain_each_date_policy_and_quote_authority() {
                     .set_quotes(&[(Currency::EUR, Currency::GBP, 1.5)])
                     .expect("direct provider cross outranks scoped pivot legs");
             }
-            let matrix = FxMatrix::new(Arc::new(provider));
+            let matrix = FxMatrix::new(Arc::new(provider), Some(Currency::USD));
             if first_leg_source == "global" {
                 matrix
                     .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
@@ -1468,9 +1490,14 @@ fn bumped_pinned_crosses_retain_each_date_policy_and_quote_authority() {
             fx.set_quotes(&[(to, from, 5.0)])
                 .expect("new global inverse override");
             assert_eq!(
-                fx.rate(FxQuery::new(from, to, dates[1], Default::default()))
-                    .expect("global")
-                    .rate,
+                fx.rate(FxQuery::new(
+                    from,
+                    to,
+                    dates[1],
+                    FxConversionPolicy::CashflowDate
+                ))
+                .expect("global")
+                .rate,
                 0.2
             );
         }
@@ -1481,7 +1508,10 @@ fn bumped_pinned_crosses_retain_each_date_policy_and_quote_authority() {
 fn snapshot_only_scoped_crosses_do_not_pin_the_live_bumped_provider() {
     let on = Date::from_ordinal_date(2025, 1).expect("date");
     let provider = Arc::new(SimpleFxProvider::new());
-    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>);
+    let matrix = FxMatrix::new(
+        Arc::clone(&provider) as Arc<dyn FxProvider>,
+        Some(Currency::USD),
+    );
     matrix
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
         .expect("global first leg");
@@ -1520,7 +1550,7 @@ fn snapshot_only_scoped_crosses_do_not_pin_the_live_bumped_provider() {
                 Currency::EUR,
                 Currency::GBP,
                 on,
-                Default::default()
+                FxConversionPolicy::CashflowDate
             ))
             .expect("live direct rate")
             .rate,
@@ -1549,7 +1579,7 @@ fn fx_bumps_reject_overflowing_static_scopes_outside_the_reference_date() {
                 (Currency::USD, Currency::GBP, 0.8),
             ])
             .expect("valid reference legs");
-        let matrix = FxMatrix::new(Arc::new(provider));
+        let matrix = FxMatrix::new(Arc::new(provider), Some(Currency::USD));
         matrix
             .set_quote_on(
                 Currency::EUR,
@@ -1574,7 +1604,7 @@ fn fx_bumps_reject_overflowing_static_scopes_outside_the_reference_date() {
                     Currency::EUR,
                     Currency::GBP,
                     reference,
-                    Default::default()
+                    FxConversionPolicy::CashflowDate
                 ))
                 .expect("valid reference")
                 .rate
@@ -1596,7 +1626,7 @@ fn fx_bumps_reject_overflowing_static_scopes_outside_the_reference_date() {
 
 #[test]
 fn scoped_provider_snapshot_field_is_required() {
-    let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
+    let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()), None);
     let mut state = serde_json::to_value(matrix.get_serializable_state().expect("stable FX state"))
         .expect("snapshot");
     state
@@ -1617,7 +1647,7 @@ fn mutable_provider_overflow_fails_snapshot_serialization_without_emitting_null(
     provider
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
         .expect("initial quote");
-    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>);
+    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>, None);
     let bumped = matrix
         .with_bumped_rate(Currency::EUR, Currency::USD, 0.1, on)
         .expect("initially valid shock");
@@ -1630,7 +1660,7 @@ fn mutable_provider_overflow_fails_snapshot_serialization_without_emitting_null(
                 Currency::EUR,
                 Currency::USD,
                 on,
-                Default::default()
+                FxConversionPolicy::CashflowDate
             ))
             .is_err()
     );
@@ -1656,7 +1686,7 @@ fn mutable_provider_cross_shock_overflow_is_not_replaced_by_unshocked_triangulat
             .set_quotes(&[(from, to, rate)])
             .expect("initial quote");
     }
-    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>);
+    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>, None);
     let bumped = matrix
         .with_bumped_rate(Currency::EUR, Currency::GBP, 0.1, on)
         .expect("initially valid cross shock");
@@ -1668,7 +1698,7 @@ fn mutable_provider_cross_shock_overflow_is_not_replaced_by_unshocked_triangulat
             Currency::EUR,
             Currency::GBP,
             on,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .expect_err("invalid direct shocked rate must not fall back to unshocked pivot legs");
     assert!(matches!(
@@ -1708,11 +1738,7 @@ fn triangulation_missing_leg_only_queries_provider_once_per_leg() {
     });
     let matrix = FxMatrix::try_with_config(
         Arc::<CountingMissingFx>::clone(&provider),
-        FxConfig {
-            enable_triangulation: true,
-            pivot_currency: Currency::USD,
-            ..Default::default()
-        },
+        FxConfig::new(Some(Currency::USD)),
     )
     .expect("valid FxConfig");
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
@@ -1721,7 +1747,7 @@ fn triangulation_missing_leg_only_queries_provider_once_per_leg() {
         Currency::GBP,
         Currency::EUR,
         as_of,
-        Default::default(),
+        FxConversionPolicy::CashflowDate,
     ));
     assert!(
         result.is_err(),
@@ -1779,11 +1805,7 @@ fn fx_triangulation_honors_pinned_leg() {
                 (Currency::USD, Currency::GBP, 0.80),
             ],
         }),
-        FxConfig {
-            enable_triangulation: true,
-            pivot_currency: Currency::USD,
-            ..Default::default()
-        },
+        FxConfig::new(Some(Currency::USD)),
     )
     .expect("valid FxConfig");
     let jan_1 = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
@@ -1803,7 +1825,7 @@ fn fx_triangulation_honors_pinned_leg() {
             Currency::EUR,
             Currency::GBP,
             jan_1,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
 
@@ -1826,7 +1848,7 @@ fn fx_triangulation_honors_pinned_leg() {
             Currency::EUR,
             Currency::USD,
             jan_1,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
     assert!((cross.rate - leg.rate * 0.80).abs() < 1e-12);
@@ -1840,11 +1862,7 @@ fn fx_triangulation_succeeds_when_leg_exists_only_as_pinned_quote() {
         Arc::new(LegFx {
             legs: vec![(Currency::USD, Currency::GBP, 0.80)],
         }),
-        FxConfig {
-            enable_triangulation: true,
-            pivot_currency: Currency::USD,
-            ..Default::default()
-        },
+        FxConfig::new(Some(Currency::USD)),
     )
     .expect("valid FxConfig");
     let jan_1 = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
@@ -1864,7 +1882,7 @@ fn fx_triangulation_succeeds_when_leg_exists_only_as_pinned_quote() {
             Currency::EUR,
             Currency::GBP,
             jan_1,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
     assert!(
@@ -1888,15 +1906,16 @@ fn fx_triangulated_flag_is_stable_across_repeat_queries() {
                 (Currency::USD, Currency::GBP, 0.80),
             ],
         }),
-        FxConfig {
-            enable_triangulation: true,
-            pivot_currency: Currency::USD,
-            ..Default::default()
-        },
+        FxConfig::new(Some(Currency::USD)),
     )
     .expect("valid FxConfig");
     let jan_1 = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
-    let query = FxQuery::new(Currency::EUR, Currency::GBP, jan_1, Default::default());
+    let query = FxQuery::new(
+        Currency::EUR,
+        Currency::GBP,
+        jan_1,
+        FxConversionPolicy::CashflowDate,
+    );
 
     let first = matrix.rate(query).unwrap();
     let second = matrix.rate(query).unwrap();
@@ -1932,7 +1951,7 @@ fn with_bumped_rate_preserves_fx_term_structure() {
         }
     }
 
-    let matrix = FxMatrix::new(Arc::new(DateAwareFx));
+    let matrix = FxMatrix::new(Arc::new(DateAwareFx), None);
     let d1 = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
     let d2 = Date::from_calendar_date(2025, time::Month::June, 1).unwrap();
 
@@ -1945,7 +1964,7 @@ fn with_bumped_rate_preserves_fx_term_structure() {
             Currency::EUR,
             Currency::USD,
             d1,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap()
         .rate;
@@ -1954,7 +1973,7 @@ fn with_bumped_rate_preserves_fx_term_structure() {
             Currency::EUR,
             Currency::USD,
             d2,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap()
         .rate;
@@ -1969,7 +1988,7 @@ fn with_bumped_rate_preserves_fx_term_structure() {
 
 #[test]
 fn with_bumped_rate_rejects_invalid_bumps() {
-    let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.1 }));
+    let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.1 }), None);
     let d = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
     for bad in [f64::NAN, f64::INFINITY, -1.0, -2.0] {
         assert!(
@@ -1983,7 +2002,7 @@ fn with_bumped_rate_rejects_invalid_bumps() {
 
 #[test]
 fn set_quotes_is_atomic_on_invalid_entry() {
-    let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }));
+    let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }), None);
     let d = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
 
     let err = matrix.set_quotes(&[
@@ -1997,7 +2016,7 @@ fn set_quotes_is_atomic_on_invalid_entry() {
             Currency::EUR,
             Currency::USD,
             d,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap()
         .rate;
@@ -2009,7 +2028,7 @@ fn set_quotes_is_atomic_on_invalid_entry() {
 
 #[test]
 fn pair_global_reciprocal_outranks_pinned_quote() {
-    let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }));
+    let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }), None);
     let d = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
 
     matrix
@@ -2030,7 +2049,7 @@ fn pair_global_reciprocal_outranks_pinned_quote() {
             Currency::EUR,
             Currency::USD,
             d,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap()
         .rate;
@@ -2045,7 +2064,7 @@ fn pair_global_reciprocal_outranks_pinned_quote() {
 fn fx_matrix_state_round_trips_pinned_quotes() {
     // After snapshot + restore, a pinned fixing must still win over the
     // provider for its (on, policy).
-    let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }));
+    let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }), None);
     let fixing_date = Date::from_calendar_date(2025, time::Month::March, 14).unwrap();
     matrix
         .set_quote_on(
@@ -2067,7 +2086,7 @@ fn fx_matrix_state_round_trips_pinned_quotes() {
     let json = serde_json::to_string(&state).unwrap();
     let state: finstack_quant_core::money::fx::FxMatrixState = serde_json::from_str(&json).unwrap();
 
-    let restored = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }));
+    let restored = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }), None);
     restored.load_from_state(&state).expect("restore");
 
     let pinned = restored
@@ -2075,7 +2094,7 @@ fn fx_matrix_state_round_trips_pinned_quotes() {
             Currency::EUR,
             Currency::USD,
             fixing_date,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap()
         .rate;
@@ -2091,7 +2110,7 @@ fn fx_matrix_state_round_trips_pinned_quotes() {
             Currency::EUR,
             Currency::USD,
             other,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap()
         .rate;
@@ -2099,7 +2118,7 @@ fn fx_matrix_state_round_trips_pinned_quotes() {
 
     // A snapshot that omits `pinned_quotes` is rejected rather than silently
     // restoring a matrix with no pinned fixings.
-    let without_pinned = r#"{"config":{"pivot_currency":"USD","enable_triangulation":true,"cache_capacity":256},"quotes":[],"provider_quotes":[],"provider_pinned_quotes":[]}"#;
+    let without_pinned = r#"{"config":{"pivot_currency":"USD","cache_capacity":256},"quotes":[],"provider_quotes":[],"provider_pinned_quotes":[]}"#;
     assert!(
         serde_json::from_str::<finstack_quant_core::money::fx::FxMatrixState>(without_pinned)
             .is_err(),
@@ -2128,14 +2147,8 @@ fn reciprocal_of_subnormal_rate_is_rejected() {
         }
     }
 
-    let matrix = FxMatrix::try_with_config(
-        Arc::new(MissingFx),
-        FxConfig {
-            enable_triangulation: false,
-            ..Default::default()
-        },
-    )
-    .expect("valid FxConfig");
+    let matrix = FxMatrix::try_with_config(Arc::new(MissingFx), FxConfig::new(None))
+        .expect("valid FxConfig");
     matrix
         .set_quotes(&[(Currency::EUR, Currency::USD, 1e-320)])
         .expect("subnormal but positive quote is accepted at insert");
@@ -2147,7 +2160,7 @@ fn reciprocal_of_subnormal_rate_is_rejected() {
         Currency::USD,
         Currency::EUR,
         d,
-        Default::default(),
+        FxConversionPolicy::CashflowDate,
     ));
     assert!(
         result.is_err(),
@@ -2163,13 +2176,13 @@ fn fx_observed_cache_is_order_independent_across_directions() {
     let date = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
     let rate = 31.528_877_897_691_935;
 
-    let first = FxMatrix::new(Arc::new(ReciprocalFx { usd_eur: rate }));
+    let first = FxMatrix::new(Arc::new(ReciprocalFx { usd_eur: rate }), None);
     let _ = first
         .rate(FxQuery::new(
             Currency::EUR,
             Currency::USD,
             date,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
     let first_forward = first
@@ -2177,7 +2190,7 @@ fn fx_observed_cache_is_order_independent_across_directions() {
             Currency::EUR,
             Currency::USD,
             date,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
     let first_reverse = first
@@ -2185,17 +2198,17 @@ fn fx_observed_cache_is_order_independent_across_directions() {
             Currency::USD,
             Currency::EUR,
             date,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
 
-    let second = FxMatrix::new(Arc::new(ReciprocalFx { usd_eur: rate }));
+    let second = FxMatrix::new(Arc::new(ReciprocalFx { usd_eur: rate }), None);
     let _ = second
         .rate(FxQuery::new(
             Currency::USD,
             Currency::EUR,
             date,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
     let second_forward = second
@@ -2203,7 +2216,7 @@ fn fx_observed_cache_is_order_independent_across_directions() {
             Currency::EUR,
             Currency::USD,
             date,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
     let second_reverse = second
@@ -2211,7 +2224,7 @@ fn fx_observed_cache_is_order_independent_across_directions() {
             Currency::USD,
             Currency::EUR,
             date,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         ))
         .unwrap();
 
@@ -2232,12 +2245,22 @@ fn fx_cold_and_warm_lookups_agree_bit_exactly() {
         (Currency::EUR, Currency::USD),
         (Currency::USD, Currency::EUR),
     ] {
-        let matrix = FxMatrix::new(Arc::new(ReciprocalFx { usd_eur: rate }));
+        let matrix = FxMatrix::new(Arc::new(ReciprocalFx { usd_eur: rate }), None);
         let cold = matrix
-            .rate(FxQuery::new(from, to, date, Default::default()))
+            .rate(FxQuery::new(
+                from,
+                to,
+                date,
+                FxConversionPolicy::CashflowDate,
+            ))
             .unwrap();
         let warm = matrix
-            .rate(FxQuery::new(from, to, date, Default::default()))
+            .rate(FxQuery::new(
+                from,
+                to,
+                date,
+                FxConversionPolicy::CashflowDate,
+            ))
             .unwrap();
         assert_eq!(cold.rate, warm.rate, "{from}->{to}");
         assert_eq!(cold.triangulated, warm.triangulated, "{from}->{to}");
@@ -2255,7 +2278,7 @@ mod fx_pinned_precedence {
     #[test]
     fn global_source_precedes_orientation_and_pinned_fixing() {
         let on = date!(2025 - 01 - 02);
-        let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
+        let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()), Some(Currency::USD));
         matrix
             .set_quotes(&[(Currency::USD, Currency::EUR, 0.8)])
             .expect("global");
@@ -2273,7 +2296,7 @@ mod fx_pinned_precedence {
                 Currency::EUR,
                 Currency::USD,
                 on,
-                Default::default(),
+                FxConversionPolicy::CashflowDate,
             ))
             .expect("forward")
             .rate;
@@ -2282,7 +2305,7 @@ mod fx_pinned_precedence {
                 Currency::USD,
                 Currency::EUR,
                 on,
-                Default::default(),
+                FxConversionPolicy::CashflowDate,
             ))
             .expect("reverse")
             .rate;
@@ -2296,7 +2319,7 @@ mod fx_pinned_precedence {
                 Currency::EUR,
                 Currency::GBP,
                 on,
-                Default::default(),
+                FxConversionPolicy::CashflowDate,
             ))
             .expect("cross");
         assert!(
@@ -2314,7 +2337,7 @@ mod fx_pinned_precedence {
         provider
             .set_quotes(&[(Currency::USD, Currency::EUR, 0.8)])
             .expect("provider quote");
-        let matrix = FxMatrix::new(Arc::new(provider));
+        let matrix = FxMatrix::new(Arc::new(provider), None);
         matrix
             .set_quote_on(
                 Currency::EUR,
@@ -2334,7 +2357,7 @@ mod fx_pinned_precedence {
             let rate = restored
                 .fx_required()
                 .expect("fx")
-                .rate(FxQuery::new(from, to, on, Default::default()))
+                .rate(FxQuery::new(from, to, on, FxConversionPolicy::CashflowDate))
                 .expect("restored rate")
                 .rate;
             assert!((rate - expected).abs() < 1e-12, "{from}/{to}: {rate}");
@@ -2346,7 +2369,7 @@ mod fx_pinned_precedence {
                 Currency::USD,
                 Currency::EUR,
                 date!(2025 - 01 - 03),
-                Default::default(),
+                FxConversionPolicy::CashflowDate,
             ))
             .expect("provider remains available")
             .rate;
@@ -2361,7 +2384,10 @@ fn bumped_matrix_snapshot_states_are_pinned() {
     provider
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
         .expect("provider leg");
-    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>);
+    let matrix = FxMatrix::new(
+        Arc::clone(&provider) as Arc<dyn FxProvider>,
+        Some(Currency::USD),
+    );
     matrix
         .set_quote_on(
             Currency::USD,
@@ -2381,7 +2407,6 @@ fn bumped_matrix_snapshot_states_are_pinned() {
         serde_json::json!({
             "config": {
                 "cache_capacity": 256,
-                "enable_triangulation": true,
                 "pivot_currency": "USD"
             },
             "pinned_quotes": [["USD", "GBP", "2025-01-01", "cashflow_date", 0.8]],

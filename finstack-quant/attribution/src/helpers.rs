@@ -1325,7 +1325,7 @@ mod tests {
     fn test_compute_pnl() {
         let val_t0 = Money::from((1000_i64, Currency::EUR));
         let val_t1 = Money::from((1100_i64, Currency::EUR));
-        let fx = FxMatrix::new(Arc::new(TestFx));
+        let fx = FxMatrix::new(Arc::new(TestFx), None);
         let market = MarketContext::new().insert_fx(fx);
         let as_of = date!(2025 - 01 - 15);
 
@@ -1342,7 +1342,7 @@ mod tests {
         let pv = Money::from((1000_i64, Currency::EUR));
 
         // T0 market: EUR/USD = 1.1
-        let fx_t0 = FxMatrix::new(Arc::new(TestFx));
+        let fx_t0 = FxMatrix::new(Arc::new(TestFx), None);
         let market_t0 = MarketContext::new().insert_fx(fx_t0);
 
         // T1 market: EUR/USD = 1.2 (10% appreciation)
@@ -1366,7 +1366,7 @@ mod tests {
                 }
             }
         }
-        let fx_t1 = FxMatrix::new(Arc::new(TestFxT1));
+        let fx_t1 = FxMatrix::new(Arc::new(TestFxT1), None);
         let market_t1 = MarketContext::new().insert_fx(fx_t1);
 
         let as_of_t0 = date!(2025 - 01 - 15);

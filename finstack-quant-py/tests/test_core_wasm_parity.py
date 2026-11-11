@@ -111,7 +111,7 @@ def _index(lag: str = "3M") -> InflationIndex:
 
 
 def _fx() -> FxMatrix:
-    return FxMatrix.from_dict({"EUR/USD": 1.1, "GBPUSD": 1.27})
+    return FxMatrix.from_dict({"EUR/USD": 1.1, "GBPUSD": 1.27}, None)
 
 
 def _market() -> MarketContext:
@@ -415,8 +415,8 @@ CASES: dict[str, Callable[[], Any]] = {
         json.loads(_index().with_publication_dates(PUBLICATION_DATES).to_json()),
     ],
     "fx_matrix": lambda: [
-        _fx().rate("EUR", "USD", "2025-01-02").rate,
-        _fx().rate("USD", "GBP", "2025-01-02").rate,
+        _fx().rate("EUR", "USD", "2025-01-02", "cashflow_date").rate,
+        _fx().rate("USD", "GBP", "2025-01-02", "cashflow_date").rate,
     ],
     "market_context": lambda: json.loads(_market().to_json()),
     "market_context_queries": lambda: {
@@ -429,7 +429,7 @@ CASES: dict[str, Callable[[], Any]] = {
         "series": _market().get_series("SOFR-FIXINGS").value_on("2025-01-06"),
         "index_lag": _market().get_inflation_index("US-CPI-U").lag,
         "credit_index": _market().get_credit_index("CDX-IG-43").num_constituents,
-        "fx_rate": _market().fx_required().rate("EUR", "USD", "2025-01-02").rate,
+        "fx_rate": _market().fx_required().rate("EUR", "USD", "2025-01-02", "cashflow_date").rate,
         "converted": [
             _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").amount.amount,
             str(_market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").amount.currency),
@@ -475,9 +475,9 @@ def test_python_matches_the_cross_host_golden(name: str) -> None:
 def test_fx_pair_keys_are_parsed_by_rust() -> None:
     """F350: a multi-byte pair key is a ``ValueError``, never a panic."""
     with pytest.raises(ValueError, match="invalid FX pair"):
-        FxMatrix.from_dict({"é€x": 1.0})
+        FxMatrix.from_dict({"é€x": 1.0}, None)
     with pytest.raises(ValueError, match="Invalid currency code"):
-        FxMatrix.from_dict({"EUR/XYZ": 1.0})
+        FxMatrix.from_dict({"EUR/XYZ": 1.0}, None)
 
 
 def test_unknown_names_raise_the_rust_error_kind() -> None:

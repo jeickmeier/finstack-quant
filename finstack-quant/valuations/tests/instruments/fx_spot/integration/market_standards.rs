@@ -197,7 +197,7 @@ fn test_triangular_arbitrage_absence() {
     rates.insert((Currency::EUR, Currency::JPY), 1.20 * 110.0); // 132.0
 
     let provider = MockFxProvider { rates };
-    let fx_matrix = FxMatrix::new(Arc::new(provider));
+    let fx_matrix = FxMatrix::new(Arc::new(provider), None);
     let market = MarketContext::new().insert_fx(fx_matrix);
     let as_of = test_date();
 

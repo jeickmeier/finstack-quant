@@ -1729,8 +1729,10 @@ mod tests {
         });
 
         // T0: EUR/USD = 1.10, T1: EUR/USD = 1.20 (EUR appreciates).
-        let market_t0 = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(FixedFx(1.10))));
-        let market_t1 = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(FixedFx(1.20))));
+        let market_t0 =
+            MarketContext::new().insert_fx(FxMatrix::new(Arc::new(FixedFx(1.10)), None));
+        let market_t1 =
+            MarketContext::new().insert_fx(FxMatrix::new(Arc::new(FixedFx(1.20)), None));
 
         let config = TaylorAttributionConfig::default();
         let attribution = crate::attribute_pnl(
@@ -3018,7 +3020,8 @@ mod tests {
         ));
 
         let market_t0 = MarketContext::new();
-        let market_t1 = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(FixedFx(1.20))));
+        let market_t1 =
+            MarketContext::new().insert_fx(FxMatrix::new(Arc::new(FixedFx(1.20)), None));
 
         let result = compute_taylor_result(
             &AttributionRequest {

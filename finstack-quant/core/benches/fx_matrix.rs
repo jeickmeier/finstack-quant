@@ -17,7 +17,7 @@ fn query_date() -> Date {
 }
 
 fn seeded_matrix() -> FxMatrix {
-    let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
+    let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()), None);
     matrix
         .set_quotes(&[
             (Currency::EUR, Currency::USD, 1.10),
@@ -29,7 +29,12 @@ fn seeded_matrix() -> FxMatrix {
 
 fn rate(matrix: &FxMatrix, from: Currency, to: Currency) -> FxRateResult {
     matrix
-        .rate(FxQuery::new(from, to, query_date(), Default::default()))
+        .rate(FxQuery::new(
+            from,
+            to,
+            query_date(),
+            FxConversionPolicy::CashflowDate,
+        ))
         .expect("valid benchmark FX lookup must succeed")
 }
 
@@ -123,7 +128,7 @@ fn bench_fx_matrix_rate(c: &mut Criterion) {
 
     group.bench_with_input(BenchmarkId::new("pinned", "eur_usd"), &(), |b, _| {
         // No pair-global EUR/USD quote can shadow this scoped fixing.
-        let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
+        let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()), None);
         let on = query_date();
         matrix
             .set_quote_on(

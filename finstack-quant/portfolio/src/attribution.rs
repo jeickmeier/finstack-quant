@@ -1070,7 +1070,7 @@ mod tests {
             Ok(MarketContext::new()
                 .insert_price("E", MarketScalar::Unitless(spot))
                 .insert_price("U", MarketScalar::Unitless(50.0))
-                .insert_fx(FxMatrix::new(provider)))
+                .insert_fx(FxMatrix::new(provider, None)))
         };
 
         let attribution = attribute_portfolio_pnl(

@@ -116,8 +116,8 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 31 | F3 | not attempted (run budget; dep F2) | | | |
 | 32 | F4 | not attempted (run budget; dep F3) | | | |
 | 33 | F5 | not attempted (run budget; plan sized L) | | | |
-| 34 | F6 | skipped (dep B3) | | | |
-| 35 | F7 | skipped (dep F6) | | | |
+| 34 | F6 | committed (`F6:` in git log) | lint, rust-test, python-test, wasm-test, all-audit (slice-gate; after gen-write) | 013 entry: config/policy items recorded as reconciled; record 013 status updated; STATEMENTS-CAPITAL-09 observed text updated | Required `pivot_currency: Option<Currency>`; no FX config/matrix/policy defaults; explicit pivots at ~165 Rust and ~60 host sites (`None` unless a deliberate hub); `PeriodAverage` removed; required host `rate` policy; calibration `fx: Option<FxConfig>`; statements `PeriodEnd` fallback removed; see Needs review |
+| 35 | F7 | not started (dep F6 met) | | | |
 | 36 | F8 | skipped (dep F7) | | | |
 | 37 | G5 | skipped (dep G4) | | | |
 | 38 | E5 | skipped (dep E3: E3b not executed) | | | |
@@ -292,6 +292,59 @@ logged under Needs review.
     matches them.
   - **WASM gate:** the WASM figure (1085) is from `wasm-test-built`, after
     one full `wasm-test` build.
+- **F6.**
+  - **Pivot assignment (O9).** Every matrix now states its pivot. Mechanical
+    sweep: `None` everywhere, then `Some(USD)` only where a test's assertions
+    route a cross through USD (14 core FX tests, the portfolio sensitivity
+    helper `test_fx_market` and `triangulated_fx_matrix`, one PeriodAverage
+    test since deleted). Explicit test configs kept their exact meaning
+    (`enable_triangulation: false` -> `None`, otherwise the given pivot).
+    JSON fixtures were rewritten the same way (`true` keeps the pivot, `false`
+    becomes `null`; about 160 files, text-edited so formatting is unchanged).
+    Tests that pass under `None` without routing were not reviewed one by one
+    for a "passes for the wrong reason" error assertion.
+  - **One routing test deadlocked instead of failing.**
+    `fx_quote_update_prevents_inflight_cross_from_repopulating_cache` blocks
+    until a cross-rate fetch through the pivot starts; under `None` it waited
+    forever (about 48 minutes) until stopped. It now has its USD pivot, and the
+    owner had every test runner cap tests at 60 s (commit `d8889521ca`).
+  - **Calibration FX config.** `CalibrationConfig.fx` is `Option<FxConfig>`
+    (omitted key = no FX choice). Building FX from spot quotes without it is
+    an error naming the missing `fx` section; a present section requires
+    `pivot_currency` (`null` allowed) and rejects `enable_triangulation`.
+    `CalibrationConfig::default()` therefore carries no FX choice.
+  - **Hosts.** Python `FxMatrix(pivot_currency)` /
+    `from_dict(quotes, pivot_currency)` and WASM `new FxMatrix(pivotCurrency)`
+    / `fromDict(quotes, pivotCurrency)` take a required routing choice (WASM
+    rejects `undefined`, accepts `null`). Python `FxMatrix.rate` and WASM
+    `rate` require a policy; the facade's default-policy patch and the
+    zero-argument `FxConversionPolicy` constructor are gone. Existing host
+    callers pass `None`/`null` and `"cashflow_date"` (the former default).
+  - **Implicit policies made explicit.** 130 `Default::default()` /
+    `FxConversionPolicy::default()` policy arguments became
+    `FxConversionPolicy::CashflowDate` (the former default), so no value moved.
+  - **PeriodAverage.** No production caller. Tests that used it only as a
+    second distinct policy now use `PeriodEnd`; the matrix test about
+    averaging was deleted (013 #2: no averaging point query).
+  - **Statements.** STATEMENTS-CAPITAL-09 (Draft) recorded "omitted policy
+    selects PeriodEnd"; O9 removes that fallback. Strictest workable reading:
+    `CapitalStructureSpec.fx_policy` stays optional, a cross-currency
+    conversion without it errors, same-currency totals need none. The builder
+    prose that claimed `CashflowDate` converts on each flow date was corrected
+    (every aggregate converts on the period-end snapshot date).
+  - **Canonical hash.** The canonical calibration fixture lost its
+    `enable_triangulation` key, so its recorded `content_hash` changed.
+    The pinned WASM content hash of `examples/market_bootstrap/01_usd_discount.json`
+    also moved (the envelope file is unchanged; the defaulted `fx` section is
+    no longer serialized); Python computes the same new hash.
+  - **Tests rewritten because the default they checked is gone.** Core
+    `fx_query_defaults_policy...` now asserts a missing `policy` errors; the
+    wasm32 `fx_matrix_rate_defaults_policy_to_cashflow_date` became
+    `fx_matrix_requires_an_explicit_routing_choice` (`undefined` rejected,
+    `null`/`"USD"` accepted). Two statements tests now set `fx_policy:
+    PeriodEnd` (one would otherwise hit the new missing-policy error before the
+    missing-FX-matrix error it checks). Host routing tests (3 Python, 2 Node)
+    got a USD pivot; one Node FX state fixture got `pivot_currency: null`.
 - **G4.**
   - **`include_today` choices preserve current behaviour.** No product
     review of same-day cash was done (016 #2 makes it a product decision).

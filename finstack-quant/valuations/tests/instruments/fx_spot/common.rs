@@ -112,7 +112,7 @@ pub fn sample_usdjpy() -> FxSpot {
 /// Create a market context with FX matrix
 pub fn market_with_fx_matrix() -> MarketContext {
     let provider = MockFxProvider::standard();
-    let fx_matrix = FxMatrix::new(Arc::new(provider));
+    let fx_matrix = FxMatrix::new(Arc::new(provider), None);
 
     MarketContext::new().insert_fx(fx_matrix)
 }
@@ -143,7 +143,7 @@ pub fn market_with_curves() -> MarketContext {
 pub fn market_full() -> MarketContext {
     let as_of = test_date();
     let provider = MockFxProvider::standard();
-    let fx_matrix = FxMatrix::new(Arc::new(provider));
+    let fx_matrix = FxMatrix::new(Arc::new(provider), None);
 
     let eur_curve = DiscountCurve::builder("EUR.OIS")
         .base_date(as_of)

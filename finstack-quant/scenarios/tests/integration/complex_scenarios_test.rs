@@ -28,7 +28,7 @@ fn test_fx_equity_curve_combo() {
     fx_provider
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
         .expect("valid rate");
-    let fx_matrix = FxMatrix::new(fx_provider);
+    let fx_matrix = FxMatrix::new(fx_provider, None);
 
     // Setup curve
     let curve = DiscountCurve::builder("USD_SOFR")
@@ -92,7 +92,7 @@ fn test_fx_equity_curve_combo() {
         Currency::EUR,
         Currency::USD,
         base_date,
-        Default::default(),
+        finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
     );
     let rate = fx.rate(query).unwrap().rate;
     assert!((rate - 1.155).abs() < 1e-6, "FX should be shocked");

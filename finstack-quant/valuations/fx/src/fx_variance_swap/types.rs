@@ -281,7 +281,7 @@ impl FxVarianceSwap {
                     self.base_currency,
                     self.quote_currency,
                     as_of,
-                    Default::default(),
+                    finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
                 ))?
                 .rate;
             return Ok(rate);

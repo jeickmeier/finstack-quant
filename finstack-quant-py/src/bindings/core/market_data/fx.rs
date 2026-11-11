@@ -48,8 +48,6 @@ label_enum!(PyFxConversionPolicy, FxConversionPolicy, "FxConversionPolicy", from
     CASHFLOW_DATE => CashflowDate,
     /// Use period end date.
     PERIOD_END => PeriodEnd,
-    /// Use an average over the period.
-    PERIOD_AVERAGE => PeriodAverage,
 });
 
 /// Result of an FX rate query.
@@ -133,14 +131,31 @@ pub struct PyFxMatrix {
     pub(crate) inner: Arc<FxMatrix>,
 }
 
+/// The explicit routing pivot: ``None`` disables routing, otherwise a
+/// ``Currency`` or ISO code.
+fn optional_pivot(
+    value: &Bound<'_, PyAny>,
+) -> PyResult<Option<finstack_quant_core::currency::Currency>> {
+    if value.is_none() {
+        Ok(None)
+    } else {
+        extract_currency(value).map(Some)
+    }
+}
+
 #[pymethods]
 impl PyFxMatrix {
-    /// Create an empty FX matrix.
+    /// Create an empty FX matrix with an explicit routing pivot (Rust
+    /// ``FxMatrix::new``); ``None`` selects direct quotes only.
     #[new]
-    fn new() -> Self {
-        Self {
-            inner: Arc::new(FxMatrix::default()),
-        }
+    #[pyo3(text_signature = "(pivot_currency)")]
+    fn new(pivot_currency: &Bound<'_, PyAny>) -> PyResult<Self> {
+        Ok(Self {
+            inner: Arc::new(FxMatrix::new(
+                Arc::new(finstack_quant_core::money::fx::SimpleFxProvider::new()),
+                optional_pivot(pivot_currency)?,
+            )),
+        })
     }
 
     /// Set an authoritative FX quote scoped to one date and policy.
@@ -176,29 +191,24 @@ impl PyFxMatrix {
     ///     Quote (to) currency.
     /// date : datetime.date
     ///     Applicable date for the rate.
-    /// policy : FxConversionPolicy | str, optional
-    ///     Conversion policy; ``None`` selects the Rust default query
-    ///     (``FxConversionPolicy::default()``, ``"cashflow_date"``).
+    /// policy : FxConversionPolicy | str
+    ///     Required conversion policy (no default).
     ///
     /// Returns
     /// -------
     /// FxRateResult
-    #[pyo3(signature = (base, quote, date, policy=None))]
-    #[pyo3(text_signature = "(self, base, quote, date, policy=None)")]
+    #[pyo3(text_signature = "(self, base, quote, date, policy)")]
     fn rate(
         &self,
         base: &Bound<'_, PyAny>,
         quote: &Bound<'_, PyAny>,
         date: &Bound<'_, PyAny>,
-        policy: Option<&Bound<'_, PyAny>>,
+        policy: &Bound<'_, PyAny>,
     ) -> PyResult<PyFxRateResult> {
         let base_currency = extract_currency(base)?;
         let quote_currency = extract_currency(quote)?;
         let d = py_to_date(date)?;
-        let query = match policy {
-            Some(p) => FxQuery::new(base_currency, quote_currency, d, extract_fx_policy(p)?),
-            None => FxQuery::new(base_currency, quote_currency, d, Default::default()),
-        };
+        let query = FxQuery::new(base_currency, quote_currency, d, extract_fx_policy(policy)?);
 
         let result = self.inner.rate(query).map_err(core_to_py)?;
         Ok(PyFxRateResult { inner: result })
@@ -244,15 +254,18 @@ impl PyFxMatrix {
     /// ValueError
     ///     If a key is not a currency pair, a code is unknown, or a rate is invalid.
     #[staticmethod]
-    #[pyo3(text_signature = "(quotes)")]
-    fn from_dict(quotes: &Bound<'_, pyo3::types::PyDict>) -> PyResult<Self> {
+    #[pyo3(text_signature = "(quotes, pivot_currency)")]
+    fn from_dict(
+        quotes: &Bound<'_, pyo3::types::PyDict>,
+        pivot_currency: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
         let mut parsed = Vec::with_capacity(quotes.len());
         for (key, value) in quotes.iter() {
             let pair: String = key.extract()?;
             let pair: CurrencyPair = pair.parse().map_err(core_to_py)?;
             parsed.push((pair.base, pair.quote, value.extract::<f64>()?));
         }
-        FxMatrix::from_quotes(&parsed)
+        FxMatrix::from_quotes(&parsed, optional_pivot(pivot_currency)?)
             .map(|matrix| Self {
                 inner: Arc::new(matrix),
             })

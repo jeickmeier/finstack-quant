@@ -1099,7 +1099,7 @@ mod tests {
         provider
             .set_quotes(&[(Currency::EUR, Currency::USD, 2.0)])
             .expect("valid rate");
-        let fx = finstack_quant_core::money::fx::FxMatrix::new(Arc::new(provider));
+        let fx = finstack_quant_core::money::fx::FxMatrix::new(Arc::new(provider), None);
 
         let base_market = MarketContext::new()
             .insert_price(
@@ -1163,7 +1163,7 @@ mod tests {
         provider
             .set_quotes(&[(Currency::EUR, Currency::USD, 2.0)])
             .expect("valid base rate");
-        let fx = finstack_quant_core::money::fx::FxMatrix::new(Arc::new(provider));
+        let fx = finstack_quant_core::money::fx::FxMatrix::new(Arc::new(provider), None);
         let base_market = MarketContext::new().insert_fx(fx);
 
         // Scenario: +50% EUR/USD shock (2.0 -> 3.0).

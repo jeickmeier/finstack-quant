@@ -406,19 +406,18 @@ impl ModelBuilder {
 
     /// Set the FX conversion policy used when converting capital-structure cashflows.
     ///
-    /// When this is not set, reporting totals use
-    /// [`finstack_quant_core::money::fx::FxConversionPolicy::PeriodEnd`]:
-    /// already-aggregated `cs.*` cash items and balances convert on the inclusive
-    /// period-end date. Pass
-    /// [`finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate`] only
-    /// when the model must convert on each contractual flow date instead.
+    /// Already-aggregated `cs.*` cash items and balances convert on the
+    /// inclusive period-end date with this policy. There is no default: a model
+    /// whose capital structure needs a cross-currency conversion fails until
+    /// the policy is set (record CORE-CONVENTIONS-013, resolution O9).
     ///
     /// # Arguments
     ///
-    /// * `policy` - Rate-selection hint applied to each reporting-currency
-    ///   conversion of a period-aggregated `cs.*` bucket. `PeriodEnd` uses the
-    ///   inclusive period-end snapshot; `CashflowDate` uses the flow date;
-    ///   `PeriodAverage` and `Custom` are forwarded to the FX provider.
+    /// * `policy` - Provider-selection purpose for each reporting-currency
+    ///   conversion of a period-aggregated `cs.*` bucket. Every conversion is
+    ///   queried on the inclusive period-end snapshot date; `period_end` is the
+    ///   period-close choice, and `cashflow_date` does not recover individual
+    ///   flow dates, which aggregation has already removed.
     pub fn fx_policy(
         &mut self,
         policy: finstack_quant_core::money::fx::FxConversionPolicy,

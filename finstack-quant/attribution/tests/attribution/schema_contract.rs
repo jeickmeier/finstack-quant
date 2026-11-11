@@ -261,7 +261,6 @@ fn attribution_schema_validates_non_empty_market_data() {
     market["fx"] = json!({
         "config": {
             "pivot_currency": "USD",
-            "enable_triangulation": true,
             "cache_capacity": 256
         },
         "quotes": [["EUR", "USD", 1.1]],

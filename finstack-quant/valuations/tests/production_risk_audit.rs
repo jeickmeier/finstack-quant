@@ -22,7 +22,7 @@ fn market() -> MarketContext {
     provider
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
         .expect("FX quote");
-    let mut market = MarketContext::new().insert_fx(FxMatrix::new(provider));
+    let mut market = MarketContext::new().insert_fx(FxMatrix::new(provider, None));
     for id in ["USD-OIS", "EUR-OIS"] {
         market = market.insert(
             DiscountCurve::builder(id)

@@ -32,7 +32,7 @@ impl FxProvider for StaticFxProvider {
 }
 
 fn sample_fx_matrix() -> FxMatrix {
-    FxMatrix::new(Arc::new(StaticFxProvider))
+    FxMatrix::new(Arc::new(StaticFxProvider), None)
 }
 
 #[test]

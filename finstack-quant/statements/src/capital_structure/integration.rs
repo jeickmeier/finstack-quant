@@ -48,16 +48,31 @@ pub fn build_instrument_from_spec(
 }
 
 /// Convert a money amount into the reporting currency `rc`.
+///
+/// Same-currency amounts are returned unchanged. A cross-currency conversion
+/// requires both an FX matrix and the explicit `fx_policy` of the capital
+/// structure (record CORE-CONVENTIONS-013, resolution O9): there is no
+/// default policy.
 pub(crate) fn convert_to_reporting(
     money: finstack_quant_core::money::Money,
     on: Date,
     rc: Currency,
     fx_matrix: Option<&Arc<finstack_quant_core::money::fx::FxMatrix>>,
-    fx_policy: finstack_quant_core::money::fx::FxConversionPolicy,
+    fx_policy: Option<finstack_quant_core::money::fx::FxConversionPolicy>,
 ) -> Result<finstack_quant_core::money::Money> {
     if rc == money.currency() {
         return Ok(money);
     }
+    let Some(fx_policy) = fx_policy else {
+        return Err(crate::error::Error::capital_structure(format!(
+            "Cannot convert {} to reporting currency {} on {}: capital_structure.fx_policy \
+             is not set. Choose the conversion policy explicitly (period_end converts the \
+             period aggregates on the inclusive period-end date).",
+            money.currency(),
+            rc,
+            on
+        )));
+    };
 
     let Some(fx) = fx_matrix else {
         return Err(crate::error::Error::capital_structure(format!(

@@ -65,7 +65,7 @@ mod tests {
         provider
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.2)])
             .expect("FX quote");
-        let mut market = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider)));
+        let mut market = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider), None));
         for (id, rate) in [("USD-OIS", 0.03_f64), ("EUR-OIS", 0.01_f64)] {
             market = market.insert(
                 DiscountCurve::builder(id)

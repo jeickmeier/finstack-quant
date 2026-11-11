@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-013: FX source authority, single-pivot conversion, state and relative shocks
 
 - Decision status: **Accepted — complete FX resolution/state/shock package, 2026-11-07**.
-- Implementation status: **Observed; reconciliation pending**, scoped to all six `money/fx/` implementation files.
+- Implementation status: **Partly reconciled 2026-11-11 (F6)**: config and policy items. `FxConfig.pivot_currency` is a required `Option<Currency>` (`null` disables routing, a missing key errors) replacing `enable_triangulation` and the implicit USD pivot; there is no `FxConfig::default`, `FxMatrix::default` or `FxConversionPolicy` default, and `FxQuery.policy` has no serde default; `FxMatrix::new`/`from_quotes` and the Python/WASM constructors take the pivot explicitly; `PeriodAverage` is removed (variant, label and host members); host `FxMatrix.rate` requires its policy; `FxPolicyMeta` has no `Default`. Routing behaviour itself is unchanged (F7). Resolution order, routing on `NotFound` only, caching, state and shocks (items 3-12) remain, scoped to all six `money/fx/` implementation files.
 - Validation status: **Evidence inspected; independent arithmetic examples passed; production qualification pending**. Documentation links/status/count checks and independent exact-average, cross-rate, shock and binary64 boundary examples passed. The linked Rust/host tests were located or inspected, not run; this is not implementation or methodology certification.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 

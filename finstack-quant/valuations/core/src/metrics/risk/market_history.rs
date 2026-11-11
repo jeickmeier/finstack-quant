@@ -681,7 +681,7 @@ mod tests {
     fn test_fx_spot_shift_applied() -> Result<()> {
         let provider = SimpleFxProvider::new();
         provider.set_quotes(&[(Currency::EUR, Currency::USD, 1.20)])?;
-        let base_market = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider)));
+        let base_market = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider), None));
 
         let scenario = MarketScenario::new(
             date!(2024 - 01 - 02),
@@ -702,7 +702,7 @@ mod tests {
                 Currency::EUR,
                 Currency::USD,
                 date!(2024 - 01 - 02),
-                Default::default(),
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
             ))?
             .rate;
 

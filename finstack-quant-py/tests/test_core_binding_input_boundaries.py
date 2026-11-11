@@ -61,13 +61,16 @@ def test_shrinkage_preserves_observation_rows_and_variable_columns(layout: str) 
 )
 def test_fx_pair_parser_rejects_malformed_unicode_and_ascii(pair: str, message: str) -> None:
     with pytest.raises(ValueError, match=re.escape(message)):
-        FxMatrix.from_dict({pair: 1.0})
+        FxMatrix.from_dict({pair: 1.0}, None)
 
 
 def test_fx_pair_parser_accepts_compact_and_slash_separated_codes() -> None:
-    compact = FxMatrix.from_dict({"eurusd": 1.1})
-    separated = FxMatrix.from_dict({"EUR/USD": 1.1})
-    assert compact.rate("EUR", "USD", "2025-01-01").rate == separated.rate("EUR", "USD", "2025-01-01").rate
+    compact = FxMatrix.from_dict({"eurusd": 1.1}, None)
+    separated = FxMatrix.from_dict({"EUR/USD": 1.1}, None)
+    assert (
+        compact.rate("EUR", "USD", "2025-01-01", "cashflow_date").rate
+        == separated.rate("EUR", "USD", "2025-01-01", "cashflow_date").rate
+    )
 
 
 def test_rating_equality_and_hashing_use_typed_values() -> None:

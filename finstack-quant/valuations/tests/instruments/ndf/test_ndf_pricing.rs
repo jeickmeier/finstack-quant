@@ -32,7 +32,7 @@ fn create_test_market(as_of: Date) -> MarketContext {
             .expect("valid rate");
         p
     };
-    let fx_matrix = FxMatrix::new(fx_provider);
+    let fx_matrix = FxMatrix::new(fx_provider, None);
 
     MarketContext::new().insert(usd_curve).insert_fx(fx_matrix)
 }
@@ -293,7 +293,7 @@ fn test_ndf_pricing_with_foreign_curve() {
             .expect("valid rate");
         p
     };
-    let fx_matrix = FxMatrix::new(fx_provider);
+    let fx_matrix = FxMatrix::new(fx_provider, None);
 
     let market = MarketContext::new()
         .insert(usd_curve)

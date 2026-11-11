@@ -807,12 +807,15 @@ export type AttributionFactor =
  */
 export type ExecutionPolicy = "parallel" | "serial";
 /**
- * Standard FX conversion strategies used to hint FX providers.
+ * Provider-selection purpose of a point-date FX query (record
+ * CORE-CONVENTIONS-013 #1/#2).
  *
- * The policy tells a provider *how* the rate will be applied so it can decide
- * between spot, forward, or averaged sources.
+ * The policy tells a provider which source purpose the rate serves; it does
+ * not calculate dates or choose spot versus forward. There is no default:
+ * every query names its policy. Period averages are not point queries; an
+ * owner that needs one computes the oriented aggregate itself.
  */
-export type FxConversionPolicy = "cashflow_date" | "period_end" | "period_average";
+export type FxConversionPolicy = "cashflow_date" | "period_end";
 /**
  * Attribution methodology for decomposing P&L.
  *

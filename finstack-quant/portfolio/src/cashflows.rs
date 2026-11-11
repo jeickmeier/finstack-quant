@@ -601,7 +601,7 @@ mod tests {
         build_test_market_at(as_of)
             .insert(flat_discount("EUR", as_of, 1.0))
             .insert(flat_discount("USD", as_of, 1.0))
-            .insert_fx(FxMatrix::new(provider))
+            .insert_fx(FxMatrix::new(provider, None))
     }
 
     fn full_cashflow_ladder_fixture() -> PortfolioCashflows {
@@ -1037,7 +1037,7 @@ mod tests {
         MarketContext::new()
             .insert(flat_discount("EUR", as_of, df_eur))
             .insert(flat_discount("USD", as_of, df_usd))
-            .insert_fx(FxMatrix::new(provider))
+            .insert_fx(FxMatrix::new(provider, None))
     }
 
     #[test]
@@ -1086,7 +1086,7 @@ mod tests {
             .expect("test FX quote should be valid");
         let market = MarketContext::new()
             .insert(flat_discount("USD", as_of, 0.95))
-            .insert_fx(FxMatrix::new(provider));
+            .insert_fx(FxMatrix::new(provider, None));
 
         let err = full
             .collapse_to_base_by_date_kind(&market, Currency::USD, as_of, None)
@@ -1110,7 +1110,7 @@ mod tests {
         let market = MarketContext::new()
             .insert(flat_discount("EUR-OIS", as_of, 0.99))
             .insert(flat_discount("USD-OIS", as_of, 0.95))
-            .insert_fx(FxMatrix::new(provider));
+            .insert_fx(FxMatrix::new(provider, None));
         let mut curves = HashMap::new();
         curves.insert(Currency::EUR, CurveId::new("EUR-OIS"));
         curves.insert(Currency::USD, CurveId::new("USD-OIS"));

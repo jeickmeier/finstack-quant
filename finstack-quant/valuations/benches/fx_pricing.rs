@@ -57,7 +57,7 @@ fn create_market() -> MarketContext {
     fx_provider
         .set_quotes(&[(Currency::CNY, Currency::USD, 7.25)])
         .unwrap();
-    let fx_matrix = FxMatrix::new(fx_provider);
+    let fx_matrix = FxMatrix::new(fx_provider, None);
 
     let vol_surface = VolSurface::from_grid(
         "EURUSD-VOL",

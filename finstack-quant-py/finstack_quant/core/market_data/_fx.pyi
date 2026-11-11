@@ -27,8 +27,6 @@ class FxConversionPolicy:
     """Use spot/forward on the cashflow date."""
     PERIOD_END: FxConversionPolicy
     """Use period end date."""
-    PERIOD_AVERAGE: FxConversionPolicy
-    """Use an average over the period."""
 
     @classmethod
     def from_name(cls, name: str) -> FxConversionPolicy:
@@ -72,9 +70,9 @@ class FxRateResult:
     --------
     >>> import datetime
     >>> from finstack_quant.core.market_data import FxMatrix
-    >>> matrix = FxMatrix()
+    >>> matrix = FxMatrix(None)
     >>> matrix.set_quotes([("EUR", "USD", 1.1)])
-    >>> result = matrix.rate("EUR", "USD", datetime.date(2025, 1, 1))
+    >>> result = matrix.rate("EUR", "USD", datetime.date(2025, 1, 1), "cashflow_date")
     >>> (result.rate, result.triangulated, float(result))
     (1.1, False, 1.1)
 
@@ -406,42 +404,52 @@ class FxMatrix:
     Explicit pair-global quotes take priority in either orientation, followed
     by date/policy-scoped fixings pinned with :meth:`set_quote_on`, then provider
     observations. Market-context JSON retains those distinct source roles.
-    Missing pairs are triangulated through the pivot
-    currency (USD by default). Matrices obtained from a
+    A missing pair is routed ``from -> pivot -> to`` only through the explicit
+    ``pivot_currency`` chosen at construction; there is no default pivot, and
+    ``None`` uses direct quotes only. Matrices obtained from a
     :class:`MarketContext` share state with it.
 
     Examples
     --------
     >>> import datetime
     >>> from finstack_quant.core.market_data import FxMatrix
-    >>> matrix = FxMatrix.from_dict({"EURUSD": 1.1, "GBP/USD": 1.25})
-    >>> round(matrix.rate("EUR", "GBP", datetime.date(2025, 1, 1)).rate, 4)
+    >>> matrix = FxMatrix.from_dict({"EURUSD": 1.1, "GBP/USD": 1.25}, "USD")
+    >>> round(matrix.rate("EUR", "GBP", datetime.date(2025, 1, 1), "cashflow_date").rate, 4)
     0.88
     >>> list(matrix.quotes()["base"])
     ['GBP', 'EUR']
 
     """
 
-    def __init__(self) -> None:
+    def __init__(self, pivot_currency: Union[Currency, str, None]) -> None:
         """
         Create an empty FX matrix backed by an in-memory quote provider.
 
-        Notes
-        -----
-        This constructor does not raise; add quotes with the mutating
-        methods after construction.
+        Parameters
+        ----------
+        pivot_currency : Currency | str | None
+            Required routing choice: the single pivot for ``from -> pivot ->
+            to`` crosses, or ``None`` for direct quotes only. There is no
+            default.
+
+        Raises
+        ------
+        ValueError
+            If *pivot_currency* is an unknown currency code.
+        TypeError
+            If *pivot_currency* is not a ``Currency``, ``str`` or ``None``.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import FxMatrix
-        >>> FxMatrix()
-        FxMatrix(quotes=0, pinned_quotes=0)
+        >>> FxMatrix(None)
+        FxMatrix(quotes=0, pinned_quotes=0, None)
 
         """
         ...
 
     @staticmethod
-    def from_dict(quotes: dict[str, float]) -> FxMatrix:
+    def from_dict(quotes: dict[str, float], pivot_currency: Union[Currency, str, None]) -> FxMatrix:
         """
         Build a matrix from a ``{"EURUSD": 1.1, "GBP/USD": 1.25}`` mapping.
 
@@ -451,6 +459,9 @@ class FxMatrix:
             Keys are six ASCII-letter ISO pairs (``"EURUSD"``) or
             slash-separated pairs (``"EUR/USD"``); values are
             ``1 base = rate quote``.
+        pivot_currency : Currency | str | None
+            Required routing choice: the single cross pivot, or ``None`` for
+            direct quotes only.
 
         Returns
         -------
@@ -467,7 +478,7 @@ class FxMatrix:
         --------
         >>> import datetime
         >>> from finstack_quant.core.market_data import FxMatrix
-        >>> FxMatrix.from_dict({"EURUSD": 1.1}).rate("EUR", "USD", datetime.date(2025, 1, 1)).rate
+        >>> FxMatrix.from_dict({"EURUSD": 1.1}, None).rate("EUR", "USD", datetime.date(2025, 1, 1)).rate
         1.1
 
         """
@@ -532,7 +543,7 @@ class FxMatrix:
         base: Union[Currency, str],
         quote: Union[Currency, str],
         date: DateLike,
-        policy: Optional[Union[FxConversionPolicy, str]] = None,
+        policy: Union[FxConversionPolicy, str],
     ) -> FxRateResult:
         """
         Look up an FX rate, triangulating through the pivot when needed.
@@ -548,8 +559,9 @@ class FxMatrix:
             Quote (to) currency.
         date : datetime.date or str
             Applicable date for the rate.
-        policy : FxConversionPolicy or str, optional
-            Conversion policy; default ``"cashflow_date"``.
+        policy : FxConversionPolicy or str
+            Required conversion policy (``"cashflow_date"`` or
+            ``"period_end"``); there is no default.
 
         Returns
         -------

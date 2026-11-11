@@ -444,7 +444,7 @@ mod tests {
         MarketContext::new()
             .insert(usd_curve)
             .insert(eur_curve)
-            .insert_fx(FxMatrix::new(fx_provider))
+            .insert_fx(FxMatrix::new(fx_provider, None))
     }
 
     #[test]

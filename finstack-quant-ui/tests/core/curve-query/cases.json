@@ -171,7 +171,6 @@
     "fx": {
       "config": {
         "pivot_currency": "USD",
-        "enable_triangulation": true,
         "cache_capacity": 17
       },
       "quotes": [["EUR", "USD", 1.1]],

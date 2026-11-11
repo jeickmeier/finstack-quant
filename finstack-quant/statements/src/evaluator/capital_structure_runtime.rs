@@ -305,10 +305,10 @@ fn compute_contractual_flows(
 
 /// Build the reporting-FX context for one period's `cs.*` totals.
 ///
-/// When `CapitalStructureSpec.fx_policy` is omitted, conversion uses
-/// [`finstack_quant_core::money::fx::FxConversionPolicy::PeriodEnd`]: cash
-/// items and balances convert on the inclusive period-end snapshot
-/// (`period.end - 1 day` under half-open `[start, end)`). Per-flow FX is not
+/// Aggregated `cs.*` cash items and balances convert on the inclusive
+/// period-end snapshot (`period.end - 1 day` under half-open `[start, end)`)
+/// with `CapitalStructureSpec.fx_policy`. There is no default policy: a
+/// cross-currency conversion without one is an error. Per-flow FX is not
 /// applied here.
 fn build_fx_context<'a>(
     model: &FinancialModelSpec,
@@ -320,9 +320,7 @@ fn build_fx_context<'a>(
     };
     let reporting_currency = model.capital_structure_currency()?;
     let fx_matrix = market_ctx.fx();
-    let fx_policy = cs_spec
-        .fx_policy
-        .unwrap_or(finstack_quant_core::money::fx::FxConversionPolicy::PeriodEnd);
+    let fx_policy = cs_spec.fx_policy;
     let snapshot_date = crate::capital_structure::period_flows::period_snapshot_date(period);
     Ok(Some(CsTotalsContext {
         reporting_currency,
@@ -335,7 +333,7 @@ fn build_fx_context<'a>(
 struct CsTotalsContext<'a> {
     reporting_currency: Option<finstack_quant_core::currency::Currency>,
     fx_matrix: Option<&'a std::sync::Arc<finstack_quant_core::money::fx::FxMatrix>>,
-    fx_policy: finstack_quant_core::money::fx::FxConversionPolicy,
+    fx_policy: Option<finstack_quant_core::money::fx::FxConversionPolicy>,
     snapshot_date: finstack_quant_core::dates::Date,
 }
 
@@ -623,7 +621,7 @@ mod fx_policy_tests {
     use time::Month;
 
     #[test]
-    fn omitted_fx_policy_selects_period_end() {
+    fn omitted_fx_policy_has_no_default() {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
@@ -646,9 +644,44 @@ mod fx_policy_tests {
             .expect("valid currencies")
             .expect("capital structure is present");
         assert_eq!(
-            ctx.fx_policy,
-            FxConversionPolicy::PeriodEnd,
-            "omitted fx_policy must convert cs.* period aggregates on the inclusive period-end date"
+            ctx.fx_policy, None,
+            "an omitted fx_policy is not replaced by PeriodEnd"
         );
+
+        // A cross-currency conversion then fails instead of inferring a policy;
+        // same-currency amounts still pass through.
+        let fx = std::sync::Arc::new(finstack_quant_core::money::fx::FxMatrix::new(
+            std::sync::Arc::new(finstack_quant_core::money::fx::SimpleFxProvider::new()),
+            None,
+        ));
+        let eur = finstack_quant_core::money::Money::from((
+            100_i64,
+            finstack_quant_core::currency::Currency::EUR,
+        ));
+        let usd = finstack_quant_core::currency::Currency::USD;
+        let error = crate::capital_structure::integration::convert_to_reporting(
+            eur,
+            ctx.snapshot_date,
+            usd,
+            Some(&fx),
+            ctx.fx_policy,
+        )
+        .expect_err("no policy for a cross-currency conversion");
+        assert!(
+            error.to_string().contains("fx_policy is not set"),
+            "{error}"
+        );
+        assert_eq!(
+            crate::capital_structure::integration::convert_to_reporting(
+                eur,
+                ctx.snapshot_date,
+                finstack_quant_core::currency::Currency::EUR,
+                Some(&fx),
+                ctx.fx_policy,
+            )
+            .expect("same currency"),
+            eur
+        );
+        let _ = FxConversionPolicy::PeriodEnd;
     }
 }

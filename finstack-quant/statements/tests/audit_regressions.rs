@@ -311,6 +311,7 @@ fn single_currency_totals_are_converted_at_the_reporting_snapshot() {
     }
     let mut model = amortizing_loan_model("2025Q1..Q1", Currency::EUR);
     model.capital_structure.as_mut().unwrap().reporting_currency = Some(Currency::USD);
+    model.capital_structure.as_mut().unwrap().fx_policy = Some(FxConversionPolicy::PeriodEnd);
     // Changing the reporting currency also changes the declared total-node units.
     for node in model.nodes.values_mut() {
         node.value_type = Some(finstack_quant_statements::types::NodeValueType::Monetary {
@@ -318,7 +319,8 @@ fn single_currency_totals_are_converted_at_the_reporting_snapshot() {
         });
     }
     model.validate_semantics().unwrap();
-    let market = MarketContext::new().insert_fx(FxMatrix::new(std::sync::Arc::new(SnapshotFx)));
+    let market =
+        MarketContext::new().insert_fx(FxMatrix::new(std::sync::Arc::new(SnapshotFx), None));
     let result = Evaluator::new()
         .evaluate_with_market(&model, &market, date!(2025 - 01 - 15))
         .unwrap();
@@ -365,7 +367,7 @@ fn fx_pivot_does_not_choose_reporting_currency() {
         }
     }
     let model = amortizing_loan_model("2025Q1..Q1", Currency::EUR);
-    let market = MarketContext::new().insert_fx(FxMatrix::new(std::sync::Arc::new(UnusedFx)));
+    let market = MarketContext::new().insert_fx(FxMatrix::new(std::sync::Arc::new(UnusedFx), None));
     let actual = Evaluator::new()
         .evaluate_with_market(&model, &market, date!(2025 - 01 - 15))
         .unwrap();

@@ -22,9 +22,9 @@
 //! let provider = Arc::new(SimpleFxProvider::new());
 //! provider.set_quotes(&[(Currency::EUR, Currency::USD, 1.1)]);
 //!
-//! let matrix = FxMatrix::new(provider.clone());
+//! let matrix = FxMatrix::new(provider.clone(), None);
 //! let date = Date::from_calendar_date(2024, Month::January, 5).expect("Valid date");
-//! let res = matrix.rate(FxQuery::new(Currency::EUR, Currency::USD, date, Default::default())).expect("FX rate lookup should succeed");
+//! let res = matrix.rate(FxQuery::new(Currency::EUR, Currency::USD, date, FxConversionPolicy::CashflowDate)).expect("FX rate lookup should succeed");
 //! // Observed quotes use a canonical storage orientation, so compare rates with
 //! // a numerical tolerance rather than relying on reciprocal round-trip equality.
 //! assert!((res.rate - 1.1).abs() < 1e-12);
@@ -57,7 +57,7 @@ mod tests {
     fn with_bumped_rate_rejects_non_positive_result() {
         let provider = Arc::new(SimpleFxProvider::new());
         let _ = provider.set_quotes(&[(Currency::EUR, Currency::USD, 1.10)]);
-        let matrix = FxMatrix::new(provider);
+        let matrix = FxMatrix::new(provider, None);
 
         let result =
             matrix.with_bumped_rate(Currency::EUR, Currency::USD, -1.0, date!(2025 - 01 - 01));
@@ -85,7 +85,6 @@ mod tests {
         for (input, expected) in [
             ("cashflow_date", FxConversionPolicy::CashflowDate),
             ("period_end", FxConversionPolicy::PeriodEnd),
-            ("period_average", FxConversionPolicy::PeriodAverage),
         ] {
             assert!(matches!(input.parse::<FxConversionPolicy>(), Ok(value) if value == expected));
         }
@@ -93,7 +92,6 @@ mod tests {
         for variant in [
             FxConversionPolicy::CashflowDate,
             FxConversionPolicy::PeriodEnd,
-            FxConversionPolicy::PeriodAverage,
         ] {
             let display = variant.to_string();
             assert!(matches!(display.parse::<FxConversionPolicy>(), Ok(value) if value == variant));
@@ -102,7 +100,14 @@ mod tests {
 
     #[test]
     fn test_fx_conversion_policy_fromstr_rejects_unknown() {
-        for rejected in ["cashflow", "end", "average", "CashflowDate", "period-end"] {
+        for rejected in [
+            "cashflow",
+            "end",
+            "average",
+            "CashflowDate",
+            "period-end",
+            "period_average",
+        ] {
             assert!(rejected.parse::<FxConversionPolicy>().is_err());
         }
     }
@@ -112,7 +117,6 @@ mod tests {
         for (variant, expected_json) in [
             (FxConversionPolicy::CashflowDate, r#""cashflow_date""#),
             (FxConversionPolicy::PeriodEnd, r#""period_end""#),
-            (FxConversionPolicy::PeriodAverage, r#""period_average""#),
         ] {
             let json = serde_json::to_string(&variant).expect("serializes");
             assert_eq!(json, expected_json);
@@ -124,10 +128,21 @@ mod tests {
     }
 
     #[test]
-    fn fx_query_defaults_policy_and_rejects_unknown_fields() {
-        let query: FxQuery = serde_json::from_str(r#"{"from":"USD","to":"EUR","on":"2025-01-01"}"#)
-            .expect("policy should default");
-        assert_eq!(query.policy, FxConversionPolicy::CashflowDate);
+    fn fx_query_requires_policy_and_rejects_unknown_fields() {
+        let missing: std::result::Result<FxQuery, _> =
+            serde_json::from_str(r#"{"from":"USD","to":"EUR","on":"2025-01-01"}"#);
+        assert!(
+            missing
+                .expect_err("policy has no default")
+                .to_string()
+                .contains("missing field `policy`")
+        );
+
+        let query: FxQuery = serde_json::from_str(
+            r#"{"from":"USD","to":"EUR","on":"2025-01-01","policy":"period_end"}"#,
+        )
+        .expect("explicit policy deserializes");
+        assert_eq!(query.policy, FxConversionPolicy::PeriodEnd);
 
         let result: std::result::Result<FxQuery, _> = serde_json::from_str(
             r#"{"from":"USD","to":"EUR","on":"2025-01-01","unexpected":true}"#,

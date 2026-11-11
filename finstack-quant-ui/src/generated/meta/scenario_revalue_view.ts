@@ -2515,25 +2515,19 @@ export default [
   {
     "path": "#/$defs/d_9ca21aa74507178203bd",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/FxConversionPolicy",
-    "description": "Standard FX conversion strategies used to hint FX providers.\n\nThe policy tells a provider *how* the rate will be applied so it can decide\nbetween spot, forward, or averaged sources."
+    "description": "Provider-selection purpose of a point-date FX query (record\nCORE-CONVENTIONS-013 #1/#2).\n\nThe policy tells a provider which source purpose the rate serves; it does\nnot calculate dates or choose spot versus forward. There is no default:\nevery query names its policy. Period averages are not point queries; an\nowner that needs one computes the oriented aggregate itself."
   },
   {
     "path": "#/$defs/d_9ca21aa74507178203bd/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/FxConversionPolicy/oneOf/0",
     "const": "cashflow_date",
-    "description": "Use spot/forward on the cashflow date."
+    "description": "The rate applicable on a cashflow's own date."
   },
   {
     "path": "#/$defs/d_9ca21aa74507178203bd/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/FxConversionPolicy/oneOf/1",
     "const": "period_end",
-    "description": "Use period end date."
-  },
-  {
-    "path": "#/$defs/d_9ca21aa74507178203bd/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/FxConversionPolicy/oneOf/2",
-    "const": "period_average",
-    "description": "Use an average over the period."
+    "description": "The rate applicable on a reporting period's closing date."
   },
   {
     "path": "#/$defs/d_9dbe9a40fccc63c10676",

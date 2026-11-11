@@ -47,19 +47,19 @@ class TestFxErrors:
 
     def test_zero_rate(self) -> None:
         """Zero FX rate should raise."""
-        fx = FxMatrix()
+        fx = FxMatrix(None)
         with pytest.raises(Exception, match=r"(?i)(positive|rate|invalid input parameter)"):
             fx.set_quotes([(Currency("EUR"), Currency("USD"), 0.0)])
 
     def test_negative_rate(self) -> None:
         """Negative FX rate should raise."""
-        fx = FxMatrix()
+        fx = FxMatrix(None)
         with pytest.raises(Exception, match=r"(?i)(positive|rate|invalid input parameter|negative)"):
             fx.set_quotes([(Currency("EUR"), Currency("USD"), -1.0)])
 
     def test_missing_pair(self) -> None:
         """Looking up an unset pair should raise."""
-        fx = FxMatrix()
+        fx = FxMatrix(None)
         # Missing-pair lookups now raise KeyError (InputError::NotFound).
         # NOTE: expectation updated alongside the binding change; not yet
         # executed against a rebuilt wheel.

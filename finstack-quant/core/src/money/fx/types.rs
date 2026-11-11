@@ -4,27 +4,27 @@ use crate::currency::Currency;
 use crate::dates::Date;
 use serde::{Deserialize, Serialize};
 
-/// Standard FX conversion strategies used to hint FX providers.
+/// Provider-selection purpose of a point-date FX query (record
+/// CORE-CONVENTIONS-013 #1/#2).
 ///
-/// The policy tells a provider *how* the rate will be applied so it can decide
-/// between spot, forward, or averaged sources.
+/// The policy tells a provider which source purpose the rate serves; it does
+/// not calculate dates or choose spot versus forward. There is no default:
+/// every query names its policy. Period averages are not point queries; an
+/// owner that needs one computes the oriented aggregate itself.
 ///
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum FxConversionPolicy {
-    /// Use spot/forward on the cashflow date.
-    #[default]
+    /// The rate applicable on a cashflow's own date.
     CashflowDate,
-    /// Use period end date.
+    /// The rate applicable on a reporting period's closing date.
     PeriodEnd,
-    /// Use an average over the period.
-    PeriodAverage,
 }
 
 impl std::fmt::Display for FxConversionPolicy {
-    /// Writes the serde label (`cashflow_date`, `period_end` or `period_average`).
+    /// Writes the serde label (`cashflow_date` or `period_end`).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
     }
@@ -52,8 +52,7 @@ pub struct FxQuery {
     pub to: Currency,
     /// Date on which the provider's rate must be applicable.
     pub on: Date,
-    /// Rate-selection hint; deserialization defaults to CashflowDate.
-    #[serde(default)]
+    /// Required provider-selection purpose; there is no default.
     pub policy: FxConversionPolicy,
 }
 
@@ -65,8 +64,8 @@ impl FxQuery {
     /// * `from` - Source currency whose units are being converted.
     /// * `to` - Target currency received after multiplying by the quoted rate.
     /// * `on` - Date on which the provider's quote must apply.
-    /// * `policy` - Provider rate-selection convention for the requested date;
-    ///   use [`FxConversionPolicy::default`] for cashflow-date conversion.
+    /// * `policy` - Provider-selection purpose for the requested date, chosen
+    ///   by the caller; there is no default.
     pub fn new(from: Currency, to: Currency, on: Date, policy: FxConversionPolicy) -> Self {
         Self {
             from,
@@ -133,7 +132,7 @@ impl std::str::FromStr for CurrencyPair {
 /// Attach [`FxPolicyMeta`] to valuation results so auditors can understand how
 /// FX conversions were sourced.
 ///
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FxPolicyMeta {
@@ -145,43 +144,75 @@ pub struct FxPolicyMeta {
     pub notes: String,
 }
 
-/// Observed-quote capacity of [`FxConfig::default`].
+/// Observed-quote capacity of [`FxConfig::new`] and an omitted
+/// `cache_capacity` key: an operational bound, not a financial choice.
 pub(crate) const DEFAULT_CACHE_CAPACITY: std::num::NonZeroUsize =
     std::num::NonZeroUsize::MIN.saturating_add(255);
 
-/// Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour.
+fn default_cache_capacity() -> usize {
+    DEFAULT_CACHE_CAPACITY.get()
+}
+
+/// Deserialize the pivot key as required: `null` selects no routing, while a
+/// missing key is an error rather than an inferred choice.
+fn required_pivot<'de, D>(deserializer: D) -> Result<Option<Currency>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    <Option<Currency> as serde::Deserialize>::deserialize(deserializer)
+}
+
+/// Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour
+/// (record CORE-CONVENTIONS-013 #5, resolution O9).
 ///
-/// Controls triangulation and caching.
+/// The routing choice is explicit: there is no default pivot and no default
+/// configuration. `cache_capacity` may be omitted on the wire and then takes
+/// the operational default.
 ///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::currency::Currency;
+/// use finstack_quant_core::money::fx::FxConfig;
+///
+/// assert_eq!(FxConfig::new(Some(Currency::USD)).pivot_currency, Some(Currency::USD));
+/// assert!(serde_json::from_str::<FxConfig>("{}").is_err());
+/// let direct: FxConfig = serde_json::from_str(r#"{"pivot_currency": null}"#)?;
+/// assert_eq!(direct.pivot_currency, None);
+/// # Ok::<(), serde_json::Error>(())
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(
+    feature = "json-schema",
+    schemars(extend("required" = ["pivot_currency"]))
+)]
 #[serde(deny_unknown_fields)]
-#[serde(default)]
 pub struct FxConfig {
-    /// Pivot currency for triangulation fallback (typically USD).
+    /// Single pivot for `from -> pivot -> to` cross routing, or `None` for
+    /// direct quotes only. Required on the wire (`null` disables routing).
     ///
-    /// Current limitation: triangulation uses this single configured pivot only.
-    /// If a market convention requires a different routing currency for a given
-    /// pair, callers must seed that direct quote explicitly instead of relying on
-    /// automatic cross construction.
-    pub pivot_currency: Currency,
-    /// Whether to enable automatic triangulation for missing rates.
-    ///
-    /// When enabled, the matrix will attempt `from -> pivot -> to` and will not
-    /// search multi-hop paths or alternative pivots.
-    pub enable_triangulation: bool,
+    /// Only this one pivot is tried: no alternative pivot, multi-hop search or
+    /// market-order inference. A pair whose market convention routes through
+    /// another currency needs its direct quote seeded explicitly.
+    #[serde(deserialize_with = "required_pivot")]
+    pub pivot_currency: Option<Currency>,
     /// Maximum number of provider-observed quotes retained in the LRU cache.
+    #[serde(default = "default_cache_capacity")]
     pub cache_capacity: usize,
 }
 
-impl Default for FxConfig {
-    fn default() -> Self {
+impl FxConfig {
+    /// Configuration with an explicit routing choice and the default cache
+    /// capacity (256 observed quotes).
+    ///
+    /// # Arguments
+    ///
+    /// * `pivot_currency` - The single routing pivot, or `None` for direct
+    ///   quotes only.
+    pub const fn new(pivot_currency: Option<Currency>) -> Self {
         Self {
-            pivot_currency: Currency::USD,
-            // Triangulation is on by default: most FX deployments need cross
-            // rates through a pivot (typically USD). Disable explicitly for
-            // strict-direct-quote setups.
-            enable_triangulation: true,
+            pivot_currency,
             cache_capacity: DEFAULT_CACHE_CAPACITY.get(),
         }
     }
@@ -271,7 +302,6 @@ mod tests {
         for (policy, label) in [
             (FxConversionPolicy::CashflowDate, "cashflow_date"),
             (FxConversionPolicy::PeriodEnd, "period_end"),
-            (FxConversionPolicy::PeriodAverage, "period_average"),
         ] {
             assert_eq!(policy.to_string(), label);
             assert_eq!(label.parse::<FxConversionPolicy>().expect(label), policy);

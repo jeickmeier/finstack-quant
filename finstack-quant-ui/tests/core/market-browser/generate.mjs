@@ -54,7 +54,6 @@ const supplemental = {
   },
   fx: {
     config: {
-      enable_triangulation: true,
       pivot_currency: "USD",
       cache_capacity: 17,
     },

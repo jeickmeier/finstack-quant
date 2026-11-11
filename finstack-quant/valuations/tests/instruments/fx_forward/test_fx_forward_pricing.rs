@@ -38,7 +38,7 @@ fn create_test_market(as_of: Date) -> MarketContext {
     fx_provider
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
         .expect("valid rate");
-    let fx_matrix = FxMatrix::new(fx_provider);
+    let fx_matrix = FxMatrix::new(fx_provider, None);
 
     MarketContext::new()
         .insert(usd_curve)

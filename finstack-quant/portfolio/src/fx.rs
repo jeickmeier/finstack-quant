@@ -123,7 +123,7 @@ pub(crate) fn spot_fx_to_base(
             from_currency,
             base_currency,
             as_of,
-            Default::default(),
+            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         ))
         .map_err(|_| Error::FxConversionFailed {
             from: from_currency,
@@ -298,7 +298,7 @@ mod tests {
         provider
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.25)])
             .expect("test FX quote should be valid");
-        let market = MarketContext::new().insert_fx(FxMatrix::new(provider));
+        let market = MarketContext::new().insert_fx(FxMatrix::new(provider, None));
 
         let direct = spot_rate_to_base(Currency::EUR, as_of, &market, Currency::USD)
             .expect("direct quote should resolve");
@@ -318,7 +318,7 @@ mod tests {
         assert!(matches!(missing_matrix, Error::MissingMarketData(_)));
 
         let empty_market =
-            MarketContext::new().insert_fx(FxMatrix::new(Arc::new(SimpleFxProvider::new())));
+            MarketContext::new().insert_fx(FxMatrix::new(Arc::new(SimpleFxProvider::new()), None));
         let missing_pair = spot_rate_to_base(Currency::EUR, as_of, &empty_market, Currency::USD)
             .expect_err("missing pair should fail");
         assert!(matches!(
@@ -341,7 +341,7 @@ mod tests {
         let market = MarketContext::new()
             .insert(flat_discount("JPY", as_of, 0.99))
             .insert(flat_discount("USD", as_of, 0.95))
-            .insert_fx(FxMatrix::new(provider));
+            .insert_fx(FxMatrix::new(provider, None));
 
         let converted = convert_to_base_forward(
             Money::from((100_i64, Currency::JPY)),
@@ -369,7 +369,7 @@ mod tests {
         let market = MarketContext::new()
             .insert(flat_discount("JPY-OIS", as_of, 0.99))
             .insert(flat_discount("USD-OIS", as_of, 0.95))
-            .insert_fx(FxMatrix::new(provider));
+            .insert_fx(FxMatrix::new(provider, None));
         let mut curves = HashMap::new();
         curves.insert(Currency::JPY, CurveId::new("JPY-OIS"));
         curves.insert(Currency::USD, CurveId::new("USD-OIS"));

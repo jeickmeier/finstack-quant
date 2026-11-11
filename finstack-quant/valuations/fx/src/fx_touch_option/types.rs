@@ -362,7 +362,7 @@ impl FxTouchOption {
                 self.base_currency,
                 self.quote_currency,
                 as_of,
-                Default::default(),
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
             ))?
             .rate)
     }
@@ -649,7 +649,7 @@ mod tests {
             .insert(usd)
             .insert(eur)
             .insert_surface(surface)
-            .insert_fx(FxMatrix::new(provider));
+            .insert_fx(FxMatrix::new(provider, None));
 
         let touch = FxTouchOption::builder()
             .id(InstrumentId::new("FXTOUCH-CORRUPT-CHECK"))
@@ -677,7 +677,7 @@ mod tests {
                 Currency::EUR,
                 Currency::USD,
                 as_of,
-                Default::default(),
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
             ))
             .expect("spot")
             .rate;
@@ -703,7 +703,7 @@ mod tests {
                 Currency::EUR,
                 Currency::USD,
                 as_of,
-                Default::default(),
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
             ))
             .expect("spot")
             .rate;

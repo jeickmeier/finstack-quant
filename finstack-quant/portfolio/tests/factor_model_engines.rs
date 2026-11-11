@@ -187,7 +187,7 @@ fn create_two_currency_market(base_date: Date) -> Result<MarketContext> {
 fn create_two_currency_market_with_fx(base_date: Date) -> Result<MarketContext> {
     let provider = Arc::new(SimpleFxProvider::new());
     provider.set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])?;
-    Ok(create_two_currency_market(base_date)?.insert_fx(FxMatrix::new(provider)))
+    Ok(create_two_currency_market(base_date)?.insert_fx(FxMatrix::new(provider, None)))
 }
 
 fn fx_factor() -> FactorDefinition {

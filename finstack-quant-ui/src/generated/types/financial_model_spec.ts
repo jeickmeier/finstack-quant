@@ -748,12 +748,15 @@ export type D_8Ef975540682A003034E =
  */
 export type D_1C91Cbdbb3238Adf0C02 = number;
 /**
- * Standard FX conversion strategies used to hint FX providers.
+ * Provider-selection purpose of a point-date FX query (record
+ * CORE-CONVENTIONS-013 #1/#2).
  *
- * The policy tells a provider *how* the rate will be applied so it can decide
- * between spot, forward, or averaged sources.
+ * The policy tells a provider which source purpose the rate serves; it does
+ * not calculate dates or choose spot versus forward. There is no default:
+ * every query names its policy. Period averages are not point queries; an
+ * owner that needs one computes the oriented aggregate itself.
  */
-export type D_97Ce4Fbfee051Bc20729 = "cashflow_date" | "period_end" | "period_average";
+export type D_97Ce4Fbfee051Bc20729 = "cashflow_date" | "period_end";
 /**
  * Payment priority levels in the waterfall.
  */

@@ -99,7 +99,7 @@ const index = (lag = '3M') =>
     'linear',
     lag
   );
-const fx = () => core.FxMatrix.fromDict({ 'EUR/USD': 1.1, GBPUSD: 1.27 });
+const fx = () => core.FxMatrix.fromDict({ 'EUR/USD': 1.1, GBPUSD: 1.27 }, null);
 const market = () => {
   const context = new core.MarketContext();
   context.insert(core.DiscountCurve.flat('USD-OIS', '2025-01-02', 0.04));
@@ -401,8 +401,8 @@ const CASES = {
     JSON.parse(index().withPublicationDates(PUBLICATION_DATES).toJson()),
   ],
   fx_matrix: () => [
-    fx().rate('EUR', 'USD', '2025-01-02').rate,
-    fx().rate('USD', 'GBP', '2025-01-02').rate,
+    fx().rate('EUR', 'USD', '2025-01-02', core.FxConversionPolicy.cashflowDate()).rate,
+    fx().rate('USD', 'GBP', '2025-01-02', core.FxConversionPolicy.cashflowDate()).rate,
   ],
   market_context: () => JSON.parse(market().toJson()),
   market_context_queries: () => ({
@@ -415,7 +415,9 @@ const CASES = {
     series: market().getSeries('SOFR-FIXINGS').valueOn('2025-01-06'),
     index_lag: market().getInflationIndex('US-CPI-U').lag,
     credit_index: market().getCreditIndex('CDX-IG-43').numConstituents,
-    fx_rate: market().fxRequired().rate('EUR', 'USD', '2025-01-02').rate,
+    fx_rate: market()
+      .fxRequired()
+      .rate('EUR', 'USD', '2025-01-02', core.FxConversionPolicy.cashflowDate()).rate,
     converted: [
       market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').amount
         .amount,
@@ -500,16 +502,19 @@ test('Rate unit views are single binary64 scalings', () => {
 
 test('F350: FX pair keys are parsed by Rust in both hosts', () => {
   assert.throws(
-    () => core.FxMatrix.fromDict({ 'é€x': 1.0 }),
+    () => core.FxMatrix.fromDict({ 'é€x': 1.0 }, null),
     kind('validation', /invalid FX pair/)
   );
-  assert.throws(() => core.FxMatrix.fromDict({ 'EUR/XYZ': 1.0 }), kind('validation'));
-  const matrix = new core.FxMatrix();
+  assert.throws(() => core.FxMatrix.fromDict({ 'EUR/XYZ': 1.0 }, null), kind('validation'));
+  const matrix = new core.FxMatrix(null);
   matrix.setQuotes([
     ['EUR', 'USD', 1.1],
     ['GBP', 'USD', 1.27],
   ]);
-  assert.equal(matrix.rate('EUR', 'USD', '2025-01-02').rate, 1.1);
+  assert.equal(
+    matrix.rate('EUR', 'USD', '2025-01-02', core.FxConversionPolicy.cashflowDate()).rate,
+    1.1
+  );
   // A bad batch is atomic: nothing is applied.
   assert.throws(
     () =>
@@ -519,7 +524,10 @@ test('F350: FX pair keys are parsed by Rust in both hosts', () => {
       ]),
     kind('validation')
   );
-  assert.throws(() => matrix.rate('USD', 'JPY', '2025-01-02'), kind('not_found'));
+  assert.throws(
+    () => matrix.rate('USD', 'JPY', '2025-01-02', core.FxConversionPolicy.cashflowDate()),
+    kind('not_found')
+  );
 });
 
 test('unknown names carry the Rust error kind', () => {
@@ -675,7 +683,10 @@ test('MarketContext inserts change the context in place and share curve data', (
   const matrix = fx();
   context.insertFx(matrix);
   matrix.setQuotes([['USD', 'JPY', 150.0]]);
-  assert.equal(context.fx.rate('USD', 'JPY', '2025-01-02').rate, 150.0);
+  assert.equal(
+    context.fx.rate('USD', 'JPY', '2025-01-02', core.FxConversionPolicy.cashflowDate()).rate,
+    150.0
+  );
   assert.deepEqual(market().getPrice('SPX'), { unitless: 5900.0 });
   assert.deepEqual(market().getPrice('ACME'), { price: { amount: '12.5', currency: 'USD' } });
   assert.equal(market().getPriceCurve('WTI').spotPrice, 72.0);

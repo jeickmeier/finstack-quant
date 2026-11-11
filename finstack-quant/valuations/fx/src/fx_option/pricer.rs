@@ -289,7 +289,7 @@ mod delegation_tests {
         provider
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.20)])
             .expect("valid rate");
-        let fx_matrix = FxMatrix::new(Arc::new(provider));
+        let fx_matrix = FxMatrix::new(Arc::new(provider), None);
 
         MarketContext::new()
             .insert(usd_curve)

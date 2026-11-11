@@ -39,7 +39,7 @@ fn build_fx_matrix(base: Currency, quote: Currency, rate: f64) -> FxMatrix {
     provider
         .set_quotes(&[(base, quote, rate)])
         .expect("valid rate");
-    FxMatrix::new(provider)
+    FxMatrix::new(provider, None)
 }
 
 #[test]

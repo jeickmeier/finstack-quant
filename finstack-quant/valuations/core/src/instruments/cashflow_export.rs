@@ -655,7 +655,7 @@ fn envelope_for_priced(
                         ccy,
                         row_reporting_currency,
                         as_of_date,
-                        Default::default(),
+                        finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
                     ))?
                     .rate,
             )

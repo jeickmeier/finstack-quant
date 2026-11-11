@@ -180,7 +180,6 @@ def build_european_fx_option() -> dict[str, Any]:
             fx={
                 "config": {
                     "pivot_currency": "USD",
-                    "enable_triangulation": True,
                     "cache_capacity": 256,
                 },
                 "quotes": [["EUR", "USD", spot]],

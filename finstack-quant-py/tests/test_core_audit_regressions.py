@@ -121,7 +121,7 @@ def test_market_context_len_and_bool_count_fx_collateral_and_dividends() -> None
     empty = MarketContext()
     assert (len(empty), empty.is_empty(), bool(empty)) == (0, True, False)
 
-    fx = FxMatrix()
+    fx = FxMatrix(None)
     fx.set_quotes([(Currency("EUR"), Currency("USD"), 1.1)])
     fx_only = MarketContext().insert_fx(fx)
     assert (len(fx_only), fx_only.is_empty(), bool(fx_only)) == (1, False, True)

@@ -312,7 +312,7 @@ impl FactorBumper for FxBumper {
                         pair.base,
                         pair.quote,
                         as_of,
-                        Default::default(),
+                        finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
                     ))
                     .ok()
                 })

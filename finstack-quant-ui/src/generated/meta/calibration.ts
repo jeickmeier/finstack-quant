@@ -29,11 +29,6 @@ export default [
               "validation_tolerance": 1e-8,
               "weighting_scheme": "sqrt_time"
             },
-            "fx": {
-              "cache_capacity": 256,
-              "enable_triangulation": true,
-              "pivot_currency": "USD"
-            },
             "hazard_curve": {
               "hazard_hard_max": 10,
               "hazard_hard_min": 0,
@@ -3716,7 +3711,7 @@ export default [
   {
     "path": "#/$defs/d_82889f5b5a91a21407f1",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FxConfig",
-    "description": "Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour.\n\nControls triangulation and caching."
+    "description": "Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour\n(record CORE-CONVENTIONS-013 #5, resolution O9).\n\nThe routing choice is explicit: there is no default pivot and no default\nconfiguration. `cache_capacity` may be omitted on the wire and then takes\nthe operational default.\n\n# Examples\n\n```rust\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::fx::FxConfig;\n\nassert_eq!(FxConfig::new(Some(Currency::USD)).pivot_currency, Some(Currency::USD));\nassert!(serde_json::from_str::<FxConfig>(\"{}\").is_err());\nlet direct: FxConfig = serde_json::from_str(r#\"{\"pivot_currency\": null}\"#)?;\nassert_eq!(direct.pivot_currency, None);\n# Ok::<(), serde_json::Error>(())\n```"
   },
   {
     "path": "#/$defs/d_82889f5b5a91a21407f1/properties/cache_capacity",
@@ -3727,18 +3722,19 @@ export default [
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_82889f5b5a91a21407f1/properties/enable_triangulation",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FxConfig/properties/enable_triangulation",
-    "default": true,
-    "description": "Whether to enable automatic triangulation for missing rates.\n\nWhen enabled, the matrix will attempt `from -> pivot -> to` and will not\nsearch multi-hop paths or alternative pivots."
-  },
-  {
     "path": "#/$defs/d_82889f5b5a91a21407f1/properties/pivot_currency",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FxConfig/properties/pivot_currency",
-    "default": "USD",
-    "description": "Pivot currency for triangulation fallback (typically USD).\n\nCurrent limitation: triangulation uses this single configured pivot only.\nIf a market convention requires a different routing currency for a given\npair, callers must seed that direct quote explicitly instead of relying on\nautomatic cross construction.",
+    "description": "Single pivot for `from -> pivot -> to` cross routing, or `None` for\ndirect quotes only. Required on the wire (`null` disables routing).\n\nOnly this one pivot is tried: no alternative pivot, multi-hop search or\nmarket-order inference. A pair whose market convention routes through\nanother currency needs its direct quote seeded explicitly."
+  },
+  {
+    "path": "#/$defs/d_82889f5b5a91a21407f1/properties/pivot_currency/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FxConfig/properties/pivot_currency/anyOf/0",
     "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_82889f5b5a91a21407f1/properties/pivot_currency/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FxConfig/properties/pivot_currency/anyOf/1"
   },
   {
     "path": "#/$defs/d_83682026197086424468",
@@ -6346,14 +6342,17 @@ export default [
   {
     "path": "#/$defs/d_e1605cebc97720bf2277/properties/fx",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationConfig/properties/fx",
-    "default": {
-      "cache_capacity": 256,
-      "enable_triangulation": true,
-      "pivot_currency": "USD"
-    },
-    "description": "FX matrix runtime config (pivot currency, triangulation, cache capacity).",
+    "description": "FX matrix config (explicit routing pivot and cache capacity) for a\nmarket built from FX spot quotes. `None` (the key omitted) supplies no\nFX configuration: building an FX matrix from quotes then errors rather\nthan inferring a pivot (record CORE-CONVENTIONS-013 #5)."
+  },
+  {
+    "path": "#/$defs/d_e1605cebc97720bf2277/properties/fx/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationConfig/properties/fx/anyOf/0",
     "ref": "#/$defs/FxConfig",
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/FxConfig"
+  },
+  {
+    "path": "#/$defs/d_e1605cebc97720bf2277/properties/fx/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationConfig/properties/fx/anyOf/1"
   },
   {
     "path": "#/$defs/d_e1605cebc97720bf2277/properties/hazard_curve",
@@ -6551,11 +6550,6 @@ export default [
       "forward_curve": {
         "validation_tolerance": 1e-8,
         "weighting_scheme": "sqrt_time"
-      },
-      "fx": {
-        "cache_capacity": 256,
-        "enable_triangulation": true,
-        "pivot_currency": "USD"
       },
       "hazard_curve": {
         "hazard_hard_max": 10,

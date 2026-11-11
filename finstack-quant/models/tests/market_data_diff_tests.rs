@@ -45,7 +45,7 @@ impl FxProvider for MockFxProvider {
 }
 
 fn sample_fx_matrix() -> FxMatrix {
-    FxMatrix::new(Arc::new(MockFxProvider))
+    FxMatrix::new(Arc::new(MockFxProvider), None)
 }
 
 fn market_with_discount(curve: DiscountCurve) -> MarketContext {
@@ -439,8 +439,8 @@ fn test_fx_shift_uses_valuation_dates() {
     let t0 = sample_date();
     let t1 = t0.next_day().expect("next day should exist");
 
-    let market_t0 = market_with_fx(FxMatrix::new(Arc::new(DateAwareFx)));
-    let market_t1 = market_with_fx(FxMatrix::new(Arc::new(DateAwareFx)));
+    let market_t0 = market_with_fx(FxMatrix::new(Arc::new(DateAwareFx), None));
+    let market_t1 = market_with_fx(FxMatrix::new(Arc::new(DateAwareFx), None));
 
     let shift =
         measure_fx_shift(Currency::EUR, Currency::USD, &market_t0, &market_t1, t0, t1).unwrap();
@@ -468,7 +468,7 @@ fn test_fx_shift_zero_baseline_errors() {
         }
     }
 
-    let market_t0 = market_with_fx(FxMatrix::new(Arc::new(ZeroFx)));
+    let market_t0 = market_with_fx(FxMatrix::new(Arc::new(ZeroFx), None));
     let market_t1 = market_with_fx(sample_fx_matrix());
     let result = measure_fx_shift(
         Currency::EUR,

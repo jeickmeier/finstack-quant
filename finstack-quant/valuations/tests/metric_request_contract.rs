@@ -63,7 +63,7 @@ fn market(as_of: Date) -> MarketContext {
     MarketContext::new()
         .insert(usd)
         .insert(eur)
-        .insert_fx(FxMatrix::new(fx))
+        .insert_fx(FxMatrix::new(fx, None))
 }
 
 fn price(

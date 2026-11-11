@@ -119,7 +119,7 @@ pub fn create_fx_matrix(eur_usd_rate: f64) -> FxMatrix {
     provider
         .set_quotes(&[(BASE, QUOTE, eur_usd_rate)])
         .expect("valid rate");
-    FxMatrix::new(provider)
+    FxMatrix::new(provider, None)
 }
 
 /// Build complete market context from parameters.
@@ -249,7 +249,7 @@ pub fn finite_diff_delta(
             option.base_currency,
             option.quote_currency,
             as_of,
-            Default::default(),
+            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         ))?
         .rate;
 
@@ -283,7 +283,7 @@ pub fn finite_diff_gamma(
             option.base_currency,
             option.quote_currency,
             as_of,
-            Default::default(),
+            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         ))?
         .rate;
 

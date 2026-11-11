@@ -103,7 +103,6 @@ def build_single_name_cds() -> dict[str, Any]:
                     "settings": {
                         "fx": {
                             "pivot_currency": "USD",
-                            "enable_triangulation": True,
                             "cache_capacity": 256,
                         }
                     },

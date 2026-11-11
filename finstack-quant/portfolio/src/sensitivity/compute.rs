@@ -254,7 +254,7 @@ mod tests {
         provider
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
             .expect("valid quote");
-        MarketContext::new().insert_fx(FxMatrix::new(provider))
+        MarketContext::new().insert_fx(FxMatrix::new(provider, None))
     }
 
     fn eurusd_factor() -> FactorDefinition {

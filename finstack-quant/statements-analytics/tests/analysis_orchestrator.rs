@@ -236,6 +236,7 @@ fn test_mixed_currency_capital_structure_requires_reporting_fx() {
                 "EUR-OIS",
             )
             .expect("eur bond");
+        model_builder.fx_policy(finstack_quant_core::money::fx::FxConversionPolicy::PeriodEnd);
         model_builder.with_meta("currency", serde_json::json!("USD"));
         model_builder.build().expect("valid model")
     };

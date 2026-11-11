@@ -98,12 +98,7 @@
           "vol_surface": {
             "validation_tolerance": 0.001
           },
-          "fail_on_bad_fit": true,
-          "fx": {
-            "pivot_currency": "USD",
-            "enable_triangulation": true,
-            "cache_capacity": 256
-          }
+          "fail_on_bad_fit": true
         }
       },
       "market_data": [
@@ -559,12 +554,7 @@
           "vol_surface": {
             "validation_tolerance": 0.001
           },
-          "fail_on_bad_fit": true,
-          "fx": {
-            "pivot_currency": "USD",
-            "enable_triangulation": true,
-            "cache_capacity": 256
-          }
+          "fail_on_bad_fit": true
         }
       },
       "market_data": [
@@ -1242,12 +1232,7 @@
           "vol_surface": {
             "validation_tolerance": 0.001
           },
-          "fail_on_bad_fit": true,
-          "fx": {
-            "pivot_currency": "USD",
-            "enable_triangulation": true,
-            "cache_capacity": 256
-          }
+          "fail_on_bad_fit": true
         }
       },
       "market_data": [
@@ -1700,11 +1685,6 @@
                   "forward_curve": {
                     "validation_tolerance": 1e-8,
                     "weighting_scheme": "sqrt_time"
-                  },
-                  "fx": {
-                    "cache_capacity": 256,
-                    "enable_triangulation": true,
-                    "pivot_currency": "USD"
                   },
                   "hazard_curve": {
                     "hazard_hard_max": 10,
@@ -2162,12 +2142,7 @@
           "vol_surface": {
             "validation_tolerance": 0.001
           },
-          "fail_on_bad_fit": true,
-          "fx": {
-            "pivot_currency": "USD",
-            "enable_triangulation": true,
-            "cache_capacity": 256
-          }
+          "fail_on_bad_fit": true
         }
       },
       "market_data": [
@@ -2620,11 +2595,6 @@
                   "forward_curve": {
                     "validation_tolerance": 1e-8,
                     "weighting_scheme": "sqrt_time"
-                  },
-                  "fx": {
-                    "cache_capacity": 256,
-                    "enable_triangulation": true,
-                    "pivot_currency": "USD"
                   },
                   "hazard_curve": {
                     "hazard_hard_max": 10,
@@ -3107,12 +3077,7 @@
           "vol_surface": {
             "validation_tolerance": 0.001
           },
-          "fail_on_bad_fit": true,
-          "fx": {
-            "pivot_currency": "USD",
-            "enable_triangulation": true,
-            "cache_capacity": 256
-          }
+          "fail_on_bad_fit": true
         }
       },
       "market_data": [
@@ -3679,11 +3644,6 @@
                     "validation_tolerance": 1e-8,
                     "weighting_scheme": "sqrt_time"
                   },
-                  "fx": {
-                    "cache_capacity": 256,
-                    "enable_triangulation": true,
-                    "pivot_currency": "USD"
-                  },
                   "hazard_curve": {
                     "hazard_hard_max": 10,
                     "hazard_hard_min": 0,
@@ -4236,12 +4196,7 @@
           "vol_surface": {
             "validation_tolerance": 0.001
           },
-          "fail_on_bad_fit": false,
-          "fx": {
-            "pivot_currency": "USD",
-            "enable_triangulation": true,
-            "cache_capacity": 256
-          }
+          "fail_on_bad_fit": false
         }
       },
       "market_data": [
@@ -4793,11 +4748,6 @@
                   "forward_curve": {
                     "validation_tolerance": 1e-8,
                     "weighting_scheme": "sqrt_time"
-                  },
-                  "fx": {
-                    "cache_capacity": 256,
-                    "enable_triangulation": true,
-                    "pivot_currency": "USD"
                   },
                   "hazard_curve": {
                     "hazard_hard_max": 10,
@@ -5429,12 +5379,7 @@
           "vol_surface": {
             "validation_tolerance": 0.001
           },
-          "fail_on_bad_fit": true,
-          "fx": {
-            "pivot_currency": "USD",
-            "enable_triangulation": true,
-            "cache_capacity": 256
-          }
+          "fail_on_bad_fit": true
         }
       },
       "market_data": [
@@ -6610,12 +6555,7 @@
           "vol_surface": {
             "validation_tolerance": 0.001
           },
-          "fail_on_bad_fit": false,
-          "fx": {
-            "pivot_currency": "USD",
-            "enable_triangulation": true,
-            "cache_capacity": 256
-          }
+          "fail_on_bad_fit": false
         }
       },
       "market_data": [
@@ -7269,7 +7209,7 @@
   },
   {
     "source": "finstack-quant/calibration/examples/market_bootstrap/09_fx_matrix.json",
-    "sha256": "436e320301e7d07e5d337243320ccfc47f6374f7ad63ccd76caa94a25feba409",
+    "sha256": "5eae5344b37fb0fa80568d38f13b46b52cc17b1559cd59de73d414b44a9fec13",
     "input": {
       "$schema": "../../schemas/calibration/1/calibration.schema.json",
       "schema": "finstack_quant.calibration/1",
@@ -7342,7 +7282,6 @@
           "fail_on_bad_fit": true,
           "fx": {
             "pivot_currency": "USD",
-            "enable_triangulation": true,
             "cache_capacity": 256
           }
         }
@@ -7380,7 +7319,6 @@
           "fx": {
             "config": {
               "pivot_currency": "USD",
-              "enable_triangulation": true,
               "cache_capacity": 256
             },
             "quotes": [
@@ -7530,12 +7468,7 @@
           "vol_surface": {
             "validation_tolerance": 0.001
           },
-          "fail_on_bad_fit": true,
-          "fx": {
-            "pivot_currency": "USD",
-            "enable_triangulation": true,
-            "cache_capacity": 256
-          }
+          "fail_on_bad_fit": true
         }
       },
       "market_data": [
@@ -7735,12 +7668,7 @@
           "vol_surface": {
             "validation_tolerance": 0.001
           },
-          "fail_on_bad_fit": true,
-          "fx": {
-            "pivot_currency": "USD",
-            "enable_triangulation": true,
-            "cache_capacity": 256
-          }
+          "fail_on_bad_fit": true
         }
       },
       "market_data": [
@@ -7942,7 +7870,7 @@
   },
   {
     "source": "finstack-quant/calibration/examples/market_bootstrap/12_full_credit_desk_market.json",
-    "sha256": "ab50d5d2ede48989a84400348588baba0e989c74e8f12d04d75c09d1b01d283c",
+    "sha256": "1911f0950d6502e6883c3c6937d0851d439fd90e96dc89f8a7ede4ab5bbc31f9",
     "input": {
       "$schema": "../../schemas/calibration/1/calibration.schema.json",
       "schema": "finstack_quant.calibration/1",
@@ -8089,7 +8017,6 @@
           "fail_on_bad_fit": true,
           "fx": {
             "pivot_currency": "USD",
-            "enable_triangulation": true,
             "cache_capacity": 256
           }
         }
@@ -8681,7 +8608,6 @@
                   },
                   "fx": {
                     "cache_capacity": 256,
-                    "enable_triangulation": true,
                     "pivot_currency": "USD"
                   },
                   "hazard_curve": {
@@ -8854,7 +8780,6 @@
           "fx": {
             "config": {
               "pivot_currency": "USD",
-              "enable_triangulation": true,
               "cache_capacity": 256
             },
             "quotes": [
@@ -9202,12 +9127,7 @@
           "vol_surface": {
             "validation_tolerance": 0.001
           },
-          "fail_on_bad_fit": true,
-          "fx": {
-            "pivot_currency": "USD",
-            "enable_triangulation": true,
-            "cache_capacity": 256
-          }
+          "fail_on_bad_fit": true
         }
       },
       "market_data": [

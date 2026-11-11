@@ -141,9 +141,8 @@ The facade is mostly a re-export map, but not purely: `exports/portfolio.js` reb
 `InstrumentArtifactCache` when the caller omits one or passes `null`. `exports/core.js` likewise
 makes the context of `DayCount.yearFraction` / `signedYearFraction` optional
 (the raw methods require a `DayCountContext`; the facade passes the Rust-default
-`new DayCountContext()`), and likewise the policy of
-`FxMatrix.rate(base, quote, date, policy?)` (the Rust-default
-`new FxConversionPolicy()`, cashflow date). wasm-bindgen cannot take an optional handle by
+`new DayCountContext()`). `FxMatrix.rate` takes a required policy: there is no
+default FX conversion policy. wasm-bindgen cannot take an optional handle by
 reference (and a by-value `Option<Handle>` consumes the caller's object), so
 optional handle arguments are completed here; the Rust parameter is declared
 optional with `unchecked_optional_param_type`. Check the facade before

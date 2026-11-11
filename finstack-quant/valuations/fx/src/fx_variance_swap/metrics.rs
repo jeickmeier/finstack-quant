@@ -218,7 +218,7 @@ mod expected_variance_tests {
         let market = MarketContext::new()
             .insert(usd)
             .insert(eur)
-            .insert_fx(FxMatrix::new(Arc::new(provider)))
+            .insert_fx(FxMatrix::new(Arc::new(provider), None))
             .insert_series(series)
             .insert_surface(surface);
 

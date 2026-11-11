@@ -498,7 +498,7 @@ impl PyModelBuilder {
         let parsed: FxConversionPolicy =
             finstack_quant_core::wire::serde_parse(policy).map_err(|e| {
                 value_error(format!(
-                    "invalid fx_policy {policy:?}: {e}; expected one of cashflow_date, period_end, period_average"
+                    "invalid fx_policy {policy:?}: {e}; expected one of cashflow_date, period_end"
                 ))
             })?;
         slf.builder_mut()?.fx_policy(parsed);

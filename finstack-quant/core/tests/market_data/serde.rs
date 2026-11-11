@@ -85,7 +85,7 @@ fn market_context_snapshot_propagates_unstable_fx_revision_errors() {
 
     let matrix = FxMatrix::try_with_config(
         Arc::new(UpdatingSnapshotProvider(AtomicU64::new(0))),
-        FxConfig::default(),
+        FxConfig::new(Some(Currency::USD)),
     )
     .expect("valid FX config");
     let market = MarketContext::new().insert_fx(matrix);
@@ -199,7 +199,8 @@ fn market_context_roundtrip() {
     fx_provider
         .set_quotes(&[(Currency::USD, Currency::EUR, 1.1)])
         .expect("valid test quote");
-    let fx = FxMatrix::try_with_config(fx_provider, FxConfig::default()).expect("valid FxConfig");
+    let fx = FxMatrix::try_with_config(fx_provider, FxConfig::new(Some(Currency::USD)))
+        .expect("valid FxConfig");
 
     let ctx = MarketContext::new()
         .insert(discount)
@@ -571,15 +572,8 @@ fn market_context_restore_reports_every_credit_index_reference_without_truncatio
 #[test]
 fn market_context_restore_uses_quote_only_fx_snapshot() {
     let fx_provider = Arc::new(SimpleFxProvider::new());
-    let fx = FxMatrix::try_with_config(
-        fx_provider,
-        FxConfig {
-            enable_triangulation: true,
-            pivot_currency: Currency::USD,
-            ..Default::default()
-        },
-    )
-    .expect("valid FxConfig");
+    let fx = FxMatrix::try_with_config(fx_provider, FxConfig::new(Some(Currency::USD)))
+        .expect("valid FxConfig");
     fx.set_quotes(&[(Currency::USD, Currency::EUR, 1.10)])
         .expect("valid test quote");
     fx.set_quotes(&[(Currency::USD, Currency::GBP, 0.80)])
@@ -595,7 +589,7 @@ fn market_context_restore_uses_quote_only_fx_snapshot() {
             Currency::USD,
             Currency::EUR,
             test_date(),
-            Default::default(),
+            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         ))
         .expect("captured direct quote should restore");
     assert!((direct.rate - 1.10).abs() < 1e-12);
@@ -605,7 +599,7 @@ fn market_context_restore_uses_quote_only_fx_snapshot() {
             Currency::EUR,
             Currency::USD,
             test_date(),
-            Default::default(),
+            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         ))
         .expect("reciprocal of captured quote should restore");
     assert!((reciprocal.rate - (1.0 / 1.10)).abs() < 1e-12);
@@ -615,7 +609,7 @@ fn market_context_restore_uses_quote_only_fx_snapshot() {
             Currency::EUR,
             Currency::GBP,
             test_date(),
-            Default::default(),
+            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         ))
         .expect("restored snapshot should triangulate from captured quotes");
     assert!((triangulated.rate - (1.0 / 1.10) * 0.80).abs() < 1e-12);

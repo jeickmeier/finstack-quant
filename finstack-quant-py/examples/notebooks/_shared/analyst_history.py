@@ -182,7 +182,7 @@ def history_market(as_of: date) -> MarketContext:
     market.insert(calibrated.get_discount("USD-OIS"))
     market.insert(calibrated.get_hazard("ACME-HZD"))
     market.insert_price("SPX-SPOT", quotes["spx"], "USD")
-    fx = FxMatrix()
+    fx = FxMatrix(None)
     fx.set_quotes([(Currency("EUR"), Currency("USD"), quotes["eur_usd"])])
     market.insert_fx(fx)
     return market

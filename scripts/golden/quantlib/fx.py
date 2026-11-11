@@ -103,7 +103,6 @@ def build_fx_forward() -> dict[str, Any]:
             fx={
                 "config": {
                     "pivot_currency": "USD",
-                    "enable_triangulation": True,
                     "cache_capacity": 256,
                 },
                 "quotes": [["EUR", "USD", spot]],

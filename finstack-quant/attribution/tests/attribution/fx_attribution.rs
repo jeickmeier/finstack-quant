@@ -124,7 +124,7 @@ impl Instrument for FxLinkedInstrument {
             self.base_currency,
             self.reporting_currency,
             as_of,
-            Default::default(),
+            FxConversionPolicy::CashflowDate,
         );
         let rate = fx_matrix.rate(query)?;
 
@@ -184,8 +184,8 @@ fn test_fx_attribution_parallel_internal_exposure() {
         .unwrap();
 
     // Create FX matrices with different EUR/USD rates
-    let fx_t0 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.1 }));
-    let fx_t1 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.2 }));
+    let fx_t0 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.1 }), None);
+    let fx_t1 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.2 }), None);
 
     let market_t0 = MarketContext::new().insert(curve_t0).insert_fx(fx_t0);
 
@@ -354,8 +354,8 @@ fn test_fx_attribution_cross_currency_exposure() {
         .unwrap();
 
     // Create FX matrices: EUR strengthened from 1.10 to 1.15 (EUR/USD)
-    let fx_t0 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.10 }));
-    let fx_t1 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.15 })); // EUR strengthened
+    let fx_t0 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.10 }), None);
+    let fx_t1 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.15 }), None); // EUR strengthened
 
     let market_t0 = MarketContext::new().insert(eur_curve_t0).insert_fx(fx_t0);
 
@@ -411,8 +411,8 @@ fn test_fx_attribution_cross_currency_fx_pnl_sign_and_magnitude() {
         Currency::USD,
     ));
 
-    let fx_t0 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.10 }));
-    let fx_t1 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.15 })); // EUR strengthens
+    let fx_t0 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.10 }), None);
+    let fx_t1 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.15 }), None); // EUR strengthens
 
     let market_t0 = MarketContext::new().insert_fx(fx_t0);
     let market_t1 = MarketContext::new().insert_fx(fx_t1);
@@ -466,8 +466,8 @@ fn test_fx_attribution_cross_currency_fx_pnl_weakening() {
         Currency::USD,
     ));
 
-    let fx_t0 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.10 }));
-    let fx_t1 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.05 })); // EUR weakens
+    let fx_t0 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.10 }), None);
+    let fx_t1 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.05 }), None); // EUR weakens
 
     let market_t0 = MarketContext::new().insert_fx(fx_t0);
     let market_t1 = MarketContext::new().insert_fx(fx_t1);
@@ -531,8 +531,8 @@ fn test_fx_attribution_eur_weakening() {
         .unwrap();
 
     // EUR weakened from 1.10 to 1.05 (EUR/USD)
-    let fx_t0 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.10 }));
-    let fx_t1 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.05 }));
+    let fx_t0 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.10 }), None);
+    let fx_t1 = FxMatrix::new(Arc::new(TestFxProvider { rate: 1.05 }), None);
 
     let market_t0 = MarketContext::new()
         .insert(eur_curve.clone())

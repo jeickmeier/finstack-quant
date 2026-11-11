@@ -66,7 +66,7 @@ fn build_market(equity_vol: f64, fx_vol: f64) -> MarketContext {
     provider
         .set_quotes(&[(Currency::JPY, Currency::USD, 1.0 / 150.0)])
         .expect("rate");
-    let fx = FxMatrix::new(provider);
+    let fx = FxMatrix::new(provider, None);
 
     MarketContext::new()
         .insert(usd)

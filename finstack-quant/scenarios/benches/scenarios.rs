@@ -81,7 +81,7 @@ fn create_base_market() -> MarketContext {
             .expect("valid rate");
         p
     });
-    let fx_matrix = FxMatrix::new(fx_provider);
+    let fx_matrix = FxMatrix::new(fx_provider, None);
 
     // Vol surface
     let vol_surface = VolSurface::builder("SPX_VOL")

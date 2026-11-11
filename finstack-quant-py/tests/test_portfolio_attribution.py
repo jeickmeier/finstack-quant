@@ -57,7 +57,7 @@ def _market(currency: str, as_of: str, shift: float = 0.0, fx: float | None = No
         )
     )
     if fx is not None:
-        matrix = FxMatrix()
+        matrix = FxMatrix(None)
         matrix.set_quotes([(Currency("EUR"), Currency("USD"), fx)])
         market.insert_fx(matrix)
     return market

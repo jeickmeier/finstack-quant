@@ -115,7 +115,7 @@ pub(crate) fn pv_mtm_reset_raw(
                     cashflow.amount.currency(),
                     swap.reporting_currency,
                     as_of,
-                    Default::default(),
+                    finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
                 ))?
                 .rate
         };
@@ -182,7 +182,7 @@ fn project_mtm_cashflows(
             resetting_leg.notional.currency(),
             constant_leg.notional.currency(),
             as_of,
-            Default::default(),
+            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         ))?
         .rate;
 

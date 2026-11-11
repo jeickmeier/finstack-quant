@@ -93,7 +93,7 @@ const FX_MARKET = JSON.stringify({
     discountCurve('USD-OIS', '2025-01-15', 0.04),
   ],
   fx: {
-    config: { pivot_currency: 'USD', enable_triangulation: true, cache_capacity: 256 },
+    config: { pivot_currency: 'USD', cache_capacity: 256 },
     quotes: [['EUR', 'USD', 1.1]],
     provider_quotes: [],
     provider_pinned_quotes: [],
@@ -675,7 +675,7 @@ test('calibration content hashes match the Python/Rust hashes', () => {
   );
   assert.equal(
     calibration.calibrationEnvelopeContentHash(envelope),
-    'sha256:1a2770b3a76c599a34734acec1254c197b2c0d13d500baf250b096bf5cd350ae'
+    'sha256:a1a010587b1cd2855db0e2ad1900568f0219cc65dfb0864d122f81da00fc7872'
   );
   // The solved residuals differ from the native build in the last bits
   // (wasm32 libm), so the result hash is pinned against its own JSON text:

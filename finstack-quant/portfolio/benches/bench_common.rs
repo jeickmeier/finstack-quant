@@ -329,11 +329,14 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
 
     // FX rates shift slightly between T0 and T1
     let fx_shift = rate_shift * 10.0; // small EUR/USD move
-    let fx = FxMatrix::new(Arc::new(SimpleFxProvider {
-        eur_usd: 1.10 + fx_shift,
-        gbp_usd: 1.25 + fx_shift,
-        jpy_usd: 0.0067,
-    }));
+    let fx = FxMatrix::new(
+        Arc::new(SimpleFxProvider {
+            eur_usd: 1.10 + fx_shift,
+            gbp_usd: 1.25 + fx_shift,
+            jpy_usd: 0.0067,
+        }),
+        None,
+    );
     let aapl_history = ScalarTimeSeries::new(
         "AAPL",
         (-2_i64..=260)

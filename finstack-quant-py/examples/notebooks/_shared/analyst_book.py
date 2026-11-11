@@ -303,7 +303,7 @@ def build_market(stage: str = "base", as_of: date = AS_OF) -> MarketContext:
             day_count="act_365f",
         )
     )
-    fx = FxMatrix()
+    fx = FxMatrix(None)
     fx.set_quotes([(Currency("EUR"), Currency("USD"), 1.08)])
     market.insert_fx(fx)
     # Overnight observations enter with the first compounding lesson, before

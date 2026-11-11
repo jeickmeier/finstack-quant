@@ -51,7 +51,7 @@ fn build_test_market() -> MarketContext {
         .expect("USD curve should build");
 
     // Build FX matrix
-    let fx = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }));
+    let fx = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }), None);
 
     // Build market context
     MarketContext::new().insert(usd_curve).insert_fx(fx)

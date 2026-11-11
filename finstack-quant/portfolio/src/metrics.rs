@@ -715,7 +715,7 @@ mod tests {
         provider
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.08)])
             .expect("quote should set");
-        let market = MarketContext::new().insert_fx(FxMatrix::new(provider));
+        let market = MarketContext::new().insert_fx(FxMatrix::new(provider, None));
 
         let rate = fx_rate_for_position(&position_value, Currency::USD, &market, as_of)
             .expect("rate should resolve");
@@ -795,7 +795,7 @@ mod tests {
             provenance: None,
         };
         let market =
-            MarketContext::new().insert_fx(FxMatrix::new(Arc::new(SimpleFxProvider::new())));
+            MarketContext::new().insert_fx(FxMatrix::new(Arc::new(SimpleFxProvider::new()), None));
 
         let error = aggregate_metrics(&valuation, &market)
             .expect_err("both positions have missing FX quotes");

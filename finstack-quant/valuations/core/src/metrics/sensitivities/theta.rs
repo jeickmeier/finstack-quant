@@ -385,7 +385,7 @@ mod tests {
             }
         }
         let market = finstack_quant_core::market_data::context::MarketContext::new()
-            .insert_fx(FxMatrix::new(std::sync::Arc::new(DatedFx)));
+            .insert_fx(FxMatrix::new(std::sync::Arc::new(DatedFx), None));
         let mut euro_receipt = test_flow(2, 100.0, CFKind::Fixed);
         euro_receipt.amount = Money::from((100_i64, Currency::EUR));
         let mut euro_payment = test_flow(3, -50.0, CFKind::Fixed);

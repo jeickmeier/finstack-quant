@@ -426,7 +426,7 @@ mod tests {
         provider
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("valid rate");
-        let fx = FxMatrix::new(Arc::new(provider));
+        let fx = FxMatrix::new(Arc::new(provider), None);
         MarketContext::new()
             .insert(usd_curve)
             .insert(eur_curve)
@@ -452,7 +452,7 @@ mod tests {
         let strikes: Vec<_> = (1..=400).map(|i| f64::from(i) * 0.01).collect();
         let vols = vec![volatility; strikes.len()];
         market
-            .insert_fx(FxMatrix::new(Arc::new(provider)))
+            .insert_fx(FxMatrix::new(Arc::new(provider), None))
             .insert_surface(
                 VolSurface::builder("EURUSD-VOL")
                     .expiries(&[1.0, 3.0])
@@ -741,7 +741,7 @@ mod tests {
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.02)])
             .expect("spot");
         let market = zero_rate_market(as_of, 0.2)
-            .insert_fx(FxMatrix::new(Arc::new(provider)))
+            .insert_fx(FxMatrix::new(Arc::new(provider), None))
             .insert_series(ScalarTimeSeries::new("EURUSD", observations, None).expect("series"));
         let q =
             cumulative_variation(&swap, &market, as_of, swap.maturity).expect("future variation");
@@ -1064,7 +1064,7 @@ mod tests {
         let market = MarketContext::new()
             .insert(usd_curve)
             .insert(eur_curve)
-            .insert_fx(FxMatrix::new(Arc::new(provider)))
+            .insert_fx(FxMatrix::new(Arc::new(provider), None))
             .insert_surface(surface);
 
         let swap = FxVarianceSwap::builder()
@@ -1236,7 +1236,7 @@ mod tests {
         let market = MarketContext::new()
             .insert(usd_curve)
             .insert(eur_curve)
-            .insert_fx(FxMatrix::new(Arc::new(provider)))
+            .insert_fx(FxMatrix::new(Arc::new(provider), None))
             .insert_surface(surface);
 
         let swap = FxVarianceSwap::builder()

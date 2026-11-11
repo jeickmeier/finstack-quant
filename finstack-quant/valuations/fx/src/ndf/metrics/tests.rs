@@ -44,7 +44,7 @@ fn market_with_quote(as_of: Date, from: Currency, to: Currency, rate: f64) -> Ma
     provider
         .set_quotes(&[(from, to, rate)])
         .expect("valid rate");
-    curves(as_of).insert_fx(FxMatrix::new(provider))
+    curves(as_of).insert_fx(FxMatrix::new(provider, None))
 }
 
 fn fx01_of(ndf: &Ndf, market: &MarketContext, as_of: Date) -> f64 {

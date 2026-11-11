@@ -14605,15 +14605,18 @@ export type FutureOptionSettlement =
       underlying_settlement_price?: number | null;
     };
 /**
- * Standard FX conversion strategies used to hint FX providers.
+ * Provider-selection purpose of a point-date FX query (record
+ * CORE-CONVENTIONS-013 #1/#2).
  *
- * The policy tells a provider *how* the rate will be applied so it can decide
- * between spot, forward, or averaged sources.
+ * The policy tells a provider which source purpose the rate serves; it does
+ * not calculate dates or choose spot versus forward. There is no default:
+ * every query names its policy. Period averages are not point queries; an
+ * owner that needs one computes the oriented aggregate itself.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "FxConversionPolicy".
  */
-export type FxConversionPolicy = "cashflow_date" | "period_end" | "period_average";
+export type FxConversionPolicy = "cashflow_date" | "period_end";
 /**
  * Pair/venue FX delta quoting convention selected by the contract.
  *
@@ -56737,7 +56740,7 @@ export interface BasketPricingConfig {
   /**
    * FX policy hint for conversions when constituent currency != basket currency.
    */
-  fx_policy: "cashflow_date" | "period_end" | "period_average";
+  fx_policy: "cashflow_date" | "period_end";
 }
 /**
  * Scenario-only pricing adjustments.
@@ -56781,7 +56784,7 @@ export interface BasketPricingConfig1 {
   /**
    * FX policy hint for conversions when constituent currency != basket currency.
    */
-  fx_policy: "cashflow_date" | "period_end" | "period_average";
+  fx_policy: "cashflow_date" | "period_end";
 }
 /**
  * Bermudan exercise schedule specification.

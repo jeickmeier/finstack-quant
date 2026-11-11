@@ -1581,8 +1581,8 @@
   },
   "core.FxConversionPolicy": {
     "kind": "class",
-    "constructor": true,
-    "statics": ["cashflowDate", "fromName", "periodAverage", "periodEnd"],
+    "constructor": false,
+    "statics": ["cashflowDate", "fromName", "periodEnd"],
     "methods": ["free", "toString"],
     "getters": []
   },

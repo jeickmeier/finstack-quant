@@ -156,7 +156,12 @@ pub(crate) fn build_initial_context(
             explicit_quote_count = fx_quotes.len(),
             "building MarketContext FX as quote-only snapshot (canonical envelope)"
         );
-        let matrix = FxMatrix::try_with_config(Arc::new(SimpleFxProvider::new()), settings.fx)?;
+        let config = settings.fx.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "FX spot quotes require an explicit `fx` configuration (pivot_currency, or null for direct quotes only)".to_string(),
+            )
+        })?;
+        let matrix = FxMatrix::try_with_config(Arc::new(SimpleFxProvider::new()), config)?;
         matrix.set_quotes(&fx_quotes)?;
         ctx.insert_fx_mut(matrix);
     }
@@ -251,9 +256,16 @@ mod tests {
             to: Currency::USD,
             rate: 1.085,
         })];
-        let cfg = CalibrationConfig::default();
+        // FX quotes need an explicit routing choice (record 013 #5).
+        let mut cfg = CalibrationConfig::default();
+        let error = build_initial_context(&[], &data, &cfg).expect_err("no fx configuration");
+        assert!(
+            error.to_string().contains("explicit `fx` configuration"),
+            "{error}"
+        );
+        cfg.fx = Some(finstack_quant_core::money::fx::FxConfig::new(None));
         let ctx = build_initial_context(&[], &data, &cfg).expect("build succeeds");
-        assert!(ctx.fx().is_some());
+        assert_eq!(ctx.fx().expect("fx").config().pivot_currency, None);
     }
 
     #[test]

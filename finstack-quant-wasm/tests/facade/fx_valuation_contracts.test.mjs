@@ -42,7 +42,7 @@ function market(domesticRate = 0.04, foreignRate = 0.02) {
   }));
   state.prices = { 'EURUSD-SPOT': { unitless: 1.1 } };
   state.fx = {
-    config: {},
+    config: { pivot_currency: null },
     quotes: [['EUR', 'USD', 1.1]],
     provider_quotes: [],
     provider_pinned_quotes: [],

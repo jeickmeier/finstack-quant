@@ -155,15 +155,15 @@ def test_discount_curve_validation_mode_defaults_in_rust() -> None:
 
 
 def test_fx_matrix_from_dict_uses_the_rust_currency_pair_parser() -> None:
-    matrix = FxMatrix.from_dict({"EURUSD": 1.1, "GBP/USD": 1.25})
-    assert matrix.rate("GBP", "USD", dt.date(2025, 1, 2)).rate == 1.25
+    matrix = FxMatrix.from_dict({"EURUSD": 1.1, "GBP/USD": 1.25}, None)
+    assert matrix.rate("GBP", "USD", dt.date(2025, 1, 2), "cashflow_date").rate == 1.25
     assert matrix.rate("EUR", "USD", dt.date(2025, 1, 2), "cashflow_date").rate == 1.1
     # Six bytes but not six characters: a ValueError, never a PanicException.
     for key in ["é€x", "EURUS"]:
         with _raises_exactly(f'Validation error: invalid FX pair "{key}": expected "EURUSD" or "EUR/USD"'):
-            FxMatrix.from_dict({key: 1.0})
+            FxMatrix.from_dict({key: 1.0}, None)
     with _raises_exactly(_unknown_currency("XYZ")):
-        FxMatrix.from_dict({"EUR/XYZ": 1.0})
+        FxMatrix.from_dict({"EUR/XYZ": 1.0}, None)
 
 
 def test_realized_variance_defaults_are_rust_owned() -> None:

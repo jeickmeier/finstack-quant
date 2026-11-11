@@ -379,7 +379,6 @@
             },
             "fx": {
               "cache_capacity": 256,
-              "enable_triangulation": true,
               "pivot_currency": "USD"
             },
             "hazard_curve": {
@@ -783,7 +782,6 @@
             },
             "fx": {
               "cache_capacity": 256,
-              "enable_triangulation": true,
               "pivot_currency": "USD"
             },
             "hazard_curve": {

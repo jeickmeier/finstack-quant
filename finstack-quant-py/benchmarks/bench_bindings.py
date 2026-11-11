@@ -626,12 +626,12 @@ class TestCoreBenchmarks:
         )
 
     def test_fx_matrix_rate(self, benchmark) -> None:
-        fx = FxMatrix()
+        fx = FxMatrix(None)
         fx.set_quotes([("USD", "EUR", 0.92)])
         ref_date = date(2024, 6, 15)
         _ccm_bench(
             benchmark,
-            lambda: fx.rate("USD", "EUR", ref_date),
+            lambda: fx.rate("USD", "EUR", ref_date, "cashflow_date"),
             _ccm._fx,
             parameters={
                 "quotes": [["USD", "EUR", 0.92]],

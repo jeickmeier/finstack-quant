@@ -534,7 +534,7 @@ fn fx_market(as_of: Date, usd_rate: f64, eur_rate: f64, spot_eur_usd: f64) -> Ma
     MarketContext::new()
         .insert(flat_discount_curve("USD-OIS", as_of, usd_rate))
         .insert(flat_discount_curve("EUR-OIS", as_of, eur_rate))
-        .insert_fx(FxMatrix::new(Arc::new(FixedEurUsd(spot_eur_usd))))
+        .insert_fx(FxMatrix::new(Arc::new(FixedEurUsd(spot_eur_usd)), None))
 }
 
 /// Total-P&L tolerance for the FX-forward parity (USD on $1.1M EUR notional).

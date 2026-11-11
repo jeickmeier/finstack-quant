@@ -527,7 +527,6 @@
         "fx": {
           "config": {
             "cache_capacity": 256,
-            "enable_triangulation": true,
             "pivot_currency": "USD"
           },
           "pinned_quotes": [],
@@ -3447,7 +3446,7 @@
     {
       "name": "floating",
       "source": "finstack-quant/valuations/tests/golden/data/pricing/regression_goldens/structured_credit/clo_mezzanine_base_case.json",
-      "sha256": "8bde35080d5faa3fa27c4eb94d4b1012b52f7fb27832052e024cf328767a4dc0",
+      "sha256": "34aa92548393eea843905bd17afa53fd301628d3fad3f7d519c6cd3c24eeb176",
       "asOf": "2026-04-30",
       "trancheId": "SENIOR",
       "marketPricePct": 25,

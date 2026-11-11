@@ -602,13 +602,12 @@ impl JsModelBuilder {
     ///
     /// Twin of Python `ModelBuilder.fx_policy` (Rust `ModelBuilder::fx_policy`).
     ///
-    /// @param policy - `"cashflow_date"`, `"period_end"` or `"period_average"`.
+    /// @param policy - `"cashflow_date"` or `"period_end"`.
     /// @throws Error with kind `validation` if `policy` is not a known policy or the builder was consumed.
     #[wasm_bindgen(js_name = fxPolicy)]
     pub fn fx_policy(
         &mut self,
-        #[wasm_bindgen(unchecked_param_type = "'cashflow_date' | 'period_end' | 'period_average'")]
-        policy: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "'cashflow_date' | 'period_end'")] policy: JsValue,
     ) -> Result<(), JsValue> {
         let policy: finstack_quant_core::money::fx::FxConversionPolicy =
             js_wire(&policy, "policy")?;

@@ -2822,12 +2822,15 @@ export type CurveState =
       type: "parametric";
     };
 /**
- * Standard FX conversion strategies used to hint FX providers.
+ * Provider-selection purpose of a point-date FX query (record
+ * CORE-CONVENTIONS-013 #1/#2).
  *
- * The policy tells a provider *how* the rate will be applied so it can decide
- * between spot, forward, or averaged sources.
+ * The policy tells a provider which source purpose the rate serves; it does
+ * not calculate dates or choose spot versus forward. There is no default:
+ * every query names its policy. Period averages are not point queries; an
+ * owner that needs one computes the oriented aggregate itself.
  */
-export type FxConversionPolicy = "cashflow_date" | "period_end" | "period_average";
+export type FxConversionPolicy = "cashflow_date" | "period_end";
 /**
  * Numeric schema revision for contracts whose sole supported revision is v1.
  */
@@ -4454,9 +4457,12 @@ export interface CalibrationConfig {
    */
   forward_curve?: ForwardCurveSolveConfig;
   /**
-   * FX matrix runtime config (pivot currency, triangulation, cache capacity).
+   * FX matrix config (explicit routing pivot and cache capacity) for a
+   * market built from FX spot quotes. `None` (the key omitted) supplies no
+   * FX configuration: building an FX matrix from quotes then errors rather
+   * than inferring a pivot (record CORE-CONVENTIONS-013 #5).
    */
-  fx?: FxConfig;
+  fx?: FxConfig | null;
   /**
    * Hazard-curve specific solver configuration.
    */
@@ -4609,9 +4615,12 @@ export interface ForwardCurveSolveConfig {
   weighting_scheme?: ResidualWeightingScheme;
 }
 /**
- * Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour.
+ * Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour
+ * (record CORE-CONVENTIONS-013 #5, resolution O9).
  *
- * Controls triangulation and caching.
+ * The routing choice is explicit: there is no default pivot and no default
+ * configuration. `cache_capacity` may be omitted on the wire and then takes
+ * the operational default.
  */
 export interface FxConfig {
   /**
@@ -4619,21 +4628,14 @@ export interface FxConfig {
    */
   cache_capacity?: number;
   /**
-   * Whether to enable automatic triangulation for missing rates.
+   * Single pivot for `from -> pivot -> to` cross routing, or `None` for
+   * direct quotes only. Required on the wire (`null` disables routing).
    *
-   * When enabled, the matrix will attempt `from -> pivot -> to` and will not
-   * search multi-hop paths or alternative pivots.
+   * Only this one pivot is tried: no alternative pivot, multi-hop search or
+   * market-order inference. A pair whose market convention routes through
+   * another currency needs its direct quote seeded explicitly.
    */
-  enable_triangulation?: boolean;
-  /**
-   * Pivot currency for triangulation fallback (typically USD).
-   *
-   * Current limitation: triangulation uses this single configured pivot only.
-   * If a market convention requires a different routing currency for a given
-   * pair, callers must seed that direct quote explicitly instead of relying on
-   * automatic cross construction.
-   */
-  pivot_currency?: valuations.Currency;
+  pivot_currency: valuations.Currency | null;
 }
 /**
  * Hazard-curve specific numerical solver configuration.

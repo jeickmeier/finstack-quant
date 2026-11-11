@@ -96,7 +96,7 @@ pub(crate) fn collect_fx_forward_inputs(
                 request.base_currency,
                 request.quote_currency,
                 request.as_of,
-                Default::default(),
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
             ))?
             .rate
     };
@@ -205,7 +205,7 @@ pub(crate) fn resolve_fx_spot(
                     base_currency,
                     quote_currency,
                     as_of,
-                    Default::default(),
+                    finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
                 ))?
                 .rate
         }
@@ -484,7 +484,7 @@ pub(crate) fn fx_valuation_details(
                     base_currency,
                     quote_currency,
                     as_of,
-                    Default::default(),
+                    finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
                 ))
                 .ok()
             })
@@ -588,7 +588,7 @@ mod tests {
         provider
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
             .expect("valid rate");
-        let fx = FxMatrix::new(provider);
+        let fx = FxMatrix::new(provider, None);
         MarketContext::new()
             .insert(discount)
             .insert(foreign)

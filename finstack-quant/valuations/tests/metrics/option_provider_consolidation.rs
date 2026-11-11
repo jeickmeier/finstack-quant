@@ -182,13 +182,13 @@ fn build_fx_market(
     provider
         .set_quotes(&[(Currency::EUR, Currency::USD, spot)])
         .expect("fx quote should build");
-    let fx_matrix = FxMatrix::new(provider);
+    let fx_matrix = FxMatrix::new(provider, None);
     let _ = fx_matrix
         .rate(FxQuery::new(
             Currency::EUR,
             Currency::USD,
             as_of,
-            Default::default(),
+            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         ))
         .expect("fx rate should exist");
 

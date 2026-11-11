@@ -298,25 +298,19 @@ export default [
   {
     "path": "#/$defs/d_1ec33fbdab11dd6751bf",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxConversionPolicy",
-    "description": "Standard FX conversion strategies used to hint FX providers.\n\nThe policy tells a provider *how* the rate will be applied so it can decide\nbetween spot, forward, or averaged sources."
+    "description": "Provider-selection purpose of a point-date FX query (record\nCORE-CONVENTIONS-013 #1/#2).\n\nThe policy tells a provider which source purpose the rate serves; it does\nnot calculate dates or choose spot versus forward. There is no default:\nevery query names its policy. Period averages are not point queries; an\nowner that needs one computes the oriented aggregate itself."
   },
   {
     "path": "#/$defs/d_1ec33fbdab11dd6751bf/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxConversionPolicy/oneOf/0",
     "const": "cashflow_date",
-    "description": "Use spot/forward on the cashflow date."
+    "description": "The rate applicable on a cashflow's own date."
   },
   {
     "path": "#/$defs/d_1ec33fbdab11dd6751bf/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxConversionPolicy/oneOf/1",
     "const": "period_end",
-    "description": "Use period end date."
-  },
-  {
-    "path": "#/$defs/d_1ec33fbdab11dd6751bf/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxConversionPolicy/oneOf/2",
-    "const": "period_average",
-    "description": "Use an average over the period."
+    "description": "The rate applicable on a reporting period's closing date."
   },
   {
     "path": "#/$defs/d_1ed5efdf996631ea5784",
@@ -935,7 +929,7 @@ export default [
   {
     "path": "#/$defs/d_7fbd5a62c7c39ad98666",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxConfig",
-    "description": "Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour.\n\nControls triangulation and caching."
+    "description": "Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour\n(record CORE-CONVENTIONS-013 #5, resolution O9).\n\nThe routing choice is explicit: there is no default pivot and no default\nconfiguration. `cache_capacity` may be omitted on the wire and then takes\nthe operational default.\n\n# Examples\n\n```rust\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::fx::FxConfig;\n\nassert_eq!(FxConfig::new(Some(Currency::USD)).pivot_currency, Some(Currency::USD));\nassert!(serde_json::from_str::<FxConfig>(\"{}\").is_err());\nlet direct: FxConfig = serde_json::from_str(r#\"{\"pivot_currency\": null}\"#)?;\nassert_eq!(direct.pivot_currency, None);\n# Ok::<(), serde_json::Error>(())\n```"
   },
   {
     "path": "#/$defs/d_7fbd5a62c7c39ad98666/properties/cache_capacity",
@@ -946,18 +940,19 @@ export default [
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_7fbd5a62c7c39ad98666/properties/enable_triangulation",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxConfig/properties/enable_triangulation",
-    "default": true,
-    "description": "Whether to enable automatic triangulation for missing rates.\n\nWhen enabled, the matrix will attempt `from -> pivot -> to` and will not\nsearch multi-hop paths or alternative pivots."
-  },
-  {
     "path": "#/$defs/d_7fbd5a62c7c39ad98666/properties/pivot_currency",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxConfig/properties/pivot_currency",
-    "default": "USD",
-    "description": "Pivot currency for triangulation fallback (typically USD).\n\nCurrent limitation: triangulation uses this single configured pivot only.\nIf a market convention requires a different routing currency for a given\npair, callers must seed that direct quote explicitly instead of relying on\nautomatic cross construction.",
+    "description": "Single pivot for `from -> pivot -> to` cross routing, or `None` for\ndirect quotes only. Required on the wire (`null` disables routing).\n\nOnly this one pivot is tried: no alternative pivot, multi-hop search or\nmarket-order inference. A pair whose market convention routes through\nanother currency needs its direct quote seeded explicitly."
+  },
+  {
+    "path": "#/$defs/d_7fbd5a62c7c39ad98666/properties/pivot_currency/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxConfig/properties/pivot_currency/anyOf/0",
     "ref": "#/$defs/Currency",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Currency"
+  },
+  {
+    "path": "#/$defs/d_7fbd5a62c7c39ad98666/properties/pivot_currency/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxConfig/properties/pivot_currency/anyOf/1"
   },
   {
     "path": "#/$defs/d_8292ddf9415f5b0b91bb",

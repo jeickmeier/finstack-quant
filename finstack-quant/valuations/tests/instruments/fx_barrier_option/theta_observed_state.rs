@@ -52,7 +52,7 @@ fn eurusd_spot(market: &MarketContext, as_of: Date) -> f64 {
             Currency::EUR,
             Currency::USD,
             as_of,
-            Default::default(),
+            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         ))
         .expect("EURUSD quote")
         .rate

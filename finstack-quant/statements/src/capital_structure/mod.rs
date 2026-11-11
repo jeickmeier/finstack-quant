@@ -20,9 +20,10 @@
 //! - `cs.debt_balance.total` - Total outstanding debt balance
 //!
 //! Cashflows are classified by `CFKind` from `finstack-quant-cashflows`. Outstanding
-//! balances use `outstanding_by_date()`. Omitted `fx_policy` converts already-
-//! aggregated `cs.*` cash items and balances on the inclusive period-end date
-//! (`PeriodEnd`), not per contractual cashflow date.
+//! balances use `outstanding_by_date()`. Already-aggregated `cs.*` cash items
+//! and balances convert on the inclusive period-end date with the explicit
+//! `fx_policy`, not per contractual cashflow date; a cross-currency
+//! conversion without a policy is an error.
 //!
 //! ## Limitations
 //! - Waterfall allocation is pro-rata inside each payment class, walking class

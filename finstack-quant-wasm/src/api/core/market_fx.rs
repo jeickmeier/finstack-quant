@@ -26,22 +26,13 @@ use wasm_bindgen::prelude::*;
 /// console.log(policy.toString());
 /// ```
 #[wasm_bindgen(js_name = FxConversionPolicy)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct JsFxConversionPolicy {
     inner: RustFxConversionPolicy,
 }
 
 #[wasm_bindgen(js_class = FxConversionPolicy)]
 impl JsFxConversionPolicy {
-    /// The Rust default policy (`FxConversionPolicy::default()`, cashflow date).
-    ///
-    /// @returns The default conversion policy, the one `FxMatrix.rate` uses
-    /// when `policy` is omitted.
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Use spot/forward on the cashflow date.
     /// @returns An `FxConversionPolicy` handle.
     #[wasm_bindgen(js_name = cashflowDate)]
@@ -60,22 +51,13 @@ impl JsFxConversionPolicy {
         }
     }
 
-    /// Use an average over the period.
-    /// @returns An `FxConversionPolicy` handle.
-    #[wasm_bindgen(js_name = periodAverage)]
-    pub fn period_average() -> Self {
-        Self {
-            inner: RustFxConversionPolicy::PeriodAverage,
-        }
-    }
-
     /// Parse from a string label such as ``\"cashflow_date\"``.
-    /// @param name - Policy label: `cashflow_date`, `period_end`, or `period_average`.
+    /// @param name - Policy label: `cashflow_date` or `period_end`.
     ///
     /// # Errors
     ///
-    /// Throws a JavaScript exception unless `name` is `cashflow_date`,
-    /// `period_end`, or `period_average`.
+    /// Throws a JavaScript exception unless `name` is `cashflow_date` or
+    /// `period_end`.
     /// @returns An `FxConversionPolicy` handle.
     #[wasm_bindgen(js_name = fromName)]
     pub fn from_name(
@@ -102,7 +84,7 @@ impl JsFxConversionPolicy {
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
-/// const matrix = new core.FxMatrix();
+/// const matrix = new core.FxMatrix(null);
 /// matrix.setQuotes([["EUR", "USD", 1.1]]);
 /// const result = matrix.rate(
 ///   "EUR",
@@ -327,30 +309,58 @@ pub fn invert_fx_rate(
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
-/// const matrix = new core.FxMatrix();
+/// const matrix = new core.FxMatrix(null);
 /// matrix.setQuotes([["EUR", "USD", 1.1]]);
-/// console.log(matrix.rate("EUR", "USD", "2026-01-02").rate);
+/// const policy = core.FxConversionPolicy.cashflowDate();
+/// console.log(matrix.rate("EUR", "USD", "2026-01-02", policy).rate);
 /// ```
 #[wasm_bindgen(js_name = FxMatrix)]
 pub struct JsFxMatrix {
     pub(crate) inner: Arc<RustFxMatrix>,
 }
 
-impl Default for JsFxMatrix {
-    fn default() -> Self {
-        Self::new()
+/// The required routing choice: `null` disables routing, a string names the
+/// pivot, and `undefined` (an omitted choice) is rejected.
+fn required_pivot(
+    value: &JsValue,
+    label: &str,
+) -> Result<Option<finstack_quant_core::currency::Currency>, JsValue> {
+    if value.is_undefined() {
+        return Err(crate::utils::input::invalid_type(
+            label,
+            "a currency code or null (no default pivot)",
+        ));
     }
+    if value.is_null() {
+        return Ok(None);
+    }
+    crate::utils::input::js_currency(value, label).map(Some)
 }
 
 #[wasm_bindgen(js_class = FxMatrix)]
 impl JsFxMatrix {
-    /// Create an empty FX matrix (Rust `FxMatrix::default`): rates come only
-    /// from quotes set on it.
+    /// Create an empty FX matrix with an explicit routing choice (Rust
+    /// `FxMatrix::new`): rates come only from quotes set on it.
+    ///
+    /// # Arguments
+    ///
+    /// * `pivot_currency` - The single cross-routing pivot, or `null` for
+    ///   direct quotes only; required (no default pivot).
+    ///
+    /// @param pivotCurrency - The single cross-routing pivot such as `"USD"`, or `null` for direct quotes only; required (no default pivot).
+    /// @returns A new empty `FxMatrix`.
+    /// @throws `TypeError` (kind `invalid_type`) if `pivotCurrency` is omitted or not a string or `null`; `FinstackError` (kind `validation`) for an unknown currency code.
     #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
-        Self {
-            inner: Arc::new(RustFxMatrix::default()),
-        }
+    pub fn new(
+        #[wasm_bindgen(js_name = "pivotCurrency", unchecked_param_type = "string | null")]
+        pivot_currency: JsValue,
+    ) -> Result<JsFxMatrix, JsValue> {
+        Ok(Self {
+            inner: Arc::new(RustFxMatrix::new(
+                Arc::new(finstack_quant_core::money::fx::SimpleFxProvider::new()),
+                required_pivot(&pivot_currency, "pivotCurrency")?,
+            )),
+        })
     }
 
     /// Set several pair-global quotes atomically (Rust `FxMatrix::set_quotes`).
@@ -396,15 +406,20 @@ impl JsFxMatrix {
     ///   rate, such as `{ "EUR/USD": 1.1, "GBPUSD": 1.27 }`. A key is
     ///   `"BASE/QUOTE"` or the six-letter compact form; the rate is the
     ///   finite, strictly positive number of quote units per one base unit.
+    /// * `pivot_currency` - The single cross-routing pivot, or `null` for
+    ///   direct quotes only; required (no default pivot).
     ///
     /// @returns A new `FxMatrix` holding every quote.
     /// @throws `TypeError` (kind `invalid_type`) if `quotes` is not a plain
     /// object or JSON text; `FinstackError` (kind `validation`) for a malformed
     /// pair key, an unknown currency code, or a non-positive or non-finite rate.
     /// @param quotes - Plain object (or its JSON text) mapping a pair to its rate, such as `{ "EUR/USD": 1.1, "GBPUSD": 1.27 }`. A key is `"BASE/QUOTE"` or the six-letter compact form; the rate is the finite, strictly positive number of quote units per one base unit.
+    /// @param pivotCurrency - The single cross-routing pivot such as `"USD"`, or `null` for direct quotes only; required (no default pivot).
     #[wasm_bindgen(js_name = fromDict)]
     pub fn from_dict(
         #[wasm_bindgen(unchecked_param_type = "Record<string, number> | string")] quotes: JsValue,
+        #[wasm_bindgen(js_name = "pivotCurrency", unchecked_param_type = "string | null")]
+        pivot_currency: JsValue,
     ) -> Result<JsFxMatrix, JsValue> {
         let quotes = from_js_json::<std::collections::BTreeMap<String, f64>>(&quotes, "quotes")?
             .into_iter()
@@ -413,7 +428,7 @@ impl JsFxMatrix {
                 Ok((pair.base, pair.quote, rate))
             })
             .collect::<Result<Vec<_>, JsValue>>()?;
-        RustFxMatrix::from_quotes(&quotes)
+        RustFxMatrix::from_quotes(&quotes, required_pivot(&pivot_currency, "pivotCurrency")?)
             .map(|matrix| Self {
                 inner: Arc::new(matrix),
             })
@@ -458,15 +473,13 @@ impl JsFxMatrix {
     /// Global quotes precede pinned fixings, then provider observations,
     /// resolving source priority before taking a reciprocal.
     ///
-    /// The published facade makes `policy` optional: when omitted it passes
-    /// `new FxConversionPolicy()`, the Rust default (cashflow date).
+    /// The policy is required: there is no default conversion policy.
     ///
     /// # Arguments
     /// * `base` - Base (from) currency ISO code.
     /// * `quote` - Quote (to) currency ISO code.
     /// * `date` - ISO date string.
-    /// * `policy` - Reusable conversion policy handle; omitted means the Rust
-    ///   default (cashflow date).
+    /// * `policy` - Required reusable conversion policy handle.
     ///
     /// # Errors
     ///
@@ -476,15 +489,13 @@ impl JsFxMatrix {
     /// @param base - Base (from) currency ISO code.
     /// @param quote - Quote (to) currency ISO code.
     /// @param date - ISO date string.
-    /// @param policy - Reusable conversion policy handle; omitted means the Rust default (cashflow date).
+    /// @param policy - Required reusable conversion policy handle.
     /// @returns Resolved FX rate, including whether it was triangulated.
     pub fn rate(
         &self,
         #[wasm_bindgen(unchecked_param_type = "string")] base: JsValue,
         #[wasm_bindgen(unchecked_param_type = "string")] quote: JsValue,
         #[wasm_bindgen(unchecked_param_type = "string")] date: JsValue,
-        // The facade (exports/core.js) defaults an omitted policy.
-        #[wasm_bindgen(unchecked_optional_param_type = "FxConversionPolicy")]
         policy: &JsFxConversionPolicy,
     ) -> Result<JsFxRateResult, JsValue> {
         let query = FxQuery::new(

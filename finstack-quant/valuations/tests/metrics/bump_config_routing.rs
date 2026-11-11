@@ -392,7 +392,7 @@ fn fx_fixture_with_strike(
     let expiries = [0.25, 0.5, 1.0, 2.0];
     let strikes = [0.9, 1.0, 1.1, 1.2, 1.3];
     let market = MarketContext::new()
-        .insert_fx(FxMatrix::new(Arc::new(FlatFx(FX_SPOT))))
+        .insert_fx(FxMatrix::new(Arc::new(FlatFx(FX_SPOT)), None))
         .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.04, 5.0))
         .insert(flat_discount_with_tenor("EUR-OIS", as_of, 0.02, 5.0))
         .insert_surface(flat_vol_surface("EURUSD-VOL", &expiries, &strikes, FX_VOL));
@@ -546,7 +546,7 @@ fn quanto_market() -> MarketContext {
             0.20,
         ))
         .insert_surface(flat_surface("JPYUSD-VOL", &[0.5, 0.8, 1.0, 1.2, 1.5], 0.10))
-        .insert_fx(FxMatrix::new(provider))
+        .insert_fx(FxMatrix::new(provider, None))
         .insert_price("NKY-DIV", MarketScalar::Unitless(0.01))
         .insert_price("NKY-SPOT", MarketScalar::Unitless(35_000.0))
         .insert_price("JPYUSD-SPOT", MarketScalar::Unitless(1.0 / 150.0))

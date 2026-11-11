@@ -96,7 +96,6 @@
       "fx": {
         "config": {
           "cache_capacity": 256,
-          "enable_triangulation": true,
           "pivot_currency": "USD"
         },
         "pinned_quotes": [],

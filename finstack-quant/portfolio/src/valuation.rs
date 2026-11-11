@@ -779,8 +779,7 @@ mod tests {
         let fx = FxMatrix::try_with_config(
             Arc::new(SimpleFxProvider::new()),
             FxConfig {
-                pivot_currency: pivot,
-                enable_triangulation: true,
+                pivot_currency: Some(pivot),
                 cache_capacity: 32,
             },
         )

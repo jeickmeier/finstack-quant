@@ -86,7 +86,7 @@ impl FxSwapPricingContext {
                     swap.base_currency,
                     swap.quote_currency,
                     as_of,
-                    Default::default(),
+                    finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
                 ))?
                 .rate
         } else {
@@ -256,7 +256,7 @@ mod tests {
         let market = MarketContext::new()
             .insert(usd)
             .insert(eur)
-            .insert_fx(FxMatrix::new(Arc::new(provider)));
+            .insert_fx(FxMatrix::new(Arc::new(provider), None));
         let mut swap = FxSwap::builder()
             .id(InstrumentId::new("FUTURE-NEAR"))
             .base_currency(Currency::EUR)
@@ -375,7 +375,7 @@ mod tests {
         let market = MarketContext::new()
             .insert(usd)
             .insert(eur)
-            .insert_fx(FxMatrix::new(Arc::new(provider)));
+            .insert_fx(FxMatrix::new(Arc::new(provider), None));
 
         // Off-market swap: both legs priced away from model spot/forward.
         let swap = FxSwap::builder()

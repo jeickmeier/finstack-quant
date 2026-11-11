@@ -838,12 +838,15 @@ export type DB205675B4D5Addcd52Ba = "senior_secured" | "senior" | "subordinated"
  */
 export type D_33Ee2F2E4664717E30Ef = string;
 /**
- * Standard FX conversion strategies used to hint FX providers.
+ * Provider-selection purpose of a point-date FX query (record
+ * CORE-CONVENTIONS-013 #1/#2).
  *
- * The policy tells a provider *how* the rate will be applied so it can decide
- * between spot, forward, or averaged sources.
+ * The policy tells a provider which source purpose the rate serves; it does
+ * not calculate dates or choose spot versus forward. There is no default:
+ * every query names its policy. Period averages are not point queries; an
+ * owner that needs one computes the oriented aggregate itself.
  */
-export type D_1Ec33Fbdab11Dd6751Bf = "cashflow_date" | "period_end" | "period_average";
+export type D_1Ec33Fbdab11Dd6751Bf = "cashflow_date" | "period_end";
 /**
  * Single market observable that doesn't require a full curve.
  *
@@ -1742,175 +1745,14 @@ export interface D_7Fbd5A62C7C39Ad98666 {
    */
   cache_capacity?: number;
   /**
-   * Whether to enable automatic triangulation for missing rates.
+   * Single pivot for `from -> pivot -> to` cross routing, or `None` for
+   * direct quotes only. Required on the wire (`null` disables routing).
    *
-   * When enabled, the matrix will attempt `from -> pivot -> to` and will not
-   * search multi-hop paths or alternative pivots.
+   * Only this one pivot is tried: no alternative pivot, multi-hop search or
+   * market-order inference. A pair whose market convention routes through
+   * another currency needs its direct quote seeded explicitly.
    */
-  enable_triangulation?: boolean;
-  /**
-   * ISO 4217 currency enumeration
-   */
-  pivot_currency?:
-    | "AED"
-    | "AFN"
-    | "ALL"
-    | "AMD"
-    | "ANG"
-    | "AOA"
-    | "ARS"
-    | "AUD"
-    | "AWG"
-    | "AZN"
-    | "BAM"
-    | "BBD"
-    | "BDT"
-    | "BGN"
-    | "BHD"
-    | "BIF"
-    | "BMD"
-    | "BND"
-    | "BOB"
-    | "BRL"
-    | "BSD"
-    | "BTN"
-    | "BWP"
-    | "BYN"
-    | "BZD"
-    | "CAD"
-    | "CDF"
-    | "CHF"
-    | "CLF"
-    | "CLP"
-    | "CNY"
-    | "COP"
-    | "CRC"
-    | "CUC"
-    | "CUP"
-    | "CVE"
-    | "CZK"
-    | "DJF"
-    | "DKK"
-    | "DOP"
-    | "DZD"
-    | "EGP"
-    | "ERN"
-    | "ETB"
-    | "EUR"
-    | "FJD"
-    | "FKP"
-    | "GBP"
-    | "GEL"
-    | "GHS"
-    | "GIP"
-    | "GMD"
-    | "GNF"
-    | "GTQ"
-    | "GYD"
-    | "HKD"
-    | "HNL"
-    | "HRK"
-    | "HTG"
-    | "HUF"
-    | "IDR"
-    | "ILS"
-    | "INR"
-    | "IQD"
-    | "IRR"
-    | "ISK"
-    | "JMD"
-    | "JOD"
-    | "JPY"
-    | "KES"
-    | "KGS"
-    | "KHR"
-    | "KMF"
-    | "KPW"
-    | "KRW"
-    | "KWD"
-    | "KYD"
-    | "KZT"
-    | "LAK"
-    | "LBP"
-    | "LKR"
-    | "LRD"
-    | "LSL"
-    | "LYD"
-    | "MAD"
-    | "MDL"
-    | "MGA"
-    | "MKD"
-    | "MMK"
-    | "MNT"
-    | "MOP"
-    | "MRU"
-    | "MUR"
-    | "MVR"
-    | "MWK"
-    | "MXN"
-    | "MYR"
-    | "MZN"
-    | "NAD"
-    | "NGN"
-    | "NIO"
-    | "NOK"
-    | "NPR"
-    | "NZD"
-    | "OMR"
-    | "PAB"
-    | "PEN"
-    | "PGK"
-    | "PHP"
-    | "PKR"
-    | "PLN"
-    | "PYG"
-    | "QAR"
-    | "RON"
-    | "RSD"
-    | "RUB"
-    | "RWF"
-    | "SAR"
-    | "SBD"
-    | "SCR"
-    | "SDG"
-    | "SEK"
-    | "SGD"
-    | "SHP"
-    | "SLE"
-    | "SLL"
-    | "SOS"
-    | "SRD"
-    | "SSP"
-    | "STN"
-    | "SYP"
-    | "SZL"
-    | "THB"
-    | "TJS"
-    | "TMT"
-    | "TND"
-    | "TOP"
-    | "TRY"
-    | "TTD"
-    | "TWD"
-    | "TZS"
-    | "UAH"
-    | "UGX"
-    | "USD"
-    | "UYU"
-    | "UZS"
-    | "VED"
-    | "VES"
-    | "VND"
-    | "VUV"
-    | "WST"
-    | "XAF"
-    | "XCD"
-    | "XOF"
-    | "XPF"
-    | "YER"
-    | "ZAR"
-    | "ZMW"
-    | "ZWL";
+  pivot_currency: DB6A74Bd737Ef1567B144 | null;
 }
 /**
  * Delta-quoted FX volatility surface.

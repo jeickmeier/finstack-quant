@@ -632,7 +632,7 @@ impl Ndf {
                 from_currency,
                 to_currency,
                 as_of,
-                Default::default(),
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
             )) {
                 Ok(fx_rate) => fx_rate.rate,
                 Err(_) => {
@@ -641,7 +641,7 @@ impl Ndf {
                         to_currency,
                         from_currency,
                         as_of,
-                        Default::default(),
+                        finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
                     ))?;
                     1.0 / inverse.rate
                 }
@@ -1182,7 +1182,7 @@ mod tests {
                 .expect("valid rate");
             p
         };
-        let fx_matrix = FxMatrix::new(fx_provider);
+        let fx_matrix = FxMatrix::new(fx_provider, None);
 
         MarketContext::new().insert(usd_curve).insert_fx(fx_matrix)
     }

@@ -222,7 +222,7 @@ fn fx_market(as_of: Date, spot: f64, vol: f64, r_d: f64, r_f: f64) -> MarketCont
     let expiries = [0.25, 0.5, 1.0, 2.0];
     let strikes = [0.9, 1.0, 1.1, 1.2, 1.3];
 
-    let fx = FxMatrix::new(Arc::new(TestFx { spot }));
+    let fx = FxMatrix::new(Arc::new(TestFx { spot }), None);
     MarketContext::new()
         .insert_fx(fx)
         .insert(flat_discount_with_tenor("USD-OIS", as_of, r_d, 5.0))

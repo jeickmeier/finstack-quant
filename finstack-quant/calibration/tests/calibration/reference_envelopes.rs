@@ -191,7 +191,7 @@ fn example_09_fx_matrix_supports_cross_rate_lookup() {
             Currency::EUR,
             Currency::USD,
             as_of,
-            Default::default(),
+            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         ))
         .expect("EUR/USD direct quote must be retrievable");
     assert!(
@@ -211,7 +211,7 @@ fn example_09_fx_matrix_supports_cross_rate_lookup() {
             Currency::EUR,
             Currency::JPY,
             as_of,
-            Default::default(),
+            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         ))
         .expect("EUR/JPY cross rate must be computable via USD triangulation");
     assert!(
@@ -230,7 +230,7 @@ fn example_09_fx_matrix_supports_cross_rate_lookup() {
             Currency::USD,
             Currency::JPY,
             as_of,
-            Default::default(),
+            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         ))
         .expect("USD/JPY direct quote must be retrievable")
         .rate;

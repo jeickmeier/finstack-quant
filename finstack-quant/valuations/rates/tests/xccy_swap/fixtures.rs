@@ -55,7 +55,7 @@ pub fn market_with_fx() -> MarketContext {
             .expect("valid rate");
         p
     };
-    let fx = FxMatrix::new(provider);
+    let fx = FxMatrix::new(provider, None);
 
     MarketContext::new()
         .insert(usd_disc)
@@ -214,7 +214,7 @@ pub fn market_with_extended_curves() -> MarketContext {
             .expect("valid rate");
         p
     };
-    let fx = FxMatrix::new(provider);
+    let fx = FxMatrix::new(provider, None);
 
     MarketContext::new()
         .insert(usd_disc)

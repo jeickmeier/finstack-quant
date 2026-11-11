@@ -87,7 +87,7 @@ fn create_market() -> MarketContext {
     provider
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.08)])
         .expect("valid fx");
-    let fx = FxMatrix::new(provider);
+    let fx = FxMatrix::new(provider, None);
 
     MarketContext::new()
         .insert(usd_disc)

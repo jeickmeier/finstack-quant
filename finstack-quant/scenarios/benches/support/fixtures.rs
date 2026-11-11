@@ -178,7 +178,7 @@ pub fn full_market() -> MarketContext {
         .insert(inflation)
         .insert(commodity)
         .insert(vol_index)
-        .insert_fx(FxMatrix::new(fx_provider))
+        .insert_fx(FxMatrix::new(fx_provider, None))
         .insert_surface(vol_surface(SPX_VOL, 0.20))
         .insert_surface(vol_surface(CDX_IG_VOL, 0.30))
         .insert(

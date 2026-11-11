@@ -17,11 +17,9 @@ fn post_shock_triangulation_warnings(
         return Ok(Vec::new());
     };
     let state = fx.get_serializable_state()?;
-    if !state.config.enable_triangulation {
+    let Some(pivot) = state.config.pivot_currency else {
         return Ok(Vec::new());
-    }
-
-    let pivot = state.config.pivot_currency;
+    };
     let bumped = fx.with_bumped_rate(base, quote, pct / 100.0, as_of)?;
     let mut warnings = Vec::new();
 
@@ -38,7 +36,7 @@ fn post_shock_triangulation_warnings(
                 from,
                 to,
                 as_of,
-                Default::default(),
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
             ))
             .map(|r| r.rate);
         let via_pivot = bumped
@@ -46,7 +44,7 @@ fn post_shock_triangulation_warnings(
                 from,
                 pivot,
                 as_of,
-                Default::default(),
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
             ))
             .and_then(|lhs| {
                 bumped
@@ -54,7 +52,7 @@ fn post_shock_triangulation_warnings(
                         pivot,
                         to,
                         as_of,
-                        Default::default(),
+                        finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
                     ))
                     .map(|rhs| lhs.rate * rhs.rate)
             });
@@ -130,8 +128,7 @@ mod tests {
         let fx = FxMatrix::try_with_config(
             Arc::new(NullFx),
             FxConfig {
-                pivot_currency: Currency::USD,
-                enable_triangulation: true,
+                pivot_currency: Some(Currency::USD),
                 cache_capacity: 32,
             },
         )
@@ -163,8 +160,7 @@ mod tests {
         let fx = FxMatrix::try_with_config(
             Arc::new(NullFx),
             FxConfig {
-                pivot_currency: Currency::USD,
-                enable_triangulation: true,
+                pivot_currency: Some(Currency::USD),
                 cache_capacity: 32,
             },
         )

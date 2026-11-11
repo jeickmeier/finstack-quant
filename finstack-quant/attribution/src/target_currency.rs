@@ -213,7 +213,7 @@ mod tests {
     }
 
     fn market(fx_rate: f64) -> MarketContext {
-        MarketContext::new().insert_fx(FxMatrix::new(Arc::new(FixedEurUsd(fx_rate))))
+        MarketContext::new().insert_fx(FxMatrix::new(Arc::new(FixedEurUsd(fx_rate)), None))
     }
 
     #[test]

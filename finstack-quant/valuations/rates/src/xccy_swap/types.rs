@@ -394,7 +394,7 @@ impl XccySwap {
                 leg.notional.currency(),
                 self.reporting_currency,
                 leg.leg.start,
-                Default::default(),
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
             ))
             .map_err(|err| {
                 finstack_quant_core::Error::Validation(format!(
@@ -413,7 +413,7 @@ impl XccySwap {
                 resetting_leg.notional.currency(),
                 constant_leg.notional.currency(),
                 constant_leg.leg.start,
-                Default::default(),
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
             ))
             .map_err(|err| {
                 finstack_quant_core::Error::Validation(format!(
@@ -829,7 +829,7 @@ impl XccySwap {
                     leg.notional.currency(),
                     self.reporting_currency,
                     as_of,
-                    Default::default(),
+                    finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
                 ))?
                 .rate;
             Ok(amount * rate)
@@ -1539,7 +1539,7 @@ mod tests {
             .insert(curve("EUR-OIS", 0.01))
             .insert(forward("USD-SOFR-3M", 0.02))
             .insert(forward("EUR-EURIBOR-3M", 0.01))
-            .insert_fx(FxMatrix::new(provider));
+            .insert_fx(FxMatrix::new(provider, None));
 
         let swap = XccySwap::example().expect("example");
         let unshocked = swap.value(&market, base).expect("unshocked value");
@@ -1606,7 +1606,7 @@ mod tests {
         provider
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("set EUR/USD rate");
-        let fx = FxMatrix::new(provider);
+        let fx = FxMatrix::new(provider, None);
 
         let ctx = MarketContext::new()
             .insert(usd_disc)

@@ -17,7 +17,7 @@ use wasm_bindgen_test::*;
 
 #[wasm_bindgen_test]
 fn fx_matrix_rate_returns_structured_result() {
-    let matrix = JsFxMatrix::new();
+    let matrix = JsFxMatrix::new(JsValue::NULL).expect("direct-quote matrix");
     matrix
         .set_quotes(serde_wasm_bindgen::to_value(&[("EUR", "USD", 1.10)]).expect("quote array"))
         .unwrap();
@@ -127,28 +127,15 @@ fn discount_curve_negative_rate_validation_mode_is_explicit() {
 }
 
 #[wasm_bindgen_test]
-fn fx_matrix_rate_defaults_policy_to_cashflow_date() {
-    let matrix = JsFxMatrix::new();
-    matrix
-        .set_quotes(serde_wasm_bindgen::to_value(&[("GBP", "USD", 1.25)]).expect("quote array"))
-        .unwrap();
-
-    let result = matrix
-        .rate(
-            JsValue::from("GBP"),
-            JsValue::from("USD"),
-            JsValue::from("2024-01-02"),
-            &JsFxConversionPolicy::new(),
-        )
-        .unwrap();
-
-    assert!((result.rate() - 1.25).abs() < 1e-12);
-    assert!(!result.triangulated());
+fn fx_matrix_requires_an_explicit_routing_choice() {
+    assert!(JsFxMatrix::new(JsValue::UNDEFINED).is_err());
+    assert!(JsFxMatrix::new(JsValue::NULL).is_ok());
+    assert!(JsFxMatrix::new(JsValue::from("USD")).is_ok());
 }
 
 #[wasm_bindgen_test]
 fn fx_matrix_policy_can_be_reused() {
-    let matrix = JsFxMatrix::new();
+    let matrix = JsFxMatrix::new(JsValue::NULL).expect("direct-quote matrix");
     let policy = JsFxConversionPolicy::cashflow_date();
     matrix
         .set_quote_on(
@@ -428,7 +415,7 @@ fn discount_curve_flat_uses_continuous_compounding() {
 
 #[wasm_bindgen_test]
 fn fx_matrix_quote_and_rate() {
-    let m = JsFxMatrix::new();
+    let m = JsFxMatrix::new(JsValue::NULL).expect("direct-quote matrix");
     m.set_quotes(serde_wasm_bindgen::to_value(&[("USD", "EUR", 0.92)]).expect("quote array"))
         .expect("set quote");
     let r = m
@@ -436,7 +423,7 @@ fn fx_matrix_quote_and_rate() {
             JsValue::from("USD"),
             JsValue::from("EUR"),
             JsValue::from("2024-01-15"),
-            &JsFxConversionPolicy::new(),
+            &JsFxConversionPolicy::cashflow_date(),
         )
         .expect("fx rate");
     assert!((r.rate() - 0.92).abs() < 1e-9);

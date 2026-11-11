@@ -101,7 +101,7 @@ impl FxProvider for StaticFx {
 }
 
 fn fx_matrix(rate: f64) -> FxMatrix {
-    FxMatrix::new(Arc::new(StaticFx { rate }))
+    FxMatrix::new(Arc::new(StaticFx { rate }), None)
 }
 
 fn triangulated_fx_matrix(eur_usd: f64) -> FxMatrix {
@@ -112,7 +112,7 @@ fn triangulated_fx_matrix(eur_usd: f64) -> FxMatrix {
             (Currency::USD, Currency::JPY, 150.0),
         ])
         .expect("valid triangulation quotes");
-    FxMatrix::new(provider)
+    FxMatrix::new(provider, Some(Currency::USD))
 }
 
 fn market_with_fx(
@@ -728,7 +728,12 @@ impl DependencyProbeInstrument {
         };
         let rate = market
             .fx_required()?
-            .rate(FxQuery::new(base, quote, as_of, Default::default()))?
+            .rate(FxQuery::new(
+                base,
+                quote,
+                as_of,
+                FxConversionPolicy::CashflowDate,
+            ))?
             .rate;
         Ok(
             Money::new(self.value.amount() * rate, self.value.currency())

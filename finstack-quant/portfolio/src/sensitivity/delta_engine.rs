@@ -448,7 +448,12 @@ mod tests {
                 }
                 MockKind::FxCross { base, quote } => Ok(market
                     .fx_required()?
-                    .rate(FxQuery::new(*base, *quote, as_of, Default::default()))?
+                    .rate(FxQuery::new(
+                        *base,
+                        *quote,
+                        as_of,
+                        finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+                    ))?
                     .rate
                     * self.scale),
                 MockKind::NonFiniteRaw => Ok(f64::NAN),
@@ -560,7 +565,7 @@ mod tests {
             (Currency::EUR, Currency::USD, 1.10),
             (Currency::USD, Currency::JPY, 150.0),
         ])?;
-        Ok(MarketContext::new().insert_fx(FxMatrix::new(provider)))
+        Ok(MarketContext::new().insert_fx(FxMatrix::new(provider, Some(Currency::USD))))
     }
 
     #[test]

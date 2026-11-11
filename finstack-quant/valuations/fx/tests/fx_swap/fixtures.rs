@@ -109,7 +109,7 @@ pub fn setup_standard_market(as_of: Date) -> MarketContext {
         .unwrap();
 
     let provider = MockFxProvider::default_eurusd();
-    let fx_matrix = FxMatrix::new(Arc::new(provider));
+    let fx_matrix = FxMatrix::new(Arc::new(provider), None);
 
     MarketContext::new()
         .insert(usd_curve)
@@ -141,7 +141,7 @@ pub fn setup_steep_curve_market(as_of: Date) -> MarketContext {
     let mut rates = FxHashMap::default();
     rates.insert((Currency::EUR, Currency::USD), 1.2);
     let provider = MockFxProvider::with_rates(rates);
-    let fx_matrix = FxMatrix::new(Arc::new(provider));
+    let fx_matrix = FxMatrix::new(Arc::new(provider), None);
 
     MarketContext::new()
         .insert(usd_curve)
@@ -179,7 +179,7 @@ pub fn setup_inverted_curve_market(as_of: Date) -> MarketContext {
         .unwrap();
 
     let provider = MockFxProvider::default_eurusd();
-    let fx_matrix = FxMatrix::new(Arc::new(provider));
+    let fx_matrix = FxMatrix::new(Arc::new(provider), None);
 
     MarketContext::new()
         .insert(usd_curve)

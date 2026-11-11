@@ -267,7 +267,7 @@ impl MarketContext {
             amount.currency(),
             target_currency,
             as_of,
-            Default::default(),
+            crate::money::fx::FxConversionPolicy::CashflowDate,
         ))?;
         Ok(ConvertedMoney {
             amount: amount.convert_at_rate_f64(target_currency, rate.rate)?,
@@ -399,7 +399,7 @@ mod tests {
         provider
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
             .expect("valid rate");
-        let ctx = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider)));
+        let ctx = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider), None));
         let eur = Money::from((1_000_i64, Currency::EUR));
         let usd = ctx
             .convert_money(eur, Currency::USD, date!(2025 - 01 - 15))
@@ -417,7 +417,7 @@ mod tests {
         provider
             .set_quotes(&[(Currency::EUR, Currency::USD, 2.0)])
             .expect("valid rate");
-        let ctx = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider)));
+        let ctx = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider), None));
         let amount = rust_decimal::Decimal::from_str("10000000000000000.1").expect("valid decimal");
         let eur = Money::from_decimal(amount, Currency::EUR);
 

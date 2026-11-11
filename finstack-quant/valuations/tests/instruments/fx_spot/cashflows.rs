@@ -366,9 +366,12 @@ fn cashflow_uses_valuation_date_spot_not_settlement_date_rate() {
         .settlement_date(d(2025, 1, 17))
         .build()
         .expect("valid FX spot");
-    let market = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(DateAwareFx {
-        valuation_date: as_of,
-    })));
+    let market = MarketContext::new().insert_fx(FxMatrix::new(
+        Arc::new(DateAwareFx {
+            valuation_date: as_of,
+        }),
+        None,
+    ));
 
     let cashflows = spot
         .dated_cashflows(&market, as_of)

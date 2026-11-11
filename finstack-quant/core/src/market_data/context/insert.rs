@@ -253,7 +253,7 @@ impl MarketContext {
     /// }
     ///
     /// // Owned value
-    /// let fx = FxMatrix::new(Arc::new(StaticFx));
+    /// let fx = FxMatrix::new(Arc::new(StaticFx), None);
     /// let ctx = MarketContext::new().insert_fx(fx);
     /// assert!(ctx.fx().is_some());
     ///
@@ -262,7 +262,7 @@ impl MarketContext {
     /// # impl FxProvider for StaticFx2 {
     /// #     fn rate(&self, _from: Currency, _to: Currency, _on: Date, _policy: FxConversionPolicy) -> finstack_quant_core::Result<f64> { Ok(1.2) }
     /// # }
-    /// let shared_fx = Arc::new(FxMatrix::new(Arc::new(StaticFx2)));
+    /// let shared_fx = Arc::new(FxMatrix::new(Arc::new(StaticFx2), None));
     /// let ctx2 = MarketContext::new().insert_fx(Arc::clone(&shared_fx));
     /// ```
     ///

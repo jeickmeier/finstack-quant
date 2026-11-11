@@ -1040,7 +1040,7 @@ mod tests {
         provider
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.15)])
             .expect("valid quote");
-        let market = MarketContext::new().insert_fx(FxMatrix::new(provider));
+        let market = MarketContext::new().insert_fx(FxMatrix::new(provider, None));
 
         let spot = resolve_fx_spot(&inst, &market, as_of).expect("fx matrix spot");
         assert!((spot - 1.15).abs() < 1e-12);

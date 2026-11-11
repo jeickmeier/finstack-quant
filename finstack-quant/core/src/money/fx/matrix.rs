@@ -195,10 +195,12 @@ impl FxProvider for ResolvedPairProvider {
         // the pivot; a bad opposite quote does not.
         let rate = match lookup(from, to) {
             Ok(Some(rate)) => Some(rate),
-            Ok(None) if self.matrix.config.enable_triangulation => {
-                pivot_cross(lookup, from, to, self.matrix.config.pivot_currency)
-            }
-            Err(_) | Ok(None) => None,
+            Ok(None) => self
+                .matrix
+                .config
+                .pivot_currency
+                .and_then(|pivot| pivot_cross(lookup, from, to, pivot)),
+            Err(_) => None,
         };
         if let Some(rate) = rate {
             // The shocked cross must survive restoration even when only its
@@ -218,9 +220,9 @@ impl FxProvider for ResolvedPairProvider {
 
     fn snapshot_pinned_quotes(&self) -> Vec<(Currency, Currency, Date, FxConversionPolicy, f64)> {
         let mut quotes = self.matrix.provider.snapshot_pinned_quotes();
-        if !self.matrix.config.enable_triangulation {
+        let Some(pivot) = self.matrix.config.pivot_currency else {
             return quotes;
-        }
+        };
         let global = lock(&self.matrix.quotes);
         let pinned = lock(&self.matrix.pinned_quotes);
         let provider: FxHashMap<CurrencyPair, f64> = self
@@ -262,7 +264,6 @@ impl FxProvider for ResolvedPairProvider {
             base: from,
             quote: to,
         } = self.pair;
-        let pivot = self.matrix.config.pivot_currency;
         for ((on, policy), (pinned, provider_pinned)) in scopes {
             let lookup = |from, to| -> crate::Result<Option<f64>> {
                 if from == to {
@@ -291,24 +292,19 @@ impl FxProvider for ResolvedPairProvider {
     }
 }
 
-impl Default for FxMatrix {
-    /// An empty matrix over an empty [`SimpleFxProvider`](super::SimpleFxProvider) with the default
-    /// configuration: rates come only from quotes set on the matrix.
-    fn default() -> Self {
-        Self::new(Arc::new(super::SimpleFxProvider::new()))
-    }
-}
-
 impl FxMatrix {
-    /// Create a new [`FxMatrix`] wrapping the given provider with the default configuration.
+    /// Create a new [`FxMatrix`] wrapping `provider` with an explicit routing
+    /// choice (record CORE-CONVENTIONS-013 #5).
     ///
-    /// The default enables triangulation through USD and retains 256
-    /// provider-observed quotes. Explicit quotes and pinned fixings start empty.
+    /// Retains 256 provider-observed quotes; use [`Self::try_with_config`]
+    /// for another capacity. Explicit quotes and pinned fixings start empty.
     ///
     /// # Arguments
     ///
     /// * `provider` - FX quote source consulted when no explicit or pinned quote
     ///   answers the pair. Date and policy behavior come from this provider.
+    /// * `pivot_currency` - Single cross-routing pivot, or `None` for direct
+    ///   quotes only. There is no default pivot.
     ///
     /// # Examples
     /// ```rust
@@ -331,23 +327,31 @@ impl FxMatrix {
     ///     }
     /// }
     ///
-    /// let matrix = FxMatrix::new(Arc::new(StaticFx));
+    /// let matrix = FxMatrix::new(Arc::new(StaticFx), None);
     /// assert!(matrix.get_serializable_state().expect("state").quotes.is_empty());
+    /// assert_eq!(matrix.config().pivot_currency, None);
     /// ```
-    pub fn new(provider: Arc<dyn FxProvider>) -> Self {
-        Self::with_capacity(provider, FxConfig::default(), DEFAULT_CACHE_CAPACITY)
+    pub fn new(provider: Arc<dyn FxProvider>, pivot_currency: Option<Currency>) -> Self {
+        Self::with_capacity(
+            provider,
+            FxConfig::new(pivot_currency),
+            DEFAULT_CACHE_CAPACITY,
+        )
     }
 
     /// Build a matrix over an empty [`SimpleFxProvider`](super::SimpleFxProvider) holding `quotes` as
     /// pair-global quotes.
     ///
-    /// This is [`FxMatrix::default`] followed by [`set_quotes`](Self::set_quotes),
-    /// the construction both host bindings expose.
+    /// This is [`FxMatrix::new`] over an empty provider followed by
+    /// [`set_quotes`](Self::set_quotes), the construction both host bindings
+    /// expose.
     ///
     /// # Arguments
     ///
     /// * `quotes` - `(base, quote, rate)` triples, where `rate` is the finite,
     ///   strictly positive number of `quote` units per one `base` unit.
+    /// * `pivot_currency` - Single cross-routing pivot, or `None` for direct
+    ///   quotes only.
     ///
     /// # Errors
     ///
@@ -358,12 +362,15 @@ impl FxMatrix {
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::money::fx::FxMatrix;
     ///
-    /// let matrix = FxMatrix::from_quotes(&[(Currency::EUR, Currency::USD, 1.1)])?;
+    /// let matrix = FxMatrix::from_quotes(&[(Currency::EUR, Currency::USD, 1.1)], None)?;
     /// assert_eq!(matrix.get_serializable_state()?.quotes.len(), 1);
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
-    pub fn from_quotes(quotes: &[(Currency, Currency, f64)]) -> crate::Result<Self> {
-        let matrix = Self::default();
+    pub fn from_quotes(
+        quotes: &[(Currency, Currency, f64)],
+        pivot_currency: Option<Currency>,
+    ) -> crate::Result<Self> {
+        let matrix = Self::new(Arc::new(super::SimpleFxProvider::new()), pivot_currency);
         matrix.set_quotes(quotes)?;
         Ok(matrix)
     }
@@ -383,7 +390,7 @@ impl FxMatrix {
     /// # Arguments
     ///
     /// * `provider` - FX quote source consulted when no explicit or pinned quote answers the pair.
-    /// * `config` - Pivot currency, triangulation switch, and observed-quote cache capacity. Capacity must be greater than zero.
+    /// * `config` - Explicit routing pivot (or `None`) and observed-quote cache capacity. Capacity must be greater than zero.
     pub fn try_with_config(provider: Arc<dyn FxProvider>, config: FxConfig) -> crate::Result<Self> {
         let Some(capacity) = NonZeroUsize::new(config.cache_capacity) else {
             return Err(crate::Error::Validation(
@@ -444,7 +451,7 @@ impl FxMatrix {
     ///     Currency::EUR,
     ///     Currency::USD,
     ///     Date::from_calendar_date(2024, Month::March, 1).expect("Valid date"),
-    ///     FxConversionPolicy::default(),
+    ///     FxConversionPolicy::CashflowDate,
     /// );
     /// let result = matrix.rate(query).expect("FX rate lookup should succeed");
     /// assert!(result.rate > 1.0);
@@ -513,7 +520,7 @@ impl FxMatrix {
                 triangulated: false,
             }),
             Err(error @ crate::Error::Input(crate::InputError::InvalidFxRate { .. })) => Err(error),
-            Err(_) if self.config.enable_triangulation => {
+            Err(_) if self.config.pivot_currency.is_some() => {
                 // Try simple triangulation via pivot
                 let rate = self.triangulate_rate(from, to, on, policy)?;
                 Ok(FxRateResult {
@@ -829,7 +836,7 @@ impl FxMatrix {
             ));
         }
         // Verify a rate exists on the reference date and the bumped value is valid.
-        let query = FxQuery::new(from, to, on, Default::default());
+        let query = FxQuery::new(from, to, on, FxConversionPolicy::CashflowDate);
         let current = self.rate(query)?;
         validate_fx_rate(from, to, current.rate * (1.0 + bump_pct))?;
 
@@ -918,7 +925,11 @@ impl FxMatrix {
         use crate::InputError;
 
         let revision = self.observation_revision();
-        let pivot = self.config.pivot_currency;
+        let Some(pivot) = self.config.pivot_currency else {
+            return Err(crate::Error::Validation(format!(
+                "FX routing for {from}->{to} is disabled (no pivot currency)"
+            )));
+        };
 
         // Try to get first leg: from -> pivot
         let Ok(a) = self.get_or_fetch(from, pivot, on, policy) else {
@@ -1192,41 +1203,6 @@ mod revision_tests {
     use crate::money::fx::SimpleFxProvider;
 
     #[test]
-    fn period_average_quotes_invert_and_triangulate_like_other_policies() {
-        let provider = Arc::new(SimpleFxProvider::new());
-        provider
-            .set_quotes(&[
-                (Currency::EUR, Currency::USD, 1.1),
-                (Currency::GBP, Currency::USD, 1.25),
-            ])
-            .expect("quotes");
-        let matrix = FxMatrix::new(provider);
-        let on = Date::from_ordinal_date(2025, 1).expect("date");
-        let query = |from, to| FxQuery::new(from, to, on, FxConversionPolicy::PeriodAverage);
-
-        assert_eq!(
-            matrix
-                .rate(query(Currency::EUR, Currency::USD))
-                .unwrap()
-                .rate,
-            1.1
-        );
-        let inverse = matrix.rate(query(Currency::USD, Currency::EUR)).unwrap();
-        assert!((inverse.rate - 1.0 / 1.1).abs() < 1e-15);
-        assert!(!inverse.triangulated);
-        let cross = matrix.rate(query(Currency::EUR, Currency::GBP)).unwrap();
-        assert!((cross.rate - 1.1 / 1.25).abs() < 1e-15);
-        assert!(cross.triangulated);
-
-        // An explicit peg answers both directions under every policy.
-        matrix
-            .set_quotes(&[(Currency::USD, Currency::HKD, 7.8)])
-            .unwrap();
-        let peg = matrix.rate(query(Currency::HKD, Currency::USD)).unwrap();
-        assert!((peg.rate - 1.0 / 7.8).abs() < 1e-15);
-    }
-
-    #[test]
     fn quote_mutations_publish_revision_before_waiting_for_cache_reclamation() {
         let on = Date::from_ordinal_date(2025, 1).expect("date");
         let key = FxQuery {
@@ -1236,7 +1212,7 @@ mod revision_tests {
             policy: FxConversionPolicy::CashflowDate,
         };
         for mutation in ["single", "batch", "pinned"] {
-            let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
+            let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()), None);
             matrix
                 .set_quotes(&[(key.from, key.to, 1.1)])
                 .expect("global");

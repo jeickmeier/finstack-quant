@@ -76,7 +76,6 @@
         "settings": {
           "fx": {
             "pivot_currency": "USD",
-            "enable_triangulation": true,
             "cache_capacity": 256
           }
         }

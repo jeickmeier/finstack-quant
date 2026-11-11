@@ -1304,7 +1304,7 @@ export interface D_5F9B0Fddaa5554Bb881F {
    * applied [`FxConversionPolicy`] so the result envelope satisfies the
    * policy-visibility invariant (the FX strategy is stamped, not implied).
    */
-  fx_collapse_policy: "cashflow_date" | "period_end" | "period_average";
+  fx_collapse_policy: "cashflow_date" | "period_end";
   /**
    * Values for each position
    */

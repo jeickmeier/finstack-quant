@@ -119,7 +119,7 @@ fn derived_fx_shocks_preserve_dates_policies_and_reciprocals() {
             }
         }
     }
-    let matrix = FxMatrix::new(Arc::new(Legs));
+    let matrix = FxMatrix::new(Arc::new(Legs), Some(Currency::USD));
     let bumped = matrix
         .with_bumped_rate(Currency::EUR, Currency::GBP, 0.1, base())
         .unwrap();

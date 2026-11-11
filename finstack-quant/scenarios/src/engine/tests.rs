@@ -319,7 +319,7 @@ fn application_report_records_the_size_of_each_market_shock() {
         .expect("quote should set");
     let mut market = MarketContext::new()
         .insert(curve)
-        .insert_fx(FxMatrix::new(provider))
+        .insert_fx(FxMatrix::new(provider, None))
         .insert_price("AAPL", MarketScalar::Unitless(200.0));
 
     let scenario = ScenarioSpec {

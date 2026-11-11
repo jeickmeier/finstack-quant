@@ -599,9 +599,12 @@ pub struct CalibrationConfig {
     #[serde(default = "default_fail_on_bad_fit")]
     pub fail_on_bad_fit: bool,
 
-    /// FX matrix runtime config (pivot currency, triangulation, cache capacity).
-    #[serde(default)]
-    pub fx: FxConfig,
+    /// FX matrix config (explicit routing pivot and cache capacity) for a
+    /// market built from FX spot quotes. `None` (the key omitted) supplies no
+    /// FX configuration: building an FX matrix from quotes then errors rather
+    /// than inferring a pivot (record CORE-CONVENTIONS-013 #5).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fx: Option<FxConfig>,
     /// Snapshot timestamp, maximum age, and selected quote side.
     #[serde(default, skip_serializing_if = "market_freshness_is_default")]
     pub market_freshness: MarketFreshnessPolicy,
@@ -653,7 +656,7 @@ impl Default for CalibrationConfig {
             inflation_curve: InflationCurveSolveConfig::default(),
             vol_surface: VolSurfaceSolveConfig::default(),
             fail_on_bad_fit: default_fail_on_bad_fit(),
-            fx: FxConfig::default(),
+            fx: None,
             market_freshness: MarketFreshnessPolicy::default(),
             hierarchy: None,
         }
@@ -1001,32 +1004,44 @@ mod fx_and_hierarchy_settings_tests {
     use finstack_quant_core::money::fx::FxConfig;
 
     #[test]
-    fn config_defaults_carry_fx_subsection() {
+    fn config_defaults_carry_no_fx_choice() {
         let cfg = CalibrationConfig::default();
-        assert_eq!(cfg.fx, FxConfig::default());
+        assert_eq!(cfg.fx, None);
         assert!(cfg.hierarchy.is_none());
     }
 
     #[test]
     fn fx_settings_round_trip_via_serde() {
         let json = r#"{
-            "fx": { "pivot_currency": "EUR", "enable_triangulation": false, "cache_capacity": 8 }
+            "fx": { "pivot_currency": "EUR", "cache_capacity": 8 }
         }"#;
         let cfg: CalibrationConfig =
             serde_json::from_str(json).expect("valid CalibrationConfig JSON");
+        let fx = cfg.fx.expect("fx section");
         assert_eq!(
-            cfg.fx.pivot_currency,
-            finstack_quant_core::currency::Currency::EUR
+            fx.pivot_currency,
+            Some(finstack_quant_core::currency::Currency::EUR)
         );
-        assert!(!cfg.fx.enable_triangulation);
-        assert_eq!(cfg.fx.cache_capacity, 8);
+        assert_eq!(fx.cache_capacity, 8);
+        let direct: CalibrationConfig =
+            serde_json::from_str(r#"{"fx": {"pivot_currency": null}}"#).expect("direct only");
+        assert_eq!(direct.fx, Some(FxConfig::new(None)));
+        // The routing choice is required inside a present section, and the
+        // retired switch is rejected.
+        assert!(serde_json::from_str::<CalibrationConfig>(r#"{"fx": {}}"#).is_err());
+        assert!(
+            serde_json::from_str::<CalibrationConfig>(
+                r#"{"fx": {"pivot_currency": "USD", "enable_triangulation": true}}"#
+            )
+            .is_err()
+        );
     }
 
     #[test]
-    fn omitted_fx_section_uses_defaults() {
+    fn omitted_fx_section_is_no_fx_choice() {
         let json = r#"{}"#;
         let cfg: CalibrationConfig = serde_json::from_str(json).expect("empty JSON");
-        assert_eq!(cfg.fx, FxConfig::default());
+        assert_eq!(cfg.fx, None);
         assert!(cfg.hierarchy.is_none());
     }
 

@@ -104,7 +104,7 @@ def _fx_market() -> MarketContext:
     market = MarketContext()
     market.insert(_discount("USD-OIS", 0.04))
     market.insert(_discount("EUR-OIS", 0.02))
-    fx = FxMatrix()
+    fx = FxMatrix(None)
     fx.set_quotes([(EUR, USD, 1.10)])
     market.insert_fx(fx)
     market.insert(

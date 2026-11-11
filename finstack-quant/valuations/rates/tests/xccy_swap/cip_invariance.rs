@@ -71,7 +71,7 @@ fn build_fx_matrix(spot_eur_to_usd: f64) -> FxMatrix {
     provider
         .set_quotes(&[(Currency::EUR, Currency::USD, spot_eur_to_usd)])
         .expect("set EUR/USD FX rate");
-    FxMatrix::new(provider)
+    FxMatrix::new(provider, None)
 }
 
 fn build_market_context() -> MarketContext {
@@ -411,7 +411,7 @@ fn mtm_reset_cashflow_schedule_npv_matches_base_value() {
                         ccy,
                         Currency::USD,
                         as_of,
-                        Default::default(),
+                        finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
                     ))
                     .expect("fx rate")
                     .rate;

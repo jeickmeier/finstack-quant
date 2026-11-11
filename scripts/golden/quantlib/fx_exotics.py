@@ -51,7 +51,6 @@ def _fx_market(
         fx={
             "config": {
                 "pivot_currency": "USD",
-                "enable_triangulation": True,
                 "cache_capacity": 256,
             },
             "quotes": [["EUR", "USD", spot]],
@@ -367,7 +366,6 @@ def build_quanto_option() -> dict[str, Any]:
             fx={
                 "config": {
                     "pivot_currency": "USD",
-                    "enable_triangulation": True,
                     "cache_capacity": 256,
                 },
                 "quotes": [["JPY", "USD", fx_spot]],

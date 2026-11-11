@@ -157,7 +157,7 @@ fn mixed_currency_fx_swap_rows_use_native_curves_and_reporting_currency_pv() {
                 .build()
                 .expect("eur curve"),
         )
-        .insert_fx(FxMatrix::new(provider));
+        .insert_fx(FxMatrix::new(provider, None));
     let instrument = InstrumentEnvelope {
         schema: finstack_quant_valuations::instruments::envelope::InstrumentSchema::CURRENT,
         instrument: InstrumentJson::FxSwap(swap),

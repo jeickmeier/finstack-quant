@@ -44,20 +44,6 @@ wasm.Tenor.prototype.toYearsWithContext = function toYearsWithContext(
   );
 };
 
-// `FxMatrix.rate(base, quote, date, policy?)`: an omitted policy is the Rust
-// default (`new FxConversionPolicy()`, cashflow date), created once after
-// `init()` and only borrowed. The Rust parameter is declared optional.
-let defaultFxConversionPolicy;
-const rawFxRate = wasm.FxMatrix.prototype.rate;
-// wasm-bindgen cannot borrow an optional policy: an omitted one is the shared Rust default.
-wasm.FxMatrix.prototype.rate = function rate(base, quote, date, policy = undefined) {
-  const resolved =
-    policy === undefined || policy === null
-      ? (defaultFxConversionPolicy ??= new wasm.FxConversionPolicy())
-      : policy;
-  return rawFxRate.call(this, base, quote, date, resolved);
-};
-
 // `MarketContext.insert(curve)` takes any of nine curve and surface classes.
 // wasm-bindgen cannot express a borrowed union of handles, so the typed raw
 // methods are bound in Rust and the dispatch on the handle's class is done

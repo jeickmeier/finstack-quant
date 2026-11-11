@@ -419,7 +419,7 @@ mod xccy_quote_calibration_tests {
         provider
             .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
             .expect("set fx");
-        let fx = FxMatrix::new(provider);
+        let fx = FxMatrix::new(provider, None);
 
         MarketContext::new()
             .insert(usd_disc)

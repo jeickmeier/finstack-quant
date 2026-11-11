@@ -473,8 +473,7 @@
     "fx": {
       "config": {
         "cache_capacity": 256,
-        "enable_triangulation": true,
-        "pivot_currency": "USD"
+        "pivot_currency": null
       },
       "pinned_quotes": [],
       "provider_pinned_quotes": [],

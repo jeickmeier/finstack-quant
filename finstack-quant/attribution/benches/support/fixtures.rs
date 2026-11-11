@@ -145,8 +145,8 @@ pub fn rich_markets(shift_bp: f64) -> BondMarkets {
         .knots([(0.0, 100.2), (1.0, 102.4), (5.0, 111.0)])
         .build()
         .unwrap();
-    let fx_t0 = FxMatrix::new(Arc::new(StaticFx { eur_usd: 1.10 }));
-    let fx_t1 = FxMatrix::new(Arc::new(StaticFx { eur_usd: 1.12 }));
+    let fx_t0 = FxMatrix::new(Arc::new(StaticFx { eur_usd: 1.10 }), None);
+    let fx_t1 = FxMatrix::new(Arc::new(StaticFx { eur_usd: 1.12 }), None);
 
     BondMarkets {
         market_t0: lean
@@ -202,8 +202,8 @@ impl FxProvider for StaticFx {
 pub fn eur_fx_markets(shift_bp: f64) -> BondMarkets {
     let as_of_t0 = calendar_date(2025, 1, 15);
     let as_of_t1 = calendar_date(2025, 1, 16);
-    let fx_t0 = FxMatrix::new(Arc::new(StaticFx { eur_usd: 1.10 }));
-    let fx_t1 = FxMatrix::new(Arc::new(StaticFx { eur_usd: 1.12 }));
+    let fx_t0 = FxMatrix::new(Arc::new(StaticFx { eur_usd: 1.10 }), None);
+    let fx_t1 = FxMatrix::new(Arc::new(StaticFx { eur_usd: 1.12 }), None);
     BondMarkets {
         market_t0: MarketContext::new()
             .insert(build_flat_curve(EUR_OIS, as_of_t0, BASE_RATE))

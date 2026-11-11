@@ -318,7 +318,7 @@ class TestLabelEnums:
 
         from finstack_quant.core.market_data import FxMatrix
 
-        matrix = FxMatrix()
+        matrix = FxMatrix(None)
         matrix.set_quotes([("EUR", "USD", 1.1)])
         with pytest.raises(TypeError, match="FxConversionPolicy"):
             matrix.rate("EUR", "USD", datetime.date(2025, 1, 2), 3)
@@ -328,7 +328,7 @@ class TestConvertedMoney:
     def _market(self):  # noqa: ANN202
         from finstack_quant.core.market_data import FxMatrix, MarketContext
 
-        fx = FxMatrix()
+        fx = FxMatrix(None)
         fx.set_quotes([("EUR", "USD", 1.1)])
         return MarketContext().insert_fx(fx)
 

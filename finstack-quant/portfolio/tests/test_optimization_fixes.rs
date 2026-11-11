@@ -98,7 +98,7 @@ fn build_multi_currency_market() -> finstack_quant_core::market_data::context::M
     MarketContext::new()
         .insert(usd_curve)
         .insert(eur_curve)
-        .insert_fx(FxMatrix::new(Arc::new(StaticFx { rate: 1.2 })))
+        .insert_fx(FxMatrix::new(Arc::new(StaticFx { rate: 1.2 }), None))
 }
 
 #[derive(Clone)]

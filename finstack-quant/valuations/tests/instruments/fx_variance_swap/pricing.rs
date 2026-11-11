@@ -35,7 +35,7 @@ fn test_forward_variance_flat_surface() {
     fx_provider
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.25)])
         .expect("valid rate");
-    let fx_matrix = FxMatrix::new(fx_provider);
+    let fx_matrix = FxMatrix::new(fx_provider, None);
 
     let ctx = MarketContext::new()
         .insert(dom_curve)

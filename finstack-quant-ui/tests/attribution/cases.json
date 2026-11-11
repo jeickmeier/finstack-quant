@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "finstack-quant/attribution/tests/fixtures/production_convertible_credit.json",
-      "sha256": "a3994a2dbd69f330345d3d15958b9204ebf814b3e3b5e9d56ba344c22995c7f4"
+      "sha256": "01dd44cd048e1b7d8f31714561b249cc554bdc3154f6448375b9facb9c04c80d"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",

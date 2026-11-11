@@ -1692,7 +1692,7 @@ pub(super) mod tests {
         let fx = Arc::new(SimpleFxProvider::new());
         fx.set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
             .unwrap();
-        let market = credit_market(as_of, id.clone()).insert_fx(FxMatrix::new(fx));
+        let market = credit_market(as_of, id.clone()).insert_fx(FxMatrix::new(fx, None));
         let bumped = bump_credit_spreads(&market, &id, 1.0).unwrap();
         let base = market.get_hazard(id.as_str()).unwrap();
         assert!(bumped.hazard_calibration().is_some());

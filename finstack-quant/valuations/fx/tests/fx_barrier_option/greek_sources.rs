@@ -34,7 +34,7 @@ fn fx_matrix(spot: f64) -> FxMatrix {
     provider
         .set_quotes(&[(Currency::EUR, Currency::USD, spot)])
         .expect("fx quote");
-    FxMatrix::new(provider)
+    FxMatrix::new(provider, None)
 }
 
 /// Curves plus an FX matrix; the vol surface is optional.

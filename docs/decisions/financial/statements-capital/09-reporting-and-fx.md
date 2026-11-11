@@ -25,7 +25,7 @@ Native-currency instrument breakdowns, native-currency totals and optional repor
 
 `convert_to_reporting` is identity for same currency. Otherwise an FX matrix is required; query it with `(source,target,on,policy)`, multiply the native amount by returned rate and build tagged reporting Money. Missing routes/rates, invalid values and amount representation failures propagate. It does not inspect original cashflow dates.
 
-The evaluator owns the aggregate conversion call and supplies the inclusive period-end snapshot after aggregating `cs.*` cash buckets. Omitted policy selects PeriodEnd. The established direction is **period-close waterfall/capital-structure aggregation**; preserve that policy. Builder prose claiming `CashflowDate` uses each flow's date conflicts with this aggregated caller. A CashflowDate enum value cannot recover dates already removed by aggregation. This is documentation/API reconciliation, not a new choice between period-close and per-flow accounting.
+The evaluator owns the aggregate conversion call and supplies the inclusive period-end snapshot after aggregating `cs.*` cash buckets. There is no default policy (resolution O9, 2026-11-11): a cross-currency conversion without `fx_policy` errors, and same-currency totals need none. The established direction is **period-close waterfall/capital-structure aggregation**; preserve that direction. Builder prose claiming `CashflowDate` uses each flow's date conflicts with this aggregated caller. A CashflowDate enum value cannot recover dates already removed by aggregation. This is documentation/API reconciliation, not a new choice between period-close and per-flow accounting.
 
 ## Limitations, alternatives and evidence
 

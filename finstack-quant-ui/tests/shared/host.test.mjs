@@ -46,7 +46,7 @@ market.curves = ["USD-OIS", "EUR-OIS"].map((id) => ({
   base: "2024-01-01",
 }));
 market.fx = {
-  config: { pivot_currency: "USD", enable_triangulation: true },
+  config: { pivot_currency: "USD" },
   quotes: [["EUR", "USD", 1.1]],
   pinned_quotes: [],
   provider_quotes: [],

@@ -151,7 +151,7 @@ fn create_market(as_of: Date) -> MarketContext {
     fx_provider
         .set_quotes(&[(Currency::USD, Currency::USD, 1.0)])
         .unwrap();
-    let fx = FxMatrix::new(fx_provider);
+    let fx = FxMatrix::new(fx_provider, None);
 
     MarketContext::new()
         .insert(usd_disc)

@@ -1509,169 +1509,6 @@ export type Id5 = string;
  */
 export type D_5Faecdb7B217A77D4Df7 = string;
 /**
- * ISO 4217 currency code.
- */
-export type Currency5 =
-  | "AED"
-  | "AFN"
-  | "ALL"
-  | "AMD"
-  | "ANG"
-  | "AOA"
-  | "ARS"
-  | "AUD"
-  | "AWG"
-  | "AZN"
-  | "BAM"
-  | "BBD"
-  | "BDT"
-  | "BGN"
-  | "BHD"
-  | "BIF"
-  | "BMD"
-  | "BND"
-  | "BOB"
-  | "BRL"
-  | "BSD"
-  | "BTN"
-  | "BWP"
-  | "BYN"
-  | "BZD"
-  | "CAD"
-  | "CDF"
-  | "CHF"
-  | "CLF"
-  | "CLP"
-  | "CNY"
-  | "COP"
-  | "CRC"
-  | "CUC"
-  | "CUP"
-  | "CVE"
-  | "CZK"
-  | "DJF"
-  | "DKK"
-  | "DOP"
-  | "DZD"
-  | "EGP"
-  | "ERN"
-  | "ETB"
-  | "EUR"
-  | "FJD"
-  | "FKP"
-  | "GBP"
-  | "GEL"
-  | "GHS"
-  | "GIP"
-  | "GMD"
-  | "GNF"
-  | "GTQ"
-  | "GYD"
-  | "HKD"
-  | "HNL"
-  | "HRK"
-  | "HTG"
-  | "HUF"
-  | "IDR"
-  | "ILS"
-  | "INR"
-  | "IQD"
-  | "IRR"
-  | "ISK"
-  | "JMD"
-  | "JOD"
-  | "JPY"
-  | "KES"
-  | "KGS"
-  | "KHR"
-  | "KMF"
-  | "KPW"
-  | "KRW"
-  | "KWD"
-  | "KYD"
-  | "KZT"
-  | "LAK"
-  | "LBP"
-  | "LKR"
-  | "LRD"
-  | "LSL"
-  | "LYD"
-  | "MAD"
-  | "MDL"
-  | "MGA"
-  | "MKD"
-  | "MMK"
-  | "MNT"
-  | "MOP"
-  | "MRU"
-  | "MUR"
-  | "MVR"
-  | "MWK"
-  | "MXN"
-  | "MYR"
-  | "MZN"
-  | "NAD"
-  | "NGN"
-  | "NIO"
-  | "NOK"
-  | "NPR"
-  | "NZD"
-  | "OMR"
-  | "PAB"
-  | "PEN"
-  | "PGK"
-  | "PHP"
-  | "PKR"
-  | "PLN"
-  | "PYG"
-  | "QAR"
-  | "RON"
-  | "RSD"
-  | "RUB"
-  | "RWF"
-  | "SAR"
-  | "SBD"
-  | "SCR"
-  | "SDG"
-  | "SEK"
-  | "SGD"
-  | "SHP"
-  | "SLE"
-  | "SLL"
-  | "SOS"
-  | "SRD"
-  | "SSP"
-  | "STN"
-  | "SYP"
-  | "SZL"
-  | "THB"
-  | "TJS"
-  | "TMT"
-  | "TND"
-  | "TOP"
-  | "TRY"
-  | "TTD"
-  | "TWD"
-  | "TZS"
-  | "UAH"
-  | "UGX"
-  | "USD"
-  | "UYU"
-  | "UZS"
-  | "VED"
-  | "VES"
-  | "VND"
-  | "VUV"
-  | "WST"
-  | "XAF"
-  | "XCD"
-  | "XOF"
-  | "XPF"
-  | "YER"
-  | "ZAR"
-  | "ZMW"
-  | "ZWL";
-/**
  * Opaque string identifier.
  */
 export type Id6 = string;
@@ -1693,7 +1530,7 @@ export type D_08Aea844Abd10Cb00E40 =
       quote_set: string;
       base_date: Date12;
       conventions?: D_5F0B38036294B8235C6A;
-      currency: Currency6;
+      currency: Currency5;
       curve_id: Id7;
       /**
        * Extrapolation policy for the curve.
@@ -1742,7 +1579,7 @@ export type D_08Aea844Abd10Cb00E40 =
       quote_set: string;
       base_date: Date13;
       conventions?: D_5F0B38036294B8235C6A1;
-      currency: Currency7;
+      currency: Currency6;
       curve_id: Id8;
       discount_curve_id: Id9;
       /**
@@ -1794,7 +1631,7 @@ export type D_08Aea844Abd10Cb00E40 =
        * during hazard calibration and rebootstrap.
        */
       cds_valuation_convention?: D_3D7928F8797773779Aed | null;
-      currency: Currency8;
+      currency: Currency7;
       curve_id: Id10;
       discount_curve_id: Id11;
       /**
@@ -1867,7 +1704,7 @@ export type D_08Aea844Abd10Cb00E40 =
        */
       base_cpi: number;
       base_date: Date15;
-      currency: Currency9;
+      currency: Currency8;
       curve_id: Id12;
       discount_curve_id: Id13;
       /**
@@ -1986,7 +1823,7 @@ export type D_08Aea844Abd10Cb00E40 =
        * Optional calendar identifier for date adjustments.
        */
       calendar_id?: string | null;
-      currency: Currency10;
+      currency: Currency9;
       discount_curve_id: Id14;
       /**
        * Optional day count convention for fixed-leg coupon accrual only.
@@ -2074,7 +1911,7 @@ export type D_08Aea844Abd10Cb00E40 =
        * Optional calendar identifier for schedule generation and date adjustments.
        */
       calendar_id?: string | null;
-      currency: Currency11;
+      currency: Currency10;
       /**
        * Day count convention for synthetic tranche premium accrual.
        */
@@ -2172,7 +2009,7 @@ export type D_08Aea844Abd10Cb00E40 =
        */
       quote_set: string;
       base_date: Date19;
-      currency: Currency12;
+      currency: Currency11;
       curve_id: Id16;
       /**
        * Required positive maximum implied-quote error in quoted volatility units.
@@ -2200,7 +2037,7 @@ export type D_08Aea844Abd10Cb00E40 =
        */
       quote_set: string;
       base_date: Date20;
-      currency: Currency13;
+      currency: Currency12;
       discount_curve_id: Id17;
       /**
        * Required positive maximum implied-quote error in quoted volatility units.
@@ -2286,7 +2123,7 @@ export type D_08Aea844Abd10Cb00E40 =
        */
       basis_spread_curve_id?: Id6 | null;
       conventions?: D_5F0B38036294B8235C6A2;
-      currency: Currency14;
+      currency: Currency13;
       curve_id: Id20;
       domestic_discount_id: Id21;
       /**
@@ -2437,7 +2274,7 @@ export type D_9F40E937966E31F97B30 =
 /**
  * ISO 4217 currency code.
  */
-export type Currency6 =
+export type Currency5 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -2608,7 +2445,7 @@ export type Date13 = string;
 /**
  * ISO 4217 currency code.
  */
-export type Currency7 =
+export type Currency6 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -2794,7 +2631,7 @@ export type D_3D7928F8797773779Aed =
 /**
  * ISO 4217 currency code.
  */
-export type Currency8 =
+export type Currency7 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -2969,7 +2806,7 @@ export type Date15 = string;
 /**
  * ISO 4217 currency code.
  */
-export type Currency9 =
+export type Currency8 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -3148,7 +2985,7 @@ export type Date17 = string;
 /**
  * ISO 4217 currency code.
  */
-export type Currency10 =
+export type Currency9 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -3324,7 +3161,7 @@ export type BusinessDayConvention =
 /**
  * ISO 4217 currency code.
  */
-export type Currency11 =
+export type Currency10 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -3495,7 +3332,7 @@ export type Date19 = string;
 /**
  * ISO 4217 currency code.
  */
-export type Currency12 =
+export type Currency11 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -3666,7 +3503,7 @@ export type Date20 = string;
 /**
  * ISO 4217 currency code.
  */
-export type Currency13 =
+export type Currency12 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -3849,7 +3686,7 @@ export type Date22 = string;
 /**
  * ISO 4217 currency code.
  */
-export type Currency14 =
+export type Currency13 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -4493,7 +4330,7 @@ export type DayCount1 =
 /**
  * ISO 4217 currency code.
  */
-export type Currency15 =
+export type Currency14 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -5391,7 +5228,13 @@ export interface DE1605Cebc97720Bf2277 {
    */
   fail_on_bad_fit?: boolean;
   forward_curve?: DD0B028D94F0F6D121A65;
-  fx?: D_82889F5B5A91A21407F1;
+  /**
+   * FX matrix config (explicit routing pivot and cache capacity) for a
+   * market built from FX spot quotes. `None` (the key omitted) supplies no
+   * FX configuration: building an FX matrix from quotes then errors rather
+   * than inferring a pivot (record CORE-CONVENTIONS-013 #5).
+   */
+  fx?: D_82889F5B5A91A21407F1 | null;
   hazard_curve?: DA7E08397Fba9E91716B7;
   /**
    * Optional market-data hierarchy snapshot.
@@ -5511,7 +5354,25 @@ export interface DD0B028D94F0F6D121A65 {
   weighting_scheme?: "equal" | "linear_time" | "sqrt_time" | "inverse_duration";
 }
 /**
- * FX matrix runtime config (pivot currency, triangulation, cache capacity).
+ * Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour
+ * (record CORE-CONVENTIONS-013 #5, resolution O9).
+ *
+ * The routing choice is explicit: there is no default pivot and no default
+ * configuration. `cache_capacity` may be omitted on the wire and then takes
+ * the operational default.
+ *
+ * # Examples
+ *
+ * ```rust
+ * use finstack_quant_core::currency::Currency;
+ * use finstack_quant_core::money::fx::FxConfig;
+ *
+ * assert_eq!(FxConfig::new(Some(Currency::USD)).pivot_currency, Some(Currency::USD));
+ * assert!(serde_json::from_str::<FxConfig>("{}").is_err());
+ * let direct: FxConfig = serde_json::from_str(r#"{"pivot_currency": null}"#)?;
+ * assert_eq!(direct.pivot_currency, None);
+ * # Ok::<(), serde_json::Error>(())
+ * ```
  */
 export interface D_82889F5B5A91A21407F1 {
   /**
@@ -5519,13 +5380,14 @@ export interface D_82889F5B5A91A21407F1 {
    */
   cache_capacity?: number;
   /**
-   * Whether to enable automatic triangulation for missing rates.
+   * Single pivot for `from -> pivot -> to` cross routing, or `None` for
+   * direct quotes only. Required on the wire (`null` disables routing).
    *
-   * When enabled, the matrix will attempt `from -> pivot -> to` and will not
-   * search multi-hop paths or alternative pivots.
+   * Only this one pivot is tried: no alternative pivot, multi-hop search or
+   * market-order inference. A pair whose market convention routes through
+   * another currency needs its direct quote seeded explicitly.
    */
-  enable_triangulation?: boolean;
-  pivot_currency?: Currency5;
+  pivot_currency: Currency3 | null;
 }
 /**
  * Hazard-curve specific solver configuration.
@@ -5850,7 +5712,7 @@ export interface D_5F0B38036294B8235C6A2 {
  * Typed conventions required to replay a rate-curve calibration.
  */
 export interface D_1Da7F2B6C0211Ad55Af2 {
-  currency: Currency15;
+  currency: Currency14;
   curve_day_count: DayCount2;
   /**
    * Numerical calibration method.

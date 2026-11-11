@@ -274,11 +274,6 @@
               "validation_tolerance": 1e-8,
               "weighting_scheme": "sqrt_time"
             },
-            "fx": {
-              "cache_capacity": 256,
-              "enable_triangulation": true,
-              "pivot_currency": "USD"
-            },
             "hazard_curve": {
               "hazard_hard_max": 10,
               "hazard_hard_min": 0,
@@ -754,11 +749,6 @@
               "validation_tolerance": 1e-8,
               "weighting_scheme": "sqrt_time"
             },
-            "fx": {
-              "cache_capacity": 256,
-              "enable_triangulation": true,
-              "pivot_currency": "USD"
-            },
             "hazard_curve": {
               "hazard_hard_max": 10,
               "hazard_hard_min": 0,
@@ -1069,7 +1059,6 @@
     "fx": {
       "config": {
         "pivot_currency": "USD",
-        "enable_triangulation": true,
         "cache_capacity": 17
       },
       "quotes": [["EUR", "USD", 1.1]],

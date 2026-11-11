@@ -355,7 +355,7 @@ test('core FX pair convention helpers', () => {
 
 test('core.FxMatrix quote updates invalidate cached crosses', () => {
   for (const pinned of [false, true]) {
-    const fx = new core.FxMatrix();
+    const fx = new core.FxMatrix('USD');
     const policy = core.FxConversionPolicy.cashflowDate();
     const date = '2025-01-02';
     fx.setQuotes([['GBP', 'USD', 1.25]]);
@@ -364,13 +364,20 @@ test('core.FxMatrix quote updates invalidate cached crosses', () => {
         ? fx.setQuoteOn('EUR', 'USD', date, policy, rate)
         : fx.setQuotes([['EUR', 'USD', rate]]);
     setEurUsd(1.1);
-    assert.ok(Math.abs(fx.rate('EUR', 'GBP', date).rate - 0.88) < 1e-12);
+    assert.ok(
+      Math.abs(fx.rate('EUR', 'GBP', date, core.FxConversionPolicy.cashflowDate()).rate - 0.88) <
+        1e-12
+    );
     setEurUsd(1.2);
-    const result = fx.rate('EUR', 'GBP', date);
+    const result = fx.rate('EUR', 'GBP', date, core.FxConversionPolicy.cashflowDate());
     assert.ok(Math.abs(result.rate - 0.96) < 1e-12);
     assert.equal(result.triangulated, true);
-    assert.ok(Math.abs(fx.rate('GBP', 'EUR', date).rate - 1 / 0.96) < 1e-12);
-    assert.equal(fx.rate('GBP', 'USD', date).rate, 1.25);
+    assert.ok(
+      Math.abs(
+        fx.rate('GBP', 'EUR', date, core.FxConversionPolicy.cashflowDate()).rate - 1 / 0.96
+      ) < 1e-12
+    );
+    assert.equal(fx.rate('GBP', 'USD', date, core.FxConversionPolicy.cashflowDate()).rate, 1.25);
     assert.equal(fx.rate('GBP', 'USD', date, policy).rate, 1.25);
   }
 });
@@ -528,7 +535,7 @@ test('core.FinstackConfig selects no rounding mode or ingest scale by default', 
 });
 
 test('core.FxMatrix rate returns FxRateResult with rate/triangulated getters', () => {
-  const fx = new core.FxMatrix();
+  const fx = new core.FxMatrix(null);
   const policy = core.FxConversionPolicy.cashflowDate();
   fx.setQuoteOn('EUR', 'USD', '2025-01-15', policy, 1.1);
   const result = fx.rate('EUR', 'USD', '2025-01-15', policy);
@@ -543,7 +550,10 @@ test('core.FxMatrix rate returns FxRateResult with rate/triangulated getters', (
 
 test('FxMatrix exposes the atomic batch setter without a singleton alias', () => {
   assert.equal('setQuote' in core.FxMatrix.prototype, false);
-  const fx = new core.FxMatrix();
+  const fx = new core.FxMatrix(null);
   fx.setQuotes([['EUR', 'USD', 1.1]]);
-  assert.equal(fx.rate('EUR', 'USD', '2025-01-02').rate, 1.1);
+  assert.equal(
+    fx.rate('EUR', 'USD', '2025-01-02', core.FxConversionPolicy.cashflowDate()).rate,
+    1.1
+  );
 });
