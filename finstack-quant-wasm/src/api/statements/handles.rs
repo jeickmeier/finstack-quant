@@ -107,7 +107,7 @@ impl JsEvaluator {
     ///
     /// @param model - `FinancialModelSpec` to evaluate (object or JSON).
     /// @param market - `MarketContext` state supplying curves, quotes and FX (object or JSON).
-    /// @param asOf - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments and the cutoff for explicit-value visibility. An actual whose availability date falls after `asOf` is hidden, so the node falls back to its forecast or formula, and a value-only node then fails.
+    /// @param asOf - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments and the cutoff for explicit-value visibility. A value whose declared availability date falls after `asOf` is hidden in any period; an actual with no declared date becomes visible at its period's end; an undated value in a forecast period is an assumption and stays visible. A hidden value makes the node fall back to its forecast or formula, and a value-only node then fails.
     /// @returns `StatementResult` plain object, including `cs_cashflows` for capital-structure models.
     /// @throws Error with kind `validation` if an input is malformed, `asOf` is not an ISO date, or a formula fails to evaluate; kind `not_found` if a node or market datum is missing; kind `computation` for a dependency cycle or a capital-structure failure.
     #[wasm_bindgen(js_name = evaluateWithMarket, unchecked_return_type = "StatementResult")]

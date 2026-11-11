@@ -61,7 +61,7 @@ pub(crate) fn evaluate_forecast(
         .rposition(|p| p.is_actual && node_spec.explicit_value_is_visible(p, visibility_cutoff));
     let anchor = actual_anchor.or_else(|| preceding.iter().position(|p| {
         node_spec.values.as_ref().is_some_and(|values| values.contains_key(&p.id))
-            && (!p.is_actual || node_spec.explicit_value_is_visible(p, visibility_cutoff))
+            && node_spec.explicit_value_is_visible(p, visibility_cutoff)
     })).ok_or_else(|| Error::forecast(format!(
         "Cannot determine base value for forecast of node '{}': no preceding visible observation", node_spec.node_id
     )))?;

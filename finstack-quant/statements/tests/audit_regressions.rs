@@ -381,3 +381,28 @@ fn fx_pivot_does_not_choose_reporting_currency() {
         Currency::EUR
     );
 }
+
+#[test]
+fn a_dated_value_hidden_by_as_of_is_not_a_forecast_base_outside_the_actuals_range() {
+    // No period is flagged actual; Q2's value is dated after the cutoff.
+    let mut model = {
+        let mut model_builder = ModelBuilder::new("availability-without-actuals");
+        model_builder.periods("2025Q1..Q3", None).unwrap();
+        model_builder.value(
+            "x",
+            &[(q(2025, 1), 100.0.into()), (q(2025, 2), 999.0.into())],
+        );
+        model_builder.build().unwrap()
+    };
+    let node = model.nodes.get_mut("x").unwrap();
+    node.forecast =
+        Some(serde_json::from_value(json!({"method":"growth_pct","params":{"rate":0.1}})).unwrap());
+    node.node_type = finstack_quant_statements::types::NodeType::Mixed;
+    node.availability_dates =
+        indexmap! {q(2025,1) => date!(2025-04-10), q(2025,2) => date!(2025-12-01)};
+    let result = Evaluator::new()
+        .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 11 - 01))
+        .unwrap();
+    assert!((result.get("x", &q(2025, 2)).unwrap() - 110.0).abs() < 1e-10);
+    assert!((result.get("x", &q(2025, 3)).unwrap() - 121.0).abs() < 1e-10);
+}

@@ -228,16 +228,21 @@ impl Evaluator {
     ///
     /// # As-of visibility
     ///
-    /// The `as_of` date is also the explicit-value visibility cutoff. Each
-    /// observation is visible only when its node-specific availability date is
-    /// on or before `as_of`. Observations without an explicit availability date
-    /// conservatively default to the reporting period's exclusive end date.
-    /// Unavailable actuals keep their place in the model timeline, but the node
+    /// The `as_of` date is also the explicit-value visibility cutoff:
+    ///
+    /// - A value with a declared availability date is visible only when that
+    ///   date is on or before `as_of`, in any period.
+    /// - A value without one in an actual period becomes visible at the
+    ///   period's exclusive end date.
+    /// - A value without one in a forecast period is an assumption, not an
+    ///   observation, and is always visible.
+    ///
+    /// A hidden value keeps its place in the model timeline, but the node
     /// resolves through forecast or formula fallbacks under normal precedence.
     ///
     /// `actuals_until` still classifies periods as actual or forecast.
     /// Availability is observation-specific and only decides whether an
-    /// explicit actual value was known at this evaluation's point in time.
+    /// explicit value was known at this evaluation's point in time.
     ///
     /// # Arguments
     ///
@@ -257,9 +262,9 @@ impl Evaluator {
     /// Returns an error if model formulas cannot be parsed or compiled, its
     /// dependency graph is invalid or cyclic, a required value or forecast
     /// cannot be resolved, capital-structure instruments cannot be built or
-    /// priced from `market_ctx`, or final checks fail. Any explicit values in
-    /// actual periods after `as_of` are intentionally hidden rather than used
-    /// as known data.
+    /// priced from `market_ctx`, or final checks fail. Explicit values not yet
+    /// available at `as_of` are intentionally hidden rather than used as known
+    /// data.
     pub fn evaluate_with_market(
         &mut self,
         model: &FinancialModelSpec,
@@ -943,13 +948,15 @@ impl Evaluator {
                     }
                 }
             }
-            let hidden = visibility_cutoff
-                .filter(|_| period.is_actual)
-                .map(|as_of| HiddenObservation {
-                    available_on: node_spec.explicit_value_available_on(period),
-                    as_of,
-                })
-                .filter(|hidden| hidden.available_on > hidden.as_of);
+            let hidden = visibility_cutoff.and_then(|as_of| {
+                node_spec
+                    .explicit_value_available_on(period)
+                    .filter(|available_on| *available_on > as_of)
+                    .map(|available_on| HiddenObservation {
+                        available_on,
+                        as_of,
+                    })
+            });
             let source =
                 resolve_node_value(node_spec, period_id, is_actual && hidden.is_none(), hidden)?;
             let cell_source = match source {
@@ -1243,6 +1250,42 @@ mod tests {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         assert_eq!(back.get("revenue", &period), Some(1.0));
         assert_eq!(back.get_source("revenue", &period), None);
+    }
+
+    #[test]
+    fn as_of_hides_a_dated_observation_outside_the_actuals_range() {
+        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let august = Date::from_calendar_date(2025, Month::August, 1).expect("date");
+        // No period is flagged actual.
+        let periods = finstack_quant_core::dates::build_periods("2025Q1..Q2", None)
+            .expect("periods")
+            .periods;
+        let evaluate = |q2_available_on: Option<Date>| {
+            let mut model = FinancialModelSpec::new("as-of-policy", periods.clone());
+            let mut availability = IndexMap::from([(q1, as_of)]);
+            if let Some(date) = q2_available_on {
+                availability.insert(q2, date);
+            }
+            model.add_node(
+                NodeSpec::new("revenue", NodeType::Mixed)
+                    .with_values(IndexMap::from([
+                        (q1, AmountOrScalar::scalar(100.0)),
+                        (q2, AmountOrScalar::scalar(999.0)),
+                    ]))
+                    .with_availability_dates(availability)
+                    .with_formula("123"),
+            );
+            Evaluator::new()
+                .evaluate_with_market(&model, &MarketContext::new(), as_of)
+                .expect("evaluation")
+                .get("revenue", &q2)
+        };
+        // Dated after the cutoff: hidden, so the formula answers.
+        assert_eq!(evaluate(Some(august)), Some(123.0));
+        // Undated value in a forecast period is an assumption and stays visible.
+        assert_eq!(evaluate(None), Some(999.0));
     }
 
     #[test]

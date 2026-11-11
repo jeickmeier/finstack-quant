@@ -814,9 +814,12 @@ class Evaluator:
             A :class:`MarketContext` with curves, FX, and vol surfaces.
         as_of:
             Valuation date for pricing, and the cutoff for explicit-value
-            visibility: an actual whose availability date falls after
-            ``as_of`` is hidden, so the node falls back to its forecast or
-            formula (a value-only node then raises).
+            visibility. A value whose declared availability date falls
+            after ``as_of`` is hidden in any period; an actual with no
+            declared date becomes visible at its period's end; an undated
+            value in a forecast period is an assumption and stays visible. A
+            hidden value makes the node fall back to its forecast or formula
+            (a value-only node then raises).
 
         Returns
         -------
