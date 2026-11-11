@@ -92,7 +92,8 @@ pub(crate) fn rebuild_residual_interest(
             0.0,
             None,
         )
-        .with_principal_delta(Money::new(delta, currency)?),
+        .with_principal_delta(Money::new(delta, currency)?)
+        .with_principal_date(from_date),
     );
     let mut changes = std::collections::BTreeMap::from([(effective, delta)]);
     let mut new_balance = new_outstanding.amount();
@@ -316,9 +317,7 @@ pub(crate) fn rebuild_residual_interest(
             if cash_is_future {
                 replacement[0].amount = Money::new(repayment, currency)?;
             }
-            if original.principal_delta.is_some() || !cash_is_future {
-                replacement[0].principal_delta = Some(Money::new(-repayment, currency)?);
-            }
+            replacement[0].principal_delta = Some(Money::new(-repayment, currency)?);
         }
         let original_delta = principal_change(original);
         let revised_delta: f64 = replacement.iter().map(principal_change).sum();
@@ -360,20 +359,10 @@ fn interest_value(flow: &CashFlow) -> Result<f64> {
         })
 }
 
+/// The explicit principal delta of a row; a non-principal row moves nothing.
+/// Nothing is inferred from cash or kind (record CORE-CONVENTIONS-015 #4).
 fn principal_change(flow: &CashFlow) -> f64 {
-    if let Some(delta) = flow.principal_delta {
-        return delta.amount();
-    }
-    match flow.kind {
-        CFKind::Pik => flow.amount.amount(),
-        CFKind::Amortization
-        | CFKind::PrePayment
-        | CFKind::DefaultedNotional
-        | CFKind::Notional
-        | CFKind::RevolvingDraw
-        | CFKind::RevolvingRepayment => -flow.amount.amount(),
-        _ => 0.0,
-    }
+    flow.principal_delta.map_or(0.0, |delta| delta.amount())
 }
 
 #[cfg(test)]
@@ -472,14 +461,12 @@ mod tests {
 
         let original = schedule(
             vec![
-                CashFlow::new(
-                    issue,
-                    None,
-                    Money::from((-1_000_000_i64, Currency::USD)),
-                    CFKind::Notional,
-                    0.0,
-                    None,
-                ),
+                {
+                    let cash = Money::from((-1_000_000_i64, Currency::USD));
+                    CashFlow::new(issue, None, cash, CFKind::Notional, 0.0, None)
+                        .with_principal_delta(Money::zero(Currency::USD))
+                        .with_principal_date(issue)
+                },
                 CashFlow::new(
                     q2_coupon,
                     None,
@@ -562,14 +549,12 @@ mod tests {
                     0.25,
                     Some(0.08),
                 ),
-                CashFlow::new(
-                    q2,
-                    None,
-                    Money::from((100_000_i64, Currency::USD)),
-                    CFKind::Amortization,
-                    0.0,
-                    None,
-                ),
+                {
+                    let cash = Money::from((100_000_i64, Currency::USD));
+                    CashFlow::new(q2, None, cash, CFKind::Amortization, 0.0, None)
+                        .with_principal_delta(cash.checked_neg())
+                        .with_principal_date(q2)
+                },
             ],
             1_000_000.0,
             issue,

@@ -28,14 +28,12 @@ fn tied_custom_coupon_intervals_choose_shorter_frequency() {
             )
         })
         .collect();
-    flows.push(CashFlow::new(
-        dates[2],
-        None,
-        Money::from((1000_i64, Currency::USD)),
-        CFKind::Notional,
-        0.0,
-        None,
-    ));
+    flows.push({
+        let cash = Money::from((1000_i64, Currency::USD));
+        CashFlow::new(dates[2], None, cash, CFKind::Notional, 0.0, None)
+            .with_principal_delta(cash.checked_neg())
+            .with_principal_date(dates[2])
+    });
     let schedule = CashFlowSchedule::from_flows(
         flows,
         Notional::par(1000.0, Currency::USD).expect("notional"),

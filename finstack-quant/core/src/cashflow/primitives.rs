@@ -618,9 +618,26 @@ impl CashFlow {
                 actual: delta.currency(),
             });
         }
+        // Every principal-like row states its complete principal effect, an
+        // explicit signed delta (zero included) and its balance date; other
+        // kinds carry neither (record CORE-CONVENTIONS-015 #4).
+        if self.kind.is_principal_like() {
+            if self.principal_delta.is_none() || self.principal_date.is_none() {
+                return Err(crate::Error::Validation(format!(
+                    "CashFlow: {} row on {} requires an explicit principal_delta and \
+                     principal_date; neither is inferred from its cash",
+                    self.kind, self.date
+                )));
+            }
+        } else if self.principal_delta.is_some() || self.principal_date.is_some() {
+            return Err(crate::Error::Validation(format!(
+                "CashFlow: {} row on {} is not a principal kind and cannot carry \
+                 principal_delta or principal_date",
+                self.kind, self.date
+            )));
+        }
         // PIK and DefaultedNotional are noncash balance events: exactly zero
-        // cash, with their value carried only by the explicit principal delta
-        // (record CORE-CONVENTIONS-015 #1).
+        // cash, dated at their balance event (record CORE-CONVENTIONS-015 #1, #6).
         if !self.kind.is_cash_settlement() {
             if !self.amount.amount_decimal().is_zero() {
                 return Err(crate::Error::Validation(format!(
@@ -629,9 +646,10 @@ impl CashFlow {
                     self.kind, self.date
                 )));
             }
-            if self.principal_delta.is_none() {
+            if self.principal_date != Some(self.date) {
                 return Err(crate::Error::Validation(format!(
-                    "CashFlow: {} row on {} requires an explicit principal_delta",
+                    "CashFlow: {} row on {} is a noncash balance event; its date must \
+                     equal its principal_date",
                     self.kind, self.date
                 )));
             }
@@ -810,8 +828,8 @@ mod tests {
             accrual_factor: 0.0,
             rate: None,
             accrual: None,
-            principal_delta: None,
-            principal_date: None,
+            principal_delta: Some(amt.checked_neg()),
+            principal_date: Some(date),
         };
         assert_eq!(princ.kind, CFKind::Notional);
         assert!(princ.validate().is_ok());
@@ -840,7 +858,7 @@ mod tests {
             rate: None,
             accrual: None,
             principal_delta: Some(amt),
-            principal_date: None,
+            principal_date: Some(date),
         };
         assert_eq!(pik.kind, CFKind::Pik);
         assert!(pik.validate().is_ok());
@@ -853,8 +871,8 @@ mod tests {
             accrual_factor: 0.0,
             rate: None,
             accrual: None,
-            principal_delta: None,
-            principal_date: None,
+            principal_delta: Some(amt.checked_neg()),
+            principal_date: Some(date),
         };
         assert_eq!(amort.kind, CFKind::Amortization);
         assert!(amort.validate().is_ok());

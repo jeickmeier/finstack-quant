@@ -782,14 +782,12 @@ fn explicit_principal_delta_preserves_movements_paid_on_redemption_date() {
     )
     .with_principal_delta(Money::from((25_i64, Currency::USD)))
     .with_principal_date(effective);
-    let redemption = CashFlow::new(
-        payment,
-        None,
-        Money::from((125_i64, Currency::USD)),
-        CFKind::Notional,
-        0.0,
-        None,
-    );
+    let redemption = {
+        let cash = Money::from((125_i64, Currency::USD));
+        CashFlow::new(payment, None, cash, CFKind::Notional, 0.0, None)
+            .with_principal_delta(cash.checked_neg())
+            .with_principal_date(payment)
+    };
     assert!(!is_terminal_redemption(&draw, Some(payment)));
     assert!(is_terminal_redemption(&redemption, Some(payment)));
     assert_eq!(static_balance_delta(&draw, false), Some(25.0));

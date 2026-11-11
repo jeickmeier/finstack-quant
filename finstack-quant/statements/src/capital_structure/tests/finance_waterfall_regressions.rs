@@ -581,23 +581,33 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
         let (mut state, mut flows) = loans(&["loan"], 100);
         let schedule = CashFlowSchedule::from_flows(
             vec![
-                CashFlow::new(
-                    date!(2025 - 04 - 04),
-                    None,
-                    usd(50),
-                    CFKind::Amortization,
-                    0.0,
-                    None,
-                )
+                {
+                    let cash = usd(50);
+                    CashFlow::new(
+                        date!(2025 - 04 - 04),
+                        None,
+                        cash,
+                        CFKind::Amortization,
+                        0.0,
+                        None,
+                    )
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(date!(2025 - 04 - 04))
+                }
                 .with_principal_date(date!(2025 - 04 - 02)),
-                CashFlow::new(
-                    date!(2025 - 03 - 31),
-                    None,
-                    usd(50),
-                    CFKind::Amortization,
-                    0.0,
-                    None,
-                )
+                {
+                    let cash = usd(50);
+                    CashFlow::new(
+                        date!(2025 - 03 - 31),
+                        None,
+                        cash,
+                        CFKind::Amortization,
+                        0.0,
+                        None,
+                    )
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(date!(2025 - 03 - 31))
+                }
                 .with_principal_date(date!(2025 - 04 - 03)),
             ],
             Notional::par(100.0, Currency::USD).expect("principal"),

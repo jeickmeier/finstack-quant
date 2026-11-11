@@ -534,14 +534,21 @@ mod period_flow_waterfall_integration {
                     0.25,
                     Some(0.04),
                 ),
-                CashFlow::new(
-                    Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
-                    None,
-                    Money::new(50_000.0, Currency::USD).expect("valid money fixture"),
-                    CFKind::Amortization,
-                    0.0,
-                    None,
-                ),
+                {
+                    let cash = Money::new(50_000.0, Currency::USD).expect("valid money fixture");
+                    CashFlow::new(
+                        Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
+                        None,
+                        cash,
+                        CFKind::Amortization,
+                        0.0,
+                        None,
+                    )
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(
+                        Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
+                    )
+                },
             ],
             1_000_000.0,
             issue,
@@ -614,14 +621,13 @@ mod period_flow_waterfall_integration {
         // coupon in Q4.
         let instrument: Arc<dyn Instrument> = Arc::new(ScheduleInstrument::new(schedule(
             vec![
-                CashFlow::new(
-                    issue,
-                    None,
-                    Money::new(-1_000_000.0, Currency::USD).expect("valid money fixture"),
-                    CFKind::Notional,
-                    0.0,
-                    None,
-                ),
+                {
+                    let cash =
+                        Money::new(-1_000_000.0, Currency::USD).expect("valid money fixture");
+                    CashFlow::new(issue, None, cash, CFKind::Notional, 0.0, None)
+                        .with_principal_delta(cash.checked_neg())
+                        .with_principal_date(issue)
+                },
                 CashFlow::new(
                     Date::from_calendar_date(2025, Month::November, 15).expect("valid date"),
                     None,

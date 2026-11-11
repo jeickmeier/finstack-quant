@@ -21,6 +21,8 @@ use finstack_quant_models::monte_carlo::results::{MoneyEstimate, MonteCarloResul
 /// Accumulator for one expected flow across Monte Carlo paths.
 struct ExpectedFlow {
     amount: Money,
+    /// Summed explicit principal deltas of the bucket's principal rows.
+    principal_delta: Option<Money>,
     rate_sum: f64,
     rate_count: usize,
     accrual_factor: f64,
@@ -75,22 +77,33 @@ impl RevolvingCreditPricer {
 
         // Insertion order of the first appearance keeps the schedule stable
         // (paths share dates and emission order).
-        let mut order: Vec<(Date, Option<Date>, CFKind)> = Vec::new();
-        let mut buckets: FxHashMap<(Date, Option<Date>, CFKind), ExpectedFlow> =
-            FxHashMap::default();
+        // A principal row's balance date is part of its identity, so rows
+        // sharing a payment but not a balance date stay apart.
+        type Key = (Date, Option<Date>, CFKind, Option<Date>);
+        let mut order: Vec<Key> = Vec::new();
+        let mut buckets: FxHashMap<Key, ExpectedFlow> = FxHashMap::default();
         for path in &enhanced.path_results {
             for cf in path.cashflows.get_flows() {
-                let key = (cf.date, cf.reset_date, cf.kind);
+                let key = (cf.date, cf.reset_date, cf.kind, cf.principal_date);
                 let entry = buckets.entry(key).or_insert_with(|| {
                     order.push(key);
                     ExpectedFlow {
                         amount: Money::from((0_i64, ccy)),
+                        principal_delta: None,
                         rate_sum: 0.0,
                         rate_count: 0,
                         accrual_factor: cf.accrual_factor,
                     }
                 });
                 entry.amount = entry.amount.checked_add(cf.amount)?;
+                // The expected principal effect is the mean of the explicit
+                // path deltas (record CORE-CONVENTIONS-015 #4).
+                if let Some(delta) = cf.principal_delta {
+                    entry.principal_delta = Some(match entry.principal_delta {
+                        Some(sum) => sum.checked_add(delta)?,
+                        None => delta,
+                    });
+                }
                 if let Some(rate) = cf.rate {
                     entry.rate_sum += rate;
                     entry.rate_count += 1;
@@ -103,14 +116,20 @@ impl RevolvingCreditPricer {
             .map(|key| {
                 let flow = &buckets[&key];
                 let rate = (flow.rate_count > 0).then(|| flow.rate_sum / flow.rate_count as f64);
-                Ok(CashFlow::new(
+                let mut expected = CashFlow::new(
                     key.0,
                     key.1,
                     flow.amount.checked_div_f64(num_paths)?,
                     key.2,
                     flow.accrual_factor,
                     rate,
-                ))
+                );
+                expected.principal_delta = flow
+                    .principal_delta
+                    .map(|sum| sum.checked_div_f64(num_paths))
+                    .transpose()?;
+                expected.principal_date = key.3;
+                Ok(expected)
             })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 

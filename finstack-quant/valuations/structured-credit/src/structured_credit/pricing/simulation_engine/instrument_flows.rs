@@ -1390,23 +1390,37 @@ fn past_principal_delta(
         if cf.date > as_of {
             continue;
         }
-        let amount = cf.amount.amount();
         match cf.kind {
             CFKind::Notional
             | CFKind::Amortization
             | CFKind::PrePayment
             | CFKind::RevolvingDraw
             | CFKind::RevolvingRepayment => {
-                if amount < 0.0 && !include_funding {
+                // The explicit par change, never the cash (record
+                // CORE-CONVENTIONS-015 #4); a positive delta is funding.
+                let change = principal_delta_of(cf)?;
+                if change > 0.0 && !include_funding {
                     continue;
                 }
-                delta -= amount;
+                delta += change;
             }
             CFKind::Pik => delta += pik_delta(cf)?,
             _ => {}
         }
     }
     Ok(delta)
+}
+
+/// Explicit principal delta of a principal row.
+fn principal_delta_of(cf: &finstack_quant_core::cashflow::CashFlow) -> Result<f64> {
+    cf.principal_delta
+        .map(|delta| delta.amount())
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "{} row on {} has no principal_delta",
+                cf.kind, cf.date
+            ))
+        })
 }
 
 /// Balance a rate-based flow accrued on: `amount / (rate × accrual)`.

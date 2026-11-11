@@ -650,14 +650,12 @@ fn outstanding_by_date_dedup_and_values() {
 fn outstanding_by_date_includes_prepayment() {
     let prepay_date = Date::from_calendar_date(2025, Month::March, 15).unwrap();
     let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
-        vec![CashFlow::new(
-            prepay_date,
-            None,
-            Money::new(250.0, Currency::USD).expect("valid money fixture"),
-            CFKind::PrePayment,
-            0.0,
-            None,
-        )],
+        vec![{
+            let cash = Money::new(250.0, Currency::USD).expect("valid money fixture");
+            CashFlow::new(prepay_date, None, cash, CFKind::PrePayment, 0.0, None)
+                .with_principal_delta(cash.checked_neg())
+                .with_principal_date(prepay_date)
+        }],
         finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD)
             .expect("valid notional fixture"),
         DayCount::Act365F,
@@ -757,17 +755,15 @@ fn builder_created_schedule_sets_issue_date_for_outstanding_by_date() {
 }
 
 #[test]
-fn outstanding_by_date_requires_issue_date() {
+fn outstanding_by_date_replays_explicit_deltas_without_an_issue_date() {
     let prepay_date = Date::from_calendar_date(2025, Month::March, 15).unwrap();
     let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
-        vec![CashFlow::new(
-            prepay_date,
-            None,
-            Money::new(250.0, Currency::USD).expect("valid money fixture"),
-            CFKind::PrePayment,
-            0.0,
-            None,
-        )],
+        vec![{
+            let cash = Money::new(250.0, Currency::USD).expect("valid money fixture");
+            CashFlow::new(prepay_date, None, cash, CFKind::PrePayment, 0.0, None)
+                .with_principal_delta(cash.checked_neg())
+                .with_principal_date(prepay_date)
+        }],
         finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD)
             .expect("valid notional fixture"),
         DayCount::Act365F,
@@ -775,10 +771,12 @@ fn outstanding_by_date_requires_issue_date() {
     )
     .expect("valid cashflow rows");
 
-    let err = schedule
-        .outstanding_by_date()
-        .expect_err("issue_date is required");
-    assert!(err.to_string().contains("issue_date"));
+    // Explicit deltas need no issue date to find a funding row
+    // (record CORE-CONVENTIONS-015 #4, #5).
+    let path = schedule.outstanding_by_date().expect("explicit replay");
+    assert_eq!(path.len(), 1);
+    assert_eq!(path[0].0, prepay_date);
+    assert_eq!(path[0].1.amount(), 750.0);
 }
 
 #[test]
@@ -1268,22 +1266,18 @@ fn test_weighted_average_life_two_amort() {
     let d2 = Date::from_calendar_date(2027, Month::January, 15).unwrap();
 
     let flows = vec![
-        CashFlow::new(
-            d1,
-            None,
-            Money::new(500.0, Currency::USD).expect("valid money fixture"),
-            CFKind::Amortization,
-            0.0,
-            None,
-        ),
-        CashFlow::new(
-            d2,
-            None,
-            Money::new(500.0, Currency::USD).expect("valid money fixture"),
-            CFKind::Amortization,
-            0.0,
-            None,
-        ),
+        {
+            let cash = Money::new(500.0, Currency::USD).expect("valid money fixture");
+            CashFlow::new(d1, None, cash, CFKind::Amortization, 0.0, None)
+                .with_principal_delta(cash.checked_neg())
+                .with_principal_date(d1)
+        },
+        {
+            let cash = Money::new(500.0, Currency::USD).expect("valid money fixture");
+            CashFlow::new(d2, None, cash, CFKind::Amortization, 0.0, None)
+                .with_principal_delta(cash.checked_neg())
+                .with_principal_date(d2)
+        },
     ];
 
     let schedule = CashFlowSchedule::from_flows(
@@ -1314,14 +1308,12 @@ fn test_weighted_average_life_bullet() {
     let as_of = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 15).unwrap();
 
-    let flows = vec![CashFlow::new(
-        maturity,
-        None,
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        CFKind::Notional,
-        0.0,
-        None,
-    )];
+    let flows = vec![{
+        let cash = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
+        CashFlow::new(maturity, None, cash, CFKind::Notional, 0.0, None)
+            .with_principal_delta(cash.checked_neg())
+            .with_principal_date(maturity)
+    }];
 
     let schedule = CashFlowSchedule::from_flows(
         flows,
@@ -1392,14 +1384,12 @@ fn test_weighted_average_life_ignores_coupons() {
             Some(0.05),
         ),
         // Single principal redemption at maturity - only this counts
-        CashFlow::new(
-            maturity,
-            None,
-            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-            CFKind::Notional,
-            0.0,
-            None,
-        ),
+        {
+            let cash = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
+            CashFlow::new(maturity, None, cash, CFKind::Notional, 0.0, None)
+                .with_principal_delta(cash.checked_neg())
+                .with_principal_date(maturity)
+        },
     ];
 
     let schedule = CashFlowSchedule::from_flows(

@@ -210,6 +210,15 @@ pub fn schedule_from_dated_flows(
     day_count: DayCount,
     opts: ScheduleBuildOpts,
 ) -> finstack_quant_core::Result<CashFlowSchedule> {
+    // A dated amount cannot state a principal effect, so principal kinds must
+    // be built as classified flows with explicit deltas (record
+    // CORE-CONVENTIONS-015 #4).
+    if kind.is_principal_like() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "schedule_from_dated_flows cannot build {kind} rows: a principal row needs an \
+             explicit principal_delta and principal_date; use schedule_from_classified_flows"
+        )));
+    }
     let classified = flows
         .into_iter()
         .map(|(date, amount)| CashFlow::new(date, None, amount, kind, 0.0, None))
@@ -256,7 +265,10 @@ pub fn schedule_from_dated_flows(
 /// let date = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
 /// let flows = vec![
 ///     CashFlow::new(date, None, Money::from((50_000_i64, Currency::USD)), CFKind::Fixed, 0.5, Some(0.05)),
-///     CashFlow::new(date, None, Money::from((10_000_i64, Currency::USD)), CFKind::Pik, 0.5, Some(0.01)),
+///     // PIK carries zero cash; its capitalization is the explicit delta.
+///     CashFlow::new(date, None, Money::zero(Currency::USD), CFKind::Pik, 0.5, Some(0.01))
+///         .with_principal_delta(Money::from((10_000_i64, Currency::USD)))
+///         .with_principal_date(date),
 /// ];
 /// let schedule = schedule_from_classified_flows(
 ///     flows,
@@ -303,9 +315,19 @@ mod tests {
     #[test]
     fn dated_flows_rejects_invalid_principal_state() {
         let date = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
-        let mut schedule = schedule_from_dated_flows(
-            vec![(date, Money::from((150_i64, Currency::USD)))],
-            CFKind::Amortization,
+        let mut schedule = schedule_from_classified_flows(
+            vec![
+                CashFlow::new(
+                    date,
+                    None,
+                    Money::from((150_i64, Currency::USD)),
+                    CFKind::Amortization,
+                    0.0,
+                    None,
+                )
+                .with_principal_delta(Money::from((-150_i64, Currency::USD)))
+                .with_principal_date(date),
+            ],
             DayCount::Act360,
             ScheduleBuildOpts {
                 notional_hint: Some(Money::from((100_i64, Currency::USD))),
@@ -340,23 +362,33 @@ mod tests {
                 0.0,
                 None,
             )
-            .with_principal_delta(Money::from((0_i64, Currency::EUR))),
+            .with_principal_delta(Money::from((0_i64, Currency::EUR)))
+            .with_principal_date(date),
         );
         let error = schedule
             .dated_flows()
             .expect_err("foreign non-principal rows cannot bypass balance checks");
-        assert!(error.to_string().contains("repayments exceed outstanding"));
+        assert!(
+            error.to_string().contains("repayments exceed outstanding"),
+            "{error}"
+        );
     }
 
     #[test]
     fn native_settlements_support_multiple_principal_currencies() {
         let date = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
-        let schedule = schedule_from_dated_flows(
+        let schedule = schedule_from_classified_flows(
             vec![
                 (date, Money::from((100_i64, Currency::USD))),
                 (date, Money::from((90_i64, Currency::EUR))),
-            ],
-            CFKind::Notional,
+            ]
+            .into_iter()
+            .map(|(date, cash)| {
+                CashFlow::new(date, None, cash, CFKind::Notional, 0.0, None)
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(date)
+            })
+            .collect(),
             DayCount::Act360,
             ScheduleBuildOpts {
                 notional_hint: Some(Money::from((100_i64, Currency::USD))),
@@ -511,7 +543,8 @@ mod tests {
                     0.0,
                     None,
                 )
-                .with_principal_delta(Money::from((40_i64, Currency::USD))),
+                .with_principal_delta(Money::from((40_i64, Currency::USD)))
+                .with_principal_date(future),
                 CashFlow::new(
                     past,
                     None,
@@ -653,14 +686,12 @@ mod tests {
     fn schedule_from_classified_flows_preserves_kinds() {
         let date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let flows = vec![
-            CashFlow::new(
-                date,
-                None,
-                Money::from((20_i64, Currency::USD)),
-                CFKind::PrePayment,
-                0.0,
-                None,
-            ),
+            {
+                let cash = Money::from((20_i64, Currency::USD));
+                CashFlow::new(date, None, cash, CFKind::PrePayment, 0.0, None)
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(date)
+            },
             CashFlow::new(
                 date,
                 None,
@@ -696,8 +727,8 @@ mod tests {
         )];
 
         let schedule = schedule_from_dated_flows(
-            flows,
-            CFKind::Notional,
+            flows.clone(),
+            CFKind::Fee,
             DayCount::Act365F,
             ScheduleBuildOpts {
                 notional_hint: Some(Money::from((100_i64, Currency::USD))),
@@ -707,7 +738,17 @@ mod tests {
         .expect("valid schedule");
 
         assert_eq!(schedule.flows.len(), 1);
-        assert_eq!(schedule.flows[0].kind, CFKind::Notional);
+        assert_eq!(schedule.flows[0].kind, CFKind::Fee);
+        // A dated amount cannot state a principal effect, so principal kinds
+        // are rejected (record CORE-CONVENTIONS-015 #4).
+        let error = schedule_from_dated_flows(
+            flows,
+            CFKind::Notional,
+            DayCount::Act365F,
+            ScheduleBuildOpts::default(),
+        )
+        .expect_err("principal kinds need explicit effects");
+        assert!(error.to_string().contains("explicit principal_delta"));
     }
 
     #[test]

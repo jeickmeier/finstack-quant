@@ -315,6 +315,7 @@ fn pik_records() -> Vec<Value> {
     );
     pik.kind = CFKind::Pik;
     pik.principal_delta = Some(pik.amount);
+    pik.principal_date = Some(pik.date);
     pik.amount = Money::zero(pik.amount.currency());
     let schedule = hand_schedule(
         vec![cash, pik],

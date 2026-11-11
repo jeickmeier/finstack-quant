@@ -328,37 +328,27 @@ pub(super) fn static_balance_delta(flow: &CashFlow, terminal_redemption: bool) -
     if terminal_redemption {
         return None;
     }
-    if let Some(delta) = flow.principal_delta {
-        return Some(delta.amount());
-    }
-    match flow.kind {
-        CFKind::Pik => Some(flow.amount.amount()),
-        CFKind::Amortization
-        | CFKind::PrePayment
-        | CFKind::DefaultedNotional
-        | CFKind::Notional
-        | CFKind::RevolvingDraw
-        | CFKind::RevolvingRepayment => Some(-flow.amount.amount()),
-        _ => None,
-    }
+    // Only the explicit delta moves the balance (record CORE-CONVENTIONS-015 #4).
+    flow.principal_delta.map(|delta| delta.amount())
 }
 
 pub(super) fn is_terminal_redemption(flow: &CashFlow, final_date: Option<Date>) -> bool {
     is_par_redemption(flow) && final_date.is_some_and(|date| flow.date == date)
 }
 
-/// A positive notional repayment that redeems exactly its cash at par; the
+/// A positive notional repayment whose explicit delta redeems exactly its cash
+/// at par; the
 /// latest one is the terminal redemption the replay pays dynamically.
 pub(super) fn is_par_redemption(flow: &CashFlow) -> bool {
     flow.kind == CFKind::Notional
         && flow.amount.amount() > 0.0
         && flow
             .principal_delta
-            .is_none_or(|delta| delta == flow.amount.checked_neg())
+            .is_some_and(|delta| delta == flow.amount.checked_neg())
 }
 
 /// The issue funding exchange whose principal the opening balance already
-/// holds: its delta is absent or an explicit zero (record
+/// holds: its delta is an explicit zero (record
 /// CORE-CONVENTIONS-015 #5).
 pub(super) fn is_opening_funding(flow: &CashFlow, issue_date: Date) -> bool {
     flow.kind == CFKind::Notional
@@ -366,7 +356,7 @@ pub(super) fn is_opening_funding(flow: &CashFlow, issue_date: Date) -> bool {
         && flow.amount.amount() < 0.0
         && flow
             .principal_delta
-            .is_none_or(|delta| delta.amount() == 0.0)
+            .is_some_and(|delta| delta.amount() == 0.0)
 }
 
 pub(super) fn scheduled_outstanding_after(

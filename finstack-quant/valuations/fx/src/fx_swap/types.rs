@@ -268,9 +268,35 @@ impl FxSwap {
         } else {
             vec![(payment_date, amount)]
         };
-        finstack_quant_cashflows::schedule_from_dated_flows(
-            flows,
-            CFKind::Notional,
+        finstack_quant_cashflows::schedule_from_classified_flows(
+            flows
+                .into_iter()
+                .map(
+                    |(date, cash): (
+                        finstack_quant_core::dates::Date,
+                        finstack_quant_core::money::Money,
+                    )| {
+                        // The opening notional is this exchange's magnitude: a paid
+                        // leg is already held, a received leg repays it (record
+                        // CORE-CONVENTIONS-015 #4, #5).
+                        let delta = if cash.amount() < 0.0 {
+                            finstack_quant_core::money::Money::zero(cash.currency())
+                        } else {
+                            cash.checked_neg()
+                        };
+                        finstack_quant_core::cashflow::CashFlow::new(
+                            date,
+                            None,
+                            cash,
+                            CFKind::Notional,
+                            0.0,
+                            None,
+                        )
+                        .with_principal_delta(delta)
+                        .with_principal_date(date)
+                    },
+                )
+                .collect(),
             finstack_quant_core::dates::DayCount::Act365F,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(Money::new(amount.amount().abs(), amount.currency())?),

@@ -855,6 +855,39 @@ logged under Needs review.
       settled claim, deposit, repo and revolver rows have cash equal to par.
     - Fixtures: the cross-host cashflows and valuations parity goldens, the
       schema golden and four UI fixtures gained the explicit fields.
+  - **G5-3d2 shape validation, no inference.** `CashFlow::validate` now
+    requires an explicit `principal_delta` and `principal_date` on every
+    principal-like row, rejects both on every other kind, and requires PIK and
+    write-down rows to be dated at their principal date (record 015 #1, #4,
+    #6). Balance replay applies only explicit deltas: the issue-funding
+    heuristic (`is_initial_funding_flow`), the funding anchor, the
+    amount-based fallback, and the issue-date requirement of
+    `outstanding_by_date` / `balances_by_flow` are gone. The same fallbacks
+    were removed from credit-recovery funding lots, WAL, statements
+    residual and funding helpers, term-loan pending principal, LSMC static
+    balance deltas and the structured-credit balance replay.
+    `schedule_from_dated_flows` rejects principal kinds.
+    - **Missed producers found by validation.** The FX spot, forward, swap,
+      NDF, commodity forward and dollar roll schedules booked their exchanges
+      as `Notional` through `schedule_from_dated_flows`; they now build
+      classified rows with explicit deltas equal to the old inference (an FX
+      swap or commodity forward leg the opening notional already held carries
+      zero). The statements residual-rebuild prepayment lacked its date; the
+      revolver stochastic expected schedule averaged cash but dropped the
+      path deltas, and now averages them too.
+    - **Settlement filter.** `dated_flows` drops a zero-cash row only when it
+      moves principal (a balance marker); a zero settlement that moves
+      nothing (a zero-notional FX spot) stays.
+    - **Fixtures.** About 90 hand-built principal rows in Rust tests and nine
+      in Python tests gained explicit effects (minus cash; zero for issue
+      funding the opening notional holds). Tests asserting retired behaviour
+      were rewritten: `outstanding_by_date_requires_issue_date` now checks
+      replay without an issue date, the dated-flow kind test uses a fee and
+      asserts principal kinds are rejected, and an early-paid PIK credit
+      fixture is dated at capitalization. No production number or golden
+      moved; the cashflows UI fixture gained the FX swap rows' deltas.
+    - Doc examples building principal rows were updated; doctests were not
+      run (nightly tier).
 - **Notebooks broken by earlier slices (found during G5, fixed in `NB:`).**
   A full run (`run_all_notebooks.py --timeout 120`) after G5-3b passed 92 of
   101; none of the 9 failures involved PIK or write-down rows, and slice

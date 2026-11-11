@@ -40,7 +40,11 @@ def test_aggregation_round_trip_preserves_currency_labels() -> None:
 
 def test_dated_flows_rejects_same_invalid_economics_as_json() -> None:
     schedule = CashFlowSchedule.from_flows(
-        [CashFlow(dt.date(2025, 6, 15), Money(150, "USD"), "amortization", 0.0)],
+        [
+            CashFlow(dt.date(2025, 6, 15), Money(150, "USD"), "amortization", 0.0)
+            .with_principal_delta(Money(-150, "USD"))
+            .with_principal_date(dt.date(2025, 6, 15))
+        ],
         Notional.par(100, "USD"),
         DayCount.ACT_360,
     )
@@ -57,7 +61,7 @@ def test_dated_flows_preserves_cash_and_omits_state_rows() -> None:
         [
             CashFlow(date, Money(10, "USD"), "fixed", 0.0),
             # Noncash balance events carry zero cash and an explicit delta.
-            CashFlow(date, Money(0, "USD"), "pik", 0.0).with_principal_delta(Money(5, "USD")),
+            CashFlow(date, Money(0, "USD"), "pik", 0.0).with_principal_delta(Money(5, "USD")).with_principal_date(date),
             CashFlow(date, Money(0, "USD"), "defaulted_notional", 0.0)
             .with_principal_delta(Money(-20, "USD"))
             .with_principal_date(date),

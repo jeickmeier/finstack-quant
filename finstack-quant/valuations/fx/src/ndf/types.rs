@@ -801,12 +801,32 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
         }
         let settlement_amount = self.settlement_amount(market, as_of)?;
         let ccy = self.settlement_currency;
-        let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
+        let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
             vec![(
                 self.maturity,
                 Money::from_model_value(settlement_amount, ccy)?,
-            )],
-            CFKind::Notional,
+            )]
+            .into_iter()
+            .map(
+                |(date, cash): (
+                    finstack_quant_core::dates::Date,
+                    finstack_quant_core::money::Money,
+                )| {
+                    // The exchanged amount is the principal movement (record
+                    // CORE-CONVENTIONS-015 #4).
+                    finstack_quant_core::cashflow::CashFlow::new(
+                        date,
+                        None,
+                        cash,
+                        CFKind::Notional,
+                        0.0,
+                        None,
+                    )
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(date)
+                },
+            )
+            .collect(),
             finstack_quant_core::dates::DayCount::Act365F,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(Money::from((0_i64, ccy))),

@@ -187,22 +187,36 @@ mod tests {
                 0.0,
                 None,
             ),
-            CashFlow::new(
-                Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
-                None,
-                Money::from((100_i64, Currency::USD)),
-                CFKind::Amortization,
-                0.0,
-                None,
-            ),
-            CashFlow::new(
-                Date::from_calendar_date(2027, Month::January, 1).expect("valid date"),
-                None,
-                Money::from((50_i64, Currency::USD)),
-                CFKind::PrePayment,
-                0.0,
-                None,
-            ),
+            {
+                let cash = Money::from((100_i64, Currency::USD));
+                CashFlow::new(
+                    Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
+                    None,
+                    cash,
+                    CFKind::Amortization,
+                    0.0,
+                    None,
+                )
+                .with_principal_delta(cash.checked_neg())
+                .with_principal_date(
+                    Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
+                )
+            },
+            {
+                let cash = Money::from((50_i64, Currency::USD));
+                CashFlow::new(
+                    Date::from_calendar_date(2027, Month::January, 1).expect("valid date"),
+                    None,
+                    cash,
+                    CFKind::PrePayment,
+                    0.0,
+                    None,
+                )
+                .with_principal_delta(cash.checked_neg())
+                .with_principal_date(
+                    Date::from_calendar_date(2027, Month::January, 1).expect("valid date"),
+                )
+            },
         ]);
 
         let wal = WalCalculator.calculate(&mut context).expect("wal");
@@ -233,14 +247,21 @@ mod tests {
             MetricContext::default_config(),
         );
         context.tagged_cashflows = Some(vec![
-            CashFlow::new(
-                Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
-                None,
-                Money::from((100_i64, Currency::USD)),
-                CFKind::Amortization,
-                0.0,
-                None,
-            ),
+            {
+                let cash = Money::from((100_i64, Currency::USD));
+                CashFlow::new(
+                    Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
+                    None,
+                    cash,
+                    CFKind::Amortization,
+                    0.0,
+                    None,
+                )
+                .with_principal_delta(cash.checked_neg())
+                .with_principal_date(
+                    Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
+                )
+            },
             // A large write-down much later: if counted as principal it would
             // drag WAL far above 1y.
             CashFlow::new(
@@ -291,7 +312,10 @@ mod tests {
             principal_flows
                 .iter()
                 .map(|(date, amount)| {
-                    CashFlow::new(*date, None, *amount, CFKind::Amortization, 0.0, None)
+                    let cash = *amount;
+                    CashFlow::new(*date, None, cash, CFKind::Amortization, 0.0, None)
+                        .with_principal_delta(cash.checked_neg())
+                        .with_principal_date(*date)
                 })
                 .collect(),
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),

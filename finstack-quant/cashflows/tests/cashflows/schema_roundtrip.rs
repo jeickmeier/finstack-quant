@@ -284,10 +284,16 @@ fn test_json_bridge_validates_pre_issue_principal_and_fee_flows() {
     pre_issue_notional["date"] = json!("2024-08-15");
     pre_issue_notional["kind"] = json!("notional");
     pre_issue_notional["amount"] = json!({"amount": "-100000", "currency": "USD"});
+    pre_issue_notional["principal_delta"] = json!({"amount": "100000", "currency": "USD"});
+    pre_issue_notional["principal_date"] = json!("2024-08-15");
     let mut pre_issue_fee = template_flow.clone();
     pre_issue_fee["date"] = json!("2024-08-15");
     pre_issue_fee["kind"] = json!("fee");
     pre_issue_fee["amount"] = json!({"amount": "5000", "currency": "USD"});
+    // A fee carries no principal effect (record CORE-CONVENTIONS-015 #4).
+    let fee_fields = pre_issue_fee.as_object_mut().expect("flow object");
+    fee_fields.remove("principal_delta");
+    fee_fields.remove("principal_date");
 
     let flows = schedule_value["flows"].as_array_mut().expect("flows array");
     flows.insert(0, pre_issue_fee);
@@ -305,6 +311,9 @@ fn test_json_bridge_validates_pre_issue_principal_and_fee_flows() {
     let mut pre_issue_coupon = template_flow;
     pre_issue_coupon["date"] = json!("2024-08-15");
     pre_issue_coupon["kind"] = json!("fixed");
+    let coupon_fields = pre_issue_coupon.as_object_mut().expect("flow object");
+    coupon_fields.remove("principal_delta");
+    coupon_fields.remove("principal_date");
     bad_schedule["flows"]
         .as_array_mut()
         .expect("flows array")

@@ -386,6 +386,8 @@ def test_cashflows_reject_amortization_over_notional() -> None:
         "kind": "amortization",
         "accrual_factor": 0.0,
         "rate": None,
+        "principal_delta": {"amount": "-1000011", "currency": "USD"},
+        "principal_date": "2025-03-31",
     })
 
     with pytest.raises(ValueError, match="principal repayments exceed outstanding"):

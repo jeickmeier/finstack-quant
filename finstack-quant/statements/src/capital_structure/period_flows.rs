@@ -46,13 +46,9 @@ pub(crate) fn funding_principal(flow: &CashFlow) -> Option<Money> {
     if !matches!(flow.kind, CFKind::Notional | CFKind::RevolvingDraw) {
         return None;
     }
-    if let Some(delta) = flow.principal_delta {
-        return (delta.amount() > 0.0).then_some(delta);
-    }
-    if matches!(flow.kind, CFKind::RevolvingDraw) || flow.amount.amount() <= 0.0 {
-        return Some(flow.amount.abs());
-    }
-    None
+    // New principal is the explicit positive delta, never the cash
+    // (record CORE-CONVENTIONS-015 #4, #5).
+    flow.principal_delta.filter(|delta| delta.amount() > 0.0)
 }
 
 /// Capitalized amount of a PIK row: the magnitude of its explicit principal
@@ -743,14 +739,12 @@ mod tests {
         // Revolver: draw 1M this period, then accrue a 20k coupon on it.
         let instrument = SignedFlowInstrument::new(test_schedule(
             vec![
-                CashFlow::new(
-                    draw_date,
-                    None,
-                    Money::from((1_000_000_i64, Currency::USD)),
-                    CFKind::RevolvingDraw,
-                    0.0,
-                    None,
-                ),
+                {
+                    let cash = Money::from((1_000_000_i64, Currency::USD));
+                    CashFlow::new(draw_date, None, cash, CFKind::RevolvingDraw, 0.0, None)
+                        .with_principal_delta(cash.checked_neg())
+                        .with_principal_date(draw_date)
+                },
                 CashFlow::new(
                     coupon_date,
                     None,
@@ -1012,14 +1006,21 @@ mod tests {
                     0.25,
                     None,
                 ),
-                CashFlow::new(
-                    Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
-                    None,
-                    Money::from((-100_000_i64, Currency::USD)),
-                    CFKind::Amortization,
-                    0.0,
-                    None,
-                ),
+                {
+                    let cash = Money::from((-100_000_i64, Currency::USD));
+                    CashFlow::new(
+                        Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
+                        None,
+                        cash,
+                        CFKind::Amortization,
+                        0.0,
+                        None,
+                    )
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(
+                        Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
+                    )
+                },
             ],
             1_000_000.0,
             Date::from_calendar_date(2024, Month::January, 1).expect("valid issue date"),
@@ -1056,14 +1057,21 @@ mod tests {
         };
 
         let instrument = SignedFlowInstrument::new(test_schedule(
-            vec![CashFlow::new(
-                Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                None,
-                Money::from((-100_000_i64, Currency::USD)),
-                CFKind::RevolvingDraw,
-                0.0,
-                None,
-            )],
+            vec![{
+                let cash = Money::from((-100_000_i64, Currency::USD));
+                CashFlow::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    cash,
+                    CFKind::RevolvingDraw,
+                    0.0,
+                    None,
+                )
+                .with_principal_delta(cash.checked_neg())
+                .with_principal_date(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                )
+            }],
             0.0,
             start,
         ));
@@ -1119,14 +1127,12 @@ mod tests {
                 0.25,
                 Some(0.04),
             ));
-            flows.push(CashFlow::new(
-                q_start(q),
-                None,
-                Money::from((100_000_i64, Currency::USD)),
-                CFKind::Amortization,
-                0.0,
-                None,
-            ));
+            flows.push({
+                let cash = Money::from((100_000_i64, Currency::USD));
+                CashFlow::new(q_start(q), None, cash, CFKind::Amortization, 0.0, None)
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(q_start(q))
+            });
             outstanding -= 100_000.0;
         }
         let instrument = SignedFlowInstrument::new(test_schedule(flows, 1_000_000.0, issue));
@@ -1183,22 +1189,36 @@ mod tests {
         let issue = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
         let instrument = SignedFlowInstrument::new(test_schedule(
             vec![
-                CashFlow::new(
-                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                    None,
-                    Money::from((-100_000_i64, Currency::USD)),
-                    CFKind::RevolvingDraw,
-                    0.0,
-                    None,
-                ),
-                CashFlow::new(
-                    Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
-                    None,
-                    Money::from((30_000_i64, Currency::USD)),
-                    CFKind::RevolvingRepayment,
-                    0.0,
-                    None,
-                ),
+                {
+                    let cash = Money::from((-100_000_i64, Currency::USD));
+                    CashFlow::new(
+                        Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                        None,
+                        cash,
+                        CFKind::RevolvingDraw,
+                        0.0,
+                        None,
+                    )
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(
+                        Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    )
+                },
+                {
+                    let cash = Money::from((30_000_i64, Currency::USD));
+                    CashFlow::new(
+                        Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
+                        None,
+                        cash,
+                        CFKind::RevolvingRepayment,
+                        0.0,
+                        None,
+                    )
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(
+                        Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
+                    )
+                },
             ],
             // Scheduled balance is 500k — the stateful balance (zero,
             // fully swept upstream) takes precedence.
@@ -1379,14 +1399,14 @@ mod tests {
 
         let instrument = SignedFlowInstrument::new(test_schedule(
             vec![
-                CashFlow::new(
-                    issue,
-                    None,
-                    Money::from((-1_000_000_i64, Currency::USD)),
-                    CFKind::Notional,
-                    0.0,
-                    None,
-                ),
+                {
+                    let cash = Money::from((-1_000_000_i64, Currency::USD));
+                    CashFlow::new(issue, None, cash, CFKind::Notional, 0.0, None)
+                        .with_principal_delta(finstack_quant_core::money::Money::zero(
+                            cash.currency(),
+                        ))
+                        .with_principal_date(issue)
+                },
                 CashFlow::new(
                     start,
                     None,
@@ -1395,14 +1415,12 @@ mod tests {
                     0.25,
                     Some(0.08),
                 ),
-                CashFlow::new(
-                    start,
-                    None,
-                    Money::from((100_000_i64, Currency::USD)),
-                    CFKind::Amortization,
-                    0.0,
-                    None,
-                ),
+                {
+                    let cash = Money::from((100_000_i64, Currency::USD));
+                    CashFlow::new(start, None, cash, CFKind::Amortization, 0.0, None)
+                        .with_principal_delta(cash.checked_neg())
+                        .with_principal_date(start)
+                },
             ],
             1_000_000.0,
             issue,

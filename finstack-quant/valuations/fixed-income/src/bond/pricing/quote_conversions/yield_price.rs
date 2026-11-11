@@ -1588,14 +1588,14 @@ mod tests {
         let maturity = date!(2026 - 01 - 01);
         let schedule = CashFlowSchedule::from_flows(
             vec![
-                CashFlow::new(
-                    issue,
-                    None,
-                    Money::from((-100_i64, Currency::USD)),
-                    CFKind::Notional,
-                    0.0,
-                    None,
-                ),
+                {
+                    let cash = Money::from((-100_i64, Currency::USD));
+                    CashFlow::new(issue, None, cash, CFKind::Notional, 0.0, None)
+                        .with_principal_delta(finstack_quant_core::money::Money::zero(
+                            cash.currency(),
+                        ))
+                        .with_principal_date(issue)
+                },
                 CashFlow::new(
                     maturity,
                     None,
@@ -1604,14 +1604,12 @@ mod tests {
                     0.0,
                     None,
                 ),
-                CashFlow::new(
-                    maturity,
-                    None,
-                    Money::from((100_i64, Currency::USD)),
-                    CFKind::Notional,
-                    0.0,
-                    None,
-                ),
+                {
+                    let cash = Money::from((100_i64, Currency::USD));
+                    CashFlow::new(maturity, None, cash, CFKind::Notional, 0.0, None)
+                        .with_principal_delta(cash.checked_neg())
+                        .with_principal_date(maturity)
+                },
             ],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,

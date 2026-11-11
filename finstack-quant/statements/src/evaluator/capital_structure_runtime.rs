@@ -484,14 +484,14 @@ mod opening_tests {
         let instrument = ScheduleInstrument {
             schedule: CashFlowSchedule::from_flows(
                 vec![
-                    CashFlow::new(
-                        issue,
-                        None,
-                        Money::from((-1_000_000_i64, Currency::USD)),
-                        CFKind::Notional,
-                        0.0,
-                        None,
-                    ),
+                    {
+                        let cash = Money::from((-1_000_000_i64, Currency::USD));
+                        CashFlow::new(issue, None, cash, CFKind::Notional, 0.0, None)
+                            .with_principal_delta(finstack_quant_core::money::Money::zero(
+                                cash.currency(),
+                            ))
+                            .with_principal_date(issue)
+                    },
                     CashFlow::new(
                         coupon_date,
                         None,
@@ -500,14 +500,12 @@ mod opening_tests {
                         0.25,
                         Some(0.08),
                     ),
-                    CashFlow::new(
-                        coupon_date,
-                        None,
-                        Money::from((100_000_i64, Currency::USD)),
-                        CFKind::Amortization,
-                        0.0,
-                        None,
-                    ),
+                    {
+                        let cash = Money::from((100_000_i64, Currency::USD));
+                        CashFlow::new(coupon_date, None, cash, CFKind::Amortization, 0.0, None)
+                            .with_principal_delta(cash.checked_neg())
+                            .with_principal_date(coupon_date)
+                    },
                 ],
                 Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
                 DayCount::Act365F,
@@ -548,14 +546,12 @@ mod opening_tests {
         ] {
             let instrument = ScheduleInstrument {
                 schedule: CashFlowSchedule::from_flows(
-                    vec![CashFlow::new(
-                        maturity,
-                        None,
-                        Money::from((100_i64, Currency::USD)),
-                        CFKind::Notional,
-                        0.0,
-                        None,
-                    )],
+                    vec![{
+                        let cash = Money::from((100_i64, Currency::USD));
+                        CashFlow::new(maturity, None, cash, CFKind::Notional, 0.0, None)
+                            .with_principal_delta(cash.checked_neg())
+                            .with_principal_date(maturity)
+                    }],
                     Notional::par(100.0, Currency::USD).expect("face"),
                     DayCount::Act365F,
                     CashFlowMeta {
@@ -581,14 +577,12 @@ mod opening_tests {
         let period_start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let instrument = ScheduleInstrument {
             schedule: CashFlowSchedule::from_flows(
-                vec![CashFlow::new(
-                    period_start,
-                    None,
-                    Money::from((20_i64, Currency::USD)),
-                    CFKind::Amortization,
-                    0.0,
-                    None,
-                )],
+                vec![{
+                    let cash = Money::from((20_i64, Currency::USD));
+                    CashFlow::new(period_start, None, cash, CFKind::Amortization, 0.0, None)
+                        .with_principal_delta(cash.checked_neg())
+                        .with_principal_date(period_start)
+                }],
                 Notional::par(100.0, Currency::USD).expect("face"),
                 DayCount::Act365F,
                 CashFlowMeta {

@@ -394,14 +394,19 @@ use crate::support::ScheduleInstrument;
 
 fn no_funding_schedule(initial: f64, issue: Date) -> ScheduleInstrument {
     let flows = if initial > 0.0 {
-        vec![CashFlow::new(
-            date!(2027 - 01 - 01),
-            None,
-            Money::new(initial, Currency::USD).expect("valid redemption principal"),
-            CFKind::Notional,
-            0.0,
-            None,
-        )]
+        vec![{
+            let cash = Money::new(initial, Currency::USD).expect("valid redemption principal");
+            CashFlow::new(
+                date!(2027 - 01 - 01),
+                None,
+                cash,
+                CFKind::Notional,
+                0.0,
+                None,
+            )
+            .with_principal_delta(cash.checked_neg())
+            .with_principal_date(date!(2027 - 01 - 01))
+        }]
     } else {
         vec![]
     };
@@ -805,17 +810,19 @@ fn oid_funding_preserves_custom_bond_face_with_separate_cash_dates() {
             )
             .with_principal_date(issue);
             let schedule = CashFlowSchedule::from_flows(
-                vec![
-                    funding,
+                vec![funding, {
+                    let cash = Money::from((100_i64, Currency::USD));
                     CashFlow::new(
                         date!(2027 - 01 - 01),
                         None,
-                        Money::from((100_i64, Currency::USD)),
+                        cash,
                         CFKind::Notional,
                         0.0,
                         None,
-                    ),
-                ],
+                    )
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(date!(2027 - 01 - 01))
+                }],
                 Notional::par(initial_face, Currency::USD).expect("initial face"),
                 DayCount::Act365F,
                 CashFlowMeta {
@@ -1276,7 +1283,8 @@ fn newly_funded_balance_capitalizes_pik_on_its_effective_date() {
     let issue = date!(2025 - 01 - 15);
     let flows = vec![
         CashFlow::new(
-            date!(2025 - 04 - 02),
+            // Dated at its capitalization (record CORE-CONVENTIONS-015 #6).
+            date!(2025 - 03 - 31),
             None,
             Money::zero(Currency::USD),
             CFKind::Pik,
@@ -1285,14 +1293,19 @@ fn newly_funded_balance_capitalizes_pik_on_its_effective_date() {
         )
         .with_principal_delta(Money::new(5.0, Currency::USD).expect("valid PIK delta"))
         .with_principal_date(date!(2025 - 03 - 31)),
-        CashFlow::new(
-            date!(2027 - 01 - 01),
-            None,
-            Money::new(105.0, Currency::USD).expect("valid redemption principal"),
-            CFKind::Notional,
-            0.0,
-            None,
-        ),
+        {
+            let cash = Money::new(105.0, Currency::USD).expect("valid redemption principal");
+            CashFlow::new(
+                date!(2027 - 01 - 01),
+                None,
+                cash,
+                CFKind::Notional,
+                0.0,
+                None,
+            )
+            .with_principal_delta(cash.checked_neg())
+            .with_principal_date(date!(2027 - 01 - 01))
+        },
     ];
     let instrument = ScheduleInstrument::new(
         CashFlowSchedule::from_flows(

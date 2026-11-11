@@ -115,20 +115,22 @@ fn test_utilization_fee_at_threshold() {
 #[test]
 fn same_date_flows_use_the_canonical_cashflow_order() {
     let payment_date = date!(2025 - 07 - 01);
-    let flow = |kind, amount| {
-        CashFlow::new(
-            payment_date,
-            None,
-            Money::new(amount, Currency::USD).expect("valid money fixture"),
-            kind,
-            0.0,
-            None,
-        )
+    // A cash principal row moves the balance by minus its cash.
+    let flow = |kind: CFKind, amount| {
+        let cash = Money::new(amount, Currency::USD).expect("valid money fixture");
+        let row = CashFlow::new(payment_date, None, cash, kind, 0.0, None);
+        if kind.is_principal_like() && kind.is_cash_settlement() {
+            row.with_principal_delta(cash.checked_neg())
+                .with_principal_date(payment_date)
+        } else {
+            row
+        }
     };
     let flows = vec![
         flow(CFKind::Notional, 5.0),
         flow(CFKind::Pik, 0.0)
-            .with_principal_delta(Money::new(10.0, Currency::USD).expect("valid PIK delta")),
+            .with_principal_delta(Money::new(10.0, Currency::USD).expect("valid PIK delta"))
+            .with_principal_date(payment_date),
         flow(CFKind::Fee, 1.0),
         flow(CFKind::Notional, -30.0),
         flow(CFKind::Amortization, 20.0),

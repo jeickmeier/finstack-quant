@@ -1480,15 +1480,27 @@ mod tests {
         let money = |amount| Money::new(amount, Currency::USD).expect("valid money fixture");
         let schedule = CashFlowSchedule::from_flows(
             vec![
-                CashFlow::new(issue, None, money(-1_000.0), CFKind::Notional, 0.0, None),
-                CashFlow::new(
-                    date!(2024 - 06 - 01),
-                    None,
-                    money(200.0),
-                    CFKind::Amortization,
-                    0.0,
-                    None,
-                ),
+                {
+                    let cash = money(-1_000.0);
+                    CashFlow::new(issue, None, cash, CFKind::Notional, 0.0, None)
+                        .with_principal_delta(finstack_quant_core::money::Money::zero(
+                            cash.currency(),
+                        ))
+                        .with_principal_date(issue)
+                },
+                {
+                    let cash = money(200.0);
+                    CashFlow::new(
+                        date!(2024 - 06 - 01),
+                        None,
+                        cash,
+                        CFKind::Amortization,
+                        0.0,
+                        None,
+                    )
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(date!(2024 - 06 - 01))
+                },
                 CashFlow::new(
                     date!(2024 - 12 - 01),
                     None,
@@ -1497,8 +1509,14 @@ mod tests {
                     0.0,
                     None,
                 )
-                .with_principal_delta(money(50.0)),
-                CashFlow::new(maturity, None, money(850.0), CFKind::Notional, 0.0, None),
+                .with_principal_delta(money(50.0))
+                .with_principal_date(date!(2024 - 12 - 01)),
+                {
+                    let cash = money(850.0);
+                    CashFlow::new(maturity, None, cash, CFKind::Notional, 0.0, None)
+                        .with_principal_delta(cash.checked_neg())
+                        .with_principal_date(maturity)
+                },
             ],
             Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,
@@ -1546,10 +1564,27 @@ mod tests {
         let money = |amount| Money::new(amount, Currency::USD).expect("valid money fixture");
         let schedule = CashFlowSchedule::from_flows(
             vec![
-                CashFlow::new(issue, None, money(-1_000.0), CFKind::Notional, 0.0, None),
+                {
+                    let cash = money(-1_000.0);
+                    CashFlow::new(issue, None, cash, CFKind::Notional, 0.0, None)
+                        .with_principal_delta(finstack_quant_core::money::Money::zero(
+                            cash.currency(),
+                        ))
+                        .with_principal_date(issue)
+                },
                 CashFlow::new(as_of, None, money(50.0), CFKind::Fixed, 0.0, None),
-                CashFlow::new(as_of, None, money(200.0), CFKind::Amortization, 0.0, None),
-                CashFlow::new(maturity, None, money(800.0), CFKind::Notional, 0.0, None),
+                {
+                    let cash = money(200.0);
+                    CashFlow::new(as_of, None, cash, CFKind::Amortization, 0.0, None)
+                        .with_principal_delta(cash.checked_neg())
+                        .with_principal_date(as_of)
+                },
+                {
+                    let cash = money(800.0);
+                    CashFlow::new(maturity, None, cash, CFKind::Notional, 0.0, None)
+                        .with_principal_delta(cash.checked_neg())
+                        .with_principal_date(maturity)
+                },
             ],
             Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
             DayCount::Act365F,

@@ -380,10 +380,31 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
             vec![(settle_date, value)]
         };
 
-        let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
-            flows,
-            finstack_quant_core::cashflow::CFKind::Notional,
-            finstack_quant_core::dates::DayCount::Act365F, // Standard for FX spot
+        let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
+            flows
+                .into_iter()
+                .map(
+                    |(date, cash): (
+                        finstack_quant_core::dates::Date,
+                        finstack_quant_core::money::Money,
+                    )| {
+                        // The exchanged amount is the principal movement (record
+                        // CORE-CONVENTIONS-015 #4).
+                        finstack_quant_core::cashflow::CashFlow::new(
+                            date,
+                            None,
+                            cash,
+                            finstack_quant_core::cashflow::CFKind::Notional,
+                            0.0,
+                            None,
+                        )
+                        .with_principal_delta(cash.checked_neg())
+                        .with_principal_date(date)
+                    },
+                )
+                .collect(),
+            finstack_quant_core::dates::DayCount::Act365F,
+            // Standard for FX spot
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: self.notional()?,
                 meta: finstack_quant_cashflows::builder::CashFlowMeta {

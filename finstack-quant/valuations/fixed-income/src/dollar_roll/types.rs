@@ -440,7 +440,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DollarRoll {
         let front_date = self.effective_front_settlement_date()?;
         let back_date = self.effective_back_settlement_date()?;
         let ccy = self.notional.currency();
-        let schedule = finstack_quant_cashflows::schedule_from_dated_flows(
+        let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
             vec![
                 (
                     front_date,
@@ -450,8 +450,28 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DollarRoll {
                     back_date,
                     Money::new(-self.trade_cash_amount(self.back_price, back_date)?, ccy)?,
                 ),
-            ],
-            CFKind::Notional,
+            ]
+            .into_iter()
+            .map(
+                |(date, cash): (
+                    finstack_quant_core::dates::Date,
+                    finstack_quant_core::money::Money,
+                )| {
+                    // The exchanged amount is the principal movement (record
+                    // CORE-CONVENTIONS-015 #4).
+                    finstack_quant_core::cashflow::CashFlow::new(
+                        date,
+                        None,
+                        cash,
+                        CFKind::Notional,
+                        0.0,
+                        None,
+                    )
+                    .with_principal_delta(cash.checked_neg())
+                    .with_principal_date(date)
+                },
+            )
+            .collect(),
             finstack_quant_core::dates::DayCount::Act365F,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),

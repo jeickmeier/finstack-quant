@@ -10,7 +10,6 @@ use std::sync::Arc;
 
 use crate::term_loan::TermLoan;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
-use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::metrics::MetricContext;
@@ -65,16 +64,10 @@ pub(crate) fn quoted_dirty_from_clean_px(
         .get_flows()
         .iter()
         .filter(|flow| flow.get_balance_date() <= settlement && flow.date > settlement)
-        .map(|flow| match flow.principal_delta {
-            Some(delta) => (-delta.amount()).max(0.0),
-            None if matches!(
-                flow.kind,
-                CFKind::Amortization | CFKind::PrePayment | CFKind::Notional
-            ) =>
-            {
-                flow.amount.amount().max(0.0)
-            }
-            _ => 0.0,
+        // The pending par is the explicit principal decrease.
+        .map(|flow| {
+            flow.principal_delta
+                .map_or(0.0, |delta| (-delta.amount()).max(0.0))
         })
         .sum();
     let accrued = finstack_quant_cashflows::accrual::accrued_interest_amount(
