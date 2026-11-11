@@ -273,11 +273,13 @@ fn resolve_rate_quote_dates(
             // anchors on the calendar month-end of the unadjusted maturity,
             // which the schedule adjusts; an end-of-month grid rejects an
             // adjusted non-month-end anchor (record CORE-CONVENTIONS-008 #5).
-            let end = if start == start.end_of_month() {
-                resolve_pillar_date(pillar, start, cal, BusinessDayConvention::Unadjusted)?
-                    .end_of_month()
-            } else {
-                maturity
+            // An explicit pillar date is the contract's own end and is never
+            // rolled; only a tenor pillar generates an end-of-month end.
+            let end = match pillar {
+                Pillar::Tenor(tenor) if start == start.end_of_month() => tenor
+                    .add_to_date(start, Some(cal), BusinessDayConvention::Unadjusted)?
+                    .end_of_month(),
+                _ => maturity,
             };
             let pillar_date = if swap_use_payment_delay {
                 finstack_quant_valuations_core::instruments::pricing::swap_legs::add_payment_delay(

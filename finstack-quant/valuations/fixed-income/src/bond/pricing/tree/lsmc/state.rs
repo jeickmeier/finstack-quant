@@ -89,6 +89,11 @@ pub(super) struct FloatingCoupon {
     pub(super) payment_step: usize,
     /// Economic accrual end at which PIK changes the principal balance.
     pub(super) effective_end_step: usize,
+    /// The cash share is still unsettled at the origin, so it is paid at
+    /// `payment_step`; a share settled before the origin is not paid again.
+    pub(super) pays_cash: bool,
+    /// The PIK share is still uncapitalized at the origin.
+    pub(super) capitalizes: bool,
     pub(super) compiled: CompiledFloatingCoupon,
     pub(super) rate_model: FloatingRateModel,
     pub(super) initial_notional: Option<f64>,
@@ -297,6 +302,10 @@ pub(super) struct FloatingBuild {
     pub(super) day_count: Option<finstack_quant_core::dates::DayCount>,
     pub(super) accrual: f64,
     pub(super) base_index_rate: Option<f64>,
+    /// The group holds the coupon's unsettled cash row.
+    pub(super) has_cash: bool,
+    /// The group holds the coupon's uncapitalized PIK row.
+    pub(super) has_pik: bool,
 }
 
 #[derive(Clone)]

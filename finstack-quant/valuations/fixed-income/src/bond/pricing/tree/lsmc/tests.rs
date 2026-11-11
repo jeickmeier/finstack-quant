@@ -370,6 +370,16 @@ fn past_overnight_payment_retains_only_fully_determined_pending_pik() {
         let template = ReplayTemplate::new(&tree, &bond, &market, as_of)
             .expect("pending PIK replays its unobserved fixing");
         assert_eq!(template.floating.len(), 1);
+        // Only the PIK share is still ahead of the origin: the Thursday cash
+        // share settled and must not be paid again at capitalization.
+        let coupon = &template.floating[0];
+        assert!(!coupon.pays_cash, "as_of {as_of}");
+        assert!(coupon.capitalizes);
+        assert!(template.floating_payment_ids.iter().all(Vec::is_empty));
+        assert_eq!(
+            template.floating_balance_ids[coupon.effective_end_step],
+            vec![0]
+        );
     }
 
     let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec else {

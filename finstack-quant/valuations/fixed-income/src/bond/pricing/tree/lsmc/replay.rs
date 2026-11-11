@@ -213,7 +213,7 @@ impl ReplayCursor {
             .chain(&template.floating_balance_ids[step])
         {
             let coupon = &template.floating[coupon_id];
-            let final_step = if coupon.compiled.economics().pik_fraction > 0.0 {
+            let final_step = if coupon.capitalizes {
                 coupon.payment_step.max(coupon.effective_end_step)
             } else {
                 coupon.payment_step
@@ -406,7 +406,7 @@ impl ReplayTemplate {
             CashflowSpec::Amortizing { schedule, .. }
                 if !matches!(schedule, finstack_quant_cashflows::builder::AmortizationSpec::None)
         ) && floating.iter().any(|coupon| {
-            coupon.compiled.economics().pik_fraction > 0.0
+            coupon.capitalizes
                 && match &coupon.rate_model {
                     FloatingRateModel::Term(ObservedRateSource::Conditional(_)) => true,
                     FloatingRateModel::Overnight(model) => model
@@ -489,10 +489,10 @@ impl ReplayTemplate {
             if coupon.initial_notional.is_none() {
                 floating_accrual_start_ids[coupon.accrual_start_step].push(id);
             }
-            floating_payment_ids[coupon.payment_step].push(id);
-            if coupon.compiled.economics().pik_fraction > 0.0
-                && coupon.compiled.period().accrual_end >= as_of
-            {
+            if coupon.pays_cash {
+                floating_payment_ids[coupon.payment_step].push(id);
+            }
+            if coupon.capitalizes && coupon.compiled.period().accrual_end >= as_of {
                 floating_balance_ids[coupon.effective_end_step].push(id);
             }
         }
@@ -667,6 +667,14 @@ impl ReplayTemplate {
                 // has no cash settlement and pays nothing before capitalizing.
                 if flow.kind != CFKind::Pik || entry.payment.is_none() {
                     entry.payment = Some(flow.date);
+                }
+                // Only the shares still ahead of the origin replay: a cash
+                // share settled before it is not paid again at capitalization,
+                // and a capitalized PIK share is not added again.
+                if flow.kind == CFKind::Pik {
+                    entry.has_pik = true;
+                } else {
+                    entry.has_cash = true;
                 }
                 entry.day_count = Some(accrual.day_count);
                 entry.day_count_context = Some(DayCountContext {
@@ -916,6 +924,8 @@ impl ReplayTemplate {
                 } else {
                     exact_grid_step(times, as_of, end)?
                 },
+                pays_cash: group.has_cash && cash_fraction > 0.0,
+                capitalizes: group.has_pik && pik_fraction > 0.0,
                 compiled,
                 rate_model,
                 initial_notional,
@@ -1491,11 +1501,10 @@ impl ReplayTemplate {
         }
         for (id, coupon) in self.floating.iter().enumerate() {
             let period = coupon.compiled.period();
-            let cash_active =
-                date < period.payment_date && coupon.compiled.economics().cash_fraction > 0.0;
+            let cash_active = date < period.payment_date && coupon.pays_cash;
             let pik_active = date < period.accrual_end
                 && redemption_date.is_none_or(|redemption| date < redemption)
-                && coupon.compiled.economics().pik_fraction > 0.0;
+                && coupon.capitalizes;
             if date <= period.accrual_start || (!cash_active && !pik_active) {
                 continue;
             }

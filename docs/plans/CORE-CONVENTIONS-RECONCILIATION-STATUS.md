@@ -809,6 +809,13 @@ logged under Needs review.
     - **Date assertions:** the lagged-redemption test now expects the last
       PIK on the unadjusted final accrual end, with only the redemption cash
       on the lagged date.
+    - **Follow-up fix (`G5-3c-fix`).** With the cash share already settled
+      and the PIK share pending, the LSMC group held only the PIK row but
+      replay paid the spec's cash fraction again at capitalization. Each
+      replayed coupon now records which shares are still ahead of the
+      origin (`pays_cash`, `capitalizes`); only those are scheduled for
+      payment, capitalization and exercise-date accrued claims. The split
+      test asserts the settled cash share is never scheduled again.
 - **Notebooks broken by earlier slices (found during G5, fixed in `NB:`).**
   A full run (`run_all_notebooks.py --timeout 120`) after G5-3b passed 92 of
   101; none of the 9 failures involved PIK or write-down rows, and slice
@@ -840,6 +847,10 @@ logged under Needs review.
     (Needs review: anchoring non-end-of-month swaps on the unadjusted
     maturity is the market convention, but would move existing calibrations;
     left for E4's date-regime work.)
+    Follow-up (`G5-3c-fix`): only a tenor pillar is rolled to month-end; an
+    explicit pillar date is the contract's own end and is never rolled, so a
+    mid-month explicit date on a month-end start is rejected rather than
+    silently forced.
   - **Margin substitution (Needs review).** Record 015 #2 and #11 say
     substitution kinds carry only genuine monetary transfers, never a marked
     collateral value; margin record 20 (Draft, observed only) describes the
