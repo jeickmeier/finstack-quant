@@ -210,7 +210,7 @@ pub(crate) fn build_context_for_period(
 
 /// Visible statement and capital-structure dates for historical expressions.
 /// Standalone contexts may contain cashflow snapshots without statement rows.
-fn expression_periods(context: &EvaluationContext) -> BTreeSet<PeriodId> {
+pub(super) fn expression_periods(context: &EvaluationContext) -> BTreeSet<PeriodId> {
     context
         .history
         .keys()

@@ -342,3 +342,51 @@ fn daily_ttm_sums_twelve_calendar_months_of_calendar_and_business_days() {
         );
     }
 }
+
+/// Year to date counts every period of the year on a timeline that changes
+/// frequency mid-year. A month starting on 1 January sorts before the quarter
+/// or half-year starting the same day, and used to be left out.
+#[test]
+fn ytd_includes_the_first_period_when_frequency_coarsens_mid_year() {
+    use finstack_quant_core::dates::build_periods;
+    for (fine, coarse, expected) in [
+        // Six months, then two quarters.
+        (
+            "2025M01..2025M06",
+            "2025Q3..2025Q4",
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+        ),
+        // Six months, then a half-year.
+        (
+            "2025M01..2025M06",
+            "2025H2..2025H2",
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+        ),
+        // Two quarters, then six months: coarse first was already right.
+        (
+            "2025Q1..2025Q2",
+            "2025M07..2025M12",
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+        ),
+    ] {
+        let mut periods = build_periods(fine, None).unwrap().periods;
+        periods.extend(build_periods(coarse, None).unwrap().periods);
+        let values: Vec<_> = periods
+            .iter()
+            .map(|period| (period.id, AmountOrScalar::scalar(1.0)))
+            .collect();
+        let model = {
+            let mut model_builder = ModelBuilder::new("mixed-frequency-ytd");
+            model_builder.periods_explicit(periods.clone()).unwrap();
+            model_builder.value("x", &values);
+            model_builder.compute("to_date", "ytd(x)").unwrap();
+            model_builder.compute("derived", "ytd(x * 2)").unwrap();
+            model_builder.build().unwrap()
+        };
+        let result = Evaluator::new().evaluate(&model).unwrap();
+        for (period, expected) in periods.iter().zip(expected) {
+            close(result.get("to_date", &period.id).unwrap(), expected);
+            close(result.get("derived", &period.id).unwrap(), 2.0 * expected);
+        }
+    }
+}

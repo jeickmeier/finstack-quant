@@ -215,8 +215,33 @@ pub(crate) fn evaluate_period_aggregate_function(
             require_args("ytd", args, 1, node_id)?;
             let current = context.period_id;
             let start_of_year = current.shift(1 - i32::from(current.index()))?;
+            // On a timeline that changes frequency mid-year, a finer period
+            // starting on the first day of the year sorts before
+            // `start_of_year` (same start, earlier end). Begin at the earliest
+            // model period that starts on or after that day instead.
+            let year_start = context
+                .history
+                .period_bounds(&start_of_year)
+                .or_else(|| start_of_year.bounds().ok())
+                .map(|(start, _)| start);
+            let first_of_year = year_start.and_then(|year_start| {
+                super::formula::expression_periods(context)
+                    .into_iter()
+                    .find(|period| {
+                        context
+                            .history
+                            .period_bounds(period)
+                            .is_some_and(|(start, _)| start >= year_start)
+                    })
+            });
 
-            sum_expression_range(&args[0], context, start_of_year, current, node_id)
+            sum_expression_range(
+                &args[0],
+                context,
+                first_of_year.unwrap_or(start_of_year),
+                current,
+                node_id,
+            )
         }
         Function::Qtd => {
             require_args("qtd", args, 1, node_id)?;
