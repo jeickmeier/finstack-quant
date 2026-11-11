@@ -224,6 +224,7 @@ pub(crate) fn mapping_to_market_bumps(
                 quote: pair.1,
                 pct,
                 as_of,
+                policy: finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
             }])
         }
         MarketMapping::VolShift {

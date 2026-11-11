@@ -178,6 +178,7 @@ impl MarketScenario {
                     quote: *quote,
                     pct: shift.shift * 100.0,
                     as_of: self.date,
+                    policy: finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
                 },
                 RiskFactorType::ImpliedVol {
                     vol_surface_id,

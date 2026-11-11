@@ -85,7 +85,7 @@ fn provider_cache_hits_refresh_recency_and_evict_the_least_recent_quote() {
 }
 
 #[test]
-fn mutable_provider_refreshes_warmed_base_and_bumped_context_snapshots() {
+fn mutable_provider_refreshes_warmed_base_while_bumped_scenario_stays_frozen() {
     use finstack_quant_core::market_data::context::MarketContext;
 
     let on = Date::from_ordinal_date(2025, 1).expect("date");
@@ -102,14 +102,23 @@ fn mutable_provider_refreshes_warmed_base_and_bumped_context_snapshots() {
     );
     assert_eq!(matrix.rate(query).expect("warm base").rate, 1.1);
     let bumped = matrix
-        .with_bumped_rate(Currency::EUR, Currency::USD, 0.01, on)
+        .with_bumped_rate(
+            finstack_quant_core::money::fx::FxQuery::new(
+                Currency::EUR,
+                Currency::USD,
+                on,
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+            ),
+            0.01,
+        )
         .expect("one percent bump");
     assert!((bumped.rate(query).expect("warm bumped").rate - 1.111).abs() < 1e-12);
 
     provider
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.2)])
         .expect("updated rate");
-    for (matrix, expected) in [(matrix, 1.2), (bumped, 1.212)] {
+    // The shock froze its baseline (record 013 #11): it keeps 1.1 * 1.01.
+    for (matrix, expected) in [(matrix, 1.2), (bumped, 1.1 * 1.01)] {
         let context = MarketContext::new().insert_fx(matrix);
         // Snapshot before another lookup: persistence and a warmed live matrix
         // must describe the same updated market state.
@@ -132,7 +141,7 @@ fn mutable_provider_refreshes_warmed_base_and_bumped_context_snapshots() {
 }
 
 #[test]
-fn mutable_provider_refresh_preserves_global_and_scoped_overrides_and_bumps() {
+fn mutable_provider_refresh_reaches_the_base_matrix_but_not_frozen_bumps() {
     let on = Date::from_ordinal_date(2025, 1).expect("date");
     let later = Date::from_ordinal_date(2025, 2).expect("later date");
     let provider = Arc::new(SimpleFxProvider::new());
@@ -156,10 +165,26 @@ fn mutable_provider_refresh_preserves_global_and_scoped_overrides_and_bumps() {
         )
         .expect("scoped override");
     let eur_bumped = matrix
-        .with_bumped_rate(Currency::EUR, Currency::USD, 0.01, on)
+        .with_bumped_rate(
+            finstack_quant_core::money::fx::FxQuery::new(
+                Currency::EUR,
+                Currency::USD,
+                on,
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+            ),
+            0.01,
+        )
         .expect("bump scoped pair");
     let gbp_bumped = matrix
-        .with_bumped_rate(Currency::GBP, Currency::USD, 0.01, on)
+        .with_bumped_rate(
+            finstack_quant_core::money::fx::FxQuery::new(
+                Currency::GBP,
+                Currency::USD,
+                on,
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+            ),
+            0.01,
+        )
         .expect("bump global pair");
     let live_query = FxQuery::new(
         Currency::EUR,
@@ -177,13 +202,16 @@ fn mutable_provider_refresh_preserves_global_and_scoped_overrides_and_bumps() {
         ])
         .expect("publish batch");
 
-    for (matrix, eur_factor, gbp_factor) in [
-        (&matrix, 1.0, 1.0),
-        (&eur_bumped, 1.01, 1.0),
-        (&gbp_bumped, 1.0, 1.01),
+    // The base matrix sees the provider update; each bump froze the
+    // provider's 1.1 at construction (record 013 #11).
+    for (matrix, eur_factor, gbp_factor, provider_eur) in [
+        (&matrix, 1.0, 1.0, 1.2),
+        (&eur_bumped, 1.01, 1.0, 1.1),
+        (&gbp_bumped, 1.0, 1.01, 1.1),
     ] {
         assert!(
-            (matrix.rate(live_query).expect("updated provider").rate - 1.2 * eur_factor).abs()
+            (matrix.rate(live_query).expect("provider rate").rate - provider_eur * eur_factor)
+                .abs()
                 < 1e-12
         );
         for date in [on, later] {
@@ -194,7 +222,7 @@ fn mutable_provider_refresh_preserves_global_and_scoped_overrides_and_bumps() {
                 let eur_expected = if date == on && policy == FxConversionPolicy::CashflowDate {
                     1.5
                 } else {
-                    1.2
+                    provider_eur
                 } * eur_factor;
                 for (from, expected) in [
                     (Currency::EUR, eur_expected),
@@ -215,7 +243,7 @@ fn mutable_provider_refresh_preserves_global_and_scoped_overrides_and_bumps() {
 }
 
 #[test]
-fn mutable_provider_refreshes_triangulated_crosses_and_preexisting_cross_bumps() {
+fn mutable_provider_refreshes_base_crosses_but_not_frozen_cross_bumps() {
     let on = Date::from_ordinal_date(2025, 1).expect("date");
     let provider = Arc::new(SimpleFxProvider::new());
     provider
@@ -229,7 +257,15 @@ fn mutable_provider_refreshes_triangulated_crosses_and_preexisting_cross_bumps()
         Some(Currency::USD),
     );
     let bumped = matrix
-        .with_bumped_rate(Currency::EUR, Currency::GBP, 0.01, on)
+        .with_bumped_rate(
+            finstack_quant_core::money::fx::FxQuery::new(
+                Currency::EUR,
+                Currency::GBP,
+                on,
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+            ),
+            0.01,
+        )
         .expect("cross bump");
     for matrix in [&matrix, &bumped] {
         for (from, to) in [
@@ -245,8 +281,9 @@ fn mutable_provider_refreshes_triangulated_crosses_and_preexisting_cross_bumps()
     provider
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.2)])
         .expect("update first pivot leg");
-    for (matrix, factor) in [(&matrix, 1.0), (&bumped, 1.01)] {
-        let expected = 1.2 * 0.8 * factor;
+    // The bump froze the provider's first leg 1.1 (record 013 #11).
+    for (matrix, factor, first_leg) in [(&matrix, 1.0, 1.2), (&bumped, 1.01, 1.1)] {
+        let expected = first_leg * 0.8 * factor;
         let cross = matrix
             .rate(FxQuery::new(
                 Currency::EUR,
@@ -273,9 +310,9 @@ fn mutable_provider_refreshes_triangulated_crosses_and_preexisting_cross_bumps()
                     on,
                     FxConversionPolicy::CashflowDate
                 ))
-                .expect("updated inverse leg")
+                .expect("inverse leg")
                 .rate
-                - 1.0 / 1.2)
+                - 1.0 / first_leg)
                 .abs()
                 < 1e-12
         );
@@ -308,13 +345,11 @@ fn providers_without_revisions_do_not_cache_observations() {
         FxConversionPolicy::CashflowDate,
     );
     assert_eq!(matrix.rate(query).expect("initial live rate").rate, 1.1);
-    let bumped = matrix
-        .with_bumped_rate(Currency::EUR, Currency::USD, 0.01, on)
-        .expect("live provider bump");
-    assert!((bumped.rate(query).expect("initial bumped rate").rate - 1.111).abs() < 1e-12);
+    // A live provider cannot be frozen, so a shock is refused rather than
+    // sharing the live feed (record 013 #11).
+    assert!(matrix.with_bumped_rate(query, 0.01).is_err());
     provider.0.store(120, Ordering::Relaxed);
     assert_eq!(matrix.rate(query).expect("updated live rate").rate, 1.2);
-    assert!((bumped.rate(query).expect("updated bumped rate").rate - 1.212).abs() < 1e-12);
 }
 
 #[test]
@@ -1091,31 +1126,14 @@ fn fx_matrix_set_quote_rejects_invalid_rates_without_mutating_state() {
 
 #[test]
 fn with_bumped_rate_invalidates_cached_crosses() {
-    struct PivotFx;
-    impl FxProvider for PivotFx {
-        fn get_revision(&self) -> Option<u64> {
-            Some(0)
-        }
-
-        fn rate(
-            &self,
-            from: Currency,
-            to: Currency,
-            _on: Date,
-            _policy: FxConversionPolicy,
-        ) -> finstack_quant_core::Result<f64> {
-            match (from, to) {
-                (Currency::GBP, Currency::USD) => Ok(1.25),
-                (Currency::USD, Currency::EUR) => Ok(0.90),
-                _ => Err(finstack_quant_core::InputError::NotFound {
-                    id: format!("FX:{from}->{to}"),
-                }
-                .into()),
-            }
-        }
-    }
-
-    let matrix = FxMatrix::try_with_config(Arc::new(PivotFx), FxConfig::new(Some(Currency::USD)))
+    let provider = SimpleFxProvider::new();
+    provider
+        .set_quotes(&[
+            (Currency::GBP, Currency::USD, 1.25),
+            (Currency::USD, Currency::EUR, 0.90),
+        ])
+        .expect("pivot legs");
+    let matrix = FxMatrix::try_with_config(Arc::new(provider), FxConfig::new(Some(Currency::USD)))
         .expect("valid FxConfig");
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
 
@@ -1129,7 +1147,15 @@ fn with_bumped_rate_invalidates_cached_crosses() {
         .unwrap()
         .rate;
     let bumped = matrix
-        .with_bumped_rate(Currency::USD, Currency::EUR, 0.10, as_of)
+        .with_bumped_rate(
+            finstack_quant_core::money::fx::FxQuery::new(
+                Currency::USD,
+                Currency::EUR,
+                as_of,
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+            ),
+            0.10,
+        )
         .unwrap();
     let bumped_cross = bumped
         .rate(FxQuery::new(
@@ -1163,7 +1189,15 @@ fn bumped_quote_providers_survive_context_snapshots_in_both_directions_and_cross
             .expect("snapshot quotes");
         let matrix = FxMatrix::new(Arc::new(provider), Some(Currency::USD));
         let bumped = matrix
-            .with_bumped_rate(from, to, 0.1, on)
+            .with_bumped_rate(
+                finstack_quant_core::money::fx::FxQuery::new(
+                    from,
+                    to,
+                    on,
+                    finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+                ),
+                0.1,
+            )
             .expect("FX shock");
         let expected = bumped
             .rate(FxQuery::new(from, to, on, FxConversionPolicy::CashflowDate))
@@ -1272,7 +1306,15 @@ fn derived_bump_snapshot_respects_explicit_source_legs() {
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.2)])
         .expect("authoritative pivot leg");
     let bumped = matrix
-        .with_bumped_rate(Currency::EUR, Currency::GBP, 0.1, on)
+        .with_bumped_rate(
+            finstack_quant_core::money::fx::FxQuery::new(
+                Currency::EUR,
+                Currency::GBP,
+                on,
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+            ),
+            0.1,
+        )
         .expect("cross shock");
     let context = MarketContext::new().insert_fx(bumped);
     let json = serde_json::to_string(&context).expect("snapshot");
@@ -1313,7 +1355,17 @@ fn bumped_global_quotes_and_derived_crosses_survive_context_snapshots() {
             .expect("rate")
             .rate
             * 1.1;
-        let bumped = matrix.with_bumped_rate(from, to, 0.1, on).expect("shock");
+        let bumped = matrix
+            .with_bumped_rate(
+                finstack_quant_core::money::fx::FxQuery::new(
+                    from,
+                    to,
+                    on,
+                    finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+                ),
+                0.1,
+            )
+            .expect("shock");
         let context = MarketContext::new().insert_fx(bumped);
         let json = serde_json::to_string(&context).expect("snapshot");
         let restored: MarketContext = serde_json::from_str(&json).expect("restore");
@@ -1360,7 +1412,15 @@ fn global_cross_bump_persists_when_reference_date_has_a_direct_pinned_target() {
         )
         .expect("direct reference fixing");
     let bumped = matrix
-        .with_bumped_rate(Currency::EUR, Currency::GBP, 0.1, reference)
+        .with_bumped_rate(
+            finstack_quant_core::money::fx::FxQuery::new(
+                Currency::EUR,
+                Currency::GBP,
+                reference,
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+            ),
+            0.1,
+        )
         .expect("shock validated against the direct fixing");
     assert!(
         (bumped
@@ -1477,7 +1537,15 @@ fn bumped_pinned_crosses_retain_each_date_policy_and_quote_authority() {
                 })
                 .collect();
             let bumped = matrix
-                .with_bumped_rate(from, to, 0.1, dates[0])
+                .with_bumped_rate(
+                    finstack_quant_core::money::fx::FxQuery::new(
+                        from,
+                        to,
+                        dates[0],
+                        finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+                    ),
+                    0.1,
+                )
                 .expect("scoped cross shock");
             let context = MarketContext::new().insert_fx(bumped);
             let json = serde_json::to_string(&context).expect("snapshot");
@@ -1527,7 +1595,7 @@ fn bumped_pinned_crosses_retain_each_date_policy_and_quote_authority() {
 }
 
 #[test]
-fn snapshot_only_scoped_crosses_do_not_pin_the_live_bumped_provider() {
+fn shocked_scoped_crosses_are_frozen_against_later_provider_quotes() {
     let on = Date::from_ordinal_date(2025, 1).expect("date");
     let provider = Arc::new(SimpleFxProvider::new());
     let matrix = FxMatrix::new(
@@ -1547,7 +1615,15 @@ fn snapshot_only_scoped_crosses_do_not_pin_the_live_bumped_provider() {
         )
         .expect("scoped second leg");
     let bumped = matrix
-        .with_bumped_rate(Currency::EUR, Currency::GBP, 0.1, on)
+        .with_bumped_rate(
+            finstack_quant_core::money::fx::FxQuery::new(
+                Currency::EUR,
+                Currency::GBP,
+                on,
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+            ),
+            0.1,
+        )
         .expect("cross shock");
     let state = bumped.get_serializable_state().expect("stable FX state");
     assert!(
@@ -1562,30 +1638,19 @@ fn snapshot_only_scoped_crosses_do_not_pin_the_live_bumped_provider() {
                     && (rate - 0.968).abs() < 1e-12
             })
     );
-    // A newly published direct provider quote still outranks triangulation.
+    // The scenario is frozen: a direct quote published to the original
+    // provider afterwards reaches the base matrix but not the shock.
     provider
         .set_quotes(&[(Currency::EUR, Currency::GBP, 2.0)])
         .expect("new direct provider quote");
-    assert_eq!(
-        bumped
-            .rate(FxQuery::new(
-                Currency::EUR,
-                Currency::GBP,
-                on,
-                FxConversionPolicy::CashflowDate
-            ))
-            .expect("live direct rate")
-            .rate,
-        2.2
+    let query = FxQuery::new(
+        Currency::EUR,
+        Currency::GBP,
+        on,
+        FxConversionPolicy::CashflowDate,
     );
-    assert!(
-        bumped
-            .get_serializable_state()
-            .expect("stable FX state")
-            .provider_pinned_quotes
-            .iter()
-            .all(|&(from, to, _, _, _)| !(from == Currency::EUR && to == Currency::GBP))
-    );
+    assert_eq!(matrix.rate(query).expect("live base rate").rate, 2.0);
+    assert!((bumped.rate(query).expect("frozen shocked rate").rate - 0.968).abs() < 1e-12);
 }
 
 #[test]
@@ -1636,7 +1701,15 @@ fn fx_bumps_reject_overflowing_static_scopes_outside_the_reference_date() {
         );
         assert!(
             matrix
-                .with_bumped_rate(Currency::EUR, Currency::GBP, 9.0, reference)
+                .with_bumped_rate(
+                    finstack_quant_core::money::fx::FxQuery::new(
+                        Currency::EUR,
+                        Currency::GBP,
+                        reference,
+                        finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate
+                    ),
+                    9.0
+                )
                 .is_err()
         );
         assert!(
@@ -1661,79 +1734,68 @@ fn scoped_provider_snapshot_field_is_required() {
 }
 
 #[test]
-fn mutable_provider_overflow_fails_snapshot_capture() {
-    use finstack_quant_core::market_data::context::MarketContext;
-
+fn overflowing_shock_fails_at_construction_and_frozen_shocks_ignore_later_updates() {
     let on = Date::from_ordinal_date(2025, 1).expect("date");
+    let query = FxQuery::new(
+        Currency::EUR,
+        Currency::USD,
+        on,
+        FxConversionPolicy::CashflowDate,
+    );
+    let huge = SimpleFxProvider::new();
+    huge.set_quotes(&[(Currency::EUR, Currency::USD, f64::MAX)])
+        .expect("finite positive quote");
+    let error = FxMatrix::new(Arc::new(huge), None)
+        .with_bumped_rate(query, 0.1)
+        .err()
+        .expect("shocked rate overflows");
+    assert!(matches!(
+        error,
+        finstack_quant_core::Error::Input(finstack_quant_core::InputError::InvalidFxRate { .. })
+    ));
+
     let provider = Arc::new(SimpleFxProvider::new());
     provider
         .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
         .expect("initial quote");
     let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>, None);
-    let bumped = matrix
-        .with_bumped_rate(Currency::EUR, Currency::USD, 0.1, on)
-        .expect("initially valid shock");
+    let bumped = matrix.with_bumped_rate(query, 0.1).expect("valid shock");
     provider
         .set_quotes(&[(Currency::EUR, Currency::USD, f64::MAX)])
         .expect("finite positive provider update");
-    assert!(
-        bumped
-            .rate(FxQuery::new(
-                Currency::EUR,
-                Currency::USD,
-                on,
-                FxConversionPolicy::CashflowDate
-            ))
-            .is_err()
-    );
-    // Capture validates every quote, so the overflowing shock fails before
-    // any state (or serialized null) is produced.
-    assert!(matches!(
-        bumped.get_serializable_state(),
-        Err(finstack_quant_core::Error::Input(
-            finstack_quant_core::InputError::InvalidFxRate { .. }
-        ))
-    ));
-    let context = MarketContext::new().insert_fx(bumped);
-    assert!(serde_json::to_string(&context).is_err());
+    assert_eq!(bumped.rate(query).expect("frozen rate").rate, 1.1 * 1.1);
+    let state = bumped.get_serializable_state().expect("frozen state");
+    assert!(serde_json::to_string(&state).is_ok());
 }
 
 #[test]
-fn mutable_provider_cross_shock_overflow_is_not_replaced_by_unshocked_triangulation() {
-    use finstack_quant_core::market_data::context::MarketContext;
-
+fn cross_shock_overflow_is_not_replaced_by_unshocked_triangulation() {
     let on = Date::from_ordinal_date(2025, 1).expect("date");
-    let provider = Arc::new(SimpleFxProvider::new());
-    for (from, to, rate) in [
-        (Currency::EUR, Currency::GBP, 1.1),
-        (Currency::EUR, Currency::USD, 1.1),
-        (Currency::USD, Currency::GBP, 0.8),
-    ] {
-        provider
-            .set_quotes(&[(from, to, rate)])
-            .expect("initial quote");
-    }
-    let matrix = FxMatrix::new(Arc::clone(&provider) as Arc<dyn FxProvider>, None);
-    let bumped = matrix
-        .with_bumped_rate(Currency::EUR, Currency::GBP, 0.1, on)
-        .expect("initially valid cross shock");
+    let provider = SimpleFxProvider::new();
     provider
-        .set_quotes(&[(Currency::EUR, Currency::GBP, f64::MAX)])
-        .expect("finite positive provider update");
-    let error = bumped
-        .rate(FxQuery::new(
-            Currency::EUR,
-            Currency::GBP,
-            on,
-            FxConversionPolicy::CashflowDate,
-        ))
-        .expect_err("invalid direct shocked rate must not fall back to unshocked pivot legs");
+        .set_quotes(&[
+            (Currency::EUR, Currency::GBP, f64::MAX),
+            (Currency::EUR, Currency::USD, 1.1),
+            (Currency::USD, Currency::GBP, 0.8),
+        ])
+        .expect("finite positive quotes");
+    let matrix = FxMatrix::new(Arc::new(provider), Some(Currency::USD));
+    let error = matrix
+        .with_bumped_rate(
+            FxQuery::new(
+                Currency::EUR,
+                Currency::GBP,
+                on,
+                FxConversionPolicy::CashflowDate,
+            ),
+            0.1,
+        )
+        .err()
+        .expect("invalid direct shocked rate must not fall back to unshocked pivot legs");
     assert!(matches!(
         error,
         finstack_quant_core::Error::Input(finstack_quant_core::InputError::InvalidFxRate { .. })
     ));
-    assert!(bumped.get_serializable_state().is_err());
-    assert!(serde_json::to_string(&MarketContext::new().insert_fx(bumped)).is_err());
 }
 
 #[test]
@@ -1965,32 +2027,36 @@ fn fx_triangulated_flag_is_stable_across_repeat_queries() {
 
 #[test]
 fn with_bumped_rate_preserves_fx_term_structure() {
-    // `with_bumped_rate` previously froze one
-    // absolute rate for every date, flattening a date-aware provider's term
-    // structure. The bump must be relative and per-date.
-    struct DateAwareFx;
-    impl FxProvider for DateAwareFx {
-        fn rate(
-            &self,
-            _from: Currency,
-            _to: Currency,
-            on: Date,
-            _policy: FxConversionPolicy,
-        ) -> finstack_quant_core::Result<f64> {
-            if on == Date::from_calendar_date(2025, time::Month::January, 1).unwrap() {
-                Ok(1.10)
-            } else {
-                Ok(1.20)
-            }
-        }
-    }
-
-    let matrix = FxMatrix::new(Arc::new(DateAwareFx), None);
+    // The bump is relative and per-date: a date-specific quote and the
+    // all-date quote each move by the same factor, so the term structure
+    // survives the shock.
     let d1 = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
     let d2 = Date::from_calendar_date(2025, time::Month::June, 1).unwrap();
+    let provider = SimpleFxProvider::new();
+    provider
+        .set_quotes(&[(Currency::EUR, Currency::USD, 1.20)])
+        .expect("all-date quote");
+    let matrix = FxMatrix::new(Arc::new(provider), None);
+    matrix
+        .set_quote_on(
+            Currency::EUR,
+            Currency::USD,
+            d1,
+            FxConversionPolicy::CashflowDate,
+            1.10,
+        )
+        .expect("date-specific quote");
 
     let bumped = matrix
-        .with_bumped_rate(Currency::EUR, Currency::USD, 0.01, d1)
+        .with_bumped_rate(
+            finstack_quant_core::money::fx::FxQuery::new(
+                Currency::EUR,
+                Currency::USD,
+                d1,
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+            ),
+            0.01,
+        )
         .expect("valid bump");
 
     let r1 = bumped
@@ -2027,7 +2093,15 @@ fn with_bumped_rate_rejects_invalid_bumps() {
     for bad in [f64::NAN, f64::INFINITY, -1.0, -2.0] {
         assert!(
             matrix
-                .with_bumped_rate(Currency::EUR, Currency::USD, bad, d)
+                .with_bumped_rate(
+                    finstack_quant_core::money::fx::FxQuery::new(
+                        Currency::EUR,
+                        Currency::USD,
+                        d,
+                        finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate
+                    ),
+                    bad
+                )
                 .is_err(),
             "bump_pct {bad} must be rejected"
         );
@@ -2449,7 +2523,15 @@ fn bumped_matrix_snapshot_states_are_pinned() {
         )
         .expect("scoped leg");
     let bumped = matrix
-        .with_bumped_rate(Currency::EUR, Currency::GBP, 0.1, on)
+        .with_bumped_rate(
+            finstack_quant_core::money::fx::FxQuery::new(
+                Currency::EUR,
+                Currency::GBP,
+                on,
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+            ),
+            0.1,
+        )
         .expect("cross shock");
     let state = serde_json::to_value(bumped.get_serializable_state().expect("stable FX state"))
         .expect("snapshot serializes");
@@ -2461,8 +2543,11 @@ fn bumped_matrix_snapshot_states_are_pinned() {
                 "pivot_currency": "USD"
             },
             "pinned_quotes": [["USD", "GBP", "2025-01-01", "cashflow_date", 0.8]],
+            // Both orientations are frozen from their own baseline route
+            // (record 013 #12); GBP->EUR = (1 / 0.8) * (1 / 1.1) / 1.1.
             "provider_pinned_quotes": [
-                ["EUR", "GBP", "2025-01-01", "cashflow_date", 0.9680000000000002]
+                ["EUR", "GBP", "2025-01-01", "cashflow_date", 0.9680000000000002],
+                ["GBP", "EUR", "2025-01-01", "cashflow_date", 1.0330578512396693]
             ],
             "provider_quotes": [["EUR", "USD", 1.1]],
             "quotes": []
@@ -2713,5 +2798,220 @@ mod fx_resolution_rules {
         let empty = FxMatrix::new(Arc::new(SimpleFxProvider::new()), None);
         let state = empty.get_serializable_state().expect("empty state");
         assert!(state.provider_quotes.is_empty() && state.provider_pinned_quotes.is_empty());
+    }
+}
+
+/// Record CORE-CONVENTIONS-013 state and shock rules (F8).
+mod fx_state_and_shock_rules {
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::money::fx::{
+        FxConfig, FxConversionPolicy, FxMatrix, FxMatrixState, FxQuery, SimpleFxProvider,
+    };
+    use std::sync::Arc;
+    use time::macros::date;
+
+    const D1: Date = date!(2025 - 01 - 02);
+    const D2: Date = date!(2025 - 06 - 30);
+    const OTHER: Date = date!(2026 - 03 - 15);
+    const POLICIES: [FxConversionPolicy; 2] = [
+        FxConversionPolicy::CashflowDate,
+        FxConversionPolicy::PeriodEnd,
+    ];
+
+    /// Every quote layer: provider global and scoped, matrix global and
+    /// pinned, with an independently supplied reverse EUR/USD and a GBP/EUR
+    /// pair reachable only through the USD pivot.
+    fn layered_matrix() -> FxMatrix {
+        let provider = SimpleFxProvider::new();
+        provider
+            .set_quotes(&[
+                (Currency::EUR, Currency::USD, 2.0),
+                (Currency::USD, Currency::EUR, 0.6),
+                (Currency::GBP, Currency::USD, 1.25),
+            ])
+            .expect("provider quotes");
+        let matrix = FxMatrix::new(Arc::new(provider), Some(Currency::USD));
+        matrix
+            .set_quote_on(Currency::USD, Currency::EUR, D1, POLICIES[0], 0.55)
+            .expect("pinned reverse only");
+        matrix
+            .set_quote_on(Currency::GBP, Currency::USD, D2, POLICIES[1], 1.3)
+            .expect("pinned pivot leg");
+        matrix
+    }
+
+    fn scopes() -> Vec<(Date, FxConversionPolicy)> {
+        [D1, D2, OTHER]
+            .into_iter()
+            .flat_map(|on| POLICIES.into_iter().map(move |policy| (on, policy)))
+            .collect()
+    }
+
+    fn rate(
+        matrix: &FxMatrix,
+        from: Currency,
+        to: Currency,
+        on: Date,
+        p: FxConversionPolicy,
+    ) -> f64 {
+        matrix
+            .rate(FxQuery::new(from, to, on, p))
+            .expect("rate")
+            .rate
+    }
+
+    fn assert_shocked(base: &FxMatrix, shocked: &FxMatrix, from: Currency, to: Currency, f: f64) {
+        for (on, policy) in scopes() {
+            assert_eq!(
+                rate(shocked, from, to, on, policy),
+                rate(base, from, to, on, policy) * f,
+                "{from}->{to} {on} {policy}"
+            );
+            assert_eq!(
+                rate(shocked, to, from, on, policy),
+                rate(base, to, from, on, policy) / f,
+                "{to}->{from} {on} {policy}"
+            );
+        }
+    }
+
+    #[test]
+    fn shocks_move_each_orientation_from_its_own_baseline_in_every_scope() {
+        let base = layered_matrix();
+        let reference = FxQuery::new(Currency::EUR, Currency::USD, D1, POLICIES[0]);
+        let shocked = base.with_bumped_rate(reference, 0.1).expect("stored pair");
+        assert_shocked(&base, &shocked, Currency::EUR, Currency::USD, 1.1);
+        // The record's example: independently supplied 2 and 0.6 stay
+        // independent (2.2 and 0.6 / 1.1), not 2.2 and 1 / 2.2.
+        assert_eq!(
+            rate(&shocked, Currency::EUR, Currency::USD, OTHER, POLICIES[0]),
+            2.0 * 1.1
+        );
+        assert_eq!(
+            rate(&shocked, Currency::USD, Currency::EUR, OTHER, POLICIES[0]),
+            0.6 / 1.1
+        );
+        // Unrelated stored quotes do not move.
+        for (on, policy) in scopes() {
+            assert_eq!(
+                rate(&shocked, Currency::GBP, Currency::USD, on, policy),
+                rate(&base, Currency::GBP, Currency::USD, on, policy)
+            );
+        }
+
+        let reference = FxQuery::new(Currency::GBP, Currency::EUR, D2, POLICIES[1]);
+        let shocked = base
+            .with_bumped_rate(reference, -0.05)
+            .expect("pivot-derived pair");
+        assert_shocked(&base, &shocked, Currency::GBP, Currency::EUR, 0.95);
+    }
+
+    #[test]
+    fn shocked_matrices_capture_restore_and_shock_again() {
+        let base = layered_matrix();
+        let once = base
+            .with_bumped_rate(
+                FxQuery::new(Currency::GBP, Currency::EUR, D1, POLICIES[0]),
+                0.1,
+            )
+            .expect("first shock");
+        let restored = FxMatrix::try_from_state(&once.get_serializable_state().expect("capture"))
+            .expect("restore");
+        for (on, policy) in scopes() {
+            for (from, to) in [
+                (Currency::GBP, Currency::EUR),
+                (Currency::EUR, Currency::GBP),
+                (Currency::EUR, Currency::USD),
+                (Currency::USD, Currency::GBP),
+            ] {
+                assert_eq!(
+                    rate(&restored, from, to, on, policy),
+                    rate(&once, from, to, on, policy)
+                );
+            }
+        }
+        let twice = once
+            .with_bumped_rate(
+                FxQuery::new(Currency::GBP, Currency::EUR, D1, POLICIES[0]),
+                0.1,
+            )
+            .expect("second shock");
+        assert_shocked(&once, &twice, Currency::GBP, Currency::EUR, 1.1);
+    }
+
+    #[test]
+    fn bump_and_reference_validation_happen_before_any_shock() {
+        let base = layered_matrix();
+        let reference = FxQuery::new(Currency::EUR, Currency::USD, D1, POLICIES[0]);
+        for bad in [f64::NAN, f64::INFINITY, -1.0, -2.0, 1e-17] {
+            assert!(base.with_bumped_rate(reference, bad).is_err(), "{bad}");
+        }
+        let identity = FxQuery::new(Currency::USD, Currency::USD, D1, POLICIES[0]);
+        assert!(base.with_bumped_rate(identity, 0.1).is_err());
+        let unpriced = FxQuery::new(Currency::EUR, Currency::JPY, D1, POLICIES[0]);
+        assert!(base.with_bumped_rate(unpriced, 0.1).is_err());
+        // A zero bump is a valid identity scenario.
+        let same = base
+            .with_bumped_rate(reference, 0.0)
+            .expect("identity scenario");
+        assert_shocked(&base, &same, Currency::EUR, Currency::USD, 1.0);
+    }
+
+    #[test]
+    fn batches_and_restored_state_reject_repeated_keys() {
+        let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()), None);
+        assert!(
+            matrix
+                .set_quotes(&[
+                    (Currency::EUR, Currency::USD, 1.1),
+                    (Currency::EUR, Currency::USD, 1.2),
+                ])
+                .is_err()
+        );
+        assert!(
+            matrix
+                .rate(FxQuery::new(Currency::EUR, Currency::USD, D1, POLICIES[0]))
+                .is_err()
+        );
+        // Opposite orientations are distinct keys; separate calls may replace.
+        matrix
+            .set_quotes(&[
+                (Currency::EUR, Currency::USD, 1.1),
+                (Currency::USD, Currency::EUR, 0.9),
+            ])
+            .expect("both orientations");
+        matrix
+            .set_quotes(&[(Currency::EUR, Currency::USD, 1.2)])
+            .expect("deliberate replacement");
+        assert!(
+            SimpleFxProvider::new()
+                .set_quotes(&[
+                    (Currency::GBP, Currency::USD, 1.3),
+                    (Currency::GBP, Currency::USD, 1.3),
+                ])
+                .is_err()
+        );
+
+        let state = |quotes, pinned_quotes, provider_quotes| FxMatrixState {
+            config: FxConfig::new(None),
+            quotes,
+            provider_quotes,
+            provider_pinned_quotes: vec![],
+            pinned_quotes,
+        };
+        let pin = (Currency::EUR, Currency::USD, D1, POLICIES[0], 1.1);
+        let global = (Currency::EUR, Currency::USD, 1.1);
+        for bad in [
+            state(vec![global, global], vec![], vec![]),
+            state(vec![], vec![pin, pin], vec![]),
+            state(vec![], vec![], vec![global, global]),
+            state(vec![(Currency::USD, Currency::USD, 1.0)], vec![], vec![]),
+        ] {
+            assert!(FxMatrix::try_from_state(&bad).is_err());
+        }
+        // The same key in different stores is valid.
+        FxMatrix::try_from_state(&state(vec![global], vec![pin], vec![global]))
+            .expect("distinct stores");
     }
 }

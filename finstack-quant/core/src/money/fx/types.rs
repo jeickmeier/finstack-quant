@@ -220,13 +220,40 @@ impl FxConfig {
 
 /// Result of an FX rate lookup with simple triangulation info.
 ///
+/// Deserialization requires a finite, strictly positive `rate`; a decoded
+/// result is not evidence of market provenance.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, try_from = "FxRateResultRepr")]
 pub struct FxRateResult {
     /// Rate such that source amount multiplied by this value is target amount.
     pub rate: f64,
     /// Whether this rate was constructed through the configured pivot currency.
     pub triangulated: bool,
+}
+
+/// Wire form of [`FxRateResult`], validated on conversion.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FxRateResultRepr {
+    rate: f64,
+    triangulated: bool,
+}
+
+impl TryFrom<FxRateResultRepr> for FxRateResult {
+    type Error = String;
+
+    fn try_from(repr: FxRateResultRepr) -> Result<Self, Self::Error> {
+        if !repr.rate.is_finite() || repr.rate <= 0.0 {
+            return Err(format!(
+                "FX rate result must be finite and strictly positive (got {})",
+                repr.rate
+            ));
+        }
+        Ok(Self {
+            rate: repr.rate,
+            triangulated: repr.triangulated,
+        })
+    }
 }
 
 /// Serializable state of an FxMatrix.
@@ -295,7 +322,25 @@ impl Serialize for FxMatrixState {
 
 #[cfg(test)]
 mod tests {
-    use super::FxConversionPolicy;
+    use super::{FxConversionPolicy, FxRateResult};
+
+    #[test]
+    fn fx_rate_result_deserialization_rejects_invalid_rates() {
+        let ok: FxRateResult =
+            serde_json::from_str(r#"{"rate":1.1,"triangulated":true}"#).expect("valid result");
+        assert_eq!((ok.rate, ok.triangulated), (1.1, true));
+        for json in [
+            r#"{"rate":0.0,"triangulated":false}"#,
+            r#"{"rate":-1.0,"triangulated":false}"#,
+            r#"{"rate":1.1,"triangulated":"yes"}"#,
+            r#"{"rate":1.1}"#,
+        ] {
+            assert!(
+                serde_json::from_str::<FxRateResult>(json).is_err(),
+                "{json}"
+            );
+        }
+    }
 
     #[test]
     fn fx_conversion_policy_display_and_fromstr_use_the_serde_labels() {

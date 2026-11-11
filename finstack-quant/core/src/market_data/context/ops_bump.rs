@@ -216,9 +216,11 @@ impl MarketContext {
                     quote,
                     pct,
                     as_of,
+                    policy,
                 } => {
                     let fx = ctx.fx_required()?;
-                    let bumped = fx.with_bumped_rate(base, quote, pct / 100.0, as_of)?;
+                    let reference = crate::money::fx::FxQuery::new(base, quote, as_of, policy);
+                    let bumped = fx.with_bumped_rate(reference, pct / 100.0)?;
                     ctx.fx = Some(Arc::new(bumped));
                 }
                 MarketBump::VolBucketPct {

@@ -505,36 +505,18 @@ struct FxForwardExpectedAttribution {
     fx_pnl_first_order: f64,
 }
 
-/// Fixed-rate FX provider for the EUR/USD market.
-struct FixedEurUsd(f64);
-impl finstack_quant_core::money::fx::FxProvider for FixedEurUsd {
-    fn rate(
-        &self,
-        from: Currency,
-        to: Currency,
-        _on: Date,
-        _policy: finstack_quant_core::money::fx::FxConversionPolicy,
-    ) -> finstack_quant_core::Result<f64> {
-        if from == to {
-            Ok(1.0)
-        } else if from == Currency::EUR && to == Currency::USD {
-            Ok(self.0)
-        } else if from == Currency::USD && to == Currency::EUR {
-            Ok(1.0 / self.0)
-        } else {
-            Err(finstack_quant_core::Error::Validation(format!(
-                "no rate {from}/{to}"
-            )))
-        }
-    }
-}
-
 fn fx_market(as_of: Date, usd_rate: f64, eur_rate: f64, spot_eur_usd: f64) -> MarketContext {
-    use finstack_quant_core::money::fx::FxMatrix;
+    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
+    // Quote-backed so FX shocks can freeze it (record CORE-CONVENTIONS-013 #11).
+    let provider = SimpleFxProvider::new();
+    provider
+        .set_quotes(&[(Currency::EUR, Currency::USD, spot_eur_usd)])
+        .expect("valid EUR/USD quote");
+    let fx_matrix = FxMatrix::new(Arc::new(provider), None);
     MarketContext::new()
         .insert(flat_discount_curve("USD-OIS", as_of, usd_rate))
         .insert(flat_discount_curve("EUR-OIS", as_of, eur_rate))
-        .insert_fx(FxMatrix::new(Arc::new(FixedEurUsd(spot_eur_usd)), None))
+        .insert_fx(fx_matrix)
 }
 
 /// Total-P&L tolerance for the FX-forward parity (USD on $1.1M EUR notional).

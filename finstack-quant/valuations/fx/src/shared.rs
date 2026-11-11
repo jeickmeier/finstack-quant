@@ -403,10 +403,13 @@ pub(crate) fn fx_matrix_bumped_market(
     Ok(market
         .clone()
         .insert_fx(market.fx_required()?.with_bumped_rate(
-            base_currency,
-            quote_currency,
+            finstack_quant_core::money::fx::FxQuery::new(
+                base_currency,
+                quote_currency,
+                as_of,
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+            ),
             bump_pct,
-            as_of,
         )?))
 }
 

@@ -17,7 +17,8 @@ fn query_date() -> Date {
 }
 
 fn seeded_matrix() -> FxMatrix {
-    let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()), None);
+    // A deliberate USD hub: the cross benchmarks route EUR/GBP through USD.
+    let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()), Some(Currency::USD));
     matrix
         .set_quotes(&[
             (Currency::EUR, Currency::USD, 1.10),

@@ -294,6 +294,7 @@ impl FactorBumper for FxBumper {
                 quote: pair.quote,
                 pct: self.bump_pct * direction * 100.0,
                 as_of,
+                policy: finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
             })
             .collect();
         market.bump(bumps)

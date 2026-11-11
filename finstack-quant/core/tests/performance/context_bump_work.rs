@@ -440,9 +440,10 @@ fn ordered_bumps(bumps: &[MarketBump]) -> Vec<Value> {
             "detachments": detachments.as_ref().map(|values| values.iter().map(|v| bits(*v)).collect::<Vec<_>>()),
             "points_bits": bits(*points),
         }),
-        MarketBump::FxPct { base, quote, pct, as_of } => json!({
+        MarketBump::FxPct { base, quote, pct, as_of, policy } => json!({
             "index": index, "kind": "fx_percentage", "base": base.to_string(),
             "quote": quote.to_string(), "pct_bits": bits(*pct), "as_of": as_of.to_string(),
+            "policy": policy.to_string(),
         }),
     }).collect()
 }

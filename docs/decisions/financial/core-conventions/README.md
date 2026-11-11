@@ -107,8 +107,8 @@ Accepted record 013 requires explicit point-date policies and routing, removal o
 PeriodAverage, scoped-before-global source specificity, literal directed rates and
 ordered caches, missing-only fallback, coherent generations and complete snapshots,
 atomic fresh restoration and frozen directional pair shocks. Runtime reconciliation
-and independent provider/risk/state qualification remain pending; observed
-implementation is not certified.
+completed on 2026-11-11 (F6-F8); independent provider/risk/state qualification
+remains pending and the implementation is not certified.
 
 Accepted record 014 requires exact Gregorian/fiscal partitions, explicit retained calendar
 context, strict signed parsing/ranges/stepping, structural total ordering, separate
@@ -215,11 +215,11 @@ observation, window and settlement qualification at each consumer remains pendin
 | Monetary arithmetic/FX at rate | Currency-checked Decimal ops; float scalar ->Decimal; explicit rate conversion | No implicit conversion | [CORE-CONVENTIONS-012](012-money-decimal-precision.md) | Arithmetic and currency tests |
 | Monetary rounding/output | Nearest-even, midpoint-away, truncate, floor, ceil | Display/minor-unit defaults; explicit options | [CORE-CONVENTIONS-012](012-money-decimal-precision.md) | Rounding mode tests |
 | Currency identity/minor units | 159 static ISO-code/numeric entries and 0/2/3/4dp groups | Generated CSV lookup | [CORE-CONVENTIONS-012](012-money-decimal-precision.md) | Full generator artifact consistency passed |
-| FX authoritative resolution | Global override > scoped pinned > observed > provider; direct/inverse by layer | Explicit stores/provider | [CORE-CONVENTIONS-013](013-fx-resolution-and-shocks.md) | Precedence/cache tests located |
-| FX cross-rate calculation | Two leg product through one pivot; default USD enabled | Triangulation flag/pivot config | [CORE-CONVENTIONS-013](013-fx-resolution-and-shocks.md) | Cross/invalidation invariants |
-| FX accounting date/average policy | Policies are query keys; inverse/product applied to supplied aggregates | CashflowDate default | [CORE-CONVENTIONS-013](013-fx-resolution-and-shocks.md) | PeriodAverage invariant test inspected |
-| FX relative risk shock | Direct*(1+b), inverse/(1+b), derived-pair scope preserved | with_bumped_rate; no identity shocks | [CORE-CONVENTIONS-013](013-fx-resolution-and-shocks.md) | Scope/snapshot/overflow tests located |
-| FX revision/cache/state | Three stable-state attempts; 256-entry LRU; authority-preserving snapshots | Versioned provider controls cacheability | [CORE-CONVENTIONS-013](013-fx-resolution-and-shocks.md) | Race/revision tests located |
+| FX authoritative resolution | Scoped pin > pair-global > provider (observed per exact ordered query); direct before checked reciprocal per layer; stored identity quotes rejected | Explicit stores/provider | [CORE-CONVENTIONS-013](013-fx-resolution-and-shocks.md) | Precedence, orientation and identity tests run |
+| FX cross-rate calculation | Two-leg product through one explicit pivot, only after a provider NotFound; failed legs keep their cause | Required `pivot_currency` (`null` disables) | [CORE-CONVENTIONS-013](013-fx-resolution-and-shocks.md) | Routing, missing-leg and outage tests run |
+| FX accounting date/average policy | CashflowDate and PeriodEnd are point-query keys; no averaging in core | Required explicit policy, no default | [CORE-CONVENTIONS-013](013-fx-resolution-and-shocks.md) | Policy-required and retired-label tests run |
+| FX relative risk shock | Frozen baseline; A->B * (1+b), B->A / (1+b) from each orientation's own baseline, every scope; quote-only result | `with_bumped_rate(reference, b)`; no identity or ineffective bumps | [CORE-CONVENTIONS-013](013-fx-resolution-and-shocks.md) | Per-scope, re-shock, freeze and overflow tests run |
+| FX revision/cache/state | Three stable-state attempts; 256-entry LRU; checked revisions; fallible validated capture; fresh atomic restore rejecting repeated keys | Revisionless providers: no cache, one call per resolution, no capture | [CORE-CONVENTIONS-013](013-fx-resolution-and-shocks.md) | Race, exhaustion, capture and restore tests run |
 | Reporting periods/fiscal grids | Half-open Gregorian/ISO/fiscal partitions with clamped starts and partial weeks | Explicit kind/config; Jan1 default | [CORE-CONVENTIONS-014](014-fiscal-periods-ltm.md) | Fiscal/ISO examples and partition invariants |
 | Annualization/LTM | Daily252/Weekly52 factors; daily12-month rows vs fixed-count other kinds | PeriodKind and explicit target | [CORE-CONVENTIONS-014](014-fiscal-periods-ltm.md) | 365/261-day and leading-gap tests inspected |
 | Cashflow economic categories | Interest/principal/repayment/cash predicates; PIK/default-notional noncash | CFKind explicit | [CORE-CONVENTIONS-015](015-cashflow-semantics.md) | Classification assertions |

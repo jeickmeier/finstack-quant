@@ -563,8 +563,11 @@ pub enum MarketBump {
         quote: Currency,
         /// Percentage change (e.g., 5.0 = +5%).
         pct: f64,
-        /// Valuation date used for the FX lookup.
+        /// Date of the reference lookup that must succeed before the shock;
+        /// the shock itself covers every date.
         as_of: Date,
+        /// Policy of that reference lookup; required, with no default.
+        policy: crate::money::fx::FxConversionPolicy,
     },
     /// Volatility surface bucket bump (percentage multiplier).
     VolBucketPct {

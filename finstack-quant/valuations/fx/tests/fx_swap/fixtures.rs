@@ -3,63 +3,26 @@
 //! Provides reusable market data setups, mock providers, and utility functions
 //! to maintain DRY principles across the test suite.
 
-use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
+use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 pub use finstack_quant_test_utils::assert::approx_eq;
 use finstack_quant_valuations_fx::fx_swap::FxSwap;
 use std::sync::Arc;
 use time::Month;
 
-/// Mock FX provider for testing.
-///
-/// Provides deterministic FX rates for test scenarios without requiring
-/// external market data sources.
-#[derive(Clone)]
-pub struct MockFxProvider {
-    pub rates: FxHashMap<(Currency, Currency), f64>,
-}
-
-impl MockFxProvider {
-    /// Create a new mock provider with EUR/USD = 1.1
-    pub fn default_eurusd() -> Self {
-        let mut rates = FxHashMap::default();
-        rates.insert((Currency::EUR, Currency::USD), 1.1);
-        Self { rates }
-    }
-
-    /// Create a new mock provider with custom rates
-    pub fn with_rates(rates: FxHashMap<(Currency, Currency), f64>) -> Self {
-        Self { rates }
-    }
-
-    /// Add a rate to the provider
-    #[allow(dead_code)]
-    pub fn add_rate(&mut self, from: Currency, to: Currency, rate: f64) {
-        self.rates.insert((from, to), rate);
-    }
-}
-
-impl FxProvider for MockFxProvider {
-    fn rate(
-        &self,
-        from: Currency,
-        to: Currency,
-        _on: Date,
-        _policy: FxConversionPolicy,
-    ) -> finstack_quant_core::Result<f64> {
-        if let Some(&rate) = self.rates.get(&(from, to)) {
-            return Ok(rate);
-        }
-        Err(finstack_quant_core::Error::Internal(
-            "test FX provider missing requested currency pair".into(),
-        ))
-    }
+/// EUR/USD matrix over a quote-backed provider, so FX shocks can freeze it
+/// (record CORE-CONVENTIONS-013 #11).
+fn eurusd_matrix(rate: f64) -> FxMatrix {
+    let provider = SimpleFxProvider::new();
+    provider
+        .set_quotes(&[(Currency::EUR, Currency::USD, rate)])
+        .expect("valid EUR/USD quote");
+    FxMatrix::new(Arc::new(provider), None)
 }
 
 /// Standard test dates for consistent scenarios
@@ -108,8 +71,7 @@ pub fn setup_standard_market(as_of: Date) -> MarketContext {
         .build()
         .unwrap();
 
-    let provider = MockFxProvider::default_eurusd();
-    let fx_matrix = FxMatrix::new(Arc::new(provider), None);
+    let fx_matrix = eurusd_matrix(1.1);
 
     MarketContext::new()
         .insert(usd_curve)
@@ -138,10 +100,7 @@ pub fn setup_steep_curve_market(as_of: Date) -> MarketContext {
         .build()
         .unwrap();
 
-    let mut rates = FxHashMap::default();
-    rates.insert((Currency::EUR, Currency::USD), 1.2);
-    let provider = MockFxProvider::with_rates(rates);
-    let fx_matrix = FxMatrix::new(Arc::new(provider), None);
+    let fx_matrix = eurusd_matrix(1.2);
 
     MarketContext::new()
         .insert(usd_curve)
@@ -178,8 +137,7 @@ pub fn setup_inverted_curve_market(as_of: Date) -> MarketContext {
         .build()
         .unwrap();
 
-    let provider = MockFxProvider::default_eurusd();
-    let fx_matrix = FxMatrix::new(Arc::new(provider), None);
+    let fx_matrix = eurusd_matrix(1.1);
 
     MarketContext::new()
         .insert(usd_curve)

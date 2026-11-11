@@ -67,6 +67,7 @@ impl MetricCalculator for GenericFx01Calculator {
                     quote: pair.quote,
                     pct: direction * Self::BUMP_PCT,
                     as_of,
+                    policy: finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
                 })
                 .collect()
         };

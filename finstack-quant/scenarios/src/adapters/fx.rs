@@ -20,7 +20,15 @@ fn post_shock_triangulation_warnings(
     let Some(pivot) = state.config.pivot_currency else {
         return Ok(Vec::new());
     };
-    let bumped = fx.with_bumped_rate(base, quote, pct / 100.0, as_of)?;
+    let bumped = fx.with_bumped_rate(
+        finstack_quant_core::money::fx::FxQuery::new(
+            base,
+            quote,
+            as_of,
+            finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+        ),
+        pct / 100.0,
+    )?;
     let mut warnings = Vec::new();
 
     for &(from, to, _) in &state.quotes {
@@ -86,6 +94,7 @@ pub(crate) fn fx_pct_effects(
         quote,
         pct,
         as_of: ctx.as_of,
+        policy: finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
     };
     let mut effects = vec![ScenarioEffect::MarketBump(bump)];
     effects.extend(

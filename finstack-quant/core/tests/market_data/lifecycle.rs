@@ -7,7 +7,7 @@ use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{
     InflationCurve, PriceCurve, PriceCurveKind,
 };
-use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider, FxQuery};
+use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxQuery};
 use std::sync::Arc;
 
 /// Parallel price shock in native price units.
@@ -94,54 +94,78 @@ fn price_and_cpi_rolls_preserve_the_new_origin_and_remaining_segment() {
 
 #[test]
 fn derived_fx_shocks_preserve_dates_policies_and_reciprocals() {
-    struct Legs;
-    impl FxProvider for Legs {
-        fn rate(
-            &self,
-            from: Currency,
-            to: Currency,
-            on: Date,
-            policy: FxConversionPolicy,
-        ) -> finstack_quant_core::Result<f64> {
-            match (from, to) {
-                (Currency::EUR, Currency::USD) => Ok(1.1 + f64::from(on.ordinal()) / 1000.0),
-                (Currency::GBP, Currency::USD) => Ok(if policy == FxConversionPolicy::PeriodEnd {
-                    1.3
-                } else {
-                    1.25
-                }),
-                (Currency::USD, Currency::EUR) | (Currency::USD, Currency::GBP) => {
-                    self.rate(to, from, on, policy).map(|rate| 1.0 / rate)
-                }
-                _ => Err(finstack_quant_core::InputError::NotFound {
-                    id: format!("FX:{from}->{to}"),
-                }
-                .into()),
-            }
-        }
-
-        fn get_revision(&self) -> Option<u64> {
-            Some(0)
+    // Date- and policy-dependent pivot legs, held as scoped quotes so the
+    // state can be frozen (record CORE-CONVENTIONS-013 #11).
+    let dates = [base(), Date::from_ordinal_date(2025, 182).unwrap()];
+    let policies = [
+        FxConversionPolicy::CashflowDate,
+        FxConversionPolicy::PeriodEnd,
+    ];
+    let matrix = FxMatrix::new(
+        Arc::new(finstack_quant_core::money::fx::SimpleFxProvider::new()),
+        Some(Currency::USD),
+    );
+    for on in dates {
+        for policy in policies {
+            let gbp_usd = if policy == FxConversionPolicy::PeriodEnd {
+                1.3
+            } else {
+                1.25
+            };
+            matrix
+                .set_quote_on(
+                    Currency::EUR,
+                    Currency::USD,
+                    on,
+                    policy,
+                    1.1 + f64::from(on.ordinal()) / 1000.0,
+                )
+                .unwrap();
+            matrix
+                .set_quote_on(Currency::GBP, Currency::USD, on, policy, gbp_usd)
+                .unwrap();
         }
     }
-    let matrix = FxMatrix::new(Arc::new(Legs), Some(Currency::USD));
     let bumped = matrix
-        .with_bumped_rate(Currency::EUR, Currency::GBP, 0.1, base())
+        .with_bumped_rate(
+            FxQuery::new(
+                Currency::EUR,
+                Currency::GBP,
+                base(),
+                FxConversionPolicy::CashflowDate,
+            ),
+            0.1,
+        )
         .unwrap();
-    // A computed provider cannot be reproduced by a quote list, so capture
-    // fails instead of writing an empty (partial) snapshot.
-    assert!(bumped.get_serializable_state().is_err());
-    for on in [base(), Date::from_ordinal_date(2025, 182).unwrap()] {
-        for policy in [
-            FxConversionPolicy::CashflowDate,
-            FxConversionPolicy::PeriodEnd,
-        ] {
-            let query = FxQuery::new(Currency::EUR, Currency::GBP, on, policy);
-            let expected = matrix.rate(query).unwrap().rate * 1.1;
-            assert!((bumped.rate(query).unwrap().rate - expected).abs() < 1e-12);
-            let reverse = FxQuery::new(Currency::GBP, Currency::EUR, on, policy);
-            assert!((bumped.rate(reverse).unwrap().rate - 1.0 / expected).abs() < 1e-12);
+    // The frozen scenario holds only quotes, so it captures and restores.
+    let restored = FxMatrix::try_from_state(&bumped.get_serializable_state().unwrap()).unwrap();
+    for fx in [&bumped, &restored] {
+        for on in dates {
+            for policy in policies {
+                let query = FxQuery::new(Currency::EUR, Currency::GBP, on, policy);
+                let reverse = FxQuery::new(Currency::GBP, Currency::EUR, on, policy);
+                // Each orientation is its own baseline route, shocked once.
+                assert_eq!(
+                    fx.rate(query).unwrap().rate,
+                    matrix.rate(query).unwrap().rate * 1.1
+                );
+                assert_eq!(
+                    fx.rate(reverse).unwrap().rate,
+                    matrix.rate(reverse).unwrap().rate / 1.1
+                );
+            }
         }
+        // No leg is quoted outside those scopes, so the pair stays unpriced.
+        let other = Date::from_ordinal_date(2025, 300).unwrap();
+        assert!(
+            fx.rate(FxQuery::new(
+                Currency::EUR,
+                Currency::GBP,
+                other,
+                FxConversionPolicy::CashflowDate
+            ))
+            .is_err()
+        );
     }
 }
 

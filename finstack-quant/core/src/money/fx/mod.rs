@@ -38,8 +38,8 @@ mod types;
 
 pub use conventions::{FxPairConvention, FxQuoteConvention, fx_pair_convention, invert_fx_rate};
 pub use matrix::FxMatrix;
+pub(crate) use provider::validate_fx_rate;
 pub use provider::{FxProvider, FxProviderSnapshot};
-pub(crate) use provider::{reciprocal_rate_or_err, validate_fx_rate};
 pub use providers::SimpleFxProvider;
 pub use types::{
     CurrencyPair, FxConfig, FxConversionPolicy, FxMatrixState, FxPolicyMeta, FxQuery, FxRateResult,
@@ -59,8 +59,15 @@ mod tests {
         let _ = provider.set_quotes(&[(Currency::EUR, Currency::USD, 1.10)]);
         let matrix = FxMatrix::new(provider, None);
 
-        let result =
-            matrix.with_bumped_rate(Currency::EUR, Currency::USD, -1.0, date!(2025 - 01 - 01));
+        let result = matrix.with_bumped_rate(
+            crate::money::fx::FxQuery::new(
+                Currency::EUR,
+                Currency::USD,
+                date!(2025 - 01 - 01),
+                crate::money::fx::FxConversionPolicy::CashflowDate,
+            ),
+            -1.0,
+        );
 
         assert!(result.is_err(), "100% negative bump should be rejected");
     }

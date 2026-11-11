@@ -118,7 +118,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 33 | F5 | not attempted (run budget; plan sized L) | | | |
 | 34 | F6 | committed (`F6:` in git log) | lint, rust-test, python-test, wasm-test, all-audit (slice-gate; after gen-write) | 013 entry: config/policy items recorded as reconciled; record 013 status updated; STATEMENTS-CAPITAL-09 observed text updated | Required `pivot_currency: Option<Currency>`; no FX config/matrix/policy defaults; explicit pivots at ~165 Rust and ~60 host sites (`None` unless a deliberate hub); `PeriodAverage` removed; required host `rate` policy; calibration `fx: Option<FxConfig>`; statements `PeriodEnd` fallback removed; see Needs review |
 | 35 | F7 | committed (`F7:` in git log) | lint, gen-check, rust-test, python-test, wasm-test, ui-check (slice-gate; after gen-write) | 013 entry: resolution items recorded as reconciled, state/shock items remain for F8; record 013 status updated | Pin > global > provider; identity quotes rejected; literal ordered cache; NotFound-only routing with preserved leg causes; checked revisions; one-call limit for revisionless providers; single fallible `FxProvider::snapshot` hook with validated capture; see Needs review |
-| 36 | F8 | not started (dep F7 met) | | | |
+| 36 | F8 | committed (`F8:` in git log) | lint, gen-check, rust-test, python-test, wasm-test, ui-check (slice-gate; after gen-write) | 013 entry and the non-atomic-merge entry removed (598 items; Observed 156, Reconciliation 92; Core conventions 17); record 013 status and core-conventions inventory updated | `load_from_state` removed; fresh `try_from_state` with repeated-key rejection; frozen quote-only `with_bumped_rate(reference, b)`; `MarketBump::FxPct.policy`; validated `FxRateResult` deserialization; see Needs review |
 | 37 | G5 | skipped (dep G4) | | | |
 | 38 | E5 | skipped (dep E3: E3b not executed) | | | |
 | 39 | E6 | skipped (dep G5, CASHFLOWS-001) | | | |
@@ -292,6 +292,51 @@ logged under Needs review.
     matches them.
   - **WASM gate:** the WASM figure (1085) is from `wasm-test-built`, after
     one full `wasm-test` build.
+- **F8.**
+  - **Shock as a state transform.** `with_bumped_rate` captures the state,
+    rewrites it as data and restores a fresh quote-only matrix, rather than
+    wrapping providers. This makes every shocked matrix frozen, capturable and
+    re-shockable; `BumpedFxProvider` and `ResolvedPairProvider` were deleted.
+  - **Pivot-derived targets are stored, not routed.** Where the pair is only
+    reachable through the pivot, each orientation's unshocked route result is
+    shocked and written at provider authority for the global scope (probed on a
+    date outside every captured scope) and for every date/policy scope. The
+    shocked matrix therefore reports `triangulated == false` for that pair: it
+    no longer routes it. Record 013 #6 defines the flag as "this matrix used
+    its pivot fallback", so this was taken as correct.
+  - **One-orientation stores.** Where a store/scope held only one orientation
+    of the target, the other is written beside it from its own unshocked
+    reciprocal, so each orientation is "its own baseline / f" exactly (bit
+    equality is asserted) rather than the reciprocal of the shocked opposite.
+  - **Live providers can no longer be shocked.** Capture is required, so FX
+    delta, FX01, cross-factor bumps, `MarketBump::FxPct` and scenario FX
+    shocks error over a computed provider. Tests that relied on live
+    flow-through (provider updates reaching an existing shock) now assert
+    freezing; tests that only needed fixed rates moved to `SimpleFxProvider`
+    or scoped quotes (the term-structure property is kept with a date pin).
+    The FX swap metrics fixtures and the attribution QuantLib FX parity market
+    used hand-written fixed-rate providers; they now hold the same EUR/USD
+    quotes in a `SimpleFxProvider` (their unused stubs were deleted).
+  - **`MarketBump::FxPct.policy`.** Required, because the bump already carries
+    its reference date. All producers (portfolio delta engine, FX01, cross
+    factor bumper, scenario adapter, valuations FX bump helper) state
+    `CashflowDate`, the policy their lookups already use, so no value moved.
+    `OperationSpec::MarketFxPct` has no date or policy; scenario authors cannot
+    choose the reference policy.
+  - **Batch duplicates.** Bulk `set_quotes` (matrix and `SimpleFxProvider`)
+    now rejects a repeated ordered pair instead of last-row-wins; host
+    `from_dict` inputs that spell one pair two ways (`eurusd`, `EUR/USD`) now
+    error.
+  - **Follow-up closure.** The plan says F8 closes the 013 entry and the
+    non-atomic-merge entry, so both were removed. The 013 entry also listed
+    independent qualification (average counterexamples, provider races,
+    snapshot/shock replay); that remains pending in record 013's validation
+    status, with no follow-up entry of its own.
+  - **Bench fix.** `core/benches/fx_matrix.rs` (outside the gate) asserted a
+    triangulated cross over a matrix the F6 sweep had given pivot `None`; it
+    is a deliberate USD hub and now uses `Some(USD)`. The pre-existing
+    `schedule_generation` bench compile error (`Schedule.warnings`) is
+    unrelated and untouched.
 - **F7.**
   - **Scope taken strictly.** The plan's F7 bullets name pinned-before-global,
     ordered literal cache keys, identity rejection, NotFound-only routing,

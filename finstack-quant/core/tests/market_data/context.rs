@@ -18,7 +18,7 @@ use finstack_quant_core::market_data::surfaces::SabrParameterData;
 use finstack_quant_core::market_data::surfaces::{FxDeltaVolSurface, VolCube, VolSurface};
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
+use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix};
 use finstack_quant_core::types::CurveId;
 use std::sync::Arc;
 use time::Month;
@@ -63,28 +63,14 @@ fn roll_forward_rejects_extreme_date_offsets() {
     }
 }
 
-// Simple static FX provider for testing
-struct StaticFxProvider;
-impl FxProvider for StaticFxProvider {
-    fn rate(
-        &self,
-        from: Currency,
-        to: Currency,
-        _on: Date,
-        _policy: FxConversionPolicy,
-    ) -> finstack_quant_core::Result<f64> {
-        if from == Currency::USD && to == Currency::EUR {
-            Ok(0.9)
-        } else if from == to {
-            Ok(1.0)
-        } else {
-            Ok(1.0 / 0.9)
-        }
-    }
-}
-
+/// Quote-backed USD/EUR matrix: shocks need a provider whose state can be
+/// captured and frozen (record CORE-CONVENTIONS-013 #11).
 fn sample_fx_matrix() -> FxMatrix {
-    FxMatrix::new(Arc::new(StaticFxProvider), None)
+    let provider = finstack_quant_core::money::fx::SimpleFxProvider::new();
+    provider
+        .set_quotes(&[(Currency::USD, Currency::EUR, 0.9)])
+        .expect("valid quote");
+    FxMatrix::new(Arc::new(provider), None)
 }
 
 #[test]
@@ -1116,6 +1102,7 @@ fn market_context_bump_fx_spot_error_and_success_paths() {
             quote: Currency::EUR,
             pct: 1.0,
             as_of: date,
+            policy: finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         }])
         .is_err()
     );
@@ -1140,6 +1127,7 @@ fn market_context_bump_fx_spot_error_and_success_paths() {
             quote: Currency::EUR,
             pct: 10.0,
             as_of: date,
+            policy: finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         }])
         .unwrap();
     let after = bumped
@@ -1219,6 +1207,7 @@ fn market_context_apply_bumps_exercises_all_variants() {
             quote: Currency::EUR,
             pct: 10.0,
             as_of: date,
+            policy: finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         },
         // Vol surface bucket bump: filter a single bucket so we hit the filtered path
         MarketBump::VolBucketPct {
@@ -1510,6 +1499,7 @@ fn market_context_apply_bumps_additional_branches_and_errors() {
             quote: Currency::EUR,
             pct: 1.0,
             as_of: date,
+            policy: finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
         }])
         .is_err()
     );
