@@ -35,22 +35,23 @@ MATRIX = {
 
 def test_schedule_builder_setters_update_the_builder_in_place_and_return_it() -> None:
     builder = Schedule.builder("2025-01-15", "2025-07-15")
-    assert builder.frequency("3M") is builder
+    assert builder.frequency("1M") is builder
     # Statement style (no chaining) applies the setting, as in WASM.
-    builder.end_of_month(True)
+    builder.grid("end_of_month")
     assert builder.stub_rule("short_front").adjust_with("following", "nyse") is builder
     assert builder.payment_lag_days(2).fixing_lag_business_days(1) is builder
-    assert builder.cds_imm().imm() is builder
+    assert builder.grid("natural").cds_imm() is builder
+    assert builder.unadjusted().adjust_with("following", "nyse") is builder
     spec = builder.to_spec()
+    # cds_imm() sets quarterly frequency and the short_back stub (Rust semantics).
     assert spec["frequency"] == {"count": 3, "unit": "months"}
-    assert spec["end_of_month"] is True
-    # imm() resets the stub to short_back (Rust ScheduleBuilder::imm semantics).
     assert spec["stub"] == "short_back"
+    assert spec["grid"] == "natural"
+    assert spec["business_day_convention"] == "following"
     assert spec["calendar_id"] == "nyse"
     assert spec["payment_lag_days"] == 2
     assert spec["fixing_lag_business_days"] == 1
-    assert spec["imm_mode"] is True
-    assert spec["cds_imm_mode"] is False
+    assert spec["cds_imm_mode"] is True
 
     with pytest.raises(ValueError, match="nope"):
         builder.frequency("nope")

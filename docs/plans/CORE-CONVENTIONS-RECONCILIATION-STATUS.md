@@ -37,6 +37,9 @@ local `master` `c5c5a0a56e`.
 | E2a | `17103b7ba5` | completed months; roll calendar rule (007) |
 | E2b | `4c5cb90980` | structured-credit month meanings stated (007, O13; docs) |
 | E3a | `28530ab1ef` | schedules: no policies, warnings or repair (008 #12) |
+| E3b-1 | `cd07652242` | strict EOM/IMM anchors, final-date ceiling (008 #5, #6, #11; 009 #10) |
+| E3b-2 | `f1959df015` | private validated `Schedule` state (008 #13) |
+| E3b-3 | `E3b-3:` | `GridMode`, complete `ScheduleSpec`, explicit builder (008 #2, #8, #14) |
 | G2 | `63645b0593` | CreditRating ladder, partial order (019) |
 
 Status-only commits: `b6182cf840`, the interim summary, and this one.
@@ -104,8 +107,8 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 19 | E1 | committed (`E1:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16361; core doctests 285; python-test 13993; python-lint; wasm-test 1085; wasm-lint; ui-check | 014/007 entry: 007 core arithmetic recorded, remaining narrowed; 002 tenor-bridge item marked landed; record 007 partly reconciled | Representation limits (D u32, W u32/7, M i32, Y i32/12; 200-year cap gone); `to_years` → `to_years_approx` in Rust, Python and WASM (`toYearsApprox`); exact `to_days_approx`; `payments_per_year -> Result` rejecting D/W (about 20 callers propagate); Hull-White swaption cashflows pick their payoff annuity at construction and look up the nominal frequency only for cash par-yield (O5); `date_from_epoch_days -> Result`; WASM `toDaysApprox` returns an exact number; `to_years_with_context` takes the caller's context (Python `ctx=`, WASM trailing optional `ctx`) and errors on an end before the origin |
 | 20 | E2 | **E2a committed** (`E2a:` in git log); **E2c (O6 compounding) not executed (scope)**; `from_years` removal **blocked (owner decision)** | E2a: workspace rust-lint; gen-write; workspace rust-test; core doctests; python-test; python-lint; wasm-test; wasm-lint; ui-check | 014/007 entry: `months_until` and roll rule recorded; remaining narrowed | E2a: `months_until -> Result<u32>` (greatest `k` with `add_months(k) <= end`; reversed errors) in core, Python and WASM; structured-credit sites moved to a named site-local `ClampedMonths::clamped_months_until` keeping the pre-007 count (E2b assigns meanings); bond future uses the checked core measure (day-1 start, identical values); `Tenor::add_to_date` errors without a calendar unless `Unadjusted` |
 | 21 | E2b | committed (`E2b:` in git log); documentation only | docs (no code change) | 014/007 entry links the stated meanings | All 16 structured-credit sites have a stated meaning (seasoning, remaining term, simulation index/grid length, lock-out months, domain bound) in the structured-credit README. None migrated: no accepted record selects a measure, and O13 forbids assuming completed months. All stay on `ClampedMonths::clamped_months_until` |
-| 22 | E3 | **E3a committed** (`E3a:` in git log); **E3b not attempted (run budget; plan sized L)** | E3a: workspace rust-lint; gen-write; workspace rust-test; core doctests; python-test; python-lint; wasm-test; wasm-lint; ui-check; notebooks schedule_building and dates_calendars_schedules | 008 entry: removed policies/warnings recorded; record 008 partly reconciled | E3a: removed `ScheduleErrorPolicy`, `ScheduleWarning`, `GracefulEmpty`, the missing-calendar warning, `warnings`/`has_warnings`/`used_graceful_fallback`, the builder/host `error_policy` and the monotonic/drop repair (now a strictness error) across Rust, Python, WASM, parity ledger, stubs and notebooks |
-| 23 | E4 | skipped (dep E3: E3b not executed) | | | CDS-mode removal needs the explicit schedule spec/grid modes |
+| 22 | E3 | committed (`E3a:`, `E3b-1:`, `E3b-2:`, `E3b-3:` in git log) | E3b: lint, gen-check, rust-test, python-test, wasm-test, ui-check (slice-gate per commit; after gen-write); notebooks schedule_building, dates_calendars_schedules, credit_factor_hierarchy | 008 entry narrowed to CDS mode (E4) and the CDS premium calendar regime (E4b); record 008 and 009 #10 status updated | E3b-1 strict EOM/IMM anchors and final-date ceiling, IMM searches removed; E3b-2 private validated `Schedule`; E3b-3 `GridMode`, complete `ScheduleSpec`, explicit builder, hosts; see Needs review |
+| 23 | E4 | not started (dep E3 met) | | | |
 | 24 | E4b | skipped (dep E4) | | | O7 decision not recorded in this run |
 | 25 | G1 | committed (`G1:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16,366 (16,365 + the mid-coupon make-whole re-expectation, re-run 19/19); python-test 14,008 / 112 skip; wasm-test 1,087; ui-check 1,527; doctests and the Linux run skipped by owner request | 017 entry: runtime reconciliation recorded (qualification remains); context-free-XIRR entry removed; record 017 status updated | Guess-free `irr`/`xirr`, fixed ACT/365F clock, canonical per-date net, full log bracket via fallible shared `solve_in_bracket`, one acceptance gate; `YieldBasis` (ACT/365F, ACT/360) with explicit loan `yield_basis` (O11); bond floor `day_count` removed; MC path IRR removed; see Needs review |
 | 26 | G2 | committed (`G2:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16358; core doctests 285; python-test 13988; python-lint; wasm-test 1085; wasm-lint; ui-check | 019 entry: CreditRating part recorded; record 019 partly reconciled | `D` = 21 and `NR` off the ladder; no `Ord`, hand-written `PartialOrd` (`NR` incomparable with rated values, equal to itself); `ladder_position()`; `notches_to`/`to_moodys_string -> Result` (`NR` arithmetic and Moody's `D` error); finite canonical/Moody's/status alias tables replace suffix stripping; the models rating-factor table and the structured-credit `rating_haircuts` move from `BTreeMap` to `IndexMap` (ladder order / wire order); Python ordering of `NR` against a rated value raises `TypeError` |
@@ -120,7 +123,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 35 | F7 | committed (`F7:` in git log) | lint, gen-check, rust-test, python-test, wasm-test, ui-check (slice-gate; after gen-write) | 013 entry: resolution items recorded as reconciled, state/shock items remain for F8; record 013 status updated | Pin > global > provider; identity quotes rejected; literal ordered cache; NotFound-only routing with preserved leg causes; checked revisions; one-call limit for revisionless providers; single fallible `FxProvider::snapshot` hook with validated capture; see Needs review |
 | 36 | F8 | committed (`F8:` in git log) | lint, gen-check, rust-test, python-test, wasm-test, ui-check (slice-gate; after gen-write) | 013 entry and the non-atomic-merge entry removed (598 items; Observed 156, Reconciliation 92; Core conventions 17); record 013 status and core-conventions inventory updated | `load_from_state` removed; fresh `try_from_state` with repeated-key rejection; frozen quote-only `with_bumped_rate(reference, b)`; `MarketBump::FxPct.policy`; validated `FxRateResult` deserialization; see Needs review |
 | 37 | G5 | skipped (dep G4) | | | |
-| 38 | E5 | skipped (dep E3: E3b not executed) | | | |
+| 38 | E5 | not started (dep E3 met) | | | |
 | 39 | E6 | skipped (dep G5, CASHFLOWS-001) | | | |
 | 40 | H1 | not attempted (run budget) | | | Data slice; needs primary sources fetched in-run |
 | 41 | H3 | not attempted (run budget) | | | Data slice |
@@ -683,14 +686,50 @@ logged under Needs review.
   and always asked for Modified Following. It now rolls Modified Following
   with a calendar and `Unadjusted` without one (previously the convention was
   silently ignored without a calendar; values are unchanged).
-- **E3b not attempted (run budget; plan sized L).** The rest of E3 (an explicit `ScheduleSpec` with
-  no defaults and `start < end`, `GridMode` replacing the mode booleans, strict
-  EOM/IMM anchors, the 100,000 final-date ceiling, private validated
-  `Schedule` state and the nominal reference accessors, then removing
-  `imm_on_or_after`/`_before`) touches every schedule construction site:
-  `Schedule::builder` 386 sites in 138 files and `ScheduleBuilder` 306 sites
-  in 119 files on this branch. Not attempted in this run; E4/E4b (CDS mode
-  removal and the CDS date regime) build on it.
+- **E3b (run in three gated commits, on the owner's instruction to run E3b before G5).**
+  - **Split.** E3b-1 strict anchors on the old API, E3b-2 private `Schedule`
+    state, E3b-3 the explicit spec and builder. No instrument, golden or
+    pricing result moved in any of them.
+  - **Strict anchors (E3b-1).** EOM and quarterly-IMM grids now reject an
+    off-grid regular anchor instead of forcing a mid-month anchor onto
+    month-ends or searching for the next IMM date and adding an extra stub.
+    25 unit tests, 3 Python tests, 1 Node test, docs and the schedule notebook
+    used off-grid anchors; they now use on-grid anchors (for example
+    2025-03-19, Jan 31) and assert the off-grid case errors. In the semi-annual
+    IMM leg test the old off-cycle maturity produced an undeclared final stub;
+    with an on-cycle maturity only the declared front stub remains.
+  - **Defaults stated, not invented.** Test, bench, doc and notebook chains
+    gained the former defaults explicitly (monthly, `StubKind::None`,
+    `GridMode::Natural`, unadjusted), so no date moved. Production sites were
+    edited by hand: the cashflow period generator, variance observation dates
+    and two bond annuity legs take only the raw grid from the core schedule and
+    adjust dates themselves, so they state `.unadjusted()` with their own grid.
+    A first sweep's pattern also matched `CashFlowSchedule::builder` and
+    `DividendSchedule::builder` and touched one production line; all 38
+    affected files were restored from `HEAD` and a corrected sweep rerun.
+  - **CDS premium calendar.** The CDS premium schedule applies its business-day
+    convention only when the leg names a calendar. Making a convention without
+    a calendar an error broke real inputs (the production CDS fixture carries
+    `modified_following` with a null calendar), and that policy belongs to the
+    CDS date regime (O7, E4b), not to 008's generic builder. The site now states
+    `.unadjusted()` explicitly when there is no calendar; E4b should decide
+    whether such inputs are accepted.
+  - **Semantics that changed.** `Schedule::builder(start, end)` errors unless
+    `start < end` (equal dates previously failed only at build). Grid
+    selection never resets frequency or stub; `imm()` used to set quarterly and
+    `short_back`. CDS IMM mode with a non-natural grid is an error in either
+    call order (there is no last-call-wins between them). An IMM roll rule with
+    the EOM flag in a cashflow leg remains an error.
+  - **Not executed.** `StubKind` keeps its `Default` (about ten instrument and
+    spec structs derive `Default` through it); removing it is outside E3's
+    bullets. `cds_imm()` still sets quarterly/`short_back` until E4 removes CDS
+    mode.
+  - **Flaky test.** `test_from_materialization_releases_gil_for_parse_and_build`
+    (portfolio materialization, a one-second thread wait) failed twice under
+    gate load and passed on rerun; it is unrelated to schedules.
+  - **Bench.** `core/benches/schedule_generation.rs` asserted the removed
+    `Schedule.warnings` (an E3a leftover) and built standard IMM from an
+    off-cycle start; both fixed. Benches are outside the gate.
 - **Dependency added (G2).** `indexmap` (already a workspace dependency, used
   by core and structured credit) was added to `finstack-quant-models` so the
   rating-factor table keeps a deterministic order once `CreditRating` lost

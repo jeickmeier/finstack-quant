@@ -5,21 +5,26 @@ use finstack_quant_core::dates::{BusinessDayConvention, Schedule, StubKind, Teno
 
 #[test]
 fn eom_rejects_incompatible_schedule_rules() {
-    let builder = || Schedule::builder(make_date(2025, 1, 1), make_date(2025, 12, 20)).unwrap();
+    let builder = || {
+        Schedule::builder(make_date(2025, 1, 1), make_date(2025, 12, 20))
+            .unwrap()
+            .frequency(finstack_quant_core::dates::Tenor::monthly())
+            .stub_rule(finstack_quant_core::dates::StubKind::None)
+            .grid(finstack_quant_core::dates::GridMode::Natural)
+            .unadjusted()
+    };
+    let eom = finstack_quant_core::dates::GridMode::EndOfMonth;
     for frequency in [Tenor::daily(), Tenor::weekly()] {
-        assert!(
-            builder()
-                .frequency(frequency)
-                .end_of_month(true)
-                .build()
-                .is_err()
-        );
+        assert!(builder().frequency(frequency).grid(eom).build().is_err());
     }
-    assert!(builder().cds_imm().end_of_month(true).build().is_err());
-    assert!(builder().end_of_month(true).cds_imm().build().is_err());
-    assert!(builder().imm().end_of_month(true).build().is_err());
+    // CDS IMM mode needs the natural grid, in either call order.
+    assert!(builder().cds_imm().grid(eom).build().is_err());
+    assert!(builder().grid(eom).cds_imm().build().is_err());
     let weekly = Schedule::builder(make_date(2025, 1, 1), make_date(2025, 1, 29))
         .unwrap()
+        .stub_rule(finstack_quant_core::dates::StubKind::None)
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::weekly())
         .build()
         .unwrap();
@@ -30,7 +35,14 @@ fn eom_rejects_incompatible_schedule_rules() {
 
 #[test]
 fn schedule_calendar_setters_replace_the_previous_representation() {
-    let builder = || Schedule::builder(make_date(2025, 6, 4), make_date(2025, 7, 4)).unwrap();
+    let builder = || {
+        Schedule::builder(make_date(2025, 6, 4), make_date(2025, 7, 4))
+            .unwrap()
+            .frequency(finstack_quant_core::dates::Tenor::monthly())
+            .stub_rule(finstack_quant_core::dates::StubKind::None)
+            .grid(finstack_quant_core::dates::GridMode::Natural)
+            .unadjusted()
+    };
     let replaced_id = builder()
         .adjust_with(BusinessDayConvention::Following, "usny")
         .adjust_with(BusinessDayConvention::Following, "weekends_only")
@@ -71,8 +83,9 @@ fn eom_roll_grid_accepts_regular_quarters_from_february() {
         ] {
             let schedule = Schedule::builder(make_date(year, 2, feb_end), make_date(year, 8, 31))
                 .unwrap()
+                .unadjusted()
                 .frequency(Tenor::quarterly())
-                .end_of_month(true)
+                .grid(finstack_quant_core::dates::GridMode::EndOfMonth)
                 .stub_rule(stub)
                 .build()
                 .unwrap();
@@ -89,8 +102,10 @@ fn eom_roll_grid_accepts_regular_quarters_from_february() {
     assert!(
         Schedule::builder(make_date(2025, 2, 28), make_date(2025, 8, 28))
             .unwrap()
+            .stub_rule(finstack_quant_core::dates::StubKind::None)
+            .unadjusted()
             .frequency(Tenor::quarterly())
-            .end_of_month(true)
+            .grid(finstack_quant_core::dates::GridMode::EndOfMonth)
             .build()
             .is_err()
     );
@@ -103,6 +118,9 @@ fn test_basic_schedule() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .stub_rule(finstack_quant_core::dates::StubKind::None)
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::monthly())
         .build()
         .unwrap()
@@ -124,6 +142,8 @@ fn test_quarterly_schedule_with_short_back_stub() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::ShortBack)
         .build()
@@ -147,6 +167,8 @@ fn test_stub_none_rejects_non_integer_tenor() {
 
     let result = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::None)
         .build();
@@ -164,6 +186,8 @@ fn test_short_front_stub() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::ShortFront)
         .build()
@@ -187,6 +211,9 @@ fn test_day_based_frequency() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .stub_rule(finstack_quant_core::dates::StubKind::None)
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::weekly()) // 7 days
         .build()
         .unwrap()
@@ -203,14 +230,9 @@ fn test_day_based_frequency() {
 fn test_single_date_schedule() {
     let date = make_date(2025, 1, 15);
 
-    let result = Schedule::builder(date, date)
-        .unwrap()
-        .frequency(Tenor::monthly())
-        .build();
-
     assert!(
-        result.is_err(),
-        "start == end is no longer valid; must have start < end"
+        Schedule::builder(date, date).is_err(),
+        "start == end is not a schedule; start < end is required"
     );
 }
 
@@ -222,6 +244,8 @@ fn test_schedule_with_business_day_adjustment() {
 
     let schedule = Schedule::builder(start, end)
         .unwrap()
+        .stub_rule(finstack_quant_core::dates::StubKind::None)
+        .grid(finstack_quant_core::dates::GridMode::Natural)
         .frequency(Tenor::weekly())
         .adjust_with(BusinessDayConvention::Following, "target2")
         .build()
@@ -243,6 +267,8 @@ fn test_schedule_builder_with_adjustment() {
 
     let schedule = Schedule::builder(start, end)
         .unwrap()
+        .stub_rule(finstack_quant_core::dates::StubKind::None)
+        .grid(finstack_quant_core::dates::GridMode::Natural)
         .frequency(Tenor::monthly())
         .adjust_with(BusinessDayConvention::Following, "target2")
         .build()
@@ -268,6 +294,9 @@ fn test_uneven_period_clamping() {
     // Verify StubKind::None rejects it
     let none_result = Schedule::builder(start, end)
         .unwrap()
+        .stub_rule(finstack_quant_core::dates::StubKind::None)
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::monthly())
         .build();
     assert!(
@@ -278,6 +307,8 @@ fn test_uneven_period_clamping() {
     // ShortBack clamps to end date
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::ShortBack)
         .build()
@@ -298,6 +329,8 @@ fn test_long_front_stub() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::LongFront)
         .build()
@@ -326,6 +359,8 @@ fn test_long_front_stub_aligned_schedule_has_no_stub() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::LongFront)
         .build()
@@ -350,6 +385,8 @@ fn test_long_front_stub_sub_period_range_is_single_period() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::LongFront)
         .build()
@@ -370,6 +407,8 @@ fn test_no_roll_day_drift_backward_through_short_month() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::semi_annual())
         .stub_rule(StubKind::ShortFront)
         .build()
@@ -399,6 +438,8 @@ fn test_no_roll_day_drift_forward_through_short_month() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::ShortBack)
         .build()
@@ -427,6 +468,9 @@ fn test_stub_none_accepts_aligned_month_end_schedule() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .stub_rule(finstack_quant_core::dates::StubKind::None)
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::monthly())
         .build()
         .unwrap()
@@ -455,6 +499,8 @@ fn test_long_back_stub() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::LongBack)
         .build()
@@ -480,6 +526,8 @@ fn test_long_back_even_schedule_emits_all_dates() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::LongBack)
         .build()
@@ -509,6 +557,8 @@ fn stub_schedules_terminate_at_finite_date_boundaries() {
             let start = make_date(maximum.year(), 12, 30);
             let schedule = Schedule::builder(start, maximum)
                 .unwrap()
+                .grid(finstack_quant_core::dates::GridMode::Natural)
+                .unadjusted()
                 .frequency(frequency)
                 .stub_rule(stub)
                 .build()
@@ -519,6 +569,8 @@ fn stub_schedules_terminate_at_finite_date_boundaries() {
             let end = make_date(minimum.year(), 1, 2);
             let schedule = Schedule::builder(minimum, end)
                 .unwrap()
+                .grid(finstack_quant_core::dates::GridMode::Natural)
+                .unadjusted()
                 .frequency(frequency)
                 .stub_rule(stub)
                 .build()
@@ -542,9 +594,14 @@ fn monthly_stubs_preserve_contractual_boundary_endpoints_with_eom() {
             };
             let schedule = Schedule::builder(start, maximum)
                 .unwrap()
+                .unadjusted()
                 .frequency(Tenor::monthly())
                 .stub_rule(stub)
-                .end_of_month(eom)
+                .grid(if eom {
+                    finstack_quant_core::dates::GridMode::EndOfMonth
+                } else {
+                    finstack_quant_core::dates::GridMode::Natural
+                })
                 .build()
                 .unwrap();
             assert_eq!(schedule.get_dates(), vec![start, maximum]);
@@ -553,9 +610,14 @@ fn monthly_stubs_preserve_contractual_boundary_endpoints_with_eom() {
             let end = make_date(minimum.year(), 1, 31);
             let schedule = Schedule::builder(minimum, end)
                 .unwrap()
+                .unadjusted()
                 .frequency(Tenor::monthly())
                 .stub_rule(stub)
-                .end_of_month(eom)
+                .grid(if eom {
+                    finstack_quant_core::dates::GridMode::EndOfMonth
+                } else {
+                    finstack_quant_core::dates::GridMode::Natural
+                })
                 .build()
                 .unwrap();
             assert_eq!(schedule.get_dates(), vec![minimum, end]);
@@ -583,6 +645,8 @@ fn aligned_long_stubs_keep_regular_anchors_at_both_date_boundaries() {
         for stub in [StubKind::LongBack, StubKind::LongFront] {
             let schedule = Schedule::builder(expected[0], expected[2])
                 .unwrap()
+                .grid(finstack_quant_core::dates::GridMode::Natural)
+                .unadjusted()
                 .frequency(Tenor::monthly())
                 .stub_rule(stub)
                 .build()
@@ -598,6 +662,9 @@ fn boundary_rolls_keep_noninteger_and_invalid_tenor_errors() {
     let end = time::Date::MAX;
     let error = Schedule::builder(start, end)
         .unwrap()
+        .stub_rule(finstack_quant_core::dates::StubKind::None)
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::monthly())
         .build()
         .expect_err("no-stub schedules still require exact tenor alignment");
@@ -620,9 +687,10 @@ fn test_end_of_month_convention() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .unadjusted()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::ShortBack)
-        .end_of_month(true)
+        .grid(finstack_quant_core::dates::GridMode::EndOfMonth)
         .build()
         .unwrap()
         .into_iter()
@@ -657,9 +725,10 @@ fn eom_rejects_an_off_month_end_regular_anchor() {
     ] {
         let error = Schedule::builder(start, end)
             .unwrap()
+            .unadjusted()
             .frequency(Tenor::monthly())
             .stub_rule(stub)
-            .end_of_month(true)
+            .grid(finstack_quant_core::dates::GridMode::EndOfMonth)
             .build()
             .expect_err("off-grid regular anchor");
         assert!(error.to_string().contains("month-end"), "{error}");
@@ -670,9 +739,10 @@ fn eom_rejects_an_off_month_end_regular_anchor() {
 fn stub_none_rejects_maturity_hidden_by_eom_snap() {
     let result = Schedule::builder(make_date(2025, 1, 15), make_date(2025, 2, 20))
         .unwrap()
+        .unadjusted()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::None)
-        .end_of_month(true)
+        .grid(finstack_quant_core::dates::GridMode::EndOfMonth)
         .build();
     assert!(
         result.is_err(),
@@ -688,9 +758,10 @@ fn test_end_of_month_with_leap_year() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .unadjusted()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::ShortBack)
-        .end_of_month(true)
+        .grid(finstack_quant_core::dates::GridMode::EndOfMonth)
         .build()
         .unwrap()
         .into_iter()
@@ -710,9 +781,10 @@ fn test_eom_with_stub_conventions() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .unadjusted()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::ShortBack)
-        .end_of_month(true)
+        .grid(finstack_quant_core::dates::GridMode::EndOfMonth)
         .build()
         .unwrap()
         .into_iter()
@@ -730,15 +802,18 @@ fn eom_rejects_a_jan30_anchor_leap_year() {
     // February month-end roll is covered from a Jan 31 anchor above.
     let result = Schedule::builder(make_date(2024, 1, 30), make_date(2024, 3, 30))
         .unwrap()
+        .unadjusted()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::ShortBack)
-        .end_of_month(true)
+        .grid(finstack_quant_core::dates::GridMode::EndOfMonth)
         .build();
     assert!(result.is_err());
     let feb = Schedule::builder(make_date(2024, 1, 31), make_date(2024, 3, 31))
         .unwrap()
+        .stub_rule(finstack_quant_core::dates::StubKind::None)
+        .unadjusted()
         .frequency(Tenor::monthly())
-        .end_of_month(true)
+        .grid(finstack_quant_core::dates::GridMode::EndOfMonth)
         .build()
         .unwrap();
     assert_eq!(feb.get_dates()[1], make_date(2024, 2, 29));
@@ -750,15 +825,18 @@ fn eom_rejects_a_jan30_anchor_non_leap_year() {
     // February month-end roll is covered from a Jan 31 anchor above.
     let result = Schedule::builder(make_date(2025, 1, 30), make_date(2025, 3, 30))
         .unwrap()
+        .unadjusted()
         .frequency(Tenor::monthly())
         .stub_rule(StubKind::ShortBack)
-        .end_of_month(true)
+        .grid(finstack_quant_core::dates::GridMode::EndOfMonth)
         .build();
     assert!(result.is_err());
     let feb = Schedule::builder(make_date(2025, 1, 31), make_date(2025, 3, 31))
         .unwrap()
+        .stub_rule(finstack_quant_core::dates::StubKind::None)
+        .unadjusted()
         .frequency(Tenor::monthly())
-        .end_of_month(true)
+        .grid(finstack_quant_core::dates::GridMode::EndOfMonth)
         .build()
         .unwrap();
     assert_eq!(feb.get_dates()[1], make_date(2025, 2, 28));
@@ -772,8 +850,10 @@ fn test_eom_quarterly_through_feb() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .stub_rule(finstack_quant_core::dates::StubKind::None)
+        .unadjusted()
         .frequency(Tenor::quarterly())
-        .end_of_month(true)
+        .grid(finstack_quant_core::dates::GridMode::EndOfMonth)
         .build()
         .unwrap()
         .into_iter()
@@ -796,6 +876,8 @@ fn test_adjustment_collision_keeps_maturity_date() {
 
     let schedule = Schedule::builder(start, end)
         .unwrap()
+        .stub_rule(finstack_quant_core::dates::StubKind::None)
+        .grid(finstack_quant_core::dates::GridMode::Natural)
         .frequency(Tenor::daily())
         .adjust_with(BusinessDayConvention::Following, "gblo")
         .build()
@@ -834,7 +916,10 @@ fn test_adjustment_collision_keeps_maturity_date() {
 fn imm_dates(start: time::Date, end: time::Date) -> Vec<time::Date> {
     Schedule::builder(start, end)
         .unwrap()
-        .imm()
+        .unadjusted()
+        .grid(finstack_quant_core::dates::GridMode::QuarterlyImm)
+        .frequency(finstack_quant_core::dates::Tenor::quarterly())
+        .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
         .build()
         .unwrap()
         .get_dates()
@@ -918,7 +1003,10 @@ fn imm_schedule_rejects_an_off_cycle_regular_anchor() {
     ] {
         let error = Schedule::builder(start, end)
             .unwrap()
-            .imm()
+            .unadjusted()
+            .grid(finstack_quant_core::dates::GridMode::QuarterlyImm)
+            .frequency(finstack_quant_core::dates::Tenor::quarterly())
+            .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
             .stub_rule(stub)
             .build()
             .expect_err("off-cycle regular anchor");
@@ -941,7 +1029,10 @@ fn imm_schedule_on_cycle_endpoints_have_no_stubs() {
     assert_eq!(imm_dates(start, end), expected);
     let aligned = Schedule::builder(start, end)
         .unwrap()
-        .imm()
+        .unadjusted()
+        .grid(finstack_quant_core::dates::GridMode::QuarterlyImm)
+        .frequency(finstack_quant_core::dates::Tenor::quarterly())
+        .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
         .stub_rule(StubKind::None)
         .build()
         .unwrap();
@@ -977,7 +1068,10 @@ fn imm_schedule_quarterly_direction_does_not_change_the_dates() {
     let build = |stub| {
         Schedule::builder(start, end)
             .unwrap()
-            .imm()
+            .unadjusted()
+            .grid(finstack_quant_core::dates::GridMode::QuarterlyImm)
+            .frequency(finstack_quant_core::dates::Tenor::quarterly())
+            .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
             .stub_rule(stub)
             .build()
             .unwrap()
@@ -993,7 +1087,10 @@ fn imm_schedule_honours_frequency_and_generation_direction() {
     let semi_annual = |start, end, stub| {
         Schedule::builder(start, end)
             .unwrap()
-            .imm()
+            .unadjusted()
+            .grid(finstack_quant_core::dates::GridMode::QuarterlyImm)
+            .frequency(finstack_quant_core::dates::Tenor::quarterly())
+            .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
             .frequency(Tenor::semi_annual())
             .stub_rule(stub)
             .build()
@@ -1023,7 +1120,10 @@ fn imm_schedule_long_stubs_merge_into_the_adjacent_regular_period() {
     let semi_annual = |start, end, stub| {
         Schedule::builder(start, end)
             .unwrap()
-            .imm()
+            .unadjusted()
+            .grid(finstack_quant_core::dates::GridMode::QuarterlyImm)
+            .frequency(finstack_quant_core::dates::Tenor::quarterly())
+            .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
             .frequency(Tenor::semi_annual())
             .stub_rule(stub)
             .build()
@@ -1064,7 +1164,10 @@ fn imm_schedule_rejects_frequencies_off_the_quarterly_cycle() {
     let builder = || {
         Schedule::builder(make_date(2025, 3, 19), make_date(2025, 12, 31))
             .unwrap()
-            .imm()
+            .unadjusted()
+            .grid(finstack_quant_core::dates::GridMode::QuarterlyImm)
+            .frequency(finstack_quant_core::dates::Tenor::quarterly())
+            .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
     };
     for frequency in [Tenor::monthly(), Tenor::weekly(), Tenor::daily()] {
         assert!(builder().frequency(frequency).build().is_err());
@@ -1078,14 +1181,20 @@ fn imm_schedule_rejects_frequencies_off_the_quarterly_cycle() {
 fn imm_schedule_without_stubs_requires_on_cycle_endpoints() {
     let off_cycle = Schedule::builder(make_date(2025, 1, 15), make_date(2025, 12, 17))
         .unwrap()
-        .imm()
+        .unadjusted()
+        .grid(finstack_quant_core::dates::GridMode::QuarterlyImm)
+        .frequency(finstack_quant_core::dates::Tenor::quarterly())
+        .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
         .stub_rule(StubKind::None)
         .build();
     assert!(off_cycle.is_err());
 
     let uneven = Schedule::builder(make_date(2025, 3, 19), make_date(2025, 12, 17))
         .unwrap()
-        .imm()
+        .unadjusted()
+        .grid(finstack_quant_core::dates::GridMode::QuarterlyImm)
+        .frequency(finstack_quant_core::dates::Tenor::quarterly())
+        .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
         .frequency(Tenor::semi_annual())
         .stub_rule(StubKind::None)
         .build();
@@ -1104,6 +1213,8 @@ fn test_cds_imm_schedule_basic() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .cds_imm()
         .build()
         .unwrap()
@@ -1128,6 +1239,8 @@ fn test_cds_imm_schedule_start_on_roll_date_has_no_front_accrual() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .cds_imm()
         .build()
         .unwrap()
@@ -1147,7 +1260,10 @@ fn test_imm_vs_cds_imm_difference() {
 
     let imm_dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
-        .imm()
+        .unadjusted()
+        .grid(finstack_quant_core::dates::GridMode::QuarterlyImm)
+        .frequency(finstack_quant_core::dates::Tenor::quarterly())
+        .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
         .build()
         .unwrap()
         .into_iter()
@@ -1155,6 +1271,8 @@ fn test_imm_vs_cds_imm_difference() {
 
     let cds_dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .cds_imm()
         .build()
         .unwrap()
@@ -1171,24 +1289,42 @@ fn test_imm_vs_cds_imm_difference() {
 }
 
 #[test]
-fn imm_and_cds_imm_setters_use_last_call_wins() {
+fn cds_imm_mode_requires_the_natural_grid() {
+    use finstack_quant_core::dates::GridMode;
     let start = make_date(2025, 3, 19);
     let end = make_date(2025, 9, 30);
+    let builder = || Schedule::builder(start, end).unwrap().unadjusted();
 
-    let cds_dates = Schedule::builder(start, end)
-        .unwrap()
-        .imm()
+    // The grid and CDS IMM mode are independent selections; combining CDS
+    // with a non-natural grid is an error in either call order.
+    assert!(
+        builder()
+            .cds_imm()
+            .grid(GridMode::QuarterlyImm)
+            .build()
+            .is_err()
+    );
+    assert!(
+        builder()
+            .grid(GridMode::QuarterlyImm)
+            .cds_imm()
+            .build()
+            .is_err()
+    );
+
+    let cds_dates = builder()
         .cds_imm()
+        .grid(GridMode::Natural)
         .build()
-        .expect("CDS IMM should win")
+        .expect("CDS IMM on the natural grid")
         .get_dates()
         .to_vec();
-    let imm_dates = Schedule::builder(start, end)
-        .unwrap()
-        .cds_imm()
-        .imm()
+    let imm_dates = builder()
+        .frequency(Tenor::quarterly())
+        .stub_rule(StubKind::ShortBack)
+        .grid(GridMode::QuarterlyImm)
         .build()
-        .expect("IMM should win")
+        .expect("standard IMM grid")
         .get_dates()
         .to_vec();
 
@@ -1207,6 +1343,8 @@ fn test_schedule_unknown_calendar_is_an_error() {
     assert!(
         Schedule::builder(start, end)
             .unwrap()
+            .stub_rule(finstack_quant_core::dates::StubKind::None)
+            .grid(finstack_quant_core::dates::GridMode::Natural)
             .frequency(Tenor::monthly())
             .adjust_with(BusinessDayConvention::Following, "unknown_calendar")
             .build()
@@ -1224,6 +1362,8 @@ fn test_no_roll_day_drift_backward_day30_anchor() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::semi_annual())
         .stub_rule(StubKind::ShortFront)
         .build()
@@ -1254,6 +1394,8 @@ fn test_stub_none_accepts_month_end_quarterly_schedule() {
 
     let dates: Vec<_> = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(Tenor::quarterly())
         .stub_rule(StubKind::None)
         .build()
@@ -1311,6 +1453,7 @@ fn cds_imm_accrual_20ths_stay_unadjusted() {
 
     let schedule = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
         .cds_imm()
         .adjust_with(BusinessDayConvention::Following, "jpto")
         .build()
@@ -1337,6 +1480,8 @@ fn payment_lag_shifts_adjusted_period_ends() {
 
     let schedule = Schedule::builder(start, end)
         .unwrap()
+        .stub_rule(finstack_quant_core::dates::StubKind::None)
+        .grid(finstack_quant_core::dates::GridMode::Natural)
         .frequency(Tenor::weekly())
         .adjust_with(BusinessDayConvention::Following, "weekends_only")
         .payment_lag_days(2)
@@ -1354,6 +1499,8 @@ fn fixing_lag_is_t_minus_from_accrual_start() {
 
     let schedule = Schedule::builder(start, end)
         .unwrap()
+        .stub_rule(finstack_quant_core::dates::StubKind::None)
+        .grid(finstack_quant_core::dates::GridMode::Natural)
         .frequency(Tenor::weekly())
         .adjust_with(BusinessDayConvention::Following, "weekends_only")
         .fixing_lag_business_days(2)
@@ -1372,6 +1519,7 @@ fn nearest_payment_tie_rolls_following() {
     // TARGET2 closes on New Year's Day; 31 Dec 2024 and 2 Jan 2025 are open.
     let schedule = Schedule::builder(start, end)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
         .frequency(Tenor::weekly())
         .stub_rule(StubKind::ShortBack)
         .adjust_with(BusinessDayConvention::Nearest, "target2")
@@ -1383,4 +1531,60 @@ fn nearest_payment_tie_rolls_following() {
         schedule.get_payment_dates().last().copied(),
         Some(make_date(2025, 1, 2))
     );
+}
+
+/// Record CORE-CONVENTIONS-008 #14: the nominal reference exposes the
+/// original anchor, frequency and grid, including boundaries a long stub
+/// removed from the schedule.
+#[test]
+fn nominal_reference_keeps_the_original_anchor_and_removed_boundaries() {
+    use finstack_quant_core::dates::GridMode;
+    let start = make_date(2025, 1, 15);
+    let end = make_date(2025, 4, 30);
+    let builder = || {
+        Schedule::builder(start, end)
+            .unwrap()
+            .frequency(Tenor::monthly())
+            .grid(GridMode::Natural)
+            .unadjusted()
+    };
+
+    let long_back = builder().stub_rule(StubKind::LongBack);
+    let schedule = long_back.clone().build().unwrap();
+    assert_eq!(
+        schedule.get_dates(),
+        [start, make_date(2025, 2, 15), make_date(2025, 3, 15), end],
+        "the final residual merges into the preceding period"
+    );
+    let reference = long_back.to_spec().unwrap().nominal_reference().unwrap();
+    assert_eq!(
+        (reference.anchor, reference.grid),
+        (start, GridMode::Natural)
+    );
+    // The merged-away Apr 15 boundary and the post-maturity roll stay available.
+    assert_eq!(reference.roll_date(3).unwrap(), make_date(2025, 4, 15));
+    assert_eq!(reference.roll_date(4).unwrap(), make_date(2025, 5, 15));
+
+    let front = builder()
+        .stub_rule(StubKind::ShortFront)
+        .to_spec()
+        .unwrap()
+        .nominal_reference()
+        .unwrap();
+    assert_eq!(front.anchor, end);
+    assert_eq!(front.roll_date(-1).unwrap(), make_date(2025, 3, 30));
+
+    // A roll outside the supported date range is an error, not a clamp.
+    let last = Schedule::builder(make_date(9999, 11, 30), time::Date::MAX)
+        .unwrap()
+        .frequency(Tenor::monthly())
+        .stub_rule(StubKind::None)
+        .grid(GridMode::EndOfMonth)
+        .unadjusted()
+        .to_spec()
+        .unwrap()
+        .nominal_reference()
+        .unwrap();
+    assert_eq!(last.roll_date(1).unwrap(), time::Date::MAX);
+    assert!(last.roll_date(2).is_err());
 }

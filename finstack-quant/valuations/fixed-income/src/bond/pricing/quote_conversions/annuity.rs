@@ -301,7 +301,7 @@ fn asset_swap_projection_rate(
 ///
 /// Returns an error when a swap calibration quote references a rate index
 /// with no registered fixed-leg conventions, or when the proxy fixed leg has
-/// fewer than two schedule dates or a near-zero annuity.
+/// a near-zero annuity.
 pub(crate) fn curve_par_rate(
     bond: &Bond,
     disc: &DiscountCurve,
@@ -318,18 +318,16 @@ pub(crate) fn curve_par_rate(
     {
         return Ok(par_swap_rate);
     }
+    // The proxy fixed leg uses the raw natural grid; a schedule always has
+    // at least two dates.
     let dates: Vec<Date> = finstack_quant_core::dates::Schedule::builder(quote_date, horizon)?
         .frequency(frequency)
         .stub_rule(StubKind::ShortFront)
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .build()?
         .into_iter()
         .collect();
-    if dates.len() < 2 {
-        return Err(finstack_quant_core::Error::Validation(
-            "Par-rate spread calculation requires at least two fixed-leg schedule dates"
-                .to_string(),
-        ));
-    }
     let (par_swap_rate, annuity) =
         crate::bond::pricing::quote_conversions::par_rate_and_annuity_from_discount(
             disc,
@@ -551,9 +549,13 @@ pub(crate) fn asw_leg_schedule(
             "ASW schedule requires start before end: start={start}, end={end}"
         )));
     }
+    // Only the raw natural grid is taken here; the optional adjustment is
+    // applied below.
     let dates = Schedule::builder(start, end)?
         .frequency(frequency)
         .stub_rule(stub)
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .build()?
         .into_iter();
     let Some((convention, calendar)) = adjustment else {

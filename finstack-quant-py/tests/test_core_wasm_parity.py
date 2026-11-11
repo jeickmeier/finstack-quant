@@ -138,6 +138,8 @@ def _schedule() -> dates.Schedule:
         dates.Schedule
         .builder("2025-01-15", "2026-01-15")
         .frequency("3M")
+        .stub_rule("none")
+        .grid("natural")
         .adjust_with("modified_following", "nyse")
         .payment_lag_days(2)
         .build()
@@ -246,7 +248,14 @@ CASES: dict[str, Callable[[], Any]] = {
     "schedule": lambda: json.loads(_schedule().to_json()),
     "schedule_dates": lambda: _isos(_schedule().payment_dates),
     "schedule_cds_imm": lambda: _isos(
-        dates.Schedule.builder("2025-03-20", "2026-03-20").frequency("3M").cds_imm().build().dates
+        dates.Schedule
+        .builder("2025-03-20", "2026-03-20")
+        .grid("natural")
+        .unadjusted()
+        .frequency("3M")
+        .cds_imm()
+        .build()
+        .dates
     ),
     # --- math ---------------------------------------------------------------------
     "symmetric_eigen": _eigen,
@@ -518,7 +527,15 @@ def test_period_plan_and_schedule_json_validate_against_their_schemas() -> None:
     plan = dates.build_periods("2025Q1..Q4", "2025Q2").to_json()
     assert json.loads(schema.validate("period_plan.schema.json", plan)) == []
     assert json.loads(schema.validate("schedule.schema.json", _schedule().to_json())) == []
-    spec = json.dumps(dates.Schedule.builder("2025-01-15", "2026-01-15").frequency("3M").to_spec())
+    spec = json.dumps(
+        dates.Schedule
+        .builder("2025-01-15", "2026-01-15")
+        .stub_rule("none")
+        .grid("natural")
+        .unadjusted()
+        .frequency("3M")
+        .to_spec()
+    )
     assert json.loads(schema.validate("schedule_spec.schema.json", spec)) == []
     scale = REGISTRY.rating_scale("moodys").to_json()
     assert json.loads(schema.validate("scorecard_scale.schema.json", scale)) == []

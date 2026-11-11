@@ -13,8 +13,8 @@ use super::periods::{BuildPeriodsParams, SchedulePeriod};
 use super::specs::RollRule;
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DateExt, DayCount, HolidayCalendar, Schedule, StubKind, Tenor,
-    TenorUnit, adjust, is_cds_date, is_imm_date, next_cds_date, prev_cds_date,
+    BusinessDayConvention, Date, DateExt, DayCount, GridMode, HolidayCalendar, Schedule, StubKind,
+    Tenor, TenorUnit, adjust, is_cds_date, is_imm_date, next_cds_date, prev_cds_date,
 };
 
 /// Resolve the coupon tenor, which the ISDA standard CDS grid fixes at quarterly.
@@ -377,9 +377,11 @@ pub(crate) fn generate_periods(
 /// counts and reset dates) remains the caller's job because the compiler needs
 /// raw periods for coupon-specific metadata.
 ///
-/// `roll_rule` selects the core `ScheduleBuilder` anchor mode.
+/// `roll_rule` and `end_of_month` select the core schedule grid.
 /// `RollRule::Imm` rolls the regular periods on IMM dates at `frequency` with
-/// `stub`, keeping `start` and `end` (see `ScheduleBuilder::imm`).
+/// `stub` (`GridMode::QuarterlyImm`; the regular anchor must be an IMM date),
+/// and `end_of_month` selects `GridMode::EndOfMonth` (a month-end anchor);
+/// the two together are an error.
 /// `RollRule::CdsImm` is the ISDA standard CDS grid: quarterly with a
 /// short-back final stub whatever `frequency`/`stub` say, anchored at the CDS
 /// roll date preceding `start` (post-Big-Bang front accrual), so the first
@@ -405,16 +407,31 @@ pub(crate) fn generate_periods_with_adjustment(
             "payment_lag_days must be non-negative; got {payment_lag_days}"
         )));
     }
-    let builder = Schedule::builder(start, end)?;
+    let grid = match (roll_rule, end_of_month) {
+        (RollRule::Imm, true) => {
+            return Err(finstack_quant_core::Error::Validation(
+                "an IMM roll rule cannot also use the end-of-month grid".to_string(),
+            ));
+        }
+        (RollRule::Imm, false) => GridMode::QuarterlyImm,
+        (_, true) => GridMode::EndOfMonth,
+        (_, false) => GridMode::Natural,
+    };
+    // Only the raw grid is taken from the core schedule; payment adjustment
+    // and lags are applied below with this leg's own calendar, so the core
+    // payment series is deliberately unadjusted.
+    let builder = Schedule::builder(start, end)?
+        .frequency(frequency)
+        .stub_rule(stub)
+        .grid(grid)
+        .unadjusted();
     // The CDS grid is fixed by the ISDA standard, so `cds_imm` applies last and
     // overrides frequency and stub; IMM is a roll convention on the leg's own
     // frequency and stub.
     let builder = match roll_rule {
-        RollRule::None => builder.frequency(frequency).stub_rule(stub),
-        RollRule::Imm => builder.imm().frequency(frequency).stub_rule(stub),
-        RollRule::CdsImm => builder.frequency(frequency).stub_rule(stub).cds_imm(),
-    }
-    .end_of_month(end_of_month);
+        RollRule::CdsImm => builder.cds_imm(),
+        RollRule::None | RollRule::Imm => builder,
+    };
     let cal = calendar_by_id_strict(calendar_id)?;
     // A built schedule always has at least two grid dates (record
     // CORE-CONVENTIONS-008 #13), so there is no empty-period fallback.

@@ -124,6 +124,8 @@ const market = () => {
 const schedule = () =>
   core.Schedule.builder(ep('2025-01-15'), ep('2026-01-15'))
     .frequency('3M')
+    .stubRule('none')
+    .grid('natural')
     .adjustWith('modified_following', 'nyse')
     .paymentLagDays(2)
     .build();
@@ -223,8 +225,12 @@ const CASES = {
   schedule_dates: () => isos(schedule().paymentDates),
   schedule_cds_imm: () =>
     isos(
-      core.Schedule.builder(ep('2025-03-20'), ep('2026-03-20')).frequency('3M').cdsImm().build()
-        .dates
+      core.Schedule.builder(ep('2025-03-20'), ep('2026-03-20'))
+        .grid('natural')
+        .unadjusted()
+        .frequency('3M')
+        .cdsImm()
+        .build().dates
     ),
   // --- math -----------------------------------------------------------------------
   symmetric_eigen: () => Array.from(core.symmetricEigen([2.0, 0.0, 0.0, 5.0], 2)[0]).sort(),
@@ -616,28 +622,37 @@ test('handles round-trip through their JSON wire form', () => {
 
 test('ScheduleBuilder setters update the builder in place and round-trip its spec', () => {
   const base = core.Schedule.builder(ep('2025-01-15'), ep('2025-07-15'));
-  const quarterly = base.frequency('3M');
+  // Record CORE-CONVENTIONS-008 #2: every financial choice is explicit.
+  assert.throws(() => base.toSpec(), /frequency, stub, grid, payment convention/);
+  const quarterly = base.frequency('3M').stubRule('none').grid('natural').unadjusted();
   assert.equal(quarterly, base);
   assert.deepEqual(base.toSpec().frequency, { count: 3, unit: 'months' });
   assert.equal(quarterly.build().dates.length, 3);
   assert.equal(core.Schedule.fromSpec(quarterly.toSpec()).toJson(), quarterly.build().toJson());
-  const imm = base.cdsImm().imm().toSpec();
-  assert.deepEqual([imm.imm_mode, imm.cds_imm_mode], [true, false]);
+  const cds = base.cdsImm().toSpec();
+  assert.deepEqual([cds.grid, cds.cds_imm_mode], ['natural', true]);
 });
 
-test('cdsImm / imm set quarterly short_back like Rust ScheduleBuilder; a later frequency wins', () => {
+test('cdsImm sets quarterly short_back like Rust ScheduleBuilder; grid() resets nothing', () => {
   const builder = core.Schedule.builder(ep('2025-01-15'), ep('2026-01-15'))
+    .grid('natural')
+    .unadjusted()
     .cdsImm()
     .frequency('1M');
   const spec = builder.toSpec();
   assert.deepEqual([spec.frequency, spec.stub], [{ count: 1, unit: 'months' }, 'short_back']);
   assert.equal(core.Schedule.fromSpec(spec).toJson(), builder.build().toJson());
   assert.equal(builder.build().dates.length, 14);
-  const imm = core.Schedule.builder(ep('2025-01-15'), ep('2026-01-15'))
-    .frequency('1M')
-    .imm()
+  const imm = core.Schedule.builder(ep('2025-03-19'), ep('2026-03-18'))
+    .frequency('6M')
+    .stubRule('short_back')
+    .unadjusted()
+    .grid('quarterly_imm')
     .toSpec();
-  assert.deepEqual([imm.frequency, imm.stub], [{ count: 3, unit: 'months' }, 'short_back']);
+  assert.deepEqual(
+    [imm.frequency, imm.stub, imm.grid],
+    [{ count: 6, unit: 'months' }, 'short_back', 'quarterly_imm']
+  );
 });
 
 test('MarketContext.len counts the FX matrix', () => {

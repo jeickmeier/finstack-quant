@@ -5,7 +5,7 @@ use crate::bindings::core::dates::tenor::extract_tenor;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::macros::{label_enum, typed_or_label, wire_methods};
 use crate::errors::core_to_py;
-use finstack_quant_core::dates::{Schedule, ScheduleBuilder, ScheduleSpec, StubKind};
+use finstack_quant_core::dates::{GridMode, Schedule, ScheduleBuilder, ScheduleSpec, StubKind};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyIterator, PyList, PyModule};
 
@@ -60,6 +60,46 @@ typed_or_label!(
     |label| label.parse().map_err(core_to_py)
 );
 
+/// Regular-grid selection for schedule generation.
+///
+/// Immutable, hashable enum-style type. ``str()`` gives the snake_case wire
+/// name (``"end_of_month"``), which ``from_name`` parses.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.core.dates import GridMode
+/// >>> GridMode.from_name("quarterly_imm") == GridMode.QUARTERLY_IMM
+/// True
+#[pyclass(
+    name = "GridMode",
+    module = "finstack_quant.core.dates",
+    frozen,
+    eq,
+    hash,
+    skip_from_py_object
+)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct PyGridMode {
+    /// Inner grid-mode variant.
+    pub(crate) inner: GridMode,
+}
+
+label_enum!(PyGridMode, GridMode, "GridMode", from_name, {
+    /// Tenor-arithmetic dates with no snapping.
+    NATURAL => Natural,
+    /// Last calendar day of each month.
+    END_OF_MONTH => EndOfMonth,
+    /// Third Wednesday of March, June, September and December.
+    QUARTERLY_IMM => QuarterlyImm,
+});
+
+typed_or_label!(
+    fn extract_grid_mode -> GridMode,
+    PyGridMode,
+    "GridMode or str",
+    |label| label.parse().map_err(core_to_py)
+);
+
 /// Convert a Python spec (``dict`` or JSON string) into a [`ScheduleSpec`].
 fn extract_schedule_spec(obj: &Bound<'_, PyAny>) -> PyResult<ScheduleSpec> {
     if let Ok(json) = obj.extract::<String>() {
@@ -79,7 +119,10 @@ fn extract_schedule_spec(obj: &Bound<'_, PyAny>) -> PyResult<ScheduleSpec> {
 /// Examples
 /// --------
 /// >>> from finstack_quant.core.dates import Schedule
-/// >>> schedule = Schedule.builder("2025-01-15", "2025-07-15").frequency("3M").build()
+/// >>> schedule = (
+/// ...     Schedule.builder("2025-01-15", "2025-07-15")
+/// ...     .frequency("3M").stub_rule("none").grid("natural").unadjusted().build()
+/// ... )
 /// >>> [d.isoformat() for d in schedule]
 /// ['2025-01-15', '2025-04-15', '2025-07-15']
 #[pyclass(
@@ -107,38 +150,22 @@ impl PySchedule {
     /// Start a schedule build between two dates.
     ///
     /// The canonical entry point, mirroring the ``Type.builder()`` form every
-    /// other builder-backed type uses. The builder defaults to a monthly
-    /// frequency, no stub, no adjustment and the ``STRICT`` policy.
-    ///
-    /// Parameters
-    /// ----------
-    /// start : datetime.date | str
-    ///     First accrual date.
-    /// end : datetime.date | str
-    ///     Final accrual date; must not precede ``start``.
-    ///
-    /// Returns
-    /// -------
-    /// ScheduleBuilder
-    ///     A fresh builder.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``start`` is after ``end`` or either date is invalid.
+    /// other builder-backed type uses. There are no financial defaults: the
+    /// frequency, stub rule, grid and payment convention must all be chosen
+    /// before ``build()``.
     #[staticmethod]
     #[pyo3(text_signature = "(start, end)")]
     fn builder(start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>) -> PyResult<PyScheduleBuilder> {
         Ok(PyScheduleBuilder {
-            spec: ScheduleSpec::new(py_to_date(start)?, py_to_date(end)?).map_err(core_to_py)?,
+            inner: Schedule::builder(py_to_date(start)?, py_to_date(end)?).map_err(core_to_py)?,
         })
     }
 
     /// Build a schedule from a serialized spec (``dict`` or JSON string)
     /// with the canonical ``ScheduleSpec`` fields (``start``, ``end``,
-    /// ``frequency``, ``stub``, ``business_day_convention``, ``calendar_id``,
-    /// ``end_of_month``, ``imm_mode``, ``cds_imm_mode``,
-    /// ``payment_lag_days``, ``fixing_lag_business_days``).
+    /// ``frequency``, ``stub``, ``grid``, ``cds_imm_mode``,
+    /// ``business_day_convention``, ``calendar_id``, and the optional
+    /// ``payment_lag_days`` and ``fixing_lag_business_days``).
     ///
     /// Raises ``ValueError`` when the spec is malformed or the schedule
     /// cannot be built.
@@ -225,8 +252,7 @@ wire_methods!(PySchedule, Schedule, "Schedule");
 /// Registry id for a ``HolidayCalendar`` wrapper or calendar-id string.
 ///
 /// Wrappers contribute their canonical code. Strings are stored as given and
-/// resolved by the Rust build under the configured error policy, so
-/// ``MISSING_CALENDAR_WARNING`` / ``GRACEFUL_EMPTY`` keep their meaning.
+/// resolved strictly by the Rust build.
 fn calendar_code(obj: &Bound<'_, PyAny>) -> PyResult<String> {
     if let Ok(cal) =
         obj.extract::<PyRef<'_, crate::bindings::core::dates::calendar::PyHolidayCalendar>>()
@@ -254,6 +280,7 @@ fn calendar_code(obj: &Bound<'_, PyAny>) -> PyResult<String> {
 /// ...     Schedule.builder(date(2025, 1, 15), date(2030, 1, 15))
 /// ...     .frequency("3M")
 /// ...     .stub_rule(StubKind.SHORT_FRONT)
+/// ...     .grid("natural")
 /// ...     .adjust_with("modified_following", "usny")
 /// ...     .build()
 /// ... )
@@ -265,8 +292,8 @@ fn calendar_code(obj: &Bound<'_, PyAny>) -> PyResult<String> {
     skip_from_py_object
 )]
 pub struct PyScheduleBuilder {
-    /// Serializable spec accumulating builder state.
-    spec: ScheduleSpec,
+    /// Canonical Rust builder accumulating the choices.
+    inner: ScheduleBuilder,
 }
 
 #[pymethods]
@@ -276,7 +303,7 @@ impl PyScheduleBuilder {
         mut slf: PyRefMut<'py, Self>,
         frequency: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        slf.spec.frequency = extract_tenor(frequency)?;
+        slf.inner = slf.inner.clone().frequency(extract_tenor(frequency)?);
         Ok(slf)
     }
 
@@ -285,8 +312,23 @@ impl PyScheduleBuilder {
         mut slf: PyRefMut<'py, Self>,
         stub: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        slf.spec.stub = extract_stub_kind(stub)?;
+        slf.inner = slf.inner.clone().stub_rule(extract_stub_kind(stub)?);
         Ok(slf)
+    }
+
+    /// Select the regular grid (``GridMode`` or its name such as ``"end_of_month"``).
+    fn grid<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        grid: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        slf.inner = slf.inner.clone().grid(extract_grid_mode(grid)?);
+        Ok(slf)
+    }
+
+    /// Keep payment dates on the raw period ends, with no calendar.
+    fn unadjusted(mut slf: PyRefMut<'_, Self>) -> PyRefMut<'_, Self> {
+        slf.inner = slf.inner.clone().unadjusted();
+        slf
     }
 
     /// Set the business-day convention and calendar used to adjust payment dates.
@@ -297,8 +339,8 @@ impl PyScheduleBuilder {
     ///     Roll rule (for example ``"modified_following"``), ignoring outer whitespace and ASCII case.
     /// calendar : HolidayCalendar | str
     ///     Holiday calendar object or registry id (``"usny"``; ``"nyse+gblo"``
-    ///     joins calendars). A string id is resolved at ``build()`` under the
-    ///     error policy (``STRICT`` raises ``KeyError`` for unknown ids).
+    ///     joins calendars). A string id is resolved strictly at ``build()``
+    ///     (``KeyError`` for unknown ids).
     ///
     /// Raises
     /// ------
@@ -309,59 +351,32 @@ impl PyScheduleBuilder {
         convention: &Bound<'_, PyAny>,
         calendar: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        slf.spec.business_day_convention = Some(extract_business_day_convention(convention)?);
-        slf.spec.calendar_id = Some(calendar_code(calendar)?);
+        let convention = extract_business_day_convention(convention)?;
+        let calendar = calendar_code(calendar)?;
+        slf.inner = slf.inner.clone().adjust_with(convention, &calendar);
         Ok(slf)
     }
 
     /// Shift each payment date by ``lag`` business days after the adjusted period end.
     fn payment_lag_days(mut slf: PyRefMut<'_, Self>, lag: i32) -> PyRefMut<'_, Self> {
-        slf.spec.payment_lag_days = lag;
+        slf.inner = slf.inner.clone().payment_lag_days(lag);
         slf
     }
 
     /// Set a T-minus fixing lag from each period's unadjusted accrual start.
     fn fixing_lag_business_days(mut slf: PyRefMut<'_, Self>, lag: i32) -> PyRefMut<'_, Self> {
-        slf.spec.fixing_lag_business_days = Some(lag);
-        slf
-    }
-
-    /// Enable or disable end-of-month roll logic.
-    ///
-    /// ``eom=True`` requires a month/year tenor and a regular schedule rule.
-    /// ``build`` raises ``ValueError`` for day/week tenors or IMM/CDS modes.
-    /// With ``StubKind.NONE``, maturity must lie on the generated month-end
-    /// roll grid; otherwise an explicit stub rule is required.
-    fn end_of_month(mut slf: PyRefMut<'_, Self>, eom: bool) -> PyRefMut<'_, Self> {
-        slf.spec.end_of_month = eom;
+        slf.inner = slf.inner.clone().fixing_lag_business_days(lag);
         slf
     }
 
     /// Use CDS IMM dates (the 20th of March, June, September and December).
     ///
     /// Same semantics as the Rust ``ScheduleBuilder::cds_imm``: sets the
-    /// frequency to quarterly and the stub rule to ``short_back``, turns CDS
-    /// IMM mode on and standard IMM mode off. A later ``frequency`` or
+    /// frequency to quarterly and the stub rule to ``short_back`` and turns
+    /// CDS IMM mode on (it requires the natural grid). A later ``frequency`` or
     /// ``stub_rule`` call wins, and ``to_spec()`` reports what ``build()`` uses.
     fn cds_imm(mut slf: PyRefMut<'_, Self>) -> PyRefMut<'_, Self> {
-        slf.spec = slf.spec.clone().with_cds_imm();
-        slf
-    }
-
-    /// Roll on standard IMM dates (the third Wednesday of Mar, Jun, Sep, Dec).
-    ///
-    /// Same semantics as the Rust ``ScheduleBuilder::imm``: sets the IMM
-    /// defaults (quarterly frequency, ``short_back`` stub rule), turns standard
-    /// IMM mode on and CDS IMM mode off. A later ``frequency`` or ``stub_rule``
-    /// call wins. ``build()`` keeps ``start`` and ``end`` as the first and last
-    /// dates and lays the regular periods on IMM dates at the frequency, which
-    /// must be a whole number of quarters: forward from the first IMM date on
-    /// or after ``start`` for back-stub rules, backward from the last IMM date
-    /// on or before ``end`` for front-stub rules. With no IMM date strictly
-    /// between ``start`` and ``end`` the schedule is the single period
-    /// ``[start, end]``.
-    fn imm(mut slf: PyRefMut<'_, Self>) -> PyRefMut<'_, Self> {
-        slf.spec = slf.spec.clone().with_imm();
+        slf.inner = slf.inner.clone().cds_imm();
         slf
     }
 
@@ -369,7 +384,8 @@ impl PyScheduleBuilder {
     /// ``Schedule.from_spec``).
     #[pyo3(text_signature = "(self)")]
     fn to_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.spec)
+        let spec = self.inner.to_spec().map_err(core_to_py)?;
+        crate::bindings::pandas_utils::serde_to_py(py, &spec)
     }
 
     /// Build the schedule.
@@ -378,27 +394,32 @@ impl PyScheduleBuilder {
     /// which returns a complete schedule or an error: a generation failure
     /// raises ``ValueError`` and an unknown calendar id ``KeyError``.
     fn build(&self) -> PyResult<PySchedule> {
-        ScheduleBuilder::from(self.spec.clone())
+        self.inner
+            .clone()
             .build()
             .map(PySchedule::from_inner)
             .map_err(core_to_py)
     }
 
     fn __repr__(&self) -> String {
-        format!(
-            "ScheduleBuilder(start='{}', end='{}', frequency='{}')",
-            self.spec.start, self.spec.end, self.spec.frequency,
-        )
+        match self.inner.to_spec() {
+            Ok(spec) => format!(
+                "ScheduleBuilder(start='{}', end='{}', frequency='{}', grid='{}')",
+                spec.start, spec.end, spec.frequency, spec.grid,
+            ),
+            Err(_) => "ScheduleBuilder(incomplete)".to_string(),
+        }
     }
 }
 
 /// Register schedule types on the `finstack_quant.core.dates` module.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyStubKind>()?;
+    m.add_class::<PyGridMode>()?;
     m.add_class::<PySchedule>()?;
     m.add_class::<PyScheduleBuilder>()?;
     Ok(())
 }
 
 /// Names exported from this submodule.
-pub const EXPORTS: &[&str] = &["StubKind", "Schedule", "ScheduleBuilder"];
+pub const EXPORTS: &[&str] = &["StubKind", "GridMode", "Schedule", "ScheduleBuilder"];

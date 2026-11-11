@@ -36,23 +36,51 @@ fn next_roll_index(i: i32) -> crate::Result<i32> {
     i.checked_add(1).ok_or_else(schedule_too_large_error)
 }
 
-/// Day-of-month rule applied to the computed (non-contractual) roll dates.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum RollDay {
-    /// Keep the day the tenor arithmetic produces.
-    Natural,
-    /// Snap to the last day of the month (`end_of_month`).
-    EndOfMonth,
-    /// Snap to the third Wednesday of the month (standard IMM roll).
-    ThirdWednesday,
-}
-
-impl RollDay {
+impl GridMode {
+    /// Snap a computed roll to this grid.
     fn apply(self, d: Date) -> crate::Result<Date> {
         match self {
             Self::Natural => Ok(d),
             Self::EndOfMonth => Ok(d.end_of_month()),
-            Self::ThirdWednesday => crate::dates::third_wednesday(d.month(), d.year()),
+            Self::QuarterlyImm => crate::dates::third_wednesday(d.month(), d.year()),
+        }
+    }
+
+    /// Reject a frequency this grid cannot carry: EOM needs a month/year
+    /// tenor, quarterly IMM a whole number of quarters.
+    pub(super) fn check_frequency(self, frequency: Tenor) -> crate::Result<()> {
+        match self {
+            Self::Natural => Ok(()),
+            Self::EndOfMonth => {
+                if matches!(
+                    frequency.unit(),
+                    crate::dates::TenorUnit::Months | crate::dates::TenorUnit::Years
+                ) {
+                    Ok(())
+                } else {
+                    Err(crate::Error::Validation(
+                        "an end-of-month grid requires a month or year frequency".to_string(),
+                    ))
+                }
+            }
+            Self::QuarterlyImm => {
+                let whole_quarters = match frequency.unit() {
+                    crate::dates::TenorUnit::Months => frequency.count().is_multiple_of(3),
+                    crate::dates::TenorUnit::Years => true,
+                    crate::dates::TenorUnit::Weeks | crate::dates::TenorUnit::Days => false,
+                };
+                if whole_quarters {
+                    Ok(())
+                } else {
+                    Err(crate::InputError::InvalidTenor {
+                        tenor: frequency.to_string(),
+                        reason: "IMM schedules roll on the quarterly IMM cycle, so the \
+                                 frequency must be a whole number of quarters"
+                            .to_string(),
+                    }
+                    .into())
+                }
+            }
         }
     }
 }
@@ -84,7 +112,7 @@ pub(super) struct BuilderInternal {
     pub end: Date,
     pub frequency: Tenor,
     pub stub: StubKind,
-    pub roll: RollDay,
+    pub roll: GridMode,
 }
 
 impl BuilderInternal {
@@ -114,41 +142,16 @@ impl BuilderInternal {
     /// policies, `end` for front-stub policies, and both for `None`. Only the
     /// declared stub side may be off-grid; no replacement anchor is searched.
     fn check_grid_anchor(self) -> crate::Result<()> {
+        self.roll.check_frequency(self.frequency)?;
         let (name, on_grid): (&str, fn(Date) -> bool) = match self.roll {
-            RollDay::Natural => return Ok(()),
-            RollDay::EndOfMonth => {
-                if !matches!(
-                    self.frequency.unit(),
-                    crate::dates::TenorUnit::Months | crate::dates::TenorUnit::Years
-                ) {
-                    return Err(crate::Error::Validation(
-                        "an end-of-month grid requires a month or year frequency".to_string(),
-                    ));
-                }
-                ("calendar month-end", |date: Date| {
-                    date == date.end_of_month()
-                })
-            }
-            RollDay::ThirdWednesday => {
-                let whole_quarters = match self.frequency.unit() {
-                    crate::dates::TenorUnit::Months => self.frequency.count().is_multiple_of(3),
-                    crate::dates::TenorUnit::Years => true,
-                    crate::dates::TenorUnit::Weeks | crate::dates::TenorUnit::Days => false,
-                };
-                if !whole_quarters {
-                    return Err(crate::InputError::InvalidTenor {
-                        tenor: self.frequency.to_string(),
-                        reason: "IMM schedules roll on the quarterly IMM cycle, so the \
-                                 frequency must be a whole number of quarters"
-                            .to_string(),
-                    }
-                    .into());
-                }
-                (
-                    "quarterly IMM (third Wednesday of Mar/Jun/Sep/Dec)",
-                    is_imm_date,
-                )
-            }
+            GridMode::Natural => return Ok(()),
+            GridMode::EndOfMonth => ("calendar month-end", |date: Date| {
+                date == date.end_of_month()
+            }),
+            GridMode::QuarterlyImm => (
+                "quarterly IMM (third Wednesday of Mar/Jun/Sep/Dec)",
+                is_imm_date,
+            ),
         };
         let mut anchors = Vec::with_capacity(2);
         if self.stub == StubKind::None || !self.is_front_stub() {
@@ -241,7 +244,7 @@ impl BuilderInternal {
     /// Wednesday. The user-provided `start` and `end` dates are contractual
     /// and are emitted verbatim (QuantLib-style); snapping them silently moves
     /// the effective date and maturity.
-    fn rolled(self, anchor: Date, n: i32) -> crate::Result<Option<Date>> {
+    pub(super) fn nth_rolled(self, anchor: Date, n: i32) -> crate::Result<Option<Date>> {
         self.nth_tenor(anchor, n)?
             .map(|raw| self.roll.apply(raw))
             .transpose()
@@ -256,7 +259,7 @@ impl BuilderInternal {
         buf.push(self.start);
         let mut i = 1;
         loop {
-            let dt = match self.rolled(self.start, i)? {
+            let dt = match self.nth_rolled(self.start, i)? {
                 Some(dt) if dt < self.end => dt,
                 last => {
                     if aligned && last != Some(self.end) {
@@ -280,7 +283,7 @@ impl BuilderInternal {
         push_if_new(&mut buf, anchor);
         let mut i = 1;
         loop {
-            let dt = match self.rolled(anchor, -i)? {
+            let dt = match self.nth_rolled(anchor, -i)? {
                 Some(dt) if dt > self.start => dt,
                 _ => {
                     push_if_new(&mut buf, self.start);
@@ -304,7 +307,7 @@ impl BuilderInternal {
         let mut anchors: Vec<Date> = vec![self.end];
         let mut i = 1;
         let aligned = loop {
-            let Some(dt) = self.rolled(self.end, -i)? else {
+            let Some(dt) = self.nth_rolled(self.end, -i)? else {
                 break false;
             };
             if dt <= self.start {
@@ -337,7 +340,7 @@ impl BuilderInternal {
         buf.push(anchor);
         let mut i = 1;
         loop {
-            let Some(next) = self.rolled(anchor, i)? else {
+            let Some(next) = self.nth_rolled(anchor, i)? else {
                 push_if_new(&mut buf, self.end);
                 check_working_count(buf.len())?;
                 break;
@@ -348,7 +351,7 @@ impl BuilderInternal {
                 check_working_count(buf.len())?;
                 break;
             }
-            let next_after = self.rolled(anchor, next_roll_index(i)?)?;
+            let next_after = self.nth_rolled(anchor, next_roll_index(i)?)?;
             if next_after.is_none_or(|date| date > self.end) {
                 push_if_new(&mut buf, self.end);
                 check_working_count(buf.len())?;

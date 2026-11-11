@@ -38,16 +38,13 @@ def test_hazard_interpolation_rejects_inconsistent_survival() -> None:
         HazardCurve("HZ", "2025-01-01", [(1.0, 0.02), (2.0, 1.0)], recovery_rate=0.4, interp="linear")
 
 
-@pytest.mark.parametrize("rule", ["weekly", "cds", "imm"])
-def test_eom_rejects_incompatible_schedules(rule: str) -> None:
-    builder = Schedule.builder("2025-01-01", "2025-12-20").end_of_month(True)
-    if rule == "weekly":
-        builder = builder.frequency("1W")
-    elif rule == "cds":
-        builder = builder.cds_imm()
-    else:
-        builder = builder.imm()
-    with pytest.raises(ValueError, match="end-of-month"):
+@pytest.mark.parametrize(("rule", "message"), [("weekly", "end-of-month"), ("cds", "natural grid")])
+def test_eom_rejects_incompatible_schedules(rule: str, message: str) -> None:
+    builder = (
+        Schedule.builder("2025-01-31", "2025-12-31").frequency("1M").stub_rule("none").grid("end_of_month").unadjusted()
+    )
+    builder = builder.frequency("1W") if rule == "weekly" else builder.cds_imm()
+    with pytest.raises(ValueError, match=message):
         builder.build()
 
 
@@ -95,7 +92,7 @@ def test_curve_day_count_rejects_non_daycount_types() -> None:
 
 # CORE-005: ScheduleBuilder IMM setters follow Rust ScheduleBuilder semantics.
 def test_schedule_builder_cds_imm_later_frequency_wins_and_to_spec_matches_build() -> None:
-    builder = Schedule.builder("2025-01-15", "2026-01-15").cds_imm().frequency("1M")
+    builder = Schedule.builder("2025-01-15", "2026-01-15").grid("natural").unadjusted().cds_imm().frequency("1M")
     spec = builder.to_spec()
     assert spec["frequency"] == {"count": 1, "unit": "months"}
     assert spec["stub"] == "short_back"
@@ -104,15 +101,38 @@ def test_schedule_builder_cds_imm_later_frequency_wins_and_to_spec_matches_build
     assert [d.isoformat() for d in Schedule.from_spec(spec).dates] == dates
 
 
-@pytest.mark.parametrize("mode", ["cds_imm", "imm"])
-def test_schedule_builder_imm_modes_report_quarterly_short_back(mode: str) -> None:
-    # A standard IMM grid is anchored on an IMM start (record CORE-CONVENTIONS-008 #6).
-    start = "2025-03-19" if mode == "imm" else "2025-01-15"
-    builder = getattr(Schedule.builder(start, "2026-01-15").frequency("1M"), mode)()
+def test_schedule_builder_cds_imm_reports_quarterly_short_back() -> None:
+    builder = (
+        Schedule.builder("2025-01-15", "2026-01-15").frequency("1M").stub_rule("none").grid("natural").unadjusted()
+    )
+    builder = builder.cds_imm()
     spec = builder.to_spec()
     assert spec["frequency"] == {"count": 3, "unit": "months"}
     assert spec["stub"] == "short_back"
+    assert spec["cds_imm_mode"] is True
     assert [d.isoformat() for d in Schedule.from_spec(spec).dates] == [d.isoformat() for d in builder.build().dates]
+
+
+def test_schedule_builder_grid_selection_keeps_frequency_and_stub() -> None:
+    # Record CORE-CONVENTIONS-008 #2: a grid selector never resets other choices.
+    builder = Schedule.builder("2025-03-19", "2026-03-18").frequency("6M").stub_rule("short_back").unadjusted()
+    spec = builder.grid("quarterly_imm").to_spec()
+    assert (spec["frequency"], spec["stub"], spec["grid"]) == (
+        {"count": 6, "unit": "months"},
+        "short_back",
+        "quarterly_imm",
+    )
+    assert [d.isoformat() for d in builder.build().dates] == ["2025-03-19", "2025-09-17", "2026-03-18"]
+
+
+def test_schedule_builder_requires_every_choice() -> None:
+    with pytest.raises(ValueError, match="frequency, stub, grid, payment convention"):
+        Schedule.builder("2025-01-15", "2026-01-15").build()
+    spec = Schedule.builder("2025-01-15", "2026-01-15").frequency("3M").stub_rule("none").grid("natural").unadjusted()
+    payload = spec.to_spec()
+    payload["business_day_convention"] = "following"
+    with pytest.raises(ValueError, match="needs a calendar"):
+        Schedule.from_spec(payload)
 
 
 # CORE-007: MarketContext len/bool come from Rust MarketContext::len/is_empty.

@@ -51,6 +51,7 @@ from finstack_quant.core.dates._calendar import (
     available_calendars as available_calendars,
 )
 from finstack_quant.core.dates._schedule import (
+    GridMode as GridMode,
     Schedule as Schedule,
     ScheduleBuilder as ScheduleBuilder,
     StubKind as StubKind,
@@ -103,6 +104,7 @@ __all__ = [
     "available_calendars",
     # schedule
     "StubKind",
+    "GridMode",
     "Schedule",
     "ScheduleBuilder",
     # SIFMA settlements

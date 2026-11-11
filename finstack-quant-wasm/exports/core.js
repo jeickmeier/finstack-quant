@@ -103,12 +103,12 @@ chain(wasm.MarketContext, [
 chain(wasm.ScheduleBuilder, [
   'frequency',
   'stubRule',
+  'grid',
   'adjustWith',
+  'unadjusted',
   'paymentLagDays',
   'fixingLagBusinessDays',
-  'endOfMonth',
   'cdsImm',
-  'imm',
 ]);
 
 /**

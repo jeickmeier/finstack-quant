@@ -72,6 +72,67 @@ class StubKind:
     def __eq__(self, other: object) -> bool: ...
     def __ne__(self, other: object) -> bool: ...
 
+class GridMode:
+    """
+    Regular-grid selection for schedule generation.
+
+    Exactly one grid is chosen; there is no default. Every regular roll is
+    computed from the original anchor (``start`` for no-stub and back-stub
+    rules, ``end`` for front-stub rules) and snapped to the grid. Only the
+    declared stub side may be off the grid; with ``StubKind.NONE`` both
+    endpoints must be on it. Immutable, hashable enum-style type.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.dates import GridMode
+    >>> str(GridMode.END_OF_MONTH)
+    'end_of_month'
+
+    """
+
+    NATURAL: GridMode
+    """Tenor-arithmetic dates with no snapping."""
+    END_OF_MONTH: GridMode
+    """Last calendar day of each month; month/year frequency and a month-end anchor."""
+    QUARTERLY_IMM: GridMode
+    """Third Wednesday of Mar/Jun/Sep/Dec; whole quarters and an IMM-date anchor."""
+
+    @classmethod
+    def from_name(cls, name: str) -> GridMode:
+        """
+        Parse this variant from its canonical name string.
+
+        Parameters
+        ----------
+        name : str
+            Grid identifier: ``"natural"``, ``"end_of_month"`` or
+            ``"quarterly_imm"``.
+
+        Returns
+        -------
+        GridMode
+            The grid with that canonical lowercase name.
+
+        Raises
+        ------
+        ValueError
+            If *name* is not recognised.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import GridMode
+        >>> GridMode.from_name("quarterly_imm") == GridMode.QUARTERLY_IMM
+        True
+
+        """
+        ...
+
+    def __repr__(self) -> str: ...
+    def __str__(self) -> str: ...
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __ne__(self, other: object) -> bool: ...
+
 class Schedule:
     """
     A generated date schedule.
@@ -82,7 +143,15 @@ class Schedule:
     --------
     >>> import datetime
     >>> from finstack_quant.core.dates import Schedule
-    >>> schedule = Schedule.builder(datetime.date(2025, 1, 15), datetime.date(2025, 7, 15)).frequency("3M").build()
+    >>> schedule = (
+    ...     Schedule
+    ...     .builder(datetime.date(2025, 1, 15), datetime.date(2025, 7, 15))
+    ...     .stub_rule("none")
+    ...     .grid("natural")
+    ...     .unadjusted()
+    ...     .frequency("3M")
+    ...     .build()
+    ... )
     >>> schedule.dates
     [datetime.date(2025, 1, 15), datetime.date(2025, 4, 15), datetime.date(2025, 7, 15)]
 
@@ -94,33 +163,42 @@ class Schedule:
         Start a schedule build between two dates.
 
         The canonical entry point, mirroring the ``Type.builder()`` form every
-        other builder-backed type uses. Constructing :class:`ScheduleBuilder`
-        directly is equivalent.
+        other builder-backed type uses. There are no financial defaults: the
+        frequency, stub rule, grid and payment convention must all be chosen
+        before :meth:`ScheduleBuilder.build`.
 
         Parameters
         ----------
         start : datetime.date | str
             First accrual date.
         end : datetime.date | str
-            Final accrual date.
+            Final accrual date; must be after *start*.
 
         Returns
         -------
         ScheduleBuilder
-            A fresh builder defaulting to a monthly frequency.
+            An empty builder for the range.
 
         Examples
         --------
         >>> import datetime
         >>> from finstack_quant.core.dates import Schedule
-        >>> schedule = Schedule.builder(datetime.date(2025, 1, 15), datetime.date(2025, 7, 15)).frequency("3M").build()
+        >>> schedule = (
+        ...     Schedule
+        ...     .builder(datetime.date(2025, 1, 15), datetime.date(2025, 7, 15))
+        ...     .stub_rule("none")
+        ...     .grid("natural")
+        ...     .unadjusted()
+        ...     .frequency("3M")
+        ...     .build()
+        ... )
         >>> len(schedule.dates)
         3
 
         Raises
         ------
         ValueError
-            If *start* is after *end* or either date is invalid.
+            If *start* is not before *end* or either date is invalid.
         """
         ...
 
@@ -133,11 +211,11 @@ class Schedule:
         ----------
         spec : dict | str
             Mapping or JSON string with the canonical fields ``start``,
-            ``end`` (ISO dates), ``frequency`` (``"3M"``), ``stub``,
-            ``business_day_convention``, ``calendar_id``, ``end_of_month``,
-            ``imm_mode``, ``cds_imm_mode``, ``payment_lag_days`` and
-            ``fixing_lag_business_days``
-            (as produced by :meth:`ScheduleBuilder.to_spec`).
+            ``end`` (ISO dates), ``frequency``, ``stub``, ``grid``,
+            ``cds_imm_mode``, ``business_day_convention``, ``calendar_id``,
+            and the optional ``payment_lag_days`` and
+            ``fixing_lag_business_days`` (as produced by
+            :meth:`ScheduleBuilder.to_spec`).
 
         Returns
         -------
@@ -147,12 +225,22 @@ class Schedule:
         Raises
         ------
         ValueError
-            If the spec is malformed or the schedule cannot be built.
+            If the spec is malformed, misses a required field, is
+            inconsistent (CDS IMM on a non-natural grid, a convention other
+            than unadjusted without a calendar) or cannot be built.
 
         Examples
         --------
         >>> from finstack_quant.core.dates import Schedule
-        >>> spec = Schedule.builder("2025-01-15", "2025-07-15").frequency("3M").to_spec()
+        >>> spec = (
+        ...     Schedule
+        ...     .builder("2025-01-15", "2025-07-15")
+        ...     .stub_rule("none")
+        ...     .grid("natural")
+        ...     .unadjusted()
+        ...     .frequency("3M")
+        ...     .to_spec()
+        ... )
         >>> len(Schedule.from_spec(spec))
         3
 
@@ -236,7 +324,16 @@ class Schedule:
         Examples
         --------
         >>> from finstack_quant.core.dates import Schedule
-        >>> frame = Schedule.builder("2025-01-15", "2026-01-15").frequency("6M").build().to_dataframe()
+        >>> frame = (
+        ...     Schedule
+        ...     .builder("2025-01-15", "2026-01-15")
+        ...     .stub_rule("none")
+        ...     .grid("natural")
+        ...     .unadjusted()
+        ...     .frequency("6M")
+        ...     .build()
+        ...     .to_dataframe()
+        ... )
         >>> list(frame.columns)
         ['period_start', 'period_end', 'payment_date', 'fixing_date']
         """
@@ -260,7 +357,15 @@ class Schedule:
         Examples
         --------
         >>> from finstack_quant.core.dates import Schedule
-        >>> schedule = Schedule.builder("2025-01-15", "2025-07-15").frequency("3M").build()
+        >>> schedule = (
+        ...     Schedule
+        ...     .builder("2025-01-15", "2025-07-15")
+        ...     .stub_rule("none")
+        ...     .grid("natural")
+        ...     .unadjusted()
+        ...     .frequency("3M")
+        ...     .build()
+        ... )
         >>> Schedule.from_json(schedule.to_json()) == schedule
         True
         """
@@ -294,7 +399,15 @@ class Schedule:
         Examples
         --------
         >>> from finstack_quant.core.dates import Schedule
-        >>> schedule = Schedule.builder("2025-01-15", "2025-07-15").frequency("3M").build()
+        >>> schedule = (
+        ...     Schedule
+        ...     .builder("2025-01-15", "2025-07-15")
+        ...     .stub_rule("none")
+        ...     .grid("natural")
+        ...     .unadjusted()
+        ...     .frequency("3M")
+        ...     .build()
+        ... )
         >>> Schedule.from_json(schedule.to_json()) == schedule
         True
 
@@ -314,21 +427,19 @@ class ScheduleBuilder:
     Setters mutate the builder **in place** and return that same instance,
     matching Rust's fluent builder semantics.
 
-    Parameters
-    ----------
-    start : datetime.date | str
-        Schedule start date.
-    end : datetime.date | str
-        Schedule end date (must not be before *start*; validated by the
-        canonical Rust builder at ``build()`` time).
+    Obtain one with :meth:`Schedule.builder`. Every financial choice is
+    explicit: :meth:`frequency`, :meth:`stub_rule`, :meth:`grid` and a payment
+    convention (:meth:`adjust_with` or :meth:`unadjusted`). An incomplete
+    builder raises at :meth:`build` and :meth:`to_spec`. The payment lag
+    defaults to zero and the fixing series to none.
 
     Examples
     --------
     >>> from datetime import date
     >>> from finstack_quant.core.dates import (
-    ...     ScheduleBuilder,
-    ...     StubKind,
     ...     BusinessDayConvention,
+    ...     Schedule,
+    ...     StubKind,
     ... )
     >>> schedule = (
     ...     Schedule
@@ -336,7 +447,7 @@ class ScheduleBuilder:
     ...     .frequency("3M")
     ...     .stub_rule(StubKind.SHORT_FRONT)
     ...     .adjust_with(BusinessDayConvention.MODIFIED_FOLLOWING, "usny")
-    ...     .end_of_month(False)
+    ...     .grid("natural")
     ...     .build()
     ... )
     >>> len(schedule) >= 20
@@ -462,25 +573,62 @@ class ScheduleBuilder:
         """
         ...
 
-    def end_of_month(self, eom: bool) -> ScheduleBuilder:
+    def grid(self, grid: Union[GridMode, str]) -> ScheduleBuilder:
         """
-        Enable or disable end-of-month roll logic.
+        Select the regular grid.
+
+        Selecting a grid never changes the frequency or stub rule.
 
         Parameters
         ----------
-        eom : bool
-            Whether to use the calendar month-end grid. Requires a month/year
-            tenor and a regular schedule rule, and the regular anchor (``start``
-            for no-stub and back-stub rules, ``end`` for front-stub rules) must
-            itself be a month-end; ``build`` raises ``ValueError`` otherwise,
-            and for day/week tenors or IMM/CDS modes. Only the declared stub
-            side may be off the grid; with ``StubKind.NONE`` both endpoints
-            must be on it.
+        grid : GridMode | str
+            ``GridMode`` or its name: ``"natural"``, ``"end_of_month"``
+            (month/year frequency, month-end regular anchor) or
+            ``"quarterly_imm"`` (whole quarters, IMM-date regular anchor).
+            ``build`` raises ``ValueError`` when the frequency or the regular
+            anchor (``start`` for no-stub and back-stub rules, ``end`` for
+            front-stub rules) does not suit the grid.
 
         Returns
         -------
         ScheduleBuilder
-            Same builder instance after enabling or disabling end-of-month rolling.
+            This builder.
+
+        Raises
+        ------
+        ValueError
+            If *grid* names no grid.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import Schedule
+        >>> dates = (
+        ...     Schedule
+        ...     .builder("2025-03-19", "2025-12-31")
+        ...     .frequency("3M")
+        ...     .stub_rule("short_back")
+        ...     .grid("quarterly_imm")
+        ...     .unadjusted()
+        ...     .build()
+        ...     .dates
+        ... )
+        >>> [d.isoformat() for d in dates]
+        ['2025-03-19', '2025-06-18', '2025-09-17', '2025-12-17', '2025-12-31']
+        """
+        ...
+
+    def unadjusted(self) -> ScheduleBuilder:
+        """
+        Keep payment dates on the raw period ends, with no calendar.
+
+        Selects the ``unadjusted`` convention and clears any calendar; a
+        positive payment or fixing lag then makes ``build`` raise, since lags
+        need a calendar (use ``adjust_with("unadjusted", calendar)``).
+
+        Returns
+        -------
+        ScheduleBuilder
+            This builder.
 
         Notes
         -----
@@ -493,8 +641,8 @@ class ScheduleBuilder:
         Use CDS IMM dates (the 20th of March, June, September and December).
 
         Same semantics as the Rust ``ScheduleBuilder::cds_imm``: sets the
-        frequency to quarterly and the stub rule to ``short_back``, turns CDS
-        IMM mode on and standard IMM mode off. A later ``frequency`` or
+        frequency to quarterly and the stub rule to ``short_back`` and turns
+        CDS IMM mode on; it requires the natural grid. A later ``frequency`` or
         ``stub_rule`` call wins, and ``to_spec()`` reports exactly what
         ``build()`` uses.
 
@@ -510,68 +658,38 @@ class ScheduleBuilder:
         Examples
         --------
         >>> from finstack_quant.core.dates import Schedule
-        >>> spec = Schedule.builder("2025-01-15", "2026-01-15").cds_imm().to_spec()
+        >>> spec = Schedule.builder("2025-01-15", "2026-01-15").grid("natural").unadjusted().cds_imm().to_spec()
         >>> spec["frequency"], spec["stub"]
         ({'count': 3, 'unit': 'months'}, 'short_back')
         """
         ...
 
-    def imm(self) -> ScheduleBuilder:
-        """
-        Roll on standard IMM dates (the third Wednesday of Mar, Jun, Sep, Dec).
-
-        Same semantics as the Rust ``ScheduleBuilder::imm``: sets the IMM
-        defaults (quarterly frequency, ``short_back`` stub rule), turns standard
-        IMM mode on and CDS IMM mode off. A later ``frequency`` or ``stub_rule``
-        call wins. ``build()`` keeps ``start`` and ``end`` as the first and last
-        dates and lays the regular periods on IMM dates at the frequency, which
-        must be a whole number of quarters: forward from ``start`` for
-        back-stub rules, backward from ``end`` for front-stub rules. That
-        regular anchor must itself be an IMM date; no replacement anchor is
-        searched and only the declared stub side may be off-cycle.
-
-        Returns
-        -------
-        ScheduleBuilder
-            This builder.
-
-        Notes
-        -----
-        This method does not raise; it returns the same instance for chaining.
-        ``build()`` raises ``ValueError`` when the frequency is not a whole
-        number of quarters, when the regular anchor is not an IMM date, or when
-        the stub rule is ``none`` and ``start`` or ``end`` is not an IMM date.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.dates import Schedule
-        >>> dates = Schedule.builder("2025-03-19", "2025-12-31").imm().build().dates
-        >>> [d.isoformat() for d in dates]
-        ['2025-03-19', '2025-06-18', '2025-09-17', '2025-12-17', '2025-12-31']
-        """
-        ...
-
     def to_spec(self) -> dict[str, object]:
         """
-        Current builder state as a ``ScheduleSpec`` mapping.
+        The complete ``ScheduleSpec`` mapping these choices describe.
 
         Returns
         -------
         dict[str, object]
             The canonical spec fields (``start``, ``end``, ``frequency``,
-            ``stub``, ``business_day_convention``, ``calendar_id``,
-            ``end_of_month``, ``imm_mode``, ``cds_imm_mode``,
-            ``payment_lag_days``, ``fixing_lag_business_days``), accepted by
+            ``stub``, ``grid``, ``cds_imm_mode``, ``business_day_convention``,
+            ``calendar_id``, ``payment_lag_days``,
+            ``fixing_lag_business_days``), accepted by
             :meth:`Schedule.from_spec`.
 
-        Notes
-        -----
-        This method does not raise; it returns the current state.
+        Raises
+        ------
+        ValueError
+            If a choice is missing (the message names every missing one:
+            frequency, stub, grid, payment convention) or the combination is
+            inconsistent.
 
         Examples
         --------
         >>> from finstack_quant.core.dates import Schedule
-        >>> Schedule.builder("2025-01-15", "2025-07-15").frequency("3M").to_spec()["frequency"]
+        >>> Schedule.builder("2025-01-15", "2025-07-15").stub_rule("none").grid("natural").unadjusted().frequency(
+        ...     "3M"
+        ... ).to_spec()["frequency"]
         {'count': 3, 'unit': 'months'}
         """
         ...
@@ -581,8 +699,7 @@ class ScheduleBuilder:
         Materialize the date schedule from the builder settings.
 
         Delegates entirely to the canonical Rust ``ScheduleBuilder::build``,
-        which returns a complete schedule or an error: a generation failure
-        raises ``ValueError`` and an unknown calendar id ``KeyError``.
+        which returns a complete schedule or an error.
 
         Returns
         -------
@@ -592,7 +709,11 @@ class ScheduleBuilder:
         Raises
         ------
         ValueError
-            If the schedule cannot be built with the given parameters.
+            If a choice is missing, the specification is inconsistent, the
+            regular anchor is off the selected grid, or the schedule cannot be
+            generated.
+        KeyError
+            If a calendar id is unknown.
         """
         ...
 

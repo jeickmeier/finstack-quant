@@ -21,18 +21,35 @@ from finstack_quant.core.dates import (
 
 def test_default_frequency_is_monthly() -> None:
     """An unspecified frequency defaults to monthly, matching Rust."""
-    builder = Schedule.builder(date(2025, 1, 15), date(2026, 1, 15))
+    builder = (
+        Schedule
+        .builder(date(2025, 1, 15), date(2026, 1, 15))
+        .frequency("1M")
+        .stub_rule("none")
+        .grid("natural")
+        .unadjusted()
+    )
     schedule = builder.build()
     # 12 monthly periods over one year -> 13 dates (start + 12 period ends).
     assert len(schedule) == 13
 
 
 def test_eom_regular_schedule_uses_the_month_end_roll_grid() -> None:
-    schedule = Schedule.builder(date(2025, 2, 28), date(2025, 8, 31)).frequency("3M").end_of_month(True).build()
+    schedule = (
+        Schedule
+        .builder(date(2025, 2, 28), date(2025, 8, 31))
+        .stub_rule("none")
+        .unadjusted()
+        .frequency("3M")
+        .grid("end_of_month")
+        .build()
+    )
     assert schedule.dates == [date(2025, 2, 28), date(2025, 5, 31), date(2025, 8, 31)]
     # Without a stub both endpoints must be on the month-end grid.
     with pytest.raises(ValueError, match="month-end"):
-        Schedule.builder(date(2025, 2, 28), date(2025, 8, 28)).frequency("3M").end_of_month(True).build()
+        Schedule.builder(date(2025, 2, 28), date(2025, 8, 28)).stub_rule("none").unadjusted().frequency("3M").grid(
+            "end_of_month"
+        ).build()
 
 
 def test_nl365_uses_exclusive_start_inclusive_end_leap_days() -> None:
@@ -60,7 +77,9 @@ def test_fiscal_boundaries_and_actuals_cutoffs_are_consistent() -> None:
 @pytest.mark.parametrize("frequency", ["1M", "1Y", "1W", "2D"])
 def test_back_stub_terminates_at_python_date_max(stub: str, frequency: str) -> None:
     start = date(9999, 12, 30)
-    schedule = Schedule.builder(start, date.max).frequency(frequency).stub_rule(stub).build()
+    schedule = (
+        Schedule.builder(start, date.max).grid("natural").unadjusted().frequency(frequency).stub_rule(stub).build()
+    )
     assert schedule.dates == [start, date.max]
 
 
@@ -73,23 +92,24 @@ def test_back_stub_terminates_at_python_date_max(stub: str, frequency: str) -> N
     ],
 )
 def test_aligned_long_stubs_preserve_boundary_anchors(stub: str, expected: list[date]) -> None:
-    schedule = Schedule.builder(expected[0], expected[-1]).frequency("1M").stub_rule(stub).build()
+    schedule = (
+        Schedule.builder(expected[0], expected[-1]).grid("natural").unadjusted().frequency("1M").stub_rule(stub).build()
+    )
     assert schedule.dates == expected
 
 
-def test_imm_modes_use_last_call_wins() -> None:
+def test_cds_imm_mode_requires_the_natural_grid() -> None:
     start = date(2025, 3, 19)  # on the IMM lattice
     end = date(2025, 9, 30)
 
-    cds_builder = Schedule.builder(start, end)
-    cds_builder.imm()
-    cds_builder.cds_imm()
-    cds_dates = cds_builder.build().dates
+    # The grid and CDS IMM mode are independent; combining them is an error.
+    with pytest.raises(ValueError, match="natural grid"):
+        Schedule.builder(start, end).unadjusted().grid("quarterly_imm").cds_imm().build()
 
-    imm_builder = Schedule.builder(start, end)
-    imm_builder.cds_imm()
-    imm_builder.imm()
-    imm_dates = imm_builder.build().dates
+    cds_dates = Schedule.builder(start, end).unadjusted().grid("natural").cds_imm().build().dates
+    imm_dates = (
+        Schedule.builder(start, end).frequency("3M").stub_rule("short_back").grid("quarterly_imm").unadjusted().build()
+    ).dates
 
     assert date(2025, 3, 20) in cds_dates
     assert date(2025, 3, 19) not in cds_dates
@@ -98,15 +118,21 @@ def test_imm_modes_use_last_call_wins() -> None:
 
 
 def test_schedule_builder_setters_are_fluent_and_mutate_in_place() -> None:
-    builder = Schedule.builder(date(2025, 1, 15), date(2026, 1, 15))
+    builder = (
+        Schedule
+        .builder(date(2025, 1, 15), date(2026, 1, 15))
+        .frequency("1M")
+        .stub_rule("none")
+        .grid("natural")
+        .unadjusted()
+    )
 
     result = (
         builder
         .frequency("3M")
         .stub_rule(StubKind.SHORT_BACK)
         .adjust_with(BusinessDayConvention.MODIFIED_FOLLOWING, "usny")
-        .end_of_month(False)
-        .imm()
+        .grid("natural")
         .cds_imm()
     )
 
@@ -119,6 +145,8 @@ def test_schedule_payment_and_fixing_dates() -> None:
         Schedule
         .builder(date(2025, 1, 2), date(2025, 1, 9))
         .frequency("1W")
+        .stub_rule("none")
+        .grid("natural")
         .adjust_with(BusinessDayConvention.FOLLOWING, "weekends_only")
         .payment_lag_days(2)
         .fixing_lag_business_days(2)
@@ -130,7 +158,14 @@ def test_schedule_payment_and_fixing_dates() -> None:
 
 
 def test_schedule_builder_fluent_setter_preserves_exceptions() -> None:
-    builder = Schedule.builder(date(2025, 1, 15), date(2026, 1, 15))
+    builder = (
+        Schedule
+        .builder(date(2025, 1, 15), date(2026, 1, 15))
+        .frequency("1M")
+        .stub_rule("none")
+        .grid("natural")
+        .unadjusted()
+    )
     with pytest.raises(ValueError, match=r"(?i)(tenor|parse|invalid)"):
         builder.frequency("not-a-tenor")
 
@@ -160,13 +195,27 @@ def test_fiscal_week_stepping_includes_week_53() -> None:
 
 def test_schedule_builder_from_spec_and_dataframe() -> None:
     schedule = (
-        Schedule.builder("2025-01-15", "2026-01-15").frequency("6M").adjust_with("modified_following", "usny").build()
+        Schedule
+        .builder("2025-01-15", "2026-01-15")
+        .stub_rule("none")
+        .grid("natural")
+        .frequency("6M")
+        .adjust_with("modified_following", "usny")
+        .build()
     )
     assert [d.isoformat() for d in schedule] == ["2025-01-15", "2025-07-15", "2026-01-15"]
     assert schedule.payment_dates == [date(2025, 7, 15), date(2026, 1, 15)]
     assert Schedule.from_json(schedule.to_json()) == schedule
 
-    spec = Schedule.builder("2025-01-15", "2025-07-15").frequency("3M").to_spec()
+    spec = (
+        Schedule
+        .builder("2025-01-15", "2025-07-15")
+        .stub_rule("none")
+        .grid("natural")
+        .unadjusted()
+        .frequency("3M")
+        .to_spec()
+    )
     assert spec["frequency"] == {"count": 3, "unit": "months"}
     assert len(Schedule.from_spec(spec)) == 3
 
@@ -184,23 +233,36 @@ def test_schedule_builder_accepts_strings_and_calendar_objects() -> None:
         .builder("2025-01-15", "2026-01-15")
         .frequency("6M")
         .stub_rule("short_front")
+        .grid("natural")
         .adjust_with("modified_following", HolidayCalendar("nyse+gblo"))
         .build()
     )
     assert len(schedule) == 3
     with pytest.raises(KeyError):
-        Schedule.builder("2025-01-15", "2026-01-15").adjust_with("modified_following", "no_such_calendar").build()
+        Schedule.builder("2025-01-15", "2026-01-15").frequency("1M").stub_rule("none").grid("natural").adjust_with(
+            "modified_following", "no_such_calendar"
+        ).build()
     with pytest.raises(ValueError, match=r"start must be before end"):
-        Schedule.builder("2026-01-15", "2025-01-15")
+        Schedule.builder("2026-01-15", "2025-01-15").frequency("1M").stub_rule("none").grid("natural").unadjusted()
 
 
 def test_schedule_has_no_lenient_policy_or_warnings() -> None:
     # A build returns a complete schedule or raises (CORE-CONVENTIONS-008 #12).
-    builder = Schedule.builder("2025-01-15", "2026-01-15")
+    builder = (
+        Schedule.builder("2025-01-15", "2026-01-15").frequency("1M").stub_rule("none").grid("natural").unadjusted()
+    )
     assert not hasattr(builder, "error_policy")
     with pytest.raises(KeyError):
         builder.adjust_with("following", "no_such_calendar").build()
-    schedule = Schedule.builder("2025-01-15", "2026-01-15").frequency("6M").build()
+    schedule = (
+        Schedule
+        .builder("2025-01-15", "2026-01-15")
+        .stub_rule("none")
+        .grid("natural")
+        .unadjusted()
+        .frequency("6M")
+        .build()
+    )
     assert not hasattr(schedule, "warnings")
 
 
@@ -228,7 +290,13 @@ def test_dates_pickle_round_trips() -> None:
         DayCount.THIRTY_360_ISDA,
         FiscalConfig.uk(),
         build_periods("2024Q1..Q4", "2024Q2"),
-        Schedule.builder("2025-01-15", "2026-01-15").frequency("6M").build(),
+        Schedule
+        .builder("2025-01-15", "2026-01-15")
+        .stub_rule("none")
+        .grid("natural")
+        .unadjusted()
+        .frequency("6M")
+        .build(),
     ]
     for value in values:
         assert pickle.loads(pickle.dumps(value)) == value  # noqa: S301

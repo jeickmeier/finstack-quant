@@ -6,7 +6,7 @@
 
 import type * as wasm from './pkg/finstack_quant_wasm.js';
 import type * as generated from './types/generated/index.js';
-import type { CashFlowBuilder, CashFlowSchedule, CreditIndexData, DayCountContext, DiscountCurve, FiscalConfig, FxMatrix, HazardCurve, HullWhiteParams, ImProfile, InflationIndex, JsonInput, LookbackReturns, MarketContext, MarketContextCurve, MoneyValue, MvaResult, Performance, PeriodStats, ScalarTimeSeries, ScheduleBuilder, endOfMonth, start } from './pkg/finstack_quant_wasm.js';
+import type { CashFlowBuilder, CashFlowSchedule, CreditIndexData, DayCountContext, DiscountCurve, FiscalConfig, FxMatrix, HazardCurve, HullWhiteParams, ImProfile, InflationIndex, JsonInput, LookbackReturns, MarketContext, MarketContextCurve, MoneyValue, MvaResult, Performance, PeriodStats, ScalarTimeSeries, ScheduleBuilder, start } from './pkg/finstack_quant_wasm.js';
 
 export { default } from './pkg/finstack_quant_wasm.js';
 export type * from './pkg/finstack_quant_wasm.js';
@@ -304,40 +304,26 @@ declare module './pkg/finstack_quant_wasm.js' {
      * * `convention` - Business-day convention name such as
      *   `"modified_following"`.
      * * `calendar` - Registered holiday-calendar id (for example `"nyse"`);
-     *   it is resolved when the schedule is built, under the error policy.
+     *   it is resolved strictly when the schedule is built.
      *
      * @returns This builder, updated in place.
      * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
      * `validation`) if the convention is unknown.
      * @param convention - Business-day convention name such as `"modified_following"`.
-     * @param calendar - Registered holiday-calendar id (for example `"nyse"`); it is resolved when the schedule is built, under the error policy.
+     * @param calendar - Registered holiday-calendar id (for example `"nyse"`); it is resolved strictly when the schedule is built.
      */
     adjustWith(convention: string, calendar: string): this;
     /**
      * Use CDS IMM dates (the 20th of March, June, September and December).
      *
      * Same semantics as the Rust `ScheduleBuilder::cds_imm`: sets the
-     * frequency to quarterly and the stub rule to `short_back`. A later
-     * `frequency` or `stubRule` call wins, and `toSpec()` reports what
-     * `build()` uses.
+     * frequency to quarterly and the stub rule to `short_back` and turns CDS
+     * IMM mode on (it requires the natural grid). A later `frequency` or
+     * `stubRule` call wins, and `toSpec()` reports what `build()` uses.
      *
-     * @returns This builder, with CDS IMM mode on and standard IMM mode off.
+     * @returns This builder, with CDS IMM mode on.
      */
     cdsImm(): this;
-    /**
-     * Enable or disable end-of-month rolling.
-     *
-     * # Arguments
-     *
-     * * `eom` - `true` selects the calendar month-end grid; the regular anchor
-     *   (`start` for no-stub and back-stub rules, `end` for front-stub rules)
-     *   must be a month end, or `build` throws.
-     *
-     * @returns This builder, updated in place.
-     * @throws `TypeError` if `eom` is not a boolean.
-     * @param eom - `true` selects the calendar month-end grid; the regular anchor must be a month end, or `build` throws.
-     */
-    endOfMonth(eom: boolean): this;
     /**
      * Set the fixing lag in business days before each period's accrual start.
      *
@@ -366,21 +352,20 @@ declare module './pkg/finstack_quant_wasm.js' {
      */
     frequency(frequency: string): this;
     /**
-     * Roll on standard IMM dates (the third Wednesday of Mar, Jun, Sep, Dec).
+     * Select the regular grid.
      *
-     * Same semantics as the Rust `ScheduleBuilder::imm`: sets the IMM
-     * defaults (quarterly frequency, `short_back` stub rule). A later
-     * `frequency` or `stubRule` call wins. `build()` keeps `start` and `end`
-     * as the first and last dates and lays the regular periods on IMM dates
-     * at the frequency, which must be a whole number of quarters: forward
-     * from `start` for back-stub rules, backward from `end` for front-stub
-     * rules. That regular anchor must itself be an IMM date, or `build`
-     * throws; no replacement anchor is searched and only the declared stub
-     * side may be off-cycle.
+     * # Arguments
      *
-     * @returns This builder, with standard IMM mode on and CDS IMM mode off.
+     * * `grid` - Grid name: `"natural"`, `"end_of_month"` (month/year
+     *   frequency, month-end regular anchor) or `"quarterly_imm"` (whole
+     *   quarters, IMM-date regular anchor), in any ASCII case.
+     *
+     * @returns This builder, updated in place.
+     * @throws `TypeError` if `grid` is not a string; `FinstackError` (kind
+     * `validation`) if no grid matches.
+     * @param grid - Grid name: `"natural"`, `"end_of_month"` (month/year frequency, month-end regular anchor) or `"quarterly_imm"` (whole quarters, IMM-date regular anchor), in any ASCII case.
      */
-    imm(): this;
+    grid(grid: string): this;
     /**
      * Set the payment lag in business days after each adjusted period end.
      *
@@ -408,6 +393,15 @@ declare module './pkg/finstack_quant_wasm.js' {
      * @param stub - Stub name: `"none"`, `"short_front"`, `"short_back"`, `"long_front"` or `"long_back"`, in any ASCII case.
      */
     stubRule(stub: string): this;
+    /**
+     * Keep payment dates on the raw period ends, with no calendar.
+     *
+     * Selects the `unadjusted` convention and clears any calendar; a
+     * positive payment or fixing lag then makes `build` throw.
+     *
+     * @returns This builder, updated in place.
+     */
+    unadjusted(): this;
   }
 }
 

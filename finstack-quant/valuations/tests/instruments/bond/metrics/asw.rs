@@ -218,6 +218,8 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
     };
     let mut builder = Schedule::builder(as_of, bond.maturity)
         .expect("schedule builder")
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(spec.schedule.frequency)
         .stub_rule(spec.schedule.stub);
     if finstack_quant_core::dates::calendar_by_id_strict(&spec.schedule.calendar_id).is_ok() {
@@ -238,6 +240,8 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
     .expect("par rate and fixed annuity");
     let float_dates = Schedule::builder(as_of, bond.maturity)
         .unwrap()
+        .grid(finstack_quant_core::dates::GridMode::Natural)
+        .unadjusted()
         .frequency(spec.schedule.frequency)
         .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
         .build()

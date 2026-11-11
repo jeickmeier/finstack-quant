@@ -2,42 +2,69 @@
 
 use super::*;
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "ScheduleSpecWire")]
-/// Serializable specification for building a schedule.
+/// Complete, validated specification of a schedule (record
+/// CORE-CONVENTIONS-008 #2).
 ///
-/// This struct captures all parameters needed to generate a schedule of dates
-/// for cashflows, coupons, or other periodic events. It can be deserialized
-/// from configuration files and built through
+/// Every financial choice is explicit: there is no default frequency, stub,
+/// grid or payment convention. Only the operation defaults remain: zero
+/// extra payment lag and no fixing series. A specification is validated when
+/// it is deserialized and again before generation, so a value assembled or
+/// mutated directly cannot bypass the rules. Build it with
 /// `ScheduleBuilder::from(spec).build()`.
+///
+/// # Examples
+/// ```rust
+/// use finstack_quant_core::dates::{
+///     BusinessDayConvention, GridMode, ScheduleBuilder, ScheduleSpec, StubKind, Tenor,
+/// };
+/// use time::macros::date;
+///
+/// let spec = ScheduleSpec {
+///     start: date!(2025 - 01 - 15),
+///     end: date!(2026 - 01 - 15),
+///     frequency: Tenor::quarterly(),
+///     stub: StubKind::None,
+///     grid: GridMode::Natural,
+///     cds_imm_mode: false,
+///     business_day_convention: BusinessDayConvention::Unadjusted,
+///     calendar_id: None,
+///     payment_lag_days: 0,
+///     fixing_lag_business_days: None,
+/// };
+/// let schedule = ScheduleBuilder::from(spec).build()?;
+/// assert_eq!(schedule.get_dates().len(), 5);
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
 pub struct ScheduleSpec {
-    /// Start date of the schedule.
+    /// First unadjusted grid date; must precede `end`.
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub start: Date,
-    /// End date (maturity) of the schedule.
+    /// Last unadjusted grid date (maturity).
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub end: Date,
-    /// Payment frequency (e.g., quarterly, monthly).
+    /// Regular period length.
     pub frequency: Tenor,
-    /// Stub convention (short/long front/back).
+    /// Stub policy, which also selects the regular anchor side.
     pub stub: StubKind,
-    /// Business day convention for adjusting dates.
-    pub business_day_convention: Option<BusinessDayConvention>,
-    /// Optional calendar identifier for holiday adjustments.
-    pub calendar_id: Option<String>,
-    /// If true, always roll to end of month when applicable.
-    pub end_of_month: bool,
-    /// If true, use standard IMM date logic (third Wednesday of quarterly months).
-    #[serde(default)]
-    pub imm_mode: bool,
-    /// If true, use CDS IMM date logic (20th of quarterly months).
+    /// Regular-grid selection.
+    pub grid: GridMode,
+    /// CDS IMM mode (20th of quarterly months, front accrual from the prior
+    /// roll); requires the natural grid.
     pub cds_imm_mode: bool,
-    /// Business days after each (adjusted) period end for the payment date.
-    #[serde(default)]
+    /// Payment-date business-day convention, including a deliberate
+    /// `Unadjusted`.
+    pub business_day_convention: BusinessDayConvention,
+    /// Calendar for payment adjustment and both lags. Required unless the
+    /// convention is `Unadjusted` and no positive lag is set; always
+    /// resolved strictly when given.
+    pub calendar_id: Option<String>,
+    /// Business days after each adjusted period end for the payment date.
     pub payment_lag_days: i32,
-    /// Optional T-minus business days from each period's accrual start.
-    #[serde(default)]
+    /// T-minus business days from each period's raw start for the fixing
+    /// date, or `None` for no fixing series.
     pub fixing_lag_business_days: Option<i32>,
 }
 
@@ -51,12 +78,10 @@ struct ScheduleSpecWire {
     end: Date,
     frequency: Tenor,
     stub: StubKind,
-    business_day_convention: Option<BusinessDayConvention>,
-    calendar_id: Option<String>,
-    end_of_month: bool,
-    #[serde(default)]
-    imm_mode: bool,
+    grid: GridMode,
     cds_imm_mode: bool,
+    business_day_convention: BusinessDayConvention,
+    calendar_id: Option<String>,
     #[serde(default)]
     payment_lag_days: i32,
     #[serde(default)]
@@ -64,119 +89,135 @@ struct ScheduleSpecWire {
 }
 
 impl TryFrom<ScheduleSpecWire> for ScheduleSpec {
-    type Error = String;
+    type Error = crate::Error;
 
     fn try_from(wire: ScheduleSpecWire) -> Result<Self, Self::Error> {
-        if wire.start > wire.end {
-            return Err("schedule start must be on or before end".to_string());
-        }
-        if wire.imm_mode && wire.cds_imm_mode {
-            return Err("standard IMM and CDS IMM modes are mutually exclusive".to_string());
-        }
-        Ok(Self {
+        let spec = Self {
             start: wire.start,
             end: wire.end,
             frequency: wire.frequency,
             stub: wire.stub,
+            grid: wire.grid,
+            cds_imm_mode: wire.cds_imm_mode,
             business_day_convention: wire.business_day_convention,
             calendar_id: wire.calendar_id,
-            end_of_month: wire.end_of_month,
-            imm_mode: wire.imm_mode,
-            cds_imm_mode: wire.cds_imm_mode,
             payment_lag_days: wire.payment_lag_days,
             fixing_lag_business_days: wire.fixing_lag_business_days,
-        })
+        };
+        spec.validate()?;
+        Ok(spec)
     }
 }
 
 impl ScheduleSpec {
-    /// Create a persisted specification using the canonical builder defaults.
-    ///
-    /// # Arguments
-    ///
-    /// * `start` - First unadjusted accrual date, included in the schedule.
-    /// * `end` - Last unadjusted accrual date; must be on or after start.
+    /// Check the specification's own consistency (not its dates' grid
+    /// alignment, which generation checks).
     ///
     /// # Errors
     ///
-    /// Returns InvalidDateRange if start is after end.
-    pub fn new(start: Date, end: Date) -> crate::Result<Self> {
-        if start > end {
+    /// Returns an error when `start` is not before `end`, the frequency does
+    /// not suit the grid, CDS IMM mode is combined with a non-natural grid, a
+    /// lag is negative, or a calendar is required but absent.
+    pub fn validate(&self) -> crate::Result<()> {
+        if self.start >= self.end {
             return Err(crate::InputError::InvalidDateRange.into());
         }
-        Ok(Self {
-            start,
-            end,
-            frequency: Tenor::monthly(),
-            stub: StubKind::None,
-            business_day_convention: None,
-            calendar_id: None,
-            end_of_month: false,
-            imm_mode: false,
-            cds_imm_mode: false,
-            payment_lag_days: 0,
-            fixing_lag_business_days: None,
+        self.grid.check_frequency(self.frequency)?;
+        if self.cds_imm_mode && self.grid != GridMode::Natural {
+            return Err(crate::Error::Validation(format!(
+                "CDS IMM mode requires the natural grid, got {}",
+                self.grid
+            )));
+        }
+        for lag in [self.payment_lag_days]
+            .into_iter()
+            .chain(self.fixing_lag_business_days)
+        {
+            if lag < 0 {
+                return Err(InputError::NegativeScheduleLag { lag }.into());
+            }
+        }
+        if self.calendar_id.is_none() {
+            if self.payment_lag_days > 0 || self.fixing_lag_business_days.is_some_and(|lag| lag > 0)
+            {
+                return Err(InputError::ScheduleLagRequiresCalendar.into());
+            }
+            if self.business_day_convention != BusinessDayConvention::Unadjusted {
+                return Err(crate::Error::Validation(format!(
+                    "payment convention {} needs a calendar; use Unadjusted for none",
+                    self.business_day_convention
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// The regular grid's nominal reference (record CORE-CONVENTIONS-008
+    /// #14): the original anchor, frequency and grid from which every
+    /// regular roll is computed, including boundaries removed by a long stub
+    /// or lying outside the schedule.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the specification is invalid, or (CDS IMM mode)
+    /// when the prior CDS roll cannot be computed.
+    pub fn nominal_reference(&self) -> crate::Result<NominalReference> {
+        self.validate()?;
+        let front = matches!(self.stub, StubKind::ShortFront | StubKind::LongFront);
+        let anchor = if front {
+            self.end
+        } else if self.cds_imm_mode && !crate::dates::imm::is_cds_date(self.start) {
+            prev_cds_date(self.start)?
+        } else {
+            self.start
+        };
+        Ok(NominalReference {
+            anchor,
+            frequency: self.frequency,
+            grid: self.grid,
         })
     }
+}
 
-    /// Switch the specification to standard IMM dates, with
-    /// [`ScheduleBuilder::imm`] semantics.
-    ///
-    /// Sets the IMM defaults, `frequency` quarterly and `stub`
-    /// [`StubKind::ShortBack`], turns `imm_mode` on and `cds_imm_mode` off. As
-    /// on the builder, a later change to `frequency` or `stub` wins:
-    /// [`ScheduleBuilder::build`] uses the stored values as they are, and in
-    /// IMM mode `frequency` must be a whole number of quarters.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use finstack_quant_core::dates::{ScheduleSpec, StubKind, Tenor};
-    /// use time::{Date, Month};
-    ///
-    /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
-    /// let end = Date::from_calendar_date(2025, Month::December, 31)?;
-    /// let spec = ScheduleSpec::new(start, end)?.with_imm();
-    /// assert!(spec.imm_mode && !spec.cds_imm_mode);
-    /// assert_eq!(spec.frequency, Tenor::quarterly());
-    /// assert_eq!(spec.stub, StubKind::ShortBack);
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    #[must_use]
-    pub fn with_imm(mut self) -> Self {
-        self.frequency = Tenor::quarterly();
-        self.stub = StubKind::ShortBack;
-        self.imm_mode = true;
-        self.cds_imm_mode = false;
-        self
-    }
+/// Original anchor, frequency and grid of a schedule's regular periods
+/// (record CORE-CONVENTIONS-008 #14), for consumers that need full nominal
+/// reference periods (for example ICMA accrual).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NominalReference {
+    /// Date every regular roll is computed from.
+    pub anchor: Date,
+    /// Regular period length.
+    pub frequency: Tenor,
+    /// Grid each computed roll is snapped to.
+    pub grid: GridMode,
+}
 
-    /// Switch the specification to CDS IMM dates (the 20th of March, June,
-    /// September and December), with [`ScheduleBuilder::cds_imm`] semantics.
+impl NominalReference {
+    /// The `n`-th regular roll from the anchor (`n` negative counts
+    /// backward), computed directly from the anchor and snapped to the grid.
     ///
-    /// Sets `frequency` to quarterly, `stub` to [`StubKind::ShortBack`],
-    /// turns `cds_imm_mode` on and `imm_mode` off. As on the builder, a later
-    /// change to `frequency` or `stub` wins: CDS IMM generation uses the stored
-    /// values.
+    /// # Arguments
     ///
-    /// # Examples
-    /// ```rust
-    /// use finstack_quant_core::dates::{ScheduleSpec, StubKind, Tenor};
-    /// use time::{Date, Month};
+    /// * `n` - Signed roll index; `0` is the anchor itself.
     ///
-    /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
-    /// let end = Date::from_calendar_date(2026, Month::January, 15)?;
-    /// let spec = ScheduleSpec::new(start, end)?.with_cds_imm();
-    /// assert!(spec.cds_imm_mode && !spec.imm_mode);
-    /// assert_eq!(spec.frequency, Tenor::quarterly());
-    /// assert_eq!(spec.stub, StubKind::ShortBack);
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    #[must_use]
-    pub fn with_cds_imm(mut self) -> Self {
-        self.frequency = Tenor::quarterly();
-        self.stub = StubKind::ShortBack;
-        self.cds_imm_mode = true;
-        self.imm_mode = false;
-        self
+    /// # Errors
+    ///
+    /// Returns an error when the roll is outside the supported date range or
+    /// the tenor arithmetic overflows; the reference is then unavailable even
+    /// if the schedule itself ends before it.
+    pub fn roll_date(&self, n: i32) -> crate::Result<Date> {
+        let generator = BuilderInternal {
+            start: self.anchor,
+            end: self.anchor,
+            frequency: self.frequency,
+            stub: StubKind::None,
+            roll: self.grid,
+        };
+        generator.nth_rolled(self.anchor, n)?.ok_or_else(|| {
+            crate::Error::Validation(format!(
+                "nominal roll {n} from {} at {} is outside the supported date range",
+                self.anchor, self.frequency
+            ))
+        })
     }
 }

@@ -1289,14 +1289,14 @@
       "adjustWith",
       "build",
       "cdsImm",
-      "endOfMonth",
       "fixingLagBusinessDays",
       "free",
       "frequency",
-      "imm",
+      "grid",
       "paymentLagDays",
       "stubRule",
-      "toSpec"
+      "toSpec",
+      "unadjusted"
     ],
     "getters": []
   },

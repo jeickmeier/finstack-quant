@@ -35,7 +35,8 @@ pub(crate) enum AccrualDayCountPolicy {
 impl CdsPricer {
     /// Generate contractual accrual and payment dates from the premium terms.
     fn premium_schedule(&self, cds: &CreditDefaultSwap) -> Result<Schedule> {
-        let mut builder = Schedule::builder(cds.premium_leg.start, cds.premium_leg.end)?;
+        let mut builder = Schedule::builder(cds.premium_leg.start, cds.premium_leg.end)?
+            .grid(finstack_quant_core::dates::GridMode::Natural);
         builder = match cds.premium_leg.roll_rule {
             RollRule::CdsImm => {
                 if cds.premium_leg.frequency != Tenor::quarterly()
@@ -59,9 +60,16 @@ impl CdsPricer {
                 )));
             }
         };
-        if let Some(calendar_id) = cds.premium_leg.calendar_id.as_deref() {
-            builder = builder.adjust_with(cds.premium_leg.business_day_convention, calendar_id);
-        }
+        // The CDS product adjusts premium dates only when the leg names a
+        // calendar; without one its dates stay unadjusted, stated explicitly
+        // here. Whether a convention without a calendar should be accepted is
+        // the CDS date regime's decision (record CORE-CONVENTIONS-008 O7).
+        builder = match cds.premium_leg.calendar_id.as_deref() {
+            Some(calendar_id) => {
+                builder.adjust_with(cds.premium_leg.business_day_convention, calendar_id)
+            }
+            None => builder.unadjusted(),
+        };
         let schedule = builder.build()?;
         // The standard grid includes the previous roll date. The explicit
         // premium start remains the contractual first accrual boundary; the

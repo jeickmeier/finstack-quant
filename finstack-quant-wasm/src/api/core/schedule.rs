@@ -1,15 +1,15 @@
 //! WASM bindings for schedule generation from [`finstack_quant_core::dates`]:
-//! `Schedule` and `ScheduleBuilder`. Stub rules, business-day conventions and
-//! error policies cross as their snake_case labels (Rust `FromStr`).
+//! `Schedule` and `ScheduleBuilder`. Stub rules, grid modes and business-day
+//! conventions cross as their snake_case labels (Rust `FromStr`).
 //!
 //! Schedule dates are **epoch days** (`Int32Array`, days since 1970-01-01);
 //! the JSON wire form (`toJson`, `fromSpec`, `toSpec`) uses ISO-8601 strings.
 
-use crate::utils::input::{from_js_json, js_bool, js_epoch_days, js_int, js_string};
+use crate::utils::input::{from_js_json, js_epoch_days, js_int, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, Schedule, ScheduleBuilder, ScheduleSpec, StubKind, Tenor,
-    days_since_epoch,
+    BusinessDayConvention, Date, GridMode, Schedule, ScheduleBuilder, ScheduleSpec, StubKind,
+    Tenor, days_since_epoch,
 };
 use wasm_bindgen::prelude::*;
 
@@ -31,6 +31,8 @@ fn epoch_day_array(dates: &[Date]) -> Box<[i32]> {
 ///   core.createDate(2026, 1, 15),
 /// )
 ///   .frequency("3M")
+///   .stubRule("none")
+///   .grid("natural")
 ///   .adjustWith("modified_following", "nyse")
 ///   .build();
 /// schedule.dates.length; // 5 accrual boundaries
@@ -44,27 +46,29 @@ pub struct JsSchedule {
 
 #[wasm_bindgen(js_class = Schedule)]
 impl JsSchedule {
-    /// Start a schedule builder for an accrual range (Rust `ScheduleSpec::new`).
+    /// Start a schedule builder for an accrual range (Rust `Schedule::builder`).
+    ///
+    /// The builder has no financial defaults: choose the frequency, stub
+    /// rule, grid and payment convention before `build()`.
     ///
     /// # Arguments
     ///
     /// * `start` - First unadjusted accrual date, as days since 1970-01-01.
     /// * `end` - Last unadjusted accrual date, as days since 1970-01-01; must
-    ///   be on or after `start`.
+    ///   be after `start`.
     ///
-    /// @returns A `ScheduleBuilder` with the Rust defaults: monthly
-    /// frequency, no stub, no business-day adjustment, strict error policy.
+    /// @returns An empty `ScheduleBuilder` for the range.
     /// @throws `TypeError` if a date is not an integer; `FinstackError` (kind
-    /// `validation`) if a date is out of range or `start` is after `end`.
+    /// `validation`) if a date is out of range or `start` is not before `end`.
     /// @param start - First unadjusted accrual date, as days since 1970-01-01.
-    /// @param end - Last unadjusted accrual date, as days since 1970-01-01; must be on or after `start`.
+    /// @param end - Last unadjusted accrual date, as days since 1970-01-01; must be after `start`.
     #[wasm_bindgen(js_name = builder)]
     pub fn builder(
         #[wasm_bindgen(unchecked_param_type = "number")] start: JsValue,
         #[wasm_bindgen(unchecked_param_type = "number")] end: JsValue,
     ) -> Result<JsScheduleBuilder, JsValue> {
-        ScheduleSpec::new(js_epoch_days(&start, "start")?, js_epoch_days(&end, "end")?)
-            .map(|spec| JsScheduleBuilder { spec })
+        Schedule::builder(js_epoch_days(&start, "start")?, js_epoch_days(&end, "end")?)
+            .map(|inner| JsScheduleBuilder { inner })
             .map_err(to_js_err)
     }
 
@@ -74,17 +78,17 @@ impl JsSchedule {
     ///
     /// * `spec` - `ScheduleSpec` JSON text or plain object, such as
     ///   `ScheduleBuilder.toSpec()` output: ISO `start`/`end`, `frequency`
-    ///   (a `{ count, unit }` tenor), `stub`, `business_day_convention`, `calendar_id`,
-    ///   `end_of_month`, `imm_mode`, `cds_imm_mode`,
+    ///   (a `{ count, unit }` tenor), `stub`, `grid`, `cds_imm_mode`,
+    ///   `business_day_convention`, `calendar_id`, and the optional
     ///   `payment_lag_days` and `fixing_lag_business_days`. Unknown fields are
     ///   rejected.
     ///
     /// @returns The generated `Schedule`.
     /// @throws `TypeError` if `spec` is not a JSON string or plain object;
-    /// `FinstackError` (kind `validation`) for an invalid spec, both IMM modes
-    /// together, or a generation failure; kind `not_found` for an unknown
-    /// calendar.
-    /// @param spec - `ScheduleSpec` JSON text or plain object, such as `ScheduleBuilder.toSpec()` output: ISO `start`/`end`, `frequency` (a `{ count, unit }` tenor), `stub`, `business_day_convention`, `calendar_id`, `end_of_month`, `imm_mode`, `cds_imm_mode`, `payment_lag_days` and `fixing_lag_business_days`. Unknown fields are rejected.
+    /// `FinstackError` (kind `validation`) for an invalid spec (missing choice,
+    /// CDS IMM on a non-natural grid, a convention without a calendar) or a
+    /// generation failure; kind `not_found` for an unknown calendar.
+    /// @param spec - `ScheduleSpec` JSON text or plain object, such as `ScheduleBuilder.toSpec()` output: ISO `start`/`end`, `frequency` (a `{ count, unit }` tenor), `stub`, `grid`, `cds_imm_mode`, `business_day_convention`, `calendar_id`, and the optional `payment_lag_days` and `fixing_lag_business_days`. Unknown fields are rejected.
     #[wasm_bindgen(js_name = fromSpec)]
     pub fn from_spec(
         #[wasm_bindgen(unchecked_param_type = "ScheduleSpec | string")] spec: JsValue,
@@ -159,7 +163,7 @@ impl JsSchedule {
 /// const monthly = core.Schedule.builder(
 ///   core.createDate(2025, 1, 15),
 ///   core.createDate(2025, 7, 15),
-/// ).frequency("1M");
+/// ).frequency("1M").stubRule("none").grid("natural");
 /// // A payment lag is counted in business days, so it needs a calendar.
 /// const schedule = monthly.adjustWith("following", "nyse").paymentLagDays(2).build();
 /// schedule.paymentDates.length; // 6
@@ -172,7 +176,11 @@ impl JsSchedule {
 /// const monthly = core.Schedule.builder(
 ///   core.createDate(2025, 1, 15),
 ///   core.createDate(2025, 7, 15),
-/// ).frequency("1M").adjustWith("modified_following", "nyse");
+/// )
+///   .frequency("1M")
+///   .stubRule("none")
+///   .grid("natural")
+///   .adjustWith("modified_following", "nyse");
 /// const schedule = monthly.paymentLagDays(2).build();
 /// schedule.paymentDates.length; // 6
 /// ```
@@ -184,14 +192,18 @@ impl JsSchedule {
 /// const monthly = core.Schedule.builder(
 ///   core.createDate(2025, 1, 15),
 ///   core.createDate(2025, 7, 15),
-/// ).frequency("1M").adjustWith("modified_following", "nyse");
+/// )
+///   .frequency("1M")
+///   .stubRule("none")
+///   .grid("natural")
+///   .adjustWith("modified_following", "nyse");
 /// const schedule = monthly.paymentLagDays(2).build();
 /// schedule.paymentDates.length; // 6
 /// ```
 #[wasm_bindgen(js_name = ScheduleBuilder)]
 #[derive(Clone, Debug)]
 pub struct JsScheduleBuilder {
-    spec: ScheduleSpec,
+    inner: ScheduleBuilder,
 }
 
 #[wasm_bindgen(js_class = ScheduleBuilder)]
@@ -212,8 +224,8 @@ impl JsScheduleBuilder {
         &mut self,
         #[wasm_bindgen(unchecked_param_type = "string")] frequency: JsValue,
     ) -> Result<(), JsValue> {
-        self.spec.frequency =
-            Tenor::parse(&js_string(&frequency, "frequency")?).map_err(to_js_err)?;
+        let frequency = Tenor::parse(&js_string(&frequency, "frequency")?).map_err(to_js_err)?;
+        self.inner = self.inner.clone().frequency(frequency);
         Ok(())
     }
 
@@ -233,10 +245,46 @@ impl JsScheduleBuilder {
         &mut self,
         #[wasm_bindgen(unchecked_param_type = "string")] stub: JsValue,
     ) -> Result<(), JsValue> {
-        self.spec.stub = js_string(&stub, "stub")?
+        let stub = js_string(&stub, "stub")?
             .parse::<StubKind>()
             .map_err(to_js_err)?;
+        self.inner = self.inner.clone().stub_rule(stub);
         Ok(())
+    }
+
+    /// Select the regular grid.
+    ///
+    /// # Arguments
+    ///
+    /// * `grid` - Grid name: `"natural"`, `"end_of_month"` (month/year
+    ///   frequency, month-end regular anchor) or `"quarterly_imm"` (whole
+    ///   quarters, IMM-date regular anchor), in any ASCII case.
+    ///
+    /// @returns This builder, updated in place.
+    /// @throws `TypeError` if `grid` is not a string; `FinstackError` (kind
+    /// `validation`) if no grid matches.
+    /// @param grid - Grid name: `"natural"`, `"end_of_month"` (month/year frequency, month-end regular anchor) or `"quarterly_imm"` (whole quarters, IMM-date regular anchor), in any ASCII case.
+    #[wasm_bindgen(js_name = grid)]
+    pub fn grid(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] grid: JsValue,
+    ) -> Result<(), JsValue> {
+        let grid = js_string(&grid, "grid")?
+            .parse::<GridMode>()
+            .map_err(to_js_err)?;
+        self.inner = self.inner.clone().grid(grid);
+        Ok(())
+    }
+
+    /// Keep payment dates on the raw period ends, with no calendar.
+    ///
+    /// Selects the `unadjusted` convention and clears any calendar; a
+    /// positive payment or fixing lag then makes `build` throw.
+    ///
+    /// @returns This builder, updated in place.
+    #[wasm_bindgen(js_name = unadjusted)]
+    pub fn unadjusted(&mut self) {
+        self.inner = self.inner.clone().unadjusted();
     }
 
     /// Adjust payment dates with a business-day convention and calendar.
@@ -246,13 +294,13 @@ impl JsScheduleBuilder {
     /// * `convention` - Business-day convention name such as
     ///   `"modified_following"`.
     /// * `calendar` - Registered holiday-calendar id (for example `"nyse"`);
-    ///   it is resolved when the schedule is built, under the error policy.
+    ///   it is resolved strictly when the schedule is built.
     ///
     /// @returns This builder, updated in place.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) if the convention is unknown.
     /// @param convention - Business-day convention name such as `"modified_following"`.
-    /// @param calendar - Registered holiday-calendar id (for example `"nyse"`); it is resolved when the schedule is built, under the error policy.
+    /// @param calendar - Registered holiday-calendar id (for example `"nyse"`); it is resolved strictly when the schedule is built.
     #[wasm_bindgen(js_name = adjustWith)]
     pub fn adjust_with(
         &mut self,
@@ -263,8 +311,7 @@ impl JsScheduleBuilder {
             .parse::<BusinessDayConvention>()
             .map_err(to_js_err)?;
         let calendar = js_string(&calendar, "calendar")?;
-        self.spec.business_day_convention = Some(convention);
-        self.spec.calendar_id = Some(calendar);
+        self.inner = self.inner.clone().adjust_with(convention, &calendar);
         Ok(())
     }
 
@@ -283,7 +330,7 @@ impl JsScheduleBuilder {
         &mut self,
         #[wasm_bindgen(unchecked_param_type = "number")] lag: JsValue,
     ) -> Result<(), JsValue> {
-        self.spec.payment_lag_days = js_int(&lag, "lag")?;
+        self.inner = self.inner.clone().payment_lag_days(js_int(&lag, "lag")?);
         Ok(())
     }
 
@@ -302,79 +349,47 @@ impl JsScheduleBuilder {
         &mut self,
         #[wasm_bindgen(unchecked_param_type = "number")] lag: JsValue,
     ) -> Result<(), JsValue> {
-        self.spec.fixing_lag_business_days = Some(js_int(&lag, "lag")?);
-        Ok(())
-    }
-
-    /// Enable or disable end-of-month rolling.
-    ///
-    /// # Arguments
-    ///
-    /// * `eom` - `true` selects the calendar month-end grid; the regular anchor
-    ///   (`start` for no-stub and back-stub rules, `end` for front-stub rules)
-    ///   must be a month end, or `build` throws.
-    ///
-    /// @returns This builder, updated in place.
-    /// @throws `TypeError` if `eom` is not a boolean.
-    /// @param eom - `true` selects the calendar month-end grid; the regular anchor must be a month end, or `build` throws.
-    #[wasm_bindgen(js_name = endOfMonth)]
-    pub fn end_of_month(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "boolean")] eom: JsValue,
-    ) -> Result<(), JsValue> {
-        self.spec.end_of_month = js_bool(&eom, "eom")?;
+        self.inner = self
+            .inner
+            .clone()
+            .fixing_lag_business_days(js_int(&lag, "lag")?);
         Ok(())
     }
 
     /// Use CDS IMM dates (the 20th of March, June, September and December).
     ///
     /// Same semantics as the Rust `ScheduleBuilder::cds_imm`: sets the
-    /// frequency to quarterly and the stub rule to `short_back`. A later
-    /// `frequency` or `stubRule` call wins, and `toSpec()` reports what
-    /// `build()` uses.
+    /// frequency to quarterly and the stub rule to `short_back` and turns CDS
+    /// IMM mode on (it requires the natural grid). A later `frequency` or
+    /// `stubRule` call wins, and `toSpec()` reports what `build()` uses.
     ///
-    /// @returns This builder, with CDS IMM mode on and standard IMM mode off.
+    /// @returns This builder, with CDS IMM mode on.
     #[wasm_bindgen(js_name = cdsImm)]
     pub fn cds_imm(&mut self) {
-        self.spec = self.spec.clone().with_cds_imm();
+        self.inner = self.inner.clone().cds_imm();
     }
 
-    /// Roll on standard IMM dates (the third Wednesday of Mar, Jun, Sep, Dec).
-    ///
-    /// Same semantics as the Rust `ScheduleBuilder::imm`: sets the IMM
-    /// defaults (quarterly frequency, `short_back` stub rule). A later
-    /// `frequency` or `stubRule` call wins. `build()` keeps `start` and `end`
-    /// as the first and last dates and lays the regular periods on IMM dates
-    /// at the frequency, which must be a whole number of quarters: forward
-    /// from `start` for back-stub rules, backward from `end` for front-stub
-    /// rules. That regular anchor must itself be an IMM date, or `build`
-    /// throws; no replacement anchor is searched and only the declared stub
-    /// side may be off-cycle.
-    ///
-    /// @returns This builder, with standard IMM mode on and CDS IMM mode off.
-    #[wasm_bindgen(js_name = imm)]
-    pub fn imm(&mut self) {
-        self.spec = self.spec.clone().with_imm();
-    }
-
-    /// The persisted specification this builder holds.
+    /// The complete specification these choices describe.
     ///
     /// @returns A plain `ScheduleSpec` object accepted by `Schedule.fromSpec`.
-    /// @throws If the specification cannot be serialized (not expected).
+    /// @throws `FinstackError` (kind `validation`) naming every missing choice
+    /// (frequency, stub, grid, payment convention) or an inconsistent
+    /// combination.
     #[wasm_bindgen(js_name = toSpec, unchecked_return_type = "ScheduleSpec")]
     pub fn to_spec(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&self.spec)
+        to_js_value(&self.inner.to_spec().map_err(to_js_err)?)
     }
 
     /// Generate the schedule (Rust `ScheduleBuilder::build`).
     ///
     /// @returns The generated `Schedule`.
-    /// @throws `FinstackError` (kind `validation`) for an invalid frequency or
-    /// a generation failure; kind `not_found` for an unknown calendar under
-    /// the strict policy.
+    /// @throws `FinstackError` (kind `validation`) for a missing choice, an
+    /// inconsistent specification or a generation failure; kind `not_found`
+    /// for an unknown calendar.
     #[wasm_bindgen(js_name = build)]
     pub fn build(&self) -> Result<JsSchedule, JsValue> {
-        ScheduleBuilder::from(self.spec.clone())
+        self.inner
+            .clone()
             .build()
             .map(|inner| JsSchedule { inner })
             .map_err(to_js_err)

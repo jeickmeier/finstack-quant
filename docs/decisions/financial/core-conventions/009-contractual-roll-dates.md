@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-009: Unadjusted roll dates and product expiry boundaries
 
 - Decision status: **Accepted — complete roll-date package, 2026-11-07**.
-- Implementation status: **Observed; reconciliation pending**, scoped to roll-date functions in `dates/imm.rs`. Item 7 (generic IMM option-expiry removal) is reconciled as of 2026-11-08; the other items remain pending.
+- Implementation status: **Observed; reconciliation pending**, scoped to roll-date functions in `dates/imm.rs`. Item 7 (generic IMM option-expiry removal) is reconciled as of 2026-11-08 and item 10 (the `imm_on_or_after`/`imm_on_or_before` schedule searches removed with 008's strict anchors) as of 2026-11-11; the other items remain pending.
 - Validation status: **Evidence inspected/located; independent qualification pending**. Documentation and independent Gregorian/lattice/search examples passed; production Rust/host tests and product-date qualification were not executed for this review.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 

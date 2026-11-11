@@ -127,11 +127,16 @@ fn period_plan_examples() -> Result<Vec<Value>> {
     example(&plan)
 }
 
-/// A one-year schedule with the builder defaults.
+/// A one-year monthly, unadjusted schedule with every choice stated.
 fn schedule_spec_example() -> Result<crate::dates::ScheduleSpec> {
     let start = crate::dates::create_date(2025, time::Month::January, 15)?;
     let end = crate::dates::create_date(2026, time::Month::January, 15)?;
-    crate::dates::ScheduleSpec::new(start, end)
+    crate::dates::Schedule::builder(start, end)?
+        .frequency(crate::dates::Tenor::monthly())
+        .stub_rule(crate::dates::StubKind::None)
+        .grid(crate::dates::GridMode::Natural)
+        .unadjusted()
+        .to_spec()
 }
 
 /// The persisted inputs of [`schedule_examples`].

@@ -73,10 +73,17 @@ pub fn variance_observation_dates(
         }
         dates
     } else {
+        // Only the raw grid is taken from the core schedule; every observation
+        // is adjusted below with the contract's own calendar.
         Schedule::builder(start, maturity)?
             .frequency(frequency)
             .stub_rule(StubKind::ShortBack)
-            .end_of_month(end_of_month)
+            .grid(if end_of_month {
+                finstack_quant_core::dates::GridMode::EndOfMonth
+            } else {
+                finstack_quant_core::dates::GridMode::Natural
+            })
+            .unadjusted()
             .build()?
             .into_iter()
             .map(|date| adjust(date, business_day_convention, calendar.0))

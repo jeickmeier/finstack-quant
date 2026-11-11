@@ -20,11 +20,14 @@
 //!   (payments) or period start (fixings)
 //! - **Deterministic**: Same inputs always produce identical outputs
 //!
+//! Every schedule states its frequency, stub, grid and payment convention;
+//! there are no defaults (record CORE-CONVENTIONS-008 #2).
+//!
 //! # Quick Example
 //!
 //! Basic monthly schedule:
 //! ```rust
-//! use finstack_quant_core::dates::{Schedule, Tenor};
+//! use finstack_quant_core::dates::{GridMode, Schedule, StubKind, Tenor};
 //! use time::{Date, Month};
 //!
 //! let start = Date::from_calendar_date(2025, Month::January, 15)?;
@@ -32,6 +35,9 @@
 //!
 //! let sched = Schedule::builder(start, end)?
 //!     .frequency(Tenor::monthly())
+//!     .stub_rule(StubKind::None)
+//!     .grid(GridMode::Natural)
+//!     .unadjusted()
 //!     .build()?;
 //!
 //! let dates: Vec<_> = sched.into_iter().collect();
@@ -41,7 +47,7 @@
 //!
 //! CDS IMM schedule (quarterly on 20-Mar/Jun/Sep/Dec):
 //! ```rust
-//! use finstack_quant_core::dates::Schedule;
+//! use finstack_quant_core::dates::{GridMode, Schedule};
 //! use time::{Date, Month};
 //!
 //! let start = Date::from_calendar_date(2025, Month::January, 15)?;
@@ -49,6 +55,8 @@
 //!
 //! let sched = Schedule::builder(start, end)?
 //!     .cds_imm()  // Anchors at the CDS roll preceding start (front accrual)
+//!     .grid(GridMode::Natural)
+//!     .unadjusted()
 //!     .build()?;
 //!
 //! let dates: Vec<_> = sched.into_iter().collect();
@@ -59,14 +67,17 @@
 //!
 //! Standard IMM schedule (quarterly rolls on the third Wednesday):
 //! ```rust
-//! use finstack_quant_core::dates::Schedule;
+//! use finstack_quant_core::dates::{GridMode, Schedule, StubKind, Tenor};
 //! use time::{Date, Month};
 //!
 //! let start = Date::from_calendar_date(2025, Month::March, 19)?; // an IMM date
 //! let end = Date::from_calendar_date(2025, Month::December, 31)?;
 //!
 //! let sched = Schedule::builder(start, end)?
-//!     .imm()  // Regular periods on IMM dates from the on-cycle start
+//!     .frequency(Tenor::quarterly())
+//!     .stub_rule(StubKind::ShortBack)
+//!     .grid(GridMode::QuarterlyImm) // regular periods on IMM dates from the start
+//!     .unadjusted()
 //!     .build()?;
 //!
 //! let dates: Vec<_> = sched.into_iter().collect();
@@ -78,7 +89,7 @@
 //!
 //! With business day adjustment:
 //! ```rust
-//! use finstack_quant_core::dates::{BusinessDayConvention, Schedule, Tenor};
+//! use finstack_quant_core::dates::{BusinessDayConvention, GridMode, Schedule, StubKind, Tenor};
 //! use time::{Date, Month};
 //!
 //! let start = Date::from_calendar_date(2025, Month::June, 15)?;
@@ -86,6 +97,8 @@
 //!
 //! let sched = Schedule::builder(start, end)?
 //!     .frequency(Tenor::monthly())
+//!     .stub_rule(StubKind::None)
+//!     .grid(GridMode::Natural)
 //!     .adjust_with(BusinessDayConvention::ModifiedFollowing, "nyse")
 //!     .build()?;
 //!
@@ -98,7 +111,7 @@
 //! When start/end dates don't align exactly with the frequency:
 //!
 //! - **`StubKind::None`**: Requires exact alignment; errors when start/end
-//!   don't divide evenly by the frequency (default)
+//!   don't divide evenly by the frequency
 //! - **`StubKind::ShortFront`**: Short period at start, regular thereafter
 //! - **`StubKind::ShortBack`**: Regular periods, short period at end
 //! - **`StubKind::LongFront`**: Long period at start, regular thereafter
@@ -154,7 +167,7 @@ use crate::dates::Tenor;
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::{Schedule, StubKind, Tenor};
+/// use finstack_quant_core::dates::{GridMode, Schedule, StubKind, Tenor};
 /// use time::{Date, Month};
 ///
 /// let start = Date::from_calendar_date(2025, Month::January, 10)?;
@@ -164,6 +177,8 @@ use crate::dates::Tenor;
 /// let sched = Schedule::builder(start, end)?
 ///     .frequency(Tenor::quarterly())
 ///     .stub_rule(StubKind::ShortFront)
+///     .grid(GridMode::Natural)
+///     .unadjusted()
 ///     .build()?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -211,6 +226,65 @@ impl std::str::FromStr for StubKind {
     }
 }
 
+/// Regular-grid selection for schedule generation (record
+/// CORE-CONVENTIONS-008 #2, #5, #6).
+///
+/// Exactly one grid is chosen; there is no default. Every regular roll is
+/// computed from the original anchor (`start` for no-stub and back-stub
+/// policies, `end` for front-stub policies) and then snapped to the grid:
+///
+/// - **`Natural`**: the date the tenor arithmetic produces (month-end
+///   clamping only for month/year tenors).
+/// - **`EndOfMonth`**: the last calendar day of each target month. Requires a
+///   month/year frequency and a calendar month-end regular anchor.
+/// - **`QuarterlyImm`**: the third Wednesday of Mar/Jun/Sep/Dec. Requires a
+///   whole number of quarters and an IMM-date regular anchor; the anchor's
+///   month sets the phase of 6M, 9M, 1Y and longer frequencies.
+///
+/// Only the declared stub side of a schedule may be off the grid; with
+/// [`StubKind::None`] both endpoints must be on it. These are unadjusted grid
+/// dates, not exchange expiries or settlement dates.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::dates::GridMode;
+///
+/// assert_eq!("end_of_month".parse::<GridMode>()?, GridMode::EndOfMonth);
+/// assert_eq!(GridMode::QuarterlyImm.to_string(), "quarterly_imm");
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum GridMode {
+    /// Tenor-arithmetic dates with no snapping.
+    Natural,
+    /// Last calendar day of each month.
+    EndOfMonth,
+    /// Third Wednesday of March, June, September and December.
+    QuarterlyImm,
+}
+
+impl std::fmt::Display for GridMode {
+    /// Writes the serde label (`natural`, `end_of_month`, `quarterly_imm`).
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
+    }
+}
+
+impl std::str::FromStr for GridMode {
+    type Err = crate::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        crate::wire::serde_parse_with_context(
+            "Unknown schedule grid mode",
+            s,
+            &s.trim().to_ascii_lowercase(),
+        )
+    }
+}
+
 /// Concrete schedule containing generated payment/coupon dates.
 ///
 /// Represents the output of schedule generation: a sequence of dates
@@ -235,7 +309,7 @@ impl std::str::FromStr for StubKind {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::{Schedule, Tenor};
+/// use finstack_quant_core::dates::{GridMode, Schedule, StubKind, Tenor};
 /// use time::{Date, Month};
 ///
 /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
@@ -243,6 +317,9 @@ impl std::str::FromStr for StubKind {
 ///
 /// let schedule = Schedule::builder(start, end)?
 ///     .frequency(Tenor::monthly())
+///     .stub_rule(StubKind::None)
+///     .grid(GridMode::Natural)
+///     .unadjusted()
 ///     .build()?;
 ///
 /// assert_eq!(schedule.get_dates().len(), 3);
@@ -398,4 +475,4 @@ mod generation;
 mod spec;
 pub use builder::ScheduleBuilder;
 use generation::*;
-pub use spec::ScheduleSpec;
+pub use spec::{NominalReference, ScheduleSpec};

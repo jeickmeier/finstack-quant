@@ -40,8 +40,28 @@
       "format": "date",
       "type": "string"
     },
+    "GridMode": {
+      "description": "Regular-grid selection for schedule generation (record\nCORE-CONVENTIONS-008 #2, #5, #6).\n\nExactly one grid is chosen; there is no default. Every regular roll is\ncomputed from the original anchor (`start` for no-stub and back-stub\npolicies, `end` for front-stub policies) and then snapped to the grid:\n\n- **`Natural`**: the date the tenor arithmetic produces (month-end\n  clamping only for month/year tenors).\n- **`EndOfMonth`**: the last calendar day of each target month. Requires a\n  month/year frequency and a calendar month-end regular anchor.\n- **`QuarterlyImm`**: the third Wednesday of Mar/Jun/Sep/Dec. Requires a\n  whole number of quarters and an IMM-date regular anchor; the anchor's\n  month sets the phase of 6M, 9M, 1Y and longer frequencies.\n\nOnly the declared stub side of a schedule may be off the grid; with\n[`StubKind::None`] both endpoints must be on it. These are unadjusted grid\ndates, not exchange expiries or settlement dates.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::GridMode;\n\nassert_eq!(\"end_of_month\".parse::<GridMode>()?, GridMode::EndOfMonth);\nassert_eq!(GridMode::QuarterlyImm.to_string(), \"quarterly_imm\");\n# Ok::<(), finstack_quant_core::Error>(())\n```",
+      "oneOf": [
+        {
+          "const": "natural",
+          "description": "Tenor-arithmetic dates with no snapping.",
+          "type": "string"
+        },
+        {
+          "const": "end_of_month",
+          "description": "Last calendar day of each month.",
+          "type": "string"
+        },
+        {
+          "const": "quarterly_imm",
+          "description": "Third Wednesday of March, June, September and December.",
+          "type": "string"
+        }
+      ]
+    },
     "StubKind": {
-      "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Schedule, StubKind, Tenor};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = Schedule::builder(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior",
+      "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{GridMode, Schedule, StubKind, Tenor};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = Schedule::builder(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .grid(GridMode::Natural)\n    .unadjusted()\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior",
       "oneOf": [
         {
           "const": "none",
@@ -123,17 +143,16 @@
   "description": "Persisted inputs of a date schedule: range, frequency, stub, adjustment and lags.",
   "examples": [
     {
-      "business_day_convention": null,
+      "business_day_convention": "unadjusted",
       "calendar_id": null,
       "cds_imm_mode": false,
       "end": "2026-01-15",
-      "end_of_month": false,
       "fixing_lag_business_days": null,
       "frequency": {
         "count": 1,
         "unit": "months"
       },
-      "imm_mode": false,
+      "grid": "natural",
       "payment_lag_days": 0,
       "start": "2025-01-15",
       "stub": "none"
@@ -141,14 +160,7 @@
   ],
   "properties": {
     "business_day_convention": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/BusinessDayConvention"
-        },
-        {
-          "type": "null"
-        }
-      ]
+      "$ref": "#/$defs/BusinessDayConvention"
     },
     "calendar_id": {
       "type": [
@@ -162,9 +174,6 @@
     "end": {
       "$ref": "#/$defs/DateWire"
     },
-    "end_of_month": {
-      "type": "boolean"
-    },
     "fixing_lag_business_days": {
       "default": null,
       "format": "int32",
@@ -176,9 +185,8 @@
     "frequency": {
       "$ref": "#/$defs/Tenor"
     },
-    "imm_mode": {
-      "default": false,
-      "type": "boolean"
+    "grid": {
+      "$ref": "#/$defs/GridMode"
     },
     "payment_lag_days": {
       "default": 0,
@@ -197,8 +205,9 @@
     "end",
     "frequency",
     "stub",
-    "end_of_month",
-    "cds_imm_mode"
+    "grid",
+    "cds_imm_mode",
+    "business_day_convention"
   ],
   "title": "ScheduleSpec",
   "type": "object"

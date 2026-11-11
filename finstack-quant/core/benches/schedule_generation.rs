@@ -86,6 +86,9 @@ fn bench_frequency_variants(c: &mut Criterion) {
                 || {
                     Schedule::builder(start, end)
                         .expect("date range")
+                        .stub_rule(finstack_quant_core::dates::StubKind::None)
+                        .grid(finstack_quant_core::dates::GridMode::Natural)
+                        .unadjusted()
                         .frequency(frequency)
                         .build()
                         .expect("valid frequency schedule")
@@ -155,6 +158,8 @@ fn bench_stub_conventions(c: &mut Criterion) {
                 || {
                     Schedule::builder(start, end)
                         .expect("date range")
+                        .grid(finstack_quant_core::dates::GridMode::Natural)
+                        .unadjusted()
                         .frequency(Tenor::quarterly())
                         .stub_rule(stub)
                         .build()
@@ -187,6 +192,9 @@ fn bench_tenor_scaling(c: &mut Criterion) {
                         || {
                             Schedule::builder(start, end)
                                 .expect("date range")
+                                .stub_rule(finstack_quant_core::dates::StubKind::None)
+                                .grid(finstack_quant_core::dates::GridMode::Natural)
+                                .unadjusted()
                                 .frequency(frequency)
                                 .build()
                                 .expect("valid tenor schedule")
@@ -218,8 +226,14 @@ fn bench_end_of_month(c: &mut Criterion) {
                 || {
                     Schedule::builder(start, end)
                         .expect("date range")
+                        .stub_rule(finstack_quant_core::dates::StubKind::None)
+                        .unadjusted()
                         .frequency(Tenor::monthly())
-                        .end_of_month(eom)
+                        .grid(if eom {
+                            finstack_quant_core::dates::GridMode::EndOfMonth
+                        } else {
+                            finstack_quant_core::dates::GridMode::Natural
+                        })
                         .build()
                         .expect("valid EOM schedule")
                 },
@@ -231,12 +245,18 @@ fn bench_end_of_month(c: &mut Criterion) {
     group.finish();
 }
 
+/// First date of an IMM schedule: CDS accrues from the prior roll; a
+/// standard IMM grid starts on its own on-cycle anchor (2025-03-19).
+fn imm_start(cds: bool) -> Date {
+    if cds { start_date() } else { date(2025, 3, 19) }
+}
+
 fn imm_dates(years: u32, cds: bool) -> Vec<Date> {
-    let mut dates = vec![if cds {
-        date(2024, 12, 20)
+    let mut dates = if cds {
+        vec![date(2024, 12, 20)]
     } else {
-        start_date()
-    }];
+        Vec::new()
+    };
     for year in 2025..2025 + years as i32 {
         for month in [3, 6, 9, 12] {
             let day = if cds {
@@ -260,17 +280,25 @@ fn bench_imm_schedules(c: &mut Criterion) {
                 BenchmarkId::new(name, format!("{years}y")),
                 &years,
                 |b, &years| {
-                    let start = start_date();
+                    let start = imm_start(cds);
                     let end = end_date_years(years);
                     let expected = imm_dates(years, cds);
                     bench_build(
                         b,
                         || {
-                            let builder = Schedule::builder(start, end).expect("date range");
+                            let builder = Schedule::builder(start, end)
+                                .expect("date range")
+                                .frequency(finstack_quant_core::dates::Tenor::monthly())
+                                .stub_rule(finstack_quant_core::dates::StubKind::None)
+                                .grid(finstack_quant_core::dates::GridMode::Natural)
+                                .unadjusted();
                             let builder = if cds {
                                 builder.cds_imm()
                             } else {
-                                builder.imm()
+                                builder
+                                    .grid(finstack_quant_core::dates::GridMode::QuarterlyImm)
+                                    .frequency(finstack_quant_core::dates::Tenor::quarterly())
+                                    .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
                             };
                             builder.build().expect("valid IMM schedule")
                         },
@@ -339,6 +367,9 @@ fn bench_business_day_adjustment(c: &mut Criterion) {
                 || {
                     let builder = Schedule::builder(start, end)
                         .expect("date range")
+                        .stub_rule(finstack_quant_core::dates::StubKind::None)
+                        .grid(finstack_quant_core::dates::GridMode::Natural)
+                        .unadjusted()
                         .frequency(Tenor::quarterly());
                     let builder = match convention {
                         Some(convention) => builder.adjust_with(convention, "nyse"),
@@ -373,6 +404,9 @@ fn bench_schedule_iteration(c: &mut Criterion) {
             let expected = regular_dates(30, 1, 15);
             let schedule = Schedule::builder(start_date(), end_date_years(30))
                 .expect("date range")
+                .stub_rule(finstack_quant_core::dates::StubKind::None)
+                .grid(finstack_quant_core::dates::GridMode::Natural)
+                .unadjusted()
                 .frequency(Tenor::monthly())
                 .build()
                 .expect("valid iteration fixture");

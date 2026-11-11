@@ -5,8 +5,8 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    BusinessDayConvention, DayCount, DayCountContextState, Schedule, ScheduleBuilder, ScheduleSpec,
-    StubKind, Tenor, TenorUnit,
+    BusinessDayConvention, DayCount, DayCountContextState, GridMode, Schedule, ScheduleBuilder,
+    ScheduleSpec, StubKind, Tenor, TenorUnit,
 };
 use finstack_quant_core::explain::ExplainOpts;
 use finstack_quant_core::{Error, InputError};
@@ -82,11 +82,10 @@ fn schedule_spec_builds_expected_dates() {
         end,
         frequency: Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"),
         stub: StubKind::None,
-        business_day_convention: Some(BusinessDayConvention::Following),
-        calendar_id: Some("target2".to_string()),
-        end_of_month: false,
-        imm_mode: false,
+        grid: GridMode::Natural,
         cds_imm_mode: false,
+        business_day_convention: BusinessDayConvention::Following,
+        calendar_id: Some("target2".to_string()),
         payment_lag_days: 0,
         fixing_lag_business_days: None,
     };
@@ -96,6 +95,7 @@ fn schedule_spec_builds_expected_dates() {
     assert!(!json.contains("\"graceful\""));
     assert!(!json.contains("\"allow_missing_calendar\""));
     let restored: ScheduleSpec = serde_json::from_str(&json).unwrap();
+    assert_eq!(restored, spec);
     let schedule = ScheduleBuilder::from(restored).build().unwrap();
     assert_eq!(schedule.get_dates().len(), 7);
 
@@ -103,6 +103,8 @@ fn schedule_spec_builds_expected_dates() {
     let builder_schedule = Schedule::builder(start, end)
         .unwrap()
         .frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
+        .stub_rule(StubKind::None)
+        .grid(GridMode::Natural)
         .adjust_with(BusinessDayConvention::Following, "target2")
         .build()
         .unwrap();
@@ -110,42 +112,75 @@ fn schedule_spec_builds_expected_dates() {
     assert_eq!(schedule.get_dates(), builder_schedule.get_dates());
 }
 
-#[test]
-fn schedule_spec_rejects_retired_policy_booleans() {
-    let retired = r#"{
+/// A canonical spec body without its closing brace, for field tests.
+const SPEC_BASE: &str = r#"{
         "start":"2025-01-15",
         "end":"2025-09-30",
         "frequency":{"count":3,"unit":"months"},
         "stub":"short_back",
-        "business_day_convention":null,
-        "calendar_id":null,
-        "end_of_month":false,
-        "imm_mode":false,
+        "grid":"natural",
         "cds_imm_mode":false,
-        "allow_missing_calendar":true
-    }"#;
-    assert!(serde_json::from_str::<ScheduleSpec>(retired).is_err());
+        "business_day_convention":"unadjusted",
+        "calendar_id":"weekends_only""#;
+
+#[test]
+fn schedule_spec_rejects_retired_policy_booleans() {
+    for retired in [
+        "\"allow_missing_calendar\":true",
+        "\"end_of_month\":false",
+        "\"imm_mode\":false",
+    ] {
+        assert!(serde_json::from_str::<ScheduleSpec>(&format!("{SPEC_BASE},{retired}}}")).is_err());
+    }
+}
+
+#[test]
+fn schedule_spec_requires_every_financial_choice() {
+    // Record CORE-CONVENTIONS-008 #2: no frequency, stub, grid or payment
+    // convention default; the operation defaults (lags) may be omitted.
+    let canonical: ScheduleSpec = serde_json::from_str(&format!("{SPEC_BASE}}}")).unwrap();
+    assert_eq!(
+        (
+            canonical.payment_lag_days,
+            canonical.fixing_lag_business_days
+        ),
+        (0, None)
+    );
+    for field in [
+        "frequency",
+        "stub",
+        "grid",
+        "cds_imm_mode",
+        "business_day_convention",
+    ] {
+        let mut value: serde_json::Value = serde_json::from_str(&format!("{SPEC_BASE}}}")).unwrap();
+        value.as_object_mut().unwrap().remove(field);
+        assert!(
+            serde_json::from_value::<ScheduleSpec>(value).is_err(),
+            "{field}"
+        );
+    }
+    // A convention other than Unadjusted needs a calendar.
+    let mut value: serde_json::Value = serde_json::from_str(&format!("{SPEC_BASE}}}")).unwrap();
+    value["business_day_convention"] = "following".into();
+    value["calendar_id"] = serde_json::Value::Null;
+    assert!(serde_json::from_value::<ScheduleSpec>(value).is_err());
+    // Equal endpoints are not a schedule.
+    let mut value: serde_json::Value = serde_json::from_str(&format!("{SPEC_BASE}}}")).unwrap();
+    value["end"] = "2025-01-15".into();
+    assert!(serde_json::from_value::<ScheduleSpec>(value).is_err());
 }
 
 #[test]
 // schema-rejection-test: ScheduleSpec `payment_lag_business_days` (now `payment_lag_days`)
 fn schedule_spec_rejects_retired_payment_lag_business_days() {
-    let base = r#"{
-        "start":"2025-01-15",
-        "end":"2025-09-30",
-        "frequency":{"count":3,"unit":"months"},
-        "stub":"short_back",
-        "business_day_convention":null,
-        "calendar_id":null,
-        "end_of_month":false,
-        "imm_mode":false,
-        "cds_imm_mode":false,"#;
     let canonical: ScheduleSpec =
-        serde_json::from_str(&format!("{base}\"payment_lag_days\":2}}")).unwrap();
+        serde_json::from_str(&format!("{SPEC_BASE},\"payment_lag_days\":2}}")).unwrap();
     assert_eq!(canonical.payment_lag_days, 2);
-    let err =
-        serde_json::from_str::<ScheduleSpec>(&format!("{base}\"payment_lag_business_days\":2}}"))
-            .unwrap_err();
+    let err = serde_json::from_str::<ScheduleSpec>(&format!(
+        "{SPEC_BASE},\"payment_lag_business_days\":2}}"
+    ))
+    .unwrap_err();
     assert!(
         err.to_string().contains("payment_lag_business_days"),
         "{err}"
@@ -153,89 +188,85 @@ fn schedule_spec_rejects_retired_payment_lag_business_days() {
 }
 
 #[test]
-fn schedule_spec_rejects_dual_imm_modes() {
-    let malformed = r#"{
-        "start":"2025-01-15",
-        "end":"2025-09-30",
-        "frequency":{"count":3,"unit":"months"},
-        "stub":"short_back",
-        "business_day_convention":null,
-        "calendar_id":null,
-        "end_of_month":false,
-        "imm_mode":true,
-        "cds_imm_mode":true
-    }"#;
-    assert!(serde_json::from_str::<ScheduleSpec>(malformed).is_err());
+fn schedule_spec_rejects_cds_imm_on_a_non_natural_grid() {
+    let mut value: serde_json::Value = serde_json::from_str(&format!("{SPEC_BASE}}}")).unwrap();
+    value["grid"] = "quarterly_imm".into();
+    value["cds_imm_mode"] = true.into();
+    assert!(serde_json::from_value::<ScheduleSpec>(value).is_err());
 
     let spec = ScheduleSpec {
-        start: Date::from_calendar_date(2025, Month::January, 15).unwrap(),
+        start: Date::from_calendar_date(2025, Month::March, 19).unwrap(),
         end: Date::from_calendar_date(2025, Month::September, 30).unwrap(),
         frequency: Tenor::quarterly(),
         stub: StubKind::ShortBack,
-        business_day_convention: None,
-        calendar_id: None,
-        end_of_month: false,
-        imm_mode: true,
+        grid: GridMode::QuarterlyImm,
         cds_imm_mode: true,
+        business_day_convention: BusinessDayConvention::Unadjusted,
+        calendar_id: None,
         payment_lag_days: 0,
         fixing_lag_business_days: None,
     };
     assert!(ScheduleBuilder::from(spec).build().is_err());
 }
 
-/// `ScheduleSpec::with_cds_imm` / `with_imm` follow `ScheduleBuilder` setter
-/// semantics: they set quarterly/ShortBack, and a later frequency or stub
-/// change wins in `build` exactly as it does on the builder.
+/// `ScheduleBuilder::to_spec` captures exactly what `build` uses, including
+/// `cds_imm`'s quarterly/ShortBack settings and a later override.
 #[test]
-fn schedule_spec_imm_setters_match_builder_semantics() {
+fn builder_to_spec_matches_build_semantics() {
     let start = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let end = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+    let choices = |builder: ScheduleBuilder| builder.grid(GridMode::Natural).unadjusted();
 
-    // Bare CDS IMM: the spec carries quarterly/ShortBack and builds the
-    // same dates as the builder.
-    let spec = ScheduleSpec::new(start, end).unwrap().with_cds_imm();
+    // Bare CDS IMM: the spec carries quarterly/ShortBack.
+    let builder = choices(Schedule::builder(start, end).unwrap().cds_imm());
+    let spec = builder.to_spec().unwrap();
     assert_eq!(spec.frequency, Tenor::quarterly());
     assert_eq!(spec.stub, StubKind::ShortBack);
-    let builder = Schedule::builder(start, end).unwrap().cds_imm();
     assert_eq!(
         ScheduleBuilder::from(spec).build().unwrap().get_dates(),
         builder.build().unwrap().get_dates()
     );
 
     // CDS IMM then monthly: the later frequency wins on both paths.
-    let mut spec = ScheduleSpec::new(start, end).unwrap().with_cds_imm();
-    spec.frequency = Tenor::monthly();
+    let builder = choices(
+        Schedule::builder(start, end)
+            .unwrap()
+            .cds_imm()
+            .frequency(Tenor::monthly()),
+    );
+    let spec = builder.to_spec().unwrap();
+    assert_eq!(spec.frequency, Tenor::monthly());
     let built = ScheduleBuilder::from(spec)
         .build()
         .unwrap()
         .get_dates()
         .to_vec();
-    let expected = Schedule::builder(start, end)
-        .unwrap()
-        .cds_imm()
-        .frequency(Tenor::monthly())
-        .build()
-        .unwrap()
-        .get_dates()
-        .to_vec();
-    assert_eq!(built, expected);
+    assert_eq!(built, builder.build().unwrap().get_dates());
     assert!(built.len() > 6, "monthly CDS schedule, got {built:?}");
 
-    // Standard IMM: quarterly/ShortBack from an on-cycle start, same dates
-    // as the builder.
+    // Standard IMM from an on-cycle start.
     let imm_start = Date::from_calendar_date(2025, Month::March, 19).unwrap();
-    let spec = ScheduleSpec::new(imm_start, end).unwrap().with_imm();
-    assert!(spec.imm_mode && !spec.cds_imm_mode);
-    assert_eq!(spec.frequency, Tenor::quarterly());
+    let builder = Schedule::builder(imm_start, end)
+        .unwrap()
+        .frequency(Tenor::quarterly())
+        .stub_rule(StubKind::ShortBack)
+        .grid(GridMode::QuarterlyImm)
+        .unadjusted();
+    let spec = builder.to_spec().unwrap();
+    assert_eq!(spec.grid, GridMode::QuarterlyImm);
     assert_eq!(
         ScheduleBuilder::from(spec).build().unwrap().get_dates(),
-        Schedule::builder(imm_start, end)
-            .unwrap()
-            .imm()
-            .build()
-            .unwrap()
-            .get_dates()
+        builder.build().unwrap().get_dates()
     );
+
+    // An incomplete builder names what is missing.
+    let error = Schedule::builder(start, end)
+        .unwrap()
+        .to_spec()
+        .unwrap_err();
+    for choice in ["frequency", "stub", "grid", "payment convention"] {
+        assert!(error.to_string().contains(choice), "{error}");
+    }
 }
 
 // Moved from phase2_strictness.rs: nested strictness.

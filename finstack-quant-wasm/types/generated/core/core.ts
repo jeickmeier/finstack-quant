@@ -993,6 +993,27 @@ export type DividendKind =
  */
 export type FxConversionPolicy = "cashflow_date" | "period_end";
 /**
+ * Regular-grid selection for schedule generation (record
+ * CORE-CONVENTIONS-008 #2, #5, #6).
+ *
+ * Exactly one grid is chosen; there is no default. Every regular roll is
+ * computed from the original anchor (`start` for no-stub and back-stub
+ * policies, `end` for front-stub policies) and then snapped to the grid:
+ *
+ * - **`Natural`**: the date the tenor arithmetic produces (month-end
+ *   clamping only for month/year tenors).
+ * - **`EndOfMonth`**: the last calendar day of each target month. Requires a
+ *   month/year frequency and a calendar month-end regular anchor.
+ * - **`QuarterlyImm`**: the third Wednesday of Mar/Jun/Sep/Dec. Requires a
+ *   whole number of quarters and an IMM-date regular anchor; the anchor's
+ *   month sets the phase of 6M, 9M, 1Y and longer frequencies.
+ *
+ * Only the declared stub side of a schedule may be off the grid; with
+ * [`StubKind::None`] both endpoints must be on it. These are unadjusted grid
+ * dates, not exchange expiries or settlement dates.
+ */
+export type GridMode = "natural" | "end_of_month" | "quarterly_imm";
+/**
  * Interpolation strategy for [`ScalarTimeSeries`].
  */
 export type SeriesInterpolation = "step" | "linear";
@@ -1972,14 +1993,13 @@ export interface Schedule {
  * Persisted inputs of a date schedule: range, frequency, stub, adjustment and lags.
  */
 export interface ScheduleSpec {
-  business_day_convention?: BusinessDayConvention | null;
+  business_day_convention: BusinessDayConvention;
   calendar_id?: string | null;
   cds_imm_mode: boolean;
   end: DateWire;
-  end_of_month: boolean;
   fixing_lag_business_days?: number | null;
   frequency: Tenor;
-  imm_mode?: boolean;
+  grid: GridMode;
   payment_lag_days?: number;
   start: DateWire;
   stub: StubKind;

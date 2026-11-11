@@ -14,8 +14,8 @@
 //! # Examples
 //! ```rust
 //! use finstack_quant_core::dates::{
-//!     adjust, build_periods, calendar_by_id_strict, BusinessDayConvention, Date, Tenor,
-//!     Schedule, create_date,
+//!     adjust, build_periods, calendar_by_id_strict, BusinessDayConvention, Date, GridMode,
+//!     Schedule, StubKind, Tenor, create_date,
 //! };
 //! use time::{Duration, Month};
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,8 +28,11 @@
 //! let end = trade_date + Duration::days(365);
 //! let schedule = Schedule::builder(trade_date, end)?
 //!     .frequency(Tenor::quarterly())
+//!     .stub_rule(StubKind::ShortBack)
+//!     .grid(GridMode::Natural)
+//!     .unadjusted()
 //!     .build()?;
-//! assert!(schedule.dates.len() >= 4);
+//! assert!(schedule.get_dates().len() >= 4);
 //!
 //! let periods = build_periods("2024Q1..Q4", None)?;
 //! assert_eq!(periods.periods.len(), 4);
@@ -137,7 +140,7 @@ pub use calendar::{WEEKENDS_ONLY, WEEKENDS_ONLY_ID};
 
 mod schedule;
 
-pub use schedule::{Schedule, ScheduleBuilder, ScheduleSpec, StubKind};
+pub use schedule::{GridMode, NominalReference, Schedule, ScheduleBuilder, ScheduleSpec, StubKind};
 
 pub(crate) use calendar::composite::CompositeCalendar;
 
