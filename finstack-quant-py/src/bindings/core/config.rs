@@ -13,9 +13,10 @@ use pyo3::types::{PyList, PyModule};
 /// Rounding mode for monetary and rate calculations.
 ///
 /// Enum-style class with class-level constants for each supported mode:
-/// ``BANKERS`` (ties to even, the default), ``AWAY_FROM_ZERO``,
+/// ``BANKERS`` (exact midpoint to even), ``MIDPOINT_AWAY_FROM_ZERO`` (exact
+/// midpoint away from zero; other fractions to nearest),
 /// ``TOWARD_ZERO``, ``FLOOR`` and ``CEIL``. Wherever a rounding mode is
-/// accepted, its exact lowercase name (``"bankers"``, ``"away_from_zero"``,
+/// accepted, its exact lowercase name (``"bankers"``, ``"midpoint_away_from_zero"``,
 /// ``"toward_zero"``, ``"floor"``, ``"ceil"``) may be passed instead.
 ///
 /// Examples
@@ -55,7 +56,7 @@ label_enum!(PyRoundingMode, RoundingMode, "RoundingMode", from_name, {
     /// Banker's rounding (ties to even).
     BANKERS => Bankers,
     /// Round halves away from zero.
-    AWAY_FROM_ZERO => AwayFromZero,
+    MIDPOINT_AWAY_FROM_ZERO => MidpointAwayFromZero,
     /// Round toward zero (truncate).
     TOWARD_ZERO => TowardZero,
     /// Round toward negative infinity.
@@ -141,8 +142,10 @@ wire_methods!(PyToleranceConfig, ToleranceConfig, "ToleranceConfig");
 /// Parameters
 /// ----------
 /// rounding_mode : RoundingMode | str | None
-///     Rounding mode override (object or exact lowercase name); library
-///     default (bankers) when ``None``.
+///     Explicitly selected rounding mode (object or exact lowercase name);
+///     ``None`` selects no mode. There is no default financial mode, so an
+///     ingest scale override without a mode makes configured construction
+///     raise ``ValueError``.
 /// tolerances : ToleranceConfig | None
 ///     Tolerance override; library default when ``None``.
 ///
@@ -182,7 +185,7 @@ impl PyFinstackConfig {
     ) -> PyResult<Self> {
         let mut inner = FinstackConfig::default();
         if let Some(rm) = rounding_mode {
-            inner.rounding.mode = extract_rounding_mode(rm)?;
+            inner.rounding.mode = Some(extract_rounding_mode(rm)?);
         }
         if let Some(t) = tolerances {
             inner.tolerances = t.inner;
@@ -190,10 +193,10 @@ impl PyFinstackConfig {
         Ok(Self { inner })
     }
 
-    /// Active rounding mode.
+    /// Explicitly selected rounding mode, or ``None`` when none was selected.
     #[getter]
-    fn rounding_mode(&self) -> PyRoundingMode {
-        PyRoundingMode::from_inner(self.inner.rounding.mode)
+    fn rounding_mode(&self) -> Option<PyRoundingMode> {
+        self.inner.rounding.mode.map(PyRoundingMode::from_inner)
     }
 
     /// Comparison tolerances.
@@ -210,11 +213,11 @@ impl PyFinstackConfig {
         Ok(self.inner.output_scale(extract_currency(currency)?))
     }
 
-    /// Effective ingest decimal scale for ``currency`` (``Currency`` or ISO code).
+    /// Configured ingest decimal scale for ``currency`` (``Currency`` or ISO code).
     ///
-    /// Falls back to ``max(6, minor units)`` when no override is set.
+    /// ``None`` when no override is set, which means no ingest rounding.
     #[pyo3(text_signature = "(self, currency)")]
-    fn ingest_scale(&self, currency: &Bound<'_, PyAny>) -> PyResult<u32> {
+    fn ingest_scale(&self, currency: &Bound<'_, PyAny>) -> PyResult<Option<u32>> {
         Ok(self.inner.ingest_scale(extract_currency(currency)?))
     }
 
@@ -324,7 +327,7 @@ impl PyFinstackConfig {
     fn __repr__(&self) -> String {
         format!(
             "FinstackConfig(rounding_mode={:?}, output_scale_overrides={}, ingest_scale_overrides={}, extensions={})",
-            self.inner.rounding.mode.to_string(),
+            self.inner.rounding.mode.map(|mode| mode.to_string()),
             self.inner.rounding.output_scale.get_overrides().len(),
             self.inner.rounding.ingest_scale.get_overrides().len(),
             self.inner.extensions.keys().count()

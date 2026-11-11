@@ -145,7 +145,7 @@ def _schedule() -> dates.Schedule:
 
 
 def _config() -> config.FinstackConfig:
-    cfg = config.FinstackConfig("away_from_zero")
+    cfg = config.FinstackConfig("midpoint_away_from_zero")
     cfg.set_output_scale("JPY", 2)
     cfg.set_extension("core.example.v1", {"flag": True, "levels": [1, 2]})
     return cfg

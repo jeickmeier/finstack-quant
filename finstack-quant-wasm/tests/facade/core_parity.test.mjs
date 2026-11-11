@@ -128,7 +128,7 @@ const schedule = () =>
     .paymentLagDays(2)
     .build();
 const config = () => {
-  const cfg = new core.FinstackConfig('away_from_zero');
+  const cfg = new core.FinstackConfig('midpoint_away_from_zero');
   cfg.setOutputScale('JPY', 2);
   cfg.setExtension('core.example.v1', { flag: true, levels: [1, 2] });
   return cfg;
@@ -263,7 +263,7 @@ const CASES = {
   finstack_config_scales: () => [
     config().outputScale('JPY'),
     config().outputScale('USD'),
-    config().ingestScale('USD'),
+    config().ingestScale('USD') ?? null,
     config().roundingMode.toString(),
     config().extensionKeys(),
   ],
@@ -547,7 +547,7 @@ test('arguments of the wrong type are TypeErrors', () => {
 test('enum classes expose every Rust variant and round-trip their names', () => {
   const families = [
     [core.PeriodKind, ['daily', 'weekly', 'monthly', 'quarterly', 'semiAnnual', 'annual']],
-    [core.RoundingMode, ['bankers', 'awayFromZero', 'towardZero', 'floor', 'ceil']],
+    [core.RoundingMode, ['bankers', 'midpointAwayFromZero', 'towardZero', 'floor', 'ceil']],
     [core.UnknownScalePolicy, ['error', 'fallbackToDefault', 'warnAndFallback']],
   ];
   for (const [family, factories] of families) {

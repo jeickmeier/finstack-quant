@@ -2492,11 +2492,11 @@ export type ResidualUnits =
   | "discounted_upfront_fraction"
   | "absolute_residual_over_step_tolerance";
 /**
- * Rounding modes supported by the library.
+ * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
  *
- * The variants mirror the most common conventions found in pricing engines.
+ * There is no default mode: every financial rounding names one explicitly.
  */
-export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
+export type RoundingMode = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
 /**
  * Numerical procedure that produced a [`CalibrationReport`].
  *
@@ -5618,9 +5618,9 @@ export interface RoundingContext {
     [k: string]: number;
   };
   /**
-   * Active rounding mode.
+   * Explicitly selected rounding mode; absent when none was selected.
    */
-  mode: RoundingMode;
+  mode?: RoundingMode | null;
   /**
    * Validated output scale snapshot by currency code, with values in `0..=28`.
    */

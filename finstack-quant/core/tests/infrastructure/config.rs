@@ -60,7 +60,7 @@ fn currency_scale_boundaries_roundtrip_and_keep_money_epsilon_finite_positive() 
             scale
         );
         let decoded: FinstackConfig = serde_json::from_value(encoded).expect("valid config");
-        assert_eq!(decoded.ingest_scale(Currency::USD), scale);
+        assert_eq!(decoded.ingest_scale(Currency::USD), Some(scale));
         let context = RoundingContext::from(&decoded);
         let restored: RoundingContext =
             serde_json::from_value(serde_json::to_value(&context).expect("context JSON"))
@@ -93,7 +93,7 @@ fn currency_scale_schema_bounds_policy_and_snapshot_values() {
 #[test]
 fn config_extensions_roundtrip() {
     let mut cfg = FinstackConfig::default();
-    cfg.rounding.mode = RoundingMode::AwayFromZero;
+    cfg.rounding.mode = Some(RoundingMode::MidpointAwayFromZero);
     cfg.extensions
         .insert("custom.section.v1", json!({ "alpha": 1, "beta": true }))
         .expect("valid extension key");
@@ -101,7 +101,10 @@ fn config_extensions_roundtrip() {
     let encoded = serde_json::to_string(&cfg).expect("serialize");
     let decoded: FinstackConfig = serde_json::from_str(&encoded).expect("deserialize");
 
-    assert_eq!(decoded.rounding.mode, RoundingMode::AwayFromZero);
+    assert_eq!(
+        decoded.rounding.mode,
+        Some(RoundingMode::MidpointAwayFromZero)
+    );
     let section = decoded
         .extensions
         .get("custom.section.v1")
@@ -121,7 +124,7 @@ fn config_extensions_serde_roundtrip() {
     }"#;
 
     let cfg: FinstackConfig = serde_json::from_str(json).expect("deserialize");
-    assert_eq!(cfg.rounding.mode, RoundingMode::Bankers);
+    assert_eq!(cfg.rounding.mode, Some(RoundingMode::Bankers));
     assert!(cfg.extensions.is_empty());
     // Tolerances should use defaults
     assert_eq!(cfg.tolerances.generic_epsilon, 1e-10);
@@ -263,5 +266,41 @@ fn finstack_config_still_accepts_valid_extensions() {
     assert!(
         config.is_ok(),
         "valid extensions must deserialize: {config:?}"
+    );
+}
+
+#[test]
+fn rounding_mode_is_optional_and_never_defaulted() {
+    // Record 012 #8/#9: no default mode, an absent mode stays absent on the
+    // wire, and no implicit ingest scale exists.
+    let cfg = FinstackConfig::default();
+    assert_eq!(cfg.rounding.mode, None);
+    assert_eq!(cfg.ingest_scale(Currency::USD), None);
+    assert_eq!(
+        cfg.ingest_rounding(Currency::USD).expect("no override"),
+        None
+    );
+    let encoded = serde_json::to_value(&cfg).expect("config JSON");
+    assert!(encoded["rounding"].get("mode").is_none());
+    let context = serde_json::to_value(RoundingContext::from(&cfg)).expect("context JSON");
+    assert!(context.get("mode").is_none());
+    let decoded: FinstackConfig = serde_json::from_str(
+        r#"{"rounding":{"ingest_scale":{"overrides":{}},"output_scale":{"overrides":{}}}}"#,
+    )
+    .expect("mode may be absent");
+    assert_eq!(decoded, cfg);
+
+    let mut incomplete = FinstackConfig::default();
+    incomplete
+        .rounding
+        .ingest_scale
+        .set_scale(Currency::USD, 2)
+        .expect("valid decimal scale");
+    assert!(incomplete.ingest_rounding(Currency::USD).is_err());
+    assert_eq!(
+        incomplete
+            .ingest_rounding(Currency::EUR)
+            .expect("no override"),
+        None
     );
 }

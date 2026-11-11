@@ -67,7 +67,8 @@ def test_negation_is_the_exact_rust_checked_neg(money: Money, expected: str) -> 
 
 
 def test_negated_zero_display_matches_wasm() -> None:
-    assert str(-Money(0, "USD")) == "USD -0.00"
+    # Record 012 #1/#10: negated zero is the canonical unsigned zero.
+    assert str(-Money(0, "USD")) == "USD 0.00"
 
 
 def test_zero_scalar_division_is_the_rust_validation_error() -> None:
@@ -80,7 +81,7 @@ def test_format_with_rounding_parses_serde_names_with_rust_default() -> None:
     assert m.format_with(2) == m.format_with(2, True, None, "bankers")
     with _raises_exactly(
         'Validation error: invalid value "BANKERS": unknown variant `BANKERS`, expected one of '
-        "`bankers`, `away_from_zero`, `toward_zero`, `floor`, `ceil`"
+        "`bankers`, `midpoint_away_from_zero`, `toward_zero`, `floor`, `ceil`"
     ):
         m.format_with(2, True, None, "BANKERS")
 

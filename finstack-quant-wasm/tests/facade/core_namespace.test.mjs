@@ -422,8 +422,8 @@ test('core.Money formatWith honours returned rounding modes', () => {
   for (const [mode, amount, expected] of [
     ['bankers', '1.245', 'USD 1.24'],
     ['bankers', '1.255', 'USD 1.26'],
-    ['away_from_zero', '-1.245', 'USD -1.25'],
-    ['away_from_zero', '1.241', 'USD 1.24'],
+    ['midpoint_away_from_zero', '-1.245', 'USD -1.25'],
+    ['midpoint_away_from_zero', '1.241', 'USD 1.24'],
     ['toward_zero', '-1.259', 'USD -1.25'],
     ['floor', '-1.241', 'USD -1.25'],
     ['floor', '1.249', 'USD 1.24'],
@@ -459,7 +459,7 @@ test('core.Money formatWith applies native defaults and JPY zero scale', () => {
 test('core.Money formatWith rejects invalid options and still frees the handle', () => {
   const m = decimalMoney('1.245', 'USD');
   try {
-    for (const decimals of [-1, 1.5, Number.NaN, Infinity, '2', 1_000_001]) {
+    for (const decimals of [-1, 1.5, Number.NaN, Infinity, '2', 29, 1_000_001]) {
       assert.throws(
         () => m.formatWith(decimals),
         /decimals: expected a non-negative whole number|decimals: expected a number|precision/,
@@ -470,6 +470,60 @@ test('core.Money formatWith rejects invalid options and still frees the handle',
     assert.throws(() => m.formatWith(2, true, ',', 'half_up'));
   } finally {
     m.free();
+  }
+});
+
+test('core.Money round requires an explicit scale and mode (record 012 #8)', () => {
+  const table = {
+    bankers: ['2', '-2'],
+    midpoint_away_from_zero: ['3', '-3'],
+    toward_zero: ['2', '-2'],
+    floor: ['2', '-3'],
+    ceil: ['3', '-2'],
+  };
+  const half = decimalMoney('2.5', 'USD');
+  const minusHalf = decimalMoney('-2.5', 'USD');
+  const tiny = decimalMoney('0.001', 'USD');
+  try {
+    for (const [mode, [up, down]] of Object.entries(table)) {
+      const a = half.round(0, mode);
+      const b = minusHalf.round(0, mode);
+      try {
+        assert.equal(a.formatWith(0, false), up, mode);
+        assert.equal(b.formatWith(0, false), down, mode);
+      } finally {
+        a.free();
+        b.free();
+      }
+    }
+    const zero = tiny.round(2, 'bankers');
+    try {
+      assert.equal(zero.formatWith(2, false), '0.00');
+    } finally {
+      zero.free();
+    }
+    for (const scale of [-1, 1.5, '2']) {
+      assert.throws(() => half.round(scale, 'bankers'), TypeError, `scale=${scale}`);
+    }
+    assert.throws(() => half.round(29, 'bankers'), /0\.\.=28/);
+    assert.throws(() => half.round(2, 'away_from_zero'));
+    assert.throws(() => half.round(2));
+  } finally {
+    half.free();
+    minusHalf.free();
+    tiny.free();
+  }
+});
+
+test('core.FinstackConfig selects no rounding mode or ingest scale by default', () => {
+  const cfg = new core.FinstackConfig();
+  try {
+    assert.equal(cfg.roundingMode, undefined);
+    assert.equal(cfg.ingestScale('USD'), undefined);
+    cfg.setIngestScale('USD', 2);
+    assert.equal(cfg.ingestScale('USD'), 2);
+  } finally {
+    cfg.free();
   }
 });
 

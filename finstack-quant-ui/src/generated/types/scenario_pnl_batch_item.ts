@@ -379,6 +379,22 @@ export type D_3Aecc8Cf7202Ad79B690 =
         | "ZWL";
     };
 /**
+ * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
+ *
+ * There is no default mode: every financial rounding names one explicitly.
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::config::{FinstackConfig, RoundingMode};
+ *
+ * let mut cfg = FinstackConfig::default();
+ * assert_eq!(cfg.rounding.mode, None);
+ * cfg.rounding.mode = Some(RoundingMode::TowardZero);
+ * assert_eq!(cfg.rounding.mode, Some(RoundingMode::TowardZero));
+ * ```
+ */
+export type D_727E7Ef07B1A104Fe20D = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
+/**
  * A single warning emitted by an adapter, the engine, or a downstream helper.
  *
  * New variants will be added over time; pattern matches on `Warning` should
@@ -1794,9 +1810,9 @@ export interface DC836Bde69A4B7427E9C2 {
     [k: string]: number;
   };
   /**
-   * Active rounding mode.
+   * Explicitly selected rounding mode; absent when none was selected.
    */
-  mode: "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
+  mode?: D_727E7Ef07B1A104Fe20D | null;
   /**
    * Validated output scale snapshot by currency code, with values in `0..=28`.
    */

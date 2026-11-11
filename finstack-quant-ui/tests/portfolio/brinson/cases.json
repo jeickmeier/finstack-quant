@@ -2,7 +2,7 @@
   "description": "Native portfolio.brinsonLinked of host-supplied SectorPeriod rows over three periods (the portfolio host-parity golden): every period's Brinson-Fachler sector effects and totals, the Carino-linked effects by sector and by effect and the compounded portfolio and benchmark returns, with the native errors of no periods, weights not summing to one and a reordered period.",
   "source": {
     "path": "finstack-quant/portfolio/tests/fixtures/host_parity.json",
-    "sha256": "937bde4e5d065b9abaf8dea491988e2771eae64a3431fb2bff1604e627f8f8ad"
+    "sha256": "9bb9d500d5250a6daea4837ad6f0a5330d5deb58873a8fee7cafc7c38af1e011"
   },
   "inputs": {
     "periods": [

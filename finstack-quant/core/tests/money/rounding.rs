@@ -7,6 +7,7 @@ use finstack_quant_core::money::{FormatOpts, Money};
 #[test]
 fn money_preserves_nonzero_amount_at_maximum_configured_scale() {
     let mut cfg = FinstackConfig::default();
+    cfg.rounding.mode = Some(RoundingMode::Bankers);
     cfg.rounding
         .ingest_scale
         .set_scale(Currency::USD, 28)
@@ -16,7 +17,8 @@ fn money_preserves_nonzero_amount_at_maximum_configured_scale() {
         .set_scale(Currency::USD, 28)
         .unwrap();
     let exact_amount = rust_decimal::Decimal::new(1, 28);
-    let money = Money::from_decimal_with_config(exact_amount, Currency::USD, &cfg);
+    let money = Money::from_decimal_with_config(exact_amount, Currency::USD, &cfg)
+        .expect("configured ingest");
     assert_eq!(money.amount_decimal(), exact_amount);
     assert_eq!(
         money.format_with(
@@ -24,7 +26,7 @@ fn money_preserves_nonzero_amount_at_maximum_configured_scale() {
                 Some(cfg.output_scale(Currency::USD) as usize),
                 Some(true),
                 None,
-                Some(cfg.rounding.mode),
+                cfg.rounding.mode,
             )
             .expect("valid format options")
         ),
@@ -41,14 +43,14 @@ fn money_preserves_nonzero_amount_at_maximum_configured_scale() {
 #[test]
 fn money_display_respects_output_scale() {
     let mut cfg = FinstackConfig::default();
-    cfg.rounding.mode = RoundingMode::AwayFromZero;
+    cfg.rounding.mode = Some(RoundingMode::MidpointAwayFromZero);
     // Keep ingest high so display rounding is the observable effect
     cfg.rounding.ingest_scale = CurrencyScalePolicy::default();
     cfg.rounding.output_scale = CurrencyScalePolicy::default();
     let m = Money::new_with_config(1.23456, Currency::USD, &cfg).expect("valid money fixture");
     // default USD decimals is 2 by ISO; override output to 3 for the test
     let mut cfg = FinstackConfig::default();
-    cfg.rounding.mode = RoundingMode::AwayFromZero;
+    cfg.rounding.mode = Some(RoundingMode::MidpointAwayFromZero);
     cfg.rounding.ingest_scale = CurrencyScalePolicy::default();
     cfg.rounding.output_scale =
         CurrencyScalePolicy::new(std::collections::BTreeMap::from([(Currency::USD, 3)]))
@@ -58,7 +60,7 @@ fn money_display_respects_output_scale() {
             Some(cfg.output_scale(Currency::USD) as usize),
             Some(true),
             None,
-            Some(cfg.rounding.mode),
+            cfg.rounding.mode,
         )
         .expect("valid format options"),
     );
@@ -149,12 +151,13 @@ fn money_integer_tuple_conversion_is_exact_above_2_pow_53() {
 fn configured_decimal_ingestion_preserves_precision() {
     let amount = "9007199254740993.125".parse().unwrap();
     let mut cfg = FinstackConfig::default();
-    cfg.rounding.mode = RoundingMode::Floor;
+    cfg.rounding.mode = Some(RoundingMode::Floor);
     cfg.rounding
         .ingest_scale
         .set_scale(Currency::USD, 2)
         .expect("valid decimal scale");
-    let money = Money::from_decimal_with_config(amount, Currency::USD, &cfg);
+    let money =
+        Money::from_decimal_with_config(amount, Currency::USD, &cfg).expect("configured ingest");
     assert_eq!(
         money,
         Money::from_decimal("9007199254740993.12".parse().unwrap(), Currency::USD)
@@ -169,13 +172,13 @@ fn money_protocol_operations_preserve_currency_and_decimal_precision() {
     assert_eq!(negative.abs(), positive);
     assert_eq!(
         positive
-            .round(Some(2))
+            .round(2, RoundingMode::Bankers)
             .unwrap()
             .amount_decimal()
             .to_string(),
         "2.36"
     );
-    assert!(positive.round(Some(-1)).is_err());
+    assert!(positive.round(29, RoundingMode::Bankers).is_err());
     assert_eq!(positive.ratio(negative).unwrap(), -1.0);
     assert!(
         positive

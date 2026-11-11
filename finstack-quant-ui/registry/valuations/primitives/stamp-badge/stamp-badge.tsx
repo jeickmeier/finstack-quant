@@ -14,9 +14,13 @@ export function returnedRounding(
     !rounding ||
     !output ||
     typeof rounding.mode !== "string" ||
-    !["bankers", "away_from_zero", "toward_zero", "floor", "ceil"].includes(
-      rounding.mode,
-    ) ||
+    ![
+      "bankers",
+      "midpoint_away_from_zero",
+      "toward_zero",
+      "floor",
+      "ceil",
+    ].includes(rounding.mode) ||
     !Object.values(output).every(
       (value) =>
         typeof value === "number" && Number.isInteger(value) && value >= 0,

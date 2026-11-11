@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "2f8f6b132cebd7653a567fc3af3fd260b079787b5bb0cff32e651e2075bcdc1a"
+      "sha256": "426a5f0e828bb35d7079abaf3ae6cfaa50b067ada0da432ca710c94d1edb7779"
     }
   ],
   "base": {
@@ -148,7 +148,6 @@
             "tolerance_pct": 0.1,
             "residual_pct": 0,
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -208,7 +207,6 @@
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -468,7 +466,6 @@
             "tolerance_pct": 0.1,
             "residual_pct": 0,
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -528,7 +525,6 @@
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -900,7 +896,6 @@
             "tolerance_pct": 5,
             "residual_pct": 0.9843200304696048,
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -965,7 +960,6 @@
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -1332,7 +1326,6 @@
             "tolerance_pct": 1,
             "residual_pct": 0.8659541896131473,
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -1396,7 +1389,6 @@
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {

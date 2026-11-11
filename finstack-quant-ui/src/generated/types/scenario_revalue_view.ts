@@ -379,6 +379,22 @@ export type D_67Be71F4Ec3Ffee70C10 =
         | "ZWL";
     };
 /**
+ * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
+ *
+ * There is no default mode: every financial rounding names one explicitly.
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::config::{FinstackConfig, RoundingMode};
+ *
+ * let mut cfg = FinstackConfig::default();
+ * assert_eq!(cfg.rounding.mode, None);
+ * cfg.rounding.mode = Some(RoundingMode::TowardZero);
+ * assert_eq!(cfg.rounding.mode, Some(RoundingMode::TowardZero));
+ * ```
+ */
+export type DD8B106616Ee126B0B615 = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
+/**
  * A single warning emitted by an adapter, the engine, or a downstream helper.
  *
  * New variants will be added over time; pattern matches on `Warning` should
@@ -782,6 +798,22 @@ export type D_4F9196221F8Fbfd9Bfe1 = string;
  * Valuation date (T+0) for the calculation.
  */
 export type Date = string;
+/**
+ * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
+ *
+ * There is no default mode: every financial rounding names one explicitly.
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::config::{FinstackConfig, RoundingMode};
+ *
+ * let mut cfg = FinstackConfig::default();
+ * assert_eq!(cfg.rounding.mode, None);
+ * cfg.rounding.mode = Some(RoundingMode::TowardZero);
+ * assert_eq!(cfg.rounding.mode, Some(RoundingMode::TowardZero));
+ * ```
+ */
+export type DD59860C6D29E319A5B5C = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
 /**
  * Model-specific typed valuation details.
  *
@@ -2237,9 +2269,9 @@ export interface D_660Ff81Ede9065A00385 {
     [k: string]: number;
   };
   /**
-   * Active rounding mode.
+   * Explicitly selected rounding mode; absent when none was selected.
    */
-  mode: "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
+  mode?: DD8B106616Ee126B0B615 | null;
   /**
    * Validated output scale snapshot by currency code, with values in `0..=28`.
    */
@@ -2854,9 +2886,9 @@ export interface D_55Fd8D302833A65D16F6 {
     [k: string]: number;
   };
   /**
-   * Active rounding mode.
+   * Explicitly selected rounding mode; absent when none was selected.
    */
-  mode: "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
+  mode?: DD59860C6D29E319A5B5C | null;
   /**
    * Validated output scale snapshot by currency code, with values in `0..=28`.
    */

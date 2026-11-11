@@ -124,8 +124,42 @@ class TestMoney:
         assert abs(Money(-2.5, "USD")) == Money(2.5, "USD")
         assert -Money(2.5, "USD") == Money(-2.5, "USD")
         assert float(Money(2.5, "USD")) == 2.5
-        assert round(Money.from_decimal(Decimal("2.345"), "USD")) == Money.from_decimal(Decimal("2.34"), "USD")
-        assert round(Money.from_decimal(Decimal("2.355"), "USD"), 2) == Money.from_decimal(Decimal("2.36"), "USD")
+        assert Money.from_decimal(Decimal("2.345"), "USD").round(2, "bankers") == Money.from_decimal(
+            Decimal("2.34"), "USD"
+        )
+        assert Money.from_decimal(Decimal("2.355"), "USD").round(2, RoundingMode.BANKERS) == Money.from_decimal(
+            Decimal("2.36"), "USD"
+        )
+
+    def test_round_requires_explicit_scale_and_mode(self) -> None:
+        # Record 012 #8: no default scale or mode, no Python round() protocol.
+        half = Money.from_decimal(Decimal("2.5"), "USD")
+        minus_half = Money.from_decimal(Decimal("-2.5"), "USD")
+        table = {
+            "bankers": ("2", "-2"),
+            "midpoint_away_from_zero": ("3", "-3"),
+            "toward_zero": ("2", "-2"),
+            "floor": ("2", "-3"),
+            "ceil": ("3", "-2"),
+        }
+        for mode, (up, down) in table.items():
+            assert half.round(0, mode).amount_decimal == Decimal(up)
+            assert minus_half.round(0, mode).amount_decimal == Decimal(down)
+        assert Money.from_decimal(Decimal("1.1"), "USD").round(0, "midpoint_away_from_zero").amount_decimal == 1
+        tiny = Money.from_decimal(Decimal("1e-28"), "USD").round(2, "bankers")
+        assert tiny.amount_decimal == 0
+        assert str(Money.from_decimal(Decimal("-0.001"), "USD").round(2, "bankers").amount_decimal) == "0"
+        with pytest.raises(TypeError):
+            round(half)  # type: ignore[call-overload]
+        with pytest.raises(TypeError):
+            half.round(2)  # type: ignore[call-arg]
+        with pytest.raises(TypeError):
+            half.round(True, "bankers")
+        for bad in (-1, 29):
+            with pytest.raises(ValueError, match=r"0\.\.=28"):
+                half.round(bad, "bankers")
+        with pytest.raises(ValueError, match="away_from_zero"):
+            half.round(2, "away_from_zero")
 
     def test_decimal_and_config(self) -> None:
         assert Money.from_decimal(Decimal("1.25"), "EUR").amount_decimal == Decimal("1.25")
@@ -135,9 +169,23 @@ class TestMoney:
 
     def test_config_rounds_float_and_decimal_inputs(self) -> None:
         cfg = FinstackConfig()
+        assert cfg.rounding_mode is None
+        assert cfg.ingest_scale("USD") is None
+        # Record 012 #9: no override means no ingest rounding.
+        assert Money(0.001, "USD", config=cfg).amount_decimal == Decimal("0.001")
+        cfg.set_ingest_scale("USD", 2)
+        # An override without a mode is incomplete; Bankers is never inferred.
+        with pytest.raises(ValueError, match="without a rounding mode"):
+            Money(1.2345, "USD", config=cfg)
+        with pytest.raises(ValueError, match="without a rounding mode"):
+            Money.from_decimal(Decimal("1.2345"), "USD", config=cfg)
+        with pytest.raises(ValueError, match="without a rounding mode"):
+            Money(3, "USD", config=cfg)
+        cfg = FinstackConfig(rounding_mode="bankers")
         cfg.set_ingest_scale("USD", 2)
         assert Money(1.2345, "USD", config=cfg).amount_decimal == Decimal("1.23")
         assert Money.from_decimal(Decimal("1.2345"), "USD", config=cfg).amount_decimal == Decimal("1.23")
+        assert Money(0.001, "EUR", config=cfg).amount_decimal == Decimal("0.001")
 
     def test_config_preserves_exact_decimal_before_rounding(self) -> None:
         cfg = FinstackConfig(rounding_mode="floor")

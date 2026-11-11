@@ -509,7 +509,6 @@
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -578,7 +577,6 @@
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -748,7 +746,6 @@
             "tolerance_pct": 0.1,
             "residual_pct": -0.0,
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -865,7 +862,6 @@
             "tolerance_pct": 0.1,
             "residual_pct": -0.0,
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {

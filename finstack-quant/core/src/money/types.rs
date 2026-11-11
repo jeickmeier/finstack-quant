@@ -28,7 +28,8 @@ use crate::{Error, InputError};
 use core::fmt;
 
 use super::rounding::{
-    repr_add, repr_div, repr_div_f64, repr_mul, repr_mul_f64, repr_sub, try_round_f64,
+    repr_add, repr_div, repr_div_f64, repr_mul, repr_mul_f64, repr_sub, round_decimal,
+    validate_rounding_scale,
 };
 
 /// Format an integer string (optionally prefixed by `-`) with thousands
@@ -76,8 +77,9 @@ pub struct FormatOpts {
 }
 
 impl Default for FormatOpts {
-    /// Defaults, matching `Display`: currency minor-unit decimals, currency
-    /// code shown, no grouping, Bankers rounding.
+    /// Declared presentation defaults (record 012 #10), matching `Display`:
+    /// currency minor-unit decimals, currency code shown, no grouping and
+    /// nearest-even display rounding. This is not a financial rounding default.
     fn default() -> Self {
         Self {
             decimals: None,
@@ -89,11 +91,8 @@ impl Default for FormatOpts {
 }
 
 impl FormatOpts {
-    /// Maximum supported display precision.
-    ///
-    /// Host bindings accept precision from untyped inputs, so the bound caps
-    /// the worst-case formatted string length before rounding work begins.
-    pub const MAX_DECIMALS: usize = 1_000_000;
+    /// Maximum supported display precision: Decimal's scale ceiling (28).
+    pub const MAX_DECIMALS: usize = 28;
 
     /// Build checked formatting options, rejecting an excessive precision bound.
     ///
@@ -106,7 +105,7 @@ impl FormatOpts {
     /// * `group` - Optional single-character thousands separator (e.g.
     ///   `Some(',')`); `None` disables grouping.
     /// * `rounding` - Rounding mode applied to the displayed value; `None`
-    ///   selects [`RoundingMode::default`] (bankers).
+    ///   selects the declared presentation default, nearest-even (Bankers).
     ///
     /// # Returns
     ///
@@ -136,7 +135,7 @@ impl FormatOpts {
         rounding: Option<RoundingMode>,
     ) -> Result<Self, Error> {
         let show_currency = show_currency.unwrap_or(true);
-        let rounding = rounding.unwrap_or_default();
+        let rounding = rounding.unwrap_or(RoundingMode::Bankers);
         if decimals.is_some_and(|precision| precision > Self::MAX_DECIMALS) {
             return Err(Error::Validation(format!(
                 "formatting precision exceeds {}",
@@ -204,11 +203,15 @@ impl Money {
     ///
     /// * `opts` - Display precision (currency minor units when omitted), currency-prefix flag, optional thousands separator, and rounding mode; does not change the stored amount.
     pub fn format_with(&self, opts: FormatOpts) -> String {
-        use super::rounding::round_decimal;
         let dp = opts
             .decimals
             .unwrap_or_else(|| usize::from(self.currency.decimals()));
-        let rounded = round_decimal(self.amount, dp as i32, opts.rounding);
+        // `dp` is at most `FormatOpts::MAX_DECIMALS` (28) by construction.
+        let mut rounded = round_decimal(self.amount, dp as u32, opts.rounding);
+        // A displayed zero carries no sign (`-0.001` at 2 places is `0.00`).
+        if rounded.is_zero() {
+            rounded.set_sign_positive(true);
+        }
         let raw = format!("{val:.prec$}", val = rounded, prec = dp);
         let value = match opts.group {
             Some(sep) => {
@@ -382,40 +385,71 @@ impl Money {
 
     /// Construct from an exact Decimal using the configured ingest rounding policy.
     ///
+    /// Without an ingest scale override for `currency` the amount is kept
+    /// exactly (record 012 #9); with one, it is rounded once to that scale in
+    /// the policy's selected mode.
+    ///
     /// # Arguments
     ///
     /// * `amount` - Exact monetary amount in major currency units, rounded without conversion through f64.
-    /// * `currency` - ISO-4217 currency used to select the ingest scale.
-    /// * `cfg` - Configuration supplying the currency scale override (or max(6, ISO minor-unit digits)) and rounding mode.
-    #[must_use]
+    /// * `currency` - ISO-4217 currency whose ingest override, if any, selects the scale.
+    /// * `cfg` - Configuration supplying the optional currency scale override and the rounding mode it requires.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when `currency` has an ingest scale override
+    /// but `cfg` selects no rounding mode.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::config::{FinstackConfig, RoundingMode};
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::money::Money;
+    /// use rust_decimal::Decimal;
+    ///
+    /// let mut cfg = FinstackConfig::default();
+    /// let exact = Decimal::new(1, 3); // 0.001
+    /// // No override: preserved exactly even though a config is supplied.
+    /// let kept = Money::from_decimal_with_config(exact, Currency::USD, &cfg).expect("exact");
+    /// assert_eq!(kept.amount_decimal(), exact);
+    ///
+    /// cfg.rounding.ingest_scale.set_scale(Currency::USD, 2).expect("valid scale");
+    /// assert!(Money::from_decimal_with_config(exact, Currency::USD, &cfg).is_err());
+    /// cfg.rounding.mode = Some(RoundingMode::Ceil);
+    /// let rounded = Money::from_decimal_with_config(exact, Currency::USD, &cfg).expect("rounded");
+    /// assert_eq!(rounded.amount_decimal(), Decimal::new(1, 2));
+    /// ```
     pub fn from_decimal_with_config(
         amount: rust_decimal::Decimal,
         currency: Currency,
         cfg: &FinstackConfig,
-    ) -> Self {
-        let scale = cfg.ingest_scale(currency) as i32;
-        Self::from_decimal(
-            super::rounding::round_decimal(amount, scale, cfg.rounding.mode),
-            currency,
-        )
+    ) -> Result<Self, Error> {
+        let amount = match cfg.ingest_rounding(currency)? {
+            Some((scale, mode)) => round_decimal(amount, scale, mode),
+            None => amount,
+        };
+        Ok(Self::from_decimal(amount, currency))
     }
 
     /// Fallible constructor using an explicit configuration for rounding.
     ///
-    /// Uses `cfg` to select the ingest scale and rounding mode for `currency`.
-    /// This is the configuration-aware counterpart to [`Self::new`].
+    /// The `f64` is first admitted exactly as [`Self::new`] does; only then is
+    /// the configured ingest rounding applied (see
+    /// [`Self::from_decimal_with_config`]), so configuration cannot rescue an
+    /// unrepresentable input.
     ///
     /// # Errors
     ///
-    /// Returns `InputError::NonFiniteValue` for NaN or infinity, or
-    /// `InputError::ConversionOverflow` when rounding or conversion cannot
-    /// produce a representable Decimal amount.
+    /// Returns `InputError::NonFiniteValue` for NaN or infinity,
+    /// `InputError::ConversionOverflow` when the value is outside the Decimal
+    /// domain, or `Error::Validation` when `currency` has an ingest scale
+    /// override but `cfg` selects no rounding mode.
     ///
     /// # Arguments
     ///
     /// * `amount` - Finite monetary quantity in major currency units before rounding
     /// * `currency` - ISO-4217 currency that defines scale, rounding, and display units
-    /// * `cfg` - Finstack configuration controlling rounding policy and money tolerances
+    /// * `cfg` - Configuration supplying the optional currency ingest override and the rounding mode it requires
     pub fn new_with_config(
         amount: f64,
         currency: Currency,
@@ -436,15 +470,11 @@ impl Money {
         // magnitudes, and uses the shortest round-trip conversion so `0.1_f64`
         // ingests as `0.1`, not the 28-digit IEEE expansion.
         let amount = if amount == 0.0 { 0.0 } else { amount };
-        let rounded = if let Some(cfg) = cfg {
-            try_round_f64(amount, cfg.ingest_scale(currency) as i32, cfg.rounding.mode)?
-        } else {
-            f64_to_decimal(amount)?
-        };
-        Ok(Self {
-            amount: rounded,
-            currency,
-        })
+        let exact = f64_to_decimal(amount)?;
+        match cfg {
+            Some(cfg) => Self::from_decimal_with_config(exact, currency, cfg),
+            None => Ok(Self::from_decimal(exact, currency)),
+        }
     }
 
     /// Amount accessor (by value).
@@ -679,10 +709,8 @@ impl Money {
     #[must_use = "returns the negated Money"]
     #[inline]
     pub fn checked_neg(self) -> Self {
-        Self {
-            amount: -self.amount,
-            currency: self.currency,
-        }
+        // Zero stays the canonical unsigned zero (record 012 #1).
+        Self::from_decimal(-self.amount, self.currency)
     }
 
     /// Divide by a nonzero Decimal scalar (record 012 #7).
@@ -814,24 +842,39 @@ impl Money {
         }
     }
 
-    /// Bankers-round the exact amount while preserving its currency.
+    /// Financially round the exact amount to an explicit scale and mode
+    /// (record 012 #8), preserving its currency.
+    ///
+    /// There is no default scale or mode. An explicit round may intentionally
+    /// produce zero (`1e-28` at scale 2 is `0`), which is normalized like any
+    /// other zero.
     ///
     /// # Arguments
     ///
-    /// * `ndigits` - Nonnegative number of decimal places in major currency units; None selects the currency's ISO minor units. Precision above Decimal's capacity leaves the value unchanged.
+    /// * `scale` - Decimal places in major currency units, in `0..=28`.
+    /// * `mode` - Rounding rule applied at that decimal quantum.
     ///
     /// # Errors
     ///
-    /// Returns a validation error when ndigits is negative.
-    pub fn round(self, ndigits: Option<i32>) -> Result<Self, Error> {
-        let dp = ndigits.unwrap_or_else(|| i32::from(self.currency.decimals()));
-        if dp < 0 {
-            return Err(Error::Validation("round(Money, n) requires n >= 0".into()));
-        }
-        Ok(Self {
-            amount: super::rounding::round_decimal(self.amount, dp, RoundingMode::Bankers),
-            currency: self.currency,
-        })
+    /// Returns `Error::Validation` when `scale` exceeds 28.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::config::RoundingMode;
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::money::Money;
+    ///
+    /// let m = Money::from_decimal_str("2.5", Currency::USD).expect("exact");
+    /// assert_eq!(m.round(0, RoundingMode::Bankers).expect("scale 0").amount_decimal().to_string(), "2");
+    /// assert_eq!(m.round(0, RoundingMode::MidpointAwayFromZero).expect("scale 0").amount_decimal().to_string(), "3");
+    /// assert!(m.round(29, RoundingMode::Bankers).is_err());
+    /// ```
+    pub fn round(self, scale: u32, mode: RoundingMode) -> Result<Self, Error> {
+        validate_rounding_scale(scale)?;
+        Ok(Self::from_decimal(
+            round_decimal(self.amount, scale, mode),
+            self.currency,
+        ))
     }
 
     /// Convert this amount with an already-resolved FX rate (record 012 #11).
@@ -1082,6 +1125,9 @@ mod tests {
         assert_eq!(negated.checked_neg(), exact);
         let tiny = Money::from_decimal_str("1e-27", Currency::USD).expect("exact");
         assert_eq!(tiny.checked_neg().amount_decimal(), -tiny.amount_decimal());
+        let zero = Money::zero(Currency::USD).checked_neg();
+        assert!(zero.amount_decimal().is_sign_positive());
+        assert_eq!(zero.to_string(), "USD 0.00");
     }
 
     #[test]
@@ -1174,6 +1220,7 @@ mod tests {
     #[test]
     fn try_new_with_config_succeeds_for_finite_values() {
         let mut cfg = FinstackConfig::default();
+        cfg.rounding.mode = Some(RoundingMode::Bankers);
         cfg.rounding
             .ingest_scale
             .set_scale(Currency::USD, 3)
@@ -1191,12 +1238,74 @@ mod tests {
     #[test]
     fn try_new_with_config_honors_ingest_scale_override() {
         let mut cfg = FinstackConfig::default();
+        cfg.rounding.mode = Some(RoundingMode::Bankers);
         cfg.rounding
             .ingest_scale
             .set_scale(Currency::USD, 2)
             .expect("valid decimal scale");
         let m = Money::new_with_config(10.999, Currency::USD, &cfg).expect("Finite should succeed");
         assert!((m.amount() - 11.00).abs() < 1e-12);
+    }
+
+    #[test]
+    fn configured_ingest_requires_an_override_and_an_explicit_mode() {
+        // Record 012 #9 boundary rows.
+        let mut cfg = FinstackConfig::default();
+        let exact =
+            Money::from_decimal_with_config(rust_decimal::Decimal::new(1, 3), Currency::USD, &cfg)
+                .expect("no override: exact");
+        assert_eq!(exact.amount_decimal().to_string(), "0.001");
+        assert_eq!(
+            Money::new_with_config(0.001, Currency::USD, &cfg)
+                .expect("no override: exact")
+                .amount_decimal()
+                .to_string(),
+            "0.001"
+        );
+        cfg.rounding
+            .ingest_scale
+            .set_scale(Currency::USD, 2)
+            .expect("valid decimal scale");
+        // An override without a mode is incomplete, never Bankers by default.
+        assert!(matches!(
+            Money::new_with_config(0.001, Currency::USD, &cfg),
+            Err(Error::Validation(_))
+        ));
+        cfg.rounding.mode = Some(RoundingMode::Bankers);
+        // Admission precedes rounding: configuration cannot rescue an
+        // unrepresentable float.
+        assert!(Money::new_with_config(1e-29, Currency::USD, &cfg).is_err());
+        let rounded = Money::new_with_config(-0.001, Currency::USD, &cfg).expect("rounds");
+        assert_eq!(rounded.amount_decimal().to_string(), "0");
+        assert!(rounded.amount_decimal().is_sign_positive());
+    }
+
+    #[test]
+    fn explicit_round_requires_scale_and_mode() {
+        let tiny = Money::from_decimal(rust_decimal::Decimal::new(1, 28), Currency::USD);
+        let zero = tiny.round(2, RoundingMode::Bankers).expect("scale 2");
+        assert!(zero.amount_decimal().is_zero());
+        let negative = Money::from_decimal(rust_decimal::Decimal::new(-1, 3), Currency::USD);
+        let rounded = negative.round(2, RoundingMode::Bankers).expect("scale 2");
+        assert!(rounded.amount_decimal().is_sign_positive());
+        assert_eq!(
+            rounded,
+            Money::from_decimal(rust_decimal::Decimal::ZERO, Currency::USD)
+        );
+        assert!(matches!(
+            tiny.round(29, RoundingMode::Bankers),
+            Err(Error::Validation(_))
+        ));
+        assert!(tiny.round(28, RoundingMode::Floor).is_ok());
+    }
+
+    #[test]
+    fn formatting_bounds_precision_and_drops_a_displayed_zero_sign() {
+        let negative = Money::from_decimal(rust_decimal::Decimal::new(-1, 3), Currency::USD);
+        assert_eq!(negative.format_with(FormatOpts::default()), "USD 0.00");
+        assert_eq!(negative.to_string(), "USD 0.00");
+        assert_eq!(FormatOpts::MAX_DECIMALS, 28);
+        assert!(FormatOpts::new(Some(29), None, None, None).is_err());
     }
 
     #[test]
@@ -1370,14 +1479,14 @@ mod tests {
             (
                 "-1.245",
                 "USD -1.25",
-                RoundingMode::AwayFromZero,
-                "away_from_zero",
+                RoundingMode::MidpointAwayFromZero,
+                "midpoint_away_from_zero",
             ),
             (
                 "1.241",
                 "USD 1.24",
-                RoundingMode::AwayFromZero,
-                "away_from_zero",
+                RoundingMode::MidpointAwayFromZero,
+                "midpoint_away_from_zero",
             ),
             (
                 "-1.259",

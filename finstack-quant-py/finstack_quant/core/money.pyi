@@ -52,13 +52,15 @@ class Money:
     currency : Currency | str
         ISO-4217 currency (object or alphabetic code string).
     config : FinstackConfig | None
-        When given, amounts are rounded on ingest using the
-        config's rounding mode and per-currency ingest scale.
+        Optional ingest configuration. When it has an ingest scale override for the currency, the
+        amount is rounded once to that scale with the config's selected
+        rounding mode; without an override it is kept exactly.
 
     Raises
     ------
     ValueError
-        If *amount* is non-finite or *currency* is invalid.
+        If *amount* is non-finite or *currency* is invalid, or *config* has
+        an ingest scale override for the currency but no rounding mode.
     TypeError
         If *amount* is not a ``float`` or ``int``.
 
@@ -94,13 +96,17 @@ class Money:
             Currency object or ISO-4217 alphabetic code string
             (case-insensitive, not trimmed).
         config : FinstackConfig | None
-            Optional config whose rounding mode and ingest scale are applied
-            to the amount.
+            Optional ingest configuration, applied after the amount is
+            admitted exactly. When it has an ingest scale override for the currency, the
+            amount is rounded once to that scale with the config's selected
+            rounding mode; without an override it is kept exactly.
 
         Raises
         ------
         ValueError
-            If *amount* is non-finite or *currency* is invalid.
+            If *amount* is non-finite or *currency* is invalid, or *config*
+            has an ingest scale override for the currency but no rounding
+            mode.
         TypeError
             If *amount* is not a ``float`` or ``int``.
         """
@@ -129,15 +135,18 @@ class Money:
         currency : Currency | str
             Currency object or ISO-4217 code string.
         config : FinstackConfig | None
-            Optional config whose rounding mode and ingest scale are applied
-            to the exact amount (Rust ``Money::from_decimal_with_config``);
-            the rounding never goes through ``float``.
+            Optional ingest configuration (Rust
+            ``Money::from_decimal_with_config``); the rounding never goes
+            through ``float``. When it has an ingest scale override for the currency, the
+            amount is rounded once to that scale with the config's selected
+            rounding mode; without an override it is kept exactly.
 
         Raises
         ------
         ValueError
             If *amount* is non-finite or not exactly representable as a Rust
-            ``Decimal``, or *currency* is invalid.
+            ``Decimal``, *currency* is invalid, or *config* has an ingest
+            scale override for the currency but no rounding mode.
         TypeError
             If *amount* is not a ``decimal.Decimal``.
 
@@ -251,7 +260,7 @@ class Money:
         Parameters
         ----------
         decimals : int | None
-            Number of decimal places, inclusive range ``0`` to ``1_000_000``.
+            Number of decimal places, inclusive range ``0`` to ``28``.
             Defaults to the currency's minor units.
         show_currency : bool | None
             Whether to prepend the currency code; ``None`` (the default)
@@ -261,8 +270,8 @@ class Money:
             disables grouping.
         rounding : RoundingMode | str | None
             Rounding applied to the displayed value; a ``RoundingMode`` or
-            its exact lowercase name. Defaults to the Rust
-            ``RoundingMode::default()`` (bankers rounding).
+            its exact lowercase name. Defaults to the declared presentation
+            default, bankers (nearest-even) display rounding.
 
         Returns
         -------
@@ -272,7 +281,7 @@ class Money:
         Raises
         ------
         ValueError
-            If *decimals* exceeds the native precision bound of 1,000,000,
+            If *decimals* exceeds Decimal's scale ceiling of 28,
             *group* is not a single character, or *rounding* is an
             unrecognised name.
         OverflowError
@@ -501,17 +510,46 @@ class Money:
         float
         """
         ...
-    def __round__(self, ndigits: int | None = None) -> Money:
-        """Bankers-round the amount to *ndigits* places (default: currency minor units).
+    def round(self, scale: int, mode: Union[RoundingMode, str]) -> Money:
+        """
+        Financially round the exact amount to an explicit scale and mode.
 
-        Raises
-        ------
-        ValueError
-            If *ndigits* is negative.
+        Delegates to Rust ``Money::round``. There is no default scale or mode,
+        and Python's ``round(money)`` is not supported. An explicit round may
+        produce zero (``1e-28`` at scale 2 is ``0``); a rounded zero carries
+        no sign.
+
+        Parameters
+        ----------
+        scale : int
+            Decimal places in major currency units, in ``0..=28``.
+        mode : RoundingMode | str
+            Rounding rule at that decimal quantum, as a ``RoundingMode`` or
+            its exact lowercase name (``"bankers"``,
+            ``"midpoint_away_from_zero"``, ``"toward_zero"``, ``"floor"``,
+            ``"ceil"``).
 
         Returns
         -------
         Money
+            The rounded amount in the same currency.
+
+        Raises
+        ------
+        ValueError
+            If *scale* is outside ``0..=28`` or *mode* is an unrecognised
+            name.
+        TypeError
+            If *scale* is not an ``int`` (``bool`` included) or *mode* is
+            neither a ``RoundingMode`` nor a ``str``.
+
+        Examples
+        --------
+        >>> from decimal import Decimal
+        >>> from finstack_quant.core.money import Money
+        >>> m = Money.from_decimal(Decimal("2.5"), "USD")
+        >>> (str(m.round(0, "bankers").amount_decimal), str(m.round(0, "midpoint_away_from_zero").amount_decimal))
+        ('2', '3')
         """
         ...
     def __radd__(self, other: Union[Money, float]) -> Money: ...

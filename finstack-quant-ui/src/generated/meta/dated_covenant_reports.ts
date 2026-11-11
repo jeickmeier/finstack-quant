@@ -69,9 +69,17 @@ export default [
   {
     "path": "#/$defs/d_69bc1d2a292ba6fc692b/properties/mode",
     "source": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json#/$defs/RoundingContext/properties/mode",
-    "description": "Active rounding mode.",
+    "description": "Explicitly selected rounding mode; absent when none was selected."
+  },
+  {
+    "path": "#/$defs/d_69bc1d2a292ba6fc692b/properties/mode/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json#/$defs/RoundingContext/properties/mode/anyOf/0",
     "ref": "#/$defs/RoundingMode",
     "resolvedRef": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json#/$defs/RoundingMode"
+  },
+  {
+    "path": "#/$defs/d_69bc1d2a292ba6fc692b/properties/mode/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json#/$defs/RoundingContext/properties/mode/anyOf/1"
   },
   {
     "path": "#/$defs/d_69bc1d2a292ba6fc692b/properties/output_scale_by_currency",
@@ -124,19 +132,19 @@ export default [
   {
     "path": "#/$defs/d_be65c13702832be108e6",
     "source": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json#/$defs/RoundingMode",
-    "description": "Rounding modes supported by the library.\n\nThe variants mirror the most common conventions found in pricing engines.\n\n# Examples\n```rust\nuse finstack_quant_core::config::{FinstackConfig, RoundingMode};\n\nlet mut cfg = FinstackConfig::default();\ncfg.rounding.mode = RoundingMode::TowardZero;\nassert!(matches!(cfg.rounding.mode, RoundingMode::TowardZero));\n```"
+    "description": "Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).\n\nThere is no default mode: every financial rounding names one explicitly.\n\n# Examples\n```rust\nuse finstack_quant_core::config::{FinstackConfig, RoundingMode};\n\nlet mut cfg = FinstackConfig::default();\nassert_eq!(cfg.rounding.mode, None);\ncfg.rounding.mode = Some(RoundingMode::TowardZero);\nassert_eq!(cfg.rounding.mode, Some(RoundingMode::TowardZero));\n```"
   },
   {
     "path": "#/$defs/d_be65c13702832be108e6/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json#/$defs/RoundingMode/oneOf/0",
     "const": "bankers",
-    "description": "Banker's rounding (ties to even)."
+    "description": "Nearest; an exact midpoint goes to the even coefficient."
   },
   {
     "path": "#/$defs/d_be65c13702832be108e6/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json#/$defs/RoundingMode/oneOf/1",
-    "const": "away_from_zero",
-    "description": "Round halves away from zero."
+    "const": "midpoint_away_from_zero",
+    "description": "Nearest; an exact midpoint increases absolute magnitude. Other\nfractions round to nearest (`1.1` -> `1`), not away from zero."
   },
   {
     "path": "#/$defs/d_be65c13702832be108e6/oneOf/2",
@@ -196,7 +204,6 @@ export default [
       "numeric_mode": "f64",
       "rounding": {
         "ingest_scale_by_currency": {},
-        "mode": "bankers",
         "output_scale_by_currency": {},
         "tolerances": {
           "generic_epsilon": 1e-10

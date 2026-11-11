@@ -352,7 +352,6 @@
           "results_meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -400,7 +399,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -422,7 +420,6 @@
         "results_meta": {
           "numeric_mode": "f64",
           "rounding": {
-            "mode": "bankers",
             "ingest_scale_by_currency": {},
             "output_scale_by_currency": {},
             "tolerances": {
@@ -985,7 +982,6 @@
           "results_meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -1033,7 +1029,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -1093,7 +1088,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -1114,7 +1108,6 @@
         "results_meta": {
           "numeric_mode": "f64",
           "rounding": {
-            "mode": "bankers",
             "ingest_scale_by_currency": {},
             "output_scale_by_currency": {},
             "tolerances": {
@@ -1920,7 +1913,6 @@
           "results_meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -1967,7 +1959,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -2016,7 +2007,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -2038,7 +2028,6 @@
         "results_meta": {
           "numeric_mode": "f64",
           "rounding": {
-            "mode": "bankers",
             "ingest_scale_by_currency": {},
             "output_scale_by_currency": {},
             "tolerances": {
@@ -2844,7 +2833,6 @@
           "results_meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -2891,7 +2879,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -2940,7 +2927,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -2962,7 +2948,6 @@
         "results_meta": {
           "numeric_mode": "f64",
           "rounding": {
-            "mode": "bankers",
             "ingest_scale_by_currency": {},
             "output_scale_by_currency": {},
             "tolerances": {
@@ -3931,7 +3916,6 @@
           "results_meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -3978,7 +3962,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -4023,7 +4006,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -4071,7 +4053,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -4093,7 +4074,6 @@
         "results_meta": {
           "numeric_mode": "f64",
           "rounding": {
-            "mode": "bankers",
             "ingest_scale_by_currency": {},
             "output_scale_by_currency": {},
             "tolerances": {
@@ -5051,7 +5031,6 @@
           "results_meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -5098,7 +5077,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -5154,7 +5132,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -5243,7 +5220,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -5265,7 +5241,6 @@
         "results_meta": {
           "numeric_mode": "f64",
           "rounding": {
-            "mode": "bankers",
             "ingest_scale_by_currency": {},
             "output_scale_by_currency": {},
             "tolerances": {
@@ -6296,7 +6271,6 @@
           "results_meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -6344,7 +6318,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -6404,7 +6377,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -6480,7 +6452,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -6501,7 +6472,6 @@
         "results_meta": {
           "numeric_mode": "f64",
           "rounding": {
-            "mode": "bankers",
             "ingest_scale_by_currency": {},
             "output_scale_by_currency": {},
             "tolerances": {
@@ -7121,7 +7091,6 @@
           "results_meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -7176,7 +7145,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -7265,7 +7233,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -7287,7 +7254,6 @@
         "results_meta": {
           "numeric_mode": "f64",
           "rounding": {
-            "mode": "bankers",
             "ingest_scale_by_currency": {},
             "output_scale_by_currency": {},
             "tolerances": {
@@ -7462,7 +7428,6 @@
           "results_meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -7480,7 +7445,6 @@
         "results_meta": {
           "numeric_mode": "f64",
           "rounding": {
-            "mode": "bankers",
             "ingest_scale_by_currency": {},
             "output_scale_by_currency": {},
             "tolerances": {
@@ -7669,7 +7633,6 @@
           "results_meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -7687,7 +7650,6 @@
         "results_meta": {
           "numeric_mode": "f64",
           "rounding": {
-            "mode": "bankers",
             "ingest_scale_by_currency": {},
             "output_scale_by_currency": {},
             "tolerances": {
@@ -7948,7 +7910,6 @@
           "results_meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -7966,7 +7927,6 @@
         "results_meta": {
           "numeric_mode": "f64",
           "rounding": {
-            "mode": "bankers",
             "ingest_scale_by_currency": {},
             "output_scale_by_currency": {},
             "tolerances": {
@@ -8970,7 +8930,6 @@
           "results_meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -9017,7 +8976,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -9063,7 +9021,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -9111,7 +9068,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -9133,7 +9089,6 @@
         "results_meta": {
           "numeric_mode": "f64",
           "rounding": {
-            "mode": "bankers",
             "ingest_scale_by_currency": {},
             "output_scale_by_currency": {},
             "tolerances": {
@@ -9501,7 +9456,6 @@
           "results_meta": {
             "numeric_mode": "f64",
             "rounding": {
-              "mode": "bankers",
               "ingest_scale_by_currency": {},
               "output_scale_by_currency": {},
               "tolerances": {
@@ -9549,7 +9503,6 @@
             "results_meta": {
               "numeric_mode": "f64",
               "rounding": {
-                "mode": "bankers",
                 "ingest_scale_by_currency": {},
                 "output_scale_by_currency": {},
                 "tolerances": {
@@ -9613,7 +9566,6 @@
         "results_meta": {
           "numeric_mode": "f64",
           "rounding": {
-            "mode": "bankers",
             "ingest_scale_by_currency": {},
             "output_scale_by_currency": {},
             "tolerances": {

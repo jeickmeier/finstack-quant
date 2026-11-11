@@ -138,36 +138,38 @@ pub(crate) fn repr_div_f64(a: Decimal, rhs: f64) -> Result<Decimal, Error> {
     repr_div(a, f64_to_decimal(rhs)?)
 }
 
-/// Fallible rounding of an `f64` into a Decimal (no silent substitution).
-#[inline]
-pub(crate) fn try_round_f64(x: f64, dp: i32, mode: RoundingMode) -> Result<Decimal, Error> {
-    Ok(round_decimal(f64_to_decimal(x)?, dp, mode))
-}
-
-#[cfg(test)]
-#[allow(clippy::expect_used)]
-fn round_f64(x: f64, dp: i32, mode: RoundingMode) -> Decimal {
-    try_round_f64(x, dp, mode).expect("Money rounding requires finite, representable scalar")
+/// Validate a financial rounding scale: decimal places in `0..=28`
+/// (record 012 #8). There is no invalid-precision identity.
+///
+/// # Arguments
+///
+/// * `scale` - Requested decimal places in major currency units.
+pub(crate) fn validate_rounding_scale(scale: u32) -> Result<(), Error> {
+    if scale > Decimal::MAX_SCALE {
+        return Err(Error::Validation(format!(
+            "rounding scale must be in 0..=28, got {scale}"
+        )));
+    }
+    Ok(())
 }
 
 /// Round a Decimal to `dp` decimal places using the supplied [`RoundingMode`].
+///
+/// Callers validate `dp` (see [`validate_rounding_scale`]); a value already
+/// at or below `dp` places is returned unchanged.
 #[inline]
-pub(crate) fn round_decimal(x: Decimal, dp: i32, mode: RoundingMode) -> Decimal {
+pub(crate) fn round_decimal(x: Decimal, dp: u32, mode: RoundingMode) -> Decimal {
     use rust_decimal::RoundingStrategy;
-
-    if dp < 0 {
-        return x;
-    }
 
     let strategy = match mode {
         RoundingMode::Bankers => RoundingStrategy::MidpointNearestEven,
-        RoundingMode::AwayFromZero => RoundingStrategy::MidpointAwayFromZero,
+        RoundingMode::MidpointAwayFromZero => RoundingStrategy::MidpointAwayFromZero,
         RoundingMode::TowardZero => RoundingStrategy::ToZero,
         RoundingMode::Floor => RoundingStrategy::ToNegativeInfinity,
         RoundingMode::Ceil => RoundingStrategy::ToPositiveInfinity,
     };
 
-    x.round_dp_with_strategy(dp as u32, strategy)
+    x.round_dp_with_strategy(dp, strategy)
 }
 
 #[cfg(test)]
@@ -270,10 +272,10 @@ mod tests {
 
     #[test]
     fn round_f64_away_from_zero() {
-        let result1 = round_f64(1.5, 0, RoundingMode::AwayFromZero);
+        let result1 = round_f64(1.5, 0, RoundingMode::MidpointAwayFromZero);
         assert_eq!(result1, Decimal::from_str("2").expect("valid decimal"));
 
-        let result2 = round_f64(-1.5, 0, RoundingMode::AwayFromZero);
+        let result2 = round_f64(-1.5, 0, RoundingMode::MidpointAwayFromZero);
         assert_eq!(result2, Decimal::from_str("-2").expect("valid decimal"));
     }
 
@@ -311,10 +313,9 @@ mod tests {
         assert!((result - expected).abs() < Decimal::from_str("0.01").expect("valid decimal"));
     }
 
-    #[test]
-    #[should_panic(expected = "Money rounding requires finite")]
-    fn round_f64_panics_on_nan() {
-        round_f64(f64::NAN, 2, RoundingMode::Bankers);
+    /// Test helper: admit `x` exactly (record 012 #4), then round.
+    fn round_f64(x: f64, dp: u32, mode: RoundingMode) -> Decimal {
+        round_decimal(f64_to_decimal(x).expect("finite fixture"), dp, mode)
     }
 
     // round_decimal tests
@@ -329,7 +330,7 @@ mod tests {
     #[test]
     fn round_decimal_away_from_zero() {
         let val = Decimal::from_str("1.5").expect("valid decimal");
-        let result = round_decimal(val, 0, RoundingMode::AwayFromZero);
+        let result = round_decimal(val, 0, RoundingMode::MidpointAwayFromZero);
         assert_eq!(result, Decimal::from_str("2").expect("valid decimal"));
     }
 
@@ -355,10 +356,32 @@ mod tests {
     }
 
     #[test]
-    fn round_decimal_negative_dp_returns_unchanged() {
-        let val = Decimal::from_str("123.456").expect("valid decimal");
-        let result = round_decimal(val, -1, RoundingMode::Bankers);
-        assert_eq!(result, val);
+    fn rounding_scale_is_bounded_by_decimal() {
+        assert!(validate_rounding_scale(0).is_ok());
+        assert!(validate_rounding_scale(28).is_ok());
+        assert!(validate_rounding_scale(29).is_err());
+    }
+
+    #[test]
+    fn record_012_mode_table_at_scale_zero() {
+        let cases = [
+            (RoundingMode::Bankers, "2", "-2"),
+            (RoundingMode::MidpointAwayFromZero, "3", "-3"),
+            (RoundingMode::TowardZero, "2", "-2"),
+            (RoundingMode::Floor, "2", "-3"),
+            (RoundingMode::Ceil, "3", "-2"),
+        ];
+        for (mode, up, down) in cases {
+            assert_eq!(round_decimal(Decimal::new(25, 1), 0, mode).to_string(), up);
+            assert_eq!(
+                round_decimal(Decimal::new(-25, 1), 0, mode).to_string(),
+                down
+            );
+        }
+        // Midpoint-away is not directed-away rounding of every fraction.
+        let m = RoundingMode::MidpointAwayFromZero;
+        assert_eq!(round_decimal(Decimal::new(11, 1), 0, m).to_string(), "1");
+        assert_eq!(round_decimal(Decimal::new(-11, 1), 0, m).to_string(), "-1");
     }
 
     #[test]

@@ -58,8 +58,8 @@ it("groups decimal text exactly and preserves the wire string", () => {
 it.each([
   ["bankers", "1.245", "USD 1.24"],
   ["bankers", "1.255", "USD 1.26"],
-  ["away_from_zero", "-1.245", "USD -1.25"],
-  ["away_from_zero", "1.241", "USD 1.24"],
+  ["midpoint_away_from_zero", "-1.245", "USD -1.25"],
+  ["midpoint_away_from_zero", "1.241", "USD 1.24"],
   ["toward_zero", "-1.259", "USD -1.25"],
   ["floor", "-1.241", "USD -1.25"],
   ["floor", "1.249", "USD 1.24"],

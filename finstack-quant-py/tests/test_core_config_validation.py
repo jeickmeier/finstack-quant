@@ -31,7 +31,7 @@ def test_config_scale_rejects_invalid_setter_and_json_values(scale: int, kind: s
 
 
 def test_config_maximum_scale_preserves_small_nonzero_money() -> None:
-    config = FinstackConfig()
+    config = FinstackConfig(rounding_mode="bankers")
     config.set_ingest_scale("USD", 28)
     config.set_output_scale("USD", 28)
     restored = FinstackConfig.from_json(config.to_json())

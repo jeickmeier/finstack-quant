@@ -72,7 +72,7 @@ test('Money.checkedNeg is the exact Rust checked_neg and cannot throw', () => {
     assert.equal(negated.toJson(), expected);
     assert.equal(negated.checkedNeg().toJson(), money.toJson());
   }
-  assert.equal(new core.Money(0, usd).checkedNeg().toString(), 'USD -0.00');
+  assert.equal(new core.Money(0, usd).checkedNeg().toString(), 'USD 0.00');
 });
 
 test('Money arithmetic carries the Rust checked_* names', () => {
@@ -108,7 +108,7 @@ test('formatWith parses rounding with the serde names and defaults in Rust', () 
     () => m.formatWith(2, true, null, 'BANKERS'),
     validation(
       'Validation error: invalid value "BANKERS": unknown variant `BANKERS`, expected one of ' +
-        '`bankers`, `away_from_zero`, `toward_zero`, `floor`, `ceil`'
+        '`bankers`, `midpoint_away_from_zero`, `toward_zero`, `floor`, `ceil`'
     )
   );
 });

@@ -189,7 +189,7 @@
       "ingest_scale": {
         "overrides": {}
       },
-      "mode": "away_from_zero",
+      "mode": "midpoint_away_from_zero",
       "output_scale": {
         "overrides": {
           "JPY": 2
@@ -203,8 +203,8 @@
   "finstack_config_scales": [
     2,
     2,
-    6,
-    "away_from_zero",
+    null,
+    "midpoint_away_from_zero",
     [
       "core.example.v1"
     ]

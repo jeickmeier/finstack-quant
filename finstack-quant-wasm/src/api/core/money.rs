@@ -2,7 +2,7 @@
 
 use crate::api::core::currency::JsCurrency;
 use crate::utils::input::{
-    from_js_json, js_f64, js_opt_bool, js_opt_string, js_opt_uint, js_string,
+    from_js_json, js_f64, js_opt_bool, js_opt_string, js_opt_uint, js_string, js_uint,
 };
 use crate::utils::to_js_err;
 use crate::utils::wire::js_decimal;
@@ -272,32 +272,77 @@ impl JsMoney {
         }
     }
 
+    /// Financially round to an explicit scale and mode (Rust `Money::round`).
+    ///
+    /// Neither argument has a default. An explicit round may produce zero
+    /// (`1e-28` at scale 2 is `0`); a rounded zero carries no sign.
+    ///
+    /// # Arguments
+    ///
+    /// * `scale` - Decimal places in major currency units, an integer in `0..=28`.
+    /// * `mode` - Canonical lowercase rounding mode: `"bankers"`,
+    ///   `"midpoint_away_from_zero"`, `"toward_zero"`, `"floor"` or `"ceil"`.
+    ///
+    /// @param scale - Decimal places in major currency units, an integer in `0..=28`.
+    /// @param mode - Canonical lowercase rounding mode: `"bankers"`, `"midpoint_away_from_zero"`, `"toward_zero"`, `"floor"` or `"ceil"`.
+    /// @returns The rounded amount in the same currency.
+    /// @throws `TypeError` if `scale` is not a non-negative integer or `mode` is not a string; `FinstackError` (kind `validation`) if `scale` exceeds 28 or `mode` is not a recognised mode name.
+    ///
+    /// @example
+    /// ```javascript
+    /// const usd = new core.Currency("USD");
+    /// const m = core.Money.fromDecimalStr("2.5", usd);
+    /// const r = m.round(0, "midpoint_away_from_zero");
+    /// try {
+    ///   r.toString(); // "USD 3.00"
+    /// } finally {
+    ///   r.free();
+    ///   m.free();
+    ///   usd.free();
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = round)]
+    pub fn round(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] scale: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] mode: JsValue,
+    ) -> Result<JsMoney, JsValue> {
+        let scale: u32 = js_uint(&scale, "scale")?;
+        let mode = js_string(&mode, "mode")?
+            .parse::<RoundingMode>()
+            .map_err(to_js_err)?;
+        self.inner
+            .round(scale, mode)
+            .map(|inner| JsMoney { inner })
+            .map_err(to_js_err)
+    }
+
     /// Format the amount with explicit display options.
     ///
     /// `decimals` accepts `null`/`undefined` (currency ISO minor units) or a
-    /// non-negative integer up to 1,000,000. `group` is an optional
+    /// non-negative integer up to 28. `group` is an optional
     /// single-character thousands separator (e.g. `","`); `null`/`undefined`
     /// disables grouping. `rounding` accepts the canonical mode names
-    /// (`"bankers"`, `"away_from_zero"`, `"toward_zero"`, `"floor"`,
-    /// `"ceil"`; case-sensitive); `null`/`undefined` selects the Rust default
-    /// (`RoundingMode::default()`, bankers). Formatting never mutates the
-    /// stored amount.
+    /// (`"bankers"`, `"midpoint_away_from_zero"`, `"toward_zero"`, `"floor"`,
+    /// `"ceil"`; case-sensitive); `null`/`undefined` selects the declared
+    /// presentation default, bankers (nearest-even). Formatting never mutates
+    /// the stored amount, and a displayed zero carries no sign.
     ///
     /// # Arguments
     ///
     /// * `decimals` - JavaScript number of fractional digits, an integer in
-    ///   `0..=1_000_000`; null or undefined selects ISO minor units.
+    ///   `0..=28`; null or undefined selects ISO minor units.
     /// * `show_currency` - Whether to prepend the ISO code; omitted means true.
     /// * `group` - Optional single-character thousands separator; omitted means no grouping.
     /// * `rounding` - Canonical lowercase rounding mode; omitted selects the
-    ///   Rust default (bankers).
+    ///   presentation default (bankers).
     ///
     /// @returns Formatted amount such as `"USD 1,234.57"`.
-    /// @throws If `decimals` is not a non-negative integer or exceeds 1,000,000, if `group` is not a single character, or if `rounding` is not a recognised mode name.
-    /// @param decimals - JavaScript number of fractional digits, an integer in `0..=1_000_000`; null or undefined selects ISO minor units.
+    /// @throws If `decimals` is not a non-negative integer or exceeds 28, if `group` is not a single character, or if `rounding` is not a recognised mode name.
+    /// @param decimals - JavaScript number of fractional digits, an integer in `0..=28`; null or undefined selects ISO minor units.
     /// @param showCurrency - Whether to prepend the ISO code; omitted means true.
     /// @param group - Optional single-character thousands separator; omitted means no grouping.
-    /// @param rounding - Canonical lowercase rounding mode; omitted selects the Rust default (bankers).
+    /// @param rounding - Canonical lowercase rounding mode; omitted selects the presentation default (bankers).
     ///
     /// @example
     /// ```javascript

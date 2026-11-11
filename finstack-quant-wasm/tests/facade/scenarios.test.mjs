@@ -410,7 +410,7 @@ function withRounding(mode) {
 test('applyScenario stamps the caller configuration into meta', () => {
   const spec = scenarios.parseScenarioSpec({ id: 'up25', operations: [UP_25] });
   const fallback = scenarios.applyScenario(spec, OIS_MARKET, AS_OF);
-  assert.equal(fallback.report.meta.rounding.mode, 'bankers');
+  assert.equal(fallback.report.meta.rounding.mode, undefined);
   const floor = scenarios.applyScenario(
     spec,
     OIS_MARKET,
@@ -432,9 +432,9 @@ test('applyScenario stamps the caller configuration into meta', () => {
     AS_OF,
     model,
     undefined,
-    withRounding('away_from_zero')
+    withRounding('midpoint_away_from_zero')
   );
-  assert.equal(withModel.report.meta.rounding.mode, 'away_from_zero');
+  assert.equal(withModel.report.meta.rounding.mode, 'midpoint_away_from_zero');
   assert.throws(
     () => scenarios.applyScenario(spec, OIS_MARKET, AS_OF, undefined, undefined, '{not json'),
     (error) => error.kind === 'validation'

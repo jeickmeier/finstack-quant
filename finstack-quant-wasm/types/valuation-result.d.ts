@@ -1,6 +1,18 @@
 // Generated from the Rust facade host schema by scripts/generate-contract-types.mjs. Do not edit.
 
 /**
+ * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
+ *
+ * There is no default mode: every financial rounding names one explicitly.
+ *
+ * This interface was referenced by `ValuationResult1`'s JSON-Schema
+ * via the `definition` "RoundingMode".
+ *
+ * This interface was referenced by `ValuationResult`'s JSON-Schema
+ * via the `definition` "RoundingMode".
+ */
+export type RoundingMode = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
+/**
  * Model-specific typed valuation details.
  *
  * These details are for rich structured outputs that do not fit the scalar
@@ -415,18 +427,6 @@ export type ModelKey =
  */
 export type PositiveF64Wire = number;
 /**
- * Rounding modes supported by the library.
- *
- * The variants mirror the most common conventions found in pricing engines.
- *
- * This interface was referenced by `ValuationResult1`'s JSON-Schema
- * via the `definition` "RoundingMode".
- *
- * This interface was referenced by `ValuationResult`'s JSON-Schema
- * via the `definition` "RoundingMode".
- */
-export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
-/**
  * Numeric schema revision for contracts whose sole supported revision is v1.
  *
  * This interface was referenced by `ValuationResult1`'s JSON-Schema
@@ -603,9 +603,9 @@ export interface RoundingContext {
     [k: string]: number;
   };
   /**
-   * Active rounding mode.
+   * Explicitly selected rounding mode; absent when none was selected.
    */
-  mode: "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
+  mode?: RoundingMode | null;
   /**
    * Validated output scale snapshot by currency code, with values in `0..=28`.
    */
@@ -3541,9 +3541,9 @@ export interface RoundingContext1 {
     [k: string]: number;
   };
   /**
-   * Active rounding mode.
+   * Explicitly selected rounding mode; absent when none was selected.
    */
-  mode: "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
+  mode?: RoundingMode | null;
   /**
    * Validated output scale snapshot by currency code, with values in `0..=28`.
    */

@@ -2,6 +2,23 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
+ * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
+ *
+ * There is no default mode: every financial rounding names one explicitly.
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::config::{FinstackConfig, RoundingMode};
+ *
+ * let mut cfg = FinstackConfig::default();
+ * assert_eq!(cfg.rounding.mode, None);
+ * cfg.rounding.mode = Some(RoundingMode::TowardZero);
+ * assert_eq!(cfg.rounding.mode, Some(RoundingMode::TowardZero));
+ * ```
+ */
+export type D_800De8Ab20Bb844Ace9C = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
+
+/**
  * Covenant check result.
  */
 export interface CovenantReportWire {
@@ -80,9 +97,9 @@ export interface D_9E668599A865645007A7 {
     [k: string]: number;
   };
   /**
-   * Active rounding mode.
+   * Explicitly selected rounding mode; absent when none was selected.
    */
-  mode: "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
+  mode?: D_800De8Ab20Bb844Ace9C | null;
   /**
    * Validated output scale snapshot by currency code, with values in `0..=28`.
    */

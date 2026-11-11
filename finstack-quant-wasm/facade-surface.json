@@ -988,6 +988,7 @@
       "convertAtRateF64",
       "formatWith",
       "free",
+      "round",
       "toJson",
       "toString"
     ],
@@ -1069,7 +1070,15 @@
   "core.RoundingMode": {
     "kind": "class",
     "constructor": false,
-    "statics": ["awayFromZero", "bankers", "ceil", "floor", "fromJson", "fromName", "towardZero"],
+    "statics": [
+      "bankers",
+      "ceil",
+      "floor",
+      "fromJson",
+      "fromName",
+      "midpointAwayFromZero",
+      "towardZero"
+    ],
     "methods": ["free", "toJson", "toString"],
     "getters": []
   },

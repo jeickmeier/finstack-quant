@@ -91,8 +91,8 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 6 | B1b | committed (`B1b:` in git log) | lint fixed-income; tests fixed-income 1253, covenants 115 | **018 entry deleted**; totals 595→594, Reconciliation 58→57, Core conventions 21→20; record 018, README, INVARIANT_MAP M23–M26, INVARIANTS, financial README, central follow-ups updated | Step-up computed fully before mutation; negative/non-finite increases rejected |
 | 7 | B2 | **B2a committed** (`B2a:` in git log); **B2b committed after owner decision D1** (`B2b:` in git log) | B2a: workspace rust-test (16346 incl. 2 re-pins), gen-write, python-test 14003, wasm-test 1086, ui-check. B2b: workspace rust-test 16360 (again after the sweep) + rust-test --doctest; gen-write + gen-check; python-test 13988; wasm-test-built 1085 after a full wasm-test build; ui-check 1527; dual pins and single re-pins checked in a linux/amd64 rust:1.97.1 container | 012 entry: B2a items recorded; B2b: item 4 recorded as reconciled, blocker sentence removed; record 012 status updated | B2b: shortest-text `f64_to_decimal`; `Money::from_model_value` for pricer outputs (125 failure-driven sites, then a 216-site classified sweep; follow-up commit); re-pins and test changes listed under Needs review |
 | 8 | B3 | committed after owner decision D7 (`B3:` in git log) | rust-test 16,368 pass; doctests pass; python-test 13,994 pass / 112 skip; wasm-test 1,085 pass; ui-check 1,527 pass; gen-write moved no golden/fixture; Linux x86_64 container: all test binaries pass except the 3 known golden-runner container artifacts (read-only mount, no git); the core doctest run hung under Rosetta emulation and was stopped (doctests pass natively) | 012 entry: arithmetic/rate adapters recorded as reconciled; record 012 status updated | Exact-to-minor-unit sums (D7); Decimal-scalar mul/div with underflow errors and `_f64` adapters; direct `ratio`; Decimal-rate `convert_at_rate` + `convert_at_rate_f64`; Python/WASM twins; see Needs review |
-| 9 | B4 | skipped (dep B3) | | | |
-| 10 | B5 | skipped (dep B4) | | | |
+| 9 | B4 | committed (`B4:` in git log) | rust-test 16,372 pass; doctests pass (last slice to run them; now nightly-tier only by owner request); python-test 13,997 pass / 112 skip; wasm-test 1,087 pass; ui-check 1,526 pass + 1 load timeout (contracts.test.ts lazy-module case) that passed on rerun (91/91); gen-write regenerated schemas/declarations/UI fixtures (default stamps lose `"mode": "bankers"`, label rename only otherwise); Linux container run skipped by owner request | 012 entry: rounding/config/mode rename/display bounds recorded as reconciled; record 012 status updated | Explicit `Money::round(scale, mode)`; `MidpointAwayFromZero` without alias; no default mode, optional policy/stamp mode; override-only ingest; fallible `from_decimal_with_config`; formatting cap 28 and sign-free zero; Python `round` replaces `__round__` (O10), WASM `round`; see Needs review |
+| 10 | B5 | not started (dep B4 met) | | | |
 | 11 | C1 | **C1a and C1b committed** (`C1a:`, `C1b:` in git log) | C1a: workspace rust-lint; rust-test 16346; core doctests 286; gen-write; python-test 14003; wasm-test 1086 | 004 entry: fallible membership/counting recorded | C1 split: C1a = fallible `HolidayCalendar` trait + propagation; C1b = engine semantics (nominal-year gating, reach, checked arithmetic, ordinals, missing-table errors, cache) |
 | 12 | C2 | committed (`C2:` in git log); partial | core lint; core tests 2226; gen-write; gen-check; py test_core_parity 134, parity 6067 | Calendar-input admission entry rewritten to the remaining work | Done: strict JSON admission + explicit controls (28 files) + ID validation + CSV widths. Not done: `CalendarMetadata` purpose/ranges/edition extension (004 #8), generator-level semantic checks, independent table ranges |
 | 13 | H2 | committed (`H2:` in git log) | workspace lint; rust-test (9 fixture fixes re-run: exotics 314, core count test); gen-write; python-test 14003; wasm-test 1086; ui-check | 004/005 entry updated (cme/cnbe removed; NERC settlement use rejected); record 005 partly reconciled | Commodity example uses `usny` as an illustrative contract calendar; NERC purpose restriction is enforced at the commodity forward only (metadata purposes pending) |
@@ -292,6 +292,41 @@ logged under Needs review.
     matches them.
   - **WASM gate:** the WASM figure (1085) is from `wasm-test-built`, after
     one full `wasm-test` build.
+- **B4.**
+  - **Wire shape of an unselected mode (strictest reading of #8/#9).**
+    `RoundingPolicy.mode` and the stamped `RoundingContext.mode` are
+    `Option<RoundingMode>` and are omitted from JSON when unselected, not
+    written as `null`. Every default result stamp therefore loses
+    `"mode": "bankers"`; generated schemas, declarations and UI fixtures were
+    regenerated, and old payloads carrying a mode still parse.
+  - **Incomplete policy is detected at use, not at load.** A config with an
+    ingest scale override and no mode deserializes; configured construction
+    for that currency then errors (`FinstackConfig::ingest_rounding`). Output
+    overrides need no mode, because output scale is a presentation control.
+  - **Host shapes.**
+    - Python `FinstackConfig.rounding_mode` and `ingest_scale()` return
+      `None` when unselected; WASM `roundingMode` and `ingestScale()` return
+      `undefined`.
+    - Python `round(scale, mode)` takes an `int` (not `bool`); a negative
+      scale raises `ValueError` from the binding, before Rust. WASM rejects a
+      negative scale as `TypeError` (its integer reader).
+    - `round(money)` now raises `TypeError` (no `__round__`).
+  - **Negated zero.** `Money::checked_neg` now goes through
+    `from_decimal`'s zero normalization (#1), so `-Money(0)` stores and
+    displays the unsigned zero. Python `test_negated_zero_display_matches_wasm`
+    and the WASM `checkedNeg` test had pinned `USD -0.00`; both now expect
+    `USD 0.00` per #10. This updates two pinned tests to the accepted rule.
+  - **Hand-maintained goldens.** `host_parity.json`, `covenants_parity.json`,
+    `valuations_parity.golden.json` and the UI `scenario-pnl.json` dropped the
+    default `"mode": "bankers"` stamp (only stamps directly preceding
+    `ingest_scale_by_currency` were edited); no other value moved.
+  - **UI.** The stamp badge and `formatMoney` already treat a stamp without
+    a mode as unavailable and show the raw amount; no implicit mode was
+    added there.
+  - **Out of scope, unchanged.** CORE-NUMERICS-23 (`rounding-and-config.md`)
+    item 1 restates these prerequisites; its own items (removing
+    `ZeroKind`/`ToleranceConfig`, `rounding_applied`, version 2 snapshots) are
+    not part of this plan and were not touched.
 - **B3 (after owner decision D7).**
   - **Qualification first.** rust_decimal 1.43's `checked_*` was tested
     against an exact BigInt reference on 200k random pairs and 600k exact

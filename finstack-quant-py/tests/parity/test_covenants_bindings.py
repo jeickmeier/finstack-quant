@@ -112,7 +112,7 @@ def test_covenant_report_json_roundtrip() -> None:
     meta = canonical.pop("meta")
     assert canonical == report
     assert meta["numeric_mode"] == "f64"
-    assert meta["rounding"]["mode"] == "bankers"
+    assert "mode" not in meta["rounding"]
 
     typed = covenants.CovenantReport.from_json(json.dumps(report))
     assert typed.covenant_type == "Debt/EBITDA <= 5.00x"

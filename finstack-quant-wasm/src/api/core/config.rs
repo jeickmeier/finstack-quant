@@ -51,7 +51,7 @@ pub fn tolerance_config_new(
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
 /// core.RoundingMode.bankers().toString(); // "bankers"
-/// core.RoundingMode.fromName("away_from_zero").toJson(); // "\"away_from_zero\""
+/// core.RoundingMode.fromName("midpoint_away_from_zero").toJson(); // "\"midpoint_away_from_zero\""
 /// ```
 #[wasm_bindgen(js_name = RoundingMode)]
 #[derive(Clone, Copy, Debug)]
@@ -69,18 +69,18 @@ impl JsRoundingMode {
 impl JsRoundingMode {
     /// Round half to even (banker's rounding).
     ///
-    /// @returns The `bankers` mode (the Rust default).
+    /// @returns The `bankers` mode (exact midpoint to even).
     #[wasm_bindgen(js_name = bankers)]
     pub fn bankers() -> Self {
         Self::from_inner(RoundingMode::Bankers)
     }
 
-    /// Round half away from zero.
+    /// Round an exact midpoint away from zero; other fractions to nearest.
     ///
-    /// @returns The `away_from_zero` mode.
-    #[wasm_bindgen(js_name = awayFromZero)]
-    pub fn away_from_zero() -> Self {
-        Self::from_inner(RoundingMode::AwayFromZero)
+    /// @returns The `midpoint_away_from_zero` mode.
+    #[wasm_bindgen(js_name = midpointAwayFromZero)]
+    pub fn midpoint_away_from_zero() -> Self {
+        Self::from_inner(RoundingMode::MidpointAwayFromZero)
     }
 
     /// Truncate toward zero.
@@ -111,13 +111,13 @@ impl JsRoundingMode {
     ///
     /// # Arguments
     ///
-    /// * `name` - Lowercase mode name: `"bankers"`, `"away_from_zero"`,
+    /// * `name` - Lowercase mode name: `"bankers"`, `"midpoint_away_from_zero"`,
     ///   `"toward_zero"`, `"floor"` or `"ceil"`.
     ///
     /// @returns The matching `RoundingMode`.
     /// @throws `TypeError` (kind `invalid_type`) if `name` is not a string;
     /// `FinstackError` (kind `validation`) if no mode matches.
-    /// @param name - Lowercase mode name: `"bankers"`, `"away_from_zero"`, `"toward_zero"`, `"floor"` or `"ceil"`.
+    /// @param name - Lowercase mode name: `"bankers"`, `"midpoint_away_from_zero"`, `"toward_zero"`, `"floor"` or `"ceil"`.
     #[wasm_bindgen(js_name = fromName)]
     pub fn from_name(
         #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
@@ -181,12 +181,12 @@ fn scale_overrides(overrides: &BTreeMap<Currency, u32>) -> Result<JsValue, JsVal
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
-/// const config = new core.FinstackConfig("away_from_zero");
+/// const config = new core.FinstackConfig("midpoint_away_from_zero");
 /// config.setOutputScale("JPY", 2);
 /// config.outputScale("JPY"); // 2
 /// config.outputScale("USD"); // 2 (the ISO-4217 minor units)
 /// const copy = core.FinstackConfig.fromJson(config.toJson());
-/// copy.roundingMode.toString(); // "away_from_zero"
+/// copy.roundingMode.toString(); // "midpoint_away_from_zero"
 /// ```
 #[wasm_bindgen(js_name = FinstackConfig)]
 #[derive(Clone, Debug)]
@@ -201,8 +201,9 @@ impl JsFinstackConfig {
     /// # Arguments
     ///
     /// * `rounding_mode` - Lowercase rounding-mode name (for example
-    ///   `"bankers"`, or `mode.toString()` of a `RoundingMode`); omitted uses the
-    ///   Rust default, `"bankers"`.
+    ///   `"bankers"`, or `mode.toString()` of a `RoundingMode`); omitted selects
+    ///   no mode (there is no default financial mode, so an ingest scale
+    ///   override then cannot be applied).
     /// * `tolerances` - `ToleranceConfig` object or JSON text with the
     ///   optional absolute tolerance `generic_epsilon` (default `1e-10`),
     ///   finite and positive; omitted uses the default.
@@ -211,7 +212,7 @@ impl JsFinstackConfig {
     /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
     /// `FinstackError` (kind `validation`) for an unknown rounding mode, an
     /// unknown tolerance field, or a non-positive tolerance.
-    /// @param roundingMode - Lowercase rounding-mode name (for example `"bankers"`, or `mode.toString()` of a `RoundingMode`); omitted uses the Rust default, `"bankers"`.
+    /// @param roundingMode - Lowercase rounding-mode name (for example `"bankers"`, or `mode.toString()` of a `RoundingMode`); omitted selects no mode (there is no default financial mode, so an ingest scale override then cannot be applied).
     /// @param tolerances - `ToleranceConfig` object or JSON text with the optional absolute tolerance `generic_epsilon` (default `1e-10`), finite and positive; omitted uses the default.
     #[wasm_bindgen(constructor)]
     pub fn new(
@@ -225,7 +226,7 @@ impl JsFinstackConfig {
     ) -> Result<JsFinstackConfig, JsValue> {
         let mut inner = FinstackConfig::default();
         if let Some(name) = js_opt_string(rounding_mode.as_ref(), "roundingMode")? {
-            inner.rounding.mode = name.parse().map_err(to_js_err)?;
+            inner.rounding.mode = Some(name.parse().map_err(to_js_err)?);
         }
         if let Some(value) = tolerances.filter(|v| !(v.is_null() || v.is_undefined())) {
             inner.tolerances = from_js_json::<ToleranceConfig>(&value, "tolerances")?;
@@ -233,10 +234,11 @@ impl JsFinstackConfig {
         Ok(Self { inner })
     }
 
-    /// Active rounding mode as a `RoundingMode`.
+    /// Explicitly selected rounding mode as a `RoundingMode`, or `undefined`
+    /// when none was selected.
     #[wasm_bindgen(getter, js_name = roundingMode)]
-    pub fn rounding_mode(&self) -> JsRoundingMode {
-        JsRoundingMode::from_inner(self.inner.rounding.mode)
+    pub fn rounding_mode(&self) -> Option<JsRoundingMode> {
+        self.inner.rounding.mode.map(JsRoundingMode::from_inner)
     }
 
     /// Numeric tolerances as a plain `ToleranceConfig` object (`generic_epsilon`).
@@ -264,15 +266,15 @@ impl JsFinstackConfig {
         Ok(self.inner.output_scale(js_currency(&currency, "currency")?))
     }
 
-    /// Decimal places kept when amounts in a currency are ingested (Rust
+    /// Configured ingest decimal places for a currency (Rust
     /// `FinstackConfig::ingest_scale`).
     ///
     /// # Arguments
     ///
     /// * `currency` - ISO-4217 alphabetic code, such as `"USD"`.
     ///
-    /// @returns The override for that currency, or the larger of `6` and its
-    /// ISO-4217 minor units.
+    /// @returns The override for that currency, or `undefined` when none is
+    /// set, which means no ingest rounding.
     /// @throws `TypeError` if `currency` is not a string; `FinstackError`
     /// (kind `validation`) if it is not a supported currency code.
     /// @param currency - ISO-4217 alphabetic code, such as `"USD"`.
@@ -280,7 +282,7 @@ impl JsFinstackConfig {
     pub fn ingest_scale(
         &self,
         #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
-    ) -> Result<u32, JsValue> {
+    ) -> Result<Option<u32>, JsValue> {
         Ok(self.inner.ingest_scale(js_currency(&currency, "currency")?))
     }
 

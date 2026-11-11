@@ -16,15 +16,14 @@
 //! use finstack_quant_core::currency::Currency;
 //!
 //! let mut cfg = FinstackConfig::default();
-//! cfg.rounding.mode = RoundingMode::AwayFromZero;
+//! cfg.rounding.mode = Some(RoundingMode::MidpointAwayFromZero);
 //! cfg.rounding.output_scale.set_scale(Currency::JPY, 0).expect("valid decimal scale");
 //! cfg.rounding.ingest_scale.set_scale(Currency::JPY, 0).expect("valid decimal scale");
 //!
-//! let usd_scale = cfg.output_scale(Currency::USD);
-//! let jpy_ingest = cfg.ingest_scale(Currency::JPY);
-//!
-//! assert_eq!(usd_scale, 2);
-//! assert_eq!(jpy_ingest, 0);
+//! assert_eq!(cfg.output_scale(Currency::USD), 2);
+//! // Ingest rounding applies only where an override is configured.
+//! assert_eq!(cfg.ingest_scale(Currency::JPY), Some(0));
+//! assert_eq!(cfg.ingest_scale(Currency::USD), None);
 //! ```
 //!
 //! ## Numeric mode
@@ -40,28 +39,29 @@ use serde_json::Value as JsonValue;
 
 use std::collections::BTreeMap;
 
-/// Rounding modes supported by the library.
+/// Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
 ///
-/// The variants mirror the most common conventions found in pricing engines.
+/// There is no default mode: every financial rounding names one explicitly.
 ///
 /// # Examples
 /// ```rust
 /// use finstack_quant_core::config::{FinstackConfig, RoundingMode};
 ///
 /// let mut cfg = FinstackConfig::default();
-/// cfg.rounding.mode = RoundingMode::TowardZero;
-/// assert!(matches!(cfg.rounding.mode, RoundingMode::TowardZero));
+/// assert_eq!(cfg.rounding.mode, None);
+/// cfg.rounding.mode = Some(RoundingMode::TowardZero);
+/// assert_eq!(cfg.rounding.mode, Some(RoundingMode::TowardZero));
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 #[serde(rename_all = "snake_case")]
 pub enum RoundingMode {
-    /// Banker's rounding (ties to even).
-    #[default]
+    /// Nearest; an exact midpoint goes to the even coefficient.
     Bankers,
-    /// Round halves away from zero.
-    AwayFromZero,
+    /// Nearest; an exact midpoint increases absolute magnitude. Other
+    /// fractions round to nearest (`1.1` -> `1`), not away from zero.
+    MidpointAwayFromZero,
     /// Round toward zero (truncate).
     TowardZero,
     /// Round toward negative infinity.
@@ -71,13 +71,13 @@ pub enum RoundingMode {
 }
 
 impl std::fmt::Display for RoundingMode {
-    /// Writes the snake_case serde label (`bankers`, `away_from_zero`, ...).
+    /// Writes the snake_case serde label (`bankers`, `midpoint_away_from_zero`, ...).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&crate::wire::serde_label(self).map_err(|_| std::fmt::Error)?)
     }
 }
 
-/// Parse the exact serde name (`"bankers"`, `"away_from_zero"`,
+/// Parse the exact serde name (`"bankers"`, `"midpoint_away_from_zero"`,
 /// `"toward_zero"`, `"floor"`, `"ceil"`; case-sensitive).
 ///
 /// Delegates to [`crate::wire::serde_parse`], so the serde names are the only
@@ -103,7 +103,7 @@ impl std::str::FromStr for RoundingMode {
 /// use finstack_quant_core::currency::Currency;
 ///
 /// let mut cfg = FinstackConfig::default();
-/// cfg.rounding.mode = RoundingMode::Bankers;
+/// cfg.rounding.mode = Some(RoundingMode::Bankers);
 /// cfg.rounding.output_scale.set_scale(Currency::CHF, 2).expect("valid decimal scale");
 /// assert_eq!(cfg.output_scale(Currency::CHF), 2);
 /// ```
@@ -329,9 +329,13 @@ where
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct RoundingPolicy {
-    /// Rounding behaviour to apply when mapping fractional values to a scale.
-    pub mode: RoundingMode,
+    /// Explicitly selected rounding mode; `None` (absent on the wire) means no
+    /// mode was selected. A configured ingest scale without a mode is an
+    /// incomplete policy and errors at use instead of inferring Bankers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<RoundingMode>,
     /// Decimal places applied when normalizing inbound values by currency.
+    /// A currency without an override is not ingest-rounded.
     pub ingest_scale: CurrencyScalePolicy,
     /// Decimal places used at output/serialization for each currency.
     pub output_scale: CurrencyScalePolicy,
@@ -428,8 +432,9 @@ impl Default for ToleranceConfig {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RoundingContext {
-    /// Active rounding mode.
-    pub mode: RoundingMode,
+    /// Explicitly selected rounding mode; absent when none was selected.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<RoundingMode>,
     /// Validated ingest scale snapshot by currency code, with values in `0..=28`.
     #[serde(deserialize_with = "deserialize_currency_scales")]
     #[cfg_attr(
@@ -484,17 +489,6 @@ fn output_scale_from_map(
         .get(&ccy)
         .copied()
         .unwrap_or_else(|| ccy.decimals() as u32)
-}
-
-#[inline]
-fn ingest_scale_from_map(
-    overrides: &BTreeMap<crate::currency::Currency, u32>,
-    ccy: crate::currency::Currency,
-) -> u32 {
-    overrides
-        .get(&ccy)
-        .copied()
-        .unwrap_or_else(|| core::cmp::max(6, ccy.decimals() as u32))
 }
 
 impl RoundingContext {
@@ -628,10 +622,40 @@ impl FinstackConfig {
         output_scale_from_map(&self.rounding.output_scale.overrides, ccy)
     }
 
-    /// Effective ingest scale for a currency. Falls back to a high precision default
-    /// to preserve inputs unless explicitly overridden (min of 6 decimals).
-    pub fn ingest_scale(&self, ccy: crate::currency::Currency) -> u32 {
-        ingest_scale_from_map(&self.rounding.ingest_scale.overrides, ccy)
+    /// Configured ingest scale for a currency; `None` when the currency has no
+    /// override, which means no ingest rounding (record 012 #9).
+    ///
+    /// # Arguments
+    ///
+    /// * `ccy` - Currency whose ingest decimal-place override is looked up.
+    pub fn ingest_scale(&self, ccy: crate::currency::Currency) -> Option<u32> {
+        self.rounding.ingest_scale.overrides.get(&ccy).copied()
+    }
+
+    /// Ingest rounding to apply for a currency: `None` when no override is
+    /// configured, otherwise the override scale with the selected mode.
+    ///
+    /// # Arguments
+    ///
+    /// * `ccy` - Currency whose ingest override and the policy mode are resolved.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] when `ccy` has an ingest scale
+    /// override but the policy selects no rounding mode.
+    pub fn ingest_rounding(
+        &self,
+        ccy: crate::currency::Currency,
+    ) -> crate::Result<Option<(u32, RoundingMode)>> {
+        let Some(scale) = self.ingest_scale(ccy) else {
+            return Ok(None);
+        };
+        let mode = self.rounding.mode.ok_or_else(|| {
+            crate::Error::Validation(format!(
+                "ingest scale {scale} for {ccy} is configured without a rounding mode"
+            ))
+        })?;
+        Ok(Some((scale, mode)))
     }
 }
 
@@ -771,7 +795,7 @@ mod tests {
     fn rounding_mode_display_roundtrip() {
         let all = [
             RoundingMode::Bankers,
-            RoundingMode::AwayFromZero,
+            RoundingMode::MidpointAwayFromZero,
             RoundingMode::TowardZero,
             RoundingMode::Floor,
             RoundingMode::Ceil,
@@ -802,6 +826,8 @@ mod tests {
         for rejected in [
             "banker",
             "awayfromzero",
+            "away_from_zero",
+            "AwayFromZero",
             "towards_zero",
             "ceiling",
             "Bankers",

@@ -41,7 +41,7 @@ class RoundingMode:
 
     BANKERS: RoundingMode
     """Banker's rounding (ties to even)."""
-    AWAY_FROM_ZERO: RoundingMode
+    MIDPOINT_AWAY_FROM_ZERO: RoundingMode
     """Round halves away from zero."""
     TOWARD_ZERO: RoundingMode
     """Round toward zero (truncate)."""
@@ -58,7 +58,7 @@ class RoundingMode:
         Parameters
         ----------
         name : str
-            One of ``"bankers"``, ``"away_from_zero"``, ``"toward_zero"``,
+            One of ``"bankers"``, ``"midpoint_away_from_zero"``, ``"toward_zero"``,
             ``"floor"``, ``"ceil"``. ``"BANKERS"`` is rejected.
 
         Returns
@@ -286,8 +286,10 @@ class FinstackConfig:
     Parameters
     ----------
     rounding_mode : RoundingMode | str | None
-        Rounding mode override (object or exact lowercase name). If ``None``,
-        the library default (bankers) is used.
+        Explicitly selected rounding mode (object or exact lowercase name).
+        If ``None``, no mode is selected: there is no default financial
+        mode, and configured construction with an ingest scale override then
+        raises ``ValueError``.
     tolerances : ToleranceConfig | None
         Tolerance configuration override. If ``None``, the library default
         is used.
@@ -303,7 +305,9 @@ class FinstackConfig:
     >>> config = FinstackConfig()
     >>> config.set_extension("example.settings.v1", {"enabled": True})
     >>> (config.output_scale("USD"), config.ingest_scale("JPY"), config.extension_keys())
-    (2, 6, ['example.settings.v1'])
+    (2, None, ['example.settings.v1'])
+    >>> config.rounding_mode is None
+    True
     >>> config.get_extension("example.settings.v1")
     {'enabled': True}
     >>> (config.remove_extension("example.settings.v1"), config.get_extension("example.settings.v1"))
@@ -328,7 +332,8 @@ class FinstackConfig:
         Parameters
         ----------
         rounding_mode : RoundingMode | str | None
-            Rounding mode object or its exact lowercase name.
+            Rounding mode object or its exact lowercase name; ``None``
+            selects no mode.
         tolerances : ToleranceConfig | None
             Tolerance configuration.
 
@@ -342,14 +347,15 @@ class FinstackConfig:
         ...
 
     @property
-    def rounding_mode(self) -> RoundingMode:
+    def rounding_mode(self) -> Optional[RoundingMode]:
         """
-        Active rounding mode.
+        Explicitly selected rounding mode.
 
         Returns
         -------
-        RoundingMode
-            The configured mode (bankers by default).
+        RoundingMode | None
+            The selected mode, or ``None`` when none was selected (the
+            default; there is no default financial mode).
 
         Notes
         -----
@@ -396,9 +402,9 @@ class FinstackConfig:
         """
         ...
 
-    def ingest_scale(self, currency: Union[Currency, str]) -> int:
+    def ingest_scale(self, currency: Union[Currency, str]) -> Optional[int]:
         """
-        Effective ingest decimal scale for a currency.
+        Configured ingest decimal scale for a currency.
 
         Parameters
         ----------
@@ -407,9 +413,10 @@ class FinstackConfig:
 
         Returns
         -------
-        int
-            Number of decimal places for input parsing; ``max(6, minor
-            units)`` unless overridden.
+        int | None
+            The ingest scale override, or ``None`` when the currency has no
+            override, which means configured construction keeps the amount
+            exactly.
 
         Raises
         ------

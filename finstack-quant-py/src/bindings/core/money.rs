@@ -221,10 +221,12 @@ impl PyMoney {
             // An integer is exact: never round it through binary64.
             let exact = finstack_quant_core::decimal::parse_decimal(amount.str()?.to_str()?)
                 .map_err(core_to_py)?;
-            return Ok(Self::from_inner(match config {
+            return match config {
                 Some(cfg) => Money::from_decimal_with_config(exact, ccy, &cfg.inner),
-                None => Money::from_decimal(exact, ccy),
-            }));
+                None => Ok(Money::from_decimal(exact, ccy)),
+            }
+            .map(Self::from_inner)
+            .map_err(core_to_py);
         }
         let amount: f64 = amount.extract()?;
         match config {
@@ -247,9 +249,11 @@ impl PyMoney {
     /// This requires an actual ``decimal.Decimal`` instance that is exactly
     /// representable as a Rust ``Decimal`` (96-bit mantissa, at most 28
     /// fractional digits); a non-exact value raises ``ValueError`` and a
-    /// non-``Decimal`` raises ``TypeError``. When ``config`` is given the
-    /// exact amount is rounded on ingest with that config's rounding mode and
-    /// ingest scale (Rust ``Money::from_decimal_with_config``).
+    /// non-``Decimal`` raises ``TypeError``. When ``config`` is given and has
+    /// an ingest scale override for the currency, the exact amount is rounded
+    /// once to it with the config's selected rounding mode (Rust
+    /// ``Money::from_decimal_with_config``); without an override it is kept
+    /// exactly, and an override without a mode raises ``ValueError``.
     #[classmethod]
     #[pyo3(signature = (amount, currency, config=None))]
     #[pyo3(text_signature = "(cls, amount, currency, config=None)")]
@@ -261,10 +265,12 @@ impl PyMoney {
     ) -> PyResult<Self> {
         let ccy = extract_currency(currency)?;
         let d = decimal_from_py(amount)?;
-        Ok(Self::from_inner(match config {
+        match config {
             Some(cfg) => Money::from_decimal_with_config(d, ccy, &cfg.inner),
-            None => Money::from_decimal(d, ccy),
-        }))
+            None => Ok(Money::from_decimal(d, ccy)),
+        }
+        .map(Self::from_inner)
+        .map_err(core_to_py)
     }
 
     /// Numeric amount as ``float`` (derived from the internal decimal representation).
@@ -291,10 +297,10 @@ impl PyMoney {
     /// Format the amount.
     ///
     /// ``decimals`` defaults to the currency's ISO minor units and is bounded
-    /// by the native maximum of 1,000,000; ``show_currency`` defaults to
+    /// by Decimal's scale ceiling of 28; ``show_currency`` defaults to
     /// ``True`` (Rust ``FormatOpts::new``); ``group`` is an optional thousands
     /// separator (``","``); ``rounding`` is a ``RoundingMode`` or its exact
-    /// lowercase name (default: the Rust ``RoundingMode::default()``, bankers).
+    /// lowercase name (default: the declared presentation default, bankers).
     #[pyo3(signature = (decimals=None, show_currency=None, group=None, rounding=None))]
     #[pyo3(text_signature = "(self, decimals=None, show_currency=None, group=None, rounding=None)")]
     fn format_with(
@@ -443,12 +449,23 @@ impl PyMoney {
         self.inner.amount()
     }
 
-    /// ``round(money, n)`` — bankers-round the amount to ``n`` decimal places
-    /// (``n`` defaults to the currency's minor units).
-    #[pyo3(signature = (ndigits=None))]
-    fn __round__(&self, ndigits: Option<i32>) -> PyResult<Self> {
+    /// Financially round to an explicit scale and mode (Rust ``Money::round``).
+    ///
+    /// ``scale`` is an ``int`` in ``0..=28`` and ``mode`` a ``RoundingMode``
+    /// or its exact lowercase name; neither has a default.
+    #[pyo3(text_signature = "(self, scale, mode)")]
+    fn round(&self, scale: &Bound<'_, PyAny>, mode: &Bound<'_, PyAny>) -> PyResult<Self> {
+        if scale.is_instance_of::<pyo3::types::PyBool>() || !scale.is_instance_of::<PyInt>() {
+            return Err(PyTypeError::new_err("rounding scale must be an int"));
+        }
+        let requested: i64 = scale.extract()?;
+        let scale = u32::try_from(requested).map_err(|_| {
+            pyo3::exceptions::PyValueError::new_err(format!(
+                "rounding scale must be in 0..=28, got {requested}"
+            ))
+        })?;
         self.inner
-            .round(ndigits)
+            .round(scale, extract_rounding_mode(mode)?)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }

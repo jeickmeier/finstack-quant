@@ -25,8 +25,9 @@
 //! [`Money::new`][crate::money::Money::new] preserves the raw finite amount
 //! without rounding — internal pricing math relies on retained precision. Use
 //! [`Money::new_with_config`][crate::money::Money::new_with_config] for
-//! ingest-scale rounding (`cfg.ingest_scale(currency)`, default `max(6, currency.decimals())`),
-//! or [`Money::round`][crate::money::Money::round] for ISO-4217 minor-unit rounding.
+//! ingest-scale rounding (only where `cfg.ingest_scale(currency)` has an override,
+//! with the explicitly selected mode), or [`Money::round`][crate::money::Money::round]
+//! for financial rounding to an explicit scale and mode.
 /// Submodule for FX interfaces.
 pub mod fx;
 

@@ -6,6 +6,22 @@
  */
 export type Date = string;
 /**
+ * Rounding modes supported by the library (record CORE-CONVENTIONS-012 #8).
+ *
+ * There is no default mode: every financial rounding names one explicitly.
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::config::{FinstackConfig, RoundingMode};
+ *
+ * let mut cfg = FinstackConfig::default();
+ * assert_eq!(cfg.rounding.mode, None);
+ * cfg.rounding.mode = Some(RoundingMode::TowardZero);
+ * assert_eq!(cfg.rounding.mode, Some(RoundingMode::TowardZero));
+ * ```
+ */
+export type DD59860C6D29E319A5B5C = "bankers" | "midpoint_away_from_zero" | "toward_zero" | "floor" | "ceil";
+/**
  * Model-specific typed valuation details.
  *
  * These details are for rich structured outputs that do not fit the scalar
@@ -939,9 +955,9 @@ export interface D_55Fd8D302833A65D16F6 {
     [k: string]: number;
   };
   /**
-   * Active rounding mode.
+   * Explicitly selected rounding mode; absent when none was selected.
    */
-  mode: "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
+  mode?: DD59860C6D29E319A5B5C | null;
   /**
    * Validated output scale snapshot by currency code, with values in `0..=28`.
    */

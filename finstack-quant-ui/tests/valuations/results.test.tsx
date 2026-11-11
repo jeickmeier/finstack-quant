@@ -55,7 +55,6 @@ it("keeps every supplied key and raw value when metadata is unavailable", () => 
     fixture.result.instrument_id,
     fixture.result.as_of,
     fixture.result.meta.numeric_mode,
-    fixture.result.meta.rounding.mode,
     fixture.result.meta.version,
   ])
     expect(screen.getAllByText(text).length).toBeGreaterThan(0);
