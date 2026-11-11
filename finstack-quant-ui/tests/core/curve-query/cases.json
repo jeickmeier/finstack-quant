@@ -176,8 +176,8 @@
       },
       "quotes": [["EUR", "USD", 1.1]],
       "provider_quotes": [
-        ["JPY", "USD", 0.007],
-        ["EUR", "USD", 1.12]
+        ["EUR", "USD", 1.12],
+        ["JPY", "USD", 0.007]
       ],
       "provider_pinned_quotes": [
         ["EUR", "USD", "2026-05-08", "period_end", 1.14]

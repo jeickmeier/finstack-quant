@@ -29,8 +29,11 @@ impl FxProvider for StaticFx {
     }
 }
 
+/// Quotes USD/EUR and derives EUR/USD as its reciprocal. The derived side is
+/// the cache's canonical orientation (EUR < USD by alphabetic code), so a
+/// cache warmed from either direction stores the same value.
 struct ReciprocalFx {
-    eur_usd: f64,
+    usd_eur: f64,
 }
 
 #[test]
@@ -466,8 +469,8 @@ impl FxProvider for ReciprocalFx {
         _policy: FxConversionPolicy,
     ) -> finstack_quant_core::Result<f64> {
         match (from, to) {
-            (Currency::EUR, Currency::USD) => Ok(self.eur_usd),
-            (Currency::USD, Currency::EUR) => Ok(self.eur_usd.recip()),
+            (Currency::USD, Currency::EUR) => Ok(self.usd_eur),
+            (Currency::EUR, Currency::USD) => Ok(self.usd_eur.recip()),
             _ => Err(finstack_quant_core::InputError::NotFound {
                 id: format!("FX:{from}->{to}"),
             }
@@ -2160,7 +2163,7 @@ fn fx_observed_cache_is_order_independent_across_directions() {
     let date = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
     let rate = 31.528_877_897_691_935;
 
-    let first = FxMatrix::new(Arc::new(ReciprocalFx { eur_usd: rate }));
+    let first = FxMatrix::new(Arc::new(ReciprocalFx { usd_eur: rate }));
     let _ = first
         .rate(FxQuery::new(
             Currency::EUR,
@@ -2186,7 +2189,7 @@ fn fx_observed_cache_is_order_independent_across_directions() {
         ))
         .unwrap();
 
-    let second = FxMatrix::new(Arc::new(ReciprocalFx { eur_usd: rate }));
+    let second = FxMatrix::new(Arc::new(ReciprocalFx { usd_eur: rate }));
     let _ = second
         .rate(FxQuery::new(
             Currency::USD,
@@ -2229,7 +2232,7 @@ fn fx_cold_and_warm_lookups_agree_bit_exactly() {
         (Currency::EUR, Currency::USD),
         (Currency::USD, Currency::EUR),
     ] {
-        let matrix = FxMatrix::new(Arc::new(ReciprocalFx { eur_usd: rate }));
+        let matrix = FxMatrix::new(Arc::new(ReciprocalFx { usd_eur: rate }));
         let cold = matrix
             .rate(FxQuery::new(from, to, date, Default::default()))
             .unwrap();

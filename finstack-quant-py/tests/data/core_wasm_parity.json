@@ -481,14 +481,14 @@
       "provider_quotes": [],
       "quotes": [
         [
-          "GBP",
-          "USD",
-          1.27
-        ],
-        [
           "EUR",
           "USD",
           1.1
+        ],
+        [
+          "GBP",
+          "USD",
+          1.27
         ]
       ]
     },

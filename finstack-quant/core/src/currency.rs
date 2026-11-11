@@ -1,17 +1,20 @@
 //! Currency types and operations based on ISO 4217 standard.
 //!
-//! This module provides the `Currency` enum representing all ISO 4217 currencies,
-//! with numeric discriminants matching the official ISO currency codes. The currency
-//! data is automatically generated from the official ISO 4217 currency list.
+//! This module provides the `Currency` enum of supported ISO 4217 currencies,
+//! generated from the maintained `data/iso_4217.csv` selection. A currency's
+//! identity is its alphabetic code (record CORE-CONVENTIONS-012 #12): equality,
+//! hashing, ordering and the wire form all follow the code, and the ISO
+//! numeric code is metadata that distinct currencies may share.
 //!
 //! # Features
 //!
-//! - Complete ISO 4217 currency enumeration with 3-letter codes
-//! - Numeric currency codes as enum discriminants
-//! - Decimal precision (minor units) for each currency
-//! - Case-insensitive parsing from strings
+//! - Closed catalogue of supported currencies with 3-letter codes
+//! - Ordering by alphabetic code, so currency-keyed maps and output are
+//!   deterministic and independent of numeric codes
+//! - ISO numeric code and decimal precision (minor units) as metadata
+//! - Case-insensitive parsing from strings (no trimming)
+//! - Numeric lookup only for a unique supported match
 //! - Serialization support with stable serde field names
-//! - Zero-cost abstractions (2-byte size)
 //!
 //! # Scope: deliverable currencies only
 //!
@@ -26,14 +29,11 @@
 //!
 //! Parsing these codes returns an error by design.
 //!
-//! # `decimals()` fallback
+//! # `decimals()`
 //!
-//! `Currency::decimals()` returns the ISO 4217
-//! minor-unit count from the generated table (`data/iso_4217.csv`). If a
-//! currency's numeric code were ever missing from that table, the accessor
-//! falls back to **2 decimal places** rather than panicking; the table is
-//! generated from the full ISO list precisely so this fallback never fires in
-//! practice.
+//! `Currency::decimals()` returns the maintained ISO 4217 minor-unit exponent
+//! from the generated metadata table (`data/iso_4217.csv`) for every supported
+//! currency; there is no fallback value.
 //!
 //! # Examples
 //!
@@ -82,9 +82,10 @@
 //! ```
 //! use finstack_quant_core::currency::Currency;
 //!
-//! // From numeric code
+//! // From a numeric code with a unique supported match
 //! let currency = Currency::try_from(840u16).expect("Currency conversion should succeed");
 //! assert_eq!(currency, Currency::USD);
+//! assert!(Currency::try_from(0u16).is_err());
 //!
 //! // To numeric code
 //! assert_eq!(Currency::EUR.numeric(), 978);
@@ -169,11 +170,17 @@ impl strum::IntoEnumIterator for Currency {
     }
 }
 
-impl Currency {
-    /// ISO 4217 numeric code as `u16`.
-    #[inline]
-    pub const fn numeric(self) -> u16 {
-        self as u16
+/// Alphabetic code order (record CORE-CONVENTIONS-012 #12, resolution O10),
+/// independent of ISO numeric codes.
+impl Ord for Currency {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.code().cmp(other.code())
+    }
+}
+
+impl PartialOrd for Currency {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -184,18 +191,63 @@ mod tests {
 
     #[test]
     fn test_currency_size() {
-        assert_eq!(mem::size_of::<Currency>(), 2);
+        assert_eq!(mem::size_of::<Currency>(), 1);
     }
 
     #[test]
     fn test_currency_numeric_values() {
-        assert_eq!(Currency::USD as u16, 840);
-        assert_eq!(Currency::EUR as u16, 978);
-        assert_eq!(Currency::GBP as u16, 826);
-        assert_eq!(Currency::JPY as u16, 392);
-        assert_eq!(Currency::CHF as u16, 756);
-        assert_eq!(Currency::AUD as u16, 36);
-        assert_eq!(Currency::CAD as u16, 124);
+        assert_eq!(Currency::USD.numeric(), 840);
+        assert_eq!(Currency::EUR.numeric(), 978);
+        assert_eq!(Currency::GBP.numeric(), 826);
+        assert_eq!(Currency::JPY.numeric(), 392);
+        assert_eq!(Currency::CHF.numeric(), 756);
+        assert_eq!(Currency::AUD.numeric(), 36);
+        assert_eq!(Currency::CAD.numeric(), 124);
+    }
+
+    #[test]
+    fn identity_and_order_follow_the_alphabetic_code() {
+        use std::collections::BTreeMap;
+        use strum::IntoEnumIterator;
+        // AUD (036) sorts before USD (840) and CHF (756) before JPY (392).
+        assert!(Currency::AUD < Currency::USD);
+        assert!(Currency::CHF < Currency::JPY);
+        let codes: Vec<&str> = Currency::iter().map(Currency::code).collect();
+        let mut sorted = codes.clone();
+        sorted.sort_unstable();
+        assert_eq!(codes, sorted);
+        for (position, currency) in Currency::iter().enumerate() {
+            // Discriminants are positions, never numeric codes.
+            assert_eq!(currency as usize, position);
+        }
+        let map = BTreeMap::from([(Currency::USD, 1), (Currency::JPY, 2), (Currency::AUD, 3)]);
+        let json = serde_json::to_string(&map).expect("map JSON");
+        assert_eq!(json, r#"{"AUD":3,"JPY":2,"USD":1}"#);
+    }
+
+    #[test]
+    fn numeric_lookup_requires_a_unique_supported_match() {
+        use strum::IntoEnumIterator;
+        let mut by_numeric = std::collections::BTreeMap::<u16, Vec<Currency>>::new();
+        for currency in Currency::iter() {
+            by_numeric
+                .entry(currency.numeric())
+                .or_default()
+                .push(currency);
+        }
+        for (numeric, currencies) in by_numeric {
+            match currencies.as_slice() {
+                [only] => assert_eq!(Currency::try_from(numeric), Ok(*only)),
+                many => {
+                    let err = Currency::try_from(numeric).expect_err("ambiguous");
+                    for currency in many {
+                        assert!(err.to_string().contains(currency.code()), "{err}");
+                    }
+                }
+            }
+        }
+        let err = Currency::try_from(999u16).expect_err("unknown numeric code");
+        assert!(err.to_string().contains("999"), "{err}");
     }
 
     #[test]
@@ -378,9 +430,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decimals_fallback_behavior() {
-        // Test that the current decimals() method no longer panics and falls back to 2
-        // This should work for all known currencies
+    fn test_decimals_are_maintained_metadata() {
         use strum::IntoEnumIterator;
         for currency in Currency::iter() {
             let decimals = currency.decimals();

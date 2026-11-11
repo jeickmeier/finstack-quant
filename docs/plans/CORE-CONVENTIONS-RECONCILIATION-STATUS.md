@@ -92,7 +92,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 7 | B2 | **B2a committed** (`B2a:` in git log); **B2b committed after owner decision D1** (`B2b:` in git log) | B2a: workspace rust-test (16346 incl. 2 re-pins), gen-write, python-test 14003, wasm-test 1086, ui-check. B2b: workspace rust-test 16360 (again after the sweep) + rust-test --doctest; gen-write + gen-check; python-test 13988; wasm-test-built 1085 after a full wasm-test build; ui-check 1527; dual pins and single re-pins checked in a linux/amd64 rust:1.97.1 container | 012 entry: B2a items recorded; B2b: item 4 recorded as reconciled, blocker sentence removed; record 012 status updated | B2b: shortest-text `f64_to_decimal`; `Money::from_model_value` for pricer outputs (125 failure-driven sites, then a 216-site classified sweep; follow-up commit); re-pins and test changes listed under Needs review |
 | 8 | B3 | committed after owner decision D7 (`B3:` in git log) | rust-test 16,368 pass; doctests pass; python-test 13,994 pass / 112 skip; wasm-test 1,085 pass; ui-check 1,527 pass; gen-write moved no golden/fixture; Linux x86_64 container: all test binaries pass except the 3 known golden-runner container artifacts (read-only mount, no git); the core doctest run hung under Rosetta emulation and was stopped (doctests pass natively) | 012 entry: arithmetic/rate adapters recorded as reconciled; record 012 status updated | Exact-to-minor-unit sums (D7); Decimal-scalar mul/div with underflow errors and `_f64` adapters; direct `ratio`; Decimal-rate `convert_at_rate` + `convert_at_rate_f64`; Python/WASM twins; see Needs review |
 | 9 | B4 | committed (`B4:` in git log) | rust-test 16,372 pass; doctests pass (last slice to run them; now nightly-tier only by owner request); python-test 13,997 pass / 112 skip; wasm-test 1,087 pass; ui-check 1,526 pass + 1 load timeout (contracts.test.ts lazy-module case) that passed on rerun (91/91); gen-write regenerated schemas/declarations/UI fixtures (default stamps lose `"mode": "bankers"`, label rename only otherwise); Linux container run skipped by owner request | 012 entry: rounding/config/mode rename/display bounds recorded as reconciled; record 012 status updated | Explicit `Money::round(scale, mode)`; `MidpointAwayFromZero` without alias; no default mode, optional policy/stamp mode; override-only ingest; fallible `from_decimal_with_config`; formatting cap 28 and sign-free zero; Python `round` replaces `__round__` (O10), WASM `round`; see Needs review |
-| 10 | B5 | not started (dep B4 met) | | | |
+| 10 | B5 | committed (`B5:` in git log) | rust-test 16,374 pass; generator tests 23 pass; python-test 14,002 pass / 112 skip; wasm-test 1,087 pass; ui-check 1,526 pass + the same contracts.test.ts lazy-module load timeout as B4, passing on rerun (91/91); gen-write moved only reorders (UI fixtures, gallery data); doctests and the Linux run skipped by owner request | 012 entry: currency identity recorded as reconciled; record 012 status updated | Position discriminants + metadata table; unique-only `TryFrom<u16>`; generator admits shared numerics; alphabetic `Ord` (O10) for maps and SIMM; Python hash by code; see Needs review |
 | 11 | C1 | **C1a and C1b committed** (`C1a:`, `C1b:` in git log) | C1a: workspace rust-lint; rust-test 16346; core doctests 286; gen-write; python-test 14003; wasm-test 1086 | 004 entry: fallible membership/counting recorded | C1 split: C1a = fallible `HolidayCalendar` trait + propagation; C1b = engine semantics (nominal-year gating, reach, checked arithmetic, ordinals, missing-table errors, cache) |
 | 12 | C2 | committed (`C2:` in git log); partial | core lint; core tests 2226; gen-write; gen-check; py test_core_parity 134, parity 6067 | Calendar-input admission entry rewritten to the remaining work | Done: strict JSON admission + explicit controls (28 files) + ID validation + CSV widths. Not done: `CalendarMetadata` purpose/ranges/edition extension (004 #8), generator-level semantic checks, independent table ranges |
 | 13 | H2 | committed (`H2:` in git log) | workspace lint; rust-test (9 fixture fixes re-run: exotics 314, core count test); gen-write; python-test 14003; wasm-test 1086; ui-check | 004/005 entry updated (cme/cnbe removed; NERC settlement use rejected); record 005 partly reconciled | Commodity example uses `usny` as an illustrative contract calendar; NERC purpose restriction is enforced at the commodity forward only (metadata purposes pending) |
@@ -126,7 +126,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 41 | H3 | not attempted (run budget) | | | Data slice |
 | 42 | H4 | not attempted (run budget) | | | Data slice |
 | 43 | H5 | not attempted (run budget) | | | Data slice |
-| 44 | H6 | skipped (dep B5) | | | |
+| 44 | H6 | not started (dep B5 met) | | | |
 
 ## Phase gates
 
@@ -292,6 +292,44 @@ logged under Needs review.
     matches them.
   - **WASM gate:** the WASM figure (1085) is from `wasm-test-built`, after
     one full `wasm-test` build.
+- **B5.**
+  - **"Python `__index__` on `Currency`" (plan line, no further detail).**
+    `Currency` had no `__index__`. Strictest reading under 012 #12 (identity
+    is the alphabetic code; `numeric()` is metadata, not a cast): Python
+    `Currency` gets no integer protocol (`operator.index`/`int()` raise
+    `TypeError`, now pinned by `tests/test_currency_identity.py`), and
+    `__hash__` moved from the numeric code to the alphabetic code. If the
+    plan meant to *add* `__index__`, that would reintroduce a numeric cast
+    and needs an owner decision.
+  - **Order changes are deliberate (O10).** Currency-keyed output now sorts
+    by code: same-date multi-currency `dated_flows`, SIMM `ir_*`/`fx_*`
+    rows, the portfolio margin JSON, FX quote snapshots, the UI XCCY ladder
+    and FRTB/SIMM rows. The SIMM FX-vega risk-factor label for an
+    unordered pair is now `EUR/USD` (was `USD/EUR`). Tests pinning the old
+    numeric order were updated to the new order; no value changed.
+  - **Generator test.** `test_duplicate_numeric_currency_rejected` pinned
+    the opposite of #14 (it rejected a numeric code shared by distinct
+    alphabetic codes). It is replaced by a duplicate-alphabetic rejection
+    test and a shared-numeric (ANG/XCG 532) ambiguity test.
+  - **FX observed-cache order independence is provider-conditional.**
+    `FxMatrix` asks the provider in the requested direction ("the provider
+    remains direction-sensitive") and stores the pair canonically by
+    `Currency` order. A cache warmed in either direction stores the same
+    value only when the provider's canonical-side quote is the exact
+    reciprocal of its other side. The test provider (`ReciprocalFx`) derived
+    EUR/USD from USD/EUR, which matched the old numeric canonical side; it
+    now quotes USD/EUR and derives EUR/USD so its derived side is again the
+    canonical one. The property under test is unchanged. Making the cache
+    order-independent for every provider (query the canonical direction)
+    is an FX design change for record 013, not done here.
+  - **Golden regeneration.** `margin_wasm_parity.json` and the
+    `market_context` case of `core_wasm_parity.json` were regenerated and
+    contain only reorders. The regeneration also rewrote three
+    `discount_curve_queries` values in their 16th digit (pre-existing
+    drift, inside the test's tolerance, unrelated to B5); those three were
+    restored to the committed values.
+  - **Schemas unchanged.** The generated enum keeps its schema-facing doc
+    text, so JSON schemas and declarations did not move.
 - **B4.**
   - **Wire shape of an unselected mode (strictest reading of #8/#9).**
     `RoundingPolicy.mode` and the stamped `RoundingContext.mode` are

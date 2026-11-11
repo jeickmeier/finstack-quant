@@ -368,9 +368,11 @@ mod tests {
             schedule.validate(),
             Err(finstack_quant_core::Error::CurrencyMismatch { .. })
         ));
+        // Same-date settlements in different currencies follow alphabetic
+        // currency order (EUR before USD).
         let expected = vec![
-            (date, Money::from((100_i64, Currency::USD))),
             (date, Money::from((90_i64, Currency::EUR))),
+            (date, Money::from((100_i64, Currency::USD))),
         ];
         assert_eq!(
             schedule.dated_flows().expect("native settlements"),

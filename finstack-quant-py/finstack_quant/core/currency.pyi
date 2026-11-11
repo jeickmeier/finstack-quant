@@ -243,22 +243,26 @@ class Currency:
     @classmethod
     def from_numeric(cls, code: int) -> Currency:
         """
-        Construct from an ISO-4217 numeric code.
+        Construct from an ISO-4217 numeric code with a unique supported match.
+
+        Numeric codes are metadata, not identities: distinct supported
+        currencies may share one, and such a code is ambiguous.
 
         Parameters
         ----------
         code : int
-            ISO-4217 numeric identifier (e.g. ``840`` for USD).
+            ISO-4217 numeric code (e.g. ``840`` for USD).
 
         Returns
         -------
         Currency
-            The matching currency.
+            The only supported currency with that numeric code.
 
         Raises
         ------
         ValueError
-            If *code* does not map to a known currency.
+            If no supported currency has *code* (the message names it), or
+            several do (the message names each alphabetic code).
 
         Examples
         --------
@@ -272,12 +276,15 @@ class Currency:
     @property
     def numeric(self) -> int:
         """
-        ISO-4217 numeric identifier.
+        ISO-4217 numeric code metadata.
+
+        The alphabetic code is the currency identity; equality, hashing and
+        ordering follow it, and distinct currencies may share a numeric code.
 
         Returns
         -------
         int
-            ISO-4217 numeric identifier.
+            ISO-4217 numeric code, such as ``840`` for USD.
 
         Notes
         -----

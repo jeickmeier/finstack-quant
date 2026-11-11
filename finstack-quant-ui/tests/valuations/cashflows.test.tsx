@@ -390,8 +390,8 @@ it("ladders the two-currency cross-currency swap per currency, never across them
   expect(
     entry.ladder!.map(({ currency, rows }) => [currency, rows.length]),
   ).toEqual([
-    ["USD", 6],
     ["EUR", 6],
+    ["USD", 6],
   ]);
 });
 it("returns the native validation error for a flow kind Rust does not know", async () => {

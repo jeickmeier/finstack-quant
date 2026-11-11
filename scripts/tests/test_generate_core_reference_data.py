@@ -13,12 +13,28 @@ reference_data = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(reference_data)
 
 
-def test_duplicate_numeric_currency_rejected(tmp_path: Path) -> None:
-    """Reject duplicate numeric codes even when the alphabetic codes differ."""
+def test_duplicate_alphabetic_currency_rejected(tmp_path: Path) -> None:
+    """Reject a repeated alphabetic code: it is the currency identity."""
     path = tmp_path / "currencies.csv"
-    path.write_text("code,numeric,minor_units,name\nUSD,840,2,Dollar\nEUR,840,2,Euro\n")
-    with pytest.raises(ValueError, match="duplicate currency"):
+    path.write_text("code,numeric,minor_units,name\nUSD,840,2,Dollar\nUSD,841,2,Other\n")
+    with pytest.raises(ValueError, match="duplicate alphabetic currency code"):
         reference_data.currency_rows(path)
+
+
+def test_shared_numeric_code_is_metadata_and_ambiguous_on_lookup(tmp_path: Path) -> None:
+    """Record 012 #12/#14: distinct codes may share a numeric code (ANG/XCG 532)."""
+    path = tmp_path / "currencies.csv"
+    path.write_text(
+        "code,numeric,minor_units,name\nXCG,532,2,Caribbean Guilder\nANG,532,2,Netherlands Antillean Guilder\n"
+        "USD,840,2,US Dollar\n"
+    )
+    rows = reference_data.currency_rows(path)
+    assert [row[0] for row in rows] == ["ANG", "USD", "XCG"]
+    rendered = reference_data.render_currency(rows)
+    assert "ambiguous ISO 4217 numeric currency code {code}: ANG, XCG" in rendered
+    assert "840 => Ok(Currency::USD)," in rendered
+    assert "= 532" not in rendered
+    assert "#[repr(" not in rendered
 
 
 def test_missing_calendar_year_rejected(tmp_path: Path) -> None:

@@ -7384,9 +7384,9 @@
               "cache_capacity": 256
             },
             "quotes": [
+              ["EUR", "USD", 1.085],
               ["GBP", "USD", 1.266],
-              ["USD", "JPY", 152.4],
-              ["EUR", "USD", 1.085]
+              ["USD", "JPY", 152.4]
             ],
             "provider_quotes": [],
             "provider_pinned_quotes": [],
@@ -8858,9 +8858,9 @@
               "cache_capacity": 256
             },
             "quotes": [
+              ["EUR", "USD", 1.085],
               ["GBP", "USD", 1.266],
-              ["USD", "JPY", 152.4],
-              ["EUR", "USD", 1.085]
+              ["USD", "JPY", 152.4]
             ],
             "provider_quotes": [],
             "provider_pinned_quotes": [],

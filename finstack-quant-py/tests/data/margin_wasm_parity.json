@@ -1231,14 +1231,14 @@
       ],
       "girr_delta": [
         [
-          "USD",
-          "5Y",
-          100000.0
-        ],
-        [
           "EUR",
           "10Y",
           -40000.0
+        ],
+        [
+          "USD",
+          "5Y",
+          100000.0
         ]
       ],
       "girr_inflation_delta": [
@@ -2148,7 +2148,7 @@
                 "weighted_sensitivities": [
                   {
                     "concentration_factor": 1.0,
-                    "risk_factor": "USD/EUR",
+                    "risk_factor": "EUR/USD",
                     "risk_weight": 0.48,
                     "sensitivity": 300.0,
                     "weighted_sensitivity": 82.07999999999998

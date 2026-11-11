@@ -41,7 +41,9 @@ impl PyCurrency {
             .map_err(crate::errors::core_to_py)
     }
 
-    /// Construct from an ISO-4217 numeric code (e.g. ``840`` for USD).
+    /// Construct from an ISO-4217 numeric code (e.g. ``840`` for USD) with a
+    /// unique supported match; an unknown or shared numeric code raises
+    /// ``ValueError``.
     #[classmethod]
     #[pyo3(text_signature = "(cls, code)")]
     fn from_numeric(_cls: &Bound<'_, PyType>, code: u16) -> PyResult<Self> {
@@ -50,7 +52,8 @@ impl PyCurrency {
             .map_err(crate::errors::core_to_py)
     }
 
-    /// ISO-4217 numeric identifier.
+    /// ISO-4217 numeric code metadata (not an identity; distinct currencies
+    /// may share it).
     #[getter]
     fn numeric(&self) -> u16 {
         self.inner.numeric()
@@ -72,9 +75,13 @@ impl PyCurrency {
         self.inner.to_string()
     }
 
-    /// Hash based on the ISO numeric currency code.
+    /// Hash of the alphabetic code, the currency identity (numeric codes may
+    /// be shared by distinct currencies).
     fn __hash__(&self) -> isize {
-        self.inner.numeric() as isize
+        self.inner
+            .code()
+            .bytes()
+            .fold(0_isize, |hash, byte| hash * 256 + isize::from(byte))
     }
 
     /// Rich comparison; compares typed currency values; other types return NotImplemented.

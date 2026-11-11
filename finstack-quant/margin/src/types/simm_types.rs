@@ -337,13 +337,10 @@ impl From<&SimmSensitivities> for SimmSensitivitiesJson {
                 .collect(),
             curvature: sens.curvature.clone(),
         };
+        // Currency keys sort by alphabetic code (record CORE-CONVENTIONS-012
+        // #12, resolution O10), never by ISO numeric metadata.
         for entries in [&mut json.ir_delta, &mut json.ir_vega] {
-            entries.sort_by(|left, right| {
-                left.0
-                    .numeric()
-                    .cmp(&right.0.numeric())
-                    .then_with(|| left.1.cmp(&right.1))
-            });
+            entries.sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1)));
         }
         for entries in [
             &mut json.credit_non_qualifying_delta,
@@ -354,13 +351,9 @@ impl From<&SimmSensitivities> for SimmSensitivitiesJson {
         for entries in [&mut json.equity_delta, &mut json.equity_vega] {
             entries.sort_by(|left, right| left.0.cmp(&right.0));
         }
-        json.fx_delta.sort_by_key(|entry| entry.0.numeric());
-        json.fx_vega.sort_by(|left, right| {
-            left.0
-                .numeric()
-                .cmp(&right.0.numeric())
-                .then_with(|| left.1.numeric().cmp(&right.1.numeric()))
-        });
+        json.fx_delta.sort_by_key(|entry| entry.0);
+        json.fx_vega
+            .sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1)));
         for entries in [&mut json.commodity_delta, &mut json.commodity_vega] {
             entries.sort_by(|left, right| left.0.cmp(&right.0));
         }
@@ -1330,8 +1323,9 @@ mod tests {
 
         let json: SimmSensitivitiesJson =
             serde_json::from_str(&first_json).expect("canonical DTO parses");
-        assert_eq!(json.ir_delta[0].0, Currency::USD);
-        assert_eq!(json.ir_vega[0].0, Currency::USD);
+        // Currency keys sort by alphabetic code (EUR before USD).
+        assert_eq!(json.ir_delta[0].0, Currency::EUR);
+        assert_eq!(json.ir_vega[0].0, Currency::EUR);
         assert_eq!(
             json.credit_qualifying_delta[0].0,
             SimmCreditSector::Sovereign
@@ -1340,8 +1334,8 @@ mod tests {
         assert_eq!(json.credit_non_qualifying_delta[0].0, "RMBS_ALPHA");
         assert_eq!(json.equity_delta[0].0, "AAPL");
         assert_eq!(json.equity_vega[0].0, "AAPL");
-        assert_eq!(json.fx_delta[0].0, Currency::USD);
-        assert_eq!(json.fx_vega[0].0, Currency::USD);
+        assert_eq!(json.fx_delta[0].0, Currency::EUR);
+        assert_eq!(json.fx_vega[0].0, Currency::EUR);
         assert_eq!(json.commodity_delta[0].0, "Crude");
         assert_eq!(json.curvature[0].risk_class, SimmRiskClass::InterestRate);
     }

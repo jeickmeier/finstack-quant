@@ -52,7 +52,9 @@ impl JsCurrency {
             .map_err(to_js_err)
     }
 
-    /// Look up a currency by its ISO-4217 numeric code (Rust `Currency::try_from`).
+    /// Look up the unique supported currency with an ISO-4217 numeric code
+    /// (Rust `Currency::try_from`). Numeric codes are metadata that distinct
+    /// currencies may share; a shared code is ambiguous.
     ///
     /// # Arguments
     ///
@@ -61,7 +63,7 @@ impl JsCurrency {
     /// @returns The matching `Currency`.
     /// @throws `TypeError` (kind `invalid_type`) if `code` is not an integer in
     /// `0..=65535`; `FinstackError` (kind `validation`) if no supported
-    /// currency has that numeric code.
+    /// currency, or more than one, has that numeric code.
     /// @param code - ISO-4217 numeric code, such as `840` for USD or `978` for EUR.
     #[wasm_bindgen(js_name = fromNumeric)]
     pub fn from_numeric(
@@ -73,7 +75,8 @@ impl JsCurrency {
             .map_err(to_js_err)
     }
 
-    /// ISO-4217 numeric code.
+    /// ISO-4217 numeric code metadata; not an identity (distinct currencies may
+    /// share it).
     ///
     /// @returns Numeric code (e.g. `840` for USD, `978` for EUR).
     #[wasm_bindgen(getter, js_name = numeric)]

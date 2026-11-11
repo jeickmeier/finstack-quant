@@ -273,7 +273,7 @@ fn test_netting_set_margin_json_roundtrip() {
         json["sensitivities"],
         serde_json::json!({
             "base_currency": "USD",
-            "ir_delta": [["USD", "5Y", 12_500.0], ["EUR", "2Y", -2_500.0]],
+            "ir_delta": [["EUR", "2Y", -2_500.0], ["USD", "5Y", 12_500.0]],
             "ir_vega": [["USD", "10Y", 3_250.0]],
             "credit_qualifying_delta": [["financial", "BANK_A", "5Y", 725.0]],
             "credit_qualifying_vega": [["financial", "BANK_A", "5Y", 77.0]],
