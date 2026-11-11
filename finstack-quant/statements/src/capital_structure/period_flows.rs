@@ -421,16 +421,32 @@ pub fn calculate_period_flows(
             // prior period). New draws this period establish a fresh balance
             // of draws net of in-period repayments — taking the scheduled
             // closing balance here would resurrect the swept balance.
-            let in_period_repayments: f64 = full_schedule
+            //
+            // Every term is dated by its balance-effective date, like the
+            // funding itself and like the scheduled close of a carried
+            // balance: a repayment or capitalization that settles in a
+            // neighbouring period still moves the balance in the period it
+            // is economically effective.
+            let economic_in_period = |cf: &&CashFlow| {
+                let effective = cf.get_balance_date();
+                effective >= period.start && effective < period.end
+            };
+            let repayments: f64 = full_schedule
                 .get_flows()
                 .iter()
-                .filter(|cf| cf.date >= period.start && cf.date < period.end)
+                .filter(economic_in_period)
                 .filter(|cf| is_principal_repayment(cf))
                 .map(|cf| cf.amount.amount().abs())
                 .sum();
+            let capitalized: f64 = full_schedule
+                .get_flows()
+                .iter()
+                .filter(economic_in_period)
+                .filter(|cf| cf.kind == CFKind::Pik)
+                .map(|cf| cf.amount.amount().abs() * scale)
+                .sum();
             Money::new(
-                (net_new_funding + breakdown.interest_expense_pik.amount() - in_period_repayments)
-                    .max(0.0),
+                (net_new_funding + capitalized - repayments).max(0.0),
                 currency,
             )?
         } else {

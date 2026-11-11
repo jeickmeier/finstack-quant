@@ -560,3 +560,126 @@ fn previously_paid_redemption_cannot_extinguish_later_pik_principal() {
     assert_close(balance.amount(), 10.0);
     assert_repeated_rebuild_is_unchanged(&mut state, cutoff);
 }
+
+/// A balance opened by this period's funding closes on the economic clock,
+/// exactly like a balance carried in from the prior period.
+#[test]
+fn newly_funded_balance_closes_on_economic_principal_dates() {
+    use crate::support::ScheduleInstrument;
+    use finstack_quant_statements::capital_structure::calculate_period_flows;
+    let periods = finstack_quant_core::dates::build_periods("2025Q1..2025Q2", None)
+        .expect("valid periods")
+        .periods;
+    let market = MarketContext::new();
+    for (economic, payment, expected_close) in [
+        // Amortized in the quarter, settled after it: the balance is already lower.
+        (date!(2025 - 03 - 31), date!(2025 - 04 - 02), 90.0),
+        // Settled in the quarter, amortized after it: the balance is still whole.
+        (date!(2025 - 04 - 02), date!(2025 - 03 - 28), 100.0),
+        (date!(2025 - 03 - 15), date!(2025 - 03 - 15), 90.0),
+    ] {
+        let mut builder = CashFlowSchedule::builder();
+        let _ = builder
+            .principal(usd(100.0), date!(2025 - 01 - 15), date!(2026 - 01 - 15))
+            .add_principal_event(
+                economic,
+                payment,
+                usd(-10.0),
+                Some(usd(10.0)),
+                CFKind::Amortization,
+            );
+        let instrument = ScheduleInstrument::new(builder.build(None).expect("schedule"));
+        let (_, closing, funding, _) = calculate_period_flows(
+            &instrument,
+            &periods[0],
+            usd(0.0),
+            &market,
+            periods[0].start,
+            None,
+        )
+        .expect("newly funded period flows");
+        assert_close(funding.amount(), 100.0);
+        assert_close(closing.amount(), expected_close);
+    }
+}
+
+/// A loan funded on or after the model start repays exactly what it borrowed
+/// when quarter-end amortization settles on the next business day.
+#[test]
+fn loan_funded_inside_the_model_repays_its_face_once() {
+    let as_of = date!(2023 - 12 - 31);
+    let quarters: Vec<_> = (1..=4)
+        .map(|quarter| PeriodId::quarter(2024, quarter).expect("valid quarter"))
+        .collect();
+    let cash: Vec<_> = quarters
+        .iter()
+        .map(|period| (*period, AmountOrScalar::scalar(1_000.0)))
+        .collect();
+    let discount = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (2.0, 0.9)])
+        .build()
+        .expect("discount curve");
+    let market = MarketContext::new().insert(discount);
+    for issue in [date!(2024 - 01 - 01), date!(2024 - 01 - 15)] {
+        let mut loan = TermLoan::example().expect("canonical term loan");
+        loan.id = INSTRUMENT.into();
+        loan.notional_limit = usd(100.0);
+        loan.issue_date = issue;
+        loan.maturity = date!(2024 - 12 - 31);
+        loan.rate = RateSpec::Fixed { rate: 0.10 };
+        loan.frequency = Tenor::quarterly();
+        loan.day_count = DayCount::Act365F;
+        loan.stub = StubKind::ShortFront;
+        loan.business_day_convention = BusinessDayConvention::Following;
+        loan.calendar_id = Some("weekends_only".into());
+        loan.amortization = AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.10 };
+        let schedule = loan
+            .raw_cashflow_schedule(&market, as_of)
+            .expect("loan cashflows");
+        let first = schedule
+            .get_flows()
+            .iter()
+            .find(|flow| flow.kind == CFKind::Amortization)
+            .expect("first amortization");
+        assert_eq!(first.get_balance_date(), date!(2024 - 03 - 31));
+        assert_eq!(first.date, date!(2024 - 04 - 01));
+
+        for waterfall in [false, true] {
+            let mut builder = ModelBuilder::new("funded-inside-model");
+            builder
+                .periods("2024Q1..2024Q4", None)
+                .expect("reporting quarters");
+            builder.value("cash", &cash);
+            builder.add_debt(
+                INSTRUMENT,
+                FinancialStatementInstrument::TermLoan(loan.clone()),
+            );
+            if waterfall {
+                builder.waterfall(WaterfallSpec::default());
+            }
+            builder
+                .compute("balance", "cs.debt_balance.LOAN")
+                .expect("balance formula");
+            builder
+                .compute("principal", "cs.principal_payment.LOAN")
+                .expect("principal formula");
+            let model = builder.build().expect("amortizing-loan model");
+            let result = Evaluator::new()
+                .evaluate_with_market(&model, &market, as_of)
+                .expect("amortizing-loan model evaluation");
+            let mut total_principal = 0.0;
+            for (period, (balance, principal)) in
+                quarters
+                    .iter()
+                    .zip([(90.0, 0.0), (80.0, 10.0), (70.0, 20.0), (0.0, 70.0)])
+            {
+                assert_close(result.get("balance", period).expect("balance"), balance);
+                let paid = result.get("principal", period).expect("principal cash");
+                assert_close(paid, principal);
+                total_principal += paid;
+            }
+            assert_close(total_principal, 100.0);
+        }
+    }
+}

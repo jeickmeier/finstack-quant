@@ -1264,3 +1264,61 @@ fn ecf_sweep_priority_pays_the_sized_sweep_and_preserves_cash() {
     assert_eq!(equity.amount(), 5.0);
     assert_eq!(debt.principal_payment.amount() + equity.amount(), 10.0);
 }
+
+/// PIK that capitalizes inside the quarter but settles after it raises a
+/// newly funded balance in the quarter it is effective, as it does for a
+/// balance carried in.
+#[test]
+fn newly_funded_balance_capitalizes_pik_on_its_effective_date() {
+    let periods = build_periods("2025Q1..2025Q2", None)
+        .expect("valid periods")
+        .periods;
+    let issue = date!(2025 - 01 - 15);
+    let flows = vec![
+        CashFlow::new(
+            date!(2025 - 04 - 02),
+            None,
+            Money::new(5.0, Currency::USD).expect("valid PIK amount"),
+            CFKind::Pik,
+            0.0,
+            None,
+        )
+        .with_principal_date(date!(2025 - 03 - 31)),
+        CashFlow::new(
+            date!(2027 - 01 - 01),
+            None,
+            Money::new(105.0, Currency::USD).expect("valid redemption principal"),
+            CFKind::Notional,
+            0.0,
+            None,
+        ),
+    ];
+    let instrument = ScheduleInstrument::new(
+        CashFlowSchedule::from_flows(
+            flows,
+            Notional::par(100.0, Currency::USD).expect("valid decimal principal"),
+            DayCount::Act365F,
+            CashFlowMeta {
+                issue_date: Some(issue),
+                ..Default::default()
+            },
+        )
+        .expect("valid cashflow rows"),
+    );
+    let market = MarketContext::new();
+    let close = |opening: i64| {
+        calculate_period_flows(
+            &instrument,
+            &periods[0],
+            Money::from((opening, Currency::USD)),
+            &market,
+            periods[0].start,
+            None,
+        )
+        .expect("period flows")
+        .1
+        .amount()
+    };
+    assert_eq!(close(100), 105.0);
+    assert_eq!(close(0), 105.0);
+}
