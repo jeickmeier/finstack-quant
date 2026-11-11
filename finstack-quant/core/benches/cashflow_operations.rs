@@ -82,7 +82,7 @@ fn checked_npv(curve: &DiscountCurve, flows: &[(Date, Money)], continuous_rate: 
         assert!(df.is_finite() && df > 0.0);
         expected += amount.amount() * df;
     }
-    let actual = npv(curve, base, flows).expect("valid benchmark cashflows");
+    let actual = npv(curve, base, flows, false).expect("valid benchmark cashflows");
     assert_eq!(actual.currency(), Currency::USD);
     assert!(actual.amount().is_finite() && expected.is_finite());
     assert!(
@@ -103,7 +103,7 @@ fn bench_npv_flat_curve(c: &mut Criterion) {
             let flows = money_flows(size);
             checked_npv(&curve, &flows, Some(rate));
             b.iter(|| {
-                let pv = npv(black_box(&curve), base_date(), black_box(&flows))
+                let pv = npv(black_box(&curve), base_date(), black_box(&flows), false)
                     .expect("valid benchmark cashflows");
                 black_box(pv);
             })
@@ -128,7 +128,7 @@ fn bench_npv_shaped_curve(c: &mut Criterion) {
             }
             checked_npv(&curve, &flows, None);
             b.iter(|| {
-                let pv = npv(black_box(&curve), base_date(), black_box(&flows))
+                let pv = npv(black_box(&curve), base_date(), black_box(&flows), false)
                     .expect("valid benchmark cashflows");
                 black_box(pv);
             })

@@ -61,7 +61,7 @@
 //! let continuous_rate = (1.0 + rate).ln();
 //! let curve = DiscountCurve::flat("EXAMPLE", base, continuous_rate)?;
 //!
-//! let present_value = npv(&curve, base, &[cf1, cf2])?;
+//! let present_value = npv(&curve, base, &[cf1, cf2], false)?;
 //! assert!(present_value.amount() > 0.0);
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
@@ -88,6 +88,6 @@ mod discounting;
 mod primitives;
 mod xirr;
 
-pub use discounting::{flat_discount_factor, npv, npv_amounts_with_curve};
+pub use discounting::{flat_discount_factor, npv, npv_amounts};
 pub use primitives::{CFKind, CashFlow, CashFlowAccrual};
 pub use xirr::{irr, xirr};

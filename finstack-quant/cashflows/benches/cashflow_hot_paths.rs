@@ -228,7 +228,8 @@ fn bench_npv(c: &mut Criterion) {
                 amount.amount() * disc.df_between_dates(base, *date).expect("fixture DF")
             })
             .sum();
-        let preflight = finstack_quant_core::cashflow::npv(disc.as_ref(), base, &flows).unwrap();
+        let preflight =
+            finstack_quant_core::cashflow::npv(disc.as_ref(), base, &flows, false).unwrap();
         assert_eq!(preflight.currency(), Currency::USD);
         checks::close(preflight.amount(), expected, 1e-6);
         drop(flows);
@@ -241,6 +242,7 @@ fn bench_npv(c: &mut Criterion) {
                     black_box(disc.as_ref()),
                     black_box(base),
                     black_box(&flows),
+                    false,
                 )
                 .expect("valid extracted-cash NPV"),
             )

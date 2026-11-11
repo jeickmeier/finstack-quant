@@ -91,6 +91,7 @@ fn test_schedule_discountable_simple() {
         &curve,
         curve.base_date(),
         &schedule.dated_flows().unwrap(),
+        false,
     )
     .unwrap();
 
@@ -165,6 +166,7 @@ fn test_npv_zero_rate() {
         &curve,
         curve.base_date(),
         &schedule.dated_flows().unwrap(),
+        false,
     )
     .unwrap();
 

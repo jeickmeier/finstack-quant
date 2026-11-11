@@ -308,7 +308,7 @@ impl Instrument for PrivateMarketsFund {
         let future_pv = if let Some(ref discount_curve_id) = self.discount_curve_id {
             let disc = curves.get_discount(discount_curve_id.as_str())?;
             // Discount and cashflow cutoff share the caller's valuation date.
-            finstack_quant_core::cashflow::npv(disc.as_ref(), as_of, &future_flows)?
+            finstack_quant_core::cashflow::npv(disc.as_ref(), as_of, &future_flows, false)?
         } else {
             let total: f64 = future_flows.iter().map(|(_, m)| m.amount()).sum();
             Money::new(total, self.currency)?

@@ -23,20 +23,26 @@ use time::Month;
 
 #[test]
 fn scalar_npv_rejects_nonfinite_amounts_and_overflow() {
-    use finstack_quant_core::cashflow::npv_amounts_with_curve;
+    use finstack_quant_core::cashflow::npv_amounts;
     let base = d(2025, 1, 1);
     let future = d(2026, 1, 1);
     let flat = FlatRateCurve::new("FLAT", base, 0.0);
     for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-        assert!(npv_amounts_with_curve(&flat, base, &[(future, invalid)]).is_err());
+        assert!(npv_amounts(&flat, base, &[(future, invalid)], false).is_err());
     }
     assert!(
-        npv_amounts_with_curve(&flat, base, &[(future, f64::MAX), (future, f64::MAX)]).is_err()
+        npv_amounts(
+            &flat,
+            base,
+            &[(future, f64::MAX), (future, f64::MAX)],
+            false
+        )
+        .is_err()
     );
     let negative_rate = FlatRateCurve::new("NEG", base, -1.0);
-    assert!(npv_amounts_with_curve(&negative_rate, base, &[(future, f64::MAX)]).is_err());
+    assert!(npv_amounts(&negative_rate, base, &[(future, f64::MAX)], false).is_err());
     assert_eq!(
-        npv_amounts_with_curve(&flat, base, &[(future, -10.0), (future, 15.0)]).unwrap(),
+        npv_amounts(&flat, base, &[(future, -10.0), (future, 15.0)], false).unwrap(),
         5.0
     );
 }
@@ -115,7 +121,7 @@ fn npv_100_cashflows_maintains_precision() {
         })
         .collect();
 
-    let pv = npv(&curve, base, &flows).expect("NPV should succeed");
+    let pv = npv(&curve, base, &flows, false).expect("NPV should succeed");
 
     // Compute expected using stable summation
     let expected_terms: Vec<f64> = flows
@@ -155,7 +161,7 @@ fn npv_500_cashflows_maintains_precision() {
         })
         .collect();
 
-    let pv = npv(&curve, base, &flows).expect("NPV should succeed");
+    let pv = npv(&curve, base, &flows, false).expect("NPV should succeed");
 
     // Compute expected using stable summation
     let expected_terms: Vec<f64> = flows
@@ -196,7 +202,7 @@ fn npv_50_year_cashflow_is_positive_and_small() {
         maturity,
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
     )];
-    let pv = npv(&curve, base, &flows).expect("NPV should succeed");
+    let pv = npv(&curve, base, &flows, false).expect("NPV should succeed");
 
     // Calculate actual year fraction (includes leap years)
     let t = day_count.year_fraction(base, maturity, ctx).unwrap();
@@ -227,7 +233,7 @@ fn npv_100_year_cashflow_is_tiny_but_positive() {
         maturity,
         Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
     )];
-    let pv = npv(&curve, base, &flows).expect("NPV should succeed");
+    let pv = npv(&curve, base, &flows, false).expect("NPV should succeed");
 
     // DF(100y) at 5% continuous = exp(-0.05 * 100) = exp(-5) ≈ 0.00674
     // PV ≈ $6,738
@@ -257,7 +263,7 @@ fn npv_cashflow_at_base_date_is_excluded_by_default() {
         base,
         Money::new(100_000.0, Currency::USD).expect("valid money fixture"),
     )];
-    let pv = npv(&curve, base, &flows).expect("NPV should succeed");
+    let pv = npv(&curve, base, &flows, false).expect("NPV should succeed");
     assert_eq!(
         pv.amount(),
         0.0,
@@ -266,7 +272,7 @@ fn npv_cashflow_at_base_date_is_excluded_by_default() {
 
     // Valued one day earlier the same flow is strictly future and prices at
     // essentially par.
-    let pv_future = npv(&curve, base - time::Duration::days(1), &flows)
+    let pv_future = npv(&curve, base - time::Duration::days(1), &flows, false)
         .expect("NPV one day before the flow should succeed");
     assert!(
         (pv_future.amount() - 100_000.0).abs() < financial_tolerance(100_000.0),
@@ -286,7 +292,7 @@ fn npv_negative_rate_inflates_value() {
         d(2026, 1, 1),
         Money::new(100.0, Currency::USD).expect("valid money fixture"),
     )];
-    let pv = npv(&curve, base, &flows).expect("NPV should succeed");
+    let pv = npv(&curve, base, &flows, false).expect("NPV should succeed");
 
     // Negative rate: DF > 1, so PV > FV
     // DF(1y) at -2% = exp(0.02) ≈ 1.0202
@@ -325,7 +331,7 @@ fn npv_zero_rate_preserves_value() {
             Money::new(1000.0, Currency::USD).expect("valid money fixture"),
         ),
     ];
-    let pv = npv(&curve, base, &flows).expect("NPV should succeed");
+    let pv = npv(&curve, base, &flows, false).expect("NPV should succeed");
 
     // Zero rate: DF = 1.0, so PV = sum of cashflows
     assert!(
@@ -347,7 +353,7 @@ fn npv_very_large_amounts() {
         d(2026, 1, 1),
         Money::new(1e12, Currency::USD).expect("valid money fixture"),
     )];
-    let pv = npv(&curve, base, &flows).expect("NPV should succeed");
+    let pv = npv(&curve, base, &flows, false).expect("NPV should succeed");
 
     // DF(1y) at 5% = exp(-0.05) ≈ 0.9512
     let expected_df = (-0.05_f64).exp();
@@ -371,7 +377,7 @@ fn npv_very_small_amounts() {
         d(2026, 1, 1),
         Money::new(0.01, Currency::USD).expect("valid money fixture"),
     )];
-    let pv = npv(&curve, base, &flows).expect("NPV should succeed");
+    let pv = npv(&curve, base, &flows, false).expect("NPV should succeed");
 
     // PV should be positive but tiny
     assert!(pv.amount() > 0.0, "Small amount PV should be positive");
@@ -453,7 +459,7 @@ fn npv_rejects_mixed_currencies() {
         ), // Different currency!
     ];
 
-    let result = npv(&curve, base, &flows);
+    let result = npv(&curve, base, &flows, false);
 
     // Should error due to currency mismatch
     assert!(result.is_err(), "NPV should reject mixed currencies");

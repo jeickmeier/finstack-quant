@@ -74,7 +74,7 @@ mod npv_tests {
         // Investment-NPV view: value one day before the day-0 outlay so every
         // flow is strictly future (npv excludes flows on/before the valuation
         // date).
-        let pv = npv(&curve, base - time::Duration::days(1), &flows).unwrap();
+        let pv = npv(&curve, base - time::Duration::days(1), &flows, false).unwrap();
 
         // NPV should be approximately 110000/1.05 - 100000 ≈ 4761.90
         assert!(
@@ -109,7 +109,7 @@ mod npv_tests {
             let curve = flat_curve("TEST", base, continuous_rate, day_count);
             // Investment-NPV view: value one day before the day-0 outlay so
             // every flow is strictly future.
-            let pv = npv(&curve, base - time::Duration::days(1), &flows).unwrap();
+            let pv = npv(&curve, base - time::Duration::days(1), &flows, false).unwrap();
 
             // At 0% rate, NPV should be sum of flows = 5000
             if rate == 0.0 {
@@ -142,7 +142,7 @@ mod npv_tests {
         for day_count in [DayCount::Act365F, DayCount::Act360, DayCount::Thirty360] {
             let continuous_rate = (1.0 + rate).ln();
             let curve = flat_curve("TEST", base, continuous_rate, day_count);
-            let pv = npv(&curve, base, &flows).unwrap();
+            let pv = npv(&curve, base, &flows, false).unwrap();
             results.push((day_count, pv.amount()));
         }
 

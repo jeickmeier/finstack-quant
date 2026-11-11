@@ -205,7 +205,7 @@ impl TermLoanDiscountingPricer {
             )?;
             Money::from_model_value(pv, loan.currency)
         } else {
-            npv(disc.as_ref(), settlement_date, &flows)
+            npv(disc.as_ref(), settlement_date, &flows, false)
         }
     }
 
@@ -562,7 +562,7 @@ mod tests {
             .iter()
             .map(|cf| (cf.date, cf.amount))
             .collect();
-        let pv_including = npv(&disc, as_of, &flows_including).expect("pv including PIK");
+        let pv_including = npv(&disc, as_of, &flows_including, false).expect("pv including PIK");
 
         assert!(
             pv_including.amount() > pv_excluding.amount(),

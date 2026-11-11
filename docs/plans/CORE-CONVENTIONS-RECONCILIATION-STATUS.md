@@ -110,7 +110,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 25 | G1 | committed (`G1:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16,366 (16,365 + the mid-coupon make-whole re-expectation, re-run 19/19); python-test 14,008 / 112 skip; wasm-test 1,087; ui-check 1,527; doctests and the Linux run skipped by owner request | 017 entry: runtime reconciliation recorded (qualification remains); context-free-XIRR entry removed; record 017 status updated | Guess-free `irr`/`xirr`, fixed ACT/365F clock, canonical per-date net, full log bracket via fallible shared `solve_in_bracket`, one acceptance gate; `YieldBasis` (ACT/365F, ACT/360) with explicit loan `yield_basis` (O11); bond floor `day_count` removed; MC path IRR removed; see Needs review |
 | 26 | G2 | committed (`G2:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16358; core doctests 285; python-test 13988; python-lint; wasm-test 1085; wasm-lint; ui-check | 019 entry: CreditRating part recorded; record 019 partly reconciled | `D` = 21 and `NR` off the ladder; no `Ord`, hand-written `PartialOrd` (`NR` incomparable with rated values, equal to itself); `ladder_position()`; `notches_to`/`to_moodys_string -> Result` (`NR` arithmetic and Moody's `D` error); finite canonical/Moody's/status alias tables replace suffix stripping; the models rating-factor table and the structured-credit `rating_haircuts` move from `BTreeMap` to `IndexMap` (ladder order / wire order); Python ordering of `NR` against a rated value raises `TypeError` |
 | 27 | G3 | not attempted (run budget; plan sized M/L) | | | See Needs review: classify validation and embedded-data retirement must land together |
-| 28 | G4 | skipped (dep B3) | | | |
+| 28 | G4 | committed (`G4:` in git log) | workspace rust-lint; gen-write (nothing moved); workspace rust-test 16,371; python-test 14,008 / 112 skip; wasm-test 1,087; ui-check 1,527; doctests and the Linux run skipped by owner request | 016 part of the 015/016 entry: runtime reconciliation recorded (qualification and product review remain); record 016 status updated | `npv`/`npv_amounts(as_of, flows, include_today)`; validate-before-select, no unused source query, `df_between_dates`, exact Money and checked scalar paths; shared `NeumaierAccumulator::checked_add`/`checked_total`; `flat_discount_factor` underflow error; schedule helpers take `include_today`; private trade-NPV copy removed; see Needs review |
 | 29 | F1 | not attempted (run budget; plan sized M) | | | About 200 sites in about 50 files (fiscal presets 48+ in 19 files, `PeriodId::annual` 72 in 20, `next_fiscal`/`prev_fiscal` 39, plus host presets) |
 | 30 | F2 | not attempted (run budget; dep F1) | | | |
 | 31 | F3 | not attempted (run budget; dep F2) | | | |
@@ -292,6 +292,31 @@ logged under Needs review.
     matches them.
   - **WASM gate:** the WASM figure (1085) is from `wasm-test-built`, after
     one full `wasm-test` build.
+- **G4.**
+  - **`include_today` choices preserve current behaviour.** No product
+    review of same-day cash was done (016 #2 makes it a product decision).
+    Every caller of the old exclusion now passes `false` explicitly: the
+    term-loan, PE fund, asset-backed facility and structured-credit pricers,
+    the valuations `schedule_pv`/`schedule_pv_raw` holder views (deposit and
+    inflation-linked bond) and tests. The deposit's raw trade NPV, which
+    already kept the T+0 inception exchange through a private loop, passes
+    `true`. The plan's "about 20 product callers" predates the helpers that
+    now centralise them; only these sites call the core NPV.
+  - **Private NPV copy removed.** `schedule_trade_pv_raw` summed
+    `amount * df` with an unchecked accumulator and no validation (016 #1
+    forbids a parallel engine). It is deleted; the deposit uses
+    `schedule_pv_raw(..., true)`. The only behavioural difference: an empty
+    schedule without a notional now errors instead of returning 0.
+  - **Error messages moved to the source boundary.** Invalid valuation-date
+    and payment-date factors now report `df_between_dates`'s "Invalid
+    discount factor on 'from'/'to' date" (016 #5: the source owns those
+    checks). Two tests were updated to the new message; both still require
+    an error.
+  - **Shared numeric checks.** `NeumaierAccumulator` gains `checked_add` and
+    `checked_total` instead of an NPV-private checked copy (016 #7).
+  - **Not done.** Doctests were not run (owner request), including the new
+    NPV, `flat_discount_factor` and `checked_add` examples. No independent
+    qualification of 016's numerical targets.
 - **G1.**
   - **Shared Brent (partial CORE-NUMERICS-05).** `solve_in_bracket` now
     takes `FnMut(f64) -> Result<f64>` and propagates objective errors (05

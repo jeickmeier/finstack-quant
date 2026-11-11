@@ -234,8 +234,8 @@ fn discounting_reconciles_with_schedule_pv_for_fixed_bond() {
         .first()
         .cloned()
         .expect("bond should declare a discount curve");
-    let reference =
-        schedule_pv_raw(&bond, &market, as_of_date, &discount_curve_id).expect("schedule pv");
+    let reference = schedule_pv_raw(&bond, &market, as_of_date, &discount_curve_id, false)
+        .expect("schedule pv");
 
     let diff = (envelope.total_pv - reference).abs();
     assert!(

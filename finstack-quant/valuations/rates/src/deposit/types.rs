@@ -158,11 +158,14 @@ impl Deposit {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        finstack_quant_valuations_core::instruments::common_impl::helpers::schedule_trade_pv_raw(
+        // The T+0 inception exchange on `as_of` is part of the trade NPV
+        // that a quoted deposit rate zeroes.
+        finstack_quant_valuations_core::instruments::common_impl::helpers::schedule_pv_raw(
             self,
             market,
             as_of,
             &self.discount_curve_id,
+            true,
         )
     }
 }
@@ -187,11 +190,13 @@ impl finstack_quant_valuations_core::instruments::Instrument for Deposit {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        // Holder view: cash settling on `as_of` is no longer owed.
         finstack_quant_valuations_core::instruments::common_impl::helpers::schedule_pv(
             self,
             curves,
             as_of,
             &self.discount_curve_id,
+            false,
         )
     }
 
@@ -205,6 +210,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Deposit {
             curves,
             as_of,
             &self.discount_curve_id,
+            false,
         )
     }
 
@@ -219,6 +225,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Deposit {
                 curves,
                 as_of,
                 &self.discount_curve_id,
+                false,
             )?,
             self.notional.currency(),
         ))

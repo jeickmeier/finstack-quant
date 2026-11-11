@@ -8,7 +8,6 @@ use crate::metrics::{MetricContext, MetricId};
 use crate::pricer::PricingDispatch;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCountContext};
-use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::market_data::{
     context::MarketContext,
     scalars::{InflationIndex, MarketScalar, SeriesInterpolation},
@@ -162,9 +161,9 @@ pub fn zero_rate_from_df(df: f64, t: f64, context: &str) -> finstack_quant_core:
 /// - Metric calculations (e.g., par rate using `df_on_date`)
 /// - NPV calculations
 ///
-/// Routes through `core::cashflow::npv`, which excludes flows on or before
-/// the valuation date. Valuation on a day assumes cash settling that day has
-/// already been paid.
+/// Routes through `core::cashflow::npv` (record CORE-CONVENTIONS-016):
+/// flows before `as_of` are excluded and a flow dated `as_of` counts at
+/// factor 1 exactly when `include_today` is true.
 /// An empty remaining schedule returns zero in the instrument's notional
 /// currency; an instrument without a defined notional still returns an error.
 ///
@@ -174,11 +173,14 @@ pub fn zero_rate_from_df(df: f64, t: f64, context: &str) -> finstack_quant_core:
 /// * `market` - Market data context
 /// * `as_of` - Valuation date
 /// * `discount_curve_id` - ID of the discount curve to use
+/// * `include_today` - Whether cash dated `as_of` is still owed; chosen by the
+///   product, with no default.
 pub fn schedule_pv<S>(
     instrument: &S,
     market: &MarketContext,
     as_of: Date,
     discount_curve_id: &finstack_quant_core::types::CurveId,
+    include_today: bool,
 ) -> finstack_quant_core::Result<Money>
 where
     S: finstack_quant_cashflows::CashflowProvider,
@@ -194,27 +196,38 @@ where
     }
     let disc = market.get_discount(discount_curve_id.as_str())?;
     // Discount on the curve's own time axis, consistent with curve metrics.
-    npv(disc.as_ref(), as_of, &flows)
+    npv(disc.as_ref(), as_of, &flows, include_today)
 }
 
 /// Schedule → PV helper that uses the curve's own day count convention (raw f64).
 ///
 /// Returns unrounded NPV for high-precision calibration/risk.
 ///
-/// Cashflows on or before `as_of` are excluded, matching [`schedule_pv`]. The
-/// only distinction is the unrounded scalar output used by calibration and risk.
-/// Empty remaining schedules return zero only when the instrument defines a
-/// notional, matching the known-currency boundary of [`schedule_pv`].
+/// Selection matches [`schedule_pv`], including the explicit `include_today`;
+/// the only distinction is the unrounded scalar output used by calibration and
+/// risk. Empty remaining schedules return zero only when the instrument
+/// defines a notional, matching the known-currency boundary of
+/// [`schedule_pv`].
+///
+/// # Arguments
+///
+/// * `instrument` - The instrument providing cashflows
+/// * `market` - Market data context
+/// * `as_of` - Valuation date
+/// * `discount_curve_id` - ID of the discount curve to use
+/// * `include_today` - Whether cash dated `as_of` is still owed; chosen by the
+///   product, with no default.
 pub fn schedule_pv_raw<S>(
     instrument: &S,
     market: &MarketContext,
     as_of: Date,
     discount_curve_id: &finstack_quant_core::types::CurveId,
+    include_today: bool,
 ) -> finstack_quant_core::Result<f64>
 where
     S: finstack_quant_cashflows::CashflowProvider,
 {
-    use finstack_quant_core::cashflow::npv_amounts_with_curve;
+    use finstack_quant_core::cashflow::npv_amounts;
 
     let flows = S::dated_cashflows(instrument, market, as_of)?;
     if flows.is_empty() {
@@ -229,38 +242,7 @@ where
         .into_iter()
         .map(|(date, amount)| (date, amount.amount()))
         .collect::<Vec<_>>();
-    npv_amounts_with_curve(disc.as_ref(), as_of, &amounts)
-}
-
-/// Schedule → raw trade NPV, including cashflows dated exactly on `as_of`.
-///
-/// This is narrower than [`schedule_pv_raw`]: truly past cashflows are excluded,
-/// while an inception exchange settling on the valuation date is retained at
-/// unit discount factor. Calibration instruments such as T+0 deposits need this
-/// convention so their quoted rate can zero the complete trade NPV.
-pub fn schedule_trade_pv_raw<S>(
-    instrument: &S,
-    market: &MarketContext,
-    as_of: Date,
-    discount_curve_id: &finstack_quant_core::types::CurveId,
-) -> finstack_quant_core::Result<f64>
-where
-    S: finstack_quant_cashflows::CashflowProvider,
-{
-    use finstack_quant_core::math::summation::NeumaierAccumulator;
-
-    let flows = S::dated_cashflows(instrument, market, as_of)?;
-    let disc = market.get_discount(discount_curve_id.as_str())?;
-    let mut total = NeumaierAccumulator::new();
-
-    for (date, amount) in flows {
-        if date < as_of {
-            continue;
-        }
-        total.add(amount.amount() * disc.df_between_dates(as_of, date)?);
-    }
-
-    Ok(total.total())
+    npv_amounts(disc.as_ref(), as_of, &amounts, include_today)
 }
 
 /// Resolve an optional dividend-yield scalar from the market context.
@@ -1063,7 +1045,13 @@ mod tests {
                 .build()?,
         );
 
-        let pv = schedule_pv_raw(&SingleFlowProvider, &market, as_of, &CurveId::new("DISC"))?;
+        let pv = schedule_pv_raw(
+            &SingleFlowProvider,
+            &market,
+            as_of,
+            &CurveId::new("DISC"),
+            false,
+        )?;
 
         assert!(pv > 0.0);
         assert!(pv < 100.0);
@@ -1077,13 +1065,13 @@ mod tests {
         let curve_id = CurveId::new("DISC");
         let as_of = date!(2025 - 01 - 16);
         assert!(matches!(
-            schedule_pv(&empty, &market, as_of, &curve_id),
+            schedule_pv(&empty, &market, as_of, &curve_id, false),
             Err(finstack_quant_core::Error::Input(
                 finstack_quant_core::InputError::TooFewPoints
             ))
         ));
         assert!(matches!(
-            schedule_pv_raw(&empty, &market, as_of, &curve_id),
+            schedule_pv_raw(&empty, &market, as_of, &curve_id, false),
             Err(finstack_quant_core::Error::Input(
                 finstack_quant_core::InputError::TooFewPoints
             ))
@@ -1101,7 +1089,13 @@ mod tests {
                 .build()?,
         );
 
-        let pv = schedule_pv(&SingleFlowProvider, &market, as_of, &CurveId::new("DISC"))?;
+        let pv = schedule_pv(
+            &SingleFlowProvider,
+            &market,
+            as_of,
+            &CurveId::new("DISC"),
+            false,
+        )?;
 
         assert!(pv.amount() > 0.0);
         assert!(pv.amount() < 100.0);

@@ -407,6 +407,7 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
         &curve,
         curve.base_date(),
         &schedule.dated_flows().unwrap(),
+        false,
     )
     .unwrap();
 
@@ -1219,18 +1220,21 @@ fn npv_decreases_with_higher_discount_rate() {
         &curve_3pct,
         curve_3pct.base_date(),
         &schedule.dated_flows().unwrap(),
+        false,
     )
     .unwrap();
     let npv_5pct = finstack_quant_core::cashflow::npv(
         &curve_5pct,
         curve_5pct.base_date(),
         &schedule.dated_flows().unwrap(),
+        false,
     )
     .unwrap();
     let npv_7pct = finstack_quant_core::cashflow::npv(
         &curve_7pct,
         curve_7pct.base_date(),
         &schedule.dated_flows().unwrap(),
+        false,
     )
     .unwrap();
 

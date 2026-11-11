@@ -79,7 +79,7 @@ impl StructuredCredit {
             run: &run,
         }
         .dated_cashflows(market, as_of)?;
-        let value = finstack_quant_core::cashflow::npv(disc.as_ref(), as_of, &flows)?;
+        let value = finstack_quant_core::cashflow::npv(disc.as_ref(), as_of, &flows, false)?;
         Ok((value, SimulationMetricSeed::from_run(run)))
     }
 }
@@ -258,7 +258,7 @@ impl Instrument for StructuredCredit {
         let disc = context.get_discount(self.discount_curve_id.as_str())?;
         let flows = self.dated_cashflows(context, as_of)?;
 
-        finstack_quant_core::cashflow::npv(disc.as_ref(), as_of, &flows)
+        finstack_quant_core::cashflow::npv(disc.as_ref(), as_of, &flows, false)
     }
 
     fn seed_metric_context(

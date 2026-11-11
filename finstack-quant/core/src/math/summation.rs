@@ -193,4 +193,63 @@ impl NeumaierAccumulator {
     pub fn total(self) -> f64 {
         self.sum + self.c
     }
+
+    /// Add a value, rejecting a non-finite input or running state.
+    ///
+    /// The checked counterpart of [`Self::add`]: on error the accumulator is
+    /// left unusable for further checked use and the caller should propagate.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - Finite value to accumulate.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] when `x`, the running sum or the
+    /// compensation term is not finite.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_core::math::summation::NeumaierAccumulator;
+    ///
+    /// let mut acc = NeumaierAccumulator::new();
+    /// acc.checked_add(1e16)?;
+    /// acc.checked_add(1.0)?;
+    /// acc.checked_add(-1e16)?;
+    /// assert_eq!(acc.checked_total()?, 1.0);
+    /// assert!(acc.checked_add(f64::MAX).and_then(|()| acc.checked_add(f64::MAX)).is_err());
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    #[inline]
+    pub fn checked_add(&mut self, x: f64) -> crate::Result<()> {
+        if !x.is_finite() {
+            return Err(crate::Error::Validation(format!(
+                "compensated sum input must be finite, got {x}"
+            )));
+        }
+        self.add(x);
+        if !(self.sum.is_finite() && self.c.is_finite()) {
+            return Err(crate::Error::Validation(
+                "compensated sum overflowed".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Return the compensated total, rejecting a non-finite result.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] when the total is not finite.
+    #[inline]
+    pub fn checked_total(self) -> crate::Result<f64> {
+        let total = self.total();
+        if !total.is_finite() {
+            return Err(crate::Error::Validation(
+                "compensated sum total is not finite".to_string(),
+            ));
+        }
+        Ok(total)
+    }
 }

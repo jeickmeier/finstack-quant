@@ -502,7 +502,7 @@ impl Instrument for AssetBackedFacility {
     ) -> finstack_quant_core::Result<Money> {
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let flows = self.dated_cashflows(market, as_of)?;
-        finstack_quant_core::cashflow::npv(disc.as_ref(), as_of, &flows)
+        finstack_quant_core::cashflow::npv(disc.as_ref(), as_of, &flows, false)
     }
 
     finstack_quant_valuations_core::impl_focused_pricing_overrides!();
