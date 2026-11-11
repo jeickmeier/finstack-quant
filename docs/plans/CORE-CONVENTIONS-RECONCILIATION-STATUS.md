@@ -117,8 +117,8 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 32 | F4 | not attempted (run budget; dep F3) | | | |
 | 33 | F5 | not attempted (run budget; plan sized L) | | | |
 | 34 | F6 | committed (`F6:` in git log) | lint, rust-test, python-test, wasm-test, all-audit (slice-gate; after gen-write) | 013 entry: config/policy items recorded as reconciled; record 013 status updated; STATEMENTS-CAPITAL-09 observed text updated | Required `pivot_currency: Option<Currency>`; no FX config/matrix/policy defaults; explicit pivots at ~165 Rust and ~60 host sites (`None` unless a deliberate hub); `PeriodAverage` removed; required host `rate` policy; calibration `fx: Option<FxConfig>`; statements `PeriodEnd` fallback removed; see Needs review |
-| 35 | F7 | not started (dep F6 met) | | | |
-| 36 | F8 | skipped (dep F7) | | | |
+| 35 | F7 | committed (`F7:` in git log) | lint, gen-check, rust-test, python-test, wasm-test, ui-check (slice-gate; after gen-write) | 013 entry: resolution items recorded as reconciled, state/shock items remain for F8; record 013 status updated | Pin > global > provider; identity quotes rejected; literal ordered cache; NotFound-only routing with preserved leg causes; checked revisions; one-call limit for revisionless providers; single fallible `FxProvider::snapshot` hook with validated capture; see Needs review |
+| 36 | F8 | not started (dep F7 met) | | | |
 | 37 | G5 | skipped (dep G4) | | | |
 | 38 | E5 | skipped (dep E3: E3b not executed) | | | |
 | 39 | E6 | skipped (dep G5, CASHFLOWS-001) | | | |
@@ -292,6 +292,48 @@ logged under Needs review.
     matches them.
   - **WASM gate:** the WASM figure (1085) is from `wasm-test-built`, after
     one full `wasm-test` build.
+- **F7.**
+  - **Scope taken strictly.** The plan's F7 bullets name pinned-before-global,
+    ordered literal cache keys, identity rejection, NotFound-only routing,
+    a checked revision counter and fallible snapshot hooks. Record 013 item 8
+    (a revisionless provider may answer only one call per resolution attempt)
+    and item 9 (validate captured state before returning it; capture needs
+    coherent generations) are not in any phase bullet, and F8 "closes the 013
+    entry", so they were implemented here.
+  - **Revisionless providers.** A resolution that needs a second provider call
+    (a pivot route after the missing probe) now errors when the provider
+    reports no revision; wholly matrix-held legs after a single missing probe
+    still route. Several immutable test providers gained `get_revision() ->
+    Some(0)` (the record's sanctioned value for immutable providers).
+  - **Snapshot hooks merged.** `snapshot_quotes` and `snapshot_pinned_quotes`
+    became one `FxProvider::snapshot() -> Result<Option<FxProviderSnapshot>>`:
+    `Ok(None)` (default) is unsupported, `Some(empty)` is a complete empty
+    provider. One call keeps the two stores coherent; no error variant for
+    "unsupported" exists, so `Option` carries it. Capture now also requires a
+    provider revision (previously only non-empty snapshots did).
+  - **Behaviour flips encoded in tests.** Pinned-before-global reverses the
+    old global-first order: core tests (`pinned_quote_outranks_pair_global_in_either_orientation`,
+    `pinned_fixing_precedes_global_source_in_routes_and_reciprocals`, two
+    bumped-snapshot authority checks), the Python
+    `test_fx_pinned_fixing_precedes_global_quote_in_either_orientation` and
+    the Node "FX pinned fixing precedes the global quote" test now assert the
+    record's order. Overflowing shocks now fail at capture instead of at
+    serialization. A live provider's bumped matrix no longer captures as an
+    empty provider snapshot; it errors (the lifecycle test asserts that).
+  - **Route context.** A non-NotFound leg error propagates with its own
+    category but without added route context: the error type has no wrapper
+    that keeps the category, and relabelling would change it. Logged rather
+    than inventing a variant.
+  - **Shock snapshots.** `ResolvedPairProvider`/`BumpedFxProvider` snapshot
+    lookups now propagate invalid reciprocals and invalid crosses instead of
+    silently omitting them, and their scoped lookups use pin before global.
+    The live-provider shock itself is unchanged (F8).
+  - **Scenario FX preview.** The scenarios FX adapter captures the matrix
+    state to read its pivot and global quotes, so an FX shock over a matrix
+    whose provider cannot be captured (a live custom provider) now errors at
+    preview instead of proceeding. Its two tests used a NotFound-only custom
+    provider and now use an empty `SimpleFxProvider` (same answers). F8 makes
+    every shock need a frozen baseline anyway.
 - **F6.**
   - **Pivot assignment (O9).** Every matrix now states its pivot. Mechanical
     sweep: `None` everywhere, then `Some(USD)` only where a test's assertions

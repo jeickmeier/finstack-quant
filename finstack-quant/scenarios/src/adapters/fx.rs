@@ -101,32 +101,15 @@ mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::money::fx::{FxConfig, FxConversionPolicy, FxMatrix, FxProvider};
+    use finstack_quant_core::money::fx::{FxConfig, FxMatrix, SimpleFxProvider};
     use std::sync::Arc;
     use time::macros::date;
-
-    struct NullFx;
-
-    impl FxProvider for NullFx {
-        fn rate(
-            &self,
-            from: Currency,
-            to: Currency,
-            _on: finstack_quant_core::dates::Date,
-            _policy: FxConversionPolicy,
-        ) -> finstack_quant_core::Result<f64> {
-            Err(finstack_quant_core::InputError::NotFound {
-                id: format!("FX:{from}->{to}"),
-            }
-            .into())
-        }
-    }
 
     #[test]
     fn post_shock_triangulation_check_warns_on_inconsistent_cross() {
         let as_of = date!(2025 - 01 - 01);
         let fx = FxMatrix::try_with_config(
-            Arc::new(NullFx),
+            Arc::new(SimpleFxProvider::new()),
             FxConfig {
                 pivot_currency: Some(Currency::USD),
                 cache_capacity: 32,
@@ -158,7 +141,7 @@ mod tests {
     fn post_shock_triangulation_check_accepts_valid_negative_percent_shock() {
         let as_of = date!(2025 - 01 - 01);
         let fx = FxMatrix::try_with_config(
-            Arc::new(NullFx),
+            Arc::new(SimpleFxProvider::new()),
             FxConfig {
                 pivot_currency: Some(Currency::USD),
                 cache_capacity: 32,

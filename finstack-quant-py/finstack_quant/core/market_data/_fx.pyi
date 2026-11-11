@@ -401,12 +401,14 @@ class FxMatrix:
     """
     Foreign-exchange rate matrix for currency conversion.
 
-    Explicit pair-global quotes take priority in either orientation, followed
-    by date/policy-scoped fixings pinned with :meth:`set_quote_on`, then provider
-    observations. Market-context JSON retains those distinct source roles.
-    A missing pair is routed ``from -> pivot -> to`` only through the explicit
-    ``pivot_currency`` chosen at construction; there is no default pivot, and
-    ``None`` uses direct quotes only. Matrices obtained from a
+    Date/policy-scoped fixings pinned with :meth:`set_quote_on` take priority
+    for their date and policy, followed by explicit pair-global quotes, then
+    the provider; within each source the supplied direction wins, otherwise the
+    reciprocal of the opposite quote. Market-context JSON retains those
+    distinct source roles. Only a pair the provider reports missing is routed
+    ``from -> pivot -> to``, and only through the explicit ``pivot_currency``
+    chosen at construction; there is no default pivot, and ``None`` uses
+    direct quotes only. Matrices obtained from a
     :class:`MarketContext` share state with it.
 
     Examples
@@ -515,8 +517,8 @@ class FxMatrix:
         """
         Set an authoritative FX quote scoped to one date and policy.
 
-        A pair-global quote in either orientation takes priority over this
-        fixing. The fixing takes priority over provider observations.
+        For its date and policy the fixing takes priority over a pair-global
+        quote in either orientation and over the provider.
 
         Parameters
         ----------
@@ -548,8 +550,10 @@ class FxMatrix:
         """
         Look up an FX rate, triangulating through the pivot when needed.
 
-        Source priority precedes orientation: global quotes, pinned fixings,
-        then provider observations, taking a reciprocal within each source.
+        Source priority precedes orientation: pinned fixings for the date and
+        policy, global quotes, then the provider, taking a reciprocal within
+        each source. Only a pair the provider reports missing is routed through
+        the pivot; any other provider error is raised unchanged.
 
         Parameters
         ----------

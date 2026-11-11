@@ -85,6 +85,37 @@ pub(crate) fn validate_fx_rate(from: Currency, to: Currency, rate: f64) -> crate
     Ok(rate)
 }
 
+/// Admit one stored quote: a distinct ordered pair with a finite, strictly
+/// positive rate.
+///
+/// Identity conversion is exactly 1 without any lookup, so a stored
+/// same-currency quote is rejected even when it is 1 (record
+/// CORE-CONVENTIONS-013 #4).
+pub(crate) fn validate_stored_quote(from: Currency, to: Currency, rate: f64) -> crate::Result<f64> {
+    if from == to {
+        return Err(crate::Error::Validation(format!(
+            "stored FX quote {from}->{to} is an identity pair; same-currency conversion is \
+             exactly 1 and cannot be quoted"
+        )));
+    }
+    validate_fx_rate(from, to, rate)
+}
+
+/// Complete stored quote state of a quote-backed [`FxProvider`].
+///
+/// `quotes` hold pair-global rates (`to` units per `from` unit, every date
+/// and policy); `pinned_quotes` hold rates for one exact `(date, policy)`
+/// scope, which outrank this provider's global rates for that scope. Both
+/// keep the supplied orientation; neither carries live revisions or cache
+/// entries.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FxProviderSnapshot {
+    /// Pair-global `(from, to, rate)` quotes.
+    pub quotes: Vec<(Currency, Currency, f64)>,
+    /// Date/policy-scoped `(from, to, on, policy, rate)` quotes.
+    pub pinned_quotes: Vec<(Currency, Currency, Date, FxConversionPolicy, f64)>,
+}
+
 /// Trait for obtaining FX rates.
 ///
 /// Implementations can be as simple as hard-coded tables or as complex as
@@ -102,12 +133,15 @@ pub(crate) fn validate_fx_rate(from: Currency, to: Currency, rate: f64) -> crate
 /// 1. Return `1.0` when `from == to` (identity conversion)
 /// 2. Consider supporting reciprocal lookups (if `A→B` exists, compute `B→A = 1/rate`)
 /// 3. Validate rates are finite and positive before returning
-/// 4. Use the `policy` hint to select between spot, forward, or averaged rates
+/// 4. Use the `policy` to select the provider-defined source for the date
 ///
 /// # Errors
 ///
 /// Implementations should return errors when:
-/// - [`InputError::NotFound`](crate::InputError::NotFound): No rate available for the requested pair
+/// - [`InputError::NotFound`](crate::InputError::NotFound): No rate available for
+///   the requested pair. This is the only error after which an
+///   [`FxMatrix`](super::FxMatrix) with a pivot currency routes through that
+///   pivot; every other error propagates unchanged.
 /// - [`InputError::InvalidFxRate`](crate::InputError::InvalidFxRate): Rate is non-finite or non-positive
 /// - [`InputError::NonFiniteValue`](crate::InputError::NonFiniteValue): Computed rate is NaN or infinity
 ///
@@ -200,34 +234,31 @@ pub trait FxProvider: Send + Sync {
     ///
     /// The default `None` disables observation caching. Use it for live or
     /// externally updated providers that cannot track every quote change. The
-    /// matrix still honors its explicit global quotes and pinned fixings.
+    /// matrix still honors its explicit global quotes and pinned fixings, but
+    /// a resolution that needs more than one call to such a provider (a pivot
+    /// route) fails, because the calls may observe different quote states.
     fn get_revision(&self) -> Option<u64> {
         None
     }
 
-    /// Return all stored quotes for serialization.
+    /// Return this provider's complete stored quote state.
     ///
-    /// The default implementation returns an empty vec (appropriate for
-    /// providers that compute rates on-the-fly). Providers that hold a
-    /// quote map should override this and [`get_revision`](Self::get_revision)
-    /// to enable coherent FxMatrix round-trips.
-    fn snapshot_quotes(&self) -> Vec<(Currency, Currency, f64)> {
-        Vec::new()
-    }
-
-    /// Return stored date- and policy-scoped quotes for serialization.
+    /// `Ok(None)`, the default, means capture is unsupported: the provider
+    /// computes or fetches rates that a quote list cannot reproduce, and
+    /// [`FxMatrix::get_serializable_state`](super::FxMatrix::get_serializable_state)
+    /// fails rather than writing a partial snapshot. `Ok(Some(snapshot))`
+    /// must reproduce every rate this provider can return; an empty snapshot
+    /// means a provider that holds no quotes. Implementations read stored data
+    /// only, without live lookups or reference-date freezing, and must also
+    /// report a [`get_revision`](Self::get_revision) so capture can detect
+    /// concurrent updates.
     ///
-    /// Each tuple contains the source currency, target currency, observation
-    /// date, conversion policy, and units of target currency per source unit.
-    /// These quotes override this provider's pair-global snapshot quotes for
-    /// their scope, but remain below explicit quotes in the containing matrix.
-    /// Implementations must use stored snapshot data without querying live
-    /// rates or freezing a reference-date observation. The default is empty
-    /// for providers without serializable scoped state. Providers exposing
-    /// stored quotes must also implement [`get_revision`](Self::get_revision)
-    /// so matrices can detect updates between snapshot hooks.
-    fn snapshot_pinned_quotes(&self) -> Vec<(Currency, Currency, Date, FxConversionPolicy, f64)> {
-        Vec::new()
+    /// # Errors
+    ///
+    /// Returns an error when the stored state cannot be expressed as valid
+    /// quotes (for example an invalid derived reciprocal).
+    fn snapshot(&self) -> crate::Result<Option<FxProviderSnapshot>> {
+        Ok(None)
     }
 }
 

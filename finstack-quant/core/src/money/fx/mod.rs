@@ -38,7 +38,7 @@ mod types;
 
 pub use conventions::{FxPairConvention, FxQuoteConvention, fx_pair_convention, invert_fx_rate};
 pub use matrix::FxMatrix;
-pub use provider::FxProvider;
+pub use provider::{FxProvider, FxProviderSnapshot};
 pub(crate) use provider::{reciprocal_rate_or_err, validate_fx_rate};
 pub use providers::SimpleFxProvider;
 pub use types::{

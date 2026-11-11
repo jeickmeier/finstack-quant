@@ -4,7 +4,8 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::{
-    FxConfig, FxConversionPolicy, FxMatrix, FxProvider, FxQuery, SimpleFxProvider,
+    FxConfig, FxConversionPolicy, FxMatrix, FxProvider, FxProviderSnapshot, FxQuery,
+    SimpleFxProvider,
 };
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -29,9 +30,9 @@ impl FxProvider for StaticFx {
     }
 }
 
-/// Quotes USD/EUR and derives EUR/USD as its reciprocal. The derived side is
-/// the cache's canonical orientation (EUR < USD by alphabetic code), so a
-/// cache warmed from either direction stores the same value.
+/// Quotes USD/EUR and derives EUR/USD as its reciprocal. Each orientation is
+/// cached under its own ordered query, so a cache warmed from either direction
+/// serves exactly the provider's bits for each.
 struct ReciprocalFx {
     usd_eur: f64,
 }
@@ -365,9 +366,9 @@ fn provider_update_between_cross_legs_retries_the_complete_rate() {
 }
 
 #[test]
-fn provider_update_between_snapshot_hooks_retries_the_complete_snapshot() {
-    struct PublishBetweenHooks(AtomicUsize);
-    impl FxProvider for PublishBetweenHooks {
+fn provider_update_during_snapshot_retries_the_complete_snapshot() {
+    struct PublishDuringSnapshot(AtomicUsize);
+    impl FxProvider for PublishDuringSnapshot {
         fn get_revision(&self) -> Option<u64> {
             Some(self.0.load(Ordering::SeqCst) as u64)
         }
@@ -382,33 +383,25 @@ fn provider_update_between_snapshot_hooks_retries_the_complete_snapshot() {
             Ok(1.2)
         }
 
-        fn snapshot_quotes(&self) -> Vec<(Currency, Currency, f64)> {
+        fn snapshot(&self) -> finstack_quant_core::Result<Option<FxProviderSnapshot>> {
+            // The first capture publishes a new revision while returning the
+            // old state; the retry must return the complete new state.
             let prior = self.0.swap(1, Ordering::SeqCst);
-            vec![(
-                Currency::EUR,
-                Currency::USD,
-                if prior == 0 { 1.1 } else { 1.2 },
-            )]
-        }
-
-        fn snapshot_pinned_quotes(
-            &self,
-        ) -> Vec<(Currency, Currency, Date, FxConversionPolicy, f64)> {
-            vec![(
-                Currency::EUR,
-                Currency::USD,
-                Date::from_ordinal_date(2025, 1).expect("date"),
-                FxConversionPolicy::CashflowDate,
-                if self.0.load(Ordering::SeqCst) == 0 {
-                    1.3
-                } else {
-                    1.4
-                },
-            )]
+            let (global, pinned) = if prior == 0 { (1.1, 1.3) } else { (1.2, 1.4) };
+            Ok(Some(FxProviderSnapshot {
+                quotes: vec![(Currency::EUR, Currency::USD, global)],
+                pinned_quotes: vec![(
+                    Currency::EUR,
+                    Currency::USD,
+                    Date::from_ordinal_date(2025, 1).expect("date"),
+                    FxConversionPolicy::CashflowDate,
+                    pinned,
+                )],
+            }))
         }
     }
 
-    let matrix = FxMatrix::new(Arc::new(PublishBetweenHooks(AtomicUsize::new(0))), None);
+    let matrix = FxMatrix::new(Arc::new(PublishDuringSnapshot(AtomicUsize::new(0))), None);
     let state = matrix.get_serializable_state().expect("coherent snapshot");
     assert_eq!(
         state.provider_quotes,
@@ -436,9 +429,12 @@ fn repeated_provider_updates_fail_rate_and_snapshot_after_bounded_retries() {
             Ok(1.2)
         }
 
-        fn snapshot_quotes(&self) -> Vec<(Currency, Currency, f64)> {
+        fn snapshot(&self) -> finstack_quant_core::Result<Option<FxProviderSnapshot>> {
             self.0.fetch_add(1, Ordering::SeqCst);
-            vec![(Currency::EUR, Currency::USD, 1.2)]
+            Ok(Some(FxProviderSnapshot {
+                quotes: vec![(Currency::EUR, Currency::USD, 1.2)],
+                pinned_quotes: vec![],
+            }))
         }
     }
 
@@ -474,8 +470,11 @@ fn unversioned_provider_snapshot_quotes_are_rejected() {
             Ok(1.2)
         }
 
-        fn snapshot_quotes(&self) -> Vec<(Currency, Currency, f64)> {
-            vec![(Currency::EUR, Currency::USD, 1.2)]
+        fn snapshot(&self) -> finstack_quant_core::Result<Option<FxProviderSnapshot>> {
+            Ok(Some(FxProviderSnapshot {
+                quotes: vec![(Currency::EUR, Currency::USD, 1.2)],
+                pinned_quotes: vec![],
+            }))
         }
     }
     let matrix = FxMatrix::new(Arc::new(UnversionedSnapshot), None);
@@ -551,6 +550,10 @@ fn closure_check_matrix() {
                 }
                 .into()),
             }
+        }
+
+        fn get_revision(&self) -> Option<u64> {
+            Some(0)
         }
     }
     let cfg = FxConfig::new(Some(Currency::USD));
@@ -1225,10 +1228,26 @@ fn bumped_quote_providers_survive_context_snapshots_in_both_directions_and_cross
                 < 1e-12
         );
         fx.set_quotes(&[(from, to, 3.0)]).expect("global override");
+        // The pinned fixing keeps its scope; the global override answers every
+        // other date ahead of the restored provider quotes.
         assert!(
             (fx.rate(FxQuery::new(from, to, on, FxConversionPolicy::CashflowDate))
-                .expect("global rate")
+                .expect("pinned rate")
                 .rate
+                - 2.0)
+                .abs()
+                < 1e-12
+        );
+        let next = on.next_day().expect("next date");
+        assert!(
+            (fx.rate(FxQuery::new(
+                from,
+                to,
+                next,
+                FxConversionPolicy::CashflowDate
+            ))
+            .expect("global rate")
+            .rate
                 - 3.0)
                 .abs()
                 < 1e-12
@@ -1489,15 +1508,18 @@ fn bumped_pinned_crosses_retain_each_date_policy_and_quote_authority() {
             );
             fx.set_quotes(&[(to, from, 5.0)])
                 .expect("new global inverse override");
+            // The scoped override keeps its scope (record 013 #3); the global
+            // override answers the other policy ahead of provider snapshots.
             assert_eq!(
-                fx.rate(FxQuery::new(
-                    from,
-                    to,
-                    dates[1],
-                    FxConversionPolicy::CashflowDate
-                ))
-                .expect("global")
-                .rate,
+                fx.rate(FxQuery::new(from, to, dates[1], policies[0]))
+                    .expect("scoped")
+                    .rate,
+                0.25
+            );
+            assert_eq!(
+                fx.rate(FxQuery::new(from, to, dates[1], policies[1]))
+                    .expect("global")
+                    .rate,
                 0.2
             );
         }
@@ -1639,7 +1661,7 @@ fn scoped_provider_snapshot_field_is_required() {
 }
 
 #[test]
-fn mutable_provider_overflow_fails_snapshot_serialization_without_emitting_null() {
+fn mutable_provider_overflow_fails_snapshot_capture() {
     use finstack_quant_core::market_data::context::MarketContext;
 
     let on = Date::from_ordinal_date(2025, 1).expect("date");
@@ -1664,9 +1686,14 @@ fn mutable_provider_overflow_fails_snapshot_serialization_without_emitting_null(
             ))
             .is_err()
     );
-    let captured = bumped.get_serializable_state().expect("stable FX state");
-    assert!(serde_json::to_string(&captured).is_err());
-    assert!(serde_json::to_value(&captured).is_err());
+    // Capture validates every quote, so the overflowing shock fails before
+    // any state (or serialized null) is produced.
+    assert!(matches!(
+        bumped.get_serializable_state(),
+        Err(finstack_quant_core::Error::Input(
+            finstack_quant_core::InputError::InvalidFxRate { .. }
+        ))
+    ));
     let context = MarketContext::new().insert_fx(bumped);
     assert!(serde_json::to_string(&context).is_err());
 }
@@ -1705,9 +1732,7 @@ fn mutable_provider_cross_shock_overflow_is_not_replaced_by_unshocked_triangulat
         error,
         finstack_quant_core::Error::Input(finstack_quant_core::InputError::InvalidFxRate { .. })
     ));
-    assert!(
-        serde_json::to_string(&bumped.get_serializable_state().expect("stable FX state")).is_err()
-    );
+    assert!(bumped.get_serializable_state().is_err());
     assert!(serde_json::to_string(&MarketContext::new().insert_fx(bumped)).is_err());
 }
 
@@ -1731,6 +1756,10 @@ fn triangulation_missing_leg_only_queries_provider_once_per_leg() {
             }
             .into())
         }
+
+        fn get_revision(&self) -> Option<u64> {
+            Some(0)
+        }
     }
 
     let provider = Arc::new(CountingMissingFx {
@@ -1750,8 +1779,13 @@ fn triangulation_missing_leg_only_queries_provider_once_per_leg() {
         FxConversionPolicy::CashflowDate,
     ));
     assert!(
-        result.is_err(),
-        "missing triangulation legs should still error"
+        matches!(
+            result,
+            Err(finstack_quant_core::Error::Input(
+                finstack_quant_core::InputError::FxTriangulationFailed { .. }
+            ))
+        ),
+        "a missing pivot leg reports the failed route"
     );
     assert_eq!(
         provider.calls.load(Ordering::Relaxed),
@@ -2027,7 +2061,7 @@ fn set_quotes_is_atomic_on_invalid_entry() {
 }
 
 #[test]
-fn pair_global_reciprocal_outranks_pinned_quote() {
+fn pinned_quote_outranks_pair_global_in_either_orientation() {
     let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }), None);
     let d = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
 
@@ -2054,9 +2088,23 @@ fn pair_global_reciprocal_outranks_pinned_quote() {
         .unwrap()
         .rate;
 
-    assert!(
-        (rate - 1.25).abs() < 1e-12,
-        "pair-global source priority must apply in either orientation"
+    assert_eq!(
+        rate, 1.30,
+        "the pinned direct quote outranks the global reciprocal"
+    );
+    let reverse = matrix
+        .rate(FxQuery::new(
+            Currency::USD,
+            Currency::EUR,
+            d,
+            FxConversionPolicy::CashflowDate,
+        ))
+        .unwrap()
+        .rate;
+    assert_eq!(
+        reverse,
+        1.0 / 1.30,
+        "the pinned reciprocal outranks the global direct quote"
     );
 }
 
@@ -2064,7 +2112,11 @@ fn pair_global_reciprocal_outranks_pinned_quote() {
 fn fx_matrix_state_round_trips_pinned_quotes() {
     // After snapshot + restore, a pinned fixing must still win over the
     // provider for its (on, policy).
-    let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }), None);
+    let provider = SimpleFxProvider::new();
+    provider
+        .set_quotes(&[(Currency::EUR, Currency::USD, 1.10)])
+        .expect("provider quote");
+    let matrix = FxMatrix::new(Arc::new(provider), None);
     let fixing_date = Date::from_calendar_date(2025, time::Month::March, 14).unwrap();
     matrix
         .set_quote_on(
@@ -2086,8 +2138,7 @@ fn fx_matrix_state_round_trips_pinned_quotes() {
     let json = serde_json::to_string(&state).unwrap();
     let state: finstack_quant_core::money::fx::FxMatrixState = serde_json::from_str(&json).unwrap();
 
-    let restored = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }), None);
-    restored.load_from_state(&state).expect("restore");
+    let restored = FxMatrix::try_from_state(&state).expect("restore");
 
     let pinned = restored
         .rate(FxQuery::new(
@@ -2276,7 +2327,7 @@ mod fx_pinned_precedence {
     use time::macros::date;
 
     #[test]
-    fn global_source_precedes_orientation_and_pinned_fixing() {
+    fn pinned_fixing_precedes_global_source_in_routes_and_reciprocals() {
         let on = date!(2025 - 01 - 02);
         let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()), Some(Currency::USD));
         matrix
@@ -2309,8 +2360,8 @@ mod fx_pinned_precedence {
             ))
             .expect("reverse")
             .rate;
-        assert_eq!(forward, 1.25);
-        assert!((forward * reverse - 1.0).abs() < 1e-12);
+        assert_eq!(forward, 1.3);
+        assert_eq!(reverse, 1.0 / 1.3);
         matrix
             .set_quotes(&[(Currency::USD, Currency::GBP, 0.8)])
             .expect("pivot leg");
@@ -2323,8 +2374,8 @@ mod fx_pinned_precedence {
             ))
             .expect("cross");
         assert!(
-            (cross.rate - 1.0).abs() < 1e-12,
-            "pivot legs must use global source first: {}",
+            (cross.rate - 1.3 * 0.8).abs() < 1e-12,
+            "pivot legs must use the pinned fixing first: {}",
             cross.rate
         );
         assert!(cross.triangulated);
@@ -2418,4 +2469,249 @@ fn bumped_matrix_snapshot_states_are_pinned() {
         }),
         "{state}"
     );
+}
+
+/// Record CORE-CONVENTIONS-013 resolution rules (F7).
+mod fx_resolution_rules {
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::money::fx::{
+        FxConfig, FxConversionPolicy, FxMatrix, FxProvider, FxQuery, SimpleFxProvider,
+    };
+    use finstack_quant_core::{Error, InputError};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use time::macros::date;
+
+    const ON: Date = date!(2025 - 01 - 02);
+    const POLICY: FxConversionPolicy = FxConversionPolicy::CashflowDate;
+
+    fn query(from: Currency, to: Currency) -> FxQuery {
+        FxQuery::new(from, to, ON, POLICY)
+    }
+
+    fn is_route_failure(error: &Error) -> bool {
+        matches!(
+            error,
+            Error::Input(InputError::FxTriangulationFailed { .. })
+        )
+    }
+
+    /// EUR->USD = 2 and USD->GBP = 3 (or an outage when `outage` is set);
+    /// GBP->EUR fails with a non-NotFound error; everything else is NotFound.
+    struct Scripted {
+        revision: Option<u64>,
+        outage: bool,
+        calls: AtomicUsize,
+    }
+
+    impl FxProvider for Scripted {
+        fn rate(
+            &self,
+            from: Currency,
+            to: Currency,
+            _on: Date,
+            _policy: FxConversionPolicy,
+        ) -> finstack_quant_core::Result<f64> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            match (from, to) {
+                (Currency::EUR, Currency::USD) => Ok(2.0),
+                (Currency::USD, Currency::GBP) if self.outage => {
+                    Err(Error::Validation("provider outage".into()))
+                }
+                (Currency::USD, Currency::GBP) => Ok(3.0),
+                (Currency::GBP, Currency::EUR) => {
+                    Err(Error::Validation("unsupported source for this pair".into()))
+                }
+                _ => Err(InputError::NotFound {
+                    id: format!("FX:{from}->{to}"),
+                }
+                .into()),
+            }
+        }
+
+        fn get_revision(&self) -> Option<u64> {
+            self.revision
+        }
+    }
+
+    fn routed(revision: Option<u64>, outage: bool) -> (Arc<Scripted>, FxMatrix) {
+        let provider = Arc::new(Scripted {
+            revision,
+            outage,
+            calls: AtomicUsize::new(0),
+        });
+        let matrix = FxMatrix::try_with_config(
+            Arc::clone(&provider) as Arc<dyn FxProvider>,
+            FxConfig::new(Some(Currency::USD)),
+        )
+        .expect("config");
+        (provider, matrix)
+    }
+
+    #[test]
+    fn stored_identity_quotes_are_rejected_everywhere() {
+        let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()), None);
+        for rate in [1.0, 1.1] {
+            assert!(
+                matrix
+                    .set_quotes(&[(Currency::USD, Currency::USD, rate)])
+                    .is_err()
+            );
+            assert!(
+                matrix
+                    .set_quote_on(Currency::USD, Currency::USD, ON, POLICY, rate)
+                    .is_err()
+            );
+            assert!(
+                SimpleFxProvider::new()
+                    .set_quotes(&[(Currency::EUR, Currency::EUR, rate)])
+                    .is_err()
+            );
+        }
+        // A rejected batch writes nothing, and identity still resolves to 1.
+        assert!(
+            matrix
+                .set_quotes(&[
+                    (Currency::EUR, Currency::USD, 1.1),
+                    (Currency::USD, Currency::USD, 1.0),
+                ])
+                .is_err()
+        );
+        assert!(matrix.rate(query(Currency::EUR, Currency::USD)).is_err());
+        let identity = matrix
+            .rate(query(Currency::USD, Currency::USD))
+            .expect("identity");
+        assert_eq!((identity.rate, identity.triangulated), (1.0, false));
+    }
+
+    #[test]
+    fn a_not_found_cross_routes_through_the_pivot() {
+        let (_, matrix) = routed(Some(0), false);
+        let cross = matrix
+            .rate(query(Currency::EUR, Currency::GBP))
+            .expect("routed cross");
+        assert_eq!(cross.rate, 6.0);
+        assert!(cross.triangulated);
+    }
+
+    #[test]
+    fn only_not_found_routes_through_the_pivot() {
+        // GBP->EUR fails with a non-NotFound error: it propagates unchanged
+        // and no pivot leg is requested.
+        let (provider, matrix) = routed(Some(0), false);
+        let error = matrix
+            .rate(query(Currency::GBP, Currency::EUR))
+            .expect_err("no routing after a non-NotFound error");
+        assert!(!is_route_failure(&error));
+        assert!(
+            error
+                .to_string()
+                .contains("unsupported source for this pair")
+        );
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn a_missing_pivot_leg_names_the_ordered_leg() {
+        let (_, matrix) = routed(Some(0), false);
+        let error = matrix
+            .rate(query(Currency::EUR, Currency::JPY))
+            .expect_err("missing second leg");
+        assert!(is_route_failure(&error), "{error}");
+        assert!(error.to_string().contains("USD->JPY"), "{error}");
+    }
+
+    #[test]
+    fn a_failed_pivot_leg_keeps_its_own_error_category() {
+        let (_, matrix) = routed(Some(0), true);
+        let error = matrix
+            .rate(query(Currency::EUR, Currency::GBP))
+            .expect_err("second leg outage");
+        assert!(!is_route_failure(&error), "{error}");
+        assert!(error.to_string().contains("provider outage"), "{error}");
+    }
+
+    #[test]
+    fn directed_provider_quotes_are_cached_literally_in_both_orientations() {
+        struct Directed;
+        impl FxProvider for Directed {
+            fn rate(
+                &self,
+                from: Currency,
+                to: Currency,
+                _on: Date,
+                _policy: FxConversionPolicy,
+            ) -> finstack_quant_core::Result<f64> {
+                match (from, to) {
+                    (Currency::EUR, Currency::USD) => Ok(2.0),
+                    (Currency::USD, Currency::EUR) => Ok(0.6),
+                    _ => Err(InputError::NotFound {
+                        id: format!("FX:{from}->{to}"),
+                    }
+                    .into()),
+                }
+            }
+
+            fn get_revision(&self) -> Option<u64> {
+                Some(0)
+            }
+        }
+        for warm_first in [
+            query(Currency::EUR, Currency::USD),
+            query(Currency::USD, Currency::EUR),
+        ] {
+            let matrix = FxMatrix::new(Arc::new(Directed), None);
+            matrix.rate(warm_first).expect("warm");
+            for _ in 0..2 {
+                let forward = matrix.rate(query(Currency::EUR, Currency::USD));
+                let reverse = matrix.rate(query(Currency::USD, Currency::EUR));
+                assert_eq!(forward.expect("forward").rate, 2.0);
+                assert_eq!(reverse.expect("reverse").rate, 0.6);
+            }
+        }
+    }
+
+    #[test]
+    fn an_unversioned_provider_cannot_serve_a_pivot_route() {
+        let (_, matrix) = routed(None, false);
+        // A single direct call is fine.
+        let direct = matrix.rate(query(Currency::EUR, Currency::USD));
+        assert_eq!(direct.expect("direct").rate, 2.0);
+        // The route needs provider calls after the NotFound probe.
+        let error = matrix
+            .rate(query(Currency::EUR, Currency::GBP))
+            .expect_err("second call to an unversioned provider");
+        assert!(error.to_string().contains("without a revision"), "{error}");
+
+        // Wholly matrix-held legs after the single missing probe are allowed.
+        matrix
+            .set_quotes(&[
+                (Currency::CHF, Currency::USD, 1.1),
+                (Currency::USD, Currency::JPY, 150.0),
+            ])
+            .expect("matrix legs");
+        let cross = matrix
+            .rate(query(Currency::CHF, Currency::JPY))
+            .expect("matrix-held route");
+        assert!((cross.rate - 165.0).abs() < 1e-9);
+        assert!(cross.triangulated);
+    }
+
+    #[test]
+    fn capture_fails_for_providers_without_snapshot_support() {
+        let (_, matrix) = routed(Some(0), false);
+        let error = matrix
+            .get_serializable_state()
+            .expect_err("unsupported capture");
+        assert!(
+            error.to_string().contains("does not support state capture"),
+            "{error}"
+        );
+
+        // A supported, empty provider captures as complete empty state.
+        let empty = FxMatrix::new(Arc::new(SimpleFxProvider::new()), None);
+        let state = empty.get_serializable_state().expect("empty state");
+        assert!(state.provider_quotes.is_empty() && state.provider_pinned_quotes.is_empty());
+    }
 }

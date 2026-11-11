@@ -180,7 +180,7 @@ impl PyFxMatrix {
     }
 
     /// Look up an FX rate.
-    /// Global quotes precede pinned fixings, then provider observations;
+    /// Pinned fixings precede global quotes, then provider observations;
     /// source priority is resolved before taking reciprocals.
     ///
     /// Parameters

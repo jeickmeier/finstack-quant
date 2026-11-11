@@ -3,14 +3,14 @@
 //! This module provides reusable FX provider types that can be shared across
 //! bindings (Python, WASM, etc.) without duplication.
 
-use super::provider::directional_rate;
+use super::provider::{FxProviderSnapshot, directional_rate, validate_stored_quote};
 use super::{FxConversionPolicy, FxProvider};
 use crate::InputError;
 use crate::currency::Currency;
 use crate::dates::Date;
 use crate::{FxHashMap, recover_lock as recover};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 /// Simple FX provider backed by an in-memory quote store.
 ///
@@ -44,6 +44,9 @@ pub struct SimpleFxProvider {
     quotes: RwLock<FxHashMap<(Currency, Currency), f64>>,
     pinned_quotes: RwLock<FxHashMap<(Currency, Currency, Date, FxConversionPolicy), f64>>,
     revision: AtomicU64,
+    /// Serializes writers so the exhaustion check and the revision advance
+    /// cover one mutation at a time.
+    writer: Mutex<()>,
 }
 
 impl SimpleFxProvider {
@@ -63,8 +66,9 @@ impl SimpleFxProvider {
     ///
     /// # Arguments
     ///
-    /// * `quotes` - Ordered `(from, to, rate)` tuples with the rate expressed
-    ///   as finite, positive units of `to` per unit of `from`.
+    /// * `quotes` - Ordered `(from, to, rate)` tuples with distinct currencies
+    ///   and the rate expressed as finite, positive units of `to` per unit of
+    ///   `from`.
     ///
     /// Each rate is units of `to` per unit of `from`. All inputs are validated
     /// before the provider acquires its write lock, so the operation is atomic
@@ -77,8 +81,9 @@ impl SimpleFxProvider {
     ///
     /// # Errors
     ///
-    /// Returns an error if any rate is non-finite or not strictly positive.
-    /// The provider remains unchanged in that case.
+    /// Returns an error if any tuple is an identity pair, any rate is
+    /// non-finite or not strictly positive, or the provider revision is
+    /// exhausted. The provider remains unchanged in that case.
     ///
     /// # Examples
     /// ```rust
@@ -95,9 +100,11 @@ impl SimpleFxProvider {
         let validated = quotes
             .iter()
             .map(|&(from, to, rate)| {
-                super::validate_fx_rate(from, to, rate).map(|rate| ((from, to), rate))
+                validate_stored_quote(from, to, rate).map(|rate| ((from, to), rate))
             })
             .collect::<crate::Result<Vec<_>>>()?;
+        let _writer = recover(self.writer.lock());
+        self.ensure_revision_available()?;
         let mut guard = recover(self.quotes.write());
         for (pair, rate) in validated {
             guard.insert(pair, rate);
@@ -114,33 +121,42 @@ impl SimpleFxProvider {
     ) -> crate::Result<()> {
         let mut validated = FxHashMap::default();
         for &(from, to, on, policy, rate) in quotes {
-            let rate = super::validate_fx_rate(from, to, rate)?;
+            let rate = validate_stored_quote(from, to, rate)?;
             if validated.insert((from, to, on, policy), rate).is_some() {
                 return Err(crate::Error::Validation(format!(
                     "duplicate scoped provider quote for {from}->{to} on {on}/{policy}"
                 )));
             }
         }
+        let _writer = recover(self.writer.lock());
+        self.ensure_revision_available()?;
         let mut quotes = recover(self.pinned_quotes.write());
         quotes.extend(validated);
         self.advance_revision();
         Ok(())
     }
 
+    /// Fail before a mutation when no fresh revision remains to publish it.
+    /// Callers hold the writer lock, so the check and the advance pair up.
+    fn ensure_revision_available(&self) -> crate::Result<()> {
+        if self.revision.load(Ordering::Acquire) == u64::MAX {
+            return Err(crate::Error::Validation(
+                "FX provider revision exhausted; create a new provider".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Publish the next revision. `ensure_revision_available` ran under the
+    /// same writer lock, so the increment cannot wrap.
     fn advance_revision(&self) {
-        // Exhaustion disables caching instead of reusing an older revision.
-        let _ = self
-            .revision
-            .try_update(Ordering::AcqRel, Ordering::Acquire, |value| {
-                value.checked_add(1)
-            });
+        self.revision.fetch_add(1, Ordering::AcqRel);
     }
 }
 
 impl FxProvider for SimpleFxProvider {
     fn get_revision(&self) -> Option<u64> {
-        let revision = self.revision.load(Ordering::Acquire);
-        (revision != u64::MAX).then_some(revision)
+        Some(self.revision.load(Ordering::Acquire))
     }
 
     /// Return an FX rate with automatic reciprocal fallback.
@@ -219,18 +235,19 @@ impl FxProvider for SimpleFxProvider {
         })
     }
 
-    fn snapshot_quotes(&self) -> Vec<(Currency, Currency, f64)> {
-        recover(self.quotes.read())
+    fn snapshot(&self) -> crate::Result<Option<FxProviderSnapshot>> {
+        let quotes = recover(self.quotes.read())
             .iter()
             .map(|(&(from, to), &rate)| (from, to, rate))
-            .collect()
-    }
-
-    fn snapshot_pinned_quotes(&self) -> Vec<(Currency, Currency, Date, FxConversionPolicy, f64)> {
-        recover(self.pinned_quotes.read())
+            .collect();
+        let pinned_quotes = recover(self.pinned_quotes.read())
             .iter()
             .map(|(&(from, to, on, policy), &rate)| (from, to, on, policy, rate))
-            .collect()
+            .collect();
+        Ok(Some(FxProviderSnapshot {
+            quotes,
+            pinned_quotes,
+        }))
     }
 }
 
@@ -295,11 +312,14 @@ impl BumpedFxProvider {
         // Validate every statically known shocked scope, not just a caller's
         // reference-date lookup. A snapshot must not turn an overflowing
         // scoped cross into an invalid serialized quote or an unshocked rate.
-        for (base, quote, rate) in bumped.snapshot_quotes() {
-            super::validate_fx_rate(base, quote, rate)?;
-        }
-        for (base, quote, _, _, rate) in bumped.snapshot_pinned_quotes() {
-            super::validate_fx_rate(base, quote, rate)?;
+        // A provider without snapshot support has no statically known scope.
+        if let Some(snapshot) = bumped.snapshot()? {
+            for (base, quote, rate) in snapshot.quotes {
+                super::validate_fx_rate(base, quote, rate)?;
+            }
+            for (base, quote, _, _, rate) in snapshot.pinned_quotes {
+                super::validate_fx_rate(base, quote, rate)?;
+            }
         }
         Ok(bumped)
     }
@@ -351,53 +371,53 @@ impl FxProvider for BumpedFxProvider {
         self.original.rate(from, to, on, policy)
     }
 
-    fn snapshot_quotes(&self) -> Vec<(Currency, Currency, f64)> {
-        let mut quotes = self.original.snapshot_quotes();
+    fn snapshot(&self) -> crate::Result<Option<FxProviderSnapshot>> {
+        let Some(FxProviderSnapshot {
+            mut quotes,
+            pinned_quotes: mut pinned,
+        }) = self.original.snapshot()?
+        else {
+            return Ok(None);
+        };
         let from = self.override_from;
         let to = self.override_to;
+        let is_target = |base: Currency, quote: Currency| {
+            (base == from && quote == to) || (base == to && quote == from)
+        };
+
         let stored = |a, b| {
             quotes
                 .iter()
                 .find(|&&(base, quote, _)| base == a && quote == b)
                 .map(|&(_, _, rate)| rate)
         };
-        // An invalid reciprocal leaves the snapshot unshocked rather than failing it.
-        if let Ok(Some(rate)) = directional_rate(stored, from, to) {
-            quotes.retain(|&(base, quote, _)| {
-                !((base == from && quote == to) || (base == to && quote == from))
-            });
+        if let Some(rate) = directional_rate(stored, from, to)? {
+            quotes.retain(|&(base, quote, _)| !is_target(base, quote));
             quotes.push((from, to, rate * self.bump_multiplier));
         }
-        quotes
-    }
 
-    fn snapshot_pinned_quotes(&self) -> Vec<(Currency, Currency, Date, FxConversionPolicy, f64)> {
-        let mut quotes = self.original.snapshot_pinned_quotes();
-        let from = self.override_from;
-        let to = self.override_to;
         let mut rates = FxHashMap::default();
-        for &(base, quote, on, policy, rate) in &quotes {
+        for &(base, quote, on, policy, rate) in &pinned {
             if base == from && quote == to {
                 rates.insert((on, policy), rate);
             }
         }
-        for &(base, quote, on, policy, rate) in &quotes {
-            if base == to
-                && quote == from
-                && let Ok(reciprocal) = super::reciprocal_rate_or_err(rate, to, from)
-            {
-                rates.entry((on, policy)).or_insert(reciprocal);
+        for &(base, quote, on, policy, rate) in &pinned {
+            if base == to && quote == from && !rates.contains_key(&(on, policy)) {
+                let reciprocal = super::reciprocal_rate_or_err(rate, to, from)?;
+                rates.insert((on, policy), reciprocal);
             }
         }
-        quotes.retain(|&(base, quote, _, _, _)| {
-            !((base == from && quote == to) || (base == to && quote == from))
-        });
-        quotes.extend(
+        pinned.retain(|&(base, quote, _, _, _)| !is_target(base, quote));
+        pinned.extend(
             rates
                 .into_iter()
                 .map(|((on, policy), rate)| (from, to, on, policy, rate * self.bump_multiplier)),
         );
-        quotes
+        Ok(Some(FxProviderSnapshot {
+            quotes,
+            pinned_quotes: pinned,
+        }))
     }
 }
 
@@ -422,7 +442,13 @@ mod tests {
             .expect("bump");
         let restored = SimpleFxProvider::new();
         restored
-            .set_quotes(&bumped.snapshot_quotes())
+            .set_quotes(
+                &bumped
+                    .snapshot()
+                    .expect("valid snapshot")
+                    .expect("supported snapshot")
+                    .quotes,
+            )
             .expect("snapshot quotes");
         for (from, to) in [
             (Currency::EUR, Currency::USD),
@@ -442,6 +468,34 @@ mod tests {
 
     fn test_date() -> Date {
         Date::from_calendar_date(2024, Month::January, 2).expect("Valid test date")
+    }
+
+    #[test]
+    fn exhausted_provider_revision_fails_before_mutation() {
+        let provider = SimpleFxProvider::new();
+        provider.revision.store(u64::MAX, Ordering::Release);
+        assert!(
+            provider
+                .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
+                .is_err()
+        );
+        assert!(
+            provider
+                .set_snapshot_pinned_quotes(&[(
+                    Currency::EUR,
+                    Currency::USD,
+                    test_date(),
+                    FxConversionPolicy::CashflowDate,
+                    1.1,
+                )])
+                .is_err()
+        );
+        assert_eq!(provider.get_revision(), Some(u64::MAX));
+        let snapshot = provider
+            .snapshot()
+            .expect("valid snapshot")
+            .expect("supported snapshot");
+        assert!(snapshot.quotes.is_empty() && snapshot.pinned_quotes.is_empty());
     }
 
     #[test]

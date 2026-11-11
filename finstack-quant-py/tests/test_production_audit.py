@@ -161,14 +161,16 @@ def test_active_volatility_override_separates_scalar_and_node_risk() -> None:
         assert result.metric_units()["bucketed_vega_residual"] == "currency"
 
 
-def test_fx_source_precedence_is_independent_of_orientation() -> None:
+def test_fx_pinned_fixing_precedes_global_quote_in_either_orientation() -> None:
     fx = FxMatrix("USD")
     fx.set_quotes([("USD", "EUR", 0.8)])
     fx.set_quote_on("EUR", "USD", "2025-01-02", "cashflow_date", 1.3)
-    assert fx.rate("EUR", "USD", "2025-01-02", "cashflow_date").rate == pytest.approx(1.25)
-    assert fx.rate("USD", "EUR", "2025-01-02", "cashflow_date").rate == pytest.approx(0.8)
+    assert fx.rate("EUR", "USD", "2025-01-02", "cashflow_date").rate == 1.3
+    assert fx.rate("USD", "EUR", "2025-01-02", "cashflow_date").rate == 1 / 1.3
     fx.set_quotes([("USD", "GBP", 0.8)])
-    assert fx.rate("EUR", "GBP", "2025-01-02", "cashflow_date").rate == pytest.approx(1.0)
+    cross = fx.rate("EUR", "GBP", "2025-01-02", "cashflow_date")
+    assert cross.rate == pytest.approx(1.3 * 0.8)
+    assert cross.triangulated
 
 
 def test_zero_rate_bond_risk_can_cross_into_negative_rates() -> None:

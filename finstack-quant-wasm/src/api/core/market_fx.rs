@@ -436,8 +436,8 @@ impl JsFxMatrix {
     }
 
     /// Set an authoritative quote scoped to one date and conversion policy.
-    /// Pair-global quotes in either orientation take priority; pinned quotes
-    /// precede provider observations.
+    /// For its date and policy the pinned quote takes priority over a
+    /// pair-global quote in either orientation and over provider observations.
     /// @param base - Base currency code of the FX quote, where the rate is quote per base.
     /// @param quote - Quote currency code of the FX rate, expressed per unit of base currency.
     /// @param date - ISO-8601 date used by the calculation or market-data lookup.
@@ -470,8 +470,10 @@ impl JsFxMatrix {
     }
 
     /// Look up an FX rate.
-    /// Global quotes precede pinned fixings, then provider observations,
-    /// resolving source priority before taking a reciprocal.
+    /// Pinned fixings for the date and policy precede global quotes, then
+    /// provider observations, resolving source priority before taking a
+    /// reciprocal. Only a pair the provider reports missing is routed through
+    /// the pivot; any other provider error is thrown unchanged.
     ///
     /// The policy is required: there is no default conversion policy.
     ///

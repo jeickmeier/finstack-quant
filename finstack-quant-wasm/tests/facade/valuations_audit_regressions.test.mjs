@@ -217,20 +217,22 @@ test('Hull-White exercise retains partial coupons and floating spread', () => {
   assert.ok(Math.abs(Number(result.value.amount) - expected * 10000000) < 0.01);
 });
 
-test('FX global source precedes the pinned quote in both orientations', () => {
+test('FX pinned fixing precedes the global quote in both orientations and routes', () => {
   const fx = new core.FxMatrix('USD');
   fx.setQuotes([['USD', 'EUR', 0.8]]);
   fx.setQuoteOn('EUR', 'USD', '2025-01-02', core.FxConversionPolicy.cashflowDate(), 1.3);
   assert.equal(
     fx.rate('EUR', 'USD', '2025-01-02', core.FxConversionPolicy.cashflowDate()).rate,
-    1.25
+    1.3
   );
   assert.equal(
     fx.rate('USD', 'EUR', '2025-01-02', core.FxConversionPolicy.cashflowDate()).rate,
-    0.8
+    1 / 1.3
   );
   fx.setQuotes([['USD', 'GBP', 0.8]]);
-  assert.equal(fx.rate('EUR', 'GBP', '2025-01-02', core.FxConversionPolicy.cashflowDate()).rate, 1);
+  const cross = fx.rate('EUR', 'GBP', '2025-01-02', core.FxConversionPolicy.cashflowDate());
+  assert.ok(Math.abs(cross.rate - 1.3 * 0.8) < 1e-12);
+  assert.equal(cross.triangulated, true);
 });
 
 test('zero-rate bond DV01 permits negative-rate stress', () => {

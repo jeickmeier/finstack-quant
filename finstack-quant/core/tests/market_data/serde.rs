@@ -77,9 +77,15 @@ fn market_context_snapshot_propagates_unstable_fx_revision_errors() {
             Some(self.0.load(Ordering::SeqCst))
         }
 
-        fn snapshot_quotes(&self) -> Vec<(Currency, Currency, f64)> {
+        fn snapshot(
+            &self,
+        ) -> finstack_quant_core::Result<Option<finstack_quant_core::money::fx::FxProviderSnapshot>>
+        {
             self.0.fetch_add(1, Ordering::SeqCst);
-            vec![(Currency::USD, Currency::EUR, 0.9)]
+            Ok(Some(finstack_quant_core::money::fx::FxProviderSnapshot {
+                quotes: vec![(Currency::USD, Currency::EUR, 0.9)],
+                pinned_quotes: vec![],
+            }))
         }
     }
 

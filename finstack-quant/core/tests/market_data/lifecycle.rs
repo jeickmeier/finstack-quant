@@ -113,23 +113,24 @@ fn derived_fx_shocks_preserve_dates_policies_and_reciprocals() {
                 (Currency::USD, Currency::EUR) | (Currency::USD, Currency::GBP) => {
                     self.rate(to, from, on, policy).map(|rate| 1.0 / rate)
                 }
-                _ => Err(finstack_quant_core::Error::Validation(
-                    "no direct quote".into(),
-                )),
+                _ => Err(finstack_quant_core::InputError::NotFound {
+                    id: format!("FX:{from}->{to}"),
+                }
+                .into()),
             }
+        }
+
+        fn get_revision(&self) -> Option<u64> {
+            Some(0)
         }
     }
     let matrix = FxMatrix::new(Arc::new(Legs), Some(Currency::USD));
     let bumped = matrix
         .with_bumped_rate(Currency::EUR, Currency::GBP, 0.1, base())
         .unwrap();
-    assert!(
-        bumped
-            .get_serializable_state()
-            .expect("stable FX state")
-            .provider_quotes
-            .is_empty()
-    );
+    // A computed provider cannot be reproduced by a quote list, so capture
+    // fails instead of writing an empty (partial) snapshot.
+    assert!(bumped.get_serializable_state().is_err());
     for on in [base(), Date::from_ordinal_date(2025, 182).unwrap()] {
         for policy in [
             FxConversionPolicy::CashflowDate,

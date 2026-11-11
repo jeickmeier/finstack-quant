@@ -1,6 +1,7 @@
 //! FX quote storage, triangulation, caching, and provider-backed conversion.
 //!
 use lru::LruCache;
+use std::cell::Cell;
 use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -16,7 +17,9 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 use crate::currency::Currency;
 use crate::dates::Date;
 
-use super::provider::{FxProvider, directional_rate, reciprocal_rate_or_err, validate_fx_rate};
+use super::provider::{
+    FxProvider, FxProviderSnapshot, directional_rate, validate_fx_rate, validate_stored_quote,
+};
 use super::types::{
     CurrencyPair, DEFAULT_CACHE_CAPACITY, FxConfig, FxConversionPolicy, FxMatrixState, FxQuery,
     FxRateResult,
@@ -43,22 +46,8 @@ struct ObservationRevision {
     provider: u64,
 }
 
-/// Return the canonical storage orientation for an unordered currency pair.
-///
-/// Observed quotes use one orientation so both lookup directions derive from
-/// the same stored floating-point value. The boolean is true when the caller's
-/// requested direction is the reciprocal of that canonical orientation.
-#[inline]
-fn canonical_orientation(from: Currency, to: Currency) -> (Currency, Currency, bool) {
-    if from <= to {
-        (from, to, false)
-    } else {
-        (to, from, true)
-    }
-}
-
-/// Resolve `from → to` through the stores in priority order, each with
-/// reciprocal fallback.
+/// Resolve `from → to` through the stores in priority order (scoped pin,
+/// pair-global, provider), each with reciprocal fallback.
 fn effective_snapshot_rate(
     global: &FxHashMap<CurrencyPair, f64>,
     pinned: &FxHashMap<CurrencyPair, f64>,
@@ -66,7 +55,7 @@ fn effective_snapshot_rate(
     from: Currency,
     to: Currency,
 ) -> crate::Result<Option<f64>> {
-    for quotes in [global, pinned, observed] {
+    for quotes in [pinned, global, observed] {
         let rate = directional_rate(
             |a, b| quotes.get(&CurrencyPair { base: a, quote: b }).copied(),
             from,
@@ -79,18 +68,27 @@ fn effective_snapshot_rate(
     Ok(None)
 }
 
-/// Cross `from → pivot → to` when both legs resolve; a missing or invalid leg
-/// yields `None`.
+/// Cross `from → pivot → to` when both legs resolve; a missing leg yields
+/// `None` and an invalid leg propagates its error.
 fn pivot_cross(
     lookup: impl Fn(Currency, Currency) -> crate::Result<Option<f64>>,
     from: Currency,
     to: Currency,
     pivot: Currency,
-) -> Option<f64> {
-    match (lookup(from, pivot), lookup(pivot, to)) {
-        (Ok(Some(first)), Ok(Some(second))) => Some(first * second),
-        _ => None,
-    }
+) -> crate::Result<Option<f64>> {
+    let (Some(first), Some(second)) = (lookup(from, pivot)?, lookup(pivot, to)?) else {
+        return Ok(None);
+    };
+    validate_fx_rate(from, to, first * second).map(Some)
+}
+
+/// Whether `error` is the provider's "no rate for this ordered query" answer,
+/// the only failure after which a pivot route is attempted.
+fn is_not_found(error: &crate::Error) -> bool {
+    matches!(
+        error,
+        crate::Error::Input(crate::InputError::NotFound { .. })
+    )
 }
 
 /// Simplified FX matrix that stores quotes and computes cross rates on demand.
@@ -124,6 +122,9 @@ pub struct FxMatrix {
     pinned_quotes: Mutex<FxHashMap<FxQuery, f64>>,
     config: FxConfig,
     quote_revision: AtomicU64,
+    /// Serializes writers so the revision-exhaustion check and the advance
+    /// cover one mutation at a time.
+    writer: Mutex<()>,
 }
 
 /// Resolve only the shocked pair through the original matrix. Other pairs
@@ -164,9 +165,16 @@ impl FxProvider for ResolvedPairProvider {
         self.matrix.provider.rate(from, to, on, policy)
     }
 
-    fn snapshot_quotes(&self) -> Vec<(Currency, Currency, f64)> {
-        let mut quotes = self.matrix.provider.snapshot_quotes();
+    fn snapshot(&self) -> crate::Result<Option<FxProviderSnapshot>> {
+        let Some(FxProviderSnapshot {
+            mut quotes,
+            pinned_quotes: mut provider_pinned,
+        }) = self.matrix.provider.snapshot()?
+        else {
+            return Ok(None);
+        };
         let global = lock(&self.matrix.quotes);
+        let pinned = lock(&self.matrix.pinned_quotes);
         let provider: FxHashMap<CurrencyPair, f64> = quotes
             .iter()
             .map(|&(from, to, rate)| {
@@ -180,32 +188,30 @@ impl FxProvider for ResolvedPairProvider {
             })
             .collect();
         let empty = FxHashMap::default();
-        let lookup = |from, to| -> crate::Result<Option<f64>> {
+        let CurrencyPair {
+            base: from,
+            quote: to,
+        } = self.pair;
+        let pivot = self.matrix.config.pivot_currency;
+
+        let global_lookup = |from, to| -> crate::Result<Option<f64>> {
             if from == to {
                 Ok(Some(1.0))
             } else {
                 effective_snapshot_rate(&global, &empty, &provider, from, to)
             }
         };
-        let CurrencyPair {
-            base: from,
-            quote: to,
-        } = self.pair;
-        // An invalid reciprocal is omitted. Absence still triangulates through
-        // the pivot; a bad opposite quote does not.
-        let rate = match lookup(from, to) {
-            Ok(Some(rate)) => Some(rate),
-            Ok(None) => self
-                .matrix
-                .config
-                .pivot_currency
-                .and_then(|pivot| pivot_cross(lookup, from, to, pivot)),
-            Err(_) => None,
+        let global_rate = match global_lookup(from, to)? {
+            Some(rate) => Some(rate),
+            None => match pivot {
+                Some(pivot) => pivot_cross(global_lookup, from, to, pivot)?,
+                None => None,
+            },
         };
-        if let Some(rate) = rate {
+        if let Some(rate) = global_rate {
             // The shocked cross must survive restoration even when only its
             // pivot legs were quoted. Provider authority stays below explicit
-            // global quotes and date/policy-pinned fixings in the outer matrix.
+            // pinned fixings and global quotes in the outer matrix.
             quotes.retain(|&(base, quote, _)| {
                 CurrencyPair { base, quote } != self.pair
                     && CurrencyPair {
@@ -215,33 +221,15 @@ impl FxProvider for ResolvedPairProvider {
             });
             quotes.push((from, to, rate));
         }
-        quotes
-    }
 
-    fn snapshot_pinned_quotes(&self) -> Vec<(Currency, Currency, Date, FxConversionPolicy, f64)> {
-        let mut quotes = self.matrix.provider.snapshot_pinned_quotes();
-        let Some(pivot) = self.matrix.config.pivot_currency else {
-            return quotes;
+        let Some(pivot) = pivot else {
+            return Ok(Some(FxProviderSnapshot {
+                quotes,
+                pinned_quotes: provider_pinned,
+            }));
         };
-        let global = lock(&self.matrix.quotes);
-        let pinned = lock(&self.matrix.pinned_quotes);
-        let provider: FxHashMap<CurrencyPair, f64> = self
-            .matrix
-            .provider
-            .snapshot_quotes()
-            .into_iter()
-            .map(|(from, to, rate)| {
-                (
-                    CurrencyPair {
-                        base: from,
-                        quote: to,
-                    },
-                    rate,
-                )
-            })
-            .collect();
         let mut scopes: FxHashMap<_, ScopedSnapshotQuotes> = FxHashMap::default();
-        for &(from, to, on, policy, rate) in &quotes {
+        for &(from, to, on, policy, rate) in &provider_pinned {
             scopes.entry((on, policy)).or_default().1.insert(
                 CurrencyPair {
                     base: from,
@@ -259,18 +247,14 @@ impl FxProvider for ResolvedPairProvider {
                 rate,
             );
         }
-        let empty = FxHashMap::default();
-        let CurrencyPair {
-            base: from,
-            quote: to,
-        } = self.pair;
-        for ((on, policy), (pinned, provider_pinned)) in scopes {
+        let mut scoped_crosses = Vec::new();
+        for ((on, policy), (pinned, scoped_provider)) in scopes {
             let lookup = |from, to| -> crate::Result<Option<f64>> {
                 if from == to {
                     return Ok(Some(1.0));
                 }
                 if let Some(rate) =
-                    effective_snapshot_rate(&global, &pinned, &provider_pinned, from, to)?
+                    effective_snapshot_rate(&global, &pinned, &scoped_provider, from, to)?
                 {
                     return Ok(Some(rate));
                 }
@@ -279,16 +263,18 @@ impl FxProvider for ResolvedPairProvider {
             // An explicit target quote is already copied and scaled by the
             // outer matrix/provider. Only a missing direct target requires
             // persisting its shocked, statically representable pivot cross.
-            // An invalid reciprocal is not replaced by that pivot cross.
-            match lookup(from, to) {
-                Ok(Some(_)) | Err(_) => continue,
-                Ok(None) => {}
+            if lookup(from, to)?.is_some() {
+                continue;
             }
-            if let Some(rate) = pivot_cross(lookup, from, to, pivot) {
-                quotes.push((from, to, on, policy, rate));
+            if let Some(rate) = pivot_cross(lookup, from, to, pivot)? {
+                scoped_crosses.push((from, to, on, policy, rate));
             }
         }
-        quotes
+        provider_pinned.extend(scoped_crosses);
+        Ok(Some(FxProviderSnapshot {
+            quotes,
+            pinned_quotes: provider_pinned,
+        }))
     }
 }
 
@@ -415,6 +401,7 @@ impl FxMatrix {
             pinned_quotes: Mutex::new(FxHashMap::default()),
             config,
             quote_revision: AtomicU64::new(0),
+            writer: Mutex::new(()),
         }
     }
 
@@ -457,27 +444,35 @@ impl FxMatrix {
     /// assert!(result.rate > 1.0);
     /// ```
     ///
-    /// Lookup precedence is: pair-global explicit quote (either orientation),
-    /// date/policy-pinned quote (either orientation), provider-observed cache
-    /// at the current provider revision, then the provider. Providers without
-    /// a revision are queried each time. Source priority is resolved before
-    /// taking a reciprocal. Every conversion policy, including period averages,
-    /// serves the reciprocal of an opposite quote and triangulates through the
-    /// pivot (the standard reporting approximation for an average rate).
-    /// If the direct provider request fails and triangulation is enabled, the
-    /// matrix derives the cross through the configured pivot, except that an
-    /// explicit invalid FX rate is returned as an error. The returned
-    /// `triangulated` flag records whether that final fallback was used, even
-    /// when the result is served from the observed cache later.
+    /// Lookup precedence (record CORE-CONVENTIONS-013 #3) is: the matrix's
+    /// exact date/policy-pinned quote, then its pair-global quote, then the
+    /// provider response for this exact ordered query (served from the
+    /// observation cache while the matrix and provider revisions are
+    /// unchanged). Within each matrix store the supplied direction wins,
+    /// otherwise the checked reciprocal of the opposite quote; a higher store's
+    /// reciprocal outranks a lower store's direct quote. Providers without a
+    /// revision are queried each time.
+    ///
+    /// Only when the provider answers this exact query with
+    /// [`InputError::NotFound`](crate::InputError::NotFound) and the matrix
+    /// has a pivot currency does it derive `from -> pivot -> to` with the same
+    /// date, policy and precedence for each leg (no recursive routing). The
+    /// returned `triangulated` flag records that route, also on cached repeats.
     ///
     /// # Errors
     ///
-    /// Returns an error for a missing provider quote when triangulation is
-    /// disabled or cannot construct both pivot legs, or when any direct,
-    /// reciprocal, provider, or triangulated rate is non-finite or non-positive.
+    /// - The provider's own error for this query when it is not `NotFound`, or
+    ///   when no pivot is configured.
+    /// - [`InputError::FxTriangulationFailed`](crate::InputError::FxTriangulationFailed)
+    ///   naming the ordered leg the provider reported missing; any other leg
+    ///   failure propagates with its own error category.
+    /// - An invalid FX rate when a direct, reciprocal, provider or crossed rate
+    ///   is non-finite or non-positive.
+    /// - A validation error when the route needs a second call to a provider
+    ///   without a revision (the calls could see different quote states), or
+    ///   when repeated updates prevent a coherent result.
+    ///
     /// Identity conversion returns exactly `1.0` without querying the provider.
-    /// Versioned provider or matrix updates during resolution trigger a retry;
-    /// repeated updates that prevent a coherent result return a validation error.
     ///
     /// # Arguments
     ///
@@ -503,32 +498,23 @@ impl FxMatrix {
     }
 
     fn rate_once(&self, query: FxQuery) -> crate::Result<FxRateResult> {
-        let from = query.from;
-        let to = query.to;
-        let on = query.on;
-        let policy = query.policy;
-
-        if let Some(cached) = self.read_cached_rate(from, to, on, policy)? {
+        if let Some(cached) = self.read_cached_rate(query)? {
             return Ok(cached);
         }
 
-        // Every error of the fetch tail after the provider call is
-        // `InvalidFxRate`, so it bypasses triangulation exactly as before.
-        match self.fetch_from_provider(query) {
+        let provider_calls = Cell::new(0);
+        match self.fetch_from_provider(query, &provider_calls) {
             Ok(rate) => Ok(FxRateResult {
                 rate,
                 triangulated: false,
             }),
-            Err(error @ crate::Error::Input(crate::InputError::InvalidFxRate { .. })) => Err(error),
-            Err(_) if self.config.pivot_currency.is_some() => {
-                // Try simple triangulation via pivot
-                let rate = self.triangulate_rate(from, to, on, policy)?;
-                Ok(FxRateResult {
-                    rate,
+            Err(error) => match self.config.pivot_currency {
+                Some(pivot) if is_not_found(&error) => Ok(FxRateResult {
+                    rate: self.triangulate_rate(query, pivot, &provider_calls)?,
                     triangulated: true,
-                })
-            }
-            Err(e) => Err(e),
+                }),
+                _ => Err(error),
+            },
         }
     }
 
@@ -542,19 +528,20 @@ impl FxMatrix {
     ///
     /// The quote is stored in a dedicated, **non-evicting** pinned-quote map
     /// (separate from the bounded provider-observed cache), so it is never
-    /// silently dropped under cache pressure and always wins over the provider
-    /// for its `(on, policy)`. It is, however, outranked by a pair-global
-    /// [`set_quotes`](Self::set_quotes).
+    /// silently dropped under cache pressure. For its `(on, policy)` it is the
+    /// highest authority: it outranks a pair-global
+    /// [`set_quotes`](Self::set_quotes) quote and the provider.
     ///
     /// # Errors
     ///
-    /// Returns an error if `rate` is non-finite or not strictly positive. The
-    /// existing pinned fixing for this exact pair/date/policy key is unchanged
-    /// on error; reciprocal lookup is derived on demand rather than stored.
+    /// Returns an error if `from == to`, `rate` is non-finite or not strictly
+    /// positive, or the matrix revision is exhausted. The existing pinned
+    /// fixing for this exact pair/date/policy key is unchanged on error;
+    /// reciprocal lookup is derived on demand rather than stored.
     ///
     /// # Arguments
     ///
-    /// * `from` - Base currency of this date-and-policy fixing.
+    /// * `from` - Base currency of this date-and-policy fixing; must differ from `to`.
     /// * `to` - Quote currency. `rate` is units of `to` per one unit of `from`.
     /// * `on` - Valuation date this fixing answers. Other dates still use the provider.
     /// * `policy` - Conversion policy this fixing answers. Other policies still use the provider.
@@ -567,31 +554,42 @@ impl FxMatrix {
         policy: FxConversionPolicy,
         rate: f64,
     ) -> crate::Result<()> {
-        let rate = validate_fx_rate(from, to, rate)?;
-        self.insert_pinned_quote(from, to, on, policy, rate);
-        Ok(())
+        let rate = validate_stored_quote(from, to, rate)?;
+        self.insert_pinned_quote(
+            FxQuery {
+                from,
+                to,
+                on,
+                policy,
+            },
+            rate,
+        )
     }
 
     /// Seed multiple quotes at once.
     ///
     /// # Arguments
     ///
-    /// * `quotes` - `(from, to, rate)` triples. Each rate is units of `to` per one unit of `from` and must be finite and strictly positive.
+    /// * `quotes` - `(from, to, rate)` triples with distinct currencies. Each rate is units of `to` per one unit of `from` and must be finite and strictly positive.
     ///
     /// This is an atomic batch with respect to the pair-global quote map: every
     /// input is validated before any replacement occurs. These quotes
-    /// shadow the provider for every date and policy and do not
-    /// expire under LRU pressure.
+    /// outrank the provider for every date and policy, rank below a pinned
+    /// fixing for that fixing's date and policy, and do not expire under LRU
+    /// pressure.
     ///
     /// # Errors
     ///
-    /// Returns an error if any rate is non-finite or not strictly positive. In
-    /// that case the matrix retains every pre-existing explicit quote and none
-    /// of the batch is applied.
+    /// Returns an error if any tuple is an identity pair, any rate is
+    /// non-finite or not strictly positive, or the matrix revision is
+    /// exhausted. In that case the matrix retains every pre-existing explicit
+    /// quote and none of the batch is applied.
     pub fn set_quotes(&self, quotes: &[(Currency, Currency, f64)]) -> crate::Result<()> {
         for &(from, to, rate) in quotes {
-            validate_fx_rate(from, to, rate)?;
+            validate_stored_quote(from, to, rate)?;
         }
+        let writer = lock(&self.writer);
+        self.ensure_revision_available()?;
         let mut map = lock(&self.quotes);
         for &(from, to, rate) in quotes {
             map.insert(
@@ -604,101 +602,92 @@ impl FxMatrix {
         }
         self.quote_revision.fetch_add(1, Ordering::AcqRel);
         drop(map);
+        drop(writer);
         self.invalidate_observed_quotes();
         Ok(())
     }
 
     /// Extract serializable state from the matrix.
     ///
-    /// Returns the configuration and current quotes that can be persisted.
-    /// Capturing the state performs no live provider lookup. Serializing the
-    /// returned state rejects non-finite or non-positive captured rates,
-    /// including a shock that overflows after a mutable provider update.
-    /// Provider and matrix revisions are checked across all snapshot hooks;
-    /// updates during capture trigger up to three attempts.
+    /// Returns the configuration, the matrix's global and pinned quotes, and
+    /// the provider's complete stored quote state from [`FxProvider::snapshot`].
+    /// Capturing performs no live rate lookup and omits observation-cache
+    /// entries and revisions. Every captured quote is validated (distinct
+    /// currencies, finite positive rate, no repeated ordered key within a
+    /// store) before the state is returned. Matrix and provider revisions are
+    /// checked around the capture; updates during capture trigger up to three
+    /// attempts.
     ///
     /// # Errors
     ///
-    /// Returns a validation error when repeated updates prevent a coherent
-    /// snapshot, or when a provider exposes snapshot quotes without a revision.
-    /// A provider without snapshot quotes can still persist matrix overrides.
+    /// Returns a validation error when the provider reports no revision, does
+    /// not support capture (its rates cannot be reproduced by a quote list),
+    /// exposes an invalid or repeated quote, or when repeated updates prevent
+    /// a coherent snapshot. There is no partial snapshot.
     ///
     /// # Examples
     /// ```rust
-    /// # use finstack_quant_core::money::fx::{FxMatrix, FxProvider, FxConversionPolicy};
-    /// # use finstack_quant_core::currency::Currency;
-    /// # use finstack_quant_core::dates::Date;
+    /// # use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     /// # use std::sync::Arc;
-    /// # use time::Month;
-    /// # struct StaticFx;
-    /// # impl FxProvider for StaticFx {
-    /// #     fn rate(&self, _from: Currency, _to: Currency, _on: Date, _policy: FxConversionPolicy)
-    /// #         -> finstack_quant_core::Result<f64> { Ok(1.0) }
-    /// # }
-    /// let matrix = FxMatrix::new(Arc::new(StaticFx));
+    /// let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()), None);
     /// let state = matrix.get_serializable_state().expect("stable FX state");
     /// assert!(state.quotes.is_empty());
     /// ```
     pub fn get_serializable_state(&self) -> crate::Result<FxMatrixState> {
         for _ in 0..MAX_STATE_ATTEMPTS {
             let revision = self.state_revision();
-            let state = self.capture_state_once();
-            if revision != self.state_revision() {
-                continue;
-            }
-            if revision.1.is_none()
-                && (!state.provider_quotes.is_empty() || !state.provider_pinned_quotes.is_empty())
-            {
+            if revision.1.is_none() {
                 return Err(crate::Error::Validation(
-                    "FX providers with snapshot quotes must expose a revision".into(),
+                    "FX state capture requires a provider that reports a revision".into(),
                 ));
             }
-            return Ok(state);
+            let state = self.capture_state_once()?;
+            if revision == self.state_revision() {
+                return Ok(state);
+            }
         }
         Err(crate::Error::Validation(
             "FX quote state changed repeatedly during snapshot capture".into(),
         ))
     }
 
-    fn capture_state_once(&self) -> FxMatrixState {
-        let mut quote_vec: Vec<(Currency, Currency, f64)> = Vec::new();
-
-        // Explicit pair-global quotes take precedence.
-        {
-            let quotes = lock(&self.quotes);
-            for (pair, rate) in quotes.iter() {
-                quote_vec.push((pair.base, pair.quote, *rate));
-            }
-        }
-
-        // Provider snapshots retain their lower authority after restoration.
-        let mut provider_quotes = self.provider.snapshot_quotes();
-
-        // Providers can preserve statically derived shocked crosses in their
-        // original date/policy scope without pinning the live bumped matrix.
-        let mut provider_pinned_quotes = self.provider.snapshot_pinned_quotes();
-        // Keep explicit fixings in their own store so later matrix overrides
-        // also outrank synthetic provider crosses after restoration.
-        let mut pinned_vec: Vec<_> = {
-            let pinned = lock(&self.pinned_quotes);
-            pinned
-                .iter()
-                .map(|(key, &rate)| (key.from, key.to, key.on, key.policy, rate))
-                .collect()
+    fn capture_state_once(&self) -> crate::Result<FxMatrixState> {
+        let Some(FxProviderSnapshot {
+            quotes: mut provider_quotes,
+            pinned_quotes: mut provider_pinned_quotes,
+        }) = self.provider.snapshot()?
+        else {
+            return Err(crate::Error::Validation(
+                "FX provider does not support state capture; freeze its rates into a \
+                 quote-backed provider before snapshotting"
+                    .into(),
+            ));
         };
+        let mut quote_vec: Vec<(Currency, Currency, f64)> = lock(&self.quotes)
+            .iter()
+            .map(|(pair, &rate)| (pair.base, pair.quote, rate))
+            .collect();
+        let mut pinned_vec: Vec<_> = lock(&self.pinned_quotes)
+            .iter()
+            .map(|(key, &rate)| (key.from, key.to, key.on, key.policy, rate))
+            .collect();
 
-        // Deterministic snapshots: sort by pair key, not by LRU order.
+        // Deterministic snapshots: sort by ordered key, not by map order.
         quote_vec.sort_by_key(|quote| (quote.0, quote.1));
         provider_quotes.sort_by_key(|quote| (quote.0, quote.1));
         provider_pinned_quotes.sort_by_key(|q| (q.0, q.1, q.2, q.3 as u8));
         pinned_vec.sort_by_key(|q| (q.0, q.1, q.2, q.3 as u8));
-        FxMatrixState {
+        validate_captured_global(&quote_vec)?;
+        validate_captured_global(&provider_quotes)?;
+        validate_captured_pinned(&pinned_vec)?;
+        validate_captured_pinned(&provider_pinned_quotes)?;
+        Ok(FxMatrixState {
             config: self.config,
             quotes: quote_vec,
             provider_quotes,
             provider_pinned_quotes,
             pinned_quotes: pinned_vec,
-        }
+        })
     }
 
     /// Load quotes from a serialized state.
@@ -910,54 +899,50 @@ impl FxMatrix {
         validate_fx_rate(stored_from, stored_to, scaled)
     }
 
-    /// Attempt to triangulate FX rate via the single configured pivot currency.
+    /// Derive `query` through `pivot` after the provider reported it missing.
     ///
     /// This is intentionally a one-pivot fallback, not a general graph search.
-    /// It keeps lookup behavior deterministic and auditable, but it can miss
-    /// valid market crosses that would require a different routing currency.
+    /// Each leg uses the same date, policy and source precedence and never
+    /// routes again. A leg the provider reports missing becomes
+    /// `FxTriangulationFailed` naming that ordered leg; any other leg error
+    /// propagates with its own category.
     fn triangulate_rate(
         &self,
-        from: Currency,
-        to: Currency,
-        on: Date,
-        policy: FxConversionPolicy,
+        query: FxQuery,
+        pivot: Currency,
+        provider_calls: &Cell<usize>,
     ) -> crate::Result<f64> {
-        use crate::InputError;
-
+        let FxQuery {
+            from,
+            to,
+            on,
+            policy,
+        } = query;
         let revision = self.observation_revision();
-        let Some(pivot) = self.config.pivot_currency else {
-            return Err(crate::Error::Validation(format!(
-                "FX routing for {from}->{to} is disabled (no pivot currency)"
-            )));
+        let leg = |leg_from, leg_to| {
+            self.get_or_fetch(FxQuery::new(leg_from, leg_to, on, policy), provider_calls)
+                .map_err(|error| {
+                    if is_not_found(&error) {
+                        crate::InputError::FxTriangulationFailed {
+                            from,
+                            to,
+                            pivot,
+                            missing_leg: format!(
+                                "{leg_from}->{leg_to} rate not found on {on} ({policy})"
+                            ),
+                        }
+                        .into()
+                    } else {
+                        error
+                    }
+                })
         };
-
-        // Try to get first leg: from -> pivot
-        let Ok(a) = self.get_or_fetch(from, pivot, on, policy) else {
-            return Err(InputError::FxTriangulationFailed {
-                from,
-                to,
-                pivot,
-                missing_leg: format!("{from}->{pivot} rate not found"),
-            }
-            .into());
-        };
-
-        // Try to get second leg: pivot -> to
-        let Ok(b) = self.get_or_fetch(pivot, to, on, policy) else {
-            return Err(InputError::FxTriangulationFailed {
-                from,
-                to,
-                pivot,
-                missing_leg: format!("{pivot}->{to} rate not found"),
-            }
-            .into());
-        };
-
-        let rate = a * b;
-        let rate = validate_fx_rate(from, to, rate)?;
+        let first = leg(from, pivot)?;
+        let second = leg(pivot, to)?;
+        let rate = validate_fx_rate(from, to, first * second)?;
         // Cache the derived rate together with its triangulated provenance so
         // repeat queries stamp the same metadata and value as the first lookup.
-        self.insert_observed_quote(FxQuery::new(from, to, on, policy), rate, true, revision)
+        self.insert_observed_quote(query, rate, true, revision)
     }
 
     fn invalidate_observed_quotes(&self) {
@@ -965,6 +950,17 @@ impl FxMatrix {
         // Cache reclamation follows after releasing that store, avoiding an
         // observed-cache -> authoritative-store lock dependency.
         lock(&self.observed_quotes).clear();
+    }
+
+    /// Fail before a mutation when no fresh revision remains to publish it.
+    /// Callers hold the writer lock, so the check and the advance pair up.
+    fn ensure_revision_available(&self) -> crate::Result<()> {
+        if self.quote_revision.load(Ordering::Acquire) == u64::MAX {
+            return Err(crate::Error::Validation(
+                "FX matrix revision exhausted; build a new matrix".into(),
+            ));
+        }
+        Ok(())
     }
 
     fn observation_revision(&self) -> Option<ObservationRevision> {
@@ -979,16 +975,11 @@ impl FxMatrix {
         )
     }
 
-    /// Insert a provider-observed quote.
+    /// Record a provider or pivot-derived answer for its exact ordered query.
     ///
-    /// Quotes are stored in the canonical orientation of the pair.
-    ///
-    /// Returns the rate as future cache reads will serve it in the requested
-    /// direction, keeping cold and warm lookups bit-identical.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an invalid input rate or an invalid reciprocal.
+    /// The rate bits and triangulation flag are stored unchanged; the opposite
+    /// query is a separate key. Nothing is stored when either revision moved
+    /// since `observed_at`.
     fn insert_observed_quote(
         &self,
         query: FxQuery,
@@ -996,92 +987,72 @@ impl FxMatrix {
         triangulated: bool,
         observed_at: Option<ObservationRevision>,
     ) -> crate::Result<f64> {
-        let FxQuery {
-            from,
-            to,
-            on,
-            policy,
-        } = query;
-        let rate = validate_fx_rate(from, to, rate)?;
-        let (key, inverted) = observed_storage_key(from, to, on, policy);
-        let (stored, served) = if inverted {
-            let stored = reciprocal_rate_or_err(rate, from, to)?;
-            let served = reciprocal_rate_or_err(stored, key.from, key.to)?;
-            (stored, served)
-        } else {
-            (rate, rate)
-        };
-
+        let rate = validate_fx_rate(query.from, query.to, rate)?;
         let mut quotes = lock(&self.observed_quotes);
         if let Some(revision) =
             observed_at.filter(|&revision| Some(revision) == self.observation_revision())
         {
             quotes.put(
-                key,
+                query,
                 ObservedQuote {
-                    rate: stored,
+                    rate,
                     triangulated,
                     revision,
                 },
             );
         }
-        Ok(served)
+        Ok(rate)
     }
 
     /// Insert an authoritative, non-evicting pinned quote (via `set_quote_on`).
     /// The rate is validated by the caller.
-    fn insert_pinned_quote(
-        &self,
-        from: Currency,
-        to: Currency,
-        on: Date,
-        policy: FxConversionPolicy,
-        rate: f64,
-    ) {
+    fn insert_pinned_quote(&self, key: FxQuery, rate: f64) -> crate::Result<()> {
         {
+            let _writer = lock(&self.writer);
+            self.ensure_revision_available()?;
             let mut pinned = lock(&self.pinned_quotes);
-            pinned.insert(
-                FxQuery {
-                    from,
-                    to,
-                    on,
-                    policy,
-                },
-                rate,
-            );
+            pinned.insert(key, rate);
             self.quote_revision.fetch_add(1, Ordering::AcqRel);
         }
         self.invalidate_observed_quotes();
+        Ok(())
     }
 
-    /// Get a single-leg rate using the same precedence as [`rate`](Self::rate):
-    /// explicit → pinned → observed → provider (each with reciprocal fallback).
+    /// Resolve one pivot leg with the same precedence as [`rate`](Self::rate)
+    /// (pinned, global, observed, provider) but without routing again.
     ///
-    /// Pinned fixings are authoritative for their `(on, policy)`, so triangulated
-    /// crosses must honor them exactly like direct lookups do — otherwise a
-    /// cross would contradict a pinned leg (internal triangular arbitrage), and
-    /// triangulation would fail when the only source for a leg is a pinned quote.
-    fn get_or_fetch(
-        &self,
-        from: Currency,
-        to: Currency,
-        on: Date,
-        policy: FxConversionPolicy,
-    ) -> crate::Result<f64> {
-        if from == to {
+    /// Pinned fixings are authoritative for their `(on, policy)`, so crosses
+    /// honor them exactly like direct lookups do; otherwise a cross would
+    /// contradict a pinned leg.
+    fn get_or_fetch(&self, query: FxQuery, provider_calls: &Cell<usize>) -> crate::Result<f64> {
+        if query.from == query.to {
             return Ok(1.0);
         }
-        if let Some(cached) = self.read_cached_rate(from, to, on, policy)? {
+        if let Some(cached) = self.read_cached_rate(query)? {
             return Ok(cached.rate);
         }
-        self.fetch_from_provider(FxQuery::new(from, to, on, policy))
+        self.fetch_from_provider(query, provider_calls)
     }
 
     /// Fetch `query` from the provider, validate the rate and record it as an
-    /// observed quote. The provider remains direction-sensitive; only cache
-    /// storage is canonical.
-    fn fetch_from_provider(&self, query: FxQuery) -> crate::Result<f64> {
+    /// observation of that exact ordered query.
+    ///
+    /// A provider without a revision answers at most one call per resolution
+    /// attempt: a second call could observe a different quote state.
+    fn fetch_from_provider(
+        &self,
+        query: FxQuery,
+        provider_calls: &Cell<usize>,
+    ) -> crate::Result<f64> {
         let revision = self.observation_revision();
+        if revision.is_none() && provider_calls.get() > 0 {
+            return Err(crate::Error::Validation(format!(
+                "FX provider without a revision cannot answer a second call ({}->{}) within \
+                 one resolution; give it a revision or freeze its quotes",
+                query.from, query.to
+            )));
+        }
+        provider_calls.set(provider_calls.get() + 1);
         let rate = self
             .provider
             .rate(query.from, query.to, query.on, query.policy)?;
@@ -1089,38 +1060,35 @@ impl FxMatrix {
         self.insert_observed_quote(query, rate, false, revision)
     }
 
-    /// Resolve cache source priority before pair orientation for every lookup path.
-    fn read_cached_rate(
-        &self,
-        from: Currency,
-        to: Currency,
-        on: Date,
-        policy: FxConversionPolicy,
-    ) -> crate::Result<Option<FxRateResult>> {
-        // Check caches in precedence order, locking each store lazily so the common
-        // case (an explicit direct quote, e.g. a pegged pair) acquires a single lock
-        // instead of all three. Explicit quotes are pair-global, while provider-observed
-        // quotes are scoped by date/policy to avoid cross-query contamination.
-        let explicit = {
-            let quotes = lock(&self.quotes);
+    /// Resolve the matrix-held and observed sources for `query`, in authority
+    /// order: exact date/policy pin, pair-global quote, then the observation
+    /// of this exact ordered query. Each matrix store prefers the supplied
+    /// direction, otherwise the checked reciprocal of its opposite quote.
+    fn read_cached_rate(&self, query: FxQuery) -> crate::Result<Option<FxRateResult>> {
+        let FxQuery {
+            from,
+            to,
+            on,
+            policy,
+        } = query;
+        // Lock each store lazily so the common case acquires a single lock.
+        let pinned = {
+            let pinned = lock(&self.pinned_quotes);
             directional_rate(
-                |a, b| quotes.get(&CurrencyPair { base: a, quote: b }).copied(),
+                |a, b| pinned.get(&FxQuery::new(a, b, on, policy)).copied(),
                 from,
                 to,
             )?
         };
-        // Pinned fixings outrank provider observations for their `(on, policy)`.
-        let authoritative = match explicit {
+        let authoritative = match pinned {
             Some(rate) => Some(rate),
             None => {
-                let pinned = lock(&self.pinned_quotes);
-                let key = |from, to| FxQuery {
+                let quotes = lock(&self.quotes);
+                directional_rate(
+                    |a, b| quotes.get(&CurrencyPair { base: a, quote: b }).copied(),
                     from,
                     to,
-                    on,
-                    policy,
-                };
-                directional_rate(|a, b| pinned.get(&key(a, b)).copied(), from, to)?
+                )?
             }
         };
         if let Some(rate) = authoritative {
@@ -1129,78 +1097,89 @@ impl FxMatrix {
                 triangulated: false,
             }));
         }
-
-        if let Some(q) = self.read_observed(from, to, on, policy)? {
-            return Ok(Some(FxRateResult {
-                rate: q.rate,
-                triangulated: q.triangulated,
-            }));
-        }
-
-        Ok(None)
+        Ok(self.read_observed(query).map(|observed| FxRateResult {
+            rate: observed.rate,
+            triangulated: observed.triangulated,
+        }))
     }
 
-    /// Read the canonically stored observed quote in the requested direction.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if resolving the reciprocal yields an invalid FX rate.
-    #[inline]
-    fn read_observed(
-        &self,
-        from: Currency,
-        to: Currency,
-        on: Date,
-        policy: FxConversionPolicy,
-    ) -> crate::Result<Option<ObservedQuote>> {
-        let Some(revision) = self.observation_revision() else {
-            return Ok(None);
-        };
-        let (key, inverted) = observed_storage_key(from, to, on, policy);
+    /// Read the observation stored for this exact ordered query at the
+    /// current revisions, discarding a stale entry.
+    fn read_observed(&self, query: FxQuery) -> Option<ObservedQuote> {
+        let revision = self.observation_revision()?;
         let mut quotes = lock(&self.observed_quotes);
-        let Some(observed) = quotes.get(&key).copied() else {
-            return Ok(None);
-        };
+        let observed = quotes.get(&query).copied()?;
         if observed.revision != revision {
-            let _ = quotes.pop(&key);
-            return Ok(None);
+            let _ = quotes.pop(&query);
+            return None;
         }
-        drop(quotes);
-
-        if inverted {
-            Ok(Some(ObservedQuote {
-                rate: reciprocal_rate_or_err(observed.rate, key.from, key.to)?,
-                triangulated: observed.triangulated,
-                revision: observed.revision,
-            }))
-        } else {
-            Ok(Some(observed))
-        }
+        Some(observed)
     }
 }
 
-fn observed_storage_key(
-    from: Currency,
-    to: Currency,
-    on: Date,
-    policy: FxConversionPolicy,
-) -> (FxQuery, bool) {
-    let (base, quote, inverted) = canonical_orientation(from, to);
-    (
-        FxQuery {
-            from: base,
-            to: quote,
-            on,
-            policy,
-        },
-        inverted,
-    )
+/// Reject an invalid captured global quote or a repeated ordered key; `quotes`
+/// is sorted by key.
+fn validate_captured_global(quotes: &[(Currency, Currency, f64)]) -> crate::Result<()> {
+    for (index, &(from, to, rate)) in quotes.iter().enumerate() {
+        validate_stored_quote(from, to, rate)?;
+        if index > 0 && (quotes[index - 1].0, quotes[index - 1].1) == (from, to) {
+            return Err(crate::Error::Validation(format!(
+                "captured FX state repeats the quote {from}->{to}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Reject an invalid captured scoped quote or a repeated ordered key; `quotes`
+/// is sorted by key.
+fn validate_captured_pinned(
+    quotes: &[(Currency, Currency, Date, FxConversionPolicy, f64)],
+) -> crate::Result<()> {
+    for (index, &(from, to, on, policy, rate)) in quotes.iter().enumerate() {
+        validate_stored_quote(from, to, rate)?;
+        if index > 0 {
+            let (pf, pt, pon, ppolicy, _) = quotes[index - 1];
+            if (pf, pt, pon, ppolicy) == (from, to, on, policy) {
+                return Err(crate::Error::Validation(format!(
+                    "captured FX state repeats the quote {from}->{to} on {on} ({policy})"
+                )));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod revision_tests {
     use super::*;
     use crate::money::fx::SimpleFxProvider;
+
+    #[test]
+    fn exhausted_matrix_revision_fails_before_mutation() {
+        let on = Date::from_ordinal_date(2025, 1).expect("date");
+        let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()), None);
+        matrix.quote_revision.store(u64::MAX, Ordering::Release);
+        assert!(
+            matrix
+                .set_quotes(&[(Currency::EUR, Currency::USD, 1.1)])
+                .is_err()
+        );
+        assert!(
+            matrix
+                .set_quote_on(
+                    Currency::EUR,
+                    Currency::USD,
+                    on,
+                    FxConversionPolicy::CashflowDate,
+                    1.1
+                )
+                .is_err()
+        );
+        assert!(lock(&matrix.quotes).is_empty());
+        assert!(lock(&matrix.pinned_quotes).is_empty());
+        assert_eq!(matrix.quote_revision.load(Ordering::Acquire), u64::MAX);
+    }
 
     #[test]
     fn quote_mutations_publish_revision_before_waiting_for_cache_reclamation() {
