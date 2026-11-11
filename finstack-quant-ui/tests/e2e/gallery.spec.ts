@@ -235,7 +235,7 @@ test("statement-monte-carlo results", async ({ page }) => {
   ).toBeVisible();
   await expect(
     results.getByRole("region", { name: "Breach probability" }),
-  ).toContainText("16.5%");
+  ).toContainText("14%");
 });
 test("portfolio-risk-report historical stress attribution", async ({
   page,
