@@ -237,7 +237,7 @@ fn test_floating_rate_fallback_spread_only_no_curve() {
         assert_eq!(
             cf.get_accrual()
                 .as_ref()
-                .and_then(|accrual| accrual.projected_index_rate),
+                .and_then(|accrual| accrual.get_projected_index_rate()),
             Some(0.0)
         );
     }
@@ -282,7 +282,7 @@ fn test_floating_rate_fallback_fixed_rate() {
         assert_eq!(
             cf.get_accrual()
                 .as_ref()
-                .and_then(|accrual| accrual.projected_index_rate),
+                .and_then(|accrual| accrual.get_projected_index_rate()),
             Some(0.045)
         );
     }
@@ -369,7 +369,7 @@ fn test_floating_rate_default_fallback_with_curve() {
         let index_rate = cf
             .get_accrual()
             .as_ref()
-            .and_then(|accrual| accrual.projected_index_rate)
+            .and_then(|accrual| accrual.get_projected_index_rate())
             .expect("projected index rate should be stored on the flow");
         assert!(
             rate > 0.04 && rate < 0.06,
@@ -426,7 +426,7 @@ fn test_pik_flow_metadata() {
         assert_eq!(
             cf.get_accrual()
                 .as_ref()
-                .and_then(|accrual| accrual.projected_index_rate),
+                .and_then(|accrual| accrual.get_projected_index_rate()),
             Some(0.0)
         );
     }

@@ -107,7 +107,7 @@ pub fn build_node_coupons(
         // Fallback-projected coupons (SpreadOnly / FixedRate) carry no
         // projected index rate; the emission treated them as deterministic
         // and the lattice must agree.
-        let Some(base_index_rate) = accrual.projected_index_rate else {
+        let Some(base_index_rate) = accrual.get_projected_index_rate() else {
             continue;
         };
         let tau = cf.get_accrual_factor();
@@ -116,9 +116,10 @@ pub fn build_node_coupons(
         }
 
         let ctx = DayCountContext::default();
-        let t_start = inputs
-            .day_count
-            .year_fraction(inputs.grid_origin, accrual.start, ctx)?;
+        let t_start =
+            inputs
+                .day_count
+                .year_fraction(inputs.grid_origin, accrual.get_start(), ctx)?;
         let t_pay = inputs
             .day_count
             .year_fraction(inputs.grid_origin, cf.get_date(), ctx)?;
@@ -130,8 +131,8 @@ pub fn build_node_coupons(
                  tree slice (step {reset_step}) under stochastic rates; the tree \
                  grid is too coarse to distinguish its reset from its payment. \
                  Increase tree_steps (currently {steps}).",
-                accrual.start,
-                accrual.end,
+                accrual.get_start(),
+                accrual.get_end(),
                 cf.get_date()
             )));
         }

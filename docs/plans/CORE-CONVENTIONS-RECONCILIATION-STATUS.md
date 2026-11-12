@@ -1027,6 +1027,15 @@ logged under Needs review.
     other steps can fail. Python `from_flows` still raises for an invalid
     DataFrame row (rows are built as `CashFlow` first);
     `schedule_from_classified_flows` no longer raises. No value moved.
+  - **G5-5g private accrual slices (record 015 #10).** `CashFlowAccrual`
+    fields are private; `CashFlowAccrual::new(start, end, day_count,
+    projected_index_rate, context)` validates, and `get_start`, `get_end`,
+    `get_day_count`, `get_projected_index_rate` and `get_context` read it
+    (214 reads rewritten via the deprecation harvest; 29 literals now call
+    the constructor). Producers propagate the error; the statements
+    residual's synthesized accrual (record 015 #8 leftover, still Needs
+    review) now builds through the constructor. Tests that edited a
+    context field rebuild the slice. No value moved.
 - **Notebooks broken by earlier slices (found during G5, fixed in `NB:`).**
   A full run (`run_all_notebooks.py --timeout 120`) after G5-3b passed 92 of
   101; none of the 9 failures involved PIK or write-down rows, and slice
@@ -1079,13 +1088,6 @@ logged under Needs review.
     attached through the validated `with_accrual` rather than a ninth
     keyword. A host `CashFlowParams` class would mirror Rust more literally
     at the cost of a new public type in both hosts.
-  - **`CashFlowAccrual` fields still public (G5-5d, Needs review).**
-    Record 015 #10 also asks for private
-    `CashFlowAccrual` fields with a validated constructor; Python
-    construction validates, but Rust code can still build or edit an
-    unvalidated slice (a `CashFlow` built from it is still validated).
-    `CashFlowSchedule::from_flows` re-checking rows was the other half; the
-    `from_flows` half was done in G5-5f; the accrual half is G5-5g.
   - **Cashflow construction cost not measured (G5-5c).** Every row now runs
     `validate()` once at construction; the `cashflow_scaling` bench was not
     run before and after.

@@ -41,20 +41,20 @@ pub(super) fn fixed_amounts(schedule: &CashFlowSchedule) {
             .get_accrual()
             .as_ref()
             .expect("fixed coupon accrual metadata");
-        assert_eq!(accrual.day_count, DayCount::Act365F);
-        assert!(accrual.start < accrual.end);
+        assert_eq!(accrual.get_day_count(), DayCount::Act365F);
+        assert!(accrual.get_start() < accrual.get_end());
         let mut principal = schedule.get_notional().initial.amount();
         for movement in schedule.get_flows() {
             if movement.get_kind() == CFKind::Amortization
                 && movement
                     .get_balance_date()
                     .expect("principal row balance date")
-                    <= accrual.start
+                    <= accrual.get_start()
             {
                 principal -= movement.get_amount().amount();
             }
         }
-        let fraction = (accrual.end - accrual.start).whole_days() as f64 / 365.0;
+        let fraction = (accrual.get_end() - accrual.get_start()).whole_days() as f64 / 365.0;
         close(flow.get_accrual_factor(), fraction, 1e-12);
         close(flow.get_rate().expect("fixed coupon rate"), 0.06, 1e-14);
         close(
@@ -87,7 +87,7 @@ pub(super) fn fixed_bullet(
         let end = base
             .add_months((index as i32 + 1) * months)
             .expect("fixture end");
-        assert_eq!((accrual.start, accrual.end), (start, end));
+        assert_eq!((accrual.get_start(), accrual.get_end()), (start, end));
         let mut payment = end;
         if adjust_payments {
             while payment.is_weekend() {
@@ -141,19 +141,19 @@ pub(super) fn floating_bullet(
     for (index, flow) in schedule.coupons().enumerate() {
         assert_eq!(flow.get_kind(), CFKind::Floating);
         let accrual = flow.get_accrual().as_ref().expect("floating accrual");
-        assert_eq!(accrual.day_count, DayCount::Act360);
+        assert_eq!(accrual.get_day_count(), DayCount::Act360);
         assert_eq!(
-            accrual.start,
+            accrual.get_start(),
             base.add_months(index as i32 * 3).expect("quarter start")
         );
         assert_eq!(
-            accrual.end,
+            accrual.get_end(),
             base.add_months((index as i32 + 1) * 3)
                 .expect("quarter end")
         );
-        let days = (accrual.end - accrual.start).whole_days() as f64;
+        let days = (accrual.get_end() - accrual.get_start()).whole_days() as f64;
         close(flow.get_accrual_factor(), days / 360.0, 1e-12);
-        let mut reset = accrual.start;
+        let mut reset = accrual.get_start();
         if !overnight {
             for _ in 0..2 {
                 reset -= time::Duration::days(1);
@@ -163,20 +163,20 @@ pub(super) fn floating_bullet(
             }
         }
         assert_eq!(flow.get_reset_date(), Some(reset));
-        let mut payment = accrual.end;
+        let mut payment = accrual.get_end();
         while payment.is_weekend() {
             payment += time::Duration::days(1);
         }
         assert_eq!(flow.get_date(), payment);
         let index_growth = if overnight {
             let mut growth = 1.0;
-            let mut cursor = accrual.start;
-            while cursor < accrual.end {
+            let mut cursor = accrual.get_start();
+            while cursor < accrual.get_end() {
                 let mut next = cursor + time::Duration::days(1);
                 while next.is_weekend() {
                     next += time::Duration::days(1);
                 }
-                next = next.min(accrual.end);
+                next = next.min(accrual.get_end());
                 growth *= 1.0 + 0.045 * (next - cursor).whole_days() as f64 / 360.0;
                 cursor = next;
             }
@@ -266,11 +266,12 @@ pub(super) fn linear_accrued(schedule: &CashFlowSchedule, date: Date) -> f64 {
         .coupons()
         .map(|flow| {
             let accrual = flow.get_accrual().as_ref().expect("fixture accrual");
-            assert_eq!(accrual.day_count, DayCount::Act365F);
-            if accrual.start <= date && date < flow.get_date() {
-                let elapsed = (date.min(accrual.end) - accrual.start).whole_days() as f64;
+            assert_eq!(accrual.get_day_count(), DayCount::Act365F);
+            if accrual.get_start() <= date && date < flow.get_date() {
+                let elapsed =
+                    (date.min(accrual.get_end()) - accrual.get_start()).whole_days() as f64;
                 flow.get_amount().amount() * elapsed
-                    / (accrual.end - accrual.start).whole_days() as f64
+                    / (accrual.get_end() - accrual.get_start()).whole_days() as f64
             } else {
                 0.0
             }

@@ -218,7 +218,7 @@ fn zeroed_split_coupon_retains_component_rates_when_closing_is_revised() {
                     && flow
                         .get_accrual()
                         .as_ref()
-                        .is_some_and(|accrual| accrual.start == effective)
+                        .is_some_and(|accrual| accrual.get_start() == effective)
             })
             .map(value)
             .sum();
@@ -243,7 +243,7 @@ fn zeroed_split_coupon_retains_component_rates_when_closing_is_revised() {
                     && flow
                         .get_accrual()
                         .as_ref()
-                        .is_some_and(|accrual| accrual.end == effective)
+                        .is_some_and(|accrual| accrual.get_end() == effective)
             })
             .map(value)
             .sum();

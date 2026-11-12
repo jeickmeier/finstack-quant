@@ -69,7 +69,7 @@ pub(super) fn schedule(schedule: &CashFlowSchedule) -> Value {
                 "principal_delta": flow.get_principal_delta().map(money),
                 "accrual_factor": scalar(flow.get_accrual_factor()), "rate": flow.get_rate().map(scalar),
                 "accrual": flow.get_accrual(),
-                "projected_index_rate": flow.get_accrual().as_ref().and_then(|a| a.projected_index_rate).map(scalar),
+                "projected_index_rate": flow.get_accrual().as_ref().and_then(|a| a.get_projected_index_rate()).map(scalar),
             })
         })
         .collect();
@@ -236,18 +236,18 @@ pub(super) fn expected_linear(schedule: &CashFlowSchedule, date: Date, include_p
         })
         .map(|flow| {
             let accrual = flow.get_accrual().as_ref().expect("contractual accrual");
-            if date < accrual.start || date >= flow.get_date() {
+            if date < accrual.get_start() || date >= flow.get_date() {
                 return 0.0;
             }
-            let end = date.min(accrual.end);
-            let (elapsed, total) = match accrual.day_count {
+            let end = date.min(accrual.get_end());
+            let (elapsed, total) = match accrual.get_day_count() {
                 DayCount::Act360 | DayCount::Act365F => (
-                    (end - accrual.start).whole_days() as f64,
-                    (accrual.end - accrual.start).whole_days() as f64,
+                    (end - accrual.get_start()).whole_days() as f64,
+                    (accrual.get_end() - accrual.get_start()).whole_days() as f64,
                 ),
                 DayCount::Thirty360 => (
-                    thirty360_days(accrual.start, end),
-                    thirty360_days(accrual.start, accrual.end),
+                    thirty360_days(accrual.get_start(), end),
+                    thirty360_days(accrual.get_start(), accrual.get_end()),
                 ),
                 other => panic!("unsupported independent consumer convention {other:?}"),
             };
@@ -288,7 +288,8 @@ pub(super) fn queries(schedule: &CashFlowSchedule, cfg: &AccrualConfig, dates: &
                     let eligible = flow.get_kind().is_coupon()
                         || (cfg.include_pik && flow.get_kind() == CFKind::Pik);
                     let accrual = flow.get_accrual().as_ref()?;
-                    (eligible && accrual.start <= date && date < flow.get_date()).then_some(row)
+                    (eligible && accrual.get_start() <= date && date < flow.get_date())
+                        .then_some(row)
                 })
                 .collect();
             json!({"ordinal": ordinal, "date": date.to_string(), "value": scalar(value),

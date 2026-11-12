@@ -37,7 +37,7 @@ fn flow_record(schedule: &CashFlowSchedule) -> Value {
             "accrual_factor_bits": flow.get_accrual_factor().to_bits(),
             "rate_bits": flow.get_rate().map(f64::to_bits),
             "accrual": flow.get_accrual(),
-            "projected_index_rate_bits": flow.get_accrual().as_ref().and_then(|a| a.projected_index_rate).map(f64::to_bits),
+            "projected_index_rate_bits": flow.get_accrual().as_ref().and_then(|a| a.get_projected_index_rate()).map(f64::to_bits),
         })
     }).collect();
     let fixings: Vec<_> = schedule

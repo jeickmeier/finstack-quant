@@ -437,19 +437,20 @@ fn json_round_trips_without_optional_accrual_field() {
 
 #[test]
 fn accrual_metadata_round_trips() {
-    let accrual = CashFlowAccrual {
-        start: d(2025, 3, 15),
-        end: d(2025, 6, 15),
-        day_count: DayCount::Act360,
-        projected_index_rate: Some(0.031),
-        context: finstack_quant_core::dates::DayCountContextState {
+    let accrual = CashFlowAccrual::new(
+        d(2025, 3, 15),
+        d(2025, 6, 15),
+        DayCount::Act360,
+        Some(0.031),
+        finstack_quant_core::dates::DayCountContextState {
             calendar_id: None,
             coupon_period: Some((d(2025, 3, 15), d(2025, 9, 15))),
             end_is_termination_date: Some(true),
             frequency: None,
             bus_basis: None,
         },
-    };
+    )
+    .expect("valid accrual");
     let flow = CashFlowParams::new(
         d(2025, 6, 15),
         Some(d(2025, 3, 13)),

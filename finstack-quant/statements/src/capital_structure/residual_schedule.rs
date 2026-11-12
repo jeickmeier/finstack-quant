@@ -127,7 +127,7 @@ pub(crate) fn rebuild_residual_interest(
         let date = if is_rebuildable_interest(flow.get_kind()) && flow.get_kind() != CFKind::Pik {
             flow.get_accrual()
                 .as_ref()
-                .map_or(flow.get_date(), |accrual| accrual.end)
+                .map_or(flow.get_date(), |accrual| accrual.get_end())
         } else {
             economic_date(flow)
         };
@@ -153,10 +153,9 @@ pub(crate) fn rebuild_residual_interest(
                 cash_is_future
             }
         {
-            let accrual = original
-                .get_accrual()
-                .clone()
-                .or_else(|| {
+            let accrual = match original.get_accrual().clone() {
+                Some(accrual) => Some(accrual),
+                None => {
                     let start = schedule
                         .get_flows()
                         .iter()
@@ -166,27 +165,32 @@ pub(crate) fn rebuild_residual_interest(
                         })
                         .map(|flow| flow.get_date())
                         .max()
-                        .or(schedule.get_meta().issue_date)?;
-                    Some(CashFlowAccrual {
-                        start,
-                        end: original.get_date(),
-                        day_count: schedule.get_day_count(),
-                        projected_index_rate: None,
-                        context: finstack_quant_core::dates::DayCountContextState {
-                            calendar_id: None,
-                            coupon_period: None,
-                            end_is_termination_date: Some(false),
-                            frequency: None,
-                            bus_basis: None,
-                        },
-                    })
-                })
-                .ok_or_else(|| {
-                    Error::capital_structure("Cannot rebuild interest without an accrual start")
-                })?;
+                        .or(schedule.get_meta().issue_date);
+                    start
+                        .map(|start| {
+                            CashFlowAccrual::new(
+                                start,
+                                original.get_date(),
+                                schedule.get_day_count(),
+                                None,
+                                finstack_quant_core::dates::DayCountContextState {
+                                    calendar_id: None,
+                                    coupon_period: None,
+                                    end_is_termination_date: Some(false),
+                                    frequency: None,
+                                    bus_basis: None,
+                                },
+                            )
+                        })
+                        .transpose()?
+                }
+            }
+            .ok_or_else(|| {
+                Error::capital_structure("Cannot rebuild interest without an accrual start")
+            })?;
             // A paid-down balance cannot cancel interest already earned,
             // including PIK capitalizing after its accrual period ends.
-            if accrual.end <= effective {
+            if accrual.get_end() <= effective {
                 if principal_is_future {
                     new_balance += principal_change(original);
                 }
@@ -194,10 +198,14 @@ pub(crate) fn rebuild_residual_interest(
                 continue;
             }
             let mut context = accrual.day_count_context()?;
-            context.coupon_period = context.coupon_period.or(Some((accrual.start, accrual.end)));
-            let total = accrual
-                .day_count
-                .year_fraction(accrual.start, accrual.end, context)?;
+            context.coupon_period = context
+                .coupon_period
+                .or(Some((accrual.get_start(), accrual.get_end())));
+            let total = accrual.get_day_count().year_fraction(
+                accrual.get_start(),
+                accrual.get_end(),
+                context,
+            )?;
             // Canonical coupons are emitted in constant-principal accrual
             // segments. `rate` on a split cash/PIK row is the full coupon
             // rate, so its amount and dated principal own the component's
@@ -206,7 +214,7 @@ pub(crate) fn rebuild_residual_interest(
             let principal = original_path
                 .iter()
                 .rev()
-                .find(|(date, _)| *date <= accrual.start)
+                .find(|(date, _)| *date <= accrual.get_start())
                 .map_or(initial, |(_, balance)| balance.amount());
             // A PIK row's interest is its explicit capitalization, not its
             // cash amount (record CORE-CONVENTIONS-015 #1, #4).
@@ -228,24 +236,24 @@ pub(crate) fn rebuild_residual_interest(
                     "Cannot infer a finite coupon-component rate or accrual interval",
                 ));
             }
-            let mut boundaries = vec![accrual.start];
+            let mut boundaries = vec![accrual.get_start()];
             boundaries.extend(
                 changes
                     .keys()
-                    .filter(|date| **date > accrual.start && **date < accrual.end)
+                    .filter(|date| **date > accrual.get_start() && **date < accrual.get_end())
                     .copied(),
             );
-            boundaries.push(accrual.end);
+            boundaries.push(accrual.get_end());
             replacement.clear();
             for bounds in boundaries.windows(2) {
-                let fraction = accrual.day_count.year_fraction(
+                let fraction = accrual.get_day_count().year_fraction(
                     bounds[0],
                     bounds[1],
                     DayCountContext {
                         end_is_termination_date: accrual
-                            .context
+                            .get_context()
                             .end_is_termination_date
-                            .map(|termination| termination && bounds[1] == accrual.end),
+                            .map(|termination| termination && bounds[1] == accrual.get_end()),
                         ..context
                     },
                 )? / total;
@@ -267,18 +275,19 @@ pub(crate) fn rebuild_residual_interest(
                 // unsplit rate from a zero principal denominator.
                 flow.rate = Some(rate);
                 flow.accrual_factor = factor;
-                flow.accrual = Some(CashFlowAccrual {
-                    start: bounds[0],
-                    end: bounds[1],
-                    context: finstack_quant_core::dates::DayCountContextState {
+                flow.accrual = Some(CashFlowAccrual::new(
+                    bounds[0],
+                    bounds[1],
+                    accrual.get_day_count(),
+                    accrual.get_projected_index_rate(),
+                    finstack_quant_core::dates::DayCountContextState {
                         end_is_termination_date: accrual
-                            .context
+                            .get_context()
                             .end_is_termination_date
-                            .map(|termination| termination && bounds[1] == accrual.end),
-                        ..accrual.context.clone()
+                            .map(|termination| termination && bounds[1] == accrual.get_end()),
+                        ..accrual.get_context().clone()
                     },
-                    ..accrual.clone()
-                });
+                )?);
                 // A PIK row capitalizes exactly its reprojected interest; any
                 // other explicit delta splits with the reprojected cash.
                 if original.get_kind() == CFKind::Pik {

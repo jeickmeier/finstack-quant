@@ -706,16 +706,22 @@ fn envelope_for_priced(
             currency: ccy,
             kind: flow.get_kind(),
             accrual_factor: flow.get_accrual_factor(),
-            accrual_start: flow.get_accrual().as_ref().map(|accrual| accrual.start),
-            accrual_end: flow.get_accrual().as_ref().map(|accrual| accrual.end),
-            accrual_day_count: flow.get_accrual().as_ref().map(|accrual| accrual.day_count),
+            accrual_start: flow
+                .get_accrual()
+                .as_ref()
+                .map(|accrual| accrual.get_start()),
+            accrual_end: flow.get_accrual().as_ref().map(|accrual| accrual.get_end()),
+            accrual_day_count: flow
+                .get_accrual()
+                .as_ref()
+                .map(|accrual| accrual.get_day_count()),
             accrual_notional: accrual_notionals
                 .as_ref()
                 .and_then(|balances| balances[row_index]),
             index_rate: flow
                 .get_accrual()
                 .as_ref()
-                .and_then(|accrual| accrual.projected_index_rate),
+                .and_then(|accrual| accrual.get_projected_index_rate()),
             principal_delta: flow.get_principal_delta().map(|delta| delta.amount()),
             principal_date: flow.get_balance_date(),
             year_fraction,
@@ -798,7 +804,11 @@ fn accrual_start_balances(
     let flows = schedule.get_flows();
     let mut starts: Vec<Date> = flows
         .iter()
-        .filter_map(|flow| flow.get_accrual().as_ref().map(|accrual| accrual.start))
+        .filter_map(|flow| {
+            flow.get_accrual()
+                .as_ref()
+                .map(|accrual| accrual.get_start())
+        })
         .collect();
     starts.sort_unstable();
     starts.dedup();
@@ -807,7 +817,7 @@ fn accrual_start_balances(
         flows
             .iter()
             .map(|flow| {
-                let start = flow.get_accrual().as_ref()?.start;
+                let start = flow.get_accrual().as_ref()?.get_start();
                 let index = starts.binary_search(&start).ok()?;
                 Some(balances[index].amount())
             })

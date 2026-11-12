@@ -78,7 +78,8 @@ fn callable_loan_record() -> Value {
     for coupon in schedule.coupons() {
         let accrual = coupon.get_accrual().as_ref().expect("loan coupon accrual");
         let expected =
-            10_000_000.0 * 0.06 * (accrual.end - accrual.start).whole_days() as f64 / 360.0;
+            10_000_000.0 * 0.06 * (accrual.get_end() - accrual.get_start()).whole_days() as f64
+                / 360.0;
         support::close(
             coupon.get_amount().amount(),
             expected,

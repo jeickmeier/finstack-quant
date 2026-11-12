@@ -201,7 +201,7 @@ fn imm_coupons_accrue_through_off_grid_maturity() {
                 .get_accrual()
                 .as_ref()
                 .expect("accrual")
-                .end,
+                .get_end(),
             end
         );
         if coupons.len() > 2 {
@@ -274,7 +274,7 @@ fn cds_interior_payment_windows_never_repeat_front_accrual() {
                 .filter_map(|flow| {
                     flow.get_accrual()
                         .as_ref()
-                        .map(|accrual| (accrual.start, accrual.end))
+                        .map(|accrual| (accrual.get_start(), accrual.get_end()))
                 })
                 .collect();
             intervals.sort_unstable();

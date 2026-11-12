@@ -36,13 +36,16 @@ pub(crate) fn bond_coupon_dates(bond: &Bond) -> Result<Vec<(Date, Date, Date)>> 
                     "ACT/365L bond timing requires contractual coupon accrual metadata".into(),
                 )
             })?;
-            let period = accrual.context.coupon_period.ok_or_else(|| {
+            let period = accrual.get_context().coupon_period.ok_or_else(|| {
                 finstack_quant_core::Error::Validation(
                     "ACT/365L custom bond timing requires explicit full coupon_period metadata"
                         .into(),
                 )
             })?;
-            if period.0 >= period.1 || accrual.start < period.0 || accrual.end > period.1 {
+            if period.0 >= period.1
+                || accrual.get_start() < period.0
+                || accrual.get_end() > period.1
+            {
                 return Err(finstack_quant_core::Error::Validation(
                     "ACT/365L custom bond accrual metadata lies outside its full coupon period"
                         .into(),
@@ -305,6 +308,23 @@ pub(crate) fn bond_cashflow_dfs_on_model_grid(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The same accrual slice with another reference coupon period.
+    fn with_coupon_period(
+        accrual: &finstack_quant_core::cashflow::CashFlowAccrual,
+        coupon_period: Option<(Date, Date)>,
+    ) -> finstack_quant_core::Result<finstack_quant_core::cashflow::CashFlowAccrual> {
+        finstack_quant_core::cashflow::CashFlowAccrual::new(
+            accrual.get_start(),
+            accrual.get_end(),
+            accrual.get_day_count(),
+            accrual.get_projected_index_rate(),
+            finstack_quant_core::dates::DayCountContextState {
+                coupon_period,
+                ..accrual.get_context().clone()
+            },
+        )
+    }
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::money::Money;
@@ -422,7 +442,7 @@ mod tests {
         custom
             .update_flows(|flow| {
                 if let Some(accrual) = &mut flow.accrual {
-                    accrual.context.coupon_period = None;
+                    *accrual = with_coupon_period(accrual, None)?;
                 }
                 Ok(())
             })
@@ -432,9 +452,9 @@ mod tests {
         overlap
             .update_flows(|flow| {
                 if let Some(accrual) = &mut flow.accrual
-                    && accrual.start == bond.issue_date
+                    && accrual.get_start() == bond.issue_date
                 {
-                    accrual.context.coupon_period = Some((bond.issue_date, bond.maturity));
+                    *accrual = with_coupon_period(accrual, Some((bond.issue_date, bond.maturity)))?;
                 }
                 Ok(())
             })

@@ -408,7 +408,7 @@ fn resolved_value(
         let earned_coupon = cf
             .get_accrual()
             .as_ref()
-            .is_some_and(|period| period.end <= ended)
+            .is_some_and(|period| period.get_end() <= ended)
             && !cf.get_kind().is_principal_like();
         let pending_redemption = mandatory_date.is_none() && cf.get_kind().is_principal_like();
         if earned_coupon || pending_redemption {

@@ -801,7 +801,7 @@ mod margin_stepup_period_semantics {
                     .get_accrual()
                     .as_ref()
                     .expect("interest flow should carry accrual metadata");
-                (accrual.start, accrual.end)
+                (accrual.get_start(), accrual.get_end())
             })
             .collect();
         periods.sort_unstable();
@@ -849,7 +849,7 @@ mod margin_stepup_period_semantics {
                         .get_accrual()
                         .as_ref()
                         .expect("interest flow should carry accrual");
-                    (accrual.start, cf.get_amount().amount())
+                    (accrual.get_start(), cf.get_amount().amount())
                 })
                 .collect();
             flows.sort_by_key(|flow| flow.0);
@@ -952,7 +952,7 @@ mod margin_stepup_period_semantics {
                 .as_ref()
                 .expect("interest flow should carry accrual");
             let rate = cf.get_rate().expect("fixed coupon should carry its rate");
-            let expected = if accrual.start < NEXT_PERIOD_START {
+            let expected = if accrual.get_start() < NEXT_PERIOD_START {
                 0.065
             } else {
                 0.075
@@ -960,7 +960,7 @@ mod margin_stepup_period_semantics {
             assert!(
                 (rate - expected).abs() < 1e-12,
                 "fixed coupon rate for period starting {} should be {expected}, got {rate}",
-                accrual.start
+                accrual.get_start()
             );
         }
     }

@@ -186,18 +186,18 @@ fn act365l_periodic_fees_use_actual_stub_boundaries_for_every_balance_segment() 
             for flow in fees {
                 let accrual = flow.get_accrual().as_ref().expect("fee accrual metadata");
                 assert_eq!(
-                    accrual.context.coupon_period,
+                    accrual.get_context().coupon_period,
                     Some((date(issue), date(maturity)))
                 );
                 let context = DayCountContext {
                     frequency: Some(frequency),
-                    coupon_period: accrual.context.coupon_period,
+                    coupon_period: accrual.get_context().coupon_period,
                     ..Default::default()
                 };
                 close(
                     flow.get_accrual_factor(),
                     DayCount::Act365L
-                        .year_fraction(accrual.start, accrual.end, context)
+                        .year_fraction(accrual.get_start(), accrual.get_end(), context)
                         .expect("segment retains its actual enclosing coupon"),
                 );
             }
@@ -639,7 +639,7 @@ fn february_rate_and_payment_boundaries_are_not_termination() {
                 .get_accrual()
                 .as_ref()
                 .expect("metadata")
-                .context
+                .get_context()
                 .end_is_termination_date,
             Some(false)
         );

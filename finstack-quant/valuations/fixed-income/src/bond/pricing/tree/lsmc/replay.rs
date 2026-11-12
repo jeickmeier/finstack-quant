@@ -627,7 +627,7 @@ impl ReplayTemplate {
                             discount.as_ref(),
                             as_of,
                             times,
-                            (accrual.start, accrual.end),
+                            (accrual.get_start(), accrual.get_end()),
                             spec,
                         )?;
                         if overnight
@@ -644,17 +644,17 @@ impl ReplayTemplate {
                     }
                     continue;
                 }
-                if accrual.projected_index_rate.is_none() {
+                if accrual.get_projected_index_rate().is_none() {
                     continue;
                 }
                 let reset = flow
                     .get_reset_date()
-                    .unwrap_or(contractual_reset_date(accrual.start, spec)?);
-                let key = (accrual.start, accrual.end);
+                    .unwrap_or(contractual_reset_date(accrual.get_start(), spec)?);
+                let key = (accrual.get_start(), accrual.get_end());
                 let entry = dynamic_groups.entry(key).or_default();
                 entry.reset = Some(reset);
-                entry.start = Some(accrual.start);
-                entry.end = Some(accrual.end);
+                entry.start = Some(accrual.get_start());
+                entry.end = Some(accrual.get_end());
                 // The cash row's date is the coupon payment; a PIK-only coupon
                 // has no cash settlement and pays nothing before capitalizing.
                 if flow.get_kind() != CFKind::Pik || entry.payment.is_none() {
@@ -668,22 +668,22 @@ impl ReplayTemplate {
                 } else {
                     entry.has_cash = true;
                 }
-                entry.day_count = Some(accrual.day_count);
+                entry.day_count = Some(accrual.get_day_count());
                 entry.day_count_context = Some(DayCountContext {
                     calendar: Some(calendar_by_id_strict(
                         accrual
-                            .context
+                            .get_context()
                             .calendar_id
                             .as_deref()
                             .unwrap_or(&spec.schedule.calendar_id),
                     )?),
                     frequency: Some(spec.schedule.frequency),
                     bus_basis: None,
-                    coupon_period: accrual.context.coupon_period,
-                    end_is_termination_date: accrual.context.end_is_termination_date,
+                    coupon_period: accrual.get_context().coupon_period,
+                    end_is_termination_date: accrual.get_context().end_is_termination_date,
                 });
                 entry.accrual = flow.get_accrual_factor();
-                entry.base_index_rate = accrual.projected_index_rate;
+                entry.base_index_rate = accrual.get_projected_index_rate();
                 dynamic_flow_indices.insert(flow_index);
             }
         }
@@ -1158,25 +1158,25 @@ impl ReplayTemplate {
                         CFKind::Fixed | CFKind::Floating | CFKind::Pik
                     )
                 })
-                .filter(|accrual| flow.get_date() >= as_of || accrual.end >= as_of)
+                .filter(|accrual| flow.get_date() >= as_of || accrual.get_end() >= as_of)
             {
                 static_accruals.push(AccrualClaim {
-                    start: accrual.start,
-                    end: accrual.end,
+                    start: accrual.get_start(),
+                    end: accrual.get_end(),
                     payment: flow.get_date(),
-                    day_count: accrual.day_count,
+                    day_count: accrual.get_day_count(),
                     day_count_context: DayCountContext {
                         calendar: Some(calendar_by_id_strict(
                             accrual
-                                .context
+                                .get_context()
                                 .calendar_id
                                 .as_deref()
                                 .unwrap_or(&bond.cashflow_spec.schedule().calendar_id),
                         )?),
                         frequency: Some(bond.cashflow_spec.schedule().frequency),
                         bus_basis: None,
-                        coupon_period: accrual.context.coupon_period,
-                        end_is_termination_date: accrual.context.end_is_termination_date,
+                        coupon_period: accrual.get_context().coupon_period,
+                        end_is_termination_date: accrual.get_context().end_is_termination_date,
                     },
                     // A PIK claim is its explicit capitalization, not its cash
                     // amount (record CORE-CONVENTIONS-015 #1, #4).

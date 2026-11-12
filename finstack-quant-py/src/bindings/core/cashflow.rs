@@ -216,46 +216,46 @@ impl PyCashFlowAccrual {
         context: PyRef<'_, PyDayCountContext>,
         projected_index_rate: Option<f64>,
     ) -> PyResult<Self> {
-        let inner = CashFlowAccrual {
-            start: py_to_date(start)?,
-            end: py_to_date(end)?,
-            day_count: day_count.inner,
+        let inner = CashFlowAccrual::new(
+            py_to_date(start)?,
+            py_to_date(end)?,
+            day_count.inner,
             projected_index_rate,
-            context: context.inner.clone(),
-        };
-        inner.validate().map_err(core_to_py)?;
+            context.inner.clone(),
+        )
+        .map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
     /// Inclusive accrual start as a Python date.
     #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        date_to_py(py, self.inner.start)
+        date_to_py(py, self.inner.get_start())
     }
 
     /// Exclusive accrual end as a Python date.
     #[getter]
     fn end<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        date_to_py(py, self.inner.end)
+        date_to_py(py, self.inner.get_end())
     }
 
     /// Convention used to calculate accrual year fractions.
     #[getter]
     fn day_count(&self) -> PyDayCount {
-        PyDayCount::from_inner(self.inner.day_count)
+        PyDayCount::from_inner(self.inner.get_day_count())
     }
 
     /// Unconstrained decimal index rate, or None if unprojected.
     #[getter]
     fn projected_index_rate(&self) -> Option<f64> {
-        self.inner.projected_index_rate
+        self.inner.get_projected_index_rate()
     }
 
     /// The complete day-count context the accrual factor was calculated with.
     #[getter]
     fn context(&self) -> PyDayCountContext {
         PyDayCountContext {
-            inner: self.inner.context.clone(),
+            inner: self.inner.get_context().clone(),
         }
     }
 }

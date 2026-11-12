@@ -618,19 +618,19 @@ impl CmsSwap {
                     accrual_fraction,
                     Some(coupon_rate),
                 )
-                .with_accrual(CashFlowAccrual {
-                    start: accrual_start,
-                    end: payment_date,
-                    day_count: self.day_count,
-                    projected_index_rate: None,
-                    context: finstack_quant_core::dates::DayCountContextState {
+                .with_accrual(CashFlowAccrual::new(
+                    accrual_start,
+                    payment_date,
+                    self.day_count,
+                    None,
+                    finstack_quant_core::dates::DayCountContextState {
                         calendar_id: None,
                         coupon_period: None,
                         end_is_termination_date: Some(false),
                         frequency: None,
                         bus_basis: None,
                     },
-                })
+                )?)
                 .build()?,
             );
             accrual_start = payment_date;
@@ -707,19 +707,19 @@ impl CmsSwap {
                     period.accrual_year_fraction,
                     Some(rate),
                 )
-                .with_accrual(CashFlowAccrual {
-                    start: period.accrual_start,
-                    end: period.accrual_end,
+                .with_accrual(CashFlowAccrual::new(
+                    period.accrual_start,
+                    period.accrual_end,
                     day_count,
-                    projected_index_rate: index_rate,
-                    context: finstack_quant_core::dates::DayCountContextState {
+                    index_rate,
+                    finstack_quant_core::dates::DayCountContextState {
                         calendar_id: None,
                         coupon_period: None,
                         end_is_termination_date: Some(false),
                         frequency: None,
                         bus_basis: None,
                     },
-                })
+                )?)
                 .build()?,
             );
         }
@@ -894,7 +894,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
                             forward_curve_id.as_str(),
                         ),
                         date,
-                        value: accrual.projected_index_rate,
+                        value: accrual.get_projected_index_rate(),
                     });
                 }
             }

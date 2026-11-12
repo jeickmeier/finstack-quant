@@ -943,7 +943,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
                     && flow
                         .get_accrual()
                         .as_ref()
-                        .is_some_and(|period| period.end <= date)
+                        .is_some_and(|period| period.get_end() <= date)
             });
         }
         Ok(schedule.with_representation(

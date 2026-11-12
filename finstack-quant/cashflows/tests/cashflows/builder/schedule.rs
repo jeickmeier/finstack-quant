@@ -298,12 +298,14 @@ fn fixed_to_float_window_has_fresh_front_stub_at_switch() {
         .as_ref()
         .expect("float coupon accrual");
     assert_eq!(
-        accrual.start, switch,
+        accrual.get_start(),
+        switch,
         "float window must start a fresh schedule at switch, not continue the Jan-15 roll"
     );
     let continued_roll = Date::from_calendar_date(2025, Month::April, 15).unwrap();
     assert_ne!(
-        accrual.start, continued_roll,
+        accrual.get_start(),
+        continued_roll,
         "must not continue the pre-switch quarterly roll"
     );
     assert!(

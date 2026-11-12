@@ -147,10 +147,10 @@ pub(super) fn fixture(case: Case) -> Fixture {
         assert_eq!(coupon.get_kind(), CFKind::Fixed);
         assert_eq!(coupon.get_amount().currency(), Currency::USD);
         assert_eq!(
-            (accrual.start, accrual.end, coupon.get_date()),
+            (accrual.get_start(), accrual.get_end(), coupon.get_date()),
             (start, end, end)
         );
-        assert_eq!(accrual.day_count, DayCount::Act365F);
+        assert_eq!(accrual.get_day_count(), DayCount::Act365F);
         close(
             coupon.get_accrual_factor(),
             (end - start).whole_days() as f64 / 365.0,

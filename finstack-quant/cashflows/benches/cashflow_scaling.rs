@@ -127,7 +127,7 @@ fn check_adjusted_schedule(
             .as_ref()
             .expect("fixed coupon accrual metadata");
         assert_eq!(
-            accrual.start,
+            accrual.get_start(),
             if adjust_accrual_dates {
                 adjusted_start
             } else {
@@ -135,7 +135,7 @@ fn check_adjusted_schedule(
             }
         );
         assert_eq!(
-            accrual.end,
+            accrual.get_end(),
             if adjust_accrual_dates {
                 adjusted_end
             } else {
@@ -175,7 +175,7 @@ fn check_amortizing_monthly(schedule: &CashFlowSchedule, base: Date, coupons: us
             .get_accrual()
             .as_ref()
             .expect("monthly coupon accrual metadata");
-        assert_eq!((accrual.start, accrual.end), (start, end));
+        assert_eq!((accrual.get_start(), accrual.get_end()), (start, end));
         assert_eq!(coupon.get_date(), end);
         assert_eq!(principal.get_date(), end);
         assert_eq!(

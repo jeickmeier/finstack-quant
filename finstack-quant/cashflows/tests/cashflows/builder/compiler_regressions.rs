@@ -606,7 +606,7 @@ fn overnight_zero_daycount_segment_keeps_replay_clock_and_emits_zero() {
         .find(|flow| {
             flow.get_accrual()
                 .as_ref()
-                .is_some_and(|accrual| accrual.end == date("2025-01-31"))
+                .is_some_and(|accrual| accrual.get_end() == date("2025-01-31"))
         })
         .expect("zero-daycount segment");
     close(zero.get_accrual_factor(), 0.0);

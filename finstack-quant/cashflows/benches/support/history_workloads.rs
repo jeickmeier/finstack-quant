@@ -345,14 +345,14 @@ pub(super) fn check(fixture: &Fixture, schedule: &CashFlowSchedule) -> Reference
             .get_accrual()
             .as_ref()
             .expect("explicit floating accrual");
-        assert_eq!((accrual.start, accrual.end), (start, end));
-        assert_eq!(accrual.day_count, DayCount::Act360);
+        assert_eq!((accrual.get_start(), accrual.get_end()), (start, end));
+        assert_eq!(accrual.get_day_count(), DayCount::Act360);
         assert_eq!(
-            accrual.context.calendar_id.as_deref(),
+            accrual.get_context().calendar_id.as_deref(),
             Some("weekends_only")
         );
         assert_eq!(
-            accrual.context.end_is_termination_date,
+            accrual.get_context().end_is_termination_date,
             Some(quarter + 1 == COUPONS)
         );
         assert_eq!(flow.get_date(), payment(end));
@@ -364,7 +364,7 @@ pub(super) fn check(fixture: &Fixture, schedule: &CashFlowSchedule) -> Reference
             RATE_BOUND
         };
         close(
-            accrual.projected_index_rate.unwrap(),
+            accrual.get_projected_index_rate().unwrap(),
             index_rate,
             rate_bound,
         );

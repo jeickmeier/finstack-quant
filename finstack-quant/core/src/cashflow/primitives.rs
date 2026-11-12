@@ -371,12 +371,12 @@ impl CFKind {
 pub struct CashFlowAccrual {
     /// Contractual accrual-period start date.
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
-    pub start: Date,
+    start: Date,
     /// Contractual accrual-period end date.
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
-    pub end: Date,
+    end: Date,
     /// Day-count convention used for the accrual factor.
-    pub day_count: DayCount,
+    day_count: DayCount,
     /// Projected index rate before spread, gearing, caps, or floors.
     /// Serialization rejects non-finite rates instead of encoding them as absent.
     #[serde(
@@ -384,7 +384,7 @@ pub struct CashFlowAccrual {
         skip_serializing_if = "Option::is_none",
         serialize_with = "serialize_optional_rate"
     )]
-    pub projected_index_rate: Option<f64>,
+    projected_index_rate: Option<f64>,
     /// The complete day-count context the accrual factor was calculated with
     /// (record CORE-CONVENTIONS-015 #7): the calendar for calendar-dependent
     /// conventions (BUS/252 requires it; joint calendars use `+`), the coupon
@@ -393,7 +393,7 @@ pub struct CashFlowAccrual {
     /// coupon), and whether `end` is the instrument termination date for the
     /// 30E/360 ISDA February exception (`None` is unspecified, which that
     /// convention rejects).
-    pub context: DayCountContextState,
+    context: DayCountContextState,
 }
 
 /// Wire fields of [`CashFlowAccrual`]; deserialization validates them.
@@ -412,19 +412,83 @@ impl TryFrom<CashFlowAccrualWire> for CashFlowAccrual {
     type Error = crate::Error;
 
     fn try_from(wire: CashFlowAccrualWire) -> crate::Result<Self> {
-        let accrual = Self {
-            start: wire.start,
-            end: wire.end,
-            day_count: wire.day_count,
-            projected_index_rate: wire.projected_index_rate,
-            context: wire.context,
-        };
-        accrual.validate()?;
-        Ok(accrual)
+        Self::new(
+            wire.start,
+            wire.end,
+            wire.day_count,
+            wire.projected_index_rate,
+            wire.context,
+        )
     }
 }
 
 impl CashFlowAccrual {
+    /// The one constructor: publish an accrual slice only once it validates
+    /// (record CORE-CONVENTIONS-015 #10).
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - Actual accrual-slice start date (inclusive).
+    /// * `end` - Actual accrual-slice end date (exclusive), independent of the
+    ///   cash payment date; must follow `start`.
+    /// * `day_count` - Day-count convention the accrual factor uses.
+    /// * `projected_index_rate` - Decimal index rate before spread, gearing,
+    ///   caps or floors (0.05 means 5%); `None` when not projected.
+    /// * `context` - The complete day-count context the factor was
+    ///   calculated with (calendar, frequency, business-day basis, reference
+    ///   coupon period, termination status).
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Self::validate`] errors.
+    pub fn new(
+        start: Date,
+        end: Date,
+        day_count: DayCount,
+        projected_index_rate: Option<f64>,
+        context: DayCountContextState,
+    ) -> crate::Result<Self> {
+        let accrual = Self {
+            start,
+            end,
+            day_count,
+            projected_index_rate,
+            context,
+        };
+        accrual.validate()?;
+        Ok(accrual)
+    }
+
+    /// Actual accrual-slice start date.
+    #[must_use]
+    pub fn get_start(&self) -> Date {
+        self.start
+    }
+
+    /// Actual accrual-slice end date.
+    #[must_use]
+    pub fn get_end(&self) -> Date {
+        self.end
+    }
+
+    /// Day-count convention of the accrual factor.
+    #[must_use]
+    pub fn get_day_count(&self) -> DayCount {
+        self.day_count
+    }
+
+    /// Projected decimal index rate before spread, gearing, caps or floors.
+    #[must_use]
+    pub fn get_projected_index_rate(&self) -> Option<f64> {
+        self.projected_index_rate
+    }
+
+    /// Day-count context the accrual factor was calculated with.
+    #[must_use]
+    pub fn get_context(&self) -> &DayCountContextState {
+        &self.context
+    }
+
     /// Check this accrual slice: actual endpoints strictly increasing, a
     /// strictly increasing reference coupon period when present, and a finite
     /// projected index rate when present (record CORE-CONVENTIONS-015 #7, #9).

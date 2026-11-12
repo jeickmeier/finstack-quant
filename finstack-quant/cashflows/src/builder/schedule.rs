@@ -128,32 +128,49 @@ fn compare_accrual(
         (None, Some(_)) => std::cmp::Ordering::Less,
         (Some(_), None) => std::cmp::Ordering::Greater,
         (Some(left), Some(right)) => left
-            .start
-            .cmp(&right.start)
-            .then_with(|| left.end.cmp(&right.end))
-            .then_with(|| left.context.calendar_id.cmp(&right.context.calendar_id))
-            .then_with(|| left.context.coupon_period.cmp(&right.context.coupon_period))
+            .get_start()
+            .cmp(&right.get_start())
+            .then_with(|| left.get_end().cmp(&right.get_end()))
             .then_with(|| {
-                left.context
-                    .end_is_termination_date
-                    .cmp(&right.context.end_is_termination_date)
+                left.get_context()
+                    .calendar_id
+                    .cmp(&right.get_context().calendar_id)
             })
             .then_with(|| {
-                left.context
+                left.get_context()
+                    .coupon_period
+                    .cmp(&right.get_context().coupon_period)
+            })
+            .then_with(|| {
+                left.get_context()
+                    .end_is_termination_date
+                    .cmp(&right.get_context().end_is_termination_date)
+            })
+            .then_with(|| {
+                left.get_context()
                     .frequency
                     .map(|tenor| tenor.to_string())
-                    .cmp(&right.context.frequency.map(|tenor| tenor.to_string()))
+                    .cmp(&right.get_context().frequency.map(|tenor| tenor.to_string()))
             })
-            .then_with(|| left.context.bus_basis.cmp(&right.context.bus_basis))
-            .then_with(|| day_count_rank(left.day_count).cmp(&day_count_rank(right.day_count)))
-            .then_with(
-                || match (left.projected_index_rate, right.projected_index_rate) {
+            .then_with(|| {
+                left.get_context()
+                    .bus_basis
+                    .cmp(&right.get_context().bus_basis)
+            })
+            .then_with(|| {
+                day_count_rank(left.get_day_count()).cmp(&day_count_rank(right.get_day_count()))
+            })
+            .then_with(|| {
+                match (
+                    left.get_projected_index_rate(),
+                    right.get_projected_index_rate(),
+                ) {
                     (None, None) => std::cmp::Ordering::Equal,
                     (None, Some(_)) => std::cmp::Ordering::Less,
                     (Some(_), None) => std::cmp::Ordering::Greater,
                     (Some(left), Some(right)) => left.total_cmp(&right),
-                },
-            ),
+                }
+            }),
     }
 }
 
@@ -945,7 +962,7 @@ impl CashFlowSchedule {
         }
         for (flow, balance) in self.flows.iter().zip(&mut balances) {
             if let (Some(accrual), true) = (&flow.get_accrual(), balance.0 == balance.1) {
-                let moved = path.partition_point(|(date, _)| *date < accrual.end);
+                let moved = path.partition_point(|(date, _)| *date < accrual.get_end());
                 let held = moved
                     .checked_sub(1)
                     .map_or(self.notional.initial, |last| path[last].1);
@@ -1450,19 +1467,22 @@ mod tests {
         ];
         let with_day_count = |day_count| {
             flow_params(end, 1.0, CFKind::Fixed)
-                .with_accrual(CashFlowAccrual {
-                    start,
-                    end,
-                    day_count,
-                    projected_index_rate: None,
-                    context: finstack_quant_core::dates::DayCountContextState {
-                        calendar_id: Some("weekends_only".into()),
-                        coupon_period: Some((start, end)),
-                        end_is_termination_date: Some(false),
-                        frequency: None,
-                        bus_basis: None,
-                    },
-                })
+                .with_accrual(
+                    CashFlowAccrual::new(
+                        start,
+                        end,
+                        day_count,
+                        None,
+                        finstack_quant_core::dates::DayCountContextState {
+                            calendar_id: Some("weekends_only".into()),
+                            coupon_period: Some((start, end)),
+                            end_is_termination_date: Some(false),
+                            frequency: None,
+                            bus_basis: None,
+                        },
+                    )
+                    .expect("valid accrual"),
+                )
                 .build()
                 .expect("valid cashflow")
         };
@@ -1561,19 +1581,22 @@ mod tests {
         )
         .with_principal_delta(Money::from((6_i64, Currency::USD)))
         .with_principal_date(maturity)
-        .with_accrual(CashFlowAccrual {
-            start: issue,
-            end: maturity,
-            day_count: DayCount::Thirty360,
-            projected_index_rate: None,
-            context: finstack_quant_core::dates::DayCountContextState {
-                calendar_id: None,
-                coupon_period: None,
-                end_is_termination_date: Some(true),
-                frequency: None,
-                bus_basis: None,
-            },
-        })
+        .with_accrual(
+            CashFlowAccrual::new(
+                issue,
+                maturity,
+                DayCount::Thirty360,
+                None,
+                finstack_quant_core::dates::DayCountContextState {
+                    calendar_id: None,
+                    coupon_period: None,
+                    end_is_termination_date: Some(true),
+                    frequency: None,
+                    bus_basis: None,
+                },
+            )
+            .expect("valid accrual"),
+        )
         .build()
         .expect("valid cashflow");
         let raw = CashFlowSchedule::from_flows(
@@ -1762,19 +1785,22 @@ mod tests {
         let left = CashFlowSchedule::from_flows(
             vec![
                 flow_params(d2, 4.0, CFKind::Recovery)
-                    .with_accrual(CashFlowAccrual {
-                        start: d1,
-                        end: d2,
-                        day_count: DayCount::Thirty360,
-                        projected_index_rate: None,
-                        context: finstack_quant_core::dates::DayCountContextState {
-                            calendar_id: None,
-                            coupon_period: None,
-                            end_is_termination_date: Some(false),
-                            frequency: None,
-                            bus_basis: None,
-                        },
-                    })
+                    .with_accrual(
+                        CashFlowAccrual::new(
+                            d1,
+                            d2,
+                            DayCount::Thirty360,
+                            None,
+                            finstack_quant_core::dates::DayCountContextState {
+                                calendar_id: None,
+                                coupon_period: None,
+                                end_is_termination_date: Some(false),
+                                frequency: None,
+                                bus_basis: None,
+                            },
+                        )
+                        .expect("valid accrual"),
+                    )
                     .build()
                     .expect("valid cashflow"),
             ],
@@ -1792,19 +1818,22 @@ mod tests {
         let right = CashFlowSchedule::from_flows(
             vec![
                 flow_params(d1, 10.0, CFKind::Amortization)
-                    .with_accrual(CashFlowAccrual {
-                        start: d1,
-                        end: d2,
-                        day_count: DayCount::Act360,
-                        projected_index_rate: None,
-                        context: finstack_quant_core::dates::DayCountContextState {
-                            calendar_id: None,
-                            coupon_period: None,
-                            end_is_termination_date: Some(false),
-                            frequency: None,
-                            bus_basis: None,
-                        },
-                    })
+                    .with_accrual(
+                        CashFlowAccrual::new(
+                            d1,
+                            d2,
+                            DayCount::Act360,
+                            None,
+                            finstack_quant_core::dates::DayCountContextState {
+                                calendar_id: None,
+                                coupon_period: None,
+                                end_is_termination_date: Some(false),
+                                frequency: None,
+                                bus_basis: None,
+                            },
+                        )
+                        .expect("valid accrual"),
+                    )
                     .build()
                     .expect("valid cashflow"),
             ],
@@ -1841,14 +1870,14 @@ mod tests {
             merged.flows[0]
                 .get_accrual()
                 .as_ref()
-                .map(|accrual| accrual.day_count),
+                .map(|accrual| accrual.get_day_count()),
             Some(DayCount::Act360)
         );
         assert_eq!(
             merged.flows[1]
                 .get_accrual()
                 .as_ref()
-                .map(|accrual| accrual.day_count),
+                .map(|accrual| accrual.get_day_count()),
             Some(DayCount::Thirty360)
         );
     }
@@ -1995,19 +2024,20 @@ mod tests {
     fn filtering_and_sorting_keep_owned_accrual_metadata() {
         let d1 = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let d2 = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
-        let accrual = CashFlowAccrual {
-            start: d1,
-            end: d2,
-            day_count: DayCount::Act360,
-            projected_index_rate: Some(0.031),
-            context: finstack_quant_core::dates::DayCountContextState {
+        let accrual = CashFlowAccrual::new(
+            d1,
+            d2,
+            DayCount::Act360,
+            Some(0.031),
+            finstack_quant_core::dates::DayCountContextState {
                 calendar_id: None,
                 coupon_period: None,
                 end_is_termination_date: Some(false),
                 frequency: None,
                 bus_basis: None,
             },
-        };
+        )
+        .expect("valid accrual");
         let schedule = CashFlowSchedule::from_flows(
             vec![
                 flow_params(d2, 12.5, CFKind::Fixed)

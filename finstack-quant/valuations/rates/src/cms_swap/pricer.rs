@@ -722,8 +722,8 @@ mod tests {
         let mut expected_pv = 0.0;
         for (flow, period) in flows.iter().zip(periods) {
             let accrual = flow.get_accrual().as_ref().expect("accrual metadata");
-            assert_eq!(accrual.start, period.accrual_start);
-            assert_eq!(accrual.end, period.accrual_end);
+            assert_eq!(accrual.get_start(), period.accrual_start);
+            assert_eq!(accrual.get_end(), period.accrual_end);
             assert_eq!(flow.get_date(), period.payment_date);
             assert_eq!(flow.get_reset_date(), Some(period.reset_date));
             expected_pv += flow.get_amount().amount()

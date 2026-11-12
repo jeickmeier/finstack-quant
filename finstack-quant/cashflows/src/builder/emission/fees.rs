@@ -128,19 +128,19 @@ pub(in crate::builder) fn emit_fees_on(
                             yf,
                             Some(rate),
                         )
-                        .with_accrual(CashFlowAccrual {
-                            start: accrual_start,
-                            end: accrual_end,
-                            day_count: pf.schedule.day_count,
-                            projected_index_rate: None,
-                            context: finstack_quant_core::dates::DayCountContextState {
+                        .with_accrual(CashFlowAccrual::new(
+                            accrual_start,
+                            accrual_end,
+                            pf.schedule.day_count,
+                            None,
+                            finstack_quant_core::dates::DayCountContextState {
                                 calendar_id: Some(pf.schedule.calendar_id.to_string()),
                                 end_is_termination_date: Some(is_termination_date),
                                 coupon_period,
                                 frequency: None,
                                 bus_basis: None,
                             },
-                        })
+                        )?)
                         .build()?,
                     );
                 }
@@ -269,8 +269,8 @@ mod tests {
             .get_accrual()
             .as_ref()
             .expect("periodic fee should own its accrual metadata");
-        assert_eq!((accrual.start, accrual.end), (start, end));
-        assert_eq!(accrual.day_count, DayCount::Act360);
+        assert_eq!((accrual.get_start(), accrual.get_end()), (start, end));
+        assert_eq!(accrual.get_day_count(), DayCount::Act360);
     }
 
     #[test]

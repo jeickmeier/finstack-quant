@@ -348,19 +348,19 @@ impl CommoditySwap {
             period.accrual_year_fraction,
             None,
         )
-        .with_accrual(CashFlowAccrual {
-            start: period.accrual_start,
-            end: period.accrual_end,
-            day_count: finstack_quant_core::dates::DayCount::Act365F,
-            projected_index_rate: None,
-            context: finstack_quant_core::dates::DayCountContextState {
+        .with_accrual(CashFlowAccrual::new(
+            period.accrual_start,
+            period.accrual_end,
+            finstack_quant_core::dates::DayCount::Act365F,
+            None,
+            finstack_quant_core::dates::DayCountContextState {
                 calendar_id: self.calendar_id.as_deref().map(str::to_owned),
                 coupon_period: None,
                 end_is_termination_date: Some(period.accrual_end == self.maturity),
                 frequency: None,
                 bus_basis: None,
             },
-        })
+        )?)
         .build()
     }
 }
@@ -540,7 +540,11 @@ mod tests {
         let final_flow = schedule.get_flows().last().expect("last flow");
         assert_eq!(final_flow.get_date(), payment);
         assert_eq!(
-            final_flow.get_accrual().as_ref().expect("accrual").end,
+            final_flow
+                .get_accrual()
+                .as_ref()
+                .expect("accrual")
+                .get_end(),
             maturity
         );
         assert!(final_flow.get_amount().amount().abs() < 1e-12);

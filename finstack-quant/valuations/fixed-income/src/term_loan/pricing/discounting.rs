@@ -393,7 +393,9 @@ impl TermLoanDiscountingPricer {
                 && flow
                     .get_accrual()
                     .as_ref()
-                    .map_or(flow.get_date() <= as_of, |accrual| accrual.start < as_of)
+                    .map_or(flow.get_date() <= as_of, |accrual| {
+                        accrual.get_start() < as_of
+                    })
         });
         if has_seasoned_pik {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -464,7 +466,7 @@ impl TermLoanDiscountingPricer {
             let accrual_start = flow
                 .accrual
                 .as_ref()
-                .map_or(reset_date, |accrual| accrual.start);
+                .map_or(reset_date, |accrual| accrual.get_start());
             let active_delta_bp: rust_decimal::Decimal = margin_deltas
                 .range(..=accrual_start)
                 .map(|(_, delta_bp)| *delta_bp)

@@ -461,10 +461,13 @@ fn bench_build_structured(c: &mut Criterion) {
         assert_eq!(fees.len(), 20);
         for fee in fees {
             let accrual = fee.get_accrual().as_ref().expect("fee accrual metadata");
-            assert_eq!(accrual.day_count, DayCount::Act360);
+            assert_eq!(accrual.get_day_count(), DayCount::Act360);
             checks::close(
                 fee.get_amount().amount(),
-                1_000_000.0 * 0.0025 * (accrual.end - accrual.start).whole_days() as f64 / 360.0,
+                1_000_000.0
+                    * 0.0025
+                    * (accrual.get_end() - accrual.get_start()).whole_days() as f64
+                    / 360.0,
                 1e-7,
             );
         }
@@ -624,9 +627,9 @@ fn bench_accrued_variants(c: &mut Criterion) {
             .coupons()
             .map(|flow| {
                 let a = flow.get_accrual().as_ref().expect("coupon accrual");
-                if a.start <= as_of && as_of < flow.get_date() {
-                    let fraction = (as_of.min(a.end) - a.start).whole_days() as f64
-                        / (a.end - a.start).whole_days() as f64;
+                if a.get_start() <= as_of && as_of < flow.get_date() {
+                    let fraction = (as_of.min(a.get_end()) - a.get_start()).whole_days() as f64
+                        / (a.get_end() - a.get_start()).whole_days() as f64;
                     1_000_000.0
                         * ((1.0 + flow.get_amount().amount() / 1_000_000.0).powf(fraction) - 1.0)
                 } else {

@@ -41,19 +41,22 @@ fn row(
         factor,
         None,
     )
-    .with_accrual(CashFlowAccrual {
-        start,
-        end,
-        day_count,
-        projected_index_rate: None,
-        context: finstack_quant_core::dates::DayCountContextState {
-            calendar_id: None,
-            coupon_period: Some((start, end)),
-            end_is_termination_date: Some(false),
-            frequency: None,
-            bus_basis: None,
-        },
-    })
+    .with_accrual(
+        CashFlowAccrual::new(
+            start,
+            end,
+            day_count,
+            None,
+            finstack_quant_core::dates::DayCountContextState {
+                calendar_id: None,
+                coupon_period: Some((start, end)),
+                end_is_termination_date: Some(false),
+                frequency: None,
+                bus_basis: None,
+            },
+        )
+        .expect("valid accrual"),
+    )
     .build()
     .expect("valid cashflow")
 }
@@ -85,7 +88,7 @@ fn schedule_record(schedule: &CashFlowSchedule) -> Value {
             "amount_decimal_bytes":flow.get_amount().amount_decimal().serialize(),
             "accrual_factor_bits":flow.get_accrual_factor().to_bits(),
             "rate_bits":flow.get_rate().map(f64::to_bits),
-            "projected_index_rate_bits":flow.get_accrual().as_ref().and_then(|a|a.projected_index_rate).map(f64::to_bits),
+            "projected_index_rate_bits":flow.get_accrual().as_ref().and_then(|a|a.get_projected_index_rate()).map(f64::to_bits),
             "principal_delta_decimal_bytes":flow.get_principal_delta().map(|m|m.amount_decimal().serialize()),
             "principal_delta_bits":flow.get_principal_delta().map(|m|m.amount().to_bits())
         })
@@ -541,12 +544,20 @@ fn lazy_calendar_records() -> Vec<Value> {
         DayCount::Act365F,
         91.0 / 365.0,
     ));
-    future
-        .accrual
-        .as_mut()
-        .expect("future accrual")
-        .context
-        .calendar_id = Some("CCM-NO-SUCH-CALENDAR".into());
+    let accrual = future.accrual.take().expect("future accrual");
+    future.accrual = Some(
+        CashFlowAccrual::new(
+            accrual.get_start(),
+            accrual.get_end(),
+            accrual.get_day_count(),
+            accrual.get_projected_index_rate(),
+            finstack_quant_core::dates::DayCountContextState {
+                calendar_id: Some("CCM-NO-SUCH-CALENDAR".into()),
+                ..accrual.get_context().clone()
+            },
+        )
+        .expect("valid accrual"),
+    );
     let future = future.build().expect("valid cashflow");
     let schedule = hand_schedule(
         vec![active, future],

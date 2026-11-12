@@ -391,7 +391,7 @@ fn test_accrued_interest_amortizing_schedule_driven() {
             let accrual_period = cf
                 .get_accrual()
                 .as_ref()
-                .map(|accrual| (accrual.start, accrual.end));
+                .map(|accrual| (accrual.get_start(), accrual.get_end()));
             if let Some(last) = out.last_mut()
                 && last.0 == cf.get_date()
             {

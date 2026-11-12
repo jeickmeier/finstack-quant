@@ -246,19 +246,19 @@ pub(crate) fn emit_fixed_coupons_on(
                 let pik_amt = coupon_total * pik_fraction_f64;
 
                 let rate_f64 = spec.rate.as_f64();
-                let accrual = CashFlowAccrual {
-                    start: accrual_start,
-                    end: accrual_end,
-                    day_count: spec.schedule.day_count,
-                    projected_index_rate: None,
-                    context: finstack_quant_core::dates::DayCountContextState {
+                let accrual = CashFlowAccrual::new(
+                    accrual_start,
+                    accrual_end,
+                    spec.schedule.day_count,
+                    None,
+                    finstack_quant_core::dates::DayCountContextState {
                         calendar_id: Some(spec.schedule.calendar_id.to_string()),
                         end_is_termination_date: Some(is_termination_date),
                         coupon_period,
                         frequency: None,
                         bus_basis: None,
                     },
-                };
+                )?;
 
                 // Gate on cash split, not amount sign, so negative-rate coupons emit.
                 if cash_fraction_f64 > 0.0 {
@@ -714,12 +714,12 @@ pub(crate) fn emit_float_coupons_on(
                 )));
             }
             for (segment, settlement) in segments.iter().zip(settlements) {
-                let accrual = CashFlowAccrual {
-                    start: segment.start,
-                    end: segment.end,
-                    day_count: spec.schedule.day_count,
-                    projected_index_rate: Some(settlement.projected_index_rate),
-                    context: finstack_quant_core::dates::DayCountContextState {
+                let accrual = CashFlowAccrual::new(
+                    segment.start,
+                    segment.end,
+                    spec.schedule.day_count,
+                    Some(settlement.projected_index_rate),
+                    finstack_quant_core::dates::DayCountContextState {
                         calendar_id: Some(spec.schedule.calendar_id.to_string()),
                         coupon_period: floating_accrual_context(schedule, period, segment.end)
                             .coupon_period,
@@ -729,7 +729,7 @@ pub(crate) fn emit_float_coupons_on(
                         frequency: None,
                         bus_basis: None,
                     },
-                };
+                )?;
                 if cash_fraction > 0.0 {
                     out_flows.push(
                         CashFlowParams::new(
