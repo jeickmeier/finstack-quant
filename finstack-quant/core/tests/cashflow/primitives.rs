@@ -53,9 +53,9 @@ fn cashflow_fixed_construction() {
         principal_date: None,
     };
 
-    assert_eq!(cf.date, d(2025, 1, 15));
-    assert_eq!(cf.kind, CFKind::Fixed);
-    assert!(cf.reset_date.is_none());
+    assert_eq!(cf.get_date(), d(2025, 1, 15));
+    assert_eq!(cf.get_kind(), CFKind::Fixed);
+    assert!(cf.get_reset_date().is_none());
     assert!(cf.validate().is_ok());
 }
 
@@ -77,8 +77,8 @@ fn cashflow_floating_construction() {
         principal_date: None,
     };
 
-    assert_eq!(cf.kind, CFKind::Floating);
-    assert_eq!(cf.reset_date, Some(reset));
+    assert_eq!(cf.get_kind(), CFKind::Floating);
+    assert_eq!(cf.get_reset_date(), Some(reset));
     assert!(cf.validate().is_ok());
 }
 
@@ -424,7 +424,7 @@ fn constructor_defaults_accrual_to_none() {
         0.25,
         Some(0.0325),
     );
-    assert!(flow.accrual.is_none());
+    assert!(flow.get_accrual().is_none());
 }
 
 #[test]
@@ -465,7 +465,7 @@ fn accrual_metadata_round_trips() {
     let encoded = serde_json::to_string(&flow).unwrap();
     let decoded: CashFlow = serde_json::from_str(&encoded).unwrap();
     assert_eq!(decoded, flow);
-    assert_eq!(decoded.accrual, Some(accrual));
+    assert_eq!(decoded.get_accrual(), &Some(accrual));
 }
 
 #[test]
@@ -484,7 +484,7 @@ fn monetary_representation_is_validated_at_construction() {
             Some(0.03),
         );
         assert!(flow.validate().is_ok());
-        assert_eq!(flow.amount.amount_decimal(), amount);
+        assert_eq!(flow.get_amount().amount_decimal(), amount);
     }
     for amount in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         assert!(Money::new(amount, Currency::USD).is_err());

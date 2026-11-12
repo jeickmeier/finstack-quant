@@ -39,10 +39,10 @@ pub(super) fn hedge_schedules(
             let schedule = hedge.swap.raw_cashflow_schedule(context, as_of)?;
             let mut by_date: BTreeMap<Date, f64> = BTreeMap::new();
             for flow in schedule.get_flows() {
-                if matches!(flow.kind, CFKind::Notional) {
+                if matches!(flow.get_kind(), CFKind::Notional) {
                     continue;
                 }
-                *by_date.entry(flow.date).or_insert(0.0) += flow.amount.amount();
+                *by_date.entry(flow.get_date()).or_insert(0.0) += flow.get_amount().amount();
             }
             Ok(HedgeSchedule {
                 id: format!("swap_{}", index + 1),

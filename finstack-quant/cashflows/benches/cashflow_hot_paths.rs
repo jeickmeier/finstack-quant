@@ -219,7 +219,7 @@ fn bench_npv(c: &mut Criterion) {
         let flows = schedule.dated_flows().unwrap();
         assert_eq!(flows.len(), 12);
         for (row, flow) in flows.iter().zip(schedule.get_flows()) {
-            assert_eq!(*row, (flow.date, flow.amount));
+            assert_eq!(*row, (flow.get_date(), flow.get_amount()));
         }
         let expected: f64 = flows
             .iter()
@@ -284,9 +284,9 @@ fn bench_merge_schedules(c: &mut Criterion) {
                 preflight
                     .get_flows()
                     .iter()
-                    .filter(|row| row.date == input.date
-                        && row.kind == input.kind
-                        && row.amount == input.amount)
+                    .filter(|row| row.get_date() == input.get_date()
+                        && row.get_kind() == input.get_kind()
+                        && row.get_amount() == input.get_amount())
                     .count(),
                 20
             );
@@ -422,11 +422,11 @@ fn bench_build_structured(c: &mut Criterion) {
         let principal: Vec<_> = preflight
             .get_flows()
             .iter()
-            .filter(|f| f.kind == CFKind::Amortization)
+            .filter(|f| f.get_kind() == CFKind::Amortization)
             .collect();
         assert_eq!(principal.len(), 20);
         for flow in principal {
-            checks::close(flow.amount.amount(), 50_000.0, 1e-8);
+            checks::close(flow.get_amount().amount(), 50_000.0, 1e-8);
         }
         checks::close(
             preflight
@@ -456,14 +456,14 @@ fn bench_build_structured(c: &mut Criterion) {
         let fees: Vec<_> = preflight
             .get_flows()
             .iter()
-            .filter(|f| f.kind == CFKind::Fee)
+            .filter(|f| f.get_kind() == CFKind::Fee)
             .collect();
         assert_eq!(fees.len(), 20);
         for fee in fees {
-            let accrual = fee.accrual.as_ref().expect("fee accrual metadata");
+            let accrual = fee.get_accrual().as_ref().expect("fee accrual metadata");
             assert_eq!(accrual.day_count, DayCount::Act360);
             checks::close(
-                fee.amount.amount(),
+                fee.get_amount().amount(),
                 1_000_000.0 * 0.0025 * (accrual.end - accrual.start).whole_days() as f64 / 360.0,
                 1e-7,
             );
@@ -520,7 +520,7 @@ fn bench_json_bridge(c: &mut Criterion) {
         let parsed: Vec<DatedFlowJson> = serde_json::from_str(&preflight).unwrap();
         assert_eq!(parsed.len(), 22);
         for (row, flow) in parsed.iter().zip(schedule.get_flows()) {
-            assert_eq!((row.date, row.amount), (flow.date, flow.amount));
+            assert_eq!((row.date, row.amount), (flow.get_date(), flow.get_amount()));
             assert_eq!(row.amount.currency(), Currency::USD);
         }
         drop(parsed);
@@ -542,20 +542,24 @@ fn bench_calendar_year_ladder(c: &mut Criterion) {
         let base = fixtures::base_date();
         let schedule = fixtures::make_fixed_schedule(base, 10, Tenor::quarterly());
         checks::fixed_bullet(&schedule, base, 10, 40, true);
-        let dates: Vec<Date> = schedule.get_flows().iter().map(|cf| cf.date).collect();
+        let dates: Vec<Date> = schedule
+            .get_flows()
+            .iter()
+            .map(|cf| cf.get_date())
+            .collect();
         let kind_strings: Vec<String> = schedule
             .get_flows()
             .iter()
-            .map(|cf| cf.kind.to_string())
+            .map(|cf| cf.get_kind().to_string())
             .collect();
         let kinds: Vec<&str> = kind_strings.iter().map(String::as_str).collect();
         for (label, flow) in kinds.iter().zip(schedule.get_flows()) {
-            assert_eq!(label.parse::<CFKind>().unwrap(), flow.kind);
+            assert_eq!(label.parse::<CFKind>().unwrap(), flow.get_kind());
         }
         let amounts: Vec<f64> = schedule
             .get_flows()
             .iter()
-            .map(|cf| cf.amount.amount())
+            .map(|cf| cf.get_amount().amount())
             .collect();
         let pvs: Vec<f64> = amounts.iter().map(|amount| amount * 0.85).collect();
         let preflight = calendar_year_ladder(&dates, &kinds, &amounts, &pvs)
@@ -566,13 +570,15 @@ fn bench_calendar_year_ladder(c: &mut Criterion) {
             let principal = schedule
                 .get_flows()
                 .iter()
-                .filter(|flow| flow.date.year() == row.year && flow.kind == CFKind::Notional)
-                .map(|flow| flow.amount.amount())
+                .filter(|flow| {
+                    flow.get_date().year() == row.year && flow.get_kind() == CFKind::Notional
+                })
+                .map(|flow| flow.get_amount().amount())
                 .sum::<f64>();
             let coupon = schedule
                 .coupons()
-                .filter(|flow| flow.date.year() == row.year)
-                .map(|flow| flow.amount.amount())
+                .filter(|flow| flow.get_date().year() == row.year)
+                .map(|flow| flow.get_amount().amount())
                 .sum::<f64>();
             checks::close(row.principal, principal, 1e-7);
             checks::close(row.non_principal, coupon, 1e-7);
@@ -617,11 +623,12 @@ fn bench_accrued_variants(c: &mut Criterion) {
         let expected: f64 = schedule
             .coupons()
             .map(|flow| {
-                let a = flow.accrual.as_ref().expect("coupon accrual");
-                if a.start <= as_of && as_of < flow.date {
+                let a = flow.get_accrual().as_ref().expect("coupon accrual");
+                if a.start <= as_of && as_of < flow.get_date() {
                     let fraction = (as_of.min(a.end) - a.start).whole_days() as f64
                         / (a.end - a.start).whole_days() as f64;
-                    1_000_000.0 * ((1.0 + flow.amount.amount() / 1_000_000.0).powf(fraction) - 1.0)
+                    1_000_000.0
+                        * ((1.0 + flow.get_amount().amount() / 1_000_000.0).powf(fraction) - 1.0)
                 } else {
                     0.0
                 }

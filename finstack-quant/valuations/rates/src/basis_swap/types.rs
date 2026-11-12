@@ -412,11 +412,11 @@ impl BasisSwap {
             let schedule = self.floating_leg_schedule(leg, market, as_of)?;
             let mut acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
             for flow in schedule.get_flows() {
-                if flow.date <= as_of {
+                if flow.get_date() <= as_of {
                     continue;
                 }
-                let df = disc.as_ref().df_between_dates(as_of, flow.date)?;
-                acc.add(flow.amount.amount() * df);
+                let df = disc.as_ref().df_between_dates(as_of, flow.get_date())?;
+                acc.add(flow.get_amount().amount() * df);
             }
             return Money::from_model_value(acc.total(), currency);
         }
@@ -1608,7 +1608,7 @@ mod tests {
         let first = schedule
             .get_flows()
             .iter()
-            .find(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Floating)
+            .find(|cf| cf.get_kind() == finstack_quant_core::cashflow::CFKind::Floating)
             .expect("overnight coupon");
         let calendar = calendar_by_id_strict("usny").expect("usny");
         let periods = finstack_quant_cashflows::builder::build_periods(
@@ -1656,9 +1656,9 @@ mod tests {
         .expect("shared engine");
         let expected_amount = 10_000_000.0 * (expected.compound_factor - 1.0);
         assert!(
-            (first.amount.amount() - expected_amount).abs() < 1e-6,
+            (first.get_amount().amount() - expected_amount).abs() < 1e-6,
             "basis overnight coupon {} != shared engine {expected_amount}",
-            first.amount.amount()
+            first.get_amount().amount()
         );
     }
 
@@ -1728,7 +1728,7 @@ mod tests {
         let first = schedule
             .get_flows()
             .iter()
-            .find(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Floating)
+            .find(|cf| cf.get_kind() == finstack_quant_core::cashflow::CFKind::Floating)
             .expect("overnight coupon");
         let calendar = calendar_by_id_strict("weekends_only").expect("fixing calendar");
         let periods = finstack_quant_cashflows::builder::build_periods(
@@ -1776,9 +1776,9 @@ mod tests {
         .expect("shared engine");
         let expected_amount = 10_000_000.0 * (expected.compound_factor - 1.0);
         assert!(
-            (first.amount.amount() - expected_amount).abs() < 1e-6,
+            (first.get_amount().amount() - expected_amount).abs() < 1e-6,
             "basis overnight coupon {} != shared engine {expected_amount}",
-            first.amount.amount()
+            first.get_amount().amount()
         );
     }
 

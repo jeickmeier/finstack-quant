@@ -106,12 +106,12 @@ fn min_dscr(
             debt_service += sched
                 .get_flows()
                 .iter()
-                .filter(|cf| cf.date > prev && cf.date <= d)
+                .filter(|cf| cf.get_date() > prev && cf.get_date() <= d)
                 // Lender outflows (e.g., funding legs, revolver draws) are
                 // borrower receipts, never debt service.
-                .filter(|cf| cf.amount.amount() > 0.0)
-                .filter(|cf| is_scheduled_debt_service(cf.kind, interest_only))
-                .map(|cf| cf.amount.amount())
+                .filter(|cf| cf.get_amount().amount() > 0.0)
+                .filter(|cf| is_scheduled_debt_service(cf.get_kind(), interest_only))
+                .map(|cf| cf.get_amount().amount())
                 .sum::<f64>();
         }
 
@@ -182,20 +182,20 @@ impl MetricCalculator for LoanToValueAtOrigination {
             let draws: Vec<_> = sched
                 .get_flows()
                 .iter()
-                .filter(|cf| cf.date >= context.as_of)
+                .filter(|cf| cf.get_date() >= context.as_of)
                 .filter(|cf| {
                     matches!(
-                        cf.kind,
+                        cf.get_kind(),
                         finstack_quant_core::cashflow::CFKind::Notional
                             | finstack_quant_core::cashflow::CFKind::RevolvingDraw
-                    ) && cf.amount.amount() < 0.0
+                    ) && cf.get_amount().amount() < 0.0
                 })
                 .collect();
-            if let Some(first_date) = draws.iter().map(|cf| cf.date).min() {
+            if let Some(first_date) = draws.iter().map(|cf| cf.get_date()).min() {
                 drawn += draws
                     .iter()
-                    .filter(|cf| cf.date == first_date)
-                    .map(|cf| -cf.amount.amount())
+                    .filter(|cf| cf.get_date() == first_date)
+                    .map(|cf| -cf.get_amount().amount())
                     .sum::<f64>();
             }
         }

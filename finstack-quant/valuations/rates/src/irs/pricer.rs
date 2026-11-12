@@ -80,15 +80,15 @@ impl InterestRateSwap {
 
         let mut pv = NeumaierAccumulator::new();
         for flow in sched.get_flows() {
-            if flow.date > as_of
+            if flow.get_date() > as_of
                 && matches!(
-                    flow.kind,
+                    flow.get_kind(),
                     finstack_quant_core::cashflow::CFKind::Fixed
                         | finstack_quant_core::cashflow::CFKind::Stub
                 )
             {
-                let discount = disc.df_between_dates(as_of, flow.date)?;
-                pv.add(flow.amount.amount() * discount);
+                let discount = disc.df_between_dates(as_of, flow.get_date())?;
+                pv.add(flow.get_amount().amount() * discount);
             }
         }
         Ok(pv.total())
@@ -150,7 +150,11 @@ impl InterestRateSwap {
             let dates = crate::irs::cashflow::float_leg_schedule_with_curves_as_of(
                 self, None, None, false,
             )?;
-            if dates.get_flows().iter().all(|flow| flow.date <= as_of) {
+            if dates
+                .get_flows()
+                .iter()
+                .all(|flow| flow.get_date() <= as_of)
+            {
                 return Ok(0.0);
             }
         }
@@ -164,15 +168,15 @@ impl InterestRateSwap {
 
         let mut acc = NeumaierAccumulator::new();
         for flow in float_sched.get_flows() {
-            if flow.kind != CFKind::Floating {
+            if flow.get_kind() != CFKind::Floating {
                 continue;
             }
-            let payment_date = flow.date;
+            let payment_date = flow.get_date();
             if payment_date <= as_of {
                 continue;
             }
             let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
-            acc.add(flow.amount.amount() * df);
+            acc.add(flow.get_amount().amount() * df);
         }
         Ok(acc.total())
     }
@@ -335,9 +339,9 @@ mod tests {
         let disc = ctx.get_discount(swap.fixed_leg.discount_curve_id.as_ref())?;
         let schedule = full_signed_schedule_with_curves(swap, Some(ctx))?;
         schedule.get_flows().iter().try_fold(0.0, |acc, flow| {
-            let payment_date = flow.date;
+            let payment_date = flow.get_date();
             let df = disc.df_between_dates(as_of, payment_date)?;
-            Ok(acc + flow.amount.amount() * df)
+            Ok(acc + flow.get_amount().amount() * df)
         })
     }
 

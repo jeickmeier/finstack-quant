@@ -121,18 +121,21 @@ pub(super) fn fixture(case: Case) -> Fixture {
     assert_eq!(schedule.get_meta().issue_date, Some(base));
     assert_eq!(schedule.get_meta().maturity, Some(maturity));
     for flow in schedule.get_flows() {
-        assert_eq!(flow.amount.currency(), Currency::USD);
-        assert!(flow.amount.amount().is_finite());
+        assert_eq!(flow.get_amount().currency(), Currency::USD);
+        assert!(flow.get_amount().amount().is_finite());
     }
     let principal: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Notional)
+        .filter(|flow| flow.get_kind() == CFKind::Notional)
         .collect();
     assert_eq!(principal.len(), 2);
-    assert_eq!((principal[0].date, principal[1].date), (base, maturity));
-    close(principal[0].amount.amount(), -1_000_000.0, 0.0);
-    close(principal[1].amount.amount(), 1_000_000.0, 0.0);
+    assert_eq!(
+        (principal[0].get_date(), principal[1].get_date()),
+        (base, maturity)
+    );
+    close(principal[0].get_amount().amount(), -1_000_000.0, 0.0);
+    close(principal[1].get_amount().amount(), 1_000_000.0, 0.0);
     for (period, coupon) in schedule.coupons().enumerate() {
         let start = base
             .add_months(period as i32)
@@ -140,19 +143,22 @@ pub(super) fn fixture(case: Case) -> Fixture {
         let end = base
             .add_months((period + 1) as i32)
             .expect("reference coupon end");
-        let accrual = coupon.accrual.as_ref().expect("coupon metadata");
-        assert_eq!(coupon.kind, CFKind::Fixed);
-        assert_eq!(coupon.amount.currency(), Currency::USD);
-        assert_eq!((accrual.start, accrual.end, coupon.date), (start, end, end));
+        let accrual = coupon.get_accrual().as_ref().expect("coupon metadata");
+        assert_eq!(coupon.get_kind(), CFKind::Fixed);
+        assert_eq!(coupon.get_amount().currency(), Currency::USD);
+        assert_eq!(
+            (accrual.start, accrual.end, coupon.get_date()),
+            (start, end, end)
+        );
         assert_eq!(accrual.day_count, DayCount::Act365F);
         close(
-            coupon.accrual_factor,
+            coupon.get_accrual_factor(),
             (end - start).whole_days() as f64 / 365.0,
             1e-12,
         );
-        close(coupon.rate.expect("monthly fixed rate"), 0.06, 1e-14);
+        close(coupon.get_rate().expect("monthly fixed rate"), 0.06, 1e-14);
         close(
-            coupon.amount.amount(),
+            coupon.get_amount().amount(),
             1_000_000.0 * 0.06 * (end - start).whole_days() as f64 / 365.0,
             SCALAR_BOUND,
         );

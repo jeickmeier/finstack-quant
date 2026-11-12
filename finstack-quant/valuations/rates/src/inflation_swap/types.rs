@@ -1388,13 +1388,13 @@ mod tests {
             flows[1].1.amount() > 0.0,
             "pay-fixed swap should receive inflation leg"
         );
-        assert_eq!(schedule.get_flows()[0].kind, CFKind::Fixed);
-        assert_eq!(schedule.get_flows()[1].kind, CFKind::InflationCoupon);
+        assert_eq!(schedule.get_flows()[0].get_kind(), CFKind::Fixed);
+        assert_eq!(schedule.get_flows()[1].get_kind(), CFKind::InflationCoupon);
         assert!(
             schedule
                 .get_flows()
                 .iter()
-                .all(|flow| flow.accrual.is_some())
+                .all(|flow| flow.get_accrual().is_some())
         );
     }
 
@@ -1580,7 +1580,7 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .filter(|flow| flow.kind == CFKind::Fixed)
+                .filter(|flow| flow.get_kind() == CFKind::Fixed)
                 .count(),
             2
         );
@@ -1588,7 +1588,7 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .filter(|flow| flow.kind == CFKind::InflationCoupon)
+                .filter(|flow| flow.get_kind() == CFKind::InflationCoupon)
                 .count(),
             2
         );
@@ -1596,7 +1596,7 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .all(|flow| flow.accrual.is_some())
+                .all(|flow| flow.get_accrual().is_some())
         );
     }
 }

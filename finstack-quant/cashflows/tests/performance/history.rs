@@ -27,17 +27,17 @@ fn d(year: i32, month: Month, day: u8) -> Date {
 fn flow_record(schedule: &CashFlowSchedule) -> Value {
     let bits: Vec<_> = schedule.get_flows().iter().map(|flow| {
         json!({
-            "date": flow.date.to_string(), "kind": flow.kind.to_string(),
-            "currency": flow.amount.currency().to_string(),
-            "amount_decimal_bytes": flow.amount.amount_decimal().serialize(),
-            "amount_bits": flow.amount.amount().to_bits(),
-            "reset_date": flow.reset_date.map(|date| date.to_string()),
-            "principal_date": flow.principal_date.map(|date| date.to_string()),
-            "principal_delta_bytes": flow.principal_delta.map(|value| value.amount_decimal().serialize()),
-            "accrual_factor_bits": flow.accrual_factor.to_bits(),
-            "rate_bits": flow.rate.map(f64::to_bits),
-            "accrual": flow.accrual,
-            "projected_index_rate_bits": flow.accrual.as_ref().and_then(|a| a.projected_index_rate).map(f64::to_bits),
+            "date": flow.get_date().to_string(), "kind": flow.get_kind().to_string(),
+            "currency": flow.get_amount().currency().to_string(),
+            "amount_decimal_bytes": flow.get_amount().amount_decimal().serialize(),
+            "amount_bits": flow.get_amount().amount().to_bits(),
+            "reset_date": flow.get_reset_date().map(|date| date.to_string()),
+            "principal_date": flow.get_balance_date().map(|date| date.to_string()),
+            "principal_delta_bytes": flow.get_principal_delta().map(|value| value.amount_decimal().serialize()),
+            "accrual_factor_bits": flow.get_accrual_factor().to_bits(),
+            "rate_bits": flow.get_rate().map(f64::to_bits),
+            "accrual": flow.get_accrual(),
+            "projected_index_rate_bits": flow.get_accrual().as_ref().and_then(|a| a.projected_index_rate).map(f64::to_bits),
         })
     }).collect();
     let fixings: Vec<_> = schedule
@@ -200,8 +200,8 @@ fn ccm_history_cutoffs_and_irrelevant_history_preserve_selection() {
             .unwrap();
         history_workloads::check(&mixed, &explicit);
         assert_ne!(
-            explicit.coupons().next().unwrap().amount,
-            implicit.coupons().next().unwrap().amount
+            explicit.coupons().next().unwrap().get_amount(),
+            implicit.coupons().next().unwrap().get_amount()
         );
         let historical = history_workloads::fixture(
             Case {
@@ -305,7 +305,7 @@ fn short_record() -> Value {
         * (weights.iter().fold(1.0, |product, (rate, days)| {
             product * (1.0 + rate * days / 360.0)
         }) - 1.0);
-    let amount = output.coupons().next().unwrap().amount.amount();
+    let amount = output.coupons().next().unwrap().get_amount().amount();
     assert!((amount - expected).abs() <= 1e-8);
     let mut missing = short_past();
     missing.retain(|(date, _)| *date != d(2025, Month::June, 4));
@@ -330,7 +330,12 @@ fn short_record() -> Value {
     )
     .build_as_of(&short_market(vec![]), cutoff)
     .unwrap();
-    let fallback_amount = fallback_output.coupons().next().unwrap().amount.amount();
+    let fallback_amount = fallback_output
+        .coupons()
+        .next()
+        .unwrap()
+        .get_amount()
+        .amount();
     assert!((fallback_amount - 1_000_000.0 * 0.01 * 14.0 / 360.0).abs() <= 1e-8);
     json!({"id":"same_day_future_and_missing_history", "market":market,
         "observations_and_weights":weights, "expected_amount":expected, "amount_bound_usd":1e-8,
@@ -371,7 +376,7 @@ fn holiday_record() -> Value {
     assert_eq!(output.coupons().count(), 1);
     assert_eq!(output.get_meta().projected_fixings.len(), 1);
     assert_eq!(output.get_meta().projected_fixings[0].date, start);
-    assert!((output.coupons().next().unwrap().amount.amount() - expected).abs() <= 1e-8);
+    assert!((output.coupons().next().unwrap().get_amount().amount() - expected).abs() <= 1e-8);
     json!({"id":"sofr_good_friday_four_day_carry", "market":market,"expected_amount":expected,"amount_bound_usd":1e-8,"output":flow_record(&output)})
 }
 
@@ -457,7 +462,7 @@ fn convention_records() -> Vec<Value> {
         let expected = 1_000_000.0*growth;
         assert_eq!(output.coupons().count(),1);
         assert_eq!(output.get_meta().projected_fixings.len(),observed.len());
-        assert!((output.coupons().next().unwrap().amount.amount()-expected).abs() <= 1e-8);
+        assert!((output.coupons().next().unwrap().get_amount().amount()-expected).abs() <= 1e-8);
         let reference:Vec<_> = expected_slices.iter().map(|(date,days)| json!({"date":date.to_string(),"weight_days":days,"raw_rate":observed[date]})).collect();
         json!({"id":id,"method":method,"market":market,"explicit_observation_reference":reference,
             "expected_amount":expected,"amount_bound_usd":1e-8,"output":flow_record(&output)})
@@ -499,12 +504,12 @@ fn roll_record(leg: Leg) -> Value {
     assert_eq!(direct.get_flows().len(), advanced.get_flows().len());
     for (left, right) in direct.get_flows().iter().zip(advanced.get_flows()) {
         assert_eq!(
-            (left.date, left.kind, left.reset_date),
-            (right.date, right.kind, right.reset_date)
+            (left.get_date(), left.get_kind(), left.get_reset_date()),
+            (right.get_date(), right.get_kind(), right.get_reset_date())
         );
-        assert_eq!(left.amount.currency(), right.amount.currency());
+        assert_eq!(left.get_amount().currency(), right.get_amount().currency());
         assert!(
-            (left.amount.amount() - right.amount.amount()).abs()
+            (left.get_amount().amount() - right.get_amount().amount()).abs()
                 <= history_workloads::OVERNIGHT_AMOUNT_BOUND
         );
     }

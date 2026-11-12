@@ -174,13 +174,13 @@ fn projected_schedule_contains_premium_and_default_rows() {
         schedule
             .get_flows()
             .iter()
-            .any(|cf| cf.kind == CFKind::Fixed)
+            .any(|cf| cf.get_kind() == CFKind::Fixed)
     );
     assert!(
         schedule
             .get_flows()
             .iter()
-            .any(|cf| cf.kind == CFKind::ProtectionPayment)
+            .any(|cf| cf.get_kind() == CFKind::ProtectionPayment)
     );
 }
 
@@ -908,7 +908,7 @@ fn test_pv_decomposition_consistency() {
         .discount_projected_rows(
             &projected_rows
                 .iter()
-                .filter(|row| row.cashflow.kind == CFKind::Fixed)
+                .filter(|row| row.cashflow.get_kind() == CFKind::Fixed)
                 .cloned()
                 .collect::<Vec<_>>(),
             discount_curve.as_ref(),
@@ -919,7 +919,7 @@ fn test_pv_decomposition_consistency() {
         .discount_projected_rows(
             &projected_rows
                 .iter()
-                .filter(|row| row.cashflow.kind == CFKind::ProtectionPayment)
+                .filter(|row| row.cashflow.get_kind() == CFKind::ProtectionPayment)
                 .cloned()
                 .collect::<Vec<_>>(),
             discount_curve.as_ref(),
@@ -2082,7 +2082,7 @@ fn premium_leg_pv(pricer: &CdsTranchePricer, tranche: &CdsTranche, ctx: &MarketC
         .discount_projected_rows(
             &rows
                 .iter()
-                .filter(|row| row.cashflow.kind == CFKind::Fixed)
+                .filter(|row| row.cashflow.get_kind() == CFKind::Fixed)
                 .cloned()
                 .collect::<Vec<_>>(),
             discount.as_ref(),
@@ -2360,7 +2360,7 @@ fn seasoned_first_period_default_timing_starts_at_valuation_date() {
         .expect("projected rows");
     let default_row = rows
         .iter()
-        .find(|row| row.cashflow.kind == CFKind::ProtectionPayment)
+        .find(|row| row.cashflow.get_kind() == CFKind::ProtectionPayment)
         .expect("default row");
 
     let DiscountAt::WithinPeriod {
@@ -2375,7 +2375,7 @@ fn seasoned_first_period_default_timing_starts_at_valuation_date() {
         .years_from_base(&index_data, as_of)
         .expect("valuation-date time");
     let t_end = pricer
-        .years_from_base(&index_data, default_row.cashflow.date)
+        .years_from_base(&index_data, default_row.cashflow.get_date())
         .expect("payment-date time");
     let expected = pricer.within_period_default_fraction(&index_data, t_start, t_end);
     assert!(
@@ -2477,11 +2477,11 @@ fn expired_protection_keeps_rolled_coupon_and_later_upfront() {
     assert_eq!(rows.len(), 2);
     let coupon = rows
         .iter()
-        .find(|r| r.cashflow.kind == CFKind::Fixed)
+        .find(|r| r.cashflow.get_kind() == CFKind::Fixed)
         .expect("coupon");
-    assert_eq!(coupon.cashflow.date, date!(2025 - 06 - 30));
+    assert_eq!(coupon.cashflow.get_date(), date!(2025 - 06 - 30));
     let expected = tranche.notional.amount() * 0.05 * 92.0 / 360.0;
-    assert!((coupon.cashflow.amount.amount() - expected).abs() < 1e-6);
+    assert!((coupon.cashflow.get_amount().amount() - expected).abs() < 1e-6);
     assert_eq!(
         pricer
             .project_discountable_rows(&tranche, &market, date!(2025 - 06 - 30))
@@ -2493,7 +2493,7 @@ fn expired_protection_keeps_rolled_coupon_and_later_upfront() {
         .project_discountable_rows(&tranche, &market, date!(2025 - 07 - 01))
         .expect("upfront only");
     assert_eq!(after_coupon.len(), 1);
-    assert_eq!(after_coupon[0].cashflow.kind, CFKind::Fee);
+    assert_eq!(after_coupon[0].cashflow.get_kind(), CFKind::Fee);
     assert!(
         pricer
             .project_discountable_rows(&tranche, &market, date!(2025 - 07 - 03))
@@ -2537,18 +2537,18 @@ fn seasoned_aod_reduces_only_the_remaining_day_of_accrual() {
         .expect("rows");
     let coupon = rows
         .iter()
-        .find(|r| r.cashflow.kind == CFKind::Fixed)
+        .find(|r| r.cashflow.get_kind() == CFKind::Fixed)
         .expect("coupon");
     // 89 known accrual days plus the survival integral over the remaining day.
     let expected = tranche.notional.amount() * 0.05 / 360.0 * (89.0 - (-0.1_f64).exp_m1() / 0.1);
     assert!(
-        (coupon.cashflow.amount.amount() - expected).abs() < 1e-5,
+        (coupon.cashflow.get_amount().amount() - expected).abs() < 1e-5,
         "{} vs {expected}",
-        coupon.cashflow.amount
+        coupon.cashflow.get_amount()
     );
     let loss = rows
         .iter()
-        .find(|r| r.cashflow.kind == CFKind::ProtectionPayment)
+        .find(|r| r.cashflow.get_kind() == CFKind::ProtectionPayment)
         .expect("loss");
     assert!(
         matches!(loss.discount_at, DiscountAt::WithinPeriod { start, end, .. }

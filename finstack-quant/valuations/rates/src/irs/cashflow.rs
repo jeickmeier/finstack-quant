@@ -581,12 +581,12 @@ mod tests {
         let coupon = schedule
             .get_flows()
             .iter()
-            .find(|cf| cf.kind == CFKind::Floating)
+            .find(|cf| cf.get_kind() == CFKind::Floating)
             .expect("coupon");
         assert!(
-            (coupon.amount.amount() - 150_000.0).abs() < 1e-6,
+            (coupon.get_amount().amount() - 150_000.0).abs() < 1e-6,
             "{}",
-            coupon.amount
+            coupon.get_amount()
         );
     }
 
@@ -684,23 +684,27 @@ mod tests {
             assert_eq!(full.get_flows().len(), 1);
             let actual = &economics.get_flows()[0];
             let expected = &full.get_flows()[0];
-            assert_eq!(actual.date, date!(2025 - 01 - 14));
-            assert_eq!(actual.date, expected.date);
-            assert_eq!(actual.kind, CFKind::Floating);
-            assert_eq!(actual.kind, expected.kind);
-            assert_eq!(actual.amount.currency(), Currency::USD);
-            assert_eq!(actual.amount.currency(), expected.amount.currency());
-            assert_eq!(actual.accrual_factor, expected.accrual_factor);
-            let actual_rate = actual.rate.expect("coupon rate");
-            let expected_rate = expected.rate.expect("coupon rate");
+            assert_eq!(actual.get_date(), date!(2025 - 01 - 14));
+            assert_eq!(actual.get_date(), expected.get_date());
+            assert_eq!(actual.get_kind(), CFKind::Floating);
+            assert_eq!(actual.get_kind(), expected.get_kind());
+            assert_eq!(actual.get_amount().currency(), Currency::USD);
+            assert_eq!(
+                actual.get_amount().currency(),
+                expected.get_amount().currency()
+            );
+            assert_eq!(actual.get_accrual_factor(), expected.get_accrual_factor());
+            let actual_rate = actual.get_rate().expect("coupon rate");
+            let expected_rate = expected.get_rate().expect("coupon rate");
             assert!((actual_rate - expected_rate).abs() <= 1e-12);
             assert!(
-                ((1.0 + actual_rate * actual.accrual_factor)
-                    - (1.0 + expected_rate * expected.accrual_factor))
-                    .abs()
+                ((1.0 + actual_rate * actual.get_accrual_factor())
+                    - (1.0 + expected_rate * expected.get_accrual_factor()))
+                .abs()
                     <= 1e-12
             );
-            let amount_error = (actual.amount.amount() - expected.amount.amount()).abs();
+            let amount_error =
+                (actual.get_amount().amount() - expected.get_amount().amount()).abs();
             assert!(amount_error <= irs.notional.amount() * 1e-12);
             assert_eq!(
                 full.get_meta()
@@ -754,7 +758,7 @@ mod tests {
             fixed
                 .get_flows()
                 .iter()
-                .all(|cf| cf.kind == CFKind::Fixed || cf.kind == CFKind::Stub),
+                .all(|cf| cf.get_kind() == CFKind::Fixed || cf.get_kind() == CFKind::Stub),
             "fixed_leg_schedule should be coupon-only"
         );
 
@@ -764,7 +768,7 @@ mod tests {
             float
                 .get_flows()
                 .iter()
-                .all(|cf| cf.kind == CFKind::Floating),
+                .all(|cf| cf.get_kind() == CFKind::Floating),
             "float_leg_schedule should be coupon-only"
         );
     }
@@ -818,10 +822,10 @@ mod tests {
             let schedule = fixed_leg_schedule(&irs).expect("ACT/365L fixed schedule");
             let flows = schedule.get_flows();
             assert_eq!(flows.len(), 1);
-            assert_eq!(flows[0].kind, kind);
+            assert_eq!(flows[0].get_kind(), kind);
             let expected_accrual = (end - start).whole_days() as f64 / denominator;
-            assert!((flows[0].accrual_factor - expected_accrual).abs() < 1e-14);
-            assert!((flows[0].amount.amount() - 50_000.0 * expected_accrual).abs() < 1e-8);
+            assert!((flows[0].get_accrual_factor() - expected_accrual).abs() < 1e-14);
+            assert!((flows[0].get_amount().amount() - 50_000.0 * expected_accrual).abs() < 1e-8);
         }
     }
 
@@ -869,7 +873,11 @@ mod tests {
             irs.fixed_leg.calendar_id = Some("weekends_only".into());
             irs.fixed_leg.end_of_month = false;
             let schedule = fixed_leg_schedule(&irs).expect("monthly fixed schedule");
-            let kinds: Vec<_> = schedule.get_flows().iter().map(|cf| cf.kind).collect();
+            let kinds: Vec<_> = schedule
+                .get_flows()
+                .iter()
+                .map(|cf| cf.get_kind())
+                .collect();
             assert_eq!(kinds, expected_kinds, "{start} to {end}, {stub:?}");
         }
     }
@@ -912,12 +920,12 @@ mod tests {
         let total_accrual: f64 = schedule
             .get_flows()
             .iter()
-            .map(|flow| flow.accrual_factor)
+            .map(|flow| flow.get_accrual_factor())
             .sum();
         let total_amount: f64 = schedule
             .get_flows()
             .iter()
-            .map(|flow| flow.amount.amount())
+            .map(|flow| flow.get_amount().amount())
             .sum();
         let expected_accrual = DayCount::Act360
             .year_fraction(
@@ -1050,12 +1058,12 @@ mod tests {
         let pv_no_cutoff: f64 = sched_no_cutoff
             .get_flows()
             .iter()
-            .map(|f| f.amount.amount())
+            .map(|f| f.get_amount().amount())
             .sum();
         let pv_cutoff: f64 = sched_cutoff
             .get_flows()
             .iter()
-            .map(|f| f.amount.amount())
+            .map(|f| f.get_amount().amount())
             .sum();
 
         assert!(

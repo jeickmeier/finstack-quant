@@ -47,7 +47,7 @@ fn test_full_schedule_marks_settlement_as_notional() {
         .expect("full schedule should build");
 
     assert_eq!(schedule.get_flows().len(), 1);
-    assert_eq!(schedule.get_flows()[0].kind, CFKind::Notional);
+    assert_eq!(schedule.get_flows()[0].get_kind(), CFKind::Notional);
 }
 
 #[test]

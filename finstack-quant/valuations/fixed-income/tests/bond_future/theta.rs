@@ -125,12 +125,9 @@ fn theta_matches_held_market_repricing_across_ctd_coupon() {
         .expect("embedded CTD")
         .cashflow_schedule(&market, as_of)
         .expect("CTD schedule");
-    assert!(
-        ctd_schedule
-            .get_flows()
-            .iter()
-            .any(|flow| { flow.date == date!(2025 - 01 - 15) && flow.amount.amount() > 0.0 })
-    );
+    assert!(ctd_schedule.get_flows().iter().any(|flow| {
+        flow.get_date() == date!(2025 - 01 - 15) && flow.get_amount().amount() > 0.0
+    }));
 
     let expected = long
         .value(&rolled_market, rolled_date)

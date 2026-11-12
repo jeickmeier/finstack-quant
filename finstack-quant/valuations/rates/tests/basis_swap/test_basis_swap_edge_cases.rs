@@ -65,14 +65,14 @@ fn basis_swap_cashflows_have_no_notional_exchange() {
         schedule
             .get_flows()
             .iter()
-            .all(|cf| cf.kind != CFKind::Notional),
+            .all(|cf| cf.get_kind() != CFKind::Notional),
         "basis swap must not emit issue or redemption notionals"
     );
     assert!(
         schedule
             .get_flows()
             .iter()
-            .any(|cf| cf.kind == CFKind::Floating),
+            .any(|cf| cf.get_kind() == CFKind::Floating),
         "coupon flows must remain without retain_flows"
     );
 }

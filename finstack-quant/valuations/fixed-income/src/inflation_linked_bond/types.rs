@@ -513,8 +513,8 @@ impl InflationLinkedBond {
         schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.date >= as_of)
-            .map(|cf| (cf.date, cf.amount))
+            .filter(|cf| cf.get_date() >= as_of)
+            .map(|cf| (cf.get_date(), cf.get_amount()))
             .collect()
     }
 
@@ -532,10 +532,10 @@ impl InflationLinkedBond {
         let coupons = schedule
             .get_flows()
             .iter()
-            .filter(|flow| flow.kind.is_coupon())
+            .filter(|flow| flow.get_kind().is_coupon())
             .map(|flow| {
                 let (start, end) = flow
-                    .accrual
+                    .get_accrual()
                     .as_ref()
                     .and_then(|accrual| accrual.context.coupon_period)
                     .ok_or_else(|| {
@@ -543,7 +543,7 @@ impl InflationLinkedBond {
                             "ACT/365L real yield requires full contractual coupon metadata".into(),
                         )
                     })?;
-                Ok((flow.date, start, end))
+                Ok((flow.get_date(), start, end))
             })
             .collect::<Result<Vec<_>>>()?;
         act365l_flow_times(&coupons, &flows, as_of)
@@ -764,12 +764,12 @@ impl finstack_quant_valuations_core::instruments::Instrument for InflationLinked
             .get_flows()
             .iter()
             .filter_map(
-                |flow| match self.index_ratio_from_market(flow.date, market, as_of) {
-                    Ok(ratio) => Some((flow.date, ratio)),
+                |flow| match self.index_ratio_from_market(flow.get_date(), market, as_of) {
+                    Ok(ratio) => Some((flow.get_date(), ratio)),
                     Err(err) => {
                         tracing::warn!(
                             instrument_id = %self.id.as_str(),
-                            date = %flow.date,
+                            date = %flow.get_date(),
                             %err,
                             "cashflow export: inflation index ratio lookup failed; \
                              exporting an empty index_ratio cell"
@@ -1487,15 +1487,15 @@ mod tests {
         let principal_dates: Vec<Date> = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind == CFKind::Notional)
-            .map(|cf| cf.date)
+            .filter(|cf| cf.get_kind() == CFKind::Notional)
+            .map(|cf| cf.get_date())
             .collect();
         assert_eq!(principal_dates, vec![adjusted]);
         assert_ne!(principal_dates[0], bond.maturity);
 
         let real = bond.real_cashflow_schedule().expect("real schedule");
         assert_eq!(
-            real.get_flows().last().map(|flow| flow.date),
+            real.get_flows().last().map(|flow| flow.get_date()),
             Some(adjusted)
         );
     }
@@ -1514,16 +1514,16 @@ mod tests {
         let first_coupon = schedule
             .get_flows()
             .iter()
-            .find(|flow| flow.kind == CFKind::InflationCoupon)
+            .find(|flow| flow.get_kind() == CFKind::InflationCoupon)
             .expect("coupon flow")
-            .amount
+            .get_amount()
             .amount();
         let principal = schedule
             .get_flows()
             .iter()
-            .find(|flow| flow.date == bond.maturity && flow.kind == CFKind::Notional)
+            .find(|flow| flow.get_date() == bond.maturity && flow.get_kind() == CFKind::Notional)
             .expect("principal flow")
-            .amount
+            .get_amount()
             .amount();
 
         assert!(
@@ -1547,16 +1547,16 @@ mod tests {
         let first_coupon = schedule
             .get_flows()
             .iter()
-            .find(|flow| flow.kind == CFKind::InflationCoupon)
+            .find(|flow| flow.get_kind() == CFKind::InflationCoupon)
             .expect("coupon flow")
-            .amount
+            .get_amount()
             .amount();
         let principal = schedule
             .get_flows()
             .iter()
-            .find(|flow| flow.date == bond.maturity && flow.kind == CFKind::Notional)
+            .find(|flow| flow.get_date() == bond.maturity && flow.get_kind() == CFKind::Notional)
             .expect("principal flow")
-            .amount
+            .get_amount()
             .amount();
 
         assert_eq!(first_coupon, 20_000.0);
@@ -1577,14 +1577,14 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .any(|flow| flow.kind == CFKind::InflationCoupon),
+                .any(|flow| flow.get_kind() == CFKind::InflationCoupon),
             "expected inflation-linked coupons in full schedule"
         );
         assert!(
             schedule
                 .get_flows()
                 .iter()
-                .any(|flow| flow.date == bond.maturity && flow.kind == CFKind::Notional),
+                .any(|flow| flow.get_date() == bond.maturity && flow.get_kind() == CFKind::Notional),
             "expected principal notional flow at maturity"
         );
     }

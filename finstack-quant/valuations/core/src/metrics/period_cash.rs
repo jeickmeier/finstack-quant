@@ -137,7 +137,7 @@ pub(crate) fn period_cash_by_date_cached(
                 skip,
                 same_day,
             )
-            .map(|cash| (flow.date, cash.total.amount()))
+            .map(|cash| (flow.get_date(), cash.total.amount()))
         })
         .filter(|result| !matches!(result, Ok((_, amount)) if *amount == 0.0))
         .collect()
@@ -194,22 +194,22 @@ pub(crate) fn collect_cashflows_from_flows(
     };
     for cf in flows {
         let received = if include_same_day {
-            cf.date >= start_date && cf.date < end_date
+            cf.get_date() >= start_date && cf.get_date() < end_date
         } else {
-            cf.date > start_date && cf.date <= end_date
+            cf.get_date() > start_date && cf.get_date() <= end_date
         };
-        if received && is_period_economic_cash(cf.kind) {
-            if cf.kind == CFKind::Notional
-                && cf.amount.amount() < 0.0
-                && skip_issue_draw_on == Some(cf.date)
+        if received && is_period_economic_cash(cf.get_kind()) {
+            if cf.get_kind() == CFKind::Notional
+                && cf.get_amount().amount() < 0.0
+                && skip_issue_draw_on == Some(cf.get_date())
             {
                 continue;
             }
             let payment = curves
-                .convert_money(cf.amount, base_currency, cf.date)?
+                .convert_money(cf.get_amount(), base_currency, cf.get_date())?
                 .amount;
             cash.total = cash.total.checked_add(payment)?;
-            if is_period_income(cf.kind) {
+            if is_period_income(cf.get_kind()) {
                 cash.income = cash.income.checked_add(payment)?;
             }
         }

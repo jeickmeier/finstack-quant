@@ -452,7 +452,7 @@ mod computation {
         let amort_flows: Vec<_> = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind == CFKind::Amortization)
+            .filter(|cf| cf.get_kind() == CFKind::Amortization)
             .collect();
 
         // Should have 4 quarterly amortization payments
@@ -466,16 +466,16 @@ mod computation {
         let expected_payment = 250_000.0;
         for (i, flow) in amort_flows.iter().enumerate() {
             assert!(
-                (flow.amount.amount() - expected_payment).abs() < 1000.0, // $1K tolerance
+                (flow.get_amount().amount() - expected_payment).abs() < 1000.0, // $1K tolerance
                 "Amortization payment {} should be ~${:.0}, got ${:.2}",
                 i + 1,
                 expected_payment,
-                flow.amount.amount()
+                flow.get_amount().amount()
             );
         }
 
         // Verify sum of amortization equals initial notional
-        let total_amort: f64 = amort_flows.iter().map(|cf| cf.amount.amount()).sum();
+        let total_amort: f64 = amort_flows.iter().map(|cf| cf.get_amount().amount()).sum();
         assert!(
             (total_amort - init.amount()).abs() < 1.0,
             "Sum of amortization should equal initial notional: ${:.2} vs ${:.2}",
@@ -507,25 +507,25 @@ mod computation {
         let issue_amort: Vec<_> = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind == CFKind::Amortization && cf.date == issue)
+            .filter(|cf| cf.get_kind() == CFKind::Amortization && cf.get_date() == issue)
             .collect();
         assert_eq!(
             issue_amort.len(),
             1,
             "issue amortization must emit exactly once"
         );
-        assert_eq!(issue_amort[0].amount.amount(), 100_000.0);
+        assert_eq!(issue_amort[0].get_amount().amount(), 100_000.0);
 
         let coupon = schedule
             .get_flows()
             .iter()
-            .find(|cf| cf.kind == CFKind::Fixed)
+            .find(|cf| cf.get_kind() == CFKind::Fixed)
             .expect("coupon");
         let expected_coupon = 900_000.0 * 0.05 * 90.0 / 365.0;
         assert!(
-            (coupon.amount.amount() - expected_coupon).abs() < 1e-6,
+            (coupon.get_amount().amount() - expected_coupon).abs() < 1e-6,
             "coupon should accrue on 900k after issue amortization, got {}",
-            coupon.amount.amount()
+            coupon.get_amount().amount()
         );
     }
 
@@ -555,12 +555,12 @@ mod computation {
         let amort_flows: Vec<_> = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind == CFKind::Amortization)
+            .filter(|cf| cf.get_kind() == CFKind::Amortization)
             .collect();
 
         // First amortization: 25% of 1M = $250K, remaining = $750K
         if !amort_flows.is_empty() {
-            let first_payment = amort_flows[0].amount.amount();
+            let first_payment = amort_flows[0].get_amount().amount();
             assert!(
                 (first_payment - 250_000.0).abs() < 100.0,
                 "First payment should be ~$250K, got ${:.2}",
@@ -580,7 +580,10 @@ mod computation {
             // Allow for small increases due to PIK if present
             if window[1] > window[0] + 1000.0 {
                 // Only fail if significant increase without PIK
-                let has_pik = schedule.get_flows().iter().any(|cf| cf.kind == CFKind::Pik);
+                let has_pik = schedule
+                    .get_flows()
+                    .iter()
+                    .any(|cf| cf.get_kind() == CFKind::Pik);
                 assert!(
                     has_pik,
                     "Outstanding should decrease: ${:.2} -> ${:.2}",
@@ -670,16 +673,16 @@ mod computation {
         let amort_sum: f64 = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind == CFKind::Amortization)
-            .map(|cf| cf.amount.amount())
+            .filter(|cf| cf.get_kind() == CFKind::Amortization)
+            .map(|cf| cf.get_amount().amount())
             .sum();
 
         // Sum of redemption flows (positive notional flows at maturity)
         let redemption_sum: f64 = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind == CFKind::Notional && cf.amount.amount() > 0.0)
-            .map(|cf| cf.amount.amount())
+            .filter(|cf| cf.get_kind() == CFKind::Notional && cf.get_amount().amount() > 0.0)
+            .map(|cf| cf.get_amount().amount())
             .sum();
 
         // Invariant: total principal returned (amort + redemption) = initial
@@ -720,7 +723,7 @@ mod computation {
         let amortization: Vec<_> = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.date == maturity && cf.kind == CFKind::Amortization)
+            .filter(|cf| cf.get_date() == maturity && cf.get_kind() == CFKind::Amortization)
             .collect();
         assert_eq!(
             amortization.len(),
@@ -728,7 +731,7 @@ mod computation {
             "custom maturity payment should emit one amortization flow"
         );
         assert!(
-            (amortization[0].amount.amount() - custom_payment.amount()).abs() < 1e-9,
+            (amortization[0].get_amount().amount() - custom_payment.amount()).abs() < 1e-9,
             "custom maturity amortization should honor the configured amount"
         );
 
@@ -736,7 +739,9 @@ mod computation {
             .get_flows()
             .iter()
             .filter(|cf| {
-                cf.date == maturity && cf.kind == CFKind::Notional && cf.amount.amount() > 0.0
+                cf.get_date() == maturity
+                    && cf.get_kind() == CFKind::Notional
+                    && cf.get_amount().amount() > 0.0
             })
             .collect();
         assert_eq!(
@@ -745,7 +750,7 @@ mod computation {
             "residual maturity balance should emit one positive notional flow"
         );
         assert!(
-            (residual_notional[0].amount.amount() - 750_000.0).abs() < 1e-9,
+            (residual_notional[0].get_amount().amount() - 750_000.0).abs() < 1e-9,
             "residual maturity notional should redeem the remaining balance"
         );
     }
@@ -819,8 +824,8 @@ mod computation {
         let maturity_amort: f64 = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.date == maturity && cf.kind == CFKind::Amortization)
-            .map(|cf| cf.amount.amount())
+            .filter(|cf| cf.get_date() == maturity && cf.get_kind() == CFKind::Amortization)
+            .map(|cf| cf.get_amount().amount())
             .sum();
         assert!(
             (maturity_amort - 600_000.0).abs() < 1e-6,
@@ -832,9 +837,11 @@ mod computation {
             .get_flows()
             .iter()
             .filter(|cf| {
-                cf.date == maturity && cf.kind == CFKind::Notional && cf.amount.amount() > 0.0
+                cf.get_date() == maturity
+                    && cf.get_kind() == CFKind::Notional
+                    && cf.get_amount().amount() > 0.0
             })
-            .map(|cf| cf.amount.amount())
+            .map(|cf| cf.get_amount().amount())
             .sum();
         assert!(
             (maturity_notional - 200_000.0).abs() < 1e-6,
@@ -845,8 +852,8 @@ mod computation {
         let total_amort: f64 = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind == CFKind::Amortization)
-            .map(|cf| cf.amount.amount())
+            .filter(|cf| cf.get_kind() == CFKind::Amortization)
+            .map(|cf| cf.get_amount().amount())
             .sum();
         assert!(
             (total_amort + maturity_notional - init.amount()).abs() < 1e-6,
@@ -880,8 +887,8 @@ mod computation {
         let maturity_amort: f64 = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.date == maturity && cf.kind == CFKind::Amortization)
-            .map(|cf| cf.amount.amount())
+            .filter(|cf| cf.get_date() == maturity && cf.get_kind() == CFKind::Amortization)
+            .map(|cf| cf.get_amount().amount())
             .sum();
         assert!(
             (maturity_amort - 100_000.0).abs() < 1e-6,
@@ -892,9 +899,11 @@ mod computation {
             .get_flows()
             .iter()
             .filter(|cf| {
-                cf.date == maturity && cf.kind == CFKind::Notional && cf.amount.amount() > 0.0
+                cf.get_date() == maturity
+                    && cf.get_kind() == CFKind::Notional
+                    && cf.get_amount().amount() > 0.0
             })
-            .map(|cf| cf.amount.amount())
+            .map(|cf| cf.get_amount().amount())
             .sum();
         assert!(
             (maturity_notional - 600_000.0).abs() < 1e-6,
@@ -904,8 +913,8 @@ mod computation {
         let total_amort: f64 = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind == CFKind::Amortization)
-            .map(|cf| cf.amount.amount())
+            .filter(|cf| cf.get_kind() == CFKind::Amortization)
+            .map(|cf| cf.get_amount().amount())
             .sum();
         assert!(
             (total_amort + maturity_notional - init.amount()).abs() < 1e-6,
@@ -1008,27 +1017,30 @@ mod computation {
         let last_amort = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind == CFKind::Amortization)
-            .max_by_key(|cf| cf.date)
+            .filter(|cf| cf.get_kind() == CFKind::Amortization)
+            .max_by_key(|cf| cf.get_date())
             .expect("amortization flows");
         assert_eq!(
-            last_amort.date, redemption_date,
+            last_amort.get_date(),
+            redemption_date,
             "LinearTo last installment must pay on adjust(maturity)+lag"
         );
         assert!(
             schedule
                 .get_flows()
                 .iter()
-                .all(|cf| !(cf.kind == CFKind::Amortization && cf.date == maturity)),
+                .all(|cf| !(cf.get_kind() == CFKind::Amortization && cf.get_date() == maturity)),
             "no LinearTo installment may settle on the raw weekend maturity"
         );
         let residual_on_raw: f64 = schedule
             .get_flows()
             .iter()
             .filter(|cf| {
-                cf.date == maturity && cf.kind == CFKind::Notional && cf.amount.amount() > 0.0
+                cf.get_date() == maturity
+                    && cf.get_kind() == CFKind::Notional
+                    && cf.get_amount().amount() > 0.0
             })
-            .map(|cf| cf.amount.amount())
+            .map(|cf| cf.get_amount().amount())
             .sum();
         assert!(
             residual_on_raw.abs() < 1e-9,
@@ -1112,8 +1124,8 @@ mod declining_and_dated_linear {
             .expect("schedule")
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind == CFKind::Amortization)
-            .map(|cf| (cf.date, cf.amount.amount()))
+            .filter(|cf| cf.get_kind() == CFKind::Amortization)
+            .map(|cf| (cf.get_date(), cf.get_amount().amount()))
             .collect()
     }
 

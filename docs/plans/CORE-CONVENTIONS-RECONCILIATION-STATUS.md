@@ -978,6 +978,12 @@ logged under Needs review.
     describe the removed amount/payment-date inference. The cross-host
     balance-date parity case now uses an amortization row (a fixed coupon
     cannot carry a principal date). No value or golden moved.
+  - **G5-5b read accessors.** `CashFlow` gained `get_*` accessors for every
+    field (`get_balance_date` is the `principal_date` accessor), and all
+    2,045 field reads outside the type's module now use them. The sites were
+    harvested by temporarily marking the fields `#[deprecated]`, which makes
+    the compiler report every use across all crates without failing; 44
+    direct writes remain for G5-5c. No behaviour change.
 - **Notebooks broken by earlier slices (found during G5, fixed in `NB:`).**
   A full run (`run_all_notebooks.py --timeout 120`) after G5-3b passed 92 of
   101; none of the 9 failures involved PIK or write-down rows, and slice

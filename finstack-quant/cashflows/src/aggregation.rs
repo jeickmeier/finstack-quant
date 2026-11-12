@@ -187,7 +187,7 @@ impl HasDate for (Date, Money) {
 
 impl HasDate for CashFlow {
     fn flow_date(&self) -> Date {
-        self.date
+        self.get_date()
     }
 }
 
@@ -560,20 +560,20 @@ pub(crate) fn calendar_year_ladder_rows(
 
 /// Survival-weighted settlement PV, excluding any estimated principal recovery.
 fn credit_adjusted_period_pv(cf: &CashFlow, df: f64, sp: f64, base: Date) -> f64 {
-    if !cf.kind.is_cash_settlement() || cf.date <= base {
+    if !cf.get_kind().is_cash_settlement() || cf.get_date() <= base {
         return 0.0;
     }
 
     // Recovery / AccruedOnDefault / ProtectionPayment are already post-default;
     // discount without survival.
     if matches!(
-        cf.kind,
+        cf.get_kind(),
         CFKind::Recovery | CFKind::AccruedOnDefault | CFKind::ProtectionPayment
     ) {
-        return cf.amount.amount() * df;
+        return cf.get_amount().amount() * df;
     }
 
-    cf.amount.amount() * df * sp
+    cf.get_amount().amount() * df * sp
 }
 
 /// Present values of a complete cashflow stream under payment-date recovery.
@@ -645,10 +645,10 @@ pub fn credit_adjusted_cashflow_pvs(
                 "discount factor must be finite and non-negative; got {discount_factor}"
             )));
         }
-        let survival = if cashflow.date <= as_of {
+        let survival = if cashflow.get_date() <= as_of {
             1.0
         } else {
-            survival_on_date(cashflow.date, hazard, as_of)?
+            survival_on_date(cashflow.get_date(), hazard, as_of)?
         };
         pvs.push(credit_adjusted_period_pv(
             cashflow,
@@ -663,7 +663,7 @@ pub fn credit_adjusted_cashflow_pvs(
             if lots.is_empty() {
                 continue;
             }
-            let pay_date = cashflows[index].date;
+            let pay_date = cashflows[index].get_date();
             let end_sp = survival_on_date(pay_date, hazard, as_of)?;
             let mut mass = NeumaierAccumulator::new();
             for &(start, amount) in lots {
@@ -695,7 +695,7 @@ fn validate_recovery(
         if rate > 0.0
             && cashflows.iter().any(|cf| {
                 matches!(
-                    cf.kind,
+                    cf.get_kind(),
                     CFKind::DefaultedNotional | CFKind::ProtectionPayment
                 )
             })
@@ -771,19 +771,19 @@ where
 }
 
 fn principal_repayment_amount(cf: &CashFlow, base: Date) -> finstack_quant_core::Result<f64> {
-    if !cf.kind.is_repayment_like() || cf.amount.amount() <= 0.0 {
+    if !cf.get_kind().is_repayment_like() || cf.get_amount().amount() <= 0.0 {
         return Ok(0.0);
     }
     let balance_date = cf
         .get_balance_date()
         .ok_or_else(|| missing_principal_delta(cf))?;
     if balance_date < base {
-        return Ok(cf.amount.amount());
+        return Ok(cf.get_amount().amount());
     }
-    Ok(match cf.principal_delta {
-        Some(delta) if delta.currency() != cf.amount.currency() => {
+    Ok(match cf.get_principal_delta() {
+        Some(delta) if delta.currency() != cf.get_amount().currency() => {
             return Err(finstack_quant_core::Error::CurrencyMismatch {
-                expected: cf.amount.currency(),
+                expected: cf.get_amount().currency(),
                 actual: delta.currency(),
             });
         }
@@ -791,7 +791,7 @@ fn principal_repayment_amount(cf: &CashFlow, base: Date) -> finstack_quant_core:
         Some(delta) if delta.amount() > 0.0 => 0.0,
         // A zero delta can preserve an unsettled cash claim after its economic
         // balance movement has already been incorporated into opening notional.
-        Some(_) => cf.amount.amount().max(0.0),
+        Some(_) => cf.get_amount().amount().max(0.0),
         None => return Err(missing_principal_delta(cf)),
     })
 }
@@ -801,20 +801,21 @@ fn principal_repayment_amount(cf: &CashFlow, base: Date) -> finstack_quant_core:
 fn missing_principal_delta(cf: &CashFlow) -> finstack_quant_core::Error {
     finstack_quant_core::Error::Validation(format!(
         "{} row on {} has no principal_delta or principal_date",
-        cf.kind, cf.date
+        cf.get_kind(),
+        cf.get_date()
     ))
 }
 
 fn principal_increase(cf: &CashFlow) -> finstack_quant_core::Result<f64> {
-    if !cf.kind.is_principal_like() {
+    if !cf.get_kind().is_principal_like() {
         return Ok(0.0);
     }
     let delta = cf
-        .principal_delta
+        .get_principal_delta()
         .ok_or_else(|| missing_principal_delta(cf))?;
-    if delta.currency() != cf.amount.currency() {
+    if delta.currency() != cf.get_amount().currency() {
         return Err(finstack_quant_core::Error::CurrencyMismatch {
-            expected: cf.amount.currency(),
+            expected: cf.get_amount().currency(),
             actual: delta.currency(),
         });
     }
@@ -832,7 +833,7 @@ fn funded_principal(
     let mut by_currency: IndexMap<Currency, Vec<usize>> = IndexMap::new();
     for (index, cf) in cashflows.iter().enumerate() {
         by_currency
-            .entry(cf.amount.currency())
+            .entry(cf.get_amount().currency())
             .or_default()
             .push(index);
     }
@@ -851,7 +852,7 @@ fn funded_principal(
             if balance_date > base {
                 let increase = principal_increase(cf)?;
                 if increase > 0.0 {
-                    if cf.kind == CFKind::Pik || cf.amount.amount() == 0.0 {
+                    if cf.get_kind() == CFKind::Pik || cf.get_amount().amount() == 0.0 {
                         *capitalizations.entry(balance_date).or_default() += increase;
                     } else {
                         increases.push((balance_date, increase));
@@ -869,9 +870,11 @@ fn funded_principal(
             // same-date capitalization, even when other funded principal is
             // available. Economic-only residual replay rows retain this pairing
             // after the cash itself has settled and been filtered away.
-            if balance_date > base && (cf.date < balance_date || cf.amount.amount() == 0.0) {
-                let early_face = if cf.amount.amount() == 0.0 {
-                    cf.principal_delta
+            if balance_date > base
+                && (cf.get_date() < balance_date || cf.get_amount().amount() == 0.0)
+            {
+                let early_face = if cf.get_amount().amount() == 0.0 {
+                    cf.get_principal_delta()
                         .map_or(0.0, |delta| (-delta.amount()).max(0.0))
                 } else {
                     repayment
@@ -879,13 +882,13 @@ fn funded_principal(
                 if let Some(increase) = capitalizations.get_mut(&balance_date) {
                     let capitalized = early_face.min(*increase);
                     *increase -= capitalized;
-                    if cf.date > base && repayment > 0.0 && capitalized > 0.0 {
-                        result[index].push((cf.date, capitalized));
+                    if cf.get_date() > base && repayment > 0.0 && capitalized > 0.0 {
+                        result[index].push((cf.get_date(), capitalized));
                         repayment -= capitalized;
                     }
                 }
             }
-            if cf.date > base && repayment > 0.0 {
+            if cf.get_date() > base && repayment > 0.0 {
                 repayments.push((index, repayment));
                 opening.add(repayment);
             }
@@ -904,7 +907,7 @@ fn funded_principal(
             opening.add(-increase);
         }
         increases.sort_by_key(|&(date, _)| date);
-        repayments.sort_by_key(|&(index, _)| cashflows[index].date);
+        repayments.sort_by_key(|&(index, _)| cashflows[index].get_date());
         let scale = repayments
             .iter()
             .map(|&(_, amount)| amount)
@@ -930,13 +933,13 @@ fn funded_principal(
                     }
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "{currency} principal repayment on {} exceeds principal funded by that date",
-                        payment.date
+                        payment.get_date()
                     )));
                 };
-                if *funded_at > payment.date {
+                if *funded_at > payment.get_date() {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "{currency} principal repayment on {} precedes its cash funding date {funded_at}",
-                        payment.date
+                        payment.get_date()
                     )));
                 }
                 let amount = remaining.min(*available);
@@ -1016,16 +1019,16 @@ pub(crate) fn pv_by_period(
     let discounts: Vec<f64> = sorted
         .iter()
         .map(|cf| {
-            if cf.date <= as_of {
+            if cf.get_date() <= as_of {
                 Ok(1.0)
             } else {
-                disc.df_between_dates(as_of, cf.date)
+                disc.df_between_dates(as_of, cf.get_date())
             }
         })
         .collect::<finstack_quant_core::Result<_>>()?;
     let pvs = credit_adjusted_cashflow_pvs(sorted, &discounts, hazard, recovery_rate, as_of)?;
     sum_by_period(sorted, periods, |index, cf| {
-        Ok((cf.amount.currency(), pvs[index]))
+        Ok((cf.get_amount().currency(), pvs[index]))
     })
 }
 
@@ -1381,7 +1384,10 @@ mod period_contract_tests {
         assert!((pv - 200.0).abs() < 1e-12, "expected 200, got {pv}");
 
         // Nominal aggregation still includes the historical flows.
-        let dated: Vec<(Date, Money)> = flows.iter().map(|cf| (cf.date, cf.amount)).collect();
+        let dated: Vec<(Date, Money)> = flows
+            .iter()
+            .map(|cf| (cf.get_date(), cf.get_amount()))
+            .collect();
         let nominal = aggregate_by_period(&dated, &periods).expect("nominal aggregation");
         let total = nominal[&PeriodId::annual(2025)][&Currency::USD].amount();
         assert!((total - 350.0).abs() < 1e-12, "expected 350, got {total}");

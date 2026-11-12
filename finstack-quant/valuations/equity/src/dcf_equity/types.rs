@@ -1667,9 +1667,15 @@ mod tests {
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected
         );
         assert_eq!(schedule.get_flows().len(), 1);
-        assert_eq!(schedule.get_flows()[0].date, dcf.flows[0].0);
-        assert_eq!(schedule.get_flows()[0].amount.amount(), dcf.flows[0].1);
-        assert_eq!(schedule.get_flows()[0].amount.currency(), Currency::USD);
+        assert_eq!(schedule.get_flows()[0].get_date(), dcf.flows[0].0);
+        assert_eq!(
+            schedule.get_flows()[0].get_amount().amount(),
+            dcf.flows[0].1
+        );
+        assert_eq!(
+            schedule.get_flows()[0].get_amount().currency(),
+            Currency::USD
+        );
     }
 
     //  Mid-year convention tests

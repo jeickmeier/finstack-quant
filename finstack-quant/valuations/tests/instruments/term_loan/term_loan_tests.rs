@@ -94,10 +94,10 @@ fn term_loan_fixed_with_draws_and_fees() {
     // Build full schedule and verify flows exist and are ordered
     let sched = loan.cashflow_schedule(&market, as_of).unwrap();
     assert!(!sched.get_flows().is_empty());
-    let mut last = sched.get_flows()[0].date;
+    let mut last = sched.get_flows()[0].get_date();
     for cf in sched.get_flows() {
-        assert!(cf.date >= last);
-        last = cf.date;
+        assert!(cf.get_date() >= last);
+        last = cf.get_date();
     }
 }
 
@@ -151,20 +151,20 @@ fn term_loan_commitment_fee_step_downs() {
     let fees: Vec<_> = sched
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::CommitmentFee)
+        .filter(|cf| cf.get_kind() == CFKind::CommitmentFee)
         .collect();
     assert!(!fees.is_empty());
 
     let before = fees
         .iter()
-        .filter(|cf| cf.date < step_down)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_date() < step_down)
+        .map(|cf| cf.get_amount().amount())
         .next()
         .expect("fee before step-down");
     let after = fees
         .iter()
-        .filter(|cf| cf.date > step_down)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_date() > step_down)
+        .map(|cf| cf.get_amount().amount())
         .next()
         .expect("fee after step-down");
 
@@ -173,9 +173,9 @@ fn term_loan_commitment_fee_step_downs() {
 
     let fee_at_step_down = fees
         .iter()
-        .find(|cf| cf.date == step_down)
+        .find(|cf| cf.get_date() == step_down)
         .expect("fee for interval ending on step-down date")
-        .amount
+        .get_amount()
         .amount();
     let expected = 10_000_000.0 * 0.01 * (91.0 / 360.0);
     assert!(
@@ -229,8 +229,8 @@ fn term_loan_commitment_fee_windowed_to_availability() {
     let fee_dates: Vec<_> = sched
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::CommitmentFee)
-        .map(|cf| cf.date)
+        .filter(|cf| cf.get_kind() == CFKind::CommitmentFee)
+        .map(|cf| cf.get_date())
         .collect();
     assert!(!fee_dates.is_empty());
 
@@ -364,14 +364,17 @@ fn term_loan_pik_toggle_and_cash_sweep() {
     assert!(!sched.get_flows().is_empty());
     // Canonical schedules retain PIK classification for accrual and balance
     // replay, while dated settlement views exclude its non-cash amount.
-    let has_pik = sched.get_flows().iter().any(|cf| cf.kind == CFKind::Pik);
+    let has_pik = sched
+        .get_flows()
+        .iter()
+        .any(|cf| cf.get_kind() == CFKind::Pik);
     assert!(has_pik);
 
     let cash_coupon_dates: Vec<_> = sched
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Fixed)
-        .map(|cf| cf.date)
+        .filter(|cf| cf.get_kind() == CFKind::Fixed)
+        .map(|cf| cf.get_date())
         .collect();
     let toggle_date = Date::from_calendar_date(2025, time::Month::July, 1).unwrap();
     assert!(cash_coupon_dates.iter().any(|date| *date <= toggle_date));
@@ -451,8 +454,8 @@ fn fixed_rate_margin_step_up_changes_coupon_from_effective_period() {
     let coupons: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Fixed)
-        .map(|flow| (flow.date, flow.rate.expect("fixed coupon rate")))
+        .filter(|flow| flow.get_kind() == CFKind::Fixed)
+        .map(|flow| (flow.get_date(), flow.get_rate().expect("fixed coupon rate")))
         .collect();
     assert!(
         coupons
@@ -595,7 +598,7 @@ fn term_loan_amortizing_outstanding_path() {
     let amortization_flows: Vec<_> = sched
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Amortization)
+        .filter(|cf| cf.get_kind() == CFKind::Amortization)
         .collect();
 
     assert!(
@@ -605,7 +608,10 @@ fn term_loan_amortizing_outstanding_path() {
     // Signed canonical schedule preserves initial negative notional.
     // Verify that positive coupon/amortization flows exist alongside any
     // negative notional flows.
-    let has_positive = sched.get_flows().iter().any(|cf| cf.amount.amount() > 0.0);
+    let has_positive = sched
+        .get_flows()
+        .iter()
+        .any(|cf| cf.get_amount().amount() > 0.0);
     assert!(
         has_positive,
         "Schedule should have positive coupon/amortization flows"

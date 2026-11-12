@@ -1399,9 +1399,9 @@ mod tests {
             let coupon = schedule
                 .get_flows()
                 .iter()
-                .find(|flow| flow.kind == CFKind::Floating)
+                .find(|flow| flow.get_kind() == CFKind::Floating)
                 .expect("floating coupon");
-            assert!((coupon.amount.amount() - expected).abs() < 1e-7);
+            assert!((coupon.get_amount().amount() - expected).abs() < 1e-7);
             assert!(schedule.get_meta().projected_fixings.iter().all(|fixing| {
                 (fixing.value.expect("recorded index") - contractual_index).abs() < 1e-14
             }));
@@ -1439,7 +1439,7 @@ mod tests {
                         .schedule
                         .get_flows()
                         .iter()
-                        .find(|flow| flow.kind == CFKind::Floating)
+                        .find(|flow| flow.get_kind() == CFKind::Floating)
                         .expect("floating path coupon");
                     let expected = expected
                         + if observed {
@@ -1448,9 +1448,9 @@ mod tests {
                             1_000_000.0 * shock * total_accrual
                         };
                     assert!(
-                        (coupon.amount.amount() - expected).abs() < 1e-5,
+                        (coupon.get_amount().amount() - expected).abs() < 1e-5,
                         "observed={observed}, stochastic_rates={stochastic_rates}, shock={shock}: {} vs {expected}",
-                        coupon.amount.amount()
+                        coupon.get_amount().amount()
                     );
                 }
             }
@@ -1578,17 +1578,18 @@ mod tests {
                     let coupons: Vec<_> = schedule
                         .get_flows()
                         .iter()
-                        .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Floating))
+                        .filter(|flow| matches!(flow.get_kind(), CFKind::Fixed | CFKind::Floating))
                         .collect();
                     assert_eq!(coupons.len(), 1);
                     assert!(
-                        (coupons[0].accrual_factor - (first_days + last_days) / denominator).abs()
+                        (coupons[0].get_accrual_factor() - (first_days + last_days) / denominator)
+                            .abs()
                             < 1e-14
                     );
                     assert!(
-                        (coupons[0].amount.amount() - expected).abs() < 1e-7,
+                        (coupons[0].get_amount().amount() - expected).abs() < 1e-7,
                         "floating={floating}, {start} -> {end}: expected {expected}, got {}",
-                        coupons[0].amount.amount()
+                        coupons[0].get_amount().amount()
                     );
                 }
             }
@@ -1624,16 +1625,16 @@ mod tests {
         let flows = path.schedule.get_flows();
         let terminal = flows
             .iter()
-            .find(|flow| flow.kind == CFKind::Notional && flow.amount.amount() > 0.0)
+            .find(|flow| flow.get_kind() == CFKind::Notional && flow.get_amount().amount() > 0.0)
             .expect("terminal principal");
         let interest = flows
             .iter()
-            .find(|flow| flow.kind == CFKind::Fixed)
+            .find(|flow| flow.get_kind() == CFKind::Fixed)
             .expect("interest");
 
-        assert_eq!(terminal.date, adjusted);
-        assert_eq!(interest.date, adjusted);
-        assert!((interest.accrual_factor - 1.0).abs() < 1e-12);
-        assert!((interest.amount.amount() - 50_000.0).abs() < 1e-8);
+        assert_eq!(terminal.get_date(), adjusted);
+        assert_eq!(interest.get_date(), adjusted);
+        assert!((interest.get_accrual_factor() - 1.0).abs() < 1e-12);
+        assert!((interest.get_amount().amount() - 50_000.0).abs() < 1e-8);
     }
 }

@@ -630,6 +630,55 @@ impl CashFlow {
         self
     }
 
+    /// Return the payment (cash settlement) date, or the event date of a
+    /// noncash balance row.
+    #[must_use]
+    pub fn get_date(&self) -> Date {
+        self.date
+    }
+
+    /// Return the single index observation date of a floating coupon.
+    #[must_use]
+    pub fn get_reset_date(&self) -> Option<Date> {
+        self.reset_date
+    }
+
+    /// Return the signed settlement cash, zero for noncash balance events.
+    #[must_use]
+    pub fn get_amount(&self) -> Money {
+        self.amount
+    }
+
+    /// Return the cashflow classification.
+    #[must_use]
+    pub fn get_kind(&self) -> CFKind {
+        self.kind
+    }
+
+    /// Return the literal accrual factor (zero is a zero-length accrual).
+    #[must_use]
+    pub fn get_accrual_factor(&self) -> f64 {
+        self.accrual_factor
+    }
+
+    /// Return the effective rate metadata, if known.
+    #[must_use]
+    pub fn get_rate(&self) -> Option<f64> {
+        self.rate
+    }
+
+    /// Return the optional single-slice contractual accrual metadata.
+    #[must_use]
+    pub fn get_accrual(&self) -> &Option<CashFlowAccrual> {
+        &self.accrual
+    }
+
+    /// Return the explicit principal change of a principal row.
+    #[must_use]
+    pub fn get_principal_delta(&self) -> Option<Money> {
+        self.principal_delta
+    }
+
     /// Return the explicit balance-effective date of a principal row.
     ///
     /// `None` for a row that moves no principal; there is no payment-date

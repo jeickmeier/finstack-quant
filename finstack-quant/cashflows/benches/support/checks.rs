@@ -24,40 +24,44 @@ pub(super) fn rows(schedule: &CashFlowSchedule, expected_rows: usize) {
         schedule
             .get_flows()
             .windows(2)
-            .all(|w| w[0].date <= w[1].date)
+            .all(|w| w[0].get_date() <= w[1].get_date())
     );
     for flow in schedule.get_flows() {
-        assert_eq!(flow.amount.currency(), Currency::USD);
-        assert!(flow.amount.amount().is_finite());
-        assert!(flow.accrual_factor.is_finite());
-        assert!(flow.rate.is_none_or(f64::is_finite));
+        assert_eq!(flow.get_amount().currency(), Currency::USD);
+        assert!(flow.get_amount().amount().is_finite());
+        assert!(flow.get_accrual_factor().is_finite());
+        assert!(flow.get_rate().is_none_or(f64::is_finite));
     }
 }
 
 pub(super) fn fixed_amounts(schedule: &CashFlowSchedule) {
     for flow in schedule.coupons() {
-        assert_eq!(flow.kind, CFKind::Fixed);
+        assert_eq!(flow.get_kind(), CFKind::Fixed);
         let accrual = flow
-            .accrual
+            .get_accrual()
             .as_ref()
             .expect("fixed coupon accrual metadata");
         assert_eq!(accrual.day_count, DayCount::Act365F);
         assert!(accrual.start < accrual.end);
         let mut principal = schedule.get_notional().initial.amount();
         for movement in schedule.get_flows() {
-            if movement.kind == CFKind::Amortization
+            if movement.get_kind() == CFKind::Amortization
                 && movement
                     .get_balance_date()
                     .expect("principal row balance date")
                     <= accrual.start
             {
-                principal -= movement.amount.amount();
+                principal -= movement.get_amount().amount();
             }
         }
         let fraction = (accrual.end - accrual.start).whole_days() as f64 / 365.0;
-        close(flow.accrual_factor, fraction, 1e-12);
-        close(flow.rate.expect("fixed coupon rate"), 0.06, 1e-14);
-        close(flow.amount.amount(), principal * 0.06 * fraction, 1e-7);
+        close(flow.get_accrual_factor(), fraction, 1e-12);
+        close(flow.get_rate().expect("fixed coupon rate"), 0.06, 1e-14);
+        close(
+            flow.get_amount().amount(),
+            principal * 0.06 * fraction,
+            1e-7,
+        );
     }
 }
 
@@ -76,7 +80,7 @@ pub(super) fn fixed_bullet(
     assert!(schedule.get_meta().projected_fixings.is_empty());
     let months = years * 12 / coupons as i32;
     for (index, flow) in schedule.coupons().enumerate() {
-        let accrual = flow.accrual.as_ref().expect("coupon accrual");
+        let accrual = flow.get_accrual().as_ref().expect("coupon accrual");
         let start = base
             .add_months(index as i32 * months)
             .expect("fixture start");
@@ -90,20 +94,20 @@ pub(super) fn fixed_bullet(
                 payment += time::Duration::days(1);
             }
         }
-        assert_eq!(flow.date, payment);
+        assert_eq!(flow.get_date(), payment);
     }
     let principal: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|f| f.kind == CFKind::Notional)
+        .filter(|f| f.get_kind() == CFKind::Notional)
         .collect();
     assert_eq!(principal.len(), 2);
-    assert_eq!(principal[0].date, base);
-    close(principal[0].amount.amount(), -1_000_000.0, 0.0);
-    close(principal[1].amount.amount(), 1_000_000.0, 0.0);
+    assert_eq!(principal[0].get_date(), base);
+    close(principal[0].get_amount().amount(), -1_000_000.0, 0.0);
+    close(principal[1].get_amount().amount(), 1_000_000.0, 0.0);
     assert_eq!(
-        principal[1].date,
-        schedule.coupons().last().expect("final coupon").date
+        principal[1].get_date(),
+        schedule.coupons().last().expect("final coupon").get_date()
     );
     fixed_amounts(schedule);
 }
@@ -135,8 +139,8 @@ pub(super) fn floating_bullet(
         close(fixing.value.expect("projected raw fixing"), 0.045, 1e-11);
     }
     for (index, flow) in schedule.coupons().enumerate() {
-        assert_eq!(flow.kind, CFKind::Floating);
-        let accrual = flow.accrual.as_ref().expect("floating accrual");
+        assert_eq!(flow.get_kind(), CFKind::Floating);
+        let accrual = flow.get_accrual().as_ref().expect("floating accrual");
         assert_eq!(accrual.day_count, DayCount::Act360);
         assert_eq!(
             accrual.start,
@@ -148,7 +152,7 @@ pub(super) fn floating_bullet(
                 .expect("quarter end")
         );
         let days = (accrual.end - accrual.start).whole_days() as f64;
-        close(flow.accrual_factor, days / 360.0, 1e-12);
+        close(flow.get_accrual_factor(), days / 360.0, 1e-12);
         let mut reset = accrual.start;
         if !overnight {
             for _ in 0..2 {
@@ -158,12 +162,12 @@ pub(super) fn floating_bullet(
                 }
             }
         }
-        assert_eq!(flow.reset_date, Some(reset));
+        assert_eq!(flow.get_reset_date(), Some(reset));
         let mut payment = accrual.end;
         while payment.is_weekend() {
             payment += time::Duration::days(1);
         }
-        assert_eq!(flow.date, payment);
+        assert_eq!(flow.get_date(), payment);
         let index_growth = if overnight {
             let mut growth = 1.0;
             let mut cursor = accrual.start;
@@ -181,12 +185,12 @@ pub(super) fn floating_bullet(
             0.045 * days / 360.0
         };
         close(
-            flow.amount.amount(),
+            flow.get_amount().amount(),
             1_000_000.0 * (index_growth + 0.02 * days / 360.0),
             1e-5,
         );
         close(
-            flow.rate.expect("floating rate"),
+            flow.get_rate().expect("floating rate"),
             index_growth / (days / 360.0) + 0.02,
             1e-10,
         );
@@ -194,15 +198,15 @@ pub(super) fn floating_bullet(
     let principal: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|f| f.kind == CFKind::Notional)
+        .filter(|f| f.get_kind() == CFKind::Notional)
         .collect();
     assert_eq!(principal.len(), 2);
-    assert_eq!(principal[0].date, base);
-    close(principal[0].amount.amount(), -1_000_000.0, 0.0);
-    close(principal[1].amount.amount(), 1_000_000.0, 0.0);
+    assert_eq!(principal[0].get_date(), base);
+    close(principal[0].get_amount().amount(), -1_000_000.0, 0.0);
+    close(principal[1].get_amount().amount(), 1_000_000.0, 0.0);
     assert_eq!(
-        principal[1].date,
-        schedule.coupons().last().expect("final coupon").date
+        principal[1].get_date(),
+        schedule.coupons().last().expect("final coupon").get_date()
     );
 }
 
@@ -220,7 +224,7 @@ pub(super) fn period_pv(
         let flows: Vec<_> = schedule
             .get_flows()
             .iter()
-            .filter(|f| period.start <= f.date && f.date < period.end)
+            .filter(|f| period.start <= f.get_date() && f.get_date() < period.end)
             .collect();
         if flows.is_empty() {
             assert!(!actual.contains_key(&period.id));
@@ -229,21 +233,21 @@ pub(super) fn period_pv(
         occupied += 1;
         let mut expected = 0.0;
         for flow in flows {
-            if flow.date <= base {
+            if flow.get_date() <= base {
                 continue;
             }
             let df = discount
-                .df_between_dates(base, flow.date)
+                .df_between_dates(base, flow.get_date())
                 .expect("fixture DF");
             let survival = if credit.is_some() {
-                (-0.015 * (flow.date - base).whole_days() as f64 / 365.0).exp()
+                (-0.015 * (flow.get_date() - base).whole_days() as f64 / 365.0).exp()
             } else {
                 1.0
             };
-            expected += flow.amount.amount() * df * survival;
+            expected += flow.get_amount().amount() * df * survival;
             if let Some(recovery) = credit
-                && flow.kind == CFKind::Notional
-                && flow.amount.amount() > 0.0
+                && flow.get_kind() == CFKind::Notional
+                && flow.get_amount().amount() > 0.0
             {
                 expected += 1_000_000.0 * recovery * df * (1.0 - survival);
             }
@@ -261,11 +265,12 @@ pub(super) fn linear_accrued(schedule: &CashFlowSchedule, date: Date) -> f64 {
     schedule
         .coupons()
         .map(|flow| {
-            let accrual = flow.accrual.as_ref().expect("fixture accrual");
+            let accrual = flow.get_accrual().as_ref().expect("fixture accrual");
             assert_eq!(accrual.day_count, DayCount::Act365F);
-            if accrual.start <= date && date < flow.date {
+            if accrual.start <= date && date < flow.get_date() {
                 let elapsed = (date.min(accrual.end) - accrual.start).whole_days() as f64;
-                flow.amount.amount() * elapsed / (accrual.end - accrual.start).whole_days() as f64
+                flow.get_amount().amount() * elapsed
+                    / (accrual.end - accrual.start).whole_days() as f64
             } else {
                 0.0
             }
@@ -281,9 +286,9 @@ pub(super) fn amortization_path(schedule: &CashFlowSchedule, n: usize, base: Dat
     assert_eq!(path.len(), n);
     for (index, ((date, balance), flow)) in path.iter().zip(schedule.get_flows()).enumerate() {
         assert_eq!(*date, base + time::Duration::days((index as i64 + 1) * 90));
-        assert_eq!(flow.kind, CFKind::Amortization);
+        assert_eq!(flow.get_kind(), CFKind::Amortization);
         assert_eq!(balance.currency(), Currency::USD);
-        close(flow.amount.amount(), 1_000_000.0 / n as f64, 1e-8);
+        close(flow.get_amount().amount(), 1_000_000.0 / n as f64, 1e-8);
         close(
             balance.amount(),
             1_000_000.0 * (1.0 - (index + 1) as f64 / n as f64),

@@ -175,8 +175,8 @@ fn test_npv_zero_rate() {
     let expected = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.date > curve.base_date())
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_date() > curve.base_date())
+        .map(|cf| cf.get_amount().amount())
         .sum();
     approx_eq(pv.amount(), expected, 1.0, "PV equals cashflow sum at 0%");
 }

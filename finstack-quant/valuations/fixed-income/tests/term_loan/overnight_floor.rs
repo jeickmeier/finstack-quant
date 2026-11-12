@@ -122,8 +122,8 @@ fn coupons<T: CashflowProvider>(instrument: &T) -> Vec<(Date, f64)> {
         .expect("schedule")
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Floating)
-        .map(|cf| (cf.date, cf.amount.amount()))
+        .filter(|cf| cf.get_kind() == CFKind::Floating)
+        .map(|cf| (cf.get_date(), cf.get_amount().amount()))
         .collect()
 }
 

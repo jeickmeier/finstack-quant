@@ -296,15 +296,15 @@ pub(super) fn make_whole_value(
     let mut value = 0.0;
     for flow in flows
         .iter()
-        .filter(|flow| flow.date > exercise_date && flow.kind.is_cash_settlement())
+        .filter(|flow| flow.get_date() > exercise_date && flow.get_kind().is_cash_settlement())
     {
         let tau = reference.day_count().year_fraction(
             exercise_date,
-            flow.date,
+            flow.get_date(),
             DayCountContext::default(),
         )?;
-        value += flow.amount.amount()
-            * reference.df_between_dates(exercise_date, flow.date)?
+        value += flow.get_amount().amount()
+            * reference.df_between_dates(exercise_date, flow.get_date())?
             * (-spread * tau).exp();
     }
     if value.is_finite() && value >= 0.0 {
@@ -317,9 +317,9 @@ pub(super) fn make_whole_value(
 }
 
 pub(super) fn is_holder_distribution(flow: &CashFlow) -> bool {
-    flow.amount.amount() > 0.0
+    flow.get_amount().amount() > 0.0
         && matches!(
-            flow.kind,
+            flow.get_kind(),
             CFKind::Fixed | CFKind::Floating | CFKind::Stub | CFKind::Amortization
         )
 }
@@ -329,33 +329,33 @@ pub(super) fn static_balance_delta(flow: &CashFlow, terminal_redemption: bool) -
         return None;
     }
     // Only the explicit delta moves the balance (record CORE-CONVENTIONS-015 #4).
-    flow.principal_delta.map(|delta| delta.amount())
+    flow.get_principal_delta().map(|delta| delta.amount())
 }
 
 pub(super) fn is_terminal_redemption(flow: &CashFlow, final_date: Option<Date>) -> bool {
-    is_par_redemption(flow) && final_date.is_some_and(|date| flow.date == date)
+    is_par_redemption(flow) && final_date.is_some_and(|date| flow.get_date() == date)
 }
 
 /// A positive notional repayment whose explicit delta redeems exactly its cash
 /// at par; the
 /// latest one is the terminal redemption the replay pays dynamically.
 pub(super) fn is_par_redemption(flow: &CashFlow) -> bool {
-    flow.kind == CFKind::Notional
-        && flow.amount.amount() > 0.0
+    flow.get_kind() == CFKind::Notional
+        && flow.get_amount().amount() > 0.0
         && flow
-            .principal_delta
-            .is_some_and(|delta| delta == flow.amount.checked_neg())
+            .get_principal_delta()
+            .is_some_and(|delta| delta == flow.get_amount().checked_neg())
 }
 
 /// The issue funding exchange whose principal the opening balance already
 /// holds: its delta is an explicit zero (record
 /// CORE-CONVENTIONS-015 #5).
 pub(super) fn is_opening_funding(flow: &CashFlow, issue_date: Date) -> bool {
-    flow.kind == CFKind::Notional
-        && flow.date == issue_date
-        && flow.amount.amount() < 0.0
+    flow.get_kind() == CFKind::Notional
+        && flow.get_date() == issue_date
+        && flow.get_amount().amount() < 0.0
         && flow
-            .principal_delta
+            .get_principal_delta()
             .is_some_and(|delta| delta.amount() == 0.0)
 }
 

@@ -391,18 +391,18 @@ fn mtm_reset_cashflow_schedule_npv_matches_base_value() {
 
         let mut pv_from_schedule = 0.0_f64;
         for cf in schedule.get_flows() {
-            if cf.date <= as_of {
+            if cf.get_date() <= as_of {
                 continue;
             }
-            let ccy = cf.amount.currency();
+            let ccy = cf.get_amount().currency();
             let disc = if ccy == Currency::USD {
                 usd_disc.as_ref()
             } else {
                 eur_disc.as_ref()
             };
-            let df = disc.df_on_date(cf.date).expect("payment DF")
+            let df = disc.df_on_date(cf.get_date()).expect("payment DF")
                 / disc.df_on_date(as_of).expect("valuation DF");
-            let native_pv = cf.amount.amount() * df;
+            let native_pv = cf.get_amount().amount() * df;
             let usd_pv = if ccy == Currency::USD {
                 native_pv
             } else {
@@ -467,22 +467,22 @@ fn seasoned_mtm_schedule_uses_resetting_leg_fixing() {
         .get_flows()
         .iter()
         .find(|flow| {
-            flow.kind == finstack_quant_core::cashflow::CFKind::Floating
-                && flow.amount.currency() == Currency::EUR
+            flow.get_kind() == finstack_quant_core::cashflow::CFKind::Floating
+                && flow.get_amount().currency() == Currency::EUR
         })
         .expect("EUR resetting coupon");
 
-    assert!((resetting_coupon.rate.expect("coupon rate") - 0.0775).abs() < 1e-12);
+    assert!((resetting_coupon.get_rate().expect("coupon rate") - 0.0775).abs() < 1e-12);
 
     let constant_coupon = schedule
         .get_flows()
         .iter()
         .find(|flow| {
-            flow.kind == finstack_quant_core::cashflow::CFKind::Floating
-                && flow.amount.currency() == Currency::USD
+            flow.get_kind() == finstack_quant_core::cashflow::CFKind::Floating
+                && flow.get_amount().currency() == Currency::USD
         })
         .expect("USD constant coupon");
-    assert!((constant_coupon.rate.expect("coupon rate") - 0.02).abs() < 1e-12);
+    assert!((constant_coupon.get_rate().expect("coupon rate") - 0.02).abs() < 1e-12);
 }
 
 #[test]
@@ -555,12 +555,12 @@ fn mtm_constant_leg_spread_changes_pv_and_schedule_rate() {
         .get_flows()
         .iter()
         .find(|flow| {
-            flow.kind == finstack_quant_core::cashflow::CFKind::Floating
-                && flow.amount.currency() == Currency::EUR
+            flow.get_kind() == finstack_quant_core::cashflow::CFKind::Floating
+                && flow.get_amount().currency() == Currency::EUR
         })
         .expect("EUR constant coupon");
     assert!(
-        (constant_coupon.rate.expect("coupon rate") - (EUR_ZERO + 0.0025)).abs() < 1e-12,
+        (constant_coupon.get_rate().expect("coupon rate") - (EUR_ZERO + 0.0025)).abs() < 1e-12,
         "constant-leg all-in rate must include its contractual spread"
     );
 }
@@ -587,16 +587,16 @@ fn mtm_schedule_applies_leg_specific_coupon_frequencies() {
         .get_flows()
         .iter()
         .filter(|flow| {
-            flow.kind == finstack_quant_core::cashflow::CFKind::Floating
-                && flow.amount.currency() == Currency::EUR
+            flow.get_kind() == finstack_quant_core::cashflow::CFKind::Floating
+                && flow.get_amount().currency() == Currency::EUR
         })
         .count();
     let usd_coupons = schedule
         .get_flows()
         .iter()
         .filter(|flow| {
-            flow.kind == finstack_quant_core::cashflow::CFKind::Floating
-                && flow.amount.currency() == Currency::USD
+            flow.get_kind() == finstack_quant_core::cashflow::CFKind::Floating
+                && flow.get_amount().currency() == Currency::USD
         })
         .count();
     assert_eq!(eur_coupons, 20);

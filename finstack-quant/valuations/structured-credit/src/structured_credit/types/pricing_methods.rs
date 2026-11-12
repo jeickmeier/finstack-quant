@@ -434,13 +434,15 @@ impl StructuredCredit {
             }
         }
         for flow in &cashflows.detailed_flows {
-            if flow.kind == finstack_quant_core::cashflow::CFKind::Notional
-                && flow.amount.amount() < 0.0
-                && flow.date > as_of
+            if flow.get_kind() == finstack_quant_core::cashflow::CFKind::Notional
+                && flow.get_amount().amount() < 0.0
+                && flow.get_date() > as_of
             {
-                let df = disc.df_between_dates(as_of, flow.date)?;
-                let flow_pv =
-                    Money::from_model_value(flow.amount.amount() * df, flow.amount.currency())?;
+                let df = disc.df_between_dates(as_of, flow.get_date())?;
+                let flow_pv = Money::from_model_value(
+                    flow.get_amount().amount() * df,
+                    flow.get_amount().currency(),
+                )?;
                 pv = pv.checked_add(flow_pv)?;
             }
         }

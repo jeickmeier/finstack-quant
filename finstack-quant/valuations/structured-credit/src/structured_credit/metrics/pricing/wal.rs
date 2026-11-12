@@ -68,11 +68,11 @@ impl MetricCalculator for WalCalculator {
                     .iter()
                     .filter(|&flow| {
                         matches!(
-                            flow.kind,
+                            flow.get_kind(),
                             CFKind::Amortization | CFKind::Notional | CFKind::PrePayment
                         )
                     })
-                    .map(|flow| (flow.date, flow.amount.abs())),
+                    .map(|flow| (flow.get_date(), flow.get_amount().abs())),
                 context.as_of,
             );
         }

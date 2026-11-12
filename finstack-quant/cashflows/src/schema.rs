@@ -237,7 +237,7 @@ fn period_aggregation_examples() -> finstack_quant_core::Result<Vec<serde_json::
     let flows: Vec<(Date, Money)> = schedule
         .flows
         .iter()
-        .map(|flow| (flow.date, flow.amount))
+        .map(|flow| (flow.get_date(), flow.get_amount()))
         .collect();
     let plan = finstack_quant_core::dates::build_periods("2025Q1..2026Q1", None)?;
     serialize_example(

@@ -155,7 +155,7 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
         .schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Floating)
+        .filter(|cf| cf.get_kind() == finstack_quant_core::cashflow::CFKind::Floating)
         .collect();
 
     assert!(
@@ -173,7 +173,7 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
     // Expected all-in rate: max(5.1%, 0%) + 2% = 7.1%
     // The actual rate stored is the time-weighted average for the period.
     if let Some(first_cf) = float_flows_with.first()
-        && let Some(rate) = first_cf.rate
+        && let Some(rate) = first_cf.get_rate()
     {
         // The rate should reflect fixing + spread, not forward + spread.
         // Forward-based would be ~4% + 2% = 6%. Fixing-based should be ~7%.
@@ -281,7 +281,7 @@ fn test_fixings_respect_floor() {
         .schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Floating)
+        .filter(|cf| cf.get_kind() == finstack_quant_core::cashflow::CFKind::Floating)
         .collect();
 
     assert!(!float_flows.is_empty());
@@ -289,7 +289,7 @@ fn test_fixings_respect_floor() {
     // For past resets: floor(1%, 3%) = 3%, + 200bp spread = 5%
     // Check the rate is at least 5% (floor is binding)
     if let Some(first_cf) = float_flows.first()
-        && let Some(rate) = first_cf.rate
+        && let Some(rate) = first_cf.get_rate()
     {
         assert!(
             (rate - 0.05).abs() < 0.002,
@@ -344,16 +344,16 @@ fn test_non_seasoned_facility_ignores_fixings() {
         .schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Floating)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_kind() == finstack_quant_core::cashflow::CFKind::Floating)
+        .map(|cf| cf.get_amount().amount())
         .sum();
 
     let total_without: f64 = schedule_without
         .schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Floating)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_kind() == finstack_quant_core::cashflow::CFKind::Floating)
+        .map(|cf| cf.get_amount().amount())
         .sum();
 
     assert!(
@@ -394,8 +394,8 @@ fn valuation_date_reset_uses_contractual_t_minus_two_fixing() {
         .schedule
         .get_flows()
         .iter()
-        .find(|flow| flow.kind == finstack_quant_core::cashflow::CFKind::Floating)
-        .and_then(|flow| flow.rate)
+        .find(|flow| flow.get_kind() == finstack_quant_core::cashflow::CFKind::Floating)
+        .and_then(|flow| flow.get_rate())
         .expect("floating coupon rate");
 
     assert!((first_rate - 0.12).abs() < 1e-12);
@@ -485,8 +485,8 @@ fn stochastic_cashflow_engine_uses_current_period_contractual_fixing() {
             .schedule
             .get_flows()
             .iter()
-            .find(|flow| flow.kind == finstack_quant_core::cashflow::CFKind::Floating)
-            .and_then(|flow| flow.rate)
+            .find(|flow| flow.get_kind() == finstack_quant_core::cashflow::CFKind::Floating)
+            .and_then(|flow| flow.get_rate())
             .expect("current-period coupon")
     };
 

@@ -204,7 +204,11 @@ impl BondValuator {
     pub(crate) fn exercise_event_dates(
         schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
     ) -> Vec<Date> {
-        let mut dates: Vec<Date> = schedule.get_flows().iter().map(|flow| flow.date).collect();
+        let mut dates: Vec<Date> = schedule
+            .get_flows()
+            .iter()
+            .map(|flow| flow.get_date())
+            .collect();
         dates.sort_unstable();
         dates.dedup();
         dates
@@ -513,18 +517,19 @@ impl BondValuator {
         let mut redemption_vec = vec![0.0; num_steps];
         let mut redemption_components = vec![Vec::new(); num_steps];
         for flow in full_schedule.get_flows().iter().filter(|flow| {
-            (flow.date > as_of || (flow.date == as_of && exercise_dates.contains(&as_of)))
-                && flow.kind == CFKind::Notional
-                && flow.amount.amount() > 0.0
+            (flow.get_date() > as_of
+                || (flow.get_date() == as_of && exercise_dates.contains(&as_of)))
+                && flow.get_kind() == CFKind::Notional
+                && flow.get_amount().amount() > 0.0
         }) {
             let event_time =
-                grid_day_count.year_fraction(as_of, flow.date, DayCountContext::default())?;
+                grid_day_count.year_fraction(as_of, flow.get_date(), DayCountContext::default())?;
             let raw_clamped = Self::fractional_step(&time_steps, event_time);
-            if exercise_dates.contains(&flow.date) {
+            if exercise_dates.contains(&flow.get_date()) {
                 let step = Self::nearest_step(&time_steps, event_time);
                 let adjusted = Self::value_at_step_time(
-                    flow.amount.amount(),
-                    flow.date,
+                    flow.get_amount().amount(),
+                    flow.get_date(),
                     step,
                     &step_discount_factors,
                     discount_curve.as_ref(),
@@ -537,8 +542,8 @@ impl BondValuator {
                 let upper_weight = raw_clamped - lower as f64;
                 if lower < num_steps {
                     let adjusted = Self::value_at_step_time(
-                        flow.amount.amount() * (1.0 - upper_weight),
-                        flow.date,
+                        flow.get_amount().amount() * (1.0 - upper_weight),
+                        flow.get_date(),
                         lower,
                         &step_discount_factors,
                         discount_curve.as_ref(),
@@ -549,8 +554,8 @@ impl BondValuator {
                 }
                 if lower + 1 < num_steps {
                     let adjusted = Self::value_at_step_time(
-                        flow.amount.amount() * upper_weight,
-                        flow.date,
+                        flow.get_amount().amount() * upper_weight,
+                        flow.get_date(),
                         lower + 1,
                         &step_discount_factors,
                         discount_curve.as_ref(),
@@ -588,10 +593,10 @@ impl BondValuator {
                         .iter()
                         .filter(|flow| {
                             flow.get_balance_date() == Some(date)
-                                && flow.kind == CFKind::Notional
-                                && flow.amount.amount() > 0.0
+                                && flow.get_kind() == CFKind::Notional
+                                && flow.get_amount().amount() > 0.0
                         })
-                        .map(|flow| flow.amount.amount())
+                        .map(|flow| flow.get_amount().amount())
                         .sum::<f64>()
             } else {
                 after_events

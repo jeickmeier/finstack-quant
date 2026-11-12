@@ -208,7 +208,7 @@ fn test_json_bridge_build_validate_flows_and_accrual() {
     let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
         serde_json::from_str(&schedule_json).expect("schedule JSON should deserialize");
     assert!(schedule.get_flows().iter().any(|flow| matches!(
-        flow.kind,
+        flow.get_kind(),
         finstack_quant_core::cashflow::CFKind::Fixed
             | finstack_quant_core::cashflow::CFKind::Floating
             | finstack_quant_core::cashflow::CFKind::Stub
@@ -340,7 +340,7 @@ fn test_json_bridge_amortizing_schedule_build() {
     let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
         serde_json::from_str(&schedule_json).expect("schedule JSON should deserialize");
     assert!(schedule.get_flows().iter().any(|flow| matches!(
-        flow.kind,
+        flow.get_kind(),
         finstack_quant_core::cashflow::CFKind::Amortization
     )));
 }
@@ -696,23 +696,30 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
     let first_coupon = schedule
         .get_flows()
         .iter()
-        .find(|flow| matches!(flow.kind, finstack_quant_core::cashflow::CFKind::Floating))
+        .find(|flow| {
+            matches!(
+                flow.get_kind(),
+                finstack_quant_core::cashflow::CFKind::Floating
+            )
+        })
         .expect("schedule has a floating coupon");
 
     // First coupon (accrues 2025-01-15 -> 2025-04-15): 4.0% fixing + 100 bp
     // spread = 5.0% on $1M, Act/360 over 90 days.
-    let rate = first_coupon.rate.expect("floating coupon carries a rate");
+    let rate = first_coupon
+        .get_rate()
+        .expect("floating coupon carries a rate");
     assert!(
         (rate - 0.05).abs() < 1e-10,
         "first coupon should price off the historical fixing + spread: {rate}"
     );
     let expected_amount = 1_000_000.0 * 0.05 * (90.0 / 360.0);
     assert!(
-        (first_coupon.amount.amount() - expected_amount).abs() < 1e-6,
+        (first_coupon.get_amount().amount() - expected_amount).abs() < 1e-6,
         "first coupon amount should be {expected_amount}, got {}",
-        first_coupon.amount.amount()
+        first_coupon.get_amount().amount()
     );
-    assert_eq!(first_coupon.amount.currency(), Currency::USD);
+    assert_eq!(first_coupon.get_amount().currency(), Currency::USD);
 }
 
 #[test]
@@ -799,7 +806,7 @@ fn canonical_coupon_and_payment_programs_build_nontrivial_schedule() {
         schedule
             .get_flows()
             .iter()
-            .any(|flow| flow.kind == finstack_quant_core::cashflow::CFKind::Pik)
+            .any(|flow| flow.get_kind() == finstack_quant_core::cashflow::CFKind::Pik)
     );
 }
 

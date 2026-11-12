@@ -79,20 +79,20 @@ pub(crate) fn realized_distributions(
 
     let mut i = 0;
     while i < flows.len() {
-        let d = flows[i].date;
+        let d = flows[i].get_date();
 
         // Aggregate all cashflows on this date into coupon and amortization buckets.
         let mut coupon_at_d = 0.0_f64;
         let mut amort_at_d = 0.0_f64;
         let mut j = i;
-        while j < flows.len() && flows[j].date == d {
+        while j < flows.len() && flows[j].get_date() == d {
             let cf = &flows[j];
-            match cf.kind {
+            match cf.get_kind() {
                 CFKind::Fixed | CFKind::Floating | CFKind::Stub => {
-                    coupon_at_d += cf.amount.amount().max(0.0);
+                    coupon_at_d += cf.get_amount().amount().max(0.0);
                 }
                 CFKind::Amortization => {
-                    amort_at_d += cf.amount.amount().max(0.0);
+                    amort_at_d += cf.get_amount().amount().max(0.0);
                 }
                 // Notional redemptions (initial or final), PIK (non-cash),
                 // fees, margin flows, etc. — excluded from distributions.
@@ -244,14 +244,15 @@ pub(crate) fn lower_return_floor(
 
     let mut distributions = BTreeMap::<Date, f64>::new();
     for flow in schedule.get_flows() {
-        if flow.date <= issue {
+        if flow.get_date() <= issue {
             continue;
         }
         if matches!(
-            flow.kind,
+            flow.get_kind(),
             CFKind::Fixed | CFKind::Floating | CFKind::Stub | CFKind::Amortization
         ) {
-            *distributions.entry(flow.date).or_default() += flow.amount.amount().max(0.0);
+            *distributions.entry(flow.get_date()).or_default() +=
+                flow.get_amount().amount().max(0.0);
         }
     }
     let outstanding_by_date = schedule.outstanding_by_date()?;

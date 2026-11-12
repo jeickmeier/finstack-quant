@@ -221,8 +221,8 @@ fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
     let funding: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.amount.amount() < 0.0)
-        .map(|flow| (flow.date, flow.amount.amount()))
+        .filter(|flow| flow.get_amount().amount() < 0.0)
+        .map(|flow| (flow.get_date(), flow.get_amount().amount()))
         .collect();
     assert_eq!(
         funding,

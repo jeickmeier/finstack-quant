@@ -81,7 +81,7 @@ impl PreparedTranche {
                             )
                         })?
                         .clone()?;
-                    pv += row.cashflow.amount.amount() * df;
+                    pv += row.cashflow.get_amount().amount() * df;
                 }
                 Money::from_model_value(pv, projection.tranche.notional.currency())
             }
@@ -135,7 +135,7 @@ impl PreparedProjection {
 impl ProjectedDiscountedRow {
     pub(super) fn discount_date(&self, as_of: Date) -> Date {
         match self.discount_at {
-            DiscountAt::PaymentDate => self.cashflow.date,
+            DiscountAt::PaymentDate => self.cashflow.get_date(),
             DiscountAt::WithinPeriod {
                 start,
                 end,

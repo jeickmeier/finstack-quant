@@ -108,8 +108,8 @@ impl TreePricer {
         if let Some(date) = schedule
             .get_flows()
             .iter()
-            .filter(|flow| flow.date > origin && flow.kind.is_cash_settlement())
-            .map(|flow| flow.date)
+            .filter(|flow| flow.get_date() > origin && flow.get_kind().is_cash_settlement())
+            .map(|flow| flow.get_date())
             .max()
         {
             return Ok(Some(date));

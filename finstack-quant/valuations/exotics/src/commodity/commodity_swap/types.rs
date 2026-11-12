@@ -537,9 +537,12 @@ mod tests {
         );
         let schedule = swap.cashflow_schedule(&market, as_of).expect("cashflows");
         let final_flow = schedule.get_flows().last().expect("last flow");
-        assert_eq!(final_flow.date, payment);
-        assert_eq!(final_flow.accrual.as_ref().expect("accrual").end, maturity);
-        assert!(final_flow.amount.amount().abs() < 1e-12);
+        assert_eq!(final_flow.get_date(), payment);
+        assert_eq!(
+            final_flow.get_accrual().as_ref().expect("accrual").end,
+            maturity
+        );
+        assert!(final_flow.get_amount().amount().abs() < 1e-12);
 
         let mut swaption = CommoditySwaption::example().expect("swaption");
         swaption.expiry = as_of;
@@ -766,7 +769,7 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .filter(|flow| flow.kind == CFKind::Fixed)
+                .filter(|flow| flow.get_kind() == CFKind::Fixed)
                 .count(),
             3
         );
@@ -774,7 +777,7 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .filter(|flow| flow.kind == CFKind::Floating)
+                .filter(|flow| flow.get_kind() == CFKind::Floating)
                 .count(),
             3
         );
@@ -782,7 +785,7 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .all(|flow| flow.accrual.is_some())
+                .all(|flow| flow.get_accrual().is_some())
         );
 
         // The canonical contractual schedule emits both fixed and floating legs.

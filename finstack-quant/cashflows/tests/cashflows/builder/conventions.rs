@@ -108,11 +108,11 @@ fn test_all_flows_preserve_currency() {
 
     for flow in schedule.get_flows() {
         assert_eq!(
-            flow.amount.currency(),
+            flow.get_amount().currency(),
             Currency::USD,
             "All flows should be USD, but found {:?} on {:?} flow",
-            flow.amount.currency(),
-            flow.kind
+            flow.get_amount().currency(),
+            flow.get_kind()
         );
     }
 }
@@ -236,9 +236,9 @@ fn sofr_swap_preset_adjusts_accrual_boundaries() {
     let last_coupon_yf = |s: &CashFlowSchedule| {
         s.get_flows()
             .iter()
-            .rfind(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
+            .rfind(|cf| matches!(cf.get_kind(), CFKind::Fixed | CFKind::Stub))
             .expect("coupon present")
-            .accrual_factor
+            .get_accrual_factor()
     };
 
     // Adjusted accrual: [2025-06-06, 2025-09-08) = 94 days on Act/360.
@@ -308,10 +308,10 @@ fn preceding_adjusted_february_termination_matches_coupon_emission() {
     let coupon = built
         .get_flows()
         .iter()
-        .find(|flow| flow.accrual.is_some())
+        .find(|flow| flow.get_accrual().is_some())
         .expect("coupon");
-    assert_eq!(coupon.accrual_factor, single.accrual_year_fraction);
-    assert!((coupon.amount.amount() - 1_000_000.0 * 0.05 * expected).abs() < 1e-8);
+    assert_eq!(coupon.get_accrual_factor(), single.accrual_year_fraction);
+    assert!((coupon.get_amount().amount() - 1_000_000.0 * 0.05 * expected).abs() < 1e-8);
 }
 
 #[test]

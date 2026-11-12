@@ -75,8 +75,8 @@ pub(crate) fn clean_call_price(
             let flows = schedule
                 .get_flows()
                 .iter()
-                .filter(|flow| flow.kind.is_cash_settlement())
-                .map(|flow| (flow.date, flow.amount))
+                .filter(|flow| flow.get_kind().is_cash_settlement())
+                .map(|flow| (flow.get_date(), flow.get_amount()))
                 .collect::<Vec<_>>();
             BondValuator::make_whole_call_price(
                 spec,

@@ -97,10 +97,10 @@ fn act365l_balance_segments_preserve_the_full_coupon_denominator() {
                 .expect("coupon schedule");
             let coupons: Vec<_> = schedule.coupons().collect();
             assert_eq!(coupons.len(), 2);
-            close(coupons[0].accrual_factor, first_days / 366.0);
-            close(coupons[1].accrual_factor, last_days / 366.0);
+            close(coupons[0].get_accrual_factor(), first_days / 366.0);
+            close(coupons[1].get_accrual_factor(), last_days / 366.0);
             close(
-                coupons.iter().map(|flow| flow.amount.amount()).sum(),
+                coupons.iter().map(|flow| flow.get_amount().amount()).sum(),
                 1_000_000.0 * 0.1 * first_days / 366.0 + 500_000.0 * 0.1 * last_days / 366.0,
             );
         }
@@ -164,7 +164,7 @@ fn act365l_periodic_fees_use_actual_stub_boundaries_for_every_balance_segment() 
             let fees: Vec<_> = schedule
                 .get_flows()
                 .iter()
-                .filter(|flow| flow.kind == CFKind::Fee)
+                .filter(|flow| flow.get_kind() == CFKind::Fee)
                 .collect();
             assert_eq!(fees.len(), if basis == "point_in_time" { 1 } else { 2 });
             let full_days = (date(maturity) - date(issue)).whole_days() as f64;
@@ -176,15 +176,15 @@ fn act365l_periodic_fees_use_actual_stub_boundaries_for_every_balance_segment() 
                     + 5_000.0 * (full_days - first_days) / denominator
             };
             close(
-                fees.iter().map(|flow| flow.amount.amount()).sum(),
+                fees.iter().map(|flow| flow.get_amount().amount()).sum(),
                 expected_amount,
             );
             close(
-                fees.iter().map(|flow| flow.accrual_factor).sum(),
+                fees.iter().map(|flow| flow.get_accrual_factor()).sum(),
                 full_days / denominator,
             );
             for flow in fees {
-                let accrual = flow.accrual.as_ref().expect("fee accrual metadata");
+                let accrual = flow.get_accrual().as_ref().expect("fee accrual metadata");
                 assert_eq!(
                     accrual.context.coupon_period,
                     Some((date(issue), date(maturity)))
@@ -195,7 +195,7 @@ fn act365l_periodic_fees_use_actual_stub_boundaries_for_every_balance_segment() 
                     ..Default::default()
                 };
                 close(
-                    flow.accrual_factor,
+                    flow.get_accrual_factor(),
                     DayCount::Act365L
                         .year_fraction(accrual.start, accrual.end, context)
                         .expect("segment retains its actual enclosing coupon"),
@@ -215,7 +215,10 @@ fn b13_adjusted_payment_does_not_delay_amortization_interest_base() {
     v["coupon_program"][0]["spec"]["business_day_convention"] = json!("following");
     let schedule = build(v);
     let last_coupon = schedule.coupons().last().expect("last quarterly coupon");
-    close(last_coupon.amount.amount(), 250_000.0 * 0.05 * 92.0 / 365.0);
+    close(
+        last_coupon.get_amount().amount(),
+        250_000.0 * 0.05 * 92.0 / 365.0,
+    );
     let replay: CashFlowSchedule =
         serde_json::from_str(&serde_json::to_string(&schedule).expect("serialize schedule"))
             .expect("restore schedule");
@@ -233,9 +236,9 @@ fn b13_adjusted_payment_does_not_delay_amortization_interest_base() {
         replay
             .get_flows()
             .iter()
-            .any(|flow| flow.kind == CFKind::Amortization
-                && flow.date == date("2025-11-17")
-                && flow.principal_date == Some(date("2025-11-15")))
+            .any(|flow| flow.get_kind() == CFKind::Amortization
+                && flow.get_date() == date("2025-11-17")
+                && flow.get_balance_date() == Some(date("2025-11-15")))
     );
 }
 
@@ -248,14 +251,17 @@ fn b14_midperiod_draw_accrues_from_its_event_date() {
         "cash":{"amount":"1000000","currency":"USD"}, "kind":"notional"
     }]);
     let schedule = build(v);
-    let interest: f64 = schedule.coupons().map(|flow| flow.amount.amount()).sum();
+    let interest: f64 = schedule
+        .coupons()
+        .map(|flow| flow.get_amount().amount())
+        .sum();
     close(interest, 1_000_000.0 * 0.1 * 59.0 / 360.0);
     let draw = schedule
         .get_flows()
         .iter()
-        .find(|flow| flow.amount.amount() < 0.0)
+        .find(|flow| flow.get_amount().amount() < 0.0)
         .expect("draw cashflow");
-    assert_eq!(draw.date, date("2025-02-03"));
+    assert_eq!(draw.get_date(), date("2025-02-03"));
     assert_eq!(
         draw.get_balance_date().expect("principal row balance date"),
         date("2025-02-01")
@@ -271,11 +277,11 @@ fn b13_preceding_final_payment_includes_contractual_pik() {
     let redemption = schedule
         .get_flows()
         .iter()
-        .find(|flow| flow.kind == CFKind::Notional && flow.amount.amount() > 0.0)
+        .find(|flow| flow.get_kind() == CFKind::Notional && flow.get_amount().amount() > 0.0)
         .expect("final redemption");
-    assert!(redemption.date < date("2024-03-31"));
+    assert!(redemption.get_date() < date("2024-03-31"));
     close(
-        redemption.amount.amount(),
+        redemption.get_amount().amount(),
         1_000_000.0 * (1.0 + 0.1 * 90.0 / 360.0),
     );
 }
@@ -312,7 +318,10 @@ fn b14_overnight_principal_events_preserve_cumulative_rate_clock() {
     let first = 0.1 / 360.0;
     let second = first * (1.0 + first);
     let expected = 1_000_000.0 * first + 500_000.0 * second;
-    let amount: f64 = schedule.coupons().map(|flow| flow.amount.amount()).sum();
+    let amount: f64 = schedule
+        .coupons()
+        .map(|flow| flow.get_amount().amount())
+        .sum();
     close(amount, expected);
 }
 
@@ -336,13 +345,13 @@ fn amortization_spans_all_step_up_segments() {
         let repayments: Vec<_> = s
             .get_flows()
             .iter()
-            .filter(|f| f.kind == CFKind::Amortization)
+            .filter(|f| f.get_kind() == CFKind::Amortization)
             .collect();
         assert_eq!(repayments.len(), 4);
         for f in repayments {
-            close(f.amount.amount(), 250.0);
+            close(f.get_amount().amount(), 250.0);
         }
-        assert!(s.coupons().all(|f| f.amount.amount() > 0.0));
+        assert!(s.coupons().all(|f| f.get_amount().amount() > 0.0));
     }
 }
 #[test]
@@ -375,8 +384,8 @@ fn short_back_icma_uses_forward_quasi_coupon() {
     v["coupon_program"][0]["spec"]["day_count"] = json!("act_act_isma");
     let s = build(v);
     let coupon = s.coupons().next().expect("stub");
-    close(coupon.accrual_factor, 74.0 / 89.0 / 4.0);
-    close(coupon.amount.amount(), 100000.0 * 74.0 / 89.0 / 4.0);
+    close(coupon.get_accrual_factor(), 74.0 / 89.0 / 4.0);
+    close(coupon.get_amount().amount(), 100000.0 * 74.0 / 89.0 / 4.0);
 }
 #[test]
 fn accrued_and_ex_coupon_follow_payment_date() {
@@ -446,7 +455,7 @@ fn funding_outflow_has_no_default_recovery_payment() {
     let draw_index = s
         .get_flows()
         .iter()
-        .position(|f| f.date == date("2025-07-01"))
+        .position(|f| f.get_date() == date("2025-07-01"))
         .expect("draw");
     let pvs = cf::aggregation::credit_adjusted_cashflow_pvs(
         s.get_flows(),
@@ -469,9 +478,9 @@ fn issue_amortization_updates_fee_history() {
         close(
             s.get_flows()
                 .iter()
-                .find(|f| f.kind == CFKind::Fee)
+                .find(|f| f.get_kind() == CFKind::Fee)
                 .expect("fee")
-                .amount
+                .get_amount()
                 .amount(),
             2.0,
         );
@@ -574,11 +583,11 @@ fn terminal_window_payment_lag_redeems_final_pik() {
         let redemption = s
             .get_flows()
             .iter()
-            .find(|f| f.kind == CFKind::Notional && f.amount.amount() > 0.0)
+            .find(|f| f.get_kind() == CFKind::Notional && f.get_amount().amount() > 0.0)
             .expect("redemption");
-        assert_eq!(redemption.date, date("2025-07-03"));
+        assert_eq!(redemption.get_date(), date("2025-07-03"));
         close(
-            redemption.amount.amount(),
+            redemption.get_amount().amount(),
             1_000_000.0 * (1.0 + 0.1 * 91.0 / 360.0),
         );
         close(
@@ -616,18 +625,18 @@ fn february_rate_and_payment_boundaries_are_not_termination() {
         let coupon = s
             .get_flows()
             .iter()
-            .find(|f| f.date == date("2025-02-28"))
+            .find(|f| f.get_date() == date("2025-02-28"))
             .expect("February coupon");
         // A PIK coupon's value is its explicit capitalization, not cash.
-        let value = if coupon.kind == finstack_quant_core::cashflow::CFKind::Pik {
-            coupon.principal_delta.expect("PIK delta").amount()
+        let value = if coupon.get_kind() == finstack_quant_core::cashflow::CFKind::Pik {
+            coupon.get_principal_delta().expect("PIK delta").amount()
         } else {
-            coupon.amount.amount()
+            coupon.get_amount().amount()
         };
         close(value, 50_000.0);
         assert_eq!(
             coupon
-                .accrual
+                .get_accrual()
                 .as_ref()
                 .expect("metadata")
                 .context

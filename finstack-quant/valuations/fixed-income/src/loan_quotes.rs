@@ -79,8 +79,8 @@ pub(crate) fn ytm_from_schedule(
         schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.date > settlement && cf.kind.is_cash_settlement())
-            .map(|cf| (cf.date, cf.amount.amount())),
+            .filter(|cf| cf.get_date() > settlement && cf.get_kind().is_cash_settlement())
+            .map(|cf| (cf.get_date(), cf.get_amount().amount())),
     );
     xirr_on_basis(&flows, basis)
 }
@@ -215,8 +215,8 @@ pub fn all_in_rate_from_schedule(
     let cash_cost: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.date > as_of)
-        .filter_map(|cf| match cf.kind {
+        .filter(|cf| cf.get_date() > as_of)
+        .filter_map(|cf| match cf.get_kind() {
             CFKind::Fixed
             | CFKind::Floating
             | CFKind::Stub
@@ -225,7 +225,7 @@ pub fn all_in_rate_from_schedule(
             | CFKind::UsageFee
             | CFKind::FacilityFee
             | CFKind::LcFee
-            | CFKind::FrontingFee => Some(cf.amount.amount()),
+            | CFKind::FrontingFee => Some(cf.get_amount().amount()),
             _ => None,
         })
         .sum();
@@ -368,10 +368,10 @@ pub fn oid_eir_schedule_from_flows(
 
     let mut buckets: BTreeMap<Date, Bucket> = BTreeMap::new();
     for cf in schedule.get_flows() {
-        let amount = cf.amount.amount();
-        match cf.kind {
+        let amount = cf.get_amount().amount();
+        match cf.get_kind() {
             CFKind::Fixed | CFKind::Floating | CFKind::Stub => {
-                let b = buckets.entry(cf.date).or_default();
+                let b = buckets.entry(cf.get_date()).or_default();
                 b.total += amount;
                 b.interest += amount;
             }
@@ -383,13 +383,13 @@ pub fn oid_eir_schedule_from_flows(
             | CFKind::FrontingFee
                 if include_fees =>
             {
-                let b = buckets.entry(cf.date).or_default();
+                let b = buckets.entry(cf.get_date()).or_default();
                 b.total += amount;
                 b.interest += amount;
             }
-            CFKind::Amortization => buckets.entry(cf.date).or_default().total += amount,
+            CFKind::Amortization => buckets.entry(cf.get_date()).or_default().total += amount,
             CFKind::Notional => {
-                let b = buckets.entry(cf.date).or_default();
+                let b = buckets.entry(cf.get_date()).or_default();
                 b.total += amount;
                 b.notional += amount;
             }

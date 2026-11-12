@@ -488,10 +488,10 @@ mod tests {
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected
         );
         assert_eq!(schedule.get_flows().len(), 3);
-        assert_eq!(schedule.get_flows()[0].date, noi1);
-        assert_eq!(schedule.get_flows()[0].amount.amount(), 100.0);
-        assert_eq!(schedule.get_flows()[1].date, noi2);
-        assert!(schedule.get_flows()[2].amount.amount() > 100.0);
+        assert_eq!(schedule.get_flows()[0].get_date(), noi1);
+        assert_eq!(schedule.get_flows()[0].get_amount().amount(), 100.0);
+        assert_eq!(schedule.get_flows()[1].get_date(), noi2);
+        assert!(schedule.get_flows()[2].get_amount().amount() > 100.0);
     }
 
     fn build_dcf_asset() -> RealEstateAsset {

@@ -615,8 +615,13 @@ impl Bond {
         let mut coupon_dates: Vec<Date> = schedule
             .get_flows()
             .iter()
-            .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub | CFKind::Floating))
-            .map(|cf| cf.date)
+            .filter(|cf| {
+                matches!(
+                    cf.get_kind(),
+                    CFKind::Fixed | CFKind::Stub | CFKind::Floating
+                )
+            })
+            .map(|cf| cf.get_date())
             .collect();
         coupon_dates.sort();
         coupon_dates.dedup();

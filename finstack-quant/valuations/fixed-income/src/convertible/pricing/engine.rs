@@ -403,17 +403,17 @@ fn resolved_value(
     for cf in schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.date > as_of && cf.kind.is_cash_settlement())
+        .filter(|cf| cf.get_date() > as_of && cf.get_kind().is_cash_settlement())
     {
         let earned_coupon = cf
-            .accrual
+            .get_accrual()
             .as_ref()
             .is_some_and(|period| period.end <= ended)
-            && !cf.kind.is_principal_like();
-        let pending_redemption = mandatory_date.is_none() && cf.kind.is_principal_like();
+            && !cf.get_kind().is_principal_like();
+        let pending_redemption = mandatory_date.is_none() && cf.get_kind().is_principal_like();
         if earned_coupon || pending_redemption {
-            let survival = conditional_survival(hazard.as_deref(), as_of, cf.date)?;
-            let df = discount.df_between_dates(as_of, cf.date)?;
+            let survival = conditional_survival(hazard.as_deref(), as_of, cf.get_date())?;
+            let df = discount.df_between_dates(as_of, cf.get_date())?;
             let recovery = if pending_redemption {
                 bond.recovery_rate.unwrap_or(0.0)
                     * finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight(
@@ -422,7 +422,7 @@ fn resolved_value(
             } else {
                 0.0
             };
-            value += cf.amount.amount() * (df * survival + recovery);
+            value += cf.get_amount().amount() * (df * survival + recovery);
         }
     }
     Ok(Some(Money::from_model_value(
@@ -459,16 +459,16 @@ fn price_convertible_bond_with_inputs(
             .cashflow_schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.date >= as_of && cf.kind.is_cash_settlement())
+            .filter(|cf| cf.get_date() >= as_of && cf.get_kind().is_cash_settlement())
         {
-            let survival = conditional_survival(hazard.as_deref(), as_of, cf.date)?;
-            let df = discount.df_between_dates(as_of, cf.date)?;
-            if cf.kind.is_principal_like() {
-                principal += cf.amount.amount();
-                redemption_pv += cf.amount.amount() * (df * survival + bond.recovery_rate.unwrap_or(0.0)
+            let survival = conditional_survival(hazard.as_deref(), as_of, cf.get_date())?;
+            let df = discount.df_between_dates(as_of, cf.get_date())?;
+            if cf.get_kind().is_principal_like() {
+                principal += cf.get_amount().amount();
+                redemption_pv += cf.get_amount().amount() * (df * survival + bond.recovery_rate.unwrap_or(0.0)
                     * finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight(df, survival)?);
             } else {
-                maturity_coupon += cf.amount.amount() * df * survival;
+                maturity_coupon += cf.get_amount().amount() * df * survival;
             }
         }
         let redemption_value = bond
@@ -590,9 +590,10 @@ pub(crate) fn price_bond_floor(
         return schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.date >= as_of && cf.kind.is_cash_settlement())
+            .filter(|cf| cf.get_date() >= as_of && cf.get_kind().is_cash_settlement())
             .try_fold(0.0, |value, cf| {
-                Ok(value + cf.amount.amount() * curve.df_between_dates(as_of, cf.date)?)
+                Ok(value
+                    + cf.get_amount().amount() * curve.df_between_dates(as_of, cf.get_date())?)
             });
     }
     let inputs = prepare_for_pricing(bond, market_context, as_of)?;
@@ -862,13 +863,12 @@ pub(crate) fn settlement_dirty_price(
         .transpose()?;
     let schedule = build_convertible_schedule(bond, market)?;
     let mut interim = 0.0;
-    for cf in schedule
-        .get_flows()
-        .iter()
-        .filter(|cf| cf.date > as_of && cf.date <= settle && cf.kind.is_cash_settlement())
-    {
-        let survival = conditional_survival(hazard.as_deref(), as_of, cf.date)?;
-        interim += cf.amount.amount() * discount.df_between_dates(as_of, cf.date)? * survival;
+    for cf in schedule.get_flows().iter().filter(|cf| {
+        cf.get_date() > as_of && cf.get_date() <= settle && cf.get_kind().is_cash_settlement()
+    }) {
+        let survival = conditional_survival(hazard.as_deref(), as_of, cf.get_date())?;
+        interim +=
+            cf.get_amount().amount() * discount.df_between_dates(as_of, cf.get_date())? * survival;
     }
     Ok((present_value - interim) / discount.df_between_dates(as_of, settle)?)
 }

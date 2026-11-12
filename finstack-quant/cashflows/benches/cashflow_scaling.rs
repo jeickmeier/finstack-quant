@@ -123,7 +123,7 @@ fn check_adjusted_schedule(
             adjust(start, BusinessDayConvention::ModifiedFollowing, calendar).unwrap();
         let adjusted_end = adjust(end, BusinessDayConvention::ModifiedFollowing, calendar).unwrap();
         let accrual = coupon
-            .accrual
+            .get_accrual()
             .as_ref()
             .expect("fixed coupon accrual metadata");
         assert_eq!(
@@ -143,14 +143,14 @@ fn check_adjusted_schedule(
             }
         );
         assert_eq!(
-            coupon.date,
+            coupon.get_date(),
             adjusted_end.add_business_days(lag, calendar).unwrap()
         );
     }
     let redemption = schedule.get_flows().last().unwrap();
-    assert_eq!(redemption.kind, CFKind::Notional);
-    assert_eq!(redemption.date, coupons.last().unwrap().date);
-    checks::close(redemption.amount.amount(), 1_000_000.0, 1e-8);
+    assert_eq!(redemption.get_kind(), CFKind::Notional);
+    assert_eq!(redemption.get_date(), coupons.last().unwrap().get_date());
+    checks::close(redemption.get_amount().amount(), 1_000_000.0, 1e-8);
 }
 
 fn check_amortizing_monthly(schedule: &CashFlowSchedule, base: Date, coupons: usize) {
@@ -159,7 +159,7 @@ fn check_amortizing_monthly(schedule: &CashFlowSchedule, base: Date, coupons: us
     let principal_rows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Amortization)
+        .filter(|flow| flow.get_kind() == CFKind::Amortization)
         .collect();
     assert_eq!(coupon_rows.len(), coupons);
     assert_eq!(principal_rows.len(), coupons);
@@ -172,12 +172,12 @@ fn check_amortizing_monthly(schedule: &CashFlowSchedule, base: Date, coupons: us
         let start = base.add_months(i as i32).unwrap();
         let end = base.add_months((i + 1) as i32).unwrap();
         let accrual = coupon
-            .accrual
+            .get_accrual()
             .as_ref()
             .expect("monthly coupon accrual metadata");
         assert_eq!((accrual.start, accrual.end), (start, end));
-        assert_eq!(coupon.date, end);
-        assert_eq!(principal.date, end);
+        assert_eq!(coupon.get_date(), end);
+        assert_eq!(principal.get_date(), end);
         assert_eq!(
             principal
                 .get_balance_date()
@@ -186,15 +186,18 @@ fn check_amortizing_monthly(schedule: &CashFlowSchedule, base: Date, coupons: us
         );
         let opening = 1_000_000.0 * (coupons - i) as f64 / coupons as f64;
         let expected_coupon = opening * 0.06 * (end - start).whole_days() as f64 / 365.0;
-        checks::close(coupon.amount.amount(), expected_coupon, 1e-6);
+        checks::close(coupon.get_amount().amount(), expected_coupon, 1e-6);
         checks::close(
-            principal.amount.amount(),
+            principal.get_amount().amount(),
             1_000_000.0 / coupons as f64,
             1e-6,
         );
     }
     checks::close(
-        principal_rows.iter().map(|flow| flow.amount.amount()).sum(),
+        principal_rows
+            .iter()
+            .map(|flow| flow.get_amount().amount())
+            .sum(),
         1_000_000.0,
         1e-6,
     );

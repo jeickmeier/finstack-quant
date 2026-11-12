@@ -49,8 +49,10 @@ fn cds_front_accrual_replays_pre_issue_and_later_balance_changes() {
         let first_coupon: f64 = schedule
             .get_flows()
             .iter()
-            .filter(|flow| flow.kind.is_coupon() && flow.date.to_string() == "2024-03-20")
-            .map(|flow| flow.amount.amount())
+            .filter(|flow| {
+                flow.get_kind().is_coupon() && flow.get_date().to_string() == "2024-03-20"
+            })
+            .map(|flow| flow.get_amount().amount())
             .sum();
         let expected = if pre_issue_draw {
             // Dec 20-Jan 1: 12 days; Jan 1-Feb 1: 31; Feb 1-Mar 20: 48.
@@ -135,8 +137,8 @@ fn explicit_amortization_can_repay_capitalized_pik_above_initial_principal() {
     let amortization: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Amortization)
-        .map(|flow| flow.amount.amount())
+        .filter(|flow| flow.get_kind() == CFKind::Amortization)
+        .map(|flow| flow.get_amount().amount())
         .sum();
     close(amortization, 103.0);
     close(
@@ -165,9 +167,9 @@ fn periodic_fee_normalizes_basis_points_before_large_notional_multiplication() {
     let fee = schedule
         .get_flows()
         .iter()
-        .find(|flow| flow.kind == CFKind::Fee)
+        .find(|flow| flow.get_kind() == CFKind::Fee)
         .expect("fee");
-    close(fee.amount.amount(), 2.5e25);
+    close(fee.get_amount().amount(), 2.5e25);
     value["fees"][0]["periodic_bp"]["bp"] = json!("100000000000000000000");
     assert!(
         build(value)
@@ -196,9 +198,12 @@ fn periodic_fee_preserves_tiny_quotes_on_large_notionals() {
         let fee = schedule
             .get_flows()
             .iter()
-            .find(|flow| flow.kind == CFKind::Fee)
+            .find(|flow| flow.get_kind() == CFKind::Fee)
             .expect("nonzero fee");
-        close(fee.amount.amount(), expected_fee);
-        close(fee.rate.expect("annual rate metadata") / expected_rate, 1.0);
+        close(fee.get_amount().amount(), expected_fee);
+        close(
+            fee.get_rate().expect("annual rate metadata") / expected_rate,
+            1.0,
+        );
     }
 }

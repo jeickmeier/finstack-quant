@@ -123,8 +123,8 @@ fn notional_sum(schedule: &finstack_quant_cashflows::builder::CashFlowSchedule) 
     schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Notional)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_kind() == CFKind::Notional)
+        .map(|cf| cf.get_amount().amount())
         .sum()
 }
 
@@ -171,7 +171,11 @@ fn seasoned_stochastic_facility_prices_and_conserves_principal() {
                 .cashflows
                 .get_flows()
                 .iter()
-                .filter(|cf| cf.kind == CFKind::Notional && cf.date > as_of && cf.date < MATURITY)
+                .filter(|cf| {
+                    cf.get_kind() == CFKind::Notional
+                        && cf.get_date() > as_of
+                        && cf.get_date() < MATURITY
+                })
                 .count();
             assert!(
                 interim >= 1,
@@ -325,15 +329,15 @@ fn intra_period_resets_refix_the_coupon_in_both_engines() {
     let first = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::Floating)
+        .find(|cf| cf.get_kind() == CFKind::Floating)
         .expect("first coupon");
     let expected = 10_000_000.0 * (0.02 * t_feb + 0.04 * (t_mar - t_feb) + 0.06 * (t_apr - t_mar));
     let period_start_only = 10_000_000.0 * 0.02 * t_apr;
     assert!(
-        (first.amount.amount() - expected).abs() < 1e-6,
+        (first.get_amount().amount() - expected).abs() < 1e-6,
         "first coupon {} must re-fix monthly (expected {expected}, period-start-only would be \
          {period_start_only})",
-        first.amount.amount()
+        first.get_amount().amount()
     );
 
     // Zero-volatility stochastic twin at 100% utilization must reproduce the
@@ -361,14 +365,14 @@ fn intra_period_resets_refix_the_coupon_in_both_engines() {
         .cashflows
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Floating)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_kind() == CFKind::Floating)
+        .map(|cf| cf.get_amount().amount())
         .collect();
     let det_coupons: Vec<f64> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Floating)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_kind() == CFKind::Floating)
+        .map(|cf| cf.get_amount().amount())
         .collect();
     assert_eq!(path_coupons.len(), det_coupons.len());
     for (i, (p, d)) in path_coupons.iter().zip(&det_coupons).enumerate() {
@@ -437,8 +441,8 @@ fn stochastic_hull_white_rates_keep_the_index_basis() {
                 .cashflows
                 .get_flows()
                 .iter()
-                .find(|cf| cf.kind == CFKind::Floating)
-                .and_then(|cf| cf.rate)
+                .find(|cf| cf.get_kind() == CFKind::Floating)
+                .and_then(|cf| cf.get_rate())
                 .expect("first coupon rate")
         };
     let rate_hw = first_rate(&pv_hw);
@@ -563,8 +567,8 @@ fn stochastic_funding_leg_conserves_cash_for_small_draws() {
             .cashflows
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind == CFKind::Notional && cf.date >= MATURITY)
-            .map(|cf| cf.amount.amount())
+            .filter(|cf| cf.get_kind() == CFKind::Notional && cf.get_date() >= MATURITY)
+            .map(|cf| cf.get_amount().amount())
             .sum();
         assert!(
             terminal > drawn + 10.0,

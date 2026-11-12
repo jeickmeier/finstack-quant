@@ -402,8 +402,8 @@ fn b14_ddtl_linear_amortizes_each_draw_over_its_remaining_dates() {
     let repayments: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Amortization && flow.amount.amount() > 0.0)
-        .map(|flow| flow.amount.amount())
+        .filter(|flow| flow.get_kind() == CFKind::Amortization && flow.get_amount().amount() > 0.0)
+        .map(|flow| flow.get_amount().amount())
         .collect();
     assert_eq!(repayments, vec![150_000.0, 150_000.0, 300_000.0, 300_000.0]);
 }
@@ -417,8 +417,8 @@ fn b14_ddtl_usage_fee_begins_at_the_draw_date() {
     let first_fee: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Fee && flow.date == date!(2025 - 04 - 01))
-        .map(|flow| flow.amount.amount())
+        .filter(|flow| flow.get_kind() == CFKind::Fee && flow.get_date() == date!(2025 - 04 - 01))
+        .map(|flow| flow.get_amount().amount())
         .sum();
     assert!((first_fee - 600_000.0 * 0.005 * 59.0 / 360.0).abs() < 1e-8);
 }
@@ -433,9 +433,9 @@ fn b14_ddtl_original_principal_excludes_future_draws() {
     let first = schedule
         .get_flows()
         .iter()
-        .find(|flow| flow.kind == CFKind::Amortization)
+        .find(|flow| flow.get_kind() == CFKind::Amortization)
         .expect("first repayment");
-    assert_eq!(first.amount.amount(), 30_000.0);
+    assert_eq!(first.get_amount().amount(), 30_000.0);
 }
 
 #[test]

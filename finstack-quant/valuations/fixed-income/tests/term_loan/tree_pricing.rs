@@ -517,15 +517,15 @@ fn quoted_oas_discounts_off_grid_cashflows_at_event_time() {
     let expected = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.date > settlement && flow.kind != CFKind::Pik)
+        .filter(|flow| flow.get_date() > settlement && flow.get_kind() != CFKind::Pik)
         .try_fold(0.0, |pv, flow| {
             let t = discount.day_count().year_fraction(
                 settlement,
-                flow.date,
+                flow.get_date(),
                 finstack_quant_core::dates::DayCountContext::default(),
             )?;
-            let df = discount.df_between_dates(settlement, flow.date)?;
-            Ok::<_, finstack_quant_core::Error>(pv + flow.amount.amount() * df * (-0.02 * t).exp())
+            let df = discount.df_between_dates(settlement, flow.get_date())?;
+            Ok::<_, finstack_quant_core::Error>(pv + flow.get_amount().amount() * df * (-0.02 * t).exp())
         })
         .expect("analytical OAS PV")
         // PV on `as_of`: the settlement-date value discounted over the lag.

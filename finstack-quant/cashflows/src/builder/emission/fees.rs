@@ -228,7 +228,7 @@ mod tests {
             &mut flows,
         )
         .expect("valid fee accrual");
-        let amount: f64 = flows.iter().map(|flow| flow.amount.amount()).sum();
+        let amount: f64 = flows.iter().map(|flow| flow.get_amount().amount()).sum();
         assert!((amount - 1_000_000.0 * 0.005 * 30.0 / 365.0).abs() < 1e-8);
     }
 
@@ -262,10 +262,10 @@ mod tests {
         .expect("valid date");
 
         assert_eq!(flows.len(), 1);
-        let fee = flows[0].amount.amount();
+        let fee = flows[0].get_amount().amount();
         assert!((fee - 1250.0).abs() < 0.01, "Expected ~1250.0, got {}", fee);
         let accrual = flows[0]
-            .accrual
+            .get_accrual()
             .as_ref()
             .expect("periodic fee should own its accrual metadata");
         assert_eq!((accrual.start, accrual.end), (start, end));
@@ -322,10 +322,10 @@ mod tests {
         assert_eq!(flows_pit.len(), 1);
         assert_eq!(flows_twa.len(), 1);
         assert!(
-            (flows_pit[0].amount.amount() - flows_twa[0].amount.amount()).abs() < 1e-10,
+            (flows_pit[0].get_amount().amount() - flows_twa[0].get_amount().amount()).abs() < 1e-10,
             "PIT={} vs TWA={}",
-            flows_pit[0].amount.amount(),
-            flows_twa[0].amount.amount()
+            flows_pit[0].get_amount().amount(),
+            flows_twa[0].get_amount().amount()
         );
     }
 
@@ -359,7 +359,7 @@ mod tests {
         .expect("valid date");
 
         assert_eq!(flows.len(), 2);
-        let fee: f64 = flows.iter().map(|flow| flow.amount.amount()).sum();
+        let fee: f64 = flows.iter().map(|flow| flow.get_amount().amount()).sum();
         let expected_twa = (1_000_000.0 * 30.0 + 500_000.0 * 60.0) / 90.0;
         let expected_fee = expected_twa * 0.005 * (90.0 / 360.0);
         assert!(
@@ -406,7 +406,7 @@ mod tests {
         let twa_outstanding = (1_000_000.0 * 30.0 + 500_000.0 * 60.0) / 90.0;
         let undrawn = commitment - twa_outstanding;
         let expected_fee = undrawn * 0.005 * (90.0 / 360.0);
-        let fee: f64 = flows.iter().map(|flow| flow.amount.amount()).sum();
+        let fee: f64 = flows.iter().map(|flow| flow.get_amount().amount()).sum();
         assert!(
             (fee - expected_fee).abs() < 0.02,
             "Expected ~{:.2}, got {:.2}",
@@ -447,7 +447,7 @@ mod tests {
         .expect("valid fee inputs");
 
         assert_eq!(flows.len(), 1);
-        let fee = flows[0].amount.amount();
+        let fee = flows[0].get_amount().amount();
         // 1,000,000 * 50bp * 90/360 = 1250.0 (golden, period-start base)
         assert!(
             (fee - 1250.0).abs() < 0.01,
@@ -484,7 +484,7 @@ mod tests {
         .expect("valid fee inputs");
 
         assert_eq!(flows.len(), 1, "negative fee must not be dropped");
-        let fee = flows[0].amount.amount();
+        let fee = flows[0].get_amount().amount();
         assert!(
             (fee + 1250.0).abs() < 0.01,
             "Expected -1250.0 rebate, got {fee}"

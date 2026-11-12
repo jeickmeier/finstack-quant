@@ -309,14 +309,19 @@ fn check_reference(
     let floating: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Floating)
+        .filter(|flow| flow.get_kind() == CFKind::Floating)
         .collect();
     assert_eq!(floating.len(), reference.coupons.len());
     for (flow, coupon) in floating.iter().zip(&reference.coupons) {
-        assert_eq!(flow.date, coupon.payment);
-        assert_eq!(flow.amount.currency(), Currency::USD);
-        close("float accrual", flow.accrual_factor, coupon.alpha, 1e-15);
-        let rate = flow.rate.unwrap();
+        assert_eq!(flow.get_date(), coupon.payment);
+        assert_eq!(flow.get_amount().currency(), Currency::USD);
+        close(
+            "float accrual",
+            flow.get_accrual_factor(),
+            coupon.alpha,
+            1e-15,
+        );
+        let rate = flow.get_rate().unwrap();
         close(
             "coupon rate",
             rate,
@@ -325,7 +330,7 @@ fn check_reference(
         );
         close(
             "coupon factor",
-            1.0 + rate * flow.accrual_factor,
+            1.0 + rate * flow.get_accrual_factor(),
             coupon.factor,
             FACTOR_BOUND,
         );
@@ -478,7 +483,7 @@ fn check_compact(
             before
                 .get_flows()
                 .iter()
-                .filter(|flow| flow.kind == kind)
+                .filter(|flow| flow.get_kind() == kind)
                 .count(),
             1
         );
@@ -501,35 +506,40 @@ fn check_compact(
     }
     let alpha = 8.0 / 360.0;
     for flow in before.get_flows() {
-        assert_eq!(flow.date, date!(2025 - 01 - 14));
-        assert_eq!(flow.amount.currency(), Currency::USD);
-        close("compact accrual", flow.accrual_factor, alpha, 1e-15);
-        match flow.kind {
+        assert_eq!(flow.get_date(), date!(2025 - 01 - 14));
+        assert_eq!(flow.get_amount().currency(), Currency::USD);
+        close("compact accrual", flow.get_accrual_factor(), alpha, 1e-15);
+        match flow.get_kind() {
             CFKind::Stub => {
                 close(
                     "signed fixed coupon",
-                    flow.amount.amount(),
+                    flow.get_amount().amount(),
                     -NOTIONAL * 0.04 * alpha,
                     FIXED_PV_BOUND,
                 );
-                close("fixed coupon rate", flow.rate.unwrap(), 0.04, FACTOR_BOUND);
+                close(
+                    "fixed coupon rate",
+                    flow.get_rate().unwrap(),
+                    0.04,
+                    FACTOR_BOUND,
+                );
             }
             CFKind::Floating => {
                 close(
                     "signed floating coupon",
-                    flow.amount.amount(),
+                    flow.get_amount().amount(),
                     NOTIONAL * (factor - 1.0),
                     NOTIONAL * FACTOR_BOUND,
                 );
                 close(
                     "compact factor",
-                    1.0 + flow.rate.unwrap() * alpha,
+                    1.0 + flow.get_rate().unwrap() * alpha,
                     factor,
                     FACTOR_BOUND,
                 );
                 close(
                     "compact coupon rate",
-                    flow.rate.unwrap(),
+                    flow.get_rate().unwrap(),
                     (factor - 1.0) / alpha,
                     FACTOR_BOUND,
                 );
@@ -578,12 +588,12 @@ fn ois_baseline_compact_export_and_inclusive_fixing_roll() {
             .get_flows()
             .iter()
             .find(|flow| {
-                flow.date == pay.date
-                    && flow.kind == pay.kind
-                    && flow.amount.currency() == pay.amount.currency()
+                flow.get_date() == pay.get_date()
+                    && flow.get_kind() == pay.get_kind()
+                    && flow.get_amount().currency() == pay.get_amount().currency()
             })
             .unwrap();
-        assert_eq!(pay.amount.amount(), -receive.amount.amount());
+        assert_eq!(pay.get_amount().amount(), -receive.get_amount().amount());
     }
     let mut spread = swap.clone();
     spread.float_leg.spread_bp = dec!(100);
@@ -593,14 +603,14 @@ fn ois_baseline_compact_export_and_inclusive_fixing_roll() {
         spread_schedule.get_meta().projected_fixings
     );
     for (base, shifted) in schedule.get_flows().iter().zip(spread_schedule.get_flows()) {
-        let expected_change = if base.kind == CFKind::Floating {
+        let expected_change = if base.get_kind() == CFKind::Floating {
             NOTIONAL * 0.01 * 8.0 / 360.0
         } else {
             0.0
         };
         close(
             "arithmetic spread cash",
-            shifted.amount.amount() - base.amount.amount(),
+            shifted.get_amount().amount() - base.get_amount().amount(),
             expected_change,
             FIXED_PV_BOUND,
         );

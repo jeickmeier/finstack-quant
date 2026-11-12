@@ -98,21 +98,23 @@ pub(crate) fn pv_mtm_reset_raw(
     let constant_discount = context.get_discount(&constant_leg.leg.discount_curve_id)?;
     let resetting_discount = context.get_discount(&resetting_leg.leg.discount_curve_id)?;
     let mut pv = NeumaierAccumulator::new();
-    for cashflow in flows.iter().filter(|flow| flow.date > as_of) {
-        let curve = if cashflow.amount.currency() == constant_leg.notional.currency() {
+    for cashflow in flows.iter().filter(|flow| flow.get_date() > as_of) {
+        let curve = if cashflow.get_amount().currency() == constant_leg.notional.currency() {
             &constant_discount
         } else {
             &resetting_discount
         };
-        let df = curve.as_ref().df_between_dates(as_of, cashflow.date)?;
-        let df = require_positive_df(df, &swap.id, "native cashflow", cashflow.date)?;
-        let amount = cashflow.amount.amount() * df;
-        let converted = if cashflow.amount.currency() == swap.reporting_currency {
+        let df = curve
+            .as_ref()
+            .df_between_dates(as_of, cashflow.get_date())?;
+        let df = require_positive_df(df, &swap.id, "native cashflow", cashflow.get_date())?;
+        let amount = cashflow.get_amount().amount() * df;
+        let converted = if cashflow.get_amount().currency() == swap.reporting_currency {
             amount
         } else {
             amount
                 * fx.rate(FxQuery::new(
-                    cashflow.amount.currency(),
+                    cashflow.get_amount().currency(),
                     swap.reporting_currency,
                     as_of,
                     finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,

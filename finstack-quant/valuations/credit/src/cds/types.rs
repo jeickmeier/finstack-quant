@@ -770,9 +770,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CreditDefaultSwap {
         let sign = self.side.sign();
         schedule.update_flows(|cf| {
             cf.amount = if sign < 0.0 {
-                cf.amount.checked_neg()
+                cf.get_amount().checked_neg()
             } else {
-                cf.amount
+                cf.get_amount()
             };
         });
 

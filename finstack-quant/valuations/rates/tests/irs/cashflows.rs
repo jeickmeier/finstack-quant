@@ -116,12 +116,12 @@ fn test_irs_cashflows_have_no_notional_exchange() {
         schedule
             .get_flows()
             .iter()
-            .all(|cf| cf.kind != finstack_quant_core::cashflow::CFKind::Notional),
+            .all(|cf| cf.get_kind() != finstack_quant_core::cashflow::CFKind::Notional),
         "vanilla IRS must not emit issue or redemption notionals"
     );
     assert!(
         schedule.get_flows().iter().any(|cf| matches!(
-            cf.kind,
+            cf.get_kind(),
             finstack_quant_core::cashflow::CFKind::Fixed
                 | finstack_quant_core::cashflow::CFKind::Floating
         )),
@@ -277,22 +277,22 @@ fn test_irs_value_matches_combined_signed_schedule() {
         .get_flows()
         .iter()
         .try_fold(0.0, |acc, flow| -> finstack_quant_core::Result<f64> {
-            let payment_date = match flow.kind {
+            let payment_date = match flow.get_kind() {
                 finstack_quant_core::cashflow::CFKind::Fixed
                 | finstack_quant_core::cashflow::CFKind::Stub => add_payment_delay(
-                    flow.date,
+                    flow.get_date(),
                     swap.fixed_leg.payment_lag_days,
                     swap.fixed_leg.calendar_id.as_deref(),
                 )?,
                 finstack_quant_core::cashflow::CFKind::Floating => add_payment_delay(
-                    flow.date,
+                    flow.get_date(),
                     swap.float_leg.payment_lag_days,
                     swap.float_leg.calendar_id.as_deref(),
                 )?,
-                _ => flow.date,
+                _ => flow.get_date(),
             };
             let df = discount.df_between_dates(as_of, payment_date)?;
-            Ok(acc + flow.amount.amount() * df)
+            Ok(acc + flow.get_amount().amount() * df)
         })
         .unwrap();
 
@@ -480,11 +480,14 @@ fn test_irs_full_schedule_with_cfkind() {
     // Verify we have both fixed and floating cashflows
     use finstack_quant_core::cashflow::CFKind;
 
-    let has_fixed = sched.get_flows().iter().any(|cf| cf.kind == CFKind::Fixed);
+    let has_fixed = sched
+        .get_flows()
+        .iter()
+        .any(|cf| cf.get_kind() == CFKind::Fixed);
     let has_float = sched
         .get_flows()
         .iter()
-        .any(|cf| cf.kind == CFKind::Floating);
+        .any(|cf| cf.get_kind() == CFKind::Floating);
 
     assert!(has_fixed || has_float, "Should have classified cashflows");
 }
@@ -537,7 +540,7 @@ fn test_regular_short_front_schedule_does_not_tag_first_coupon_as_stub() {
     let fixed_stub_count = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Stub)
+        .filter(|cf| cf.get_kind() == finstack_quant_core::cashflow::CFKind::Stub)
         .count();
 
     assert_eq!(
@@ -594,7 +597,7 @@ fn test_genuine_front_stub_fixed_coupon_is_tagged_as_stub() {
     let fixed_stub_count = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Stub)
+        .filter(|cf| cf.get_kind() == finstack_quant_core::cashflow::CFKind::Stub)
         .count();
 
     assert_eq!(fixed_stub_count, 1);
@@ -648,7 +651,7 @@ fn test_regular_holiday_end_coupon_under_stub_rule_is_not_tagged_stub() {
     let fixed_stub_count = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Stub)
+        .filter(|cf| cf.get_kind() == finstack_quant_core::cashflow::CFKind::Stub)
         .count();
 
     assert_eq!(
@@ -705,7 +708,7 @@ fn test_regular_eom_schedule_under_stub_rule_is_not_tagged_stub() {
     let fixed_stub_count = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Stub)
+        .filter(|cf| cf.get_kind() == finstack_quant_core::cashflow::CFKind::Stub)
         .count();
 
     assert_eq!(
@@ -882,12 +885,12 @@ fn test_irs_explicit_zero_payment_delay_preserved() {
         .iter()
         .filter(|cf| {
             matches!(
-                cf.kind,
+                cf.get_kind(),
                 finstack_quant_core::cashflow::CFKind::Fixed
                     | finstack_quant_core::cashflow::CFKind::Stub
             )
         })
-        .map(|cf| cf.date)
+        .map(|cf| cf.get_date())
         .min()
         .expect("first payment");
     assert_eq!(first_payment, expected[0].payment_date);
@@ -944,8 +947,8 @@ fn test_irs_explicit_zero_reset_lag_preserved() {
     let first_reset = full_schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Floating)
-        .and_then(|cf| cf.reset_date)
+        .find(|cf| cf.get_kind() == finstack_quant_core::cashflow::CFKind::Floating)
+        .and_then(|cf| cf.get_reset_date())
         .expect("reset date");
     // With reset_lag_days: 0, reset date should equal accrual start (spot reset)
     assert_eq!(first_reset, start);
@@ -973,18 +976,18 @@ fn test_irs_receive_fixed_cashflow_signs() {
 
     // Check signs
     for cf in full_schedule.get_flows() {
-        match cf.kind {
+        match cf.get_kind() {
             CFKind::Fixed | CFKind::Stub => {
                 // Receive fixed: should be positive
                 assert!(
-                    cf.amount.amount() > 0.0,
+                    cf.get_amount().amount() > 0.0,
                     "Fixed leg should be positive for Receive"
                 );
             }
             CFKind::Floating => {
                 // Pay floating: should be negative
                 assert!(
-                    cf.amount.amount() < 0.0,
+                    cf.get_amount().amount() < 0.0,
                     "Floating leg should be negative for Receive"
                 );
             }
@@ -1015,18 +1018,18 @@ fn test_irs_pay_fixed_cashflow_signs() {
 
     // Check signs
     for cf in full_schedule.get_flows() {
-        match cf.kind {
+        match cf.get_kind() {
             CFKind::Fixed | CFKind::Stub => {
                 // Pay fixed: should be negative
                 assert!(
-                    cf.amount.amount() < 0.0,
+                    cf.get_amount().amount() < 0.0,
                     "Fixed leg should be negative for Pay"
                 );
             }
             CFKind::Floating => {
                 // Receive floating: should be positive
                 assert!(
-                    cf.amount.amount() > 0.0,
+                    cf.get_amount().amount() > 0.0,
                     "Floating leg should be positive for Pay"
                 );
             }
@@ -1096,15 +1099,15 @@ fn test_irs_npv_parity_at_par_rate() {
     let fixed_sum: f64 = full_schedule
         .get_flows()
         .iter()
-        .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| matches!(cf.get_kind(), CFKind::Fixed | CFKind::Stub))
+        .map(|cf| cf.get_amount().amount())
         .sum();
 
     let float_sum: f64 = full_schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Floating)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_kind() == CFKind::Floating)
+        .map(|cf| cf.get_amount().amount())
         .sum();
 
     // For a par swap: |fixed_sum| ≈ |float_sum| (both undiscounted)
@@ -1156,14 +1159,14 @@ fn typed_accrual_flags_control_each_leg_and_annuity() {
         let fixed = schedule
             .get_flows()
             .iter()
-            .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
-            .map(|cf| cf.amount.amount())
+            .filter(|cf| matches!(cf.get_kind(), CFKind::Fixed | CFKind::Stub))
+            .map(|cf| cf.get_amount().amount())
             .sum::<f64>();
         let floating = schedule
             .get_flows()
             .iter()
-            .filter(|cf| !matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
-            .map(|cf| cf.amount.amount())
+            .filter(|cf| !matches!(cf.get_kind(), CFKind::Fixed | CFKind::Stub))
+            .map(|cf| cf.get_amount().amount())
             .sum::<f64>();
         (fixed, floating)
     };

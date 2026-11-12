@@ -738,17 +738,17 @@ fn test_real_estate_cashflow_schedule_truncates_at_sale_date() {
         .expect("schedule");
 
     let flows = schedule.get_flows();
-    let last_date = flows.iter().map(|cf| cf.date).max().expect("flows");
+    let last_date = flows.iter().map(|cf| cf.get_date()).max().expect("flows");
     assert_eq!(
         last_date, sale_date,
         "no flows may occur after sale_date; got {last_date}"
     );
-    assert_eq!(flows[0].date, noi1);
+    assert_eq!(flows[0].get_date(), noi1);
     // At sale_date: NOI (100) + terminal proceeds (NOI_N / cap = 100/0.10 = 1000).
     let at_sale: f64 = flows
         .iter()
-        .filter(|cf| cf.date == sale_date)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_date() == sale_date)
+        .map(|cf| cf.get_amount().amount())
         .sum();
     assert!(
         (at_sale - 1_100.0).abs() < 1e-9,
@@ -811,7 +811,7 @@ fn test_levered_exit_defaults_to_asset_sale_date() {
     let last_date = schedule
         .get_flows()
         .iter()
-        .map(|cf| cf.date)
+        .map(|cf| cf.get_date())
         .max()
         .expect("flows");
     assert_eq!(

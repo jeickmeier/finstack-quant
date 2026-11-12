@@ -211,7 +211,7 @@ fn payment_dates_in(
     let mut dates: Vec<_> = schedule
         .get_flows()
         .iter()
-        .map(|cf| cf.date)
+        .map(|cf| cf.get_date())
         .filter(|d| d.year() == year && d.month() == month)
         .collect();
     dates.sort();
@@ -291,16 +291,16 @@ fn payment_lag_moves_the_payment_date_but_not_the_accrual() {
         schedule
             .get_flows()
             .iter()
-            .find(|cf| matches!(cf.kind, finstack_quant_core::cashflow::CFKind::Fixed))
+            .find(|cf| matches!(cf.get_kind(), finstack_quant_core::cashflow::CFKind::Fixed))
             .cloned()
             .expect("interest flow")
     };
     let (a, b) = (first(&flat), first(&lagged));
     // 2025-04-15 is a Tuesday: two business days later is Thursday 17th.
-    assert_eq!(a.date, date!(2025 - 04 - 15));
-    assert_eq!(b.date, date!(2025 - 04 - 17));
-    assert!((a.accrual_factor - b.accrual_factor).abs() < 1e-15);
-    assert!((a.amount.amount() - b.amount.amount()).abs() < 1e-9);
+    assert_eq!(a.get_date(), date!(2025 - 04 - 15));
+    assert_eq!(b.get_date(), date!(2025 - 04 - 17));
+    assert!((a.get_accrual_factor() - b.get_accrual_factor()).abs() < 1e-15);
+    assert!((a.get_amount().amount() - b.get_amount().amount()).abs() < 1e-9);
 }
 
 /// `Preceding` rolls a weekend maturity payment back to the Friday; Modified
@@ -392,25 +392,25 @@ fn commitment_step_down_reprices_fees_and_charges_the_reduction_fee() {
     // Commitment fee for 2025-10-15 -> 2026-01-15 (92 days) on 5M undrawn.
     let before = flows
         .iter()
-        .find(|cf| cf.kind == CFKind::CommitmentFee && cf.date == date!(2026 - 01 - 15))
+        .find(|cf| cf.get_kind() == CFKind::CommitmentFee && cf.get_date() == date!(2026 - 01 - 15))
         .expect("fee before the step");
-    assert!((before.amount.amount() - 5_000_000.0 * 0.005 * 92.0 / 360.0).abs() < 1e-6);
+    assert!((before.get_amount().amount() - 5_000_000.0 * 0.005 * 92.0 / 360.0).abs() < 1e-6);
     // Commitment fee for 2026-01-15 -> 2026-04-15 (90 days) on 1M undrawn.
     let after = flows
         .iter()
-        .find(|cf| cf.kind == CFKind::CommitmentFee && cf.date == date!(2026 - 04 - 15))
+        .find(|cf| cf.get_kind() == CFKind::CommitmentFee && cf.get_date() == date!(2026 - 04 - 15))
         .expect("fee after the step");
     assert!(
-        (after.amount.amount() - 1_000_000.0 * 0.005 * 90.0 / 360.0).abs() < 1e-6,
+        (after.get_amount().amount() - 1_000_000.0 * 0.005 * 90.0 / 360.0).abs() < 1e-6,
         "{}",
-        after.amount
+        after.get_amount()
     );
     // Reduction fee: 4M reduced at 25 bp on the step date.
     let reduction = flows
         .iter()
-        .find(|cf| cf.kind == CFKind::Fee && cf.date == STEP_DATE)
+        .find(|cf| cf.get_kind() == CFKind::Fee && cf.get_date() == STEP_DATE)
         .expect("reduction fee");
-    assert!((reduction.amount.amount() - 10_000.0).abs() < 1e-6);
+    assert!((reduction.get_amount().amount() - 10_000.0).abs() < 1e-6);
 }
 
 /// A step below the drawn balance is rejected at construction; the analyst
@@ -451,8 +451,8 @@ fn stochastic_utilization_books_the_principal_implied_by_a_commitment_step() {
     let flows = result.path_results[0].cashflows.get_flows().to_vec();
     let notional: Vec<_> = flows
         .iter()
-        .filter(|cf| cf.kind == CFKind::Notional)
-        .map(|cf| (cf.date, cf.amount.amount()))
+        .filter(|cf| cf.get_kind() == CFKind::Notional)
+        .map(|cf| (cf.get_date(), cf.get_amount().amount()))
         .collect();
     let repaid: f64 = notional.iter().map(|(_, a)| a).sum();
     assert!((repaid - 5_000_000.0).abs() < 1e-6, "{notional:?}");
@@ -552,8 +552,8 @@ fn interest_on(
 ) -> f64 {
     flows
         .iter()
-        .find(|cf| cf.kind == CFKind::Fixed && cf.date == date)
-        .map(|cf| cf.amount.amount())
+        .find(|cf| cf.get_kind() == CFKind::Fixed && cf.get_date() == date)
+        .map(|cf| cf.get_amount().amount())
         .expect("interest flow")
 }
 
@@ -599,8 +599,8 @@ fn fee_step_changes_only_the_named_fee() {
                d: finstack_quant_core::dates::Date| {
         flows
             .iter()
-            .find(|cf| cf.kind == CFKind::CommitmentFee && cf.date == d)
-            .map(|cf| cf.amount.amount())
+            .find(|cf| cf.get_kind() == CFKind::CommitmentFee && cf.get_date() == d)
+            .map(|cf| cf.get_amount().amount())
             .expect("commitment fee")
     };
     assert!((fee(&a, date!(2026 - 07 - 15)) - fee(&b, date!(2026 - 07 - 15))).abs() < 1e-9);
@@ -738,8 +738,8 @@ fn flow_amount(
 ) -> f64 {
     flows
         .iter()
-        .find(|cf| cf.kind == kind && cf.date == date)
-        .map(|cf| cf.amount.amount())
+        .find(|cf| cf.get_kind() == kind && cf.get_date() == date)
+        .map(|cf| cf.get_amount().amount())
         .unwrap_or(0.0)
 }
 
@@ -1045,7 +1045,7 @@ fn model_discount_margin_excludes_flows_inside_the_settlement_window() {
             .to_vec()
     }
     .into_iter()
-    .filter(|cf| cf.date > AS_OF && cf.date <= settlement)
+    .filter(|cf| cf.get_date() > AS_OF && cf.get_date() <= settlement)
     .count();
     assert!(window_flows > 0, "fixture needs a flow inside the window");
 
@@ -1414,10 +1414,13 @@ fn scheduled_fee_is_paid_once_on_its_date() {
     }];
     facility.validate().expect("valid");
     let flows = flows_of(&facility);
-    let fees: Vec<_> = flows.iter().filter(|cf| cf.kind == CFKind::Fee).collect();
+    let fees: Vec<_> = flows
+        .iter()
+        .filter(|cf| cf.get_kind() == CFKind::Fee)
+        .collect();
     assert_eq!(fees.len(), 1);
-    assert_eq!(fees[0].date, date!(2026 - 03 - 01));
-    assert!((fees[0].amount.amount() - 100_000.0).abs() < 1e-9);
+    assert_eq!(fees[0].get_date(), date!(2026 - 03 - 01));
+    assert!((fees[0].get_amount().amount() - 100_000.0).abs() < 1e-9);
     let base = seasoned(DrawRepaySpec::Deterministic(vec![]))
         .value(&market(), AS_OF)
         .expect("pv")
@@ -1474,19 +1477,23 @@ fn term_out_recipe_stops_availability_and_amortizes() {
     assert!(
         flows
             .iter()
-            .filter(|cf| cf.kind == CFKind::CommitmentFee)
-            .all(|cf| cf.date <= term_out),
+            .filter(|cf| cf.get_kind() == CFKind::CommitmentFee)
+            .all(|cf| cf.get_date() <= term_out),
         "no commitment fee after the term-out: {:?}",
         flows
             .iter()
-            .filter(|cf| cf.kind == CFKind::CommitmentFee)
-            .map(|cf| (cf.date, cf.amount.amount()))
+            .filter(|cf| cf.get_kind() == CFKind::CommitmentFee)
+            .map(|cf| (cf.get_date(), cf.get_amount().amount()))
             .collect::<Vec<_>>()
     );
     let repaid: f64 = flows
         .iter()
-        .filter(|cf| cf.kind == CFKind::Notional && cf.date > term_out && cf.date < MATURITY)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| {
+            cf.get_kind() == CFKind::Notional
+                && cf.get_date() > term_out
+                && cf.get_date() < MATURITY
+        })
+        .map(|cf| cf.get_amount().amount())
         .sum();
     assert!((repaid - 4_000_000.0).abs() < 1e-6, "amortized {repaid}");
 }
@@ -1517,8 +1524,8 @@ fn clean_down_recipe_zeroes_the_balance_inside_the_window() {
     );
     let fee = flows
         .iter()
-        .find(|cf| cf.kind == CFKind::CommitmentFee && cf.date == date!(2026 - 04 - 15))
-        .map(|cf| cf.amount.amount())
+        .find(|cf| cf.get_kind() == CFKind::CommitmentFee && cf.get_date() == date!(2026 - 04 - 15))
+        .map(|cf| cf.get_amount().amount())
         .expect("commitment fee");
     let expected = 10_000_000.0 * 0.005 * 30.0 / 360.0 + 6_000_000.0 * 0.005 * 60.0 / 360.0;
     assert!((fee - expected).abs() < 1e-6, "{fee} vs {expected}");
@@ -1594,8 +1601,8 @@ fn historical_commitment_steps_book_no_principal() {
     let flows = result.path_results[0].cashflows.get_flows().to_vec();
     let notional: Vec<_> = flows
         .iter()
-        .filter(|cf| cf.kind == CFKind::Notional)
-        .map(|cf| (cf.date, cf.amount.amount()))
+        .filter(|cf| cf.get_kind() == CFKind::Notional)
+        .map(|cf| (cf.get_date(), cf.get_amount().amount()))
         .collect();
     assert_eq!(
         notional.len(),
@@ -1604,7 +1611,7 @@ fn historical_commitment_steps_book_no_principal() {
     );
     assert!((notional[0].1 - 5_000_000.0).abs() < 1e-6, "{notional:?}");
     assert!(
-        flows.iter().all(|cf| cf.kind != CFKind::Fee),
+        flows.iter().all(|cf| cf.get_kind() != CFKind::Fee),
         "the historical reduction fee is not re-charged"
     );
 }

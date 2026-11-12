@@ -84,7 +84,12 @@ impl RevolvingCreditPricer {
         let mut buckets: FxHashMap<Key, ExpectedFlow> = FxHashMap::default();
         for path in &enhanced.path_results {
             for cf in path.cashflows.get_flows() {
-                let key = (cf.date, cf.reset_date, cf.kind, cf.principal_date);
+                let key = (
+                    cf.get_date(),
+                    cf.get_reset_date(),
+                    cf.get_kind(),
+                    cf.get_balance_date(),
+                );
                 let entry = buckets.entry(key).or_insert_with(|| {
                     order.push(key);
                     ExpectedFlow {
@@ -92,19 +97,19 @@ impl RevolvingCreditPricer {
                         principal_delta: None,
                         rate_sum: 0.0,
                         rate_count: 0,
-                        accrual_factor: cf.accrual_factor,
+                        accrual_factor: cf.get_accrual_factor(),
                     }
                 });
-                entry.amount = entry.amount.checked_add(cf.amount)?;
+                entry.amount = entry.amount.checked_add(cf.get_amount())?;
                 // The expected principal effect is the mean of the explicit
                 // path deltas (record CORE-CONVENTIONS-015 #4).
-                if let Some(delta) = cf.principal_delta {
+                if let Some(delta) = cf.get_principal_delta() {
                     entry.principal_delta = Some(match entry.principal_delta {
                         Some(sum) => sum.checked_add(delta)?,
                         None => delta,
                     });
                 }
-                if let Some(rate) = cf.rate {
+                if let Some(rate) = cf.get_rate() {
                     entry.rate_sum += rate;
                     entry.rate_count += 1;
                 }

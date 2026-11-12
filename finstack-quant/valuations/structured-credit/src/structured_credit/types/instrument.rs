@@ -123,12 +123,12 @@ impl SimulationMetricSeed {
             flows.extend(result.detailed_flows);
             accruals.extend(result.accrual_periods);
         }
-        flows.sort_by_key(|flow| flow.date);
+        flows.sort_by_key(|flow| flow.get_date());
         Self {
             cashflows: flows
                 .iter()
-                .filter(|flow| flow.kind.is_cash_settlement())
-                .map(|flow| (flow.date, flow.amount))
+                .filter(|flow| flow.get_kind().is_cash_settlement())
+                .map(|flow| (flow.get_date(), flow.get_amount()))
                 .collect(),
             tagged_cashflows: flows,
             accruals,

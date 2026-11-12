@@ -223,10 +223,13 @@ impl TermLoanDiscountingPricer {
         let df_settlement = disc.df_between_dates(as_of, settlement)?;
         let mut pre_settlement = Money::from((0_i64, loan.currency));
         for cf in schedule.get_flows() {
-            if cf.kind.is_cash_settlement() && cf.date > as_of && cf.date <= settlement {
+            if cf.get_kind().is_cash_settlement()
+                && cf.get_date() > as_of
+                && cf.get_date() <= settlement
+            {
                 pre_settlement = pre_settlement.checked_add(
-                    cf.amount
-                        .checked_mul_f64(disc.df_between_dates(as_of, cf.date)?)?,
+                    cf.get_amount()
+                        .checked_mul_f64(disc.df_between_dates(as_of, cf.get_date())?)?,
                 )?;
             }
         }
@@ -334,8 +337,8 @@ impl TermLoanDiscountingPricer {
         let flows = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind.is_cash_settlement() && cf.date > settlement_date)
-            .map(|cf| (cf.date, cf.amount))
+            .filter(|cf| cf.get_kind().is_cash_settlement() && cf.get_date() > settlement_date)
+            .map(|cf| (cf.get_date(), cf.get_amount()))
             .collect();
         Ok((settlement_date, flows))
     }
@@ -386,11 +389,11 @@ impl TermLoanDiscountingPricer {
         // final redemption, which this post-hoc pass does not rebuild. Failing
         // loudly beats silently pricing known principal off today's forwards.
         let has_seasoned_pik = schedule.get_flows().iter().any(|flow| {
-            flow.kind == CFKind::Pik
+            flow.get_kind() == CFKind::Pik
                 && flow
-                    .accrual
+                    .get_accrual()
                     .as_ref()
-                    .map_or(flow.date <= as_of, |accrual| accrual.start < as_of)
+                    .map_or(flow.get_date() <= as_of, |accrual| accrual.start < as_of)
         });
         if has_seasoned_pik {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -404,7 +407,8 @@ impl TermLoanDiscountingPricer {
         }
 
         let has_past_reset = schedule.get_flows().iter().any(|flow| {
-            flow.kind == CFKind::Floating && flow.reset_date.is_some_and(|date| date < as_of)
+            flow.get_kind() == CFKind::Floating
+                && flow.get_reset_date().is_some_and(|date| date < as_of)
         });
         if !has_past_reset {
             return Ok(());
@@ -443,10 +447,10 @@ impl TermLoanDiscountingPricer {
         };
 
         schedule.try_update_flows(|flow| {
-            if flow.kind != CFKind::Floating {
+            if flow.get_kind() != CFKind::Floating {
                 return Ok(());
             }
-            let reset_date = match flow.reset_date {
+            let reset_date = match flow.get_reset_date() {
                 Some(date) if date < as_of => date,
                 _ => return Ok(()),
             };
@@ -458,7 +462,7 @@ impl TermLoanDiscountingPricer {
                 as_of,
             )?;
             let accrual_start = flow
-                .accrual
+                .get_accrual()
                 .as_ref()
                 .map_or(reset_date, |accrual| accrual.start);
             let active_delta_bp: rust_decimal::Decimal = margin_deltas
@@ -473,14 +477,14 @@ impl TermLoanDiscountingPricer {
             // Rescaling retains the builder's accrual notional and any
             // intra-period balance segmentation. The balance fallback handles
             // a projected coupon whose original rate was exactly zero.
-            let new_amount = match flow.rate {
+            let new_amount = match flow.get_rate() {
                 Some(old_rate) if old_rate.is_finite() && old_rate.abs() > 1.0e-14 => {
-                    flow.amount.amount() * all_in_rate / old_rate
+                    flow.get_amount().amount() * all_in_rate / old_rate
                 }
-                _ => notional_before(flow.date) * all_in_rate * flow.accrual_factor,
+                _ => notional_before(flow.get_date()) * all_in_rate * flow.get_accrual_factor(),
             };
             flow.rate = Some(all_in_rate);
-            flow.amount = Money::from_model_value(new_amount, flow.amount.currency())?;
+            flow.amount = Money::from_model_value(new_amount, flow.get_amount().currency())?;
             Ok(())
         })?;
         Ok(())
@@ -546,7 +550,10 @@ mod tests {
 
         let schedule = generate_cashflows(&loan, &market).expect("cashflows");
         assert!(
-            schedule.get_flows().iter().any(|cf| cf.kind == CFKind::Pik),
+            schedule
+                .get_flows()
+                .iter()
+                .any(|cf| cf.get_kind() == CFKind::Pik),
             "PIK loan should generate PIK cashflows"
         );
 
@@ -555,21 +562,21 @@ mod tests {
         for cf in schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind == CFKind::Pik)
+            .filter(|cf| cf.get_kind() == CFKind::Pik)
         {
-            assert_eq!(cf.amount.amount(), 0.0);
-            assert!(cf.principal_delta.expect("PIK delta").amount() > 0.0);
+            assert_eq!(cf.get_amount().amount(), 0.0);
+            assert!(cf.get_principal_delta().expect("PIK delta").amount() > 0.0);
         }
         let all_flows: Vec<(Date, Money)> = schedule
             .get_flows()
             .iter()
-            .map(|cf| (cf.date, cf.amount))
+            .map(|cf| (cf.get_date(), cf.get_amount()))
             .collect();
         let cash_flows: Vec<(Date, Money)> = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind != CFKind::Pik)
-            .map(|cf| (cf.date, cf.amount))
+            .filter(|cf| cf.get_kind() != CFKind::Pik)
+            .map(|cf| (cf.get_date(), cf.get_amount()))
             .collect();
         assert_eq!(
             npv(&disc, as_of, &all_flows, false).expect("pv of all rows"),
@@ -696,7 +703,10 @@ mod tests {
         let past_float_flows: Vec<_> = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind == CFKind::Floating && cf.reset_date.is_some_and(|rd| rd < as_of))
+            .filter(|cf| {
+                cf.get_kind() == CFKind::Floating
+                    && cf.get_reset_date().is_some_and(|rd| rd < as_of)
+            })
             .collect();
 
         assert!(
@@ -705,7 +715,7 @@ mod tests {
         );
 
         for flow in &past_float_flows {
-            let rate = flow.rate.expect("rate should be set");
+            let rate = flow.get_rate().expect("rate should be set");
             assert!(
                 (rate - fixing_rate_expected).abs() < 1e-8,
                 "past period rate should use fixing: got {rate}, expected {fixing_rate_expected}"
@@ -769,9 +779,12 @@ mod tests {
         let current_coupon = schedule
             .get_flows()
             .iter()
-            .find(|flow| flow.kind == CFKind::Floating && flow.reset_date == Some(date(2025, 4, 1)))
+            .find(|flow| {
+                flow.get_kind() == CFKind::Floating
+                    && flow.get_reset_date() == Some(date(2025, 4, 1))
+            })
             .expect("current reset coupon");
-        let rate = current_coupon.rate.expect("all-in rate");
+        let rate = current_coupon.get_rate().expect("all-in rate");
         assert!(
             (rate - 0.07).abs() < 1e-12,
             "2% fixing + 300bp base margin + 200bp step-up must equal 7%, got {rate}"

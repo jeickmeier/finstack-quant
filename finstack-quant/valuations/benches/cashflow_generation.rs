@@ -198,14 +198,18 @@ fn bench_schedule_builder_fixed(c: &mut Criterion) {
                     assert_eq!(
                         flows
                             .iter()
-                            .filter(|flow| flow.kind == CFKind::Fixed)
+                            .filter(|flow| flow.get_kind() == CFKind::Fixed)
                             .count(),
                         10
                     );
-                    assert!(flows.windows(2).all(|pair| pair[0].date <= pair[1].date));
+                    assert!(
+                        flows
+                            .windows(2)
+                            .all(|pair| pair[0].get_date() <= pair[1].get_date())
+                    );
                     for flow in flows {
-                        assert_eq!(flow.amount.currency(), Currency::USD);
-                        assert!(flow.amount.amount().is_finite());
+                        assert_eq!(flow.get_amount().currency(), Currency::USD);
+                        assert!(flow.get_amount().amount().is_finite());
                     }
                 },
             );

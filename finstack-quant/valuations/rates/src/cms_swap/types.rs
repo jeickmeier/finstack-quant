@@ -774,7 +774,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsSwap {
         Ok(schedule
             .get_flows()
             .iter()
-            .map(|flow| flow.date)
+            .map(|flow| flow.get_date())
             .chain(self.expiry())
             .max())
     }
@@ -886,7 +886,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
         } = &self.funding_leg
         {
             for flow in &funding_flows {
-                if let (Some(date), Some(accrual)) = (flow.reset_date, &flow.accrual) {
+                if let (Some(date), Some(accrual)) = (flow.get_reset_date(), &flow.get_accrual()) {
                     projected_fixings.push(finstack_quant_cashflows::fixings::ProjectedFixing {
                         series_id: finstack_quant_core::market_data::fixings::fixing_series_id(
                             forward_curve_id.as_str(),
@@ -1009,7 +1009,7 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .filter(|flow| flow.kind == CFKind::Floating)
+                .filter(|flow| flow.get_kind() == CFKind::Floating)
                 .count(),
             swap.payment_dates.len()
         );
@@ -1017,7 +1017,7 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .filter(|flow| flow.kind == CFKind::Fixed)
+                .filter(|flow| flow.get_kind() == CFKind::Fixed)
                 .count(),
             swap.payment_dates.len()
         );
@@ -1025,7 +1025,7 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .all(|flow| flow.accrual.is_some())
+                .all(|flow| flow.get_accrual().is_some())
         );
     }
 
@@ -1157,9 +1157,9 @@ mod tests {
             .map(|flow| {
                 let df = discount_curve
                     .as_ref()
-                    .df_between_dates(as_of, flow.date)
+                    .df_between_dates(as_of, flow.get_date())
                     .expect("df");
-                df * flow.amount.amount()
+                df * flow.get_amount().amount()
             })
             .sum();
 
@@ -1205,9 +1205,9 @@ mod tests {
             .map(|flow| {
                 let df = discount_curve
                     .as_ref()
-                    .df_between_dates(as_of, flow.date)
+                    .df_between_dates(as_of, flow.get_date())
                     .expect("df");
-                df * flow.amount.amount()
+                df * flow.get_amount().amount()
             })
             .sum();
 
@@ -1270,12 +1270,12 @@ mod tests {
             .expect("seasoned CMS leg flows");
 
         assert_eq!(flows.len(), 1);
-        assert_eq!(flows[0].date, pay);
+        assert_eq!(flows[0].get_date(), pay);
         let expected = observed * 0.25 * 1_000_000.0;
         assert!(
-            (flows[0].amount.amount() - expected).abs() < 0.01,
+            (flows[0].get_amount().amount() - expected).abs() < 0.01,
             "seasoned flow must use recorded fixing: expected {expected}, got {}",
-            flows[0].amount.amount()
+            flows[0].get_amount().amount()
         );
     }
 
@@ -1324,7 +1324,7 @@ mod tests {
             .funding_leg_flows(&market.insert_series(series), as_of, true)
             .expect("funding flows with fixing");
         let expected = (observed + 0.001) * 0.25 * 1_000_000.0;
-        assert!((flows[0].amount.amount() - expected).abs() < 1e-8);
+        assert!((flows[0].get_amount().amount() - expected).abs() < 1e-8);
     }
 
     #[test]

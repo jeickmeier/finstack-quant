@@ -443,22 +443,22 @@ pub(crate) fn settlement_asw_components(
     for flow in schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.date > settlement && flow.kind != CFKind::Pik)
+        .filter(|flow| flow.get_date() > settlement && flow.get_kind() != CFKind::Pik)
     {
-        if flow.kind.is_coupon() {
+        if flow.get_kind().is_coupon() {
             if let Some(rule) = &ex_coupon
-                && rule.is_ex_coupon(flow.date, settlement)?
+                && rule.is_ex_coupon(flow.get_date(), settlement)?
             {
                 continue;
             }
-            coupon_pv += flow.amount.amount() * disc.df_on_date(flow.date)?
+            coupon_pv += flow.get_amount().amount() * disc.df_on_date(flow.get_date())?
                 / df_settlement
                 / bond.notional.amount();
-        } else if matches!(flow.kind, CFKind::Amortization | CFKind::Notional)
-            && flow.amount.amount() > 0.0
+        } else if matches!(flow.get_kind(), CFKind::Amortization | CFKind::Notional)
+            && flow.get_amount().amount() > 0.0
         {
             has_principal_flows = true;
-            principal_pv += flow.amount.amount() * disc.df_on_date(flow.date)?
+            principal_pv += flow.get_amount().amount() * disc.df_on_date(flow.get_date())?
                 / df_settlement
                 / bond.notional.amount();
         }

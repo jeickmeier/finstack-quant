@@ -216,7 +216,8 @@ fn truncate_at_call(
     out.cashflows = before(&flows.cashflows);
     out.cashflows
         .push((call_date, interest.checked_add(principal)?));
-    out.detailed_flows.retain(|flow| flow.date < call_date);
+    out.detailed_flows
+        .retain(|flow| flow.get_date() < call_date);
     out.accrual_periods
         .retain(|accrued| accrued.payment_date < call_date);
     out.accrual_periods.push(TrancheAccrualPeriod {

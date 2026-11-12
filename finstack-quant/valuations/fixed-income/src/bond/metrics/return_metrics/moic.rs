@@ -74,7 +74,7 @@ pub(crate) fn lifetime_dated_cashflows(
         .into_flows()
         .into_iter()
         .filter(Bond::is_holder_cashflow)
-        .map(|cf| (cf.date, cf.amount))
+        .map(|cf| (cf.get_date(), cf.get_amount()))
         .collect())
 }
 
@@ -362,8 +362,10 @@ mod tests {
         let call_date = schedule
             .get_flows()
             .iter()
-            .find(|flow| flow.kind == CFKind::Amortization && flow.amount.amount() > 0.0)
-            .map(|flow| flow.date)
+            .find(|flow| {
+                flow.get_kind() == CFKind::Amortization && flow.get_amount().amount() > 0.0
+            })
+            .map(|flow| flow.get_date())
             .expect("amortization date");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
@@ -383,11 +385,11 @@ mod tests {
             .get_flows()
             .iter()
             .filter(|flow| {
-                flow.date <= call_date
-                    && matches!(flow.kind, CFKind::Amortization | CFKind::Notional)
-                    && flow.amount.amount() > 0.0
+                flow.get_date() <= call_date
+                    && matches!(flow.get_kind(), CFKind::Amortization | CFKind::Notional)
+                    && flow.get_amount().amount() > 0.0
             })
-            .map(|flow| flow.amount.amount())
+            .map(|flow| flow.get_amount().amount())
             .sum();
         let outstanding = bond.notional.amount() - amortized;
         assert!(outstanding < bond.notional.amount());

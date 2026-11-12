@@ -271,7 +271,7 @@ fn test_equity_trs_cashflow_provider_emits_financing_flows() {
         schedule
             .get_flows()
             .iter()
-            .any(|cf| cf.amount.amount().abs() > 0.0),
+            .any(|cf| cf.get_amount().amount().abs() > 0.0),
         "TRS cashflow provider should emit non-zero financing cashflows"
     );
 }
@@ -302,10 +302,10 @@ fn test_equity_trs_cashflow_schedule_reprices_base_value() {
                 .expect("schedule should build");
             let mut exported = 0.0;
             for cf in schedule.get_flows() {
-                exported += cf.amount.amount()
+                exported += cf.get_amount().amount()
                     * discount
                         .as_ref()
-                        .df_between_dates(as_of, cf.date)
+                        .df_between_dates(as_of, cf.get_date())
                         .expect("df");
             }
             approx_eq(

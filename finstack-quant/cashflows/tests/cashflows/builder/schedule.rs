@@ -101,13 +101,14 @@ fn linear_vs_step_parity() {
 
     assert_eq!(s1.get_flows().len(), s2.get_flows().len());
     for (a, b) in s1.get_flows().iter().zip(s2.get_flows().iter()) {
-        assert_eq!(a.date, b.date);
-        assert_eq!(a.kind, b.kind);
+        assert_eq!(a.get_date(), b.get_date());
+        assert_eq!(a.get_kind(), b.get_kind());
         assert!(
-            (a.amount.amount() - b.amount.amount()).abs() < financial_tolerance(init.amount()),
+            (a.get_amount().amount() - b.get_amount().amount()).abs()
+                < financial_tolerance(init.amount()),
             "Flow amounts should match: {} vs {}",
-            a.amount.amount(),
-            b.amount.amount()
+            a.get_amount().amount(),
+            b.get_amount().amount()
         );
     }
 }
@@ -215,8 +216,8 @@ fn linear_amortization_spans_fixed_to_float_cadences() {
     let amortization_dates: Vec<Date> = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Amortization)
-        .map(|flow| flow.date)
+        .filter(|flow| flow.get_kind() == CFKind::Amortization)
+        .map(|flow| flow.get_date())
         .collect();
 
     assert_eq!(amortization_dates.len(), 8); // six monthly + two quarterly periods
@@ -227,9 +228,9 @@ fn linear_amortization_spans_fixed_to_float_cadences() {
     for flow in schedule
         .get_flows()
         .iter()
-        .filter(|f| f.kind == CFKind::Amortization)
+        .filter(|f| f.get_kind() == CFKind::Amortization)
     {
-        assert!((flow.amount.amount() - 150.0).abs() < 1e-10);
+        assert!((flow.get_amount().amount() - 150.0).abs() < 1e-10);
     }
 }
 
@@ -290,9 +291,12 @@ fn fixed_to_float_window_has_fresh_front_stub_at_switch() {
     let first_float = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::Floating)
+        .find(|cf| cf.get_kind() == CFKind::Floating)
         .expect("post-switch coupon");
-    let accrual = first_float.accrual.as_ref().expect("float coupon accrual");
+    let accrual = first_float
+        .get_accrual()
+        .as_ref()
+        .expect("float coupon accrual");
     assert_eq!(
         accrual.start, switch,
         "float window must start a fresh schedule at switch, not continue the Jan-15 roll"
@@ -303,9 +307,9 @@ fn fixed_to_float_window_has_fresh_front_stub_at_switch() {
         "must not continue the pre-switch quarterly roll"
     );
     assert!(
-        first_float.accrual_factor < 0.25,
+        first_float.get_accrual_factor() < 0.25,
         "first post-switch period should be a short-front stub, got {}",
-        first_float.accrual_factor
+        first_float.get_accrual_factor()
     );
 }
 
@@ -344,7 +348,10 @@ fn ordering_invariants_within_date() {
     let mut by_date: finstack_quant_core::FxHashMap<Date, Vec<CFKind>> =
         finstack_quant_core::FxHashMap::default();
     for cf in s.get_flows() {
-        by_date.entry(cf.date).or_default().push(cf.kind);
+        by_date
+            .entry(cf.get_date())
+            .or_default()
+            .push(cf.get_kind());
     }
 
     for (_d, kinds) in by_date {
@@ -414,8 +421,8 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
     let expected = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.date > issue)
-        .fold(0.0, |sum, cf| sum + cf.amount.amount());
+        .filter(|cf| cf.get_date() > issue)
+        .fold(0.0, |sum, cf| sum + cf.get_amount().amount());
     assert!(
         (pv.amount() - expected).abs() < financial_tolerance(init.amount()),
         "PV should equal sum of cashflows: {} vs {}",
@@ -454,10 +461,10 @@ fn detects_stub_periods() {
     let coupon_flows: Vec<&CashFlow> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Fixed || cf.kind == CFKind::Stub)
+        .filter(|cf| cf.get_kind() == CFKind::Fixed || cf.get_kind() == CFKind::Stub)
         .collect();
 
-    let has_stub = coupon_flows.iter().any(|cf| cf.kind == CFKind::Stub);
+    let has_stub = coupon_flows.iter().any(|cf| cf.get_kind() == CFKind::Stub);
     assert!(
         has_stub,
         "Should detect stub period with irregular start date"
@@ -467,15 +474,15 @@ fn detects_stub_periods() {
     // remaining regular periods (including the last) stay Fixed.
     let stub_count = coupon_flows
         .iter()
-        .filter(|cf| cf.kind == CFKind::Stub)
+        .filter(|cf| cf.get_kind() == CFKind::Stub)
         .count();
     assert_eq!(stub_count, 1, "exactly one genuine stub period expected");
     let earliest = coupon_flows
         .iter()
-        .min_by_key(|cf| cf.date)
+        .min_by_key(|cf| cf.get_date())
         .expect("coupons present");
     assert_eq!(
-        earliest.kind,
+        earliest.get_kind(),
         CFKind::Stub,
         "the short-front stub coupon must be labeled Stub"
     );
@@ -518,16 +525,16 @@ fn negative_rate_fixed_coupons_are_emitted() {
     let coupons: Vec<&CashFlow> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Fixed)
+        .filter(|cf| cf.get_kind() == CFKind::Fixed)
         .collect();
     assert_eq!(coupons.len(), 2, "negative-rate coupons must be emitted");
     for cf in &coupons {
         assert!(
-            cf.amount.amount() < 0.0,
+            cf.get_amount().amount() < 0.0,
             "negative-rate coupon should carry a negative amount, got {}",
-            cf.amount.amount()
+            cf.get_amount().amount()
         );
-        assert_eq!(cf.rate, Some(-0.005));
+        assert_eq!(cf.get_rate(), Some(-0.005));
     }
 }
 
@@ -602,7 +609,7 @@ fn outstanding_by_date_dedup_and_values() {
     let end_by_date = s.outstanding_by_date().unwrap();
 
     let unique_dates: std::collections::BTreeSet<Date> =
-        s.get_flows().iter().map(|cf| cf.date).collect();
+        s.get_flows().iter().map(|cf| cf.get_date()).collect();
     assert_eq!(end_by_date.len(), unique_dates.len());
     for ((d1, _), d2) in end_by_date.iter().zip(unique_dates.iter()) {
         assert_eq!(d1, d2);
@@ -803,13 +810,13 @@ fn fixed_fee_on_issue_date_is_emitted() {
     let fees: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Fee)
+        .filter(|cf| cf.get_kind() == CFKind::Fee)
         .collect();
 
     assert_eq!(fees.len(), 1, "expected exactly one issue-date fixed fee");
-    assert_eq!(fees[0].date, issue);
+    assert_eq!(fees[0].get_date(), issue);
     assert!(
-        (fees[0].amount.amount() - 12_500.0).abs() < 1e-10,
+        (fees[0].get_amount().amount() - 12_500.0).abs() < 1e-10,
         "issue-date fixed fee amount should be preserved"
     );
 }
@@ -882,16 +889,16 @@ fn stub_period_thirty360_produces_proportional_accrual() {
     let coupon_flows: Vec<&CashFlow> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Fixed || cf.kind == CFKind::Stub)
+        .filter(|cf| cf.get_kind() == CFKind::Fixed || cf.get_kind() == CFKind::Stub)
         .collect();
 
     let stubs: Vec<&&CashFlow> = coupon_flows
         .iter()
-        .filter(|cf| cf.kind == CFKind::Stub)
+        .filter(|cf| cf.get_kind() == CFKind::Stub)
         .collect();
     let regular: Vec<&&CashFlow> = coupon_flows
         .iter()
-        .filter(|cf| cf.kind == CFKind::Fixed)
+        .filter(|cf| cf.get_kind() == CFKind::Fixed)
         .collect();
 
     assert!(!stubs.is_empty(), "Should have at least one stub period");
@@ -902,11 +909,11 @@ fn stub_period_thirty360_produces_proportional_accrual() {
 
     // Regular semi-annual coupon should be approximately 3% of notional (6% / 2)
     // Stub period should be smaller due to shorter accrual period
-    let regular_amount = regular[0].amount.amount();
-    let stub_amount = stubs[0].amount.amount();
+    let regular_amount = regular[0].get_amount().amount();
+    let stub_amount = stubs[0].get_amount().amount();
 
     let expected_regular =
-        init.amount() * fixed.rate.to_f64().unwrap_or(0.0) * regular[0].accrual_factor;
+        init.amount() * fixed.rate.to_f64().unwrap_or(0.0) * regular[0].get_accrual_factor();
 
     // Regular should match notional * rate * accrual_factor
     // Using financial_tolerance for $1M notional (allows ~$10 variance)
@@ -919,7 +926,7 @@ fn stub_period_thirty360_produces_proportional_accrual() {
     );
 
     let expected_stub =
-        init.amount() * fixed.rate.to_f64().unwrap_or(0.0) * stubs[0].accrual_factor;
+        init.amount() * fixed.rate.to_f64().unwrap_or(0.0) * stubs[0].get_accrual_factor();
 
     assert!(
         (stub_amount - expected_stub).abs() < financial_tolerance(1_000_000.0),
@@ -930,7 +937,7 @@ fn stub_period_thirty360_produces_proportional_accrual() {
     );
 
     assert!(
-        (stubs[0].accrual_factor - regular[0].accrual_factor).abs() > 1e-6,
+        (stubs[0].get_accrual_factor() - regular[0].get_accrual_factor()).abs() > 1e-6,
         "Stub and regular accrual factors should differ"
     );
 }
@@ -972,7 +979,7 @@ fn coupon_amount_golden_values() {
     let coupons: Vec<&CashFlow> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Fixed)
+        .filter(|cf| cf.get_kind() == CFKind::Fixed)
         .collect();
 
     // A regular semi-annual one-year bullet emits exactly two Fixed coupons —
@@ -987,7 +994,7 @@ fn coupon_amount_golden_values() {
         !schedule
             .get_flows()
             .iter()
-            .any(|cf| cf.kind == CFKind::Stub),
+            .any(|cf| cf.get_kind() == CFKind::Stub),
         "regular bullet schedule must not contain Stub coupons"
     );
 
@@ -996,23 +1003,24 @@ fn coupon_amount_golden_values() {
 
     for coupon in &coupons {
         assert!(
-            (coupon.amount.amount() - expected_coupon).abs() < financial_tolerance(init.amount()),
+            (coupon.get_amount().amount() - expected_coupon).abs()
+                < financial_tolerance(init.amount()),
             "Coupon amount should be ${:.2}, got ${:.2}",
             expected_coupon,
-            coupon.amount.amount()
+            coupon.get_amount().amount()
         );
 
         assert!(
-            (coupon.accrual_factor - 0.5).abs() < 0.01,
+            (coupon.get_accrual_factor() - 0.5).abs() < 0.01,
             "Accrual factor should be ~0.5 for semi-annual, got {}",
-            coupon.accrual_factor
+            coupon.get_accrual_factor()
         );
     }
 
     let redemption: Vec<&CashFlow> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Notional && cf.amount.amount() > 0.0)
+        .filter(|cf| cf.get_kind() == CFKind::Notional && cf.get_amount().amount() > 0.0)
         .collect();
 
     assert_eq!(
@@ -1021,10 +1029,11 @@ fn coupon_amount_golden_values() {
         "Should have exactly one redemption flow"
     );
     assert!(
-        (redemption[0].amount.amount() - init.amount()).abs() < financial_tolerance(init.amount()),
+        (redemption[0].get_amount().amount() - init.amount()).abs()
+            < financial_tolerance(init.amount()),
         "Redemption should equal notional: expected ${:.2}, got ${:.2}",
         init.amount(),
-        redemption[0].amount.amount()
+        redemption[0].get_amount().amount()
     );
 }
 
@@ -1066,8 +1075,8 @@ fn cashflow_conservation_bond_principal() {
     let principal_sum: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|cf| matches!(cf.kind, CFKind::Notional | CFKind::Amortization))
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| matches!(cf.get_kind(), CFKind::Notional | CFKind::Amortization))
+        .map(|cf| cf.get_amount().amount())
         .sum();
 
     // For a bullet bond: initial funding (-notional) + final principal (+notional) = 0
@@ -1117,8 +1126,8 @@ fn cashflow_conservation_amortizing_bond_principal() {
     let principal_sum: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|cf| matches!(cf.kind, CFKind::Notional | CFKind::Amortization))
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| matches!(cf.get_kind(), CFKind::Notional | CFKind::Amortization))
+        .map(|cf| cf.get_amount().amount())
         .sum();
 
     // For amortizing to zero: initial funding + sum(amortization) + final = 0
@@ -1463,23 +1472,23 @@ fn lagged_redemption_matches_final_coupon_on_weekend_maturity() {
     let last_coupon_date = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Floating)
-        .map(|cf| cf.date)
+        .filter(|cf| cf.get_kind() == CFKind::Floating)
+        .map(|cf| cf.get_date())
         .max()
         .expect("coupon flows");
     let redemption = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::Notional && cf.amount.amount() > 0.0)
+        .find(|cf| cf.get_kind() == CFKind::Notional && cf.get_amount().amount() > 0.0)
         .expect("redemption flow");
 
     assert_eq!(last_coupon_date, redemption_date);
-    assert_eq!(redemption.date, redemption_date);
+    assert_eq!(redemption.get_date(), redemption_date);
     assert!(
         schedule
             .get_flows()
             .iter()
-            .all(|cf| !(cf.kind == CFKind::Notional && cf.date == maturity)),
+            .all(|cf| !(cf.get_kind() == CFKind::Notional && cf.get_date() == maturity)),
         "no notional may settle on the raw weekend maturity"
     );
 }
@@ -1516,31 +1525,31 @@ fn pik_then_redemption_on_lagged_payment_date() {
     let pik_total: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Pik)
-        .map(|cf| cf.principal_delta.expect("PIK delta").amount())
+        .filter(|cf| cf.get_kind() == CFKind::Pik)
+        .map(|cf| cf.get_principal_delta().expect("PIK delta").amount())
         .sum();
     let last_pik_date = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Pik)
-        .map(|cf| cf.date)
+        .filter(|cf| cf.get_kind() == CFKind::Pik)
+        .map(|cf| cf.get_date())
         .max()
         .expect("PIK flows");
     let redemption = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::Notional && cf.amount.amount() > 0.0)
+        .find(|cf| cf.get_kind() == CFKind::Notional && cf.get_amount().amount() > 0.0)
         .expect("redemption flow");
 
     // PIK capitalizes at the final accrual end (record CORE-CONVENTIONS-015
     // #6); only the redemption cash settles on the lagged payment date.
     assert_eq!(last_pik_date, maturity);
-    assert_eq!(redemption.date, redemption_date);
+    assert_eq!(redemption.get_date(), redemption_date);
     assert!(
-        (redemption.amount.amount() - (init.amount() + pik_total)).abs()
+        (redemption.get_amount().amount() - (init.amount() + pik_total)).abs()
             < financial_tolerance(init.amount()),
         "redemption should equal post-PIK outstanding: got {} expected {}",
-        redemption.amount.amount(),
+        redemption.get_amount().amount(),
         init.amount() + pik_total
     );
     let path = schedule.outstanding_by_date().unwrap();
@@ -1583,20 +1592,23 @@ fn lag_zero_weekend_maturity_redeems_on_adjusted_business_day() {
     let last_coupon_date = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Fixed)
-        .map(|cf| cf.date)
+        .filter(|cf| cf.get_kind() == CFKind::Fixed)
+        .map(|cf| cf.get_date())
         .max()
         .expect("coupon flows");
     let redemption = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::Notional && cf.amount.amount() > 0.0)
+        .find(|cf| cf.get_kind() == CFKind::Notional && cf.get_amount().amount() > 0.0)
         .expect("redemption flow");
 
     assert_eq!(last_coupon_date, adjusted);
-    assert_eq!(redemption.date, adjusted);
+    assert_eq!(redemption.get_date(), adjusted);
     assert!(
-        schedule.get_flows().iter().all(|cf| cf.date != maturity),
+        schedule
+            .get_flows()
+            .iter()
+            .all(|cf| cf.get_date() != maturity),
         "no flow may be dated on the unadjusted weekend maturity"
     );
 }
@@ -1635,14 +1647,15 @@ fn principal_exchange_default_emits_issue_and_redemption() {
     let notionals: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Notional)
+        .filter(|cf| cf.get_kind() == CFKind::Notional)
         .collect();
     assert_eq!(notionals.len(), 2, "default must emit issue + redemption");
-    assert_eq!(notionals[0].date, issue);
-    assert!(notionals[0].amount.amount() < 0.0);
-    assert_eq!(notionals[1].date, maturity);
+    assert_eq!(notionals[0].get_date(), issue);
+    assert!(notionals[0].get_amount().amount() < 0.0);
+    assert_eq!(notionals[1].get_date(), maturity);
     assert!(
-        (notionals[1].amount.amount() - init.amount()).abs() < financial_tolerance(init.amount())
+        (notionals[1].get_amount().amount() - init.amount()).abs()
+            < financial_tolerance(init.amount())
     );
 }
 
@@ -1672,24 +1685,24 @@ fn principal_exchange_none_is_coupon_only() {
         coupons_only
             .get_flows()
             .iter()
-            .all(|cf| cf.kind != CFKind::Notional),
+            .all(|cf| cf.get_kind() != CFKind::Notional),
         "PrincipalExchange::None must not emit issue or redemption notionals"
     );
     let exchanged_coupons: Vec<_> = exchanged
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Fixed)
+        .filter(|cf| cf.get_kind() == CFKind::Fixed)
         .collect();
     let none_coupons: Vec<_> = coupons_only
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Fixed)
+        .filter(|cf| cf.get_kind() == CFKind::Fixed)
         .collect();
     assert_eq!(exchanged_coupons.len(), none_coupons.len());
     for (left, right) in exchanged_coupons.iter().zip(none_coupons.iter()) {
-        assert_eq!(left.date, right.date);
+        assert_eq!(left.get_date(), right.get_date());
         assert!(
-            (left.amount.amount() - right.amount.amount()).abs()
+            (left.get_amount().amount() - right.get_amount().amount()).abs()
                 < financial_tolerance(init.amount()),
             "coupon amounts must match with or without notional exchange"
         );
@@ -1717,14 +1730,14 @@ fn principal_exchange_none_keeps_amortization_flows() {
         schedule
             .get_flows()
             .iter()
-            .any(|cf| cf.kind == CFKind::Amortization),
+            .any(|cf| cf.get_kind() == CFKind::Amortization),
         "scheduled amortization must still emit"
     );
     assert!(
         schedule
             .get_flows()
             .iter()
-            .all(|cf| cf.kind != CFKind::Notional),
+            .all(|cf| cf.get_kind() != CFKind::Notional),
         "opt-out must not add a residual notional balloon"
     );
 }

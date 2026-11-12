@@ -43,23 +43,24 @@ pub(crate) fn is_cash_interest_kind(kind: CFKind) -> bool {
 /// * `flow` - A raw classified cashflow; only notional and revolving funding
 ///   rows establish new principal. Cash amounts and their dates are preserved.
 pub(crate) fn funding_principal(flow: &CashFlow) -> Option<Money> {
-    if !matches!(flow.kind, CFKind::Notional | CFKind::RevolvingDraw) {
+    if !matches!(flow.get_kind(), CFKind::Notional | CFKind::RevolvingDraw) {
         return None;
     }
     // New principal is the explicit positive delta, never the cash
     // (record CORE-CONVENTIONS-015 #4, #5).
-    flow.principal_delta.filter(|delta| delta.amount() > 0.0)
+    flow.get_principal_delta()
+        .filter(|delta| delta.amount() > 0.0)
 }
 
 /// Capitalized amount of a PIK row: the magnitude of its explicit principal
 /// delta, never its cash amount (record CORE-CONVENTIONS-015 #1, #4).
 fn pik_capitalized(cf: &CashFlow) -> Result<f64> {
-    cf.principal_delta
+    cf.get_principal_delta()
         .map(|delta| delta.amount().abs())
         .ok_or_else(|| {
             crate::error::Error::capital_structure(format!(
                 "PIK row on {} has no principal_delta; its capitalized amount must be explicit",
-                cf.date
+                cf.get_date()
             ))
         })
 }
@@ -97,7 +98,8 @@ pub(crate) fn period_snapshot_date(period: &Period) -> Date {
 /// Whether a flow returns principal to the lender: amortization, prepayment,
 /// revolver repayment, or a positive notional (redemption) row.
 fn is_repayment_like(flow: &CashFlow) -> bool {
-    flow.kind.is_repayment_like() && (flow.kind != CFKind::Notional || flow.amount.amount() > 0.0)
+    flow.get_kind().is_repayment_like()
+        && (flow.get_kind() != CFKind::Notional || flow.get_amount().amount() > 0.0)
 }
 
 /// Preserve the cash and economic dates of this period's principal claims.
@@ -108,16 +110,16 @@ pub(crate) fn period_principal_claims(
     schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.date >= period.start && flow.date < period.end)
+        .filter(|flow| flow.get_date() >= period.start && flow.get_date() < period.end)
         .filter(|flow| is_repayment_like(flow))
-        .filter(|flow| flow.amount.amount() != 0.0)
+        .filter(|flow| flow.get_amount().amount() != 0.0)
         // A repayment row carries its explicit balance date.
         .filter_map(|flow| {
             flow.get_balance_date()
                 .map(|balance_date| crate::capital_structure::PrincipalClaim {
-                    payment_date: flow.date,
+                    payment_date: flow.get_date(),
                     balance_date,
-                    amount: flow.amount.abs(),
+                    amount: flow.get_amount().abs(),
                 })
         })
         .collect()
@@ -241,10 +243,10 @@ pub fn calculate_period_flows(
                     principal.currency(),
                 ));
             }
-            if flow.amount.currency() != currency {
+            if flow.get_amount().currency() != currency {
                 return Err(crate::error::Error::CurrencyMismatch(
                     currency,
-                    flow.amount.currency(),
+                    flow.get_amount().currency(),
                 ));
             }
             if flow.get_balance_date().is_some_and(|funding_date| {
@@ -310,25 +312,27 @@ pub fn calculate_period_flows(
     let mut net_interest_cash = 0.0_f64;
 
     for cf in full_schedule.get_flows() {
-        if cf.date >= period.start && cf.date < period.end {
+        if cf.get_date() >= period.start && cf.get_date() < period.end {
             // Currency safety: every in-period flow must share the breakdown
             // currency. Cross-currency instruments (e.g. xccy swaps) mix
             // currencies in one schedule and require explicit FX, which this
             // classifier does not perform. Reject rather than let `Money`
             // arithmetic panic on a currency mismatch.
-            if cf.amount.currency() != currency {
+            if cf.get_amount().currency() != currency {
                 return Err(crate::error::Error::CurrencyMismatch(
                     currency,
-                    cf.amount.currency(),
+                    cf.get_amount().currency(),
                 ));
             }
 
-            let scaled_abs_value =
-                Money::new(cf.amount.amount().abs() * scale, cf.amount.currency())?;
+            let scaled_abs_value = Money::new(
+                cf.get_amount().amount().abs() * scale,
+                cf.get_amount().currency(),
+            )?;
 
-            match cf.kind {
+            match cf.get_kind() {
                 kind if is_cash_interest_kind(kind) => {
-                    net_interest_cash += cf.amount.amount() * scale;
+                    net_interest_cash += cf.get_amount().amount() * scale;
                 }
                 _ if is_repayment_like(cf) => {
                     breakdown.principal_payment =
@@ -342,9 +346,10 @@ pub fn calculate_period_flows(
                     // undrawn commitment, the facility size or the LC face, NOT on the drawn
                     // balance — they must not be scaled by the drawn-balance
                     // ratio. Pass them through at the scheduled amount.
-                    breakdown.fees = breakdown
-                        .fees
-                        .checked_add(Money::new(cf.amount.amount().abs(), cf.amount.currency())?)?;
+                    breakdown.fees = breakdown.fees.checked_add(Money::new(
+                        cf.get_amount().amount().abs(),
+                        cf.get_amount().currency(),
+                    )?)?;
                 }
                 CFKind::Fee | CFKind::UsageFee => {
                     // Generic and usage (drawn-balance based) fees scale with
@@ -353,7 +358,7 @@ pub fn calculate_period_flows(
                 }
                 CFKind::Pik => {
                     let capitalized =
-                        Money::new(pik_capitalized(cf)? * scale, cf.amount.currency())?;
+                        Money::new(pik_capitalized(cf)? * scale, cf.get_amount().currency())?;
                     breakdown.interest_expense_pik =
                         breakdown.interest_expense_pik.checked_add(capitalized)?;
                 }
@@ -365,14 +370,14 @@ pub fn calculate_period_flows(
                     warnings.push(EvalWarning::CapitalStructure {
                         period: period.id,
                         warning: CapitalStructureWarning::CashflowIgnored {
-                            cashflow_kind: cf.kind,
-                            cashflow_date: cf.date,
+                            cashflow_kind: cf.get_kind(),
+                            cashflow_date: cf.get_date(),
                         },
                     });
                     tracing::warn!(
                         "Ignoring credit-event CFKind={:?} for period flow calc (date={:?})",
-                        cf.kind,
-                        cf.date
+                        cf.get_kind(),
+                        cf.get_date()
                     );
                 }
                 _ => {
@@ -380,14 +385,14 @@ pub fn calculate_period_flows(
                     warnings.push(EvalWarning::CapitalStructure {
                         period: period.id,
                         warning: CapitalStructureWarning::CashflowIgnored {
-                            cashflow_kind: cf.kind,
-                            cashflow_date: cf.date,
+                            cashflow_kind: cf.get_kind(),
+                            cashflow_date: cf.get_date(),
                         },
                     });
                     tracing::warn!(
                         "Unhandled CFKind={:?} for period flow calc (date={:?}); ignoring",
-                        cf.kind,
-                        cf.date
+                        cf.get_kind(),
+                        cf.get_date()
                     );
                 }
             }
@@ -450,13 +455,13 @@ pub fn calculate_period_flows(
                 .iter()
                 .filter(economic_in_period)
                 .filter(|cf| is_repayment_like(cf))
-                .map(|cf| cf.amount.amount().abs())
+                .map(|cf| cf.get_amount().amount().abs())
                 .sum();
             let capitalized: f64 = full_schedule
                 .get_flows()
                 .iter()
                 .filter(economic_in_period)
-                .filter(|cf| cf.kind == CFKind::Pik)
+                .filter(|cf| cf.get_kind() == CFKind::Pik)
                 .map(|cf| pik_capitalized(cf).map(|value| value * scale))
                 .sum::<Result<f64>>()?;
             Money::new(

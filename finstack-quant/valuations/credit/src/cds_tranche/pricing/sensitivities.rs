@@ -373,7 +373,7 @@ impl CdsTranchePricer {
         let (rows, curve) = self.coupon_projection(tranche, market, as_of)?;
         let premium: Vec<_> = rows
             .into_iter()
-            .filter(|row| row.cashflow.kind == CFKind::Fixed)
+            .filter(|row| row.cashflow.get_kind() == CFKind::Fixed)
             .collect();
         let pv = self.discount_projected_rows(&premium, curve.as_ref(), as_of)?;
         finstack_quant_core::money::Money::new(pv, tranche.notional.currency())
@@ -408,7 +408,7 @@ impl CdsTranchePricer {
         let (mut rows, curve) = self.coupon_projection(tranche, market, as_of)?;
         let premium: Vec<_> = rows
             .iter()
-            .filter(|row| row.cashflow.kind == CFKind::Fixed)
+            .filter(|row| row.cashflow.get_kind() == CFKind::Fixed)
             .cloned()
             .collect();
         let premium_per_bp = self.discount_projected_rows(&premium, curve.as_ref(), as_of)?;
@@ -417,22 +417,23 @@ impl CdsTranchePricer {
         }
         let constants: Vec<_> = rows
             .iter()
-            .filter(|row| row.cashflow.kind != CFKind::Fixed)
+            .filter(|row| row.cashflow.get_kind() != CFKind::Fixed)
             .cloned()
             .collect();
         let constant_pv = self.discount_projected_rows(&constants, curve.as_ref(), as_of)?;
         let spread = (-constant_pv / premium_per_bp).clamp(0.0, 100000.0);
         for row in &mut rows {
-            if row.cashflow.kind == CFKind::Fixed {
+            if row.cashflow.get_kind() == CFKind::Fixed {
                 row.cashflow.amount = finstack_quant_core::money::Money::new(
-                    row.cashflow.amount.amount() * spread,
-                    row.cashflow.amount.currency(),
+                    row.cashflow.get_amount().amount() * spread,
+                    row.cashflow.get_amount().currency(),
                 )?;
                 row.cashflow.rate = Some(spread / BASIS_POINTS_PER_UNIT);
             }
         }
         rows.retain(|row| {
-            row.cashflow.kind != CFKind::Fixed || row.cashflow.amount.amount().abs() > f64::EPSILON
+            row.cashflow.get_kind() != CFKind::Fixed
+                || row.cashflow.get_amount().amount().abs() > f64::EPSILON
         });
         let npv = self.discount_projected_rows(&rows, curve.as_ref(), as_of)?;
         let tolerance = PAR_SPREAD_TOLERANCE * tranche.notional.amount();

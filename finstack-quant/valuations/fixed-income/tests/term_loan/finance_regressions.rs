@@ -104,8 +104,8 @@ fn seasoned_overnight_coupon_retains_observation_aggregation() {
         let expected: f64 = schedule
             .get_flows()
             .iter()
-            .filter(|f| f.date > as_of)
-            .map(|f| f.amount.amount())
+            .filter(|f| f.get_date() > as_of)
+            .map(|f| f.get_amount().amount())
             .sum();
         let pv = loan.value(&market, as_of).expect("value").amount();
         assert!((pv - expected).abs() < 1e-6, "{mode:?}: {pv} != {expected}");
@@ -172,8 +172,8 @@ fn seasoned_overnight_preserves_an_intraperiod_balance_change() {
     let expected: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|f| f.date > as_of)
-        .map(|f| f.amount.amount())
+        .filter(|f| f.get_date() > as_of)
+        .map(|f| f.get_amount().amount())
         .sum();
     let value = loan
         .value(&market, as_of)

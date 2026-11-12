@@ -227,14 +227,14 @@ pub(crate) fn recovery_principal_path(schedule: &CashFlowSchedule) -> Result<Vec
     let mut cash_schedule = schedule.clone();
     cash_schedule.update_flows(|flow| {
         if matches!(
-            flow.kind,
+            flow.get_kind(),
             CFKind::Amortization
                 | CFKind::PrePayment
                 | CFKind::Notional
                 | CFKind::RevolvingDraw
                 | CFKind::RevolvingRepayment
         ) {
-            flow.principal_date = Some(flow.date);
+            flow.principal_date = Some(flow.get_date());
         }
     });
     cash_schedule.outstanding_by_date()

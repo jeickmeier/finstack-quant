@@ -351,7 +351,8 @@ impl Bond {
     /// funding draw.
     pub(crate) fn is_holder_cashflow(cf: &finstack_quant_core::cashflow::CashFlow) -> bool {
         use finstack_quant_core::cashflow::CFKind;
-        cf.kind.is_cash_settlement() && !(cf.kind == CFKind::Notional && cf.amount.amount() < 0.0)
+        cf.get_kind().is_cash_settlement()
+            && !(cf.get_kind() == CFKind::Notional && cf.get_amount().amount() < 0.0)
     }
 
     fn pricing_dated_cashflows_from_schedule_with_boundary(
@@ -369,17 +370,17 @@ impl Bond {
         let ex_coupon = self.accrual_config().ex_coupon;
         let mut flows = Vec::with_capacity(schedule.get_flows().len());
         for cf in schedule.get_flows() {
-            let after_boundary = cf.date > as_of || (include_as_of && cf.date == as_of);
+            let after_boundary = cf.get_date() > as_of || (include_as_of && cf.get_date() == as_of);
             if !(after_boundary && Self::is_holder_cashflow(cf)) {
                 continue;
             }
-            if cf.kind.is_coupon()
+            if cf.get_kind().is_coupon()
                 && let Some(rule) = &ex_coupon
-                && rule.is_ex_coupon(cf.date, entitlement_date)?
+                && rule.is_ex_coupon(cf.get_date(), entitlement_date)?
             {
                 continue;
             }
-            flows.push((cf.date, cf.amount));
+            flows.push((cf.get_date(), cf.get_amount()));
         }
         Ok(flows)
     }

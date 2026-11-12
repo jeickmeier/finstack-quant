@@ -66,11 +66,11 @@ pub(crate) fn quoted_dirty_from_clean_px(
         .filter(|flow| {
             flow.get_balance_date()
                 .is_some_and(|balance| balance <= settlement)
-                && flow.date > settlement
+                && flow.get_date() > settlement
         })
         // The pending par is the explicit principal decrease.
         .map(|flow| {
-            flow.principal_delta
+            flow.get_principal_delta()
                 .map_or(0.0, |delta| (-delta.amount()).max(0.0))
         })
         .sum();
@@ -158,13 +158,13 @@ pub(super) fn solve_irr_to_exercise(
     // Scheduled cash paid on or before the exercise date. Redemption covers
     // the remaining claim after PIK capitalization and scheduled principal.
     for cf in schedule.get_flows() {
-        if cf.date <= settlement_date || cf.date > exercise_date {
+        if cf.get_date() <= settlement_date || cf.get_date() > exercise_date {
             continue;
         }
         // Same cash-settlement kinds as YTM; PIK is capitalized into the
         // remaining exercise claim.
-        if cf.kind.is_cash_settlement() {
-            flows.push((cf.date, cf.amount.amount()));
+        if cf.get_kind().is_cash_settlement() {
+            flows.push((cf.get_date(), cf.get_amount().amount()));
         }
     }
 
@@ -192,7 +192,7 @@ pub(super) fn maturity_exercise_date(loan: &TermLoan, schedule: &CashFlowSchedul
     schedule
         .get_flows()
         .iter()
-        .map(|cf| cf.date)
+        .map(|cf| cf.get_date())
         .max()
         .map_or(loan.maturity, |last| last.max(loan.maturity))
 }
@@ -282,13 +282,13 @@ pub(super) fn exercisable_call_candidates(
             .iter()
             .filter(|cf| {
                 matches!(
-                    cf.kind,
+                    cf.get_kind(),
                     finstack_quant_core::cashflow::CFKind::Fixed
                         | finstack_quant_core::cashflow::CFKind::Floating
                         | finstack_quant_core::cashflow::CFKind::Stub
                 )
             })
-            .map(|cf| cf.date)
+            .map(|cf| cf.get_date())
             .filter(|date| *date > settlement)
             .min();
         if let Some(exercise) = first_coupon_after_settlement {

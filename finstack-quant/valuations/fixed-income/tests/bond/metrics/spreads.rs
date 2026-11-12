@@ -96,18 +96,18 @@ fn test_z_spread_reports_bond_compounding_spread() {
         .unwrap()
         .into_flows()
         .into_iter()
-        .filter(|flow| flow.date > as_of)
+        .filter(|flow| flow.get_date() > as_of)
         .map(|flow| {
             let t = DayCount::Act365F
-                .year_fraction(as_of, flow.date, DayCountContext::default())
+                .year_fraction(as_of, flow.get_date(), DayCountContext::default())
                 .unwrap();
             let df_base = market
                 .get_discount("USD-OIS")
                 .unwrap()
-                .df_between_dates(as_of, flow.date)
+                .df_between_dates(as_of, flow.get_date())
                 .unwrap();
             let base_rate = df_base.powf(-1.0 / t) - 1.0;
-            flow.amount.amount() * (1.0 + base_rate + target_z).powf(-t)
+            flow.get_amount().amount() * (1.0 + base_rate + target_z).powf(-t)
         })
         .sum::<f64>();
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()

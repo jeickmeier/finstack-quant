@@ -119,12 +119,12 @@ impl ConvertibleBondValuator {
         let mut coupon_map: FxHashMap<usize, f64> = FxHashMap::default();
         let mut principal_map: FxHashMap<usize, f64> = FxHashMap::default();
         for cf in cashflow_schedule.get_flows() {
-            if cf.date <= base_date || !cf.kind.is_cash_settlement() {
+            if cf.get_date() <= base_date || !cf.get_kind().is_cash_settlement() {
                 continue;
             }
             let step = map_date_to_step(
                 base_date,
-                cf.date.min(bond.maturity),
+                cf.get_date().min(bond.maturity),
                 bond.maturity,
                 steps,
                 DayCount::Act365F,
@@ -132,25 +132,28 @@ impl ConvertibleBondValuator {
             )?;
             // Preserve the contractual payment PV when a date is rounded onto
             // the equity grid, including final coupons paid after maturity.
-            let correction = rf_curve.df_between_dates(base_date, cf.date)?
-                * survival_between(base_date, cf.date)?
+            let correction = rf_curve.df_between_dates(base_date, cf.get_date())?
+                * survival_between(base_date, cf.get_date())?
                 / (rf_curve.df_between_dates(base_date, step_dates[step])?
                     * survival_between(base_date, step_dates[step])?);
-            let target = if cf.kind.is_principal_like() {
+            let target = if cf.get_kind().is_principal_like() {
                 &mut principal_map
             } else {
                 &mut coupon_map
             };
-            let tail_recovery = if cf.kind.is_principal_like() && cf.date > bond.maturity {
+            let tail_recovery = if cf.get_kind().is_principal_like()
+                && cf.get_date() > bond.maturity
+            {
                 bond.recovery_rate.unwrap_or(0.0)
                     * finstack_quant_valuations_core::instruments::pricing::rates_credit::continuous_frp_weight(
-                        rf_curve.df_between_dates(bond.maturity, cf.date)?,
-                        survival_between(bond.maturity, cf.date)?,
+                        rf_curve.df_between_dates(bond.maturity, cf.get_date())?,
+                        survival_between(bond.maturity, cf.get_date())?,
                     )?
             } else {
                 0.0
             };
-            *target.entry(step).or_insert(0.0) += cf.amount.amount() * (correction + tail_recovery);
+            *target.entry(step).or_insert(0.0) +=
+                cf.get_amount().amount() * (correction + tail_recovery);
         }
         let balance_path = cashflow_schedule.outstanding_by_date()?;
         let mut principal_by_step: Vec<f64> = cashflow_schedule
@@ -164,14 +167,14 @@ impl ConvertibleBondValuator {
             .get_flows()
             .iter()
             .filter(|cf| {
-                cf.kind.is_principal_like()
-                    && cf.kind.is_cash_settlement()
-                    && cf.amount.amount() > 0.0
+                cf.get_kind().is_principal_like()
+                    && cf.get_kind().is_cash_settlement()
+                    && cf.get_amount().amount() > 0.0
                     && cf
                         .get_balance_date()
                         .is_some_and(|balance| balance >= bond.maturity)
             })
-            .map(|cf| cf.amount.amount())
+            .map(|cf| cf.get_amount().amount())
             .sum();
 
         // One accrual index serves every call/put exercise date below.
@@ -227,16 +230,17 @@ impl ConvertibleBondValuator {
                             for cashflow in cashflow_schedule
                                 .get_flows()
                                 .iter()
-                                .filter(|cashflow| cashflow.date > exercise_date)
+                                .filter(|cashflow| cashflow.get_date() > exercise_date)
                             {
-                                let df = curve.df_between_dates(exercise_date, cashflow.date)?;
+                                let df =
+                                    curve.df_between_dates(exercise_date, cashflow.get_date())?;
                                 let tau = curve.day_count().year_fraction(
                                     exercise_date,
-                                    cashflow.date,
+                                    cashflow.get_date(),
                                     finstack_quant_core::dates::DayCountContext::default(),
                                 )?;
                                 pv_remaining +=
-                                    cashflow.amount.amount() * df * (-spread * tau).exp();
+                                    cashflow.get_amount().amount() * df * (-spread * tau).exp();
                             }
                             (floor_price + accrued).max(pv_remaining)
                         } else {

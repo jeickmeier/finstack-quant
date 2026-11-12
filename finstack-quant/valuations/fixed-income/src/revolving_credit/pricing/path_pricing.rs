@@ -58,7 +58,7 @@ impl RevolvingCreditPricer {
                 .schedule
                 .get_flows()
                 .iter()
-                .map(|cf| cf.date)
+                .map(|cf| cf.get_date())
                 .collect();
             Self::compute_dynamic_survival_at_dates(
                 &path_data.credit_spread_path,
@@ -76,7 +76,7 @@ impl RevolvingCreditPricer {
                     .schedule
                     .get_flows()
                     .iter()
-                    .map(|cf| cf.date)
+                    .map(|cf| cf.get_date())
                     .collect::<Vec<_>>(),
             )?
         } else {
@@ -173,12 +173,12 @@ impl RevolvingCreditPricer {
             .iter()
             .zip(&survival_probs)
         {
-            if cf.date < as_of {
+            if cf.get_date() < as_of {
                 continue;
             }
-            let df = df_asof_to(cf.date)?;
+            let df = df_asof_to(cf.get_date())?;
             let survival = *survival_uncond / sp_as_of;
-            total_pv += cf.amount.amount() * df * survival;
+            total_pv += cf.get_amount().amount() * df * survival;
         }
 
         // Default leg PV — trapezoidal integration on a monthly-or-finer grid.

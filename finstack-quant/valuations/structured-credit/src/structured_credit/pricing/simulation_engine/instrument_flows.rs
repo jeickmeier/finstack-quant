@@ -1364,12 +1364,12 @@ fn utilization_terms(
 /// Capitalized amount of a PIK row: its explicit principal delta, never its
 /// cash amount (record CORE-CONVENTIONS-015 #1, #4).
 fn pik_delta(cf: &finstack_quant_core::cashflow::CashFlow) -> Result<f64> {
-    cf.principal_delta
+    cf.get_principal_delta()
         .map(|delta| delta.amount())
         .ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
                 "PIK row on {} has no principal_delta",
-                cf.date
+                cf.get_date()
             ))
         })
 }
@@ -1387,10 +1387,10 @@ fn past_principal_delta(
 ) -> Result<f64> {
     let mut delta = 0.0;
     for cf in schedule.get_flows() {
-        if cf.date > as_of {
+        if cf.get_date() > as_of {
             continue;
         }
-        match cf.kind {
+        match cf.get_kind() {
             CFKind::Notional
             | CFKind::Amortization
             | CFKind::PrePayment
@@ -1413,21 +1413,22 @@ fn past_principal_delta(
 
 /// Explicit principal delta of a principal row.
 fn principal_delta_of(cf: &finstack_quant_core::cashflow::CashFlow) -> Result<f64> {
-    cf.principal_delta
+    cf.get_principal_delta()
         .map(|delta| delta.amount())
         .ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
                 "{} row on {} has no principal_delta",
-                cf.kind, cf.date
+                cf.get_kind(),
+                cf.get_date()
             ))
         })
 }
 
 /// Balance a rate-based flow accrued on: `amount / (rate × accrual)`.
 fn accrual_basis(cf: &CashFlow) -> f64 {
-    match cf.rate {
-        Some(rate) if rate.abs() > 1e-12 && cf.accrual_factor > 0.0 => {
-            cf.amount.amount() / (rate * cf.accrual_factor)
+    match cf.get_rate() {
+        Some(rate) if rate.abs() > 1e-12 && cf.get_accrual_factor() > 0.0 => {
+            cf.get_amount().amount() / (rate * cf.get_accrual_factor())
         }
         _ => 0.0,
     }
@@ -1445,28 +1446,28 @@ fn bucket_flows(
         .collect();
     let fixings = &schedule.get_meta().projected_fixings;
     for cf in schedule.get_flows() {
-        if cf.date <= as_of {
+        if cf.get_date() <= as_of {
             continue;
         }
         let k = period_dates
             .iter()
-            .position(|pay| *pay >= cf.date)
+            .position(|pay| *pay >= cf.get_date())
             .unwrap_or(period_dates.len() - 1);
         let bucket = &mut periods[k];
-        let amount = cf.amount.amount();
-        match cf.kind {
+        let amount = cf.get_amount().amount();
+        match cf.get_kind() {
             CFKind::Fixed | CFKind::InflationCoupon | CFKind::Stub => {
                 bucket.interest.push(InterestComponent {
                     projected: amount,
                     basis: accrual_basis(cf),
-                    accrual: cf.accrual_factor,
+                    accrual: cf.get_accrual_factor(),
                     index_rate: None,
                     fixing_date: None,
-                    rate: cf.rate,
+                    rate: cf.get_rate(),
                 });
             }
             CFKind::Floating => {
-                let index_rate = cf.reset_date.and_then(|reset| {
+                let index_rate = cf.get_reset_date().and_then(|reset| {
                     fixings
                         .iter()
                         .find(|f| f.date == reset)
@@ -1475,10 +1476,10 @@ fn bucket_flows(
                 bucket.interest.push(InterestComponent {
                     projected: amount,
                     basis: accrual_basis(cf),
-                    accrual: cf.accrual_factor,
+                    accrual: cf.get_accrual_factor(),
                     index_rate,
-                    fixing_date: cf.reset_date,
-                    rate: cf.rate,
+                    fixing_date: cf.get_reset_date(),
+                    rate: cf.get_rate(),
                 });
             }
             CFKind::Fee
@@ -1487,7 +1488,7 @@ fn bucket_flows(
             | CFKind::FacilityFee
             | CFKind::LcFee
             | CFKind::FrontingFee => {
-                let kind = match cf.kind {
+                let kind = match cf.get_kind() {
                     CFKind::CommitmentFee => FeeKind::Commitment,
                     CFKind::UsageFee => FeeKind::Usage,
                     _ => FeeKind::Fixed,
@@ -1495,8 +1496,8 @@ fn bucket_flows(
                 bucket.fees.push(FeeComponent {
                     projected: amount,
                     basis: accrual_basis(cf),
-                    accrual: cf.accrual_factor,
-                    rate: cf.rate,
+                    accrual: cf.get_accrual_factor(),
+                    rate: cf.get_rate(),
                     kind,
                 });
             }

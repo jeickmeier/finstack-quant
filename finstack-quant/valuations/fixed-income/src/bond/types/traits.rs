@@ -177,7 +177,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         Ok(schedule
             .get_flows()
             .iter()
-            .map(|flow| flow.date)
+            .map(|flow| flow.get_date())
             .chain(self.expiry())
             .max())
     }

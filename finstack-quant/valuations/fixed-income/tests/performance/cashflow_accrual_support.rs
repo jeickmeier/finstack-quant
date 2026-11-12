@@ -63,13 +63,13 @@ pub(super) fn schedule(schedule: &CashFlowSchedule) -> Value {
         .enumerate()
         .map(|(ordinal, flow)| {
             json!({
-                "ordinal": ordinal, "date": flow.date.to_string(), "kind": flow.kind,
-                "amount": money(flow.amount), "reset_date": flow.reset_date,
-                "principal_date": flow.principal_date,
-                "principal_delta": flow.principal_delta.map(money),
-                "accrual_factor": scalar(flow.accrual_factor), "rate": flow.rate.map(scalar),
-                "accrual": flow.accrual,
-                "projected_index_rate": flow.accrual.as_ref().and_then(|a| a.projected_index_rate).map(scalar),
+                "ordinal": ordinal, "date": flow.get_date().to_string(), "kind": flow.get_kind(),
+                "amount": money(flow.get_amount()), "reset_date": flow.get_reset_date(),
+                "principal_date": flow.get_balance_date(),
+                "principal_delta": flow.get_principal_delta().map(money),
+                "accrual_factor": scalar(flow.get_accrual_factor()), "rate": flow.get_rate().map(scalar),
+                "accrual": flow.get_accrual(),
+                "projected_index_rate": flow.get_accrual().as_ref().and_then(|a| a.projected_index_rate).map(scalar),
             })
         })
         .collect();
@@ -231,10 +231,12 @@ pub(super) fn expected_linear(schedule: &CashFlowSchedule, date: Date, include_p
     schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind.is_coupon() || (include_pik && flow.kind == CFKind::Pik))
+        .filter(|flow| {
+            flow.get_kind().is_coupon() || (include_pik && flow.get_kind() == CFKind::Pik)
+        })
         .map(|flow| {
-            let accrual = flow.accrual.as_ref().expect("contractual accrual");
-            if date < accrual.start || date >= flow.date {
+            let accrual = flow.get_accrual().as_ref().expect("contractual accrual");
+            if date < accrual.start || date >= flow.get_date() {
                 return 0.0;
             }
             let end = date.min(accrual.end);
@@ -250,10 +252,10 @@ pub(super) fn expected_linear(schedule: &CashFlowSchedule, date: Date, include_p
                 other => panic!("unsupported independent consumer convention {other:?}"),
             };
             // A PIK row's value is its explicit capitalization, not cash.
-            let value = if flow.kind == CFKind::Pik {
-                flow.principal_delta.expect("PIK delta").amount()
+            let value = if flow.get_kind() == CFKind::Pik {
+                flow.get_principal_delta().expect("PIK delta").amount()
             } else {
-                flow.amount.amount()
+                flow.get_amount().amount()
             };
             value * elapsed / total
         })
@@ -283,10 +285,10 @@ pub(super) fn queries(schedule: &CashFlowSchedule, cfg: &AccrualConfig, dates: &
                 .iter()
                 .enumerate()
                 .filter_map(|(row, flow)| {
-                    let eligible =
-                        flow.kind.is_coupon() || (cfg.include_pik && flow.kind == CFKind::Pik);
-                    let accrual = flow.accrual.as_ref()?;
-                    (eligible && accrual.start <= date && date < flow.date).then_some(row)
+                    let eligible = flow.get_kind().is_coupon()
+                        || (cfg.include_pik && flow.get_kind() == CFKind::Pik);
+                    let accrual = flow.get_accrual().as_ref()?;
+                    (eligible && accrual.start <= date && date < flow.get_date()).then_some(row)
                 })
                 .collect();
             json!({"ordinal": ordinal, "date": date.to_string(), "value": scalar(value),

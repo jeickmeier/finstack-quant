@@ -429,17 +429,17 @@ fn discount_schedule(
     let day_count = curve.day_count();
     let mut pv = 0.0;
     for cf in schedule.get_flows() {
-        if cf.date <= as_of {
+        if cf.get_date() <= as_of {
             continue;
         }
-        let years = day_count.year_fraction(as_of, cf.date, DayCountContext::default())?;
-        let base_df = curve.df_between_dates(as_of, cf.date)?;
+        let years = day_count.year_fraction(as_of, cf.get_date(), DayCountContext::default())?;
+        let base_df = curve.df_between_dates(as_of, cf.get_date())?;
         let df = if spread.abs() > f64::EPSILON {
             base_df * (-spread * years).exp()
         } else {
             base_df
         };
-        pv += cf.amount.amount() * df;
+        pv += cf.get_amount().amount() * df;
     }
     Ok(pv)
 }
@@ -699,13 +699,13 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .any(|cf| cf.kind == CFKind::Fixed)
+                .any(|cf| cf.get_kind() == CFKind::Fixed)
         );
         assert!(
             schedule
                 .get_flows()
                 .iter()
-                .any(|cf| matches!(cf.kind, CFKind::Amortization | CFKind::PrePayment))
+                .any(|cf| matches!(cf.get_kind(), CFKind::Amortization | CFKind::PrePayment))
         );
     }
 

@@ -610,7 +610,7 @@ fn project_cds_flows(
     let protection_sign = -premium_sign;
     let loss_given_default = 1.0 - cds.protection_leg.recovery_rate;
 
-    schedule.retain_flows(|flow| flow.date >= as_of);
+    schedule.retain_flows(|flow| flow.get_date() >= as_of);
     let mut prev_survival = if as_of <= survival.base_date() {
         1.0
     } else {
@@ -626,10 +626,10 @@ fn project_cds_flows(
     let mut previous_premium_date = as_of;
 
     for flow in schedule.into_flows() {
-        if matches!(flow.kind, CFKind::Fixed | CFKind::Stub) {
+        if matches!(flow.get_kind(), CFKind::Fixed | CFKind::Stub) {
             let t = survival.day_count().year_fraction(
                 survival.base_date(),
-                flow.date,
+                flow.get_date(),
                 finstack_quant_core::dates::DayCountContext::default(),
             )?;
             let current_survival = survival.sp(t);
@@ -638,18 +638,18 @@ fn project_cds_flows(
             let conditional_survival = current_survival / conditioning_survival;
             // Mid-period default credits half the coupon (accrual on default).
             let projected_survival = conditional_survival + 0.5 * conditional_default;
-            let projected_premium = flow.amount.amount().abs() * projected_survival;
+            let projected_premium = flow.get_amount().amount().abs() * projected_survival;
             if projected_premium.abs() > f64::EPSILON {
                 let mut projected_flow = flow.clone();
                 projected_flow.amount = Money::from_model_value(
                     projected_premium * premium_sign,
-                    flow.amount.currency(),
+                    flow.get_amount().currency(),
                 )?;
                 projected_flows.push(projected_flow);
             }
             if delta_default > 0.0 {
                 let default_date =
-                    midpoint_default_date(survival, previous_premium_date, flow.date)?;
+                    midpoint_default_date(survival, previous_premium_date, flow.get_date())?;
                 let settlement_date =
                     settlement_date_with_delay(default_date, cds.protection_leg.settlement_delay)?;
                 projected_flows.push(CashFlow::new(
@@ -667,7 +667,7 @@ fn project_cds_flows(
                     None,
                 ));
             }
-            previous_premium_date = flow.date;
+            previous_premium_date = flow.get_date();
             prev_survival = current_survival;
         }
     }
@@ -812,19 +812,19 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .any(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
+                .any(|cf| matches!(cf.get_kind(), CFKind::Fixed | CFKind::Stub))
         );
         assert!(
             schedule
                 .get_flows()
                 .iter()
-                .any(|cf| cf.kind == CFKind::ProtectionPayment)
+                .any(|cf| cf.get_kind() == CFKind::ProtectionPayment)
         );
         // Protection is settlement cash, so the cash ladder counts it.
         let amounts: Vec<f64> = schedule
             .get_flows()
             .iter()
-            .map(|cf| cf.amount.amount())
+            .map(|cf| cf.get_amount().amount())
             .collect();
         let ladder_total: f64 = schedule
             .calendar_year_ladder(&amounts)
@@ -853,8 +853,8 @@ mod tests {
             .get_flows()
             .iter()
             .try_fold(Money::from((0_i64, Currency::USD)), |acc, flow| {
-                let df = discount.df_between_dates(as_of, flow.date)?;
-                acc.checked_add(flow.amount.checked_mul_f64(df)?)
+                let df = discount.df_between_dates(as_of, flow.get_date())?;
+                acc.checked_add(flow.get_amount().checked_mul_f64(df)?)
             })
             .expect("discounted projected rows should sum");
         let npv = index.npv(&market, as_of).expect("index npv");

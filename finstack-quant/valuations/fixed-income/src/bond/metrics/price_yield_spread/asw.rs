@@ -147,13 +147,13 @@ fn pv_coupon_from_custom_schedule(
 
     let mut pv = NeumaierAccumulator::new();
     for cf in schedule.get_flows() {
-        if cf.date <= as_of {
+        if cf.get_date() <= as_of {
             continue;
         }
-        match cf.kind {
+        match cf.get_kind() {
             CFKind::Fixed | CFKind::Stub => {
-                let df = disc.df_on_date(cf.date)?;
-                pv.add(cf.amount.amount() * df);
+                let df = disc.df_on_date(cf.get_date())?;
+                pv.add(cf.get_amount().amount() * df);
             }
             _ => {}
         }

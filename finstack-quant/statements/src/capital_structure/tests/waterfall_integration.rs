@@ -353,16 +353,16 @@ mod period_flow_waterfall_integration {
             let start = if i == 0 {
                 issue
             } else {
-                instrument.schedule.get_flows()[i as usize - 1].date
+                instrument.schedule.get_flows()[i as usize - 1].get_date()
             };
-            let days = (coupon.date - start).whole_days() as f64;
+            let days = (coupon.get_date() - start).whole_days() as f64;
             let expected = notional * rate_q
                 + capitalizations
                     .iter()
                     .map(|(date, amount)| {
                         amount
                             * rate_q
-                            * (coupon.date - (*date).max(start)).whole_days().max(0) as f64
+                            * (coupon.get_date() - (*date).max(start)).whole_days().max(0) as f64
                             / days
                     })
                     .sum::<f64>();
@@ -492,8 +492,8 @@ mod period_flow_waterfall_integration {
         let rebuilt_q2: f64 = state.residual_schedules["TL-1"]
             .get_flows()
             .iter()
-            .filter(|flow| flow.date == coupon_date)
-            .map(|flow| flow.amount.amount().abs())
+            .filter(|flow| flow.get_date() == coupon_date)
+            .map(|flow| flow.get_amount().amount().abs())
             .sum();
         assert!(
             (rebuilt_q2 - expected_coupon).abs() < 1e-6,

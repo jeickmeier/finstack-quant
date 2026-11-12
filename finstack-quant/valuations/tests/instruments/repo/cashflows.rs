@@ -52,10 +52,10 @@ fn test_full_schedule_marks_initial_exchange_as_notional() {
         .expect("repo full schedule");
 
     assert_eq!(schedule.get_flows().len(), 3);
-    assert_eq!(schedule.get_flows()[0].kind, CFKind::Notional);
-    assert_eq!(schedule.get_flows()[1].kind, CFKind::Fixed);
-    assert_eq!(schedule.get_flows()[2].kind, CFKind::Notional);
-    assert_eq!(schedule.get_flows()[2].amount, repo.cash_amount);
+    assert_eq!(schedule.get_flows()[0].get_kind(), CFKind::Notional);
+    assert_eq!(schedule.get_flows()[1].get_kind(), CFKind::Fixed);
+    assert_eq!(schedule.get_flows()[2].get_kind(), CFKind::Notional);
+    assert_eq!(schedule.get_flows()[2].get_amount(), repo.cash_amount);
 }
 
 #[test]

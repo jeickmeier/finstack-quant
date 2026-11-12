@@ -58,8 +58,8 @@ impl ZSpreadCs01 for RevolvingCredit {
                     .schedule
                     .get_flows()
                     .iter()
-                    .filter(|cf| cf.date >= as_of)
-                    .map(|cf| (cf.date, cf.amount))
+                    .filter(|cf| cf.get_date() >= as_of)
+                    .map(|cf| (cf.get_date(), cf.get_amount()))
                     .collect();
 
                 // Upfront fee is a separate PV term in the pricer, paid at the

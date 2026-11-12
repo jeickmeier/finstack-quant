@@ -663,14 +663,14 @@ mod tests {
         let fees: Vec<_> = schedule
             .get_flows()
             .iter()
-            .filter(|flow| flow.kind == CFKind::CommitmentFee)
+            .filter(|flow| flow.get_kind() == CFKind::CommitmentFee)
             .collect();
         assert_eq!(fees.len(), 2);
-        assert_eq!(fees[0].date, date!(2024 - 03 - 01));
-        assert_eq!(fees[1].date, date!(2025 - 03 - 01));
+        assert_eq!(fees[0].get_date(), date!(2024 - 03 - 01));
+        assert_eq!(fees[1].get_date(), date!(2025 - 03 - 01));
         let expected_first = (10_000.0 * 183.0 + 5_000.0 * 91.0) / 366.0;
         let expected_second = 5_000.0 * 92.0 / 365.0;
-        assert!((fees[0].amount.amount() - expected_first).abs() < 1e-8);
-        assert!((fees[1].amount.amount() - expected_second).abs() < 1e-8);
+        assert!((fees[0].get_amount().amount() - expected_first).abs() < 1e-8);
+        assert!((fees[1].get_amount().amount() - expected_second).abs() < 1e-8);
     }
 }

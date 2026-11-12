@@ -203,9 +203,9 @@ mod tests {
         substitution.call_type = super::super::MarginCallType::Substitution;
         let flows = margin_calls_to_cashflows(&[post, substitution]);
         assert_eq!(flows.len(), 1);
-        assert_eq!(flows[0].kind, CFKind::VariationMarginPay);
-        assert_eq!(flows[0].date, settlement);
-        assert_eq!(flows[0].reset_date, None);
+        assert_eq!(flows[0].get_kind(), CFKind::VariationMarginPay);
+        assert_eq!(flows[0].get_date(), settlement);
+        assert_eq!(flows[0].get_reset_date(), None);
     }
 
     fn test_date(y: i32, m: u8, d: u8) -> Date {
@@ -251,8 +251,8 @@ mod tests {
 
         // Should have one margin call for the 2M deficit
         assert_eq!(cashflows.len(), 1);
-        assert_eq!(cashflows[0].kind, CFKind::VariationMarginPay);
-        assert_eq!(cashflows[0].amount.amount(), 2_000_000.0);
+        assert_eq!(cashflows[0].get_kind(), CFKind::VariationMarginPay);
+        assert_eq!(cashflows[0].get_amount().amount(), 2_000_000.0);
     }
 
     #[test]
@@ -297,8 +297,8 @@ mod tests {
         .expect("valid margin cashflows fixture");
 
         assert_eq!(cashflows.len(), 1);
-        assert_eq!(cashflows[0].kind, CFKind::VariationMarginPay);
-        assert_eq!(cashflows[0].amount.amount(), 2_000_000.0);
+        assert_eq!(cashflows[0].get_kind(), CFKind::VariationMarginPay);
+        assert_eq!(cashflows[0].get_amount().amount(), 2_000_000.0);
     }
 
     #[test]
@@ -320,8 +320,8 @@ mod tests {
 
         // Should have one margin return for the 3M excess
         assert_eq!(cashflows.len(), 1);
-        assert_eq!(cashflows[0].kind, CFKind::VariationMarginReceive);
-        assert_eq!(cashflows[0].amount.amount(), 3_000_000.0);
+        assert_eq!(cashflows[0].get_kind(), CFKind::VariationMarginReceive);
+        assert_eq!(cashflows[0].get_amount().amount(), 3_000_000.0);
     }
 
     #[test]
@@ -346,8 +346,8 @@ mod tests {
 
         // Interest = 2M * 5% * (7/360) ≈ 1944.44
         assert_eq!(cashflows.len(), 1);
-        assert_eq!(cashflows[0].kind, CFKind::MarginInterest);
-        assert!((cashflows[0].amount.amount() - 1944.44).abs() < 1.0);
+        assert_eq!(cashflows[0].get_kind(), CFKind::MarginInterest);
+        assert!((cashflows[0].get_amount().amount() - 1944.44).abs() < 1.0);
     }
 
     #[test]
@@ -378,8 +378,8 @@ mod tests {
         .expect("ACT/365F margin interest");
 
         // Act/360 gives higher interest than Act/365F for same period
-        assert!(cf_360[0].amount.amount() > cf_365[0].amount.amount());
+        assert!(cf_360[0].get_amount().amount() > cf_365[0].get_amount().amount());
         // Act/365F: 2M * 5% * (7/365) ≈ 1917.81
-        assert!((cf_365[0].amount.amount() - 1917.81).abs() < 1.0);
+        assert!((cf_365[0].get_amount().amount() - 1917.81).abs() < 1.0);
     }
 }

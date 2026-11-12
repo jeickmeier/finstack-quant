@@ -283,8 +283,10 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
             .unwrap()
             .get_flows()
             .iter()
-            .filter(|flow| flow.kind.is_coupon())
-            .map(|flow| flow.amount.amount() / 100.0 * disc.df_on_date(flow.date).unwrap())
+            .filter(|flow| flow.get_kind().is_coupon())
+            .map(|flow| {
+                flow.get_amount().amount() / 100.0 * disc.df_on_date(flow.get_date()).unwrap()
+            })
             .sum();
     let float_pv = 1.0 - disc.df_on_date(*float_dates.last().unwrap()).unwrap();
     let expected = (coupon_pv - float_pv + 1.0 - price_pct) / float_ann;

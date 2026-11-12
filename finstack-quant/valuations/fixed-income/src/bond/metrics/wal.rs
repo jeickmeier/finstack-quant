@@ -42,13 +42,13 @@ impl MetricCalculator for BondWalCalculator {
         let mut total_principal = 0.0;
 
         for cf in schedule.get_flows() {
-            if cf.date <= context.as_of {
+            if cf.get_date() <= context.as_of {
                 continue;
             }
 
-            let principal = match cf.kind {
-                CFKind::Amortization => cf.amount.amount(),
-                CFKind::Notional if cf.amount.amount() > 0.0 => cf.amount.amount(),
+            let principal = match cf.get_kind() {
+                CFKind::Amortization => cf.get_amount().amount(),
+                CFKind::Notional if cf.get_amount().amount() > 0.0 => cf.get_amount().amount(),
                 _ => continue,
             };
 
@@ -60,7 +60,7 @@ impl MetricCalculator for BondWalCalculator {
             // flow and understate WAL with no diagnostic.
             let years = finstack_quant_core::dates::DayCount::Act365F.year_fraction(
                 context.as_of,
-                cf.date,
+                cf.get_date(),
                 finstack_quant_core::dates::DayCountContext::default(),
             )?;
 

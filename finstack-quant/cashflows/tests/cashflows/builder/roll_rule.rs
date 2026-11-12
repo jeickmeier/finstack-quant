@@ -168,8 +168,8 @@ fn coupon_total(schedule: &CashFlowSchedule) -> f64 {
     schedule
         .get_flows()
         .iter()
-        .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub))
-        .map(|flow| flow.amount.amount())
+        .filter(|flow| matches!(flow.get_kind(), CFKind::Fixed | CFKind::Stub))
+        .map(|flow| flow.get_amount().amount())
         .sum()
 }
 
@@ -192,13 +192,13 @@ fn imm_coupons_accrue_through_off_grid_maturity() {
         let coupons: Vec<_> = schedule
             .get_flows()
             .iter()
-            .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub))
+            .filter(|flow| matches!(flow.get_kind(), CFKind::Fixed | CFKind::Stub))
             .collect();
         assert_eq!(
             coupons
                 .last()
                 .expect("terminal coupon")
-                .accrual
+                .get_accrual()
                 .as_ref()
                 .expect("accrual")
                 .end,
@@ -208,7 +208,7 @@ fn imm_coupons_accrue_through_off_grid_maturity() {
             assert!(
                 coupons[1..coupons.len() - 1]
                     .iter()
-                    .all(|flow| flow.kind == CFKind::Fixed)
+                    .all(|flow| flow.get_kind() == CFKind::Fixed)
             );
         }
     }
@@ -246,8 +246,8 @@ fn imm_roll_rule_honours_the_leg_frequency_and_stub() {
     let kinds: Vec<CFKind> = schedule
         .get_flows()
         .iter()
-        .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub))
-        .map(|flow| flow.kind)
+        .filter(|flow| matches!(flow.get_kind(), CFKind::Fixed | CFKind::Stub))
+        .map(|flow| flow.get_kind())
         .collect();
     assert_eq!(kinds, vec![CFKind::Stub, CFKind::Fixed, CFKind::Fixed]);
 }
@@ -272,7 +272,7 @@ fn cds_interior_payment_windows_never_repeat_front_accrual() {
                 .get_flows()
                 .iter()
                 .filter_map(|flow| {
-                    flow.accrual
+                    flow.get_accrual()
                         .as_ref()
                         .map(|accrual| (accrual.start, accrual.end))
                 })
@@ -310,7 +310,7 @@ fn cds_effective_frequency_controls_day_counts_and_coupon_kinds() {
                 !schedule
                     .get_flows()
                     .iter()
-                    .any(|flow| flow.kind == CFKind::Stub)
+                    .any(|flow| flow.get_kind() == CFKind::Stub)
             );
             let periods =
                 build_periods(BuildPeriodsParams::from_schedule(&params, start, end, None))
@@ -400,8 +400,8 @@ fn cds_imm_schedule_params_reach_the_cashflow_compiler() {
     let coupon_dates: Vec<Date> = flows
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Fixed)
-        .map(|flow| flow.date)
+        .filter(|flow| flow.get_kind() == CFKind::Fixed)
+        .map(|flow| flow.get_date())
         .collect();
     assert_eq!(
         coupon_dates,

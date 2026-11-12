@@ -123,18 +123,18 @@ pub(crate) fn rebuild_residual_interest(
     }
     let mut economic_order: Vec<_> = schedule.get_flows().iter().collect();
     economic_order.sort_by_key(|flow| {
-        let date = if is_rebuildable_interest(flow.kind) && flow.kind != CFKind::Pik {
-            flow.accrual
+        let date = if is_rebuildable_interest(flow.get_kind()) && flow.get_kind() != CFKind::Pik {
+            flow.get_accrual()
                 .as_ref()
-                .map_or(flow.date, |accrual| accrual.end)
+                .map_or(flow.get_date(), |accrual| accrual.end)
         } else {
             economic_date(flow)
         };
         // Capitalize the final PIK coupon before sizing redemption, even when
         // their payment dates differ. Other repayments retain schedule order.
-        let rank = if flow.kind == CFKind::Notional && principal_change(flow) < 0.0 {
+        let rank = if flow.get_kind() == CFKind::Notional && principal_change(flow) < 0.0 {
             2
-        } else if is_rebuildable_interest(flow.kind) {
+        } else if is_rebuildable_interest(flow.get_kind()) {
             1
         } else {
             0
@@ -144,28 +144,31 @@ pub(crate) fn rebuild_residual_interest(
     for original in economic_order {
         let mut replacement = vec![original.clone()];
         let principal_is_future = economic_date(original) > from_date;
-        let cash_is_future = original.date > from_date;
-        if is_rebuildable_interest(original.kind)
-            && if original.kind == CFKind::Pik {
+        let cash_is_future = original.get_date() > from_date;
+        if is_rebuildable_interest(original.get_kind())
+            && if original.get_kind() == CFKind::Pik {
                 principal_is_future
             } else {
                 cash_is_future
             }
         {
             let accrual = original
-                .accrual
+                .get_accrual()
                 .clone()
                 .or_else(|| {
                     let start = schedule
                         .get_flows()
                         .iter()
-                        .filter(|flow| flow.date < original.date && flow.kind == original.kind)
-                        .map(|flow| flow.date)
+                        .filter(|flow| {
+                            flow.get_date() < original.get_date()
+                                && flow.get_kind() == original.get_kind()
+                        })
+                        .map(|flow| flow.get_date())
                         .max()
                         .or(schedule.get_meta().issue_date)?;
                     Some(CashFlowAccrual {
                         start,
-                        end: original.date,
+                        end: original.get_date(),
                         day_count: schedule.get_day_count(),
                         projected_index_rate: None,
                         context: finstack_quant_core::dates::DayCountContextState {
@@ -211,12 +214,12 @@ pub(crate) fn rebuild_residual_interest(
                 // A previous rebuild can zero a whole component without
                 // extinguishing its coupon terms. Rebuilt rows retain the
                 // signed component rate for a subsequent balance increase.
-                original.rate.unwrap_or(f64::NAN)
+                original.get_rate().unwrap_or(f64::NAN)
             } else {
-                original_value / principal / original.accrual_factor
+                original_value / principal / original.get_accrual_factor()
             };
             if !rate.is_finite()
-                || original.rate.is_some_and(|rate| !rate.is_finite())
+                || original.get_rate().is_some_and(|rate| !rate.is_finite())
                 || total <= 0.0
                 || !total.is_finite()
             {
@@ -246,15 +249,16 @@ pub(crate) fn rebuild_residual_interest(
                     },
                 )? / total;
                 let balance_delta: f64 = changes.range(..=bounds[0]).map(|(_, delta)| delta).sum();
-                let factor = original.accrual_factor * fraction;
+                let factor = original.get_accrual_factor() * fraction;
                 let value = original_value * fraction + balance_delta * rate * factor;
                 let mut flow = original.clone();
                 // A PIK row keeps its zero cash; its value is the delta below.
-                if original.kind != CFKind::Pik {
+                if original.get_kind() != CFKind::Pik {
                     flow.amount = Money::new(value, currency).map_err(|error| {
                         Error::capital_structure(format!(
                             "cannot rebuild {:?} interest on {}: {error}",
-                            flow.kind, flow.date
+                            flow.get_kind(),
+                            flow.get_date()
                         ))
                     })?;
                 }
@@ -277,14 +281,14 @@ pub(crate) fn rebuild_residual_interest(
                 });
                 // A PIK row capitalizes exactly its reprojected interest; any
                 // other explicit delta splits with the reprojected cash.
-                if original.kind == CFKind::Pik {
+                if original.get_kind() == CFKind::Pik {
                     flow.principal_delta = Some(Money::new(value, currency)?);
-                } else if let Some(principal) = original.principal_delta {
+                } else if let Some(principal) = original.get_principal_delta() {
                     flow.principal_delta = Some(Money::new(
-                        if original.amount.amount() == 0.0 {
+                        if original.get_amount().amount() == 0.0 {
                             principal.amount() * fraction
                         } else {
-                            principal.amount() * value / original.amount.amount()
+                            principal.amount() * value / original.get_amount().amount()
                         },
                         currency,
                     )?);
@@ -292,29 +296,29 @@ pub(crate) fn rebuild_residual_interest(
                 replacement.push(flow);
             }
         } else if matches!(
-            original.kind,
+            original.get_kind(),
             CFKind::Amortization
                 | CFKind::PrePayment
                 | CFKind::RevolvingRepayment
                 | CFKind::Notional
-        ) && original.amount.amount() > 0.0
+        ) && original.get_amount().amount() > 0.0
             && principal_is_future
         {
             // Paid advances and cash arrears retain their economic reductions.
             // Earlier future installments cannot consume that reserved face.
             let reservation = reserved
-                .get_mut(&(original.date, economic_date(original)))
+                .get_mut(&(original.get_date(), economic_date(original)))
                 .map_or(0.0, |remaining| {
-                    let amount = remaining.min(original.amount.amount());
+                    let amount = remaining.min(original.get_amount().amount());
                     *remaining -= amount;
                     amount
                 });
             reserved_total -= reservation;
             let available = (new_balance - reserved_total).max(0.0);
-            let repayment = if original.kind == CFKind::Notional && cash_is_future {
+            let repayment = if original.get_kind() == CFKind::Notional && cash_is_future {
                 available
             } else {
-                original.amount.amount().min(available)
+                original.get_amount().amount().min(available)
             };
             if cash_is_future {
                 replacement[0].amount = Money::new(repayment, currency)?;
@@ -348,15 +352,15 @@ pub(crate) fn rebuild_residual_interest(
 /// Interest a rebuildable row carries: a PIK row's explicit capitalization,
 /// any other row's cash amount.
 fn interest_value(flow: &CashFlow) -> Result<f64> {
-    if flow.kind != CFKind::Pik {
-        return Ok(flow.amount.amount());
+    if flow.get_kind() != CFKind::Pik {
+        return Ok(flow.get_amount().amount());
     }
-    flow.principal_delta
+    flow.get_principal_delta()
         .map(|delta| delta.amount())
         .ok_or_else(|| {
             Error::capital_structure(format!(
                 "PIK row on {} has no principal_delta; its capitalized amount must be explicit",
-                flow.date
+                flow.get_date()
             ))
         })
 }
@@ -368,14 +372,15 @@ fn interest_value(flow: &CashFlow) -> Result<f64> {
 fn economic_date(flow: &CashFlow) -> Date {
     match flow.get_balance_date() {
         Some(balance_date) => balance_date,
-        None => flow.date,
+        None => flow.get_date(),
     }
 }
 
 /// The explicit principal delta of a row; a non-principal row moves nothing.
 /// Nothing is inferred from cash or kind (record CORE-CONVENTIONS-015 #4).
 fn principal_change(flow: &CashFlow) -> f64 {
-    flow.principal_delta.map_or(0.0, |delta| delta.amount())
+    flow.get_principal_delta()
+        .map_or(0.0, |delta| delta.amount())
 }
 
 #[cfg(test)]
@@ -439,7 +444,10 @@ mod tests {
         .expect("rebuild");
 
         assert!(
-            rebuilt.get_flows().iter().any(|cf| cf.date == q1_coupon),
+            rebuilt
+                .get_flows()
+                .iter()
+                .any(|cf| cf.get_date() == q1_coupon),
             "realized coupons retain the historical accrual anchors"
         );
         assert_eq!(rebuilt.get_notional().initial.amount(), 1_000_000.0);
@@ -447,8 +455,8 @@ mod tests {
         let q2: f64 = rebuilt
             .get_flows()
             .iter()
-            .filter(|cf| cf.date == q2_coupon)
-            .map(|cf| cf.amount.amount())
+            .filter(|cf| cf.get_date() == q2_coupon)
+            .map(|cf| cf.get_amount().amount())
             .sum();
         let remaining = (q2_coupon - from_date.next_day().unwrap()).whole_days() as f64;
         let full = (q2_coupon - q1_coupon).whole_days() as f64;
@@ -504,8 +512,8 @@ mod tests {
         let q2: f64 = rebuilt
             .get_flows()
             .iter()
-            .filter(|cf| cf.date == q2_coupon)
-            .map(|cf| cf.amount.amount())
+            .filter(|cf| cf.get_date() == q2_coupon)
+            .map(|cf| cf.get_amount().amount())
             .sum();
         let remaining = (q2_coupon - from_date.next_day().unwrap()).whole_days() as f64;
         let full = (q2_coupon - issue).whole_days() as f64;
@@ -542,7 +550,7 @@ mod tests {
             )
             .expect_err("unrepresentable rebuilt interest must return an error");
             assert!(error.to_string().contains("cannot rebuild Fixed interest"));
-            assert_eq!(original.get_flows()[0].amount.amount(), -rate);
+            assert_eq!(original.get_flows()[0].get_amount().amount(), -rate);
         }
     }
 
@@ -584,8 +592,8 @@ mod tests {
         let amort = rebuilt
             .get_flows()
             .iter()
-            .find(|cf| cf.kind == CFKind::Amortization)
+            .find(|cf| cf.get_kind() == CFKind::Amortization)
             .expect("amort kept");
-        assert_eq!(amort.amount.amount(), 100_000.0);
+        assert_eq!(amort.get_amount().amount(), 100_000.0);
     }
 }

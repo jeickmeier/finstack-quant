@@ -76,10 +76,10 @@ fn state_with_balance(schedule: CashFlowSchedule, balance: f64) -> CapitalStruct
 /// A row's economic value: a PIK row's explicit capitalization (it carries no
 /// cash), any other row's cash amount.
 fn value(flow: &CashFlow) -> f64 {
-    if flow.kind == CFKind::Pik {
-        flow.principal_delta.expect("PIK delta").amount()
+    if flow.get_kind() == CFKind::Pik {
+        flow.get_principal_delta().expect("PIK delta").amount()
     } else {
-        flow.amount.amount()
+        flow.get_amount().amount()
     }
 }
 
@@ -87,7 +87,7 @@ fn amount_on(schedule: &CashFlowSchedule, kind: CFKind, payment_date: Date) -> f
     schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == kind && flow.date == payment_date)
+        .filter(|flow| flow.get_kind() == kind && flow.get_date() == payment_date)
         .map(value)
         .sum()
 }
@@ -191,7 +191,7 @@ fn split_coupon_full_paydown_preserves_earned_cash_and_pik_interest() {
         rebuilt
             .get_flows()
             .iter()
-            .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Pik))
+            .filter(|flow| matches!(flow.get_kind(), CFKind::Fixed | CFKind::Pik))
             .all(|flow| value(flow) >= 0.0),
         "repayment must not create negative positive-rate coupons"
     );
@@ -214,9 +214,9 @@ fn zeroed_split_coupon_retains_component_rates_when_closing_is_revised() {
             .get_flows()
             .iter()
             .filter(|flow| {
-                flow.kind == kind
+                flow.get_kind() == kind
                     && flow
-                        .accrual
+                        .get_accrual()
                         .as_ref()
                         .is_some_and(|accrual| accrual.start == effective)
             })
@@ -239,9 +239,9 @@ fn zeroed_split_coupon_retains_component_rates_when_closing_is_revised() {
             .get_flows()
             .iter()
             .filter(|flow| {
-                flow.kind == kind
+                flow.get_kind() == kind
                     && flow
-                        .accrual
+                        .get_accrual()
                         .as_ref()
                         .is_some_and(|accrual| accrual.end == effective)
             })
@@ -291,20 +291,20 @@ fn assert_separate_principal_and_settlement_dates(
     let amortization: Vec<_> = rebuilt
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Amortization)
+        .filter(|flow| flow.get_kind() == CFKind::Amortization)
         .collect();
     assert_eq!(amortization.len(), 1);
-    assert_eq!(amortization[0].date, payment_date);
+    assert_eq!(amortization[0].get_date(), payment_date);
     assert_eq!(
         amortization[0]
             .get_balance_date()
             .expect("principal row balance date"),
         economic_date
     );
-    assert_close(amortization[0].amount.amount(), 10.0);
+    assert_close(amortization[0].get_amount().amount(), 10.0);
     assert_close(
         amortization[0]
-            .principal_delta
+            .get_principal_delta()
             .expect("explicit principal delta")
             .amount(),
         -10.0,
@@ -364,19 +364,19 @@ fn full_paydown_preserves_paid_cash_and_suppresses_its_later_principal_movement(
     let paid_amortization = rebuilt
         .get_flows()
         .iter()
-        .find(|flow| flow.kind == CFKind::Amortization)
+        .find(|flow| flow.get_kind() == CFKind::Amortization)
         .expect("historical cash payment remains in the schedule");
-    assert_eq!(paid_amortization.date, payment_date);
+    assert_eq!(paid_amortization.get_date(), payment_date);
     assert_eq!(
         paid_amortization
             .get_balance_date()
             .expect("principal row balance date"),
         economic_date
     );
-    assert_close(paid_amortization.amount.amount(), 10.0);
+    assert_close(paid_amortization.get_amount().amount(), 10.0);
     assert_close(
         paid_amortization
-            .principal_delta
+            .get_principal_delta()
             .expect("explicit capped principal delta")
             .amount(),
         0.0,
@@ -425,12 +425,12 @@ fn model_preserves_economic_amortization_across_quarter_end_with_optional_sweep(
             .get_flows()
             .iter()
             .find(|flow| {
-                flow.kind == CFKind::Amortization
+                flow.get_kind() == CFKind::Amortization
                     && flow.get_balance_date().expect("principal row balance date") == economic
             })
             .expect("scheduled quarter-end principal movement");
-        assert_eq!(amortization.date, settlement);
-        assert_close(amortization.amount.amount(), 10.0);
+        assert_eq!(amortization.get_date(), settlement);
+        assert_close(amortization.get_amount().amount(), 10.0);
     }
 
     let quarters: Vec<_> = (1..=4)
@@ -562,19 +562,19 @@ fn previously_paid_redemption_cannot_extinguish_later_pik_principal() {
     let redemption = rebuilt
         .get_flows()
         .iter()
-        .find(|flow| flow.kind == CFKind::Notional)
+        .find(|flow| flow.get_kind() == CFKind::Notional)
         .expect("historical redemption cash remains");
-    assert_eq!(redemption.date, payment_date);
+    assert_eq!(redemption.get_date(), payment_date);
     assert_eq!(
         redemption
             .get_balance_date()
             .expect("principal row balance date"),
         economic_date
     );
-    assert_close(redemption.amount.amount(), 100.0);
+    assert_close(redemption.get_amount().amount(), 100.0);
     assert_close(
         redemption
-            .principal_delta
+            .get_principal_delta()
             .expect("original economic repayment")
             .amount(),
         -100.0,
@@ -668,7 +668,7 @@ fn loan_funded_inside_the_model_repays_its_face_once() {
         let first = schedule
             .get_flows()
             .iter()
-            .find(|flow| flow.kind == CFKind::Amortization)
+            .find(|flow| flow.get_kind() == CFKind::Amortization)
             .expect("first amortization");
         assert_eq!(
             first
@@ -676,7 +676,7 @@ fn loan_funded_inside_the_model_repays_its_face_once() {
                 .expect("principal row balance date"),
             date!(2024 - 03 - 31)
         );
-        assert_eq!(first.date, date!(2024 - 04 - 01));
+        assert_eq!(first.get_date(), date!(2024 - 04 - 01));
 
         for waterfall in [false, true] {
             let mut builder = ModelBuilder::new("funded-inside-model");

@@ -81,29 +81,32 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
         let net: f64 = raw
             .get_flows()
             .iter()
-            .filter(|flow| flow.date >= period.start && flow.date < period.end)
-            .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub | CFKind::Floating))
-            .map(|flow| flow.amount.amount())
+            .filter(|flow| flow.get_date() >= period.start && flow.get_date() < period.end)
+            .filter(|flow| {
+                matches!(
+                    flow.get_kind(),
+                    CFKind::Fixed | CFKind::Stub | CFKind::Floating
+                )
+            })
+            .map(|flow| flow.get_amount().amount())
             .sum();
         assert!(net != 0.0, "fixture must produce a net payment or receipt");
         if fixed_rate == 0.0 {
-            assert!(
-                raw.get_flows()
-                    .iter()
-                    .any(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub)
-                        && flow.amount.amount() == 0.0)
-            );
+            assert!(raw.get_flows().iter().any(|flow| matches!(
+                flow.get_kind(),
+                CFKind::Fixed | CFKind::Stub
+            ) && flow.get_amount().amount() == 0.0));
         } else {
             // These canonical schedules carry one sign throughout their life,
             // so opposite-sign inference cannot recognize the instrument.
             let positive = raw
                 .get_flows()
                 .iter()
-                .any(|flow| flow.amount.amount() > 0.0);
+                .any(|flow| flow.get_amount().amount() > 0.0);
             let negative = raw
                 .get_flows()
                 .iter()
-                .any(|flow| flow.amount.amount() < 0.0);
+                .any(|flow| flow.get_amount().amount() < 0.0);
             assert_ne!(positive, negative);
         }
         let expected_expense = (-net).max(0.0);
@@ -228,9 +231,14 @@ fn canonical_negative_debt_coupons_are_income() {
     let net: f64 = raw
         .get_flows()
         .iter()
-        .filter(|flow| flow.date >= period.start && flow.date < period.end)
-        .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub | CFKind::Floating))
-        .map(|flow| flow.amount.amount())
+        .filter(|flow| flow.get_date() >= period.start && flow.get_date() < period.end)
+        .filter(|flow| {
+            matches!(
+                flow.get_kind(),
+                CFKind::Fixed | CFKind::Stub | CFKind::Floating
+            )
+        })
+        .map(|flow| flow.get_amount().amount())
         .sum();
     assert!(
         net < 0.0,
@@ -713,13 +721,16 @@ fn oid_funding_preserves_loan_face_and_cash_at_boundaries() {
                 .get_flows()
                 .iter()
                 .find(|flow| {
-                    flow.principal_delta
+                    flow.get_principal_delta()
                         .is_some_and(|delta| delta.amount() > 0.0)
                 })
                 .expect("DDTL draw preserves principal separately from cash");
             let expected_cash = if oid_bp == 200 { -98.0 } else { 0.0 };
-            assert_eq!(draw.amount.amount(), expected_cash);
-            assert_eq!(draw.principal_delta.expect("draw face").amount(), 100.0);
+            assert_eq!(draw.get_amount().amount(), expected_cash);
+            assert_eq!(
+                draw.get_principal_delta().expect("draw face").amount(),
+                100.0
+            );
             let opening = if issue < periods[0].start {
                 Money::from((100_i64, Currency::USD))
             } else {
@@ -845,7 +856,7 @@ fn oid_funding_preserves_custom_bond_face_with_separate_cash_dates() {
             let raw = bond
                 .raw_cashflow_schedule(&market, periods[0].start)
                 .expect("custom discounted issuance");
-            assert_eq!(raw.get_flows()[0].amount.amount(), -98.0);
+            assert_eq!(raw.get_flows()[0].get_amount().amount(), -98.0);
             for waterfall in [false, true] {
                 let mut builder = {
                     let mut model_builder = ModelBuilder::new("custom OID bond");
@@ -1061,8 +1072,13 @@ fn contractual_pik_is_redeemed_at_maturity_and_capitalized_once() {
     let expected_pik: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Pik)
-        .map(|flow| flow.principal_delta.expect("PIK delta").amount().abs())
+        .filter(|flow| flow.get_kind() == CFKind::Pik)
+        .map(|flow| {
+            flow.get_principal_delta()
+                .expect("PIK delta")
+                .amount()
+                .abs()
+        })
         .sum();
     let expected_principal = 100.0 + expected_pik;
     assert!(expected_pik > 0.0);

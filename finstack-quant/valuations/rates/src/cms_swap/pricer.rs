@@ -120,10 +120,12 @@ impl CmsSwapPricer {
         };
         inst.funding_leg_flows(market, as_of, false)?
             .iter()
-            .filter(|flow| flow.date > as_of)
+            .filter(|flow| flow.get_date() > as_of)
             .try_fold(0.0, |pv, flow| {
-                let df = discount_curve.as_ref().df_between_dates(as_of, flow.date)?;
-                Ok(pv + direction * flow.amount.amount() * df)
+                let df = discount_curve
+                    .as_ref()
+                    .df_between_dates(as_of, flow.get_date())?;
+                Ok(pv + direction * flow.get_amount().amount() * df)
             })
     }
 }
@@ -666,7 +668,7 @@ mod tests {
             .year_fraction(start, end, DayCountContext::default())
             .expect("curve accrual");
         assert!((growth / accrual - growth / curve_accrual).abs() > 1e-6);
-        assert!((flow.amount.amount() - expected_cashflow).abs() < 1e-7);
+        assert!((flow.get_amount().amount() - expected_cashflow).abs() < 1e-7);
         let discount = market.get_discount("USD-OIS").expect("discount");
         let df = discount.as_ref().df_between_dates(as_of, end).expect("df");
         let pv = CmsSwapPricer
@@ -719,15 +721,15 @@ mod tests {
         let discount = market.get_discount("USD-OIS").expect("discount");
         let mut expected_pv = 0.0;
         for (flow, period) in flows.iter().zip(periods) {
-            let accrual = flow.accrual.as_ref().expect("accrual metadata");
+            let accrual = flow.get_accrual().as_ref().expect("accrual metadata");
             assert_eq!(accrual.start, period.accrual_start);
             assert_eq!(accrual.end, period.accrual_end);
-            assert_eq!(flow.date, period.payment_date);
-            assert_eq!(flow.reset_date, Some(period.reset_date));
-            expected_pv += flow.amount.amount()
+            assert_eq!(flow.get_date(), period.payment_date);
+            assert_eq!(flow.get_reset_date(), Some(period.reset_date));
+            expected_pv += flow.get_amount().amount()
                 * discount
                     .as_ref()
-                    .df_between_dates(as_of, flow.date)
+                    .df_between_dates(as_of, flow.get_date())
                     .expect("df");
         }
         let actual = CmsSwapPricer

@@ -462,19 +462,20 @@ impl PyCashFlowSchedule {
     fn to_dataframe<'py>(&self, py: Python<'py>, outstanding: bool) -> PyResult<Bound<'py, PyAny>> {
         let flows = self.inner.get_flows();
         let pd = py.import("pandas")?;
-        let dates: Vec<finstack_quant_core::dates::Date> = flows.iter().map(|f| f.date).collect();
+        let dates: Vec<finstack_quant_core::dates::Date> =
+            flows.iter().map(|f| f.get_date()).collect();
         let reset_dates: Vec<Option<Bound<'py, PyAny>>> = flows
             .iter()
-            .map(|f| f.reset_date.map(|d| date_to_py(py, d)).transpose())
+            .map(|f| f.get_reset_date().map(|d| date_to_py(py, d)).transpose())
             .collect::<PyResult<_>>()?;
-        let kinds: Vec<String> = flows.iter().map(|f| f.kind.to_string()).collect();
-        let amounts: Vec<f64> = flows.iter().map(|f| f.amount.amount()).collect();
+        let kinds: Vec<String> = flows.iter().map(|f| f.get_kind().to_string()).collect();
+        let amounts: Vec<f64> = flows.iter().map(|f| f.get_amount().amount()).collect();
         let currencies: Vec<String> = flows
             .iter()
-            .map(|f| f.amount.currency().to_string())
+            .map(|f| f.get_amount().currency().to_string())
             .collect();
-        let factors: Vec<f64> = flows.iter().map(|f| f.accrual_factor).collect();
-        let rates: Vec<Option<f64>> = flows.iter().map(|f| f.rate).collect();
+        let factors: Vec<f64> = flows.iter().map(|f| f.get_accrual_factor()).collect();
+        let rates: Vec<Option<f64>> = flows.iter().map(|f| f.get_rate()).collect();
         let columns = PyDict::new(py);
         columns.set_item(
             "date",
@@ -496,20 +497,23 @@ impl PyCashFlowSchedule {
             "accrual",
             crate::bindings::pandas_utils::serde_to_py(
                 py,
-                &flows.iter().map(|f| &f.accrual).collect::<Vec<_>>(),
+                &flows.iter().map(|f| f.get_accrual()).collect::<Vec<_>>(),
             )?,
         )?;
         columns.set_item(
             "principal_delta",
             crate::bindings::pandas_utils::serde_to_py(
                 py,
-                &flows.iter().map(|f| f.principal_delta).collect::<Vec<_>>(),
+                &flows
+                    .iter()
+                    .map(|f| f.get_principal_delta())
+                    .collect::<Vec<_>>(),
             )?,
         )?;
         let principal_dates: Vec<Option<Bound<'py, PyAny>>> = flows
             .iter()
             .map(|flow| {
-                flow.principal_date
+                flow.get_balance_date()
                     .map(|date| date_to_py(py, date))
                     .transpose()
             })

@@ -382,34 +382,34 @@ fn check_price(
     let floating: Vec<_> = before
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Floating)
+        .filter(|flow| flow.get_kind() == CFKind::Floating)
         .collect();
     assert_eq!(floating.len(), oracle.coupons.len());
     let spread = swap.float_leg.spread_bp.to_f64().unwrap() * 1e-4;
     for (flow, expected) in floating.iter().zip(&oracle.coupons) {
-        assert_eq!(flow.date, expected.grid.payment);
-        assert_eq!(flow.amount.currency(), Currency::USD);
+        assert_eq!(flow.get_date(), expected.grid.payment);
+        assert_eq!(flow.get_amount().currency(), Currency::USD);
         close(
             "control floating accrual",
-            flow.accrual_factor,
+            flow.get_accrual_factor(),
             expected.grid.alpha,
             1e-15,
         );
         close(
             "control coupon amount",
-            flow.amount.amount(),
+            flow.get_amount().amount(),
             expected.amount,
             oracle.notional.abs() * FACTOR_BOUND,
         );
         close(
             "control coupon rate",
-            flow.rate.unwrap(),
+            flow.get_rate().unwrap(),
             expected.rate,
             FACTOR_BOUND,
         );
         close(
             "control compound factor",
-            1.0 + (flow.rate.unwrap() - spread) * flow.accrual_factor,
+            1.0 + (flow.get_rate().unwrap() - spread) * flow.get_accrual_factor(),
             expected.factor,
             FACTOR_BOUND,
         );
@@ -417,21 +417,31 @@ fn check_price(
     let fixed: Vec<_> = before
         .get_flows()
         .iter()
-        .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub))
+        .filter(|flow| matches!(flow.get_kind(), CFKind::Fixed | CFKind::Stub))
         .collect();
     assert_eq!(fixed.len(), oracle.fixed_rows.len());
     for (flow, (payment, alpha, amount, kind)) in fixed.iter().zip(&oracle.fixed_rows) {
-        assert_eq!(flow.date, *payment);
-        assert_eq!(flow.kind, *kind);
-        assert_eq!(flow.amount.currency(), Currency::USD);
-        close("control fixed accrual", flow.accrual_factor, *alpha, 1e-15);
+        assert_eq!(flow.get_date(), *payment);
+        assert_eq!(flow.get_kind(), *kind);
+        assert_eq!(flow.get_amount().currency(), Currency::USD);
+        close(
+            "control fixed accrual",
+            flow.get_accrual_factor(),
+            *alpha,
+            1e-15,
+        );
         close(
             "control signed fixed amount",
-            flow.amount.amount(),
+            flow.get_amount().amount(),
             -*amount,
             FIXED_PV_BOUND,
         );
-        close("control fixed rate", flow.rate.unwrap(), 0.04, FACTOR_BOUND);
+        close(
+            "control fixed rate",
+            flow.get_rate().unwrap(),
+            0.04,
+            FACTOR_BOUND,
+        );
     }
     let expected_fixings = oracle.fixings();
     assert_eq!(
@@ -462,7 +472,7 @@ fn check_price(
         .get_flows()
         .iter()
         .map(|flow| {
-            flow.amount.amount() * curve.df_on_date(flow.date).unwrap()
+            flow.get_amount().amount() * curve.df_on_date(flow.get_date()).unwrap()
                 / curve.df_on_date(as_of).unwrap()
         })
         .sum::<f64>();
@@ -1121,11 +1131,11 @@ fn ois_control_holiday_adjusted_spread_matches_full_export() {
     let floating = schedule
         .get_flows()
         .iter()
-        .find(|flow| flow.kind == CFKind::Floating)
+        .find(|flow| flow.get_kind() == CFKind::Floating)
         .unwrap();
     close(
         "holiday actual spread cash",
-        floating.amount.amount(),
+        floating.get_amount().amount(),
         1_000_000.0 * 0.01 * 186.0 / 360.0,
         1e-9,
     );

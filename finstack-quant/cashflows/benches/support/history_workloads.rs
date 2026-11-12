@@ -316,8 +316,8 @@ pub(super) fn check(fixture: &Fixture, schedule: &CashFlowSchedule) -> Reference
         raw_fixings: BTreeMap::new(),
     };
     for (quarter, flow) in schedule.coupons().enumerate() {
-        assert_eq!(flow.kind, CFKind::Floating);
-        assert_eq!(flow.amount.currency(), Currency::USD);
+        assert_eq!(flow.get_kind(), CFKind::Floating);
+        assert_eq!(flow.get_amount().currency(), Currency::USD);
         let start = issue().add_months(quarter as i32 * 3).unwrap();
         let end = issue().add_months((quarter as i32 + 1) * 3).unwrap();
         let accrual_factor = (end - start).whole_days() as f64 / 360.0;
@@ -341,7 +341,10 @@ pub(super) fn check(fixture: &Fixture, schedule: &CashFlowSchedule) -> Reference
         };
         let all_in_rate = index_rate + 0.02;
         let amount = 1_000_000.0 * all_in_rate * accrual_factor;
-        let accrual = flow.accrual.as_ref().expect("explicit floating accrual");
+        let accrual = flow
+            .get_accrual()
+            .as_ref()
+            .expect("explicit floating accrual");
         assert_eq!((accrual.start, accrual.end), (start, end));
         assert_eq!(accrual.day_count, DayCount::Act360);
         assert_eq!(
@@ -352,9 +355,9 @@ pub(super) fn check(fixture: &Fixture, schedule: &CashFlowSchedule) -> Reference
             accrual.context.end_is_termination_date,
             Some(quarter + 1 == COUPONS)
         );
-        assert_eq!(flow.date, payment(end));
-        assert_eq!(flow.reset_date, Some(reset));
-        close(flow.accrual_factor, accrual_factor, 1e-12);
+        assert_eq!(flow.get_date(), payment(end));
+        assert_eq!(flow.get_reset_date(), Some(reset));
+        close(flow.get_accrual_factor(), accrual_factor, 1e-12);
         let rate_bound = if fixture.case.leg == Leg::Term {
             TERM_RATE_BOUND
         } else {
@@ -365,13 +368,13 @@ pub(super) fn check(fixture: &Fixture, schedule: &CashFlowSchedule) -> Reference
             index_rate,
             rate_bound,
         );
-        close(flow.rate.unwrap(), all_in_rate, rate_bound);
+        close(flow.get_rate().unwrap(), all_in_rate, rate_bound);
         let amount_bound = if fixture.case.leg == Leg::Term {
             TERM_AMOUNT_BOUND
         } else {
             OVERNIGHT_AMOUNT_BOUND
         };
-        close(flow.amount.amount(), amount, amount_bound);
+        close(flow.get_amount().amount(), amount, amount_bound);
         reference.coupons.push(CouponReference {
             start,
             end,
@@ -386,13 +389,16 @@ pub(super) fn check(fixture: &Fixture, schedule: &CashFlowSchedule) -> Reference
     let principal: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Notional)
+        .filter(|flow| flow.get_kind() == CFKind::Notional)
         .collect();
     assert_eq!(principal.len(), 2);
-    assert_eq!(principal[0].date, issue());
-    close(principal[0].amount.amount(), -1_000_000.0, 0.0);
-    assert_eq!(principal[1].date, payment(issue().add_months(192).unwrap()));
-    close(principal[1].amount.amount(), 1_000_000.0, 0.0);
+    assert_eq!(principal[0].get_date(), issue());
+    close(principal[0].get_amount().amount(), -1_000_000.0, 0.0);
+    assert_eq!(
+        principal[1].get_date(),
+        payment(issue().add_months(192).unwrap())
+    );
+    close(principal[1].get_amount().amount(), 1_000_000.0, 0.0);
     assert_eq!(
         schedule.get_meta().projected_fixings.len(),
         reference.raw_fixings.len()

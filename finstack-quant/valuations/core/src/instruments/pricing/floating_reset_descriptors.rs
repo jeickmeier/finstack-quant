@@ -89,19 +89,19 @@ pub fn build_node_coupons(
     }
 
     for cf in inputs.schedule.get_flows() {
-        if cf.kind != CFKind::Floating {
+        if cf.get_kind() != CFKind::Floating {
             continue;
         }
         // Future observation only: a published fixing (reset on or before
         // the origin) is deterministic and must not move with rate vol.
-        let future_reset = match cf.reset_date {
+        let future_reset = match cf.get_reset_date() {
             Some(reset) => reset > inputs.grid_origin,
             None => false,
         };
         if !future_reset {
             continue;
         }
-        let Some(accrual) = &cf.accrual else {
+        let Some(accrual) = &cf.get_accrual() else {
             continue;
         };
         // Fallback-projected coupons (SpreadOnly / FixedRate) carry no
@@ -110,7 +110,7 @@ pub fn build_node_coupons(
         let Some(base_index_rate) = accrual.projected_index_rate else {
             continue;
         };
-        let tau = cf.accrual_factor;
+        let tau = cf.get_accrual_factor();
         if tau <= 0.0 || !tau.is_finite() {
             continue;
         }
@@ -121,7 +121,7 @@ pub fn build_node_coupons(
             .year_fraction(inputs.grid_origin, accrual.start, ctx)?;
         let t_pay = inputs
             .day_count
-            .year_fraction(inputs.grid_origin, cf.date, ctx)?;
+            .year_fraction(inputs.grid_origin, cf.get_date(), ctx)?;
         let reset_step = ceil_step(inputs.time_steps, t_start.max(0.0));
         let payment_step = ceil_step(inputs.time_steps, t_pay);
         if reset_step >= payment_step {
@@ -130,7 +130,9 @@ pub fn build_node_coupons(
                  tree slice (step {reset_step}) under stochastic rates; the tree \
                  grid is too coarse to distinguish its reset from its payment. \
                  Increase tree_steps (currently {steps}).",
-                accrual.start, accrual.end, cf.date
+                accrual.start,
+                accrual.end,
+                cf.get_date()
             )));
         }
 
@@ -176,7 +178,7 @@ pub fn has_future_pik(schedule: &CashFlowSchedule, grid_origin: Date) -> bool {
     schedule
         .get_flows()
         .iter()
-        .any(|cf| cf.kind == CFKind::Pik && cf.date > grid_origin)
+        .any(|cf| cf.get_kind() == CFKind::Pik && cf.get_date() > grid_origin)
 }
 
 #[cfg(test)]

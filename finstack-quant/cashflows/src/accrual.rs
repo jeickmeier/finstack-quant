@@ -285,12 +285,12 @@ impl AccrualIndex {
         schedule.validate()?;
         let expected_currency = schedule.notional.initial.currency();
         for flow in &schedule.flows {
-            if is_coupon_kind(flow.kind, cfg.include_pik)
-                && flow.amount.currency() != expected_currency
+            if is_coupon_kind(flow.get_kind(), cfg.include_pik)
+                && flow.get_amount().currency() != expected_currency
             {
                 return Err(finstack_quant_core::Error::CurrencyMismatch {
                     expected: expected_currency,
-                    actual: flow.amount.currency(),
+                    actual: flow.get_amount().currency(),
                 });
             }
         }
@@ -466,22 +466,22 @@ fn build_coupon_periods(
     for cf in schedule
         .flows
         .iter()
-        .filter(|cf| is_coupon_kind(cf.kind, cfg.include_pik))
+        .filter(|cf| is_coupon_kind(cf.get_kind(), cfg.include_pik))
     {
         // A PIK row's coupon value is its explicit capitalization (principal
         // delta), not its cash amount (record CORE-CONVENTIONS-015 #1, #4).
-        let (cash_value, pik_value) = if cf.kind == CFKind::Pik {
-            let delta = cf.principal_delta.ok_or_else(|| {
+        let (cash_value, pik_value) = if cf.get_kind() == CFKind::Pik {
+            let delta = cf.get_principal_delta().ok_or_else(|| {
                 finstack_quant_core::Error::Validation(format!(
                     "PIK row on {} has no principal_delta; its capitalized amount must be explicit",
-                    cf.date
+                    cf.get_date()
                 ))
             })?;
             (0.0, delta.amount())
         } else {
-            (cf.amount.amount(), 0.0)
+            (cf.get_amount().amount(), 0.0)
         };
-        let accrual = cf.accrual.as_ref();
+        let accrual = cf.get_accrual().as_ref();
         let true_period = accrual.map(|accrual| (accrual.start, accrual.end));
         let calendar_id = accrual.and_then(|accrual| accrual.context.calendar_id.clone());
         let coupon_period = accrual.and_then(|accrual| accrual.context.coupon_period);
@@ -492,12 +492,12 @@ fn build_coupon_periods(
         // `AccrualIndex::build` validated the schedule: factors are finite
         // and non-negative. A zero factor is a literal zero-length accrual,
         // never "missing, derive it" (record CORE-CONVENTIONS-015 #9).
-        let cf_af = cf.accrual_factor;
+        let cf_af = cf.get_accrual_factor();
 
         let matching_bucket = buckets
             .iter_mut()
             .rev()
-            .take_while(|bucket| bucket.date == cf.date)
+            .take_while(|bucket| bucket.date == cf.get_date())
             .find(|bucket| {
                 bucket.accrual_start == true_period.map(|(start, _)| start)
                     && bucket.accrual_end == true_period.map(|(_, end)| end)
@@ -513,7 +513,7 @@ fn build_coupon_periods(
         }
 
         buckets.push(CouponBucket {
-            date: cf.date,
+            date: cf.get_date(),
             accrual_start: true_period.map(|(start, _)| start),
             accrual_end: true_period.map(|(_, end)| end),
             accrual_day_count: flow_day_count,

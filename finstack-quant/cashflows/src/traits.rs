@@ -293,7 +293,7 @@ pub fn schedule_from_classified_flows(
     // for an empty stream, which has no currency to inherit).
     let currency = flows
         .first()
-        .map_or(Currency::USD, |cf| cf.amount.currency());
+        .map_or(Currency::USD, |cf| cf.get_amount().currency());
     let notional = Notional {
         initial: opts
             .notional_hint
@@ -600,17 +600,26 @@ mod tests {
             CashflowRepresentation::Projected
         );
         assert_eq!(schedule.flows.len(), 4);
-        assert_eq!(schedule.flows[0].date, as_of);
-        assert_eq!(schedule.flows[1].date, as_of + time::Duration::days(31));
-        assert_eq!(schedule.flows[2].date, as_of + time::Duration::days(31));
+        assert_eq!(schedule.flows[0].get_date(), as_of);
+        assert_eq!(
+            schedule.flows[1].get_date(),
+            as_of + time::Duration::days(31)
+        );
+        assert_eq!(
+            schedule.flows[2].get_date(),
+            as_of + time::Duration::days(31)
+        );
         let capitalization = schedule
             .flows
             .iter()
-            .find(|f| f.kind == CFKind::Pik)
+            .find(|f| f.get_kind() == CFKind::Pik)
             .expect("PIK principal movement");
-        assert_eq!(capitalization.amount.amount(), 0.0);
+        assert_eq!(capitalization.get_amount().amount(), 0.0);
         assert_eq!(
-            capitalization.principal_delta.expect("PIK delta").amount(),
+            capitalization
+                .get_principal_delta()
+                .expect("PIK delta")
+                .amount(),
             40.0
         );
 
@@ -715,8 +724,8 @@ mod tests {
         .expect("valid schedule");
 
         assert_eq!(schedule.flows.len(), 2);
-        assert_eq!(schedule.flows[0].kind, CFKind::PrePayment);
-        assert_eq!(schedule.flows[1].kind, CFKind::DefaultedNotional);
+        assert_eq!(schedule.flows[0].get_kind(), CFKind::PrePayment);
+        assert_eq!(schedule.flows[1].get_kind(), CFKind::DefaultedNotional);
     }
 
     #[test]
@@ -738,7 +747,7 @@ mod tests {
         .expect("valid schedule");
 
         assert_eq!(schedule.flows.len(), 1);
-        assert_eq!(schedule.flows[0].kind, CFKind::Fee);
+        assert_eq!(schedule.flows[0].get_kind(), CFKind::Fee);
         // A dated amount cannot state a principal effect, so principal kinds
         // are rejected (record CORE-CONVENTIONS-015 #4).
         let error = schedule_from_dated_flows(

@@ -225,7 +225,7 @@ impl CdsTranchePricer {
         let mut pv = 0.0;
         for row in rows {
             let df = discount_curve.df_between_dates(as_of, row.discount_date(as_of))?;
-            pv += row.cashflow.amount.amount() * df;
+            pv += row.cashflow.get_amount().amount() * df;
         }
         Ok(pv)
     }

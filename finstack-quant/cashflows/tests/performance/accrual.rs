@@ -80,13 +80,13 @@ fn schedule_record(schedule: &CashFlowSchedule) -> Value {
     let rows: Vec<_> = schedule.get_flows().iter().enumerate().map(|(order,flow)| {
         json!({
             "order":order,"row":flow,
-            "amount_bits":flow.amount.amount().to_bits(),
-            "amount_decimal_bytes":flow.amount.amount_decimal().serialize(),
-            "accrual_factor_bits":flow.accrual_factor.to_bits(),
-            "rate_bits":flow.rate.map(f64::to_bits),
-            "projected_index_rate_bits":flow.accrual.as_ref().and_then(|a|a.projected_index_rate).map(f64::to_bits),
-            "principal_delta_decimal_bytes":flow.principal_delta.map(|m|m.amount_decimal().serialize()),
-            "principal_delta_bits":flow.principal_delta.map(|m|m.amount().to_bits())
+            "amount_bits":flow.get_amount().amount().to_bits(),
+            "amount_decimal_bytes":flow.get_amount().amount_decimal().serialize(),
+            "accrual_factor_bits":flow.get_accrual_factor().to_bits(),
+            "rate_bits":flow.get_rate().map(f64::to_bits),
+            "projected_index_rate_bits":flow.get_accrual().as_ref().and_then(|a|a.projected_index_rate).map(f64::to_bits),
+            "principal_delta_decimal_bytes":flow.get_principal_delta().map(|m|m.amount_decimal().serialize()),
+            "principal_delta_bits":flow.get_principal_delta().map(|m|m.amount().to_bits())
         })
     }).collect();
     json!({
@@ -318,9 +318,9 @@ fn pik_records() -> Vec<Value> {
         181.0 / 365.0,
     );
     pik.kind = CFKind::Pik;
-    pik.principal_delta = Some(pik.amount);
-    pik.principal_date = Some(pik.date);
-    pik.amount = Money::zero(pik.amount.currency());
+    pik.principal_delta = Some(pik.get_amount());
+    pik.principal_date = Some(pik.get_date());
+    pik.amount = Money::zero(pik.get_amount().currency());
     let schedule = hand_schedule(
         vec![cash, pik],
         "2025-01-01",
@@ -589,7 +589,7 @@ fn phase_order_records() -> Vec<Value> {
         1_000_000.0,
         DayCount::Act360,
     );
-    assert_eq!(schedule.get_flows()[0].amount.amount(), -2_000_000.0);
+    assert_eq!(schedule.get_flows()[0].get_amount().amount(), -2_000_000.0);
     let config = AccrualConfig {
         method: AccrualMethod::Compounded,
         ex_coupon: Some(ExCouponRule {

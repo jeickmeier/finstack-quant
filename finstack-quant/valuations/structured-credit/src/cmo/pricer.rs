@@ -251,8 +251,8 @@ pub(crate) fn price_cmo(cmo: &AgencyCmo, market: &MarketContext, as_of: Date) ->
     let discount_curve = market.get_discount(&cmo.discount_curve_id)?;
     let mut pv = 0.0;
     for cf in schedule.get_flows() {
-        let df = discount_curve.df_between_dates(as_of, cf.date)?;
-        pv += cf.amount.amount() * df;
+        let df = discount_curve.df_between_dates(as_of, cf.get_date())?;
+        pv += cf.get_amount().amount() * df;
     }
 
     Money::new(pv, currency)
@@ -313,19 +313,19 @@ mod tests {
             schedule
                 .get_flows()
                 .iter()
-                .any(|cf| cf.kind == CFKind::Fixed)
+                .any(|cf| cf.get_kind() == CFKind::Fixed)
         );
         assert!(
             schedule
                 .get_flows()
                 .iter()
-                .any(|cf| cf.kind == CFKind::Amortization)
+                .any(|cf| cf.get_kind() == CFKind::Amortization)
         );
         assert!(
             schedule
                 .get_flows()
                 .iter()
-                .any(|cf| cf.kind == CFKind::PrePayment)
+                .any(|cf| cf.get_kind() == CFKind::PrePayment)
         );
     }
 
@@ -357,7 +357,7 @@ mod tests {
             pac_schedule
                 .get_flows()
                 .iter()
-                .any(|cf| cf.kind == CFKind::Amortization),
+                .any(|cf| cf.get_kind() == CFKind::Amortization),
             "PAC tranche should receive scheduled principal"
         );
         // The PAC tranche, priced on its schedule, must not show prepayment
@@ -368,7 +368,7 @@ mod tests {
             !pac_schedule
                 .get_flows()
                 .iter()
-                .any(|cf| cf.kind == CFKind::PrePayment),
+                .any(|cf| cf.get_kind() == CFKind::PrePayment),
             "PAC tranche within collar must not carry prepayment rows"
         );
     }

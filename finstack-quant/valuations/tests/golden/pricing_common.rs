@@ -333,18 +333,26 @@ mod tests {
         let (mut floating, mut fixed): (Vec<_>, Vec<_>) = schedule
             .get_flows()
             .iter()
-            .partition(|flow| matches!(flow.kind, CFKind::Floating));
-        fixed.sort_by_key(|flow| flow.date);
-        floating.sort_by_key(|flow| flow.date);
+            .partition(|flow| matches!(flow.get_kind(), CFKind::Floating));
+        fixed.sort_by_key(|flow| flow.get_date());
+        floating.sort_by_key(|flow| flow.get_date());
 
         for (leg, flows) in [("fixed", &fixed), ("floating", &floating)] {
             assert_eq!(flows.len(), 5, "{leg} leg payment count");
-            assert_eq!(flows[0].date, date!(2027 - 05 - 06), "{leg} first payment");
-            assert_eq!(flows[4].date, date!(2031 - 05 - 07), "{leg} last payment");
+            assert_eq!(
+                flows[0].get_date(),
+                date!(2027 - 05 - 06),
+                "{leg} first payment"
+            );
+            assert_eq!(
+                flows[4].get_date(),
+                date!(2031 - 05 - 07),
+                "{leg} last payment"
+            );
             assert!(
-                (flows[0].accrual_factor - 365.0 / 360.0).abs() < 1e-12,
+                (flows[0].get_accrual_factor() - 365.0 / 360.0).abs() < 1e-12,
                 "{leg} first accrual factor {}",
-                flows[0].accrual_factor
+                flows[0].get_accrual_factor()
             );
         }
     }

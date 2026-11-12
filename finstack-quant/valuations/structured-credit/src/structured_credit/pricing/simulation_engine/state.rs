@@ -996,7 +996,7 @@ impl<'a> SimulationState<'a> {
             // flow carries its own date), but any consumer assuming date order —
             // e.g. terminal residual sweeps dated at the last pay date — no
             // longer sees them interleaved out of order.
-            res.detailed_flows.sort_by_key(|cf| cf.date);
+            res.detailed_flows.sort_by_key(|cf| cf.get_date());
         }
 
         (self.results, diagnostics)

@@ -157,7 +157,8 @@ fn test_mid_period_draw_accrual() {
         .get_flows()
         .iter()
         .find(|cf| {
-            cf.date == end && matches!(cf.kind, finstack_quant_core::cashflow::CFKind::Fixed)
+            cf.get_date() == end
+                && matches!(cf.get_kind(), finstack_quant_core::cashflow::CFKind::Fixed)
         })
         .expect("Should have interest flow at period end");
 
@@ -169,10 +170,10 @@ fn test_mid_period_draw_accrual() {
     let tolerance = 1e-6; // High precision for deterministic calculations
 
     assert!(
-        (interest_flow.amount.amount() - expected_interest).abs() < tolerance,
+        (interest_flow.get_amount().amount() - expected_interest).abs() < tolerance,
         "Interest should account for mid-period draw. Expected ~{}, got {}",
         expected_interest,
-        interest_flow.amount.amount()
+        interest_flow.get_amount().amount()
     );
 }
 
@@ -352,20 +353,24 @@ fn test_reset_frequency_mismatch() {
         .get_flows()
         .iter()
         .find(|cf| {
-            cf.date == end && matches!(cf.kind, finstack_quant_core::cashflow::CFKind::Floating)
+            cf.get_date() == end
+                && matches!(
+                    cf.get_kind(),
+                    finstack_quant_core::cashflow::CFKind::Floating
+                )
         })
         .expect("Should have floating interest flow");
 
     // Verify reset_date is set (should be Jan 1, first reset)
     assert!(
-        interest_flow.reset_date.is_some(),
+        interest_flow.get_reset_date().is_some(),
         "Floating interest should have reset_date set"
     );
 
     // Interest should use multiple monthly fixings over the quarter
     // With monthly resets, we should see different rates applied to sub-periods
     assert!(
-        interest_flow.amount.amount() > 0.0,
+        interest_flow.get_amount().amount() > 0.0,
         "Interest should be positive"
     );
 }
@@ -450,15 +455,25 @@ fn test_utilization_tier() {
     let fee_low: f64 = schedule_low
         .get_flows()
         .iter()
-        .filter(|cf| matches!(cf.kind, finstack_quant_core::cashflow::CFKind::UsageFee))
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| {
+            matches!(
+                cf.get_kind(),
+                finstack_quant_core::cashflow::CFKind::UsageFee
+            )
+        })
+        .map(|cf| cf.get_amount().amount())
         .sum();
 
     let fee_high: f64 = schedule_high
         .get_flows()
         .iter()
-        .filter(|cf| matches!(cf.kind, finstack_quant_core::cashflow::CFKind::UsageFee))
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| {
+            matches!(
+                cf.get_kind(),
+                finstack_quant_core::cashflow::CFKind::UsageFee
+            )
+        })
+        .map(|cf| cf.get_amount().amount())
         .sum();
 
     // High utilization (70%) should pay more fees than low (30%)
@@ -513,7 +528,7 @@ fn test_as_of_filtering() {
         .iter()
         .filter(|cf| {
             matches!(
-                cf.kind,
+                cf.get_kind(),
                 finstack_quant_core::cashflow::CFKind::Fixed
                     | finstack_quant_core::cashflow::CFKind::Floating
                     | finstack_quant_core::cashflow::CFKind::Fee
@@ -522,7 +537,7 @@ fn test_as_of_filtering() {
         .collect();
 
     assert!(
-        non_principal_flows.iter().all(|cf| cf.date > q1_end),
+        non_principal_flows.iter().all(|cf| cf.get_date() > q1_end),
         "All non-principal flows should be strictly after as_of date"
     );
 }

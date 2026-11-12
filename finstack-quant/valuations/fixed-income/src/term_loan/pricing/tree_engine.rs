@@ -376,16 +376,16 @@ impl TermLoanValuator {
             // The tree is valued immediately after settlement. Contractual
             // funding and other flows on the settlement date have already
             // exchanged and must not enter the holder's forward value.
-            if cf.date <= origin {
+            if cf.get_date() <= origin {
                 continue;
             }
-            let t = dc_curve.year_fraction(origin, cf.date, DayCountContext::default())?;
+            let t = dc_curve.year_fraction(origin, cf.get_date(), DayCountContext::default())?;
             let raw = (t / time_to_maturity) * tree_steps as f64;
             let raw_clamped = raw.clamp(0.0, tree_steps as f64);
 
-            let is_exercise = exercise_dates.contains(&cf.date);
+            let is_exercise = exercise_dates.contains(&cf.get_date());
 
-            match cf.kind {
+            match cf.get_kind() {
                 CFKind::Fixed
                 | CFKind::Floating
                 | CFKind::Stub
@@ -398,7 +398,7 @@ impl TermLoanValuator {
                     book(
                         &mut coupon_fee_vec,
                         &mut coupon_fee_components,
-                        cf.amount.amount(),
+                        cf.get_amount().amount(),
                         t,
                         raw_clamped,
                         is_exercise,
@@ -410,7 +410,7 @@ impl TermLoanValuator {
                     book(
                         &mut principal_vec,
                         &mut principal_components,
-                        cf.amount.amount(),
+                        cf.get_amount().amount(),
                         t,
                         raw_clamped,
                         is_exercise,

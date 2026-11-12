@@ -259,7 +259,11 @@ mod tests {
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected
         );
         assert_eq!(
-            schedule.get_flows().first().expect("initial flow").date,
+            schedule
+                .get_flows()
+                .first()
+                .expect("initial flow")
+                .get_date(),
             as_of
         );
         assert!(
@@ -267,7 +271,7 @@ mod tests {
                 .get_flows()
                 .first()
                 .expect("initial flow")
-                .amount
+                .get_amount()
                 .amount()
                 < 0.0
         );
@@ -276,7 +280,7 @@ mod tests {
                 .get_flows()
                 .last()
                 .expect("exit flow")
-                .amount
+                .get_amount()
                 .amount()
                 > 0.0
         );

@@ -114,7 +114,10 @@ fn principal_events_before_issue_included_and_adjusts_outstanding() {
 
     // Pre-issue event should appear in flows
     assert!(
-        schedule.get_flows().iter().any(|cf| cf.date == pre_issue),
+        schedule
+            .get_flows()
+            .iter()
+            .any(|cf| cf.get_date() == pre_issue),
         "Pre-issue event should appear in flows"
     );
 
@@ -259,7 +262,8 @@ fn multiple_principal_events_same_date_accepted() {
         .get_flows()
         .iter()
         .filter(|cf| {
-            cf.date == mid_date && (cf.kind == CFKind::Notional || cf.kind == CFKind::Amortization)
+            cf.get_date() == mid_date
+                && (cf.get_kind() == CFKind::Notional || cf.get_kind() == CFKind::Amortization)
         })
         .collect();
 
@@ -349,7 +353,7 @@ fn principal_event_repay_effect_on_outstanding() {
     let notional_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Notional)
+        .filter(|cf| cf.get_kind() == CFKind::Notional)
         .collect();
 
     // Should have at least 2 notional flows: initial funding + our event (+ maturity redemption)
@@ -363,7 +367,7 @@ fn principal_event_repay_effect_on_outstanding() {
     let mid_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.date == mid_date && cf.kind == CFKind::Amortization)
+        .filter(|cf| cf.get_date() == mid_date && cf.get_kind() == CFKind::Amortization)
         .collect();
 
     assert!(
@@ -371,7 +375,7 @@ fn principal_event_repay_effect_on_outstanding() {
         "Should have an amortization flow at mid_date"
     );
     assert_eq!(
-        mid_flows[0].amount.amount(),
+        mid_flows[0].get_amount().amount(),
         300_000.0,
         "cash: None should default to -delta for Amortization events"
     );
@@ -422,16 +426,16 @@ fn principal_event_emitted_cashflow_sign_follows_kind() {
     let draw_flow = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.date == draw_date && cf.kind == CFKind::Notional)
+        .find(|cf| cf.get_date() == draw_date && cf.get_kind() == CFKind::Notional)
         .expect("draw flow emitted");
     let repay_flow = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.date == repay_date && cf.kind == CFKind::Amortization)
+        .find(|cf| cf.get_date() == repay_date && cf.get_kind() == CFKind::Amortization)
         .expect("repayment flow emitted");
 
-    assert_eq!(draw_flow.amount.amount(), -100_000.0);
-    assert_eq!(repay_flow.amount.amount(), 50_000.0);
+    assert_eq!(draw_flow.get_amount().amount(), -100_000.0);
+    assert_eq!(repay_flow.get_amount().amount(), 50_000.0);
 
     let outstanding = schedule.outstanding_by_date().unwrap();
     let post_repay = outstanding
@@ -470,7 +474,7 @@ fn count_flows(schedule: &CashFlowSchedule, date: Date, kind: CFKind) -> usize {
     schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.date == date && cf.kind == kind)
+        .filter(|cf| cf.get_date() == date && cf.get_kind() == kind)
         .count()
 }
 
@@ -534,8 +538,8 @@ fn pre_issue_and_at_issue_events_emit_once_each() {
     let redemption: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.date >= maturity && cf.kind == CFKind::Notional)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_date() >= maturity && cf.get_kind() == CFKind::Notional)
+        .map(|cf| cf.get_amount().amount())
         .sum();
     assert!(
         (redemption - 1_300_000.0).abs() < 0.01,
@@ -650,9 +654,9 @@ fn fixed_fee_before_issue_emitted_once_at_its_date() {
     let fee = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.date == fee_date && cf.kind == CFKind::Fee)
+        .find(|cf| cf.get_date() == fee_date && cf.get_kind() == CFKind::Fee)
         .unwrap();
-    assert_eq!(fee.amount.amount(), 2_500.0);
+    assert_eq!(fee.get_amount().amount(), 2_500.0);
 }
 
 // Maturity Redemption Date Adjustment (M9)
@@ -698,28 +702,33 @@ fn weekend_maturity_redemption_matches_final_coupon_date() {
     let redemption = schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.kind == CFKind::Notional && cf.amount.amount() > 0.0)
+        .find(|cf| cf.get_kind() == CFKind::Notional && cf.get_amount().amount() > 0.0)
         .expect("redemption flow emitted");
     assert_eq!(
-        redemption.date, adjusted,
+        redemption.get_date(),
+        adjusted,
         "redemption must pay on the business-day-adjusted maturity"
     );
 
     let final_coupon_date = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind != CFKind::Notional && cf.amount.amount() > 0.0)
-        .map(|cf| cf.date)
+        .filter(|cf| cf.get_kind() != CFKind::Notional && cf.get_amount().amount() > 0.0)
+        .map(|cf| cf.get_date())
         .max()
         .expect("coupon flows emitted");
     assert_eq!(
-        redemption.date, final_coupon_date,
+        redemption.get_date(),
+        final_coupon_date,
         "redemption and final coupon must share the same payment date"
     );
 
     // No flow may remain on the raw (non-business-day) maturity date.
     assert!(
-        schedule.get_flows().iter().all(|cf| cf.date != maturity),
+        schedule
+            .get_flows()
+            .iter()
+            .all(|cf| cf.get_date() != maturity),
         "no flow may be dated on the unadjusted weekend maturity"
     );
 }
@@ -988,8 +997,8 @@ fn margin_step_coupons(steps: &[(Date, Decimal)]) -> finstack_quant_core::Result
     let mut flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Floating)
-        .map(|cf| (cf.date, cf.amount.amount()))
+        .filter(|cf| cf.get_kind() == CFKind::Floating)
+        .map(|cf| (cf.get_date(), cf.get_amount().amount()))
         .collect();
     flows.sort_by_key(|flow| flow.0);
     Ok(flows.into_iter().map(|(_, amount)| amount).collect())

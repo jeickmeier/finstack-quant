@@ -92,7 +92,7 @@ fn test_bond_with_custom_cashflows() {
     let expected_flow_count = custom_schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind != finstack_quant_core::cashflow::CFKind::Pik)
+        .filter(|cf| cf.get_kind() != finstack_quant_core::cashflow::CFKind::Pik)
         .count();
     assert_eq!(flows.len(), expected_flow_count);
 }
@@ -377,8 +377,13 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
     let first_coupon_date = full_schedule
         .get_flows()
         .iter()
-        .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Floating | CFKind::Stub))
-        .map(|cf| cf.date)
+        .filter(|cf| {
+            matches!(
+                cf.get_kind(),
+                CFKind::Fixed | CFKind::Floating | CFKind::Stub
+            )
+        })
+        .map(|cf| cf.get_date())
         .filter(|d| *d > issue)
         .min()
         .expect("FRN should have at least one coupon date in test");
@@ -496,8 +501,8 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
     let first_coupon_date = full_schedule
         .get_flows()
         .iter()
-        .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
-        .map(|cf| cf.date)
+        .filter(|cf| matches!(cf.get_kind(), CFKind::Fixed | CFKind::Stub))
+        .map(|cf| cf.get_date())
         .filter(|d| *d > issue)
         .min()
         .expect("Amortizing bond should have at least one coupon date in test");
@@ -595,7 +600,7 @@ fn test_bond_frn_dated_cashflows_uses_builder() {
     let has_floating = full_schedule
         .get_flows()
         .iter()
-        .any(|cf| matches!(cf.kind, CFKind::Floating));
+        .any(|cf| matches!(cf.get_kind(), CFKind::Floating));
     assert!(
         has_floating,
         "Full schedule should include CFKind::Floating for FRN"
@@ -665,7 +670,7 @@ fn test_bond_amortization_signed_schedule_preserves_all_flows() {
     let initial_notional = full_schedule
         .get_flows()
         .iter()
-        .find(|cf| cf.date == issue && matches!(cf.kind, CFKind::Notional));
+        .find(|cf| cf.get_date() == issue && matches!(cf.get_kind(), CFKind::Notional));
     assert!(
         initial_notional.is_some(),
         "Full schedule should have initial notional"
@@ -673,7 +678,7 @@ fn test_bond_amortization_signed_schedule_preserves_all_flows() {
     assert!(
         initial_notional
             .expect("Initial notional should exist")
-            .amount
+            .get_amount()
             .amount()
             < 0.0,
         "Initial notional should be negative (issuer receives)"
@@ -683,12 +688,12 @@ fn test_bond_amortization_signed_schedule_preserves_all_flows() {
     let amort_flows: Vec<_> = full_schedule
         .get_flows()
         .iter()
-        .filter(|cf| matches!(cf.kind, CFKind::Amortization))
+        .filter(|cf| matches!(cf.get_kind(), CFKind::Amortization))
         .collect();
     assert!(!amort_flows.is_empty(), "Should have amortization flows");
     for cf in &amort_flows {
         assert!(
-            cf.amount.amount() > 0.0,
+            cf.get_amount().amount() > 0.0,
             "Amortization in full schedule should be positive"
         );
     }

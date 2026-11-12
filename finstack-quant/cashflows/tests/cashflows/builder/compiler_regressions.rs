@@ -217,10 +217,10 @@ fn step_up_uses_contractual_start_under_both_adjustment_directions() {
         coupon.insert("adjust_accrual_dates".into(), json!(true));
         let schedule = build(value, None);
         let coupon = schedule.coupons().last().expect("last coupon");
-        close(coupon.rate.expect("coupon rate"), expected_rate);
+        close(coupon.get_rate().expect("coupon rate"), expected_rate);
         close(
-            coupon.amount.amount(),
-            1_000_000.0 * coupon.accrual_factor * expected_rate,
+            coupon.get_amount().amount(),
+            1_000_000.0 * coupon.get_accrual_factor() * expected_rate,
         );
     }
 }
@@ -282,8 +282,10 @@ fn pik_and_same_date_draws_are_included_in_remaining_principal_targets() {
     let repayment: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Amortization && flow.date == date("2025-04-15"))
-        .map(|flow| flow.amount.amount())
+        .filter(|flow| {
+            flow.get_kind() == CFKind::Amortization && flow.get_date() == date("2025-04-15")
+        })
+        .map(|flow| flow.get_amount().amount())
         .sum();
     close(repayment, 260_000.0);
 }
@@ -312,25 +314,25 @@ fn linear_between_full_payoff_includes_final_pik_and_principal_movements() {
         !schedule
             .get_flows()
             .iter()
-            .any(|flow| flow.kind == CFKind::Pik && flow.date > date("2025-07-15"))
+            .any(|flow| flow.get_kind() == CFKind::Pik && flow.get_date() > date("2025-07-15"))
     );
     assert!(
         !schedule
             .get_flows()
             .iter()
-            .any(|flow| flow.kind == CFKind::Notional && flow.amount.amount() > 0.0)
+            .any(|flow| flow.get_kind() == CFKind::Notional && flow.get_amount().amount() > 0.0)
     );
     let principal_paid: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Amortization)
-        .map(|flow| flow.amount.amount())
+        .filter(|flow| flow.get_kind() == CFKind::Amortization)
+        .map(|flow| flow.get_amount().amount())
         .sum();
     let pik: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Pik)
-        .map(|flow| flow.principal_delta.expect("PIK delta").amount())
+        .filter(|flow| flow.get_kind() == CFKind::Pik)
+        .map(|flow| flow.get_principal_delta().expect("PIK delta").amount())
         .sum();
     close(principal_paid, 1_050_000.0 + pik);
 }
@@ -355,11 +357,13 @@ fn linear_between_installments_use_the_balance_entering_the_window() {
         let installments: Vec<_> = schedule
             .get_flows()
             .iter()
-            .filter(|flow| flow.kind == CFKind::Amortization && flow.date > date("2025-04-16"))
+            .filter(|flow| {
+                flow.get_kind() == CFKind::Amortization && flow.get_date() > date("2025-04-16")
+            })
             .collect();
         assert_eq!(installments.len(), 3);
         for installment in installments {
-            close(installment.amount.amount(), entering_balance / 3.0);
+            close(installment.get_amount().amount(), entering_balance / 3.0);
         }
     }
 }
@@ -376,10 +380,13 @@ fn linear_between_uses_effective_boundaries_and_lagged_cash_settlement() {
         .get_flows()
         .iter()
         .rev()
-        .find(|flow| flow.kind == CFKind::Amortization)
+        .find(|flow| flow.get_kind() == CFKind::Amortization)
         .expect("final installment");
-    assert_eq!(final_installment.principal_date, Some(date("2025-07-15")));
-    assert_eq!(final_installment.date, date("2025-07-17"));
+    assert_eq!(
+        final_installment.get_balance_date(),
+        Some(date("2025-07-15"))
+    );
+    assert_eq!(final_installment.get_date(), date("2025-07-17"));
     let balance = schedule
         .outstanding_by_date()
         .expect("balance replay")
@@ -439,7 +446,8 @@ fn explicit_amortization_after_adjusted_terminal_boundary_is_rejected() {
         value["coupon_program"][0]["spec"]["adjust_accrual_dates"] = json!(false);
         let schedule = build(value, None);
         assert!(schedule.get_flows().iter().any(|flow| {
-            flow.kind == CFKind::Amortization && flow.principal_date == Some(date("2025-03-30"))
+            flow.get_kind() == CFKind::Amortization
+                && flow.get_balance_date() == Some(date("2025-03-30"))
         }));
     }
 }
@@ -478,7 +486,10 @@ fn overnight_market() -> MarketContext {
 fn overnight_period_bounds_use_final_rate_and_uniform_accrual_adjustment() {
     let market = overnight_market();
     let unbounded = build(overnight_spec(), Some(&market));
-    let raw_interest: f64 = unbounded.coupons().map(|flow| flow.amount.amount()).sum();
+    let raw_interest: f64 = unbounded
+        .coupons()
+        .map(|flow| flow.get_amount().amount())
+        .sum();
     close(raw_interest, 1_000_000.0 * 0.1 / 360.0);
     for (field, bound, annual_adjustment) in [
         ("index_cap_bp", "600", 0.0),
@@ -491,7 +502,10 @@ fn overnight_period_bounds_use_final_rate_and_uniform_accrual_adjustment() {
         let mut value = overnight_spec();
         value["coupon_program"][0]["spec"]["rate_spec"][field] = json!(bound);
         let schedule = build(value, Some(&market));
-        let interest: f64 = schedule.coupons().map(|flow| flow.amount.amount()).sum();
+        let interest: f64 = schedule
+            .coupons()
+            .map(|flow| flow.get_amount().amount())
+            .sum();
         close(
             interest,
             raw_interest + 1_500_000.0 * annual_adjustment / 360.0,
@@ -507,7 +521,10 @@ fn overnight_daily_bounds_are_applied_before_compounding() {
     rate["overnight_index_constraints"] = json!("daily");
     rate["index_cap_bp"] = json!("600");
     let schedule = build(value, Some(&market));
-    let interest: f64 = schedule.coupons().map(|flow| flow.amount.amount()).sum();
+    let interest: f64 = schedule
+        .coupons()
+        .map(|flow| flow.get_amount().amount())
+        .sum();
     close(interest, 1_000_000.0 * 0.06 / 360.0);
 }
 
@@ -526,35 +543,35 @@ fn bounded_split_pik_capitalizes_net_coupon_on_one_contractual_boundary() {
         let pik: f64 = schedule
             .get_flows()
             .iter()
-            .filter(|flow| flow.kind == CFKind::Pik)
-            .map(|flow| flow.principal_delta.expect("PIK delta").amount())
+            .filter(|flow| flow.get_kind() == CFKind::Pik)
+            .map(|flow| flow.get_principal_delta().expect("PIK delta").amount())
             .sum();
         let cash: f64 = schedule
             .coupons()
-            .filter(|flow| flow.kind == CFKind::Floating)
-            .map(|flow| flow.amount.amount())
+            .filter(|flow| flow.get_kind() == CFKind::Floating)
+            .map(|flow| flow.get_amount().amount())
             .sum();
         close(cash + pik, expected_interest);
         assert!(
             schedule
                 .get_flows()
                 .iter()
-                .filter(|flow| flow.kind == CFKind::Pik)
-                .all(|flow| flow.principal_date == Some(date("2025-01-08")))
+                .filter(|flow| flow.get_kind() == CFKind::Pik)
+                .all(|flow| flow.get_balance_date() == Some(date("2025-01-08")))
         );
         assert!(
             schedule
                 .get_flows()
                 .iter()
-                .any(|flow| flow.kind == CFKind::Pik
-                    && flow.principal_delta.expect("PIK delta").amount() < 0.0)
+                .any(|flow| flow.get_kind() == CFKind::Pik
+                    && flow.get_principal_delta().expect("PIK delta").amount() < 0.0)
         );
         let repayment = schedule
             .get_flows()
             .iter()
-            .find(|flow| flow.kind == CFKind::Notional && flow.amount.amount() > 0.0)
+            .find(|flow| flow.get_kind() == CFKind::Notional && flow.get_amount().amount() > 0.0)
             .expect("redemption");
-        close(repayment.amount.amount(), 500_000.0 + pik);
+        close(repayment.get_amount().amount(), 500_000.0 + pik);
         close(
             schedule
                 .outstanding_by_date()
@@ -587,17 +604,17 @@ fn overnight_zero_daycount_segment_keeps_replay_clock_and_emits_zero() {
     let zero = schedule
         .coupons()
         .find(|flow| {
-            flow.accrual
+            flow.get_accrual()
                 .as_ref()
                 .is_some_and(|accrual| accrual.end == date("2025-01-31"))
         })
         .expect("zero-daycount segment");
-    close(zero.accrual_factor, 0.0);
-    close(zero.amount.amount(), 0.0);
+    close(zero.get_accrual_factor(), 0.0);
+    close(zero.get_amount().amount(), 0.0);
     assert!(
         schedule
             .coupons()
-            .all(|flow| flow.amount.amount().is_finite())
+            .all(|flow| flow.get_amount().amount().is_finite())
     );
 }
 
@@ -647,8 +664,14 @@ fn weekend_balance_splits_record_one_raw_fixing_and_materialize_without_conflict
     );
     let replayed = build(value, Some(&realized));
     close(
-        replayed.coupons().map(|flow| flow.amount.amount()).sum(),
-        schedule.coupons().map(|flow| flow.amount.amount()).sum(),
+        replayed
+            .coupons()
+            .map(|flow| flow.get_amount().amount())
+            .sum(),
+        schedule
+            .coupons()
+            .map(|flow| flow.get_amount().amount())
+            .sum(),
     );
 }
 
@@ -666,8 +689,8 @@ fn linear_between_later_draw_starts_repayment_after_its_funding_boundary() {
     let amounts: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Amortization)
-        .map(|flow| flow.amount.amount())
+        .filter(|flow| flow.get_kind() == CFKind::Amortization)
+        .map(|flow| flow.get_amount().amount())
         .collect();
     assert_eq!(amounts, vec![250_000.0, 450_000.0, 450_000.0, 450_000.0]);
 }

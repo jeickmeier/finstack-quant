@@ -427,12 +427,12 @@ fn step_up_no_steps_equals_fixed_rate() {
     let step_coupons: Vec<_> = step_sched
         .get_flows()
         .iter()
-        .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
+        .filter(|cf| matches!(cf.get_kind(), CFKind::Fixed | CFKind::Stub))
         .collect();
     let fixed_coupons: Vec<_> = fixed_sched
         .get_flows()
         .iter()
-        .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
+        .filter(|cf| matches!(cf.get_kind(), CFKind::Fixed | CFKind::Stub))
         .collect();
 
     assert_eq!(
@@ -442,14 +442,14 @@ fn step_up_no_steps_equals_fixed_rate() {
     );
 
     for (s, f) in step_coupons.iter().zip(fixed_coupons.iter()) {
-        assert_eq!(s.date, f.date, "Coupon dates should match");
+        assert_eq!(s.get_date(), f.get_date(), "Coupon dates should match");
         assert!(
-            (s.amount.amount() - f.amount.amount()).abs() < 1e-6,
+            (s.get_amount().amount() - f.get_amount().amount()).abs() < 1e-6,
             "Coupon amounts should match: step={}, fixed={}",
-            s.amount.amount(),
-            f.amount.amount()
+            s.get_amount().amount(),
+            f.get_amount().amount()
         );
-        assert_eq!(s.rate, f.rate, "Coupon rates should match");
+        assert_eq!(s.get_rate(), f.get_rate(), "Coupon rates should match");
     }
 }
 
@@ -467,7 +467,7 @@ fn step_up_one_step_changes_rate() {
     let coupons: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
+        .filter(|cf| matches!(cf.get_kind(), CFKind::Fixed | CFKind::Stub))
         .collect();
 
     // Semi-annual over 2 years = 4 coupon periods
@@ -480,22 +480,22 @@ fn step_up_one_step_changes_rate() {
     // First 2 coupons (before step_date) should have initial_rate = 3%
     for c in &coupons[..2] {
         assert_eq!(
-            c.rate,
+            c.get_rate(),
             Some(0.03),
             "Pre-step coupon rate should be 3%, got {:?} on {}",
-            c.rate,
-            c.date
+            c.get_rate(),
+            c.get_date()
         );
     }
 
     // Last 2 coupons (on or after step_date) should have stepped rate = 5%
     for c in &coupons[2..] {
         assert_eq!(
-            c.rate,
+            c.get_rate(),
             Some(0.05),
             "Post-step coupon rate should be 5%, got {:?} on {}",
-            c.rate,
-            c.date
+            c.get_rate(),
+            c.get_date()
         );
     }
 
@@ -505,16 +505,16 @@ fn step_up_one_step_changes_rate() {
     // 5% coupon: 1,000,000 * 0.05 * 0.5 = 25,000
     for c in &coupons[..2] {
         assert!(
-            (c.amount.amount() - 15_000.0).abs() < 1.0,
+            (c.get_amount().amount() - 15_000.0).abs() < 1.0,
             "3% coupon should be ~15000, got {}",
-            c.amount.amount()
+            c.get_amount().amount()
         );
     }
     for c in &coupons[2..] {
         assert!(
-            (c.amount.amount() - 25_000.0).abs() < 1.0,
+            (c.get_amount().amount() - 25_000.0).abs() < 1.0,
             "5% coupon should be ~25000, got {}",
-            c.amount.amount()
+            c.get_amount().amount()
         );
     }
 }
@@ -535,7 +535,7 @@ fn step_up_multiple_steps() {
     let coupons: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
+        .filter(|cf| matches!(cf.get_kind(), CFKind::Fixed | CFKind::Stub))
         .collect();
 
     // Semi-annual over 3 years = 6 coupon periods
@@ -549,12 +549,12 @@ fn step_up_multiple_steps() {
     let expected_rates = [0.02, 0.02, 0.04, 0.04, 0.06, 0.06];
     for (i, (c, &expected_rate)) in coupons.iter().zip(expected_rates.iter()).enumerate() {
         assert_eq!(
-            c.rate,
+            c.get_rate(),
             Some(expected_rate),
             "Period {} rate should be {}, got {:?}",
             i,
             expected_rate,
-            c.rate
+            c.get_rate()
         );
     }
 }

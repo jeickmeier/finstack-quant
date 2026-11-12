@@ -345,7 +345,7 @@ impl ReplayTemplate {
             .get_flows()
             .iter()
             .filter(|flow| is_par_redemption(flow))
-            .map(|flow| flow.date)
+            .map(|flow| flow.get_date())
             .max();
         let inputs = TemplateInputs {
             tree,
@@ -600,16 +600,16 @@ impl ReplayTemplate {
         let mut dynamic_flow_indices = BTreeSet::new();
         if let Some(spec) = floating_spec {
             for (flow_index, flow) in schedule.get_flows().iter().enumerate() {
-                if !matches!(flow.kind, CFKind::Floating | CFKind::Pik) {
+                if !matches!(flow.get_kind(), CFKind::Floating | CFKind::Pik) {
                     continue;
                 }
-                let Some(accrual) = &flow.accrual else {
+                let Some(accrual) = &flow.get_accrual() else {
                     continue;
                 };
-                let dynamic =
-                    flow.date > as_of || (flow.date == as_of && include_as_of_option_cash);
+                let dynamic = flow.get_date() > as_of
+                    || (flow.get_date() == as_of && include_as_of_option_cash);
                 if !dynamic {
-                    if flow.kind == CFKind::Pik
+                    if flow.get_kind() == CFKind::Pik
                         && flow
                             .get_balance_date()
                             .is_some_and(|balance| balance >= as_of)
@@ -638,7 +638,7 @@ impl ReplayTemplate {
                             return Err(Error::Validation(format!(
                                 "Bond '{}' overnight PIK capitalizing on {} still requires unobserved fixings",
                                 bond.id.as_str(),
-                                flow.date,
+                                flow.get_date(),
                             )));
                         }
                     }
@@ -648,7 +648,7 @@ impl ReplayTemplate {
                     continue;
                 }
                 let reset = flow
-                    .reset_date
+                    .get_reset_date()
                     .unwrap_or(contractual_reset_date(accrual.start, spec)?);
                 let key = (accrual.start, accrual.end);
                 let entry = dynamic_groups.entry(key).or_default();
@@ -657,13 +657,13 @@ impl ReplayTemplate {
                 entry.end = Some(accrual.end);
                 // The cash row's date is the coupon payment; a PIK-only coupon
                 // has no cash settlement and pays nothing before capitalizing.
-                if flow.kind != CFKind::Pik || entry.payment.is_none() {
-                    entry.payment = Some(flow.date);
+                if flow.get_kind() != CFKind::Pik || entry.payment.is_none() {
+                    entry.payment = Some(flow.get_date());
                 }
                 // Only the shares still ahead of the origin replay: a cash
                 // share settled before it is not paid again at capitalization,
                 // and a capitalized PIK share is not added again.
-                if flow.kind == CFKind::Pik {
+                if flow.get_kind() == CFKind::Pik {
                     entry.has_pik = true;
                 } else {
                     entry.has_cash = true;
@@ -682,7 +682,7 @@ impl ReplayTemplate {
                     coupon_period: accrual.context.coupon_period,
                     end_is_termination_date: accrual.context.end_is_termination_date,
                 });
-                entry.accrual = flow.accrual_factor;
+                entry.accrual = flow.get_accrual_factor();
                 entry.base_index_rate = accrual.projected_index_rate;
                 dynamic_flow_indices.insert(flow_index);
             }
@@ -960,7 +960,7 @@ impl ReplayTemplate {
                     let has_later_reference_cash = schedule
                         .get_flows()
                         .iter()
-                        .any(|flow| flow.date > date && flow.kind.is_cash_settlement());
+                        .any(|flow| flow.get_date() > date && flow.get_kind().is_cash_settlement());
                     let make_whole = if call.make_whole.is_none() {
                         None
                     } else if date == bond.maturity && !has_later_reference_cash {
@@ -1089,16 +1089,16 @@ impl ReplayTemplate {
                 // not a second draw into the modeled balance.
                 continue;
             }
-            let event_time = if flow.date >= as_of {
-                grid_day_count.year_fraction(as_of, flow.date, DayCountContext::default())?
+            let event_time = if flow.get_date() >= as_of {
+                grid_day_count.year_fraction(as_of, flow.get_date(), DayCountContext::default())?
             } else {
                 0.0
             };
             let step = nearest_step(times, event_time);
             let terminal_redemption = is_terminal_redemption(flow, final_redemption_date);
-            if flow.kind == CFKind::Pik
+            if flow.get_kind() == CFKind::Pik
                 && final_redemption_date.is_some_and(|redemption| {
-                    flow.date <= redemption
+                    flow.get_date() <= redemption
                         && flow
                             .get_balance_date()
                             .is_some_and(|balance| balance > redemption)
@@ -1106,8 +1106,11 @@ impl ReplayTemplate {
             {
                 static_redemption_pik += static_balance_delta(flow, false).unwrap_or(0.0);
             }
-            if flow.date >= as_of && flow.kind.is_cash_settlement() && !terminal_redemption {
-                let entitlement_key = (flow.date, flow.amount.amount().to_bits());
+            if flow.get_date() >= as_of
+                && flow.get_kind().is_cash_settlement()
+                && !terminal_redemption
+            {
+                let entitlement_key = (flow.get_date(), flow.get_amount().amount().to_bits());
                 let entitled = entitled_counts
                     .get_mut(&entitlement_key)
                     .is_some_and(|count| {
@@ -1124,11 +1127,11 @@ impl ReplayTemplate {
                         return Err(Error::Validation(format!(
                             "Bond '{}' cashflow date {} is not an exact node on the daily ACT/365F rates-credit grid (offset {event_minus_step}); rebuild calibration with build_daily_bond_rates_credit_targets",
                             bond.id.as_str(),
-                            flow.date
+                            flow.get_date()
                         )));
                     }
                     static_cash[step].push(CashEvent {
-                        amount_at_step: flow.amount.amount(),
+                        amount_at_step: flow.get_amount().amount(),
                         event_minus_step,
                     });
                 }
@@ -1140,22 +1143,27 @@ impl ReplayTemplate {
                 let balance_step = exact_grid_step(times, as_of, balance_date)?;
                 balance_events[balance_step].push(BalanceEvent { delta });
             }
-            if flow.date >= as_of && is_holder_distribution(flow) {
+            if flow.get_date() >= as_of && is_holder_distribution(flow) {
                 static_distributions[step].push(DistributionEvent {
-                    date: flow.date,
-                    amount: flow.amount.amount().max(0.0),
+                    date: flow.get_date(),
+                    amount: flow.get_amount().amount().max(0.0),
                 });
             }
             if let Some(accrual) = flow
-                .accrual
+                .get_accrual()
                 .as_ref()
-                .filter(|_| matches!(flow.kind, CFKind::Fixed | CFKind::Floating | CFKind::Pik))
-                .filter(|accrual| flow.date >= as_of || accrual.end >= as_of)
+                .filter(|_| {
+                    matches!(
+                        flow.get_kind(),
+                        CFKind::Fixed | CFKind::Floating | CFKind::Pik
+                    )
+                })
+                .filter(|accrual| flow.get_date() >= as_of || accrual.end >= as_of)
             {
                 static_accruals.push(AccrualClaim {
                     start: accrual.start,
                     end: accrual.end,
-                    payment: flow.date,
+                    payment: flow.get_date(),
                     day_count: accrual.day_count,
                     day_count_context: DayCountContext {
                         calendar: Some(calendar_by_id_strict(
@@ -1172,19 +1180,19 @@ impl ReplayTemplate {
                     },
                     // A PIK claim is its explicit capitalization, not its cash
                     // amount (record CORE-CONVENTIONS-015 #1, #4).
-                    amount: if flow.kind == CFKind::Pik {
-                        flow.principal_delta
+                    amount: if flow.get_kind() == CFKind::Pik {
+                        flow.get_principal_delta()
                             .ok_or_else(|| {
                                 finstack_quant_core::Error::Validation(format!(
                                     "PIK row on {} has no principal_delta",
-                                    flow.date
+                                    flow.get_date()
                                 ))
                             })?
                             .amount()
                     } else {
-                        flow.amount.amount()
+                        flow.get_amount().amount()
                     },
-                    pik: flow.kind == CFKind::Pik,
+                    pik: flow.get_kind() == CFKind::Pik,
                 });
             }
         }

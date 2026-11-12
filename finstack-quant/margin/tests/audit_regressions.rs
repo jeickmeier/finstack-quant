@@ -46,8 +46,8 @@ fn vm_cashflows_follow_desk_direction_on_both_sides() {
             .expect("calls");
         let flows = finstack_quant_margin::types::margin_calls_to_cashflows(&calls);
         assert_eq!(flows.len(), 1);
-        assert_eq!(flows[0].kind, expected);
-        assert!(flows[0].date > date);
+        assert_eq!(flows[0].get_kind(), expected);
+        assert!(flows[0].get_date() > date);
     }
 }
 
@@ -320,7 +320,7 @@ fn repo_margin_call_settles_after_weekend_and_preserves_call_date() {
     let calendar = finstack_quant_core::dates::calendar_by_id_strict("usny").expect("calendar");
     let flows = generate_margin_cashflows(&spec, usd(1e6), &[(call_date, 900_000.0)], calendar)
         .expect("flows");
-    assert_eq!(flows[0].date, settlement);
+    assert_eq!(flows[0].get_date(), settlement);
 }
 
 #[test]

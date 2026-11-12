@@ -680,9 +680,9 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
             schedule
                 .get_flows()
                 .iter()
-                .find(|flow| flow.date == date!(2025 - 04 - 04))
+                .find(|flow| flow.get_date() == date!(2025 - 04 - 04))
                 .expect("future installment row")
-                .amount
+                .get_amount()
                 .amount(),
             0.0,
             "the unpaid installment is extinguished by the prepayment"

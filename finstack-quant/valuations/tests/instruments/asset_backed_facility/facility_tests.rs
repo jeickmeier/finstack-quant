@@ -764,7 +764,7 @@ fn floating_facility_interest_is_tagged_floating() {
         f.cashflow_schedule(&market, close())
             .expect("schedule")
             .coupons()
-            .map(|cf| cf.kind)
+            .map(|cf| cf.get_kind())
             .collect()
     };
     let floating_kinds = kinds(&floating);

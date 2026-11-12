@@ -332,57 +332,60 @@ impl PyCashFlow {
     /// Payment date as ``datetime.date``.
     #[getter]
     fn date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        date_to_py(py, self.inner.date)
+        date_to_py(py, self.inner.get_date())
     }
 
     /// Optional index reset date as ``datetime.date``.
     #[getter]
     fn reset_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner.reset_date.map(|d| date_to_py(py, d)).transpose()
+        self.inner
+            .get_reset_date()
+            .map(|d| date_to_py(py, d))
+            .transpose()
     }
 
     /// Monetary amount including its currency.
     #[getter]
     fn amount(&self) -> PyMoney {
-        PyMoney::from_inner(self.inner.amount)
+        PyMoney::from_inner(self.inner.get_amount())
     }
 
     /// Cashflow classification.
     #[getter]
     fn kind(&self) -> PyCFKind {
-        PyCFKind::from_inner(self.inner.kind)
+        PyCFKind::from_inner(self.inner.get_kind())
     }
 
     /// Accrual year fraction.
     #[getter]
     fn accrual_factor(&self) -> f64 {
-        self.inner.accrual_factor
+        self.inner.get_accrual_factor()
     }
 
     /// Effective annual rate, when known.
     #[getter]
     fn rate(&self) -> Option<f64> {
-        self.inner.rate
+        self.inner.get_rate()
     }
 
     /// Contractual coupon metadata, or None for an unannotated row.
     #[getter]
     fn accrual(&self) -> Option<PyCashFlowAccrual> {
         self.inner
-            .accrual
+            .get_accrual()
             .clone()
             .map(PyCashFlowAccrual::from_inner)
     }
     /// Explicit principal movement, or None when derived from kind and amount.
     #[getter]
     fn principal_delta(&self) -> Option<PyMoney> {
-        self.inner.principal_delta.map(PyMoney::from_inner)
+        self.inner.get_principal_delta().map(PyMoney::from_inner)
     }
     /// Explicit economic principal date, or None for a row that moves no principal.
     #[getter]
     fn principal_date<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         self.inner
-            .principal_date
+            .get_balance_date()
             .map(|date| date_to_py(py, date))
             .transpose()
     }
@@ -461,19 +464,19 @@ impl PyCashFlow {
     fn __repr__(&self) -> String {
         let reset = self
             .inner
-            .reset_date
+            .get_reset_date()
             .map_or_else(|| "None".to_string(), |d| format!("'{d}'"));
         let rate = self
             .inner
-            .rate
+            .get_rate()
             .map_or_else(|| "None".to_string(), |r| r.to_string());
         format!(
             "CashFlow(date='{}', amount={} {}, kind='{}', reset_date={reset}, accrual_factor={}, rate={rate})",
-            self.inner.date,
-            self.inner.amount.amount(),
-            self.inner.amount.currency(),
-            self.inner.kind,
-            self.inner.accrual_factor,
+            self.inner.get_date(),
+            self.inner.get_amount().amount(),
+            self.inner.get_amount().currency(),
+            self.inner.get_kind(),
+            self.inner.get_accrual_factor(),
         )
     }
 }

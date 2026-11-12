@@ -312,10 +312,10 @@ fn early_overnight_payment_rejects_unknown_fixings_after_payment() {
     let pik = schedule
         .get_flows()
         .iter()
-        .find(|flow| flow.kind == CFKind::Pik)
+        .find(|flow| flow.get_kind() == CFKind::Pik)
         .expect("PIK coupon");
     assert_eq!(
-        pik.date,
+        pik.get_date(),
         pik.get_balance_date().expect("principal row balance date")
     );
     assert_eq!(
@@ -325,9 +325,9 @@ fn early_overnight_payment_rejects_unknown_fixings_after_payment() {
     let cash = schedule
         .get_flows()
         .iter()
-        .find(|flow| flow.kind == CFKind::Floating)
+        .find(|flow| flow.get_kind() == CFKind::Floating)
         .expect("cash coupon");
-    assert_eq!(cash.date, time::macros::date!(2024 - 03 - 28));
+    assert_eq!(cash.get_date(), time::macros::date!(2024 - 03 - 28));
     let error = ReplayTemplate::new(&tree, &bond, &market, as_of)
         .err()
         .expect("unknown Friday fixing must reject early payment");
@@ -367,10 +367,10 @@ fn past_overnight_payment_retains_only_fully_determined_pending_pik() {
         let pik = schedule
             .get_flows()
             .iter()
-            .find(|flow| flow.kind == CFKind::Pik)
+            .find(|flow| flow.get_kind() == CFKind::Pik)
             .expect("PIK coupon");
         assert_eq!(
-            pik.date,
+            pik.get_date(),
             pik.get_balance_date().expect("principal row balance date")
         );
         assert_eq!(
@@ -616,22 +616,23 @@ fn floating_pik_uses_accrual_boundaries_with_lagged_and_early_cash_dates() {
             .get_flows()
             .iter()
             .find(|flow| {
-                flow.kind == CFKind::Pik
+                flow.get_kind() == CFKind::Pik
                     && flow.get_balance_date().expect("principal row balance date")
                         == first.compiled.period().accrual_end
             })
             .expect("first PIK")
-            .principal_delta
+            .get_principal_delta()
             .expect("PIK delta")
             .amount();
         let first_cash = schedule
             .get_flows()
             .iter()
             .find(|flow| {
-                flow.kind == CFKind::Floating && flow.date == first.compiled.period().payment_date
+                flow.get_kind() == CFKind::Floating
+                    && flow.get_date() == first.compiled.period().payment_date
             })
             .expect("first cash coupon")
-            .amount
+            .get_amount()
             .amount();
         let mut path = Vec::new();
         tree.sample_path_into(57, 0, false, &mut path)
@@ -753,14 +754,15 @@ fn scheduled_amortization_reduces_balance_before_lagged_cash_settlement() {
         .get_flows()
         .iter()
         .find(|flow| {
-            flow.kind == CFKind::Amortization
+            flow.get_kind() == CFKind::Amortization
                 && flow.get_balance_date().expect("principal row balance date") == effective
         })
         .expect("first repayment");
-    assert!(repayment.date > effective);
+    assert!(repayment.get_date() > effective);
     let effective_step =
         exact_grid_step(&template.times, as_of, effective).expect("effective step");
-    let cash_step = exact_grid_step(&template.times, as_of, repayment.date).expect("cash step");
+    let cash_step =
+        exact_grid_step(&template.times, as_of, repayment.get_date()).expect("cash step");
     assert_eq!(template.balance_events[effective_step][0].delta, -25.0);
     assert!(template.balance_events[cash_step].is_empty());
     let mut path = Vec::new();
@@ -1253,10 +1255,10 @@ fn lagged_term_reset_uses_curve_tenor_and_captures_post_pik_start_balance() {
     let first_pik = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.kind == CFKind::Pik)
-        .min_by_key(|flow| flow.date)
+        .filter(|flow| flow.get_kind() == CFKind::Pik)
+        .min_by_key(|flow| flow.get_date())
         .expect("first PIK coupon")
-        .principal_delta
+        .get_principal_delta()
         .expect("PIK delta")
         .amount();
     let expected_start_balance = 100.0 + first_pik;

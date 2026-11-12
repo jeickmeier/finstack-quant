@@ -152,7 +152,7 @@ fn same_date_flows_use_the_canonical_cashflow_order() {
         schedule
             .get_flows()
             .iter()
-            .map(|cashflow| cashflow.kind)
+            .map(|cashflow| cashflow.get_kind())
             .collect::<Vec<_>>(),
         vec![
             CFKind::Fee,
@@ -163,11 +163,11 @@ fn same_date_flows_use_the_canonical_cashflow_order() {
         ]
     );
     assert_eq!(
-        schedule.get_flows()[3].amount.amount(),
+        schedule.get_flows()[3].get_amount().amount(),
         -30.0,
         "draw sorts before repayment"
     );
-    assert_eq!(schedule.get_flows()[4].amount.amount(), 5.0);
+    assert_eq!(schedule.get_flows()[4].get_amount().amount(), 5.0);
     let outstanding = schedule.outstanding_by_date().unwrap();
     assert_eq!(
         outstanding,

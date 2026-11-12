@@ -113,22 +113,22 @@ pub(crate) fn equity_cashflows(
     let financing_schedules = financing_schedules_supported(inst, market, as_of)?;
     for sched in &financing_schedules {
         for cf in sched.get_flows() {
-            if cf.date < as_of || cf.date > exit {
+            if cf.get_date() < as_of || cf.get_date() > exit {
                 continue;
             }
             // Noncash balance events (PIK, write-downs) are not financing cash.
-            if !cf.kind.is_cash_settlement() {
+            if !cf.get_kind().is_cash_settlement() {
                 continue;
             }
             let is_principal = matches!(
-                cf.kind,
+                cf.get_kind(),
                 finstack_quant_core::cashflow::CFKind::Notional
                     | finstack_quant_core::cashflow::CFKind::Amortization
             );
-            if cf.date == exit && is_principal {
+            if cf.get_date() == exit && is_principal {
                 continue;
             }
-            *flows.entry(cf.date).or_insert(0.0) += -cf.amount.amount();
+            *flows.entry(cf.get_date()).or_insert(0.0) += -cf.get_amount().amount();
         }
     }
 

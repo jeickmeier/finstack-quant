@@ -530,18 +530,18 @@ fn test_cdsw_final_coupon_cashflow_accrual_matches_pricer_premium_pv() {
     let final_coupon = schedule
         .get_flows()
         .iter()
-        .find(|flow| flow.date == maturity)
+        .find(|flow| flow.get_date() == maturity)
         .expect("final coupon should be exported");
 
     let expected_accrual = 93.0 / 360.0;
     assert!(
-        (final_coupon.accrual_factor - expected_accrual).abs() < 1e-12,
+        (final_coupon.get_accrual_factor() - expected_accrual).abs() < 1e-12,
         "exported final coupon accrual should use CDSW inclusive Act/360"
     );
 
     let expected_coupon = notional.amount() * (spread_bp / 10_000.0) * expected_accrual;
     assert!(
-        (final_coupon.amount.amount() + expected_coupon).abs() < 1e-8,
+        (final_coupon.get_amount().amount() + expected_coupon).abs() < 1e-8,
         "protection-buyer exported premium cashflow should match signed CDSW coupon"
     );
 

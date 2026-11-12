@@ -28,10 +28,10 @@ pub(crate) fn bond_coupon_dates(bond: &Bond) -> Result<Vec<(Date, Date, Date)>> 
     if let Some(schedule) = &bond.custom_cashflows {
         let mut periods = Vec::new();
         for flow in schedule.get_flows() {
-            if !(flow.kind.is_coupon() || flow.kind == CFKind::Pik) {
+            if !(flow.get_kind().is_coupon() || flow.get_kind() == CFKind::Pik) {
                 continue;
             }
-            let accrual = flow.accrual.as_ref().ok_or_else(|| {
+            let accrual = flow.get_accrual().as_ref().ok_or_else(|| {
                 finstack_quant_core::Error::Validation(
                     "ACT/365L bond timing requires contractual coupon accrual metadata".into(),
                 )
@@ -48,7 +48,7 @@ pub(crate) fn bond_coupon_dates(bond: &Bond) -> Result<Vec<(Date, Date, Date)>> 
                         .into(),
                 ));
             }
-            periods.push((flow.date, period.0, period.1));
+            periods.push((flow.get_date(), period.0, period.1));
         }
         periods.sort_unstable();
         periods.dedup();
@@ -172,20 +172,23 @@ pub(crate) fn bond_model_schedule(bond: &Bond, as_of: Date) -> Result<BondModelS
     let ex_coupon = bond.accrual_config().ex_coupon;
     let mut coupon_flows: Vec<(Date, f64)> = Vec::new();
     for cf in schedule.get_flows() {
-        if cf.date <= as_of || !(cf.kind.is_coupon() || cf.kind == CFKind::Pik) {
+        if cf.get_date() <= as_of || !(cf.get_kind().is_coupon() || cf.get_kind() == CFKind::Pik) {
             continue;
         }
         if let Some(rule) = &ex_coupon
-            && rule.is_ex_coupon(cf.date, as_of)?
+            && rule.is_ex_coupon(cf.get_date(), as_of)?
         {
             continue;
         }
         // Split coupons emit a cash and a PIK flow on the same date for one
         // accrual period; keep one entry per payment date.
-        if coupon_flows.last().is_some_and(|&(d, _)| d == cf.date) {
+        if coupon_flows
+            .last()
+            .is_some_and(|&(d, _)| d == cf.get_date())
+        {
             continue;
         }
-        coupon_flows.push((cf.date, cf.accrual_factor));
+        coupon_flows.push((cf.get_date(), cf.get_accrual_factor()));
     }
 
     let day_count = bond.cashflow_spec.day_count();
@@ -351,7 +354,7 @@ mod tests {
             .full_cashflow_schedule(&MarketContext::new())
             .expect("custom source");
         custom.update_flows(|flow| {
-            if flow.kind.is_coupon() {
+            if flow.get_kind().is_coupon() {
                 flow.date = bond.maturity;
             }
         });

@@ -937,10 +937,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
         };
         if let Some(date) = mandatory.filter(|date| *date < as_of) {
             schedule.retain_flows(|flow| {
-                flow.date > as_of
-                    && !flow.kind.is_principal_like()
+                flow.get_date() > as_of
+                    && !flow.get_kind().is_principal_like()
                     && flow
-                        .accrual
+                        .get_accrual()
                         .as_ref()
                         .is_some_and(|period| period.end <= date)
             });

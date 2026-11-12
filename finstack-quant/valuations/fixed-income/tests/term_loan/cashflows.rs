@@ -229,8 +229,8 @@ fn test_over_amortization_is_capped() {
     let total_amort: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Amortization)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_kind() == CFKind::Amortization)
+        .map(|cf| cf.get_amount().amount())
         .sum();
 
     // Amort amounts are positive from holder view (principal returned),
@@ -295,7 +295,7 @@ fn test_linear_amort_no_event_at_issue_date() {
     let amort_at_issue: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Amortization && cf.date == issue)
+        .filter(|cf| cf.get_kind() == CFKind::Amortization && cf.get_date() == issue)
         .collect();
     assert!(
         amort_at_issue.is_empty(),
@@ -307,8 +307,8 @@ fn test_linear_amort_no_event_at_issue_date() {
     let total_amort: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Amortization)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_kind() == CFKind::Amortization)
+        .map(|cf| cf.get_amount().amount())
         .sum();
     assert!(
         (total_amort - 1_000_000.0).abs() < 1.0,
@@ -319,7 +319,7 @@ fn test_linear_amort_no_event_at_issue_date() {
     let amort_count = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Amortization)
+        .filter(|cf| cf.get_kind() == CFKind::Amortization)
         .count();
     assert_eq!(
         amort_count, 4,
@@ -368,8 +368,8 @@ fn test_percent_per_period_full_amort() {
     let total_amort: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Amortization)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_kind() == CFKind::Amortization)
+        .map(|cf| cf.get_amount().amount())
         .sum();
     assert!(
         (total_amort - 1_000_000.0).abs() < 1.0,
@@ -416,8 +416,8 @@ fn test_percent_of_original_notional_flat_dollar() {
     let amort_amounts: Vec<f64> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Amortization)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_kind() == CFKind::Amortization)
+        .map(|cf| cf.get_amount().amount())
         .collect();
 
     // Should have 4 quarterly amort events
@@ -484,8 +484,8 @@ fn test_flat_vs_geometric_amort_differ() {
         schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind == CFKind::Amortization)
-            .map(|cf| cf.amount.amount())
+            .filter(|cf| cf.get_kind() == CFKind::Amortization)
+            .map(|cf| cf.get_amount().amount())
             .collect()
     };
 
@@ -573,8 +573,8 @@ fn test_ddtl_partial_draw_amort_uses_funded_amount() {
     let amort_amounts: Vec<f64> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Amortization)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_kind() == CFKind::Amortization)
+        .map(|cf| cf.get_amount().amount())
         .collect();
 
     // Each payment should be based on drawn amount, not commitment limit:
@@ -644,7 +644,7 @@ fn test_commitment_fees_use_correct_kind() {
     let commitment_fees: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::CommitmentFee)
+        .filter(|cf| cf.get_kind() == CFKind::CommitmentFee)
         .collect();
     assert!(
         !commitment_fees.is_empty(),
@@ -654,8 +654,8 @@ fn test_commitment_fees_use_correct_kind() {
         schedule
             .get_flows()
             .iter()
-            .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
-            .all(|cf| cf.accrual.is_some()),
+            .filter(|cf| matches!(cf.get_kind(), CFKind::Fixed | CFKind::Stub))
+            .all(|cf| cf.get_accrual().is_some()),
         "merging the commitment-fee leg must preserve coupon accrual metadata"
     );
 
@@ -663,7 +663,7 @@ fn test_commitment_fees_use_correct_kind() {
     let generic_fees: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Fee)
+        .filter(|cf| cf.get_kind() == CFKind::Fee)
         .collect();
     // The only CFKind::Fee flows should be from upfront/OID fees, not commitment fees.
     // Since we have no upfront fee and no OID, there should be no generic fees.
@@ -795,10 +795,10 @@ mod margin_stepup_period_semantics {
         )> = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind.is_coupon())
+            .filter(|cf| cf.get_kind().is_coupon())
             .map(|cf| {
                 let accrual = cf
-                    .accrual
+                    .get_accrual()
                     .as_ref()
                     .expect("interest flow should carry accrual metadata");
                 (accrual.start, accrual.end)
@@ -843,13 +843,13 @@ mod margin_stepup_period_semantics {
             let mut flows: Vec<(finstack_quant_core::dates::Date, f64)> = schedule
                 .get_flows()
                 .iter()
-                .filter(|cf| cf.kind.is_coupon())
+                .filter(|cf| cf.get_kind().is_coupon())
                 .map(|cf| {
                     let accrual = cf
-                        .accrual
+                        .get_accrual()
                         .as_ref()
                         .expect("interest flow should carry accrual");
-                    (accrual.start, cf.amount.amount())
+                    (accrual.start, cf.get_amount().amount())
                 })
                 .collect();
             flows.sort_by_key(|flow| flow.0);
@@ -890,8 +890,8 @@ mod margin_stepup_period_semantics {
             let mut flows: Vec<(finstack_quant_core::dates::Date, f64)> = schedule
                 .get_flows()
                 .iter()
-                .filter(|cf| cf.kind.is_coupon())
-                .map(|cf| (cf.date, cf.amount.amount()))
+                .filter(|cf| cf.get_kind().is_coupon())
+                .map(|cf| (cf.get_date(), cf.get_amount().amount()))
                 .collect();
             flows.sort_by_key(|flow| flow.0);
             flows.iter().map(|(_, amount)| amount.to_bits()).collect()
@@ -942,12 +942,16 @@ mod margin_stepup_period_semantics {
         let schedule = fixed
             .cashflow_schedule(&market, date!(2025 - 01 - 01))
             .unwrap();
-        for cf in schedule.get_flows().iter().filter(|cf| cf.kind.is_coupon()) {
+        for cf in schedule
+            .get_flows()
+            .iter()
+            .filter(|cf| cf.get_kind().is_coupon())
+        {
             let accrual = cf
-                .accrual
+                .get_accrual()
                 .as_ref()
                 .expect("interest flow should carry accrual");
-            let rate = cf.rate.expect("fixed coupon should carry its rate");
+            let rate = cf.get_rate().expect("fixed coupon should carry its rate");
             let expected = if accrual.start < NEXT_PERIOD_START {
                 0.065
             } else {
@@ -1014,8 +1018,8 @@ fn commitment_fees_are_paid_once_per_period_on_the_payment_date() {
     let fees: Vec<(finstack_quant_core::dates::Date, f64)> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::CommitmentFee)
-        .map(|cf| (cf.date, cf.amount.amount()))
+        .filter(|cf| cf.get_kind() == CFKind::CommitmentFee)
+        .map(|cf| (cf.get_date(), cf.get_amount().amount()))
         .collect();
     assert_eq!(fees.len(), 2, "{fees:?}");
     assert_eq!(fees[0].0, date!(2025 - 04 - 01));
@@ -1042,8 +1046,8 @@ fn remaining_amortization_includes_same_date_pik() {
     let amort: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind == CFKind::Amortization)
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_kind() == CFKind::Amortization)
+        .map(|cf| cf.get_amount().amount())
         .collect();
     assert_eq!(amort.len(), 2);
     assert!((amort[0] - 55.0).abs() < 1e-10);

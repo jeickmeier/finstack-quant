@@ -25,7 +25,7 @@ fn windowed_bond_record() -> Value {
         .expect("full signed schedule");
     assert_eq!(schedule.coupons().count(), 20);
     for coupon in schedule.coupons() {
-        support::close(coupon.amount.amount(), 2.5, support::AI_BOUND_USD);
+        support::close(coupon.get_amount().amount(), 2.5, support::AI_BOUND_USD);
     }
     let value = bond
         .value(&market, as_of)
@@ -76,10 +76,14 @@ fn callable_loan_record() -> Value {
         .expect("full signed schedule");
     assert_eq!(schedule.coupons().count(), 20);
     for coupon in schedule.coupons() {
-        let accrual = coupon.accrual.as_ref().expect("loan coupon accrual");
+        let accrual = coupon.get_accrual().as_ref().expect("loan coupon accrual");
         let expected =
             10_000_000.0 * 0.06 * (accrual.end - accrual.start).whole_days() as f64 / 360.0;
-        support::close(coupon.amount.amount(), expected, support::AI_BOUND_USD);
+        support::close(
+            coupon.get_amount().amount(),
+            expected,
+            support::AI_BOUND_USD,
+        );
     }
     let pricer = fi::term_loan::TermLoanTreePricer;
     let value = pricer

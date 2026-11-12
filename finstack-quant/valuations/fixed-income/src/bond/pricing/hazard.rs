@@ -142,8 +142,8 @@ pub(crate) fn price_raw_with_oas(
     let Some(final_payment_date) = schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.date > as_of && flow.kind.is_cash_settlement())
-        .map(|flow| flow.date)
+        .filter(|flow| flow.get_date() > as_of && flow.get_kind().is_cash_settlement())
+        .map(|flow| flow.get_date())
         .max()
     else {
         return Ok(0.0);

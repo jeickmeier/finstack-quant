@@ -788,15 +788,15 @@ fn assert_ois_schedule(schedule: &CashFlowSchedule) {
         schedule
             .get_flows()
             .iter()
-            .filter(|flow| flow.kind == CFKind::Floating)
+            .filter(|flow| flow.get_kind() == CFKind::Floating)
             .count(),
         5
     );
     assert!(!schedule.get_meta().projected_fixings.is_empty());
     for flow in schedule.get_flows() {
-        assert_usd(&flow.amount);
-        assert!(flow.accrual_factor.is_finite());
-        assert!(flow.rate.is_none_or(f64::is_finite));
+        assert_usd(&flow.get_amount());
+        assert!(flow.get_accrual_factor().is_finite());
+        assert!(flow.get_rate().is_none_or(f64::is_finite));
     }
 }
 

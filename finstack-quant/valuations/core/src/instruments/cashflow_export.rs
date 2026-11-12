@@ -561,7 +561,7 @@ fn envelope_for_priced(
         .iter()
         .map(|flow| {
             let id = currency_discount_curves
-                .get(&flow.amount.currency())
+                .get(&flow.get_amount().currency())
                 .unwrap_or(&discount_curve_id);
             if id == &discount_curve_id {
                 Ok(std::sync::Arc::clone(&primary_discount))
@@ -575,10 +575,10 @@ fn envelope_for_priced(
         .iter()
         .zip(&row_discounts)
         .map(|(flow, discount)| {
-            if flow.date <= as_of_date {
+            if flow.get_date() <= as_of_date {
                 Ok(1.0)
             } else {
-                discount.df_between_dates(as_of_date, flow.date)
+                discount.df_between_dates(as_of_date, flow.get_date())
             }
         })
         .collect::<Result<_>>()?;
@@ -593,7 +593,7 @@ fn envelope_for_priced(
     let accrual_notionals = accrual_start_balances(&schedule);
 
     for (row_index, flow) in schedule.get_flows().iter().enumerate() {
-        let ccy = flow.amount.currency();
+        let ccy = flow.get_amount().currency();
         if envelope_currency.is_none() {
             envelope_currency = Some(ccy);
         }
@@ -603,7 +603,8 @@ fn envelope_for_priced(
             .unwrap_or(&discount_curve_id);
         let row_discount = &row_discounts[row_index];
         let curve_day_count = row_discount.day_count();
-        let year_fraction = curve_day_count.signed_year_fraction(as_of_date, flow.date, dc_ctx)?;
+        let year_fraction =
+            curve_day_count.signed_year_fraction(as_of_date, flow.get_date(), dc_ctx)?;
 
         // Flows on or before `as_of` are already settled (holder view): they
         // are not part of present value, matching `core::cashflow::npv` and
@@ -615,7 +616,7 @@ fn envelope_for_priced(
         // `pv = 0` so `total_pv` reconciles with `base_value` — including for
         // T+0 instruments like a deposit valued on its effective date, whose
         // initial notional exchange settles on `as_of`.
-        let settled = flow.date <= as_of_date;
+        let settled = flow.get_date() <= as_of_date;
         let (discount_factor, survival_probability, conditional_default_prob) = if settled {
             let sp = if hazard_arc.is_some() {
                 Some(1.0)
@@ -635,7 +636,7 @@ fn envelope_for_priced(
             let (sp, cond_pd) = match (hazard_arc.as_ref(), survival_at_as_of) {
                 (Some(h), Some(s0)) => {
                     // Conditional survival Q(as_of, T) = S(T) / S(as_of).
-                    let s_t = h.sp_on_date(flow.date)?;
+                    let s_t = h.sp_on_date(flow.get_date())?;
                     let sp = (s_t / s0).clamp(0.0, 1.0);
                     let cond_pd = (prev_sp - sp).max(0.0);
                     prev_sp = sp;
@@ -674,7 +675,7 @@ fn envelope_for_priced(
         let pv =
             crate::instruments::common_impl::helpers::apply_scenario_raw_value(instrument, base_pv);
 
-        let mbs_row = mbs_state.as_ref().and_then(|m| m.get(&flow.date));
+        let mbs_row = mbs_state.as_ref().and_then(|m| m.get(&flow.get_date()));
         let row_balance = terms
             .flow_balances
             .as_ref()
@@ -697,29 +698,29 @@ fn envelope_for_priced(
         let inflation_index_ratio = terms
             .index_ratios
             .as_ref()
-            .and_then(|ratios| ratios.get(&flow.date).copied());
+            .and_then(|ratios| ratios.get(&flow.get_date()).copied());
 
         rows.push(CashflowRow {
-            date: flow.date,
-            amount: flow.amount.amount(),
+            date: flow.get_date(),
+            amount: flow.get_amount().amount(),
             currency: ccy,
-            kind: flow.kind,
-            accrual_factor: flow.accrual_factor,
-            accrual_start: flow.accrual.as_ref().map(|accrual| accrual.start),
-            accrual_end: flow.accrual.as_ref().map(|accrual| accrual.end),
-            accrual_day_count: flow.accrual.as_ref().map(|accrual| accrual.day_count),
+            kind: flow.get_kind(),
+            accrual_factor: flow.get_accrual_factor(),
+            accrual_start: flow.get_accrual().as_ref().map(|accrual| accrual.start),
+            accrual_end: flow.get_accrual().as_ref().map(|accrual| accrual.end),
+            accrual_day_count: flow.get_accrual().as_ref().map(|accrual| accrual.day_count),
             accrual_notional: accrual_notionals
                 .as_ref()
                 .and_then(|balances| balances[row_index]),
             index_rate: flow
-                .accrual
+                .get_accrual()
                 .as_ref()
                 .and_then(|accrual| accrual.projected_index_rate),
-            principal_delta: flow.principal_delta.map(|delta| delta.amount()),
-            principal_date: flow.principal_date,
+            principal_delta: flow.get_principal_delta().map(|delta| delta.amount()),
+            principal_date: flow.get_balance_date(),
             year_fraction,
-            rate: flow.rate,
-            reset_date: flow.reset_date,
+            rate: flow.get_rate(),
+            reset_date: flow.get_reset_date(),
             discount_factor,
             discount_curve_id: row_discount_curve_id.clone(),
             survival_probability,
@@ -797,7 +798,7 @@ fn accrual_start_balances(
     let flows = schedule.get_flows();
     let mut starts: Vec<Date> = flows
         .iter()
-        .filter_map(|flow| flow.accrual.as_ref().map(|accrual| accrual.start))
+        .filter_map(|flow| flow.get_accrual().as_ref().map(|accrual| accrual.start))
         .collect();
     starts.sort_unstable();
     starts.dedup();
@@ -806,7 +807,7 @@ fn accrual_start_balances(
         flows
             .iter()
             .map(|flow| {
-                let start = flow.accrual.as_ref()?.start;
+                let start = flow.get_accrual().as_ref()?.start;
                 let index = starts.binary_search(&start).ok()?;
                 Some(balances[index].amount())
             })

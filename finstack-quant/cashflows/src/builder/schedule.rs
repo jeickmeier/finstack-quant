@@ -70,23 +70,27 @@ fn kind_rank(kind: CFKind) -> u8 {
 /// already-sorted schedules, and the stable sort's run detection handles those
 /// pre-sorted runs in near-linear time (an unstable sort re-partitions them).
 fn compare_flows(a: &CashFlow, b: &CashFlow) -> std::cmp::Ordering {
-    a.date
-        .cmp(&b.date)
-        .then_with(|| kind_rank(a.kind).cmp(&kind_rank(b.kind)))
-        .then_with(|| a.amount.currency().cmp(&b.amount.currency()))
-        .then_with(|| a.amount.amount_decimal().cmp(&b.amount.amount_decimal()))
-        .then_with(|| a.reset_date.cmp(&b.reset_date))
-        .then_with(|| a.principal_date.cmp(&b.principal_date))
-        .then_with(|| a.accrual_factor.total_cmp(&b.accrual_factor))
-        .then_with(|| match (a.rate, b.rate) {
+    a.get_date()
+        .cmp(&b.get_date())
+        .then_with(|| kind_rank(a.get_kind()).cmp(&kind_rank(b.get_kind())))
+        .then_with(|| a.get_amount().currency().cmp(&b.get_amount().currency()))
+        .then_with(|| {
+            a.get_amount()
+                .amount_decimal()
+                .cmp(&b.get_amount().amount_decimal())
+        })
+        .then_with(|| a.get_reset_date().cmp(&b.get_reset_date()))
+        .then_with(|| a.get_balance_date().cmp(&b.get_balance_date()))
+        .then_with(|| a.get_accrual_factor().total_cmp(&b.get_accrual_factor()))
+        .then_with(|| match (a.get_rate(), b.get_rate()) {
             (None, None) => std::cmp::Ordering::Equal,
             (None, Some(_)) => std::cmp::Ordering::Less,
             (Some(_), None) => std::cmp::Ordering::Greater,
             (Some(x), Some(y)) => x.total_cmp(&y),
         })
         .then_with(|| {
-            compare_accrual(a.accrual.as_ref(), b.accrual.as_ref()).then_with(|| {
-                match (a.principal_delta, b.principal_delta) {
+            compare_accrual(a.get_accrual().as_ref(), b.get_accrual().as_ref()).then_with(
+                || match (a.get_principal_delta(), b.get_principal_delta()) {
                     (Some(x), Some(y)) => x
                         .currency()
                         .cmp(&y.currency())
@@ -94,22 +98,22 @@ fn compare_flows(a: &CashFlow, b: &CashFlow) -> std::cmp::Ordering {
                     (None, Some(_)) => std::cmp::Ordering::Less,
                     (Some(_), None) => std::cmp::Ordering::Greater,
                     _ => std::cmp::Ordering::Equal,
-                }
-            })
+                },
+            )
         })
         // Retain the existing economic precedence before resolving representation ties.
-        .then_with(|| (a.kind as usize).cmp(&(b.kind as usize)))
+        .then_with(|| (a.get_kind() as usize).cmp(&(b.get_kind() as usize)))
         .then_with(|| {
-            a.amount
+            a.get_amount()
                 .amount_decimal()
                 .serialize()
-                .cmp(&b.amount.amount_decimal().serialize())
+                .cmp(&b.get_amount().amount_decimal().serialize())
         })
         .then_with(|| {
-            a.principal_delta
+            a.get_principal_delta()
                 .map(|value| value.amount_decimal().serialize())
                 .cmp(
-                    &b.principal_delta
+                    &b.get_principal_delta()
                         .map(|value| value.amount_decimal().serialize()),
                 )
         })
@@ -522,7 +526,7 @@ impl CashFlowSchedule {
             ));
         }
         for flow in &mut self.flows {
-            flow.amount = flow.amount.checked_mul_f64(scale)?;
+            flow.amount = flow.get_amount().checked_mul_f64(scale)?;
             if let Some(delta) = &mut flow.principal_delta {
                 *delta = delta.checked_mul_f64(scale)?;
             }
@@ -533,7 +537,7 @@ impl CashFlowSchedule {
 
     /// Returns the list of dates for all flows in schedule order.
     pub fn dates(&self) -> Vec<Date> {
-        self.flows.iter().map(|cf| cf.date).collect()
+        self.flows.iter().map(|cf| cf.get_date()).collect()
     }
 
     /// Validate all schedule-level and per-flow invariants.
@@ -560,7 +564,11 @@ impl CashFlowSchedule {
         for flow in &self.flows {
             flow.validate()?;
         }
-        if self.flows.windows(2).any(|w| w[0].date > w[1].date) {
+        if self
+            .flows
+            .windows(2)
+            .any(|w| w[0].get_date() > w[1].get_date())
+        {
             return Err(finstack_quant_core::Error::Validation(
                 "cashflow schedule flows must be sorted by date".into(),
             ));
@@ -577,7 +585,7 @@ impl CashFlowSchedule {
         let mut principal_currency = None;
         let mut multiple_principal_currencies = false;
         for flow in &self.flows {
-            if let Some(delta) = flow.principal_delta
+            if let Some(delta) = flow.get_principal_delta()
                 && delta.amount() != 0.0
             {
                 if let Some(currency) = principal_currency {
@@ -613,22 +621,24 @@ impl CashFlowSchedule {
             let long_horizon = issue_date.add_months(1200)?;
             for flow in &self.flows {
                 let interest_bearing = matches!(
-                    flow.kind,
+                    flow.get_kind(),
                     CFKind::Fixed
                         | CFKind::Floating
                         | CFKind::InflationCoupon
                         | CFKind::Pik
                         | CFKind::Stub
                 );
-                if flow.date < issue_date && interest_bearing {
+                if flow.get_date() < issue_date && interest_bearing {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "interest-bearing cashflow ({:?}) dated {} is before issue date {}",
-                        flow.kind, flow.date, issue_date
+                        flow.get_kind(),
+                        flow.get_date(),
+                        issue_date
                     )));
                 }
-                if flow.date > long_horizon {
+                if flow.get_date() > long_horizon {
                     tracing::warn!(
-                        flow_date = %flow.date,
+                        flow_date = %flow.get_date(),
                         issue_date = %issue_date,
                         horizon_date = %long_horizon,
                         "cashflow schedule contains a flow more than 100 years after issue date"
@@ -645,22 +655,22 @@ impl CashFlowSchedule {
         {
             let initial = self.notional.initial;
             let mut balance = initial;
-            let order =
-                self.balance_replay_order(|flow| flow.amount.currency() == initial.currency());
+            let order = self
+                .balance_replay_order(|flow| flow.get_amount().currency() == initial.currency());
             let mut pending_principal = Vec::new();
             for (index, balance_date) in order {
                 let flow = &mut self.flows[index];
-                let delta = flow.principal_delta;
+                let delta = flow.get_principal_delta();
                 if balance_date < as_of {
                     if let Some(delta) = delta {
                         balance = balance.checked_add(delta)?;
                         // The cash can still be pending after its economic
                         // movement has entered the opening balance.
-                        if flow.date >= as_of {
+                        if flow.get_date() >= as_of {
                             flow.principal_delta = Some(Money::from((0_i64, initial.currency())));
                         }
                     }
-                } else if flow.date < as_of
+                } else if flow.get_date() < as_of
                     && let Some(delta) = delta.filter(|delta| delta.amount() != 0.0)
                 {
                     // Cash settled before its economic boundary. Keep the
@@ -686,7 +696,7 @@ impl CashFlowSchedule {
         // The remaining rows already resolve the contractual amortization.
         // An inception recipe cannot be reapplied to the rebased opening balance.
         self.notional.amort = super::AmortizationSpec::None;
-        self.flows.retain(|cf| cf.date >= as_of);
+        self.flows.retain(|cf| cf.get_date() >= as_of);
         self.flows.sort_by(compare_flows);
         Ok(self)
     }
@@ -726,7 +736,7 @@ impl CashFlowSchedule {
     /// assert_eq!(coupons[0].kind, CFKind::Fixed);
     /// ```
     pub fn coupons(&self) -> impl Iterator<Item = &CashFlow> {
-        self.flows.iter().filter(|cf| cf.kind.is_coupon())
+        self.flows.iter().filter(|cf| cf.get_kind().is_coupon())
     }
 
     /// Weighted Average Life (WAL) in years from `as_of`.
@@ -773,15 +783,16 @@ impl CashFlowSchedule {
         let repayments = self
             .flows
             .iter()
-            .filter(|cf| cf.kind.is_repayment_like())
+            .filter(|cf| cf.get_kind().is_repayment_like())
             .map(|cf| {
-                cf.principal_delta
+                cf.get_principal_delta()
                     .zip(cf.get_balance_date())
                     .map(|(delta, date)| (date, delta.checked_neg()))
                     .ok_or_else(|| {
                         finstack_quant_core::Error::Validation(format!(
                             "{} row on {} has no principal_delta or principal_date",
-                            cf.kind, cf.date
+                            cf.get_kind(),
+                            cf.get_date()
                         ))
                     })
             })
@@ -857,16 +868,16 @@ impl CashFlowSchedule {
     pub(crate) fn settlement_rows(&self) -> Vec<(Date, Money)> {
         self.flows
             .iter()
-            .filter(|flow| flow.kind.is_cash_settlement())
+            .filter(|flow| flow.get_kind().is_cash_settlement())
             // A zero-cash row that moves principal is a balance marker, not a
             // settlement; a zero settlement that moves nothing stays.
             .filter(|flow| {
-                flow.amount.amount() != 0.0
+                flow.get_amount().amount() != 0.0
                     || flow
-                        .principal_delta
+                        .get_principal_delta()
                         .is_none_or(|delta| delta.amount() == 0.0)
             })
-            .map(|flow| (flow.date, flow.amount))
+            .map(|flow| (flow.get_date(), flow.get_amount()))
             .collect()
     }
 
@@ -968,7 +979,7 @@ impl CashFlowSchedule {
             }
         }
         for (flow, balance) in self.flows.iter().zip(&mut balances) {
-            if let (Some(accrual), true) = (&flow.accrual, balance.0 == balance.1) {
+            if let (Some(accrual), true) = (&flow.get_accrual(), balance.0 == balance.1) {
                 let moved = path.partition_point(|(date, _)| *date < accrual.end);
                 let held = moved
                     .checked_sub(1)
@@ -1153,15 +1164,15 @@ fn apply_flow_to_outstanding(
     cf: &CashFlow,
 ) -> finstack_quant_core::Result<()> {
     const NEGATIVE_BALANCE_EPSILON: f64 = 1e-9;
-    if let Some(delta) = cf.principal_delta
+    if let Some(delta) = cf.get_principal_delta()
         && delta.amount() != 0.0
     {
         *outstanding = outstanding.checked_add(delta)?;
     }
     if outstanding.amount() < -NEGATIVE_BALANCE_EPSILON {
         tracing::warn!(
-            date = %cf.date,
-            kind = ?cf.kind,
+            date = %cf.get_date(),
+            kind = ?cf.get_kind(),
             balance = outstanding.amount(),
             "replayed outstanding balance went negative"
         );
@@ -1275,12 +1286,12 @@ impl CashFlowSchedule {
         pvs: &[f64],
     ) -> finstack_quant_core::Result<Vec<crate::aggregation::CalendarYearLadderRow>> {
         if let Some(first) = self.flows.first() {
-            let expected = first.amount.currency();
+            let expected = first.get_amount().currency();
             for flow in &self.flows {
-                if flow.amount.currency() != expected {
+                if flow.get_amount().currency() != expected {
                     return Err(finstack_quant_core::Error::CurrencyMismatch {
                         expected,
-                        actual: flow.amount.currency(),
+                        actual: flow.get_amount().currency(),
                     });
                 }
             }
@@ -1292,12 +1303,16 @@ impl CashFlowSchedule {
                 pvs.len()
             )));
         }
-        crate::aggregation::calendar_year_ladder_rows(
-            self.flows
-                .iter()
-                .zip(pvs)
-                .map(|(flow, &pv)| (flow.date, Ok(flow.kind), flow.amount.amount(), pv)),
-        )
+        crate::aggregation::calendar_year_ladder_rows(self.flows.iter().zip(pvs).map(
+            |(flow, &pv)| {
+                (
+                    flow.get_date(),
+                    Ok(flow.get_kind()),
+                    flow.get_amount().amount(),
+                    pv,
+                )
+            },
+        ))
     }
 }
 
@@ -1547,11 +1562,11 @@ mod tests {
         .expect("normalize");
         schedule.validate().expect("preserved principal");
         assert_eq!(schedule.notional.initial.amount(), 100.0);
-        assert_eq!(schedule.flows[0].kind, CFKind::Pik);
-        assert_eq!(schedule.flows[0].amount.amount(), 0.0);
+        assert_eq!(schedule.flows[0].get_kind(), CFKind::Pik);
+        assert_eq!(schedule.flows[0].get_amount().amount(), 0.0);
         assert_eq!(
             schedule.flows[0]
-                .principal_delta
+                .get_principal_delta()
                 .expect("PIK delta")
                 .amount(),
             5.0
@@ -1694,13 +1709,13 @@ mod tests {
             DayCount::Act365F,
             CashFlowMeta::default(),
         );
-        assert_eq!(schedule.flows[0].amount.amount(), 100.0);
-        assert_eq!(schedule.flows[1].amount.amount(), 200.0);
+        assert_eq!(schedule.flows[0].get_amount().amount(), 100.0);
+        assert_eq!(schedule.flows[1].get_amount().amount(), 200.0);
 
         let scaled = schedule.scale_amounts(-1.0).expect("finite scale");
 
-        assert_eq!(scaled.flows[0].amount.amount(), -200.0);
-        assert_eq!(scaled.flows[1].amount.amount(), -100.0);
+        assert_eq!(scaled.flows[0].get_amount().amount(), -200.0);
+        assert_eq!(scaled.flows[1].get_amount().amount(), -100.0);
         assert!(
             scaled
                 .flows
@@ -1725,10 +1740,10 @@ mod tests {
             CashFlowMeta::default(),
         );
 
-        assert_eq!(schedule.flows[0].kind, CFKind::Fixed);
-        assert_eq!(schedule.flows[1].kind, CFKind::Amortization);
-        assert_eq!(schedule.flows[2].kind, CFKind::PrePayment);
-        assert_eq!(schedule.flows[3].kind, CFKind::Recovery);
+        assert_eq!(schedule.flows[0].get_kind(), CFKind::Fixed);
+        assert_eq!(schedule.flows[1].get_kind(), CFKind::Amortization);
+        assert_eq!(schedule.flows[2].get_kind(), CFKind::PrePayment);
+        assert_eq!(schedule.flows[3].get_kind(), CFKind::Recovery);
     }
 
     #[test]
@@ -1834,7 +1849,7 @@ mod tests {
         );
 
         assert_eq!(merged.flows.len(), 2);
-        assert_eq!(merged.flows[0].date, d1);
+        assert_eq!(merged.flows[0].get_date(), d1);
         assert_eq!(
             merged.meta.representation,
             CashflowRepresentation::Projected
@@ -1846,14 +1861,14 @@ mod tests {
         assert_eq!(merged.meta.issue_date, Some(d1));
         assert_eq!(
             merged.flows[0]
-                .accrual
+                .get_accrual()
                 .as_ref()
                 .map(|accrual| accrual.day_count),
             Some(DayCount::Act360)
         );
         assert_eq!(
             merged.flows[1]
-                .accrual
+                .get_accrual()
                 .as_ref()
                 .map(|accrual| accrual.day_count),
             Some(DayCount::Thirty360)
@@ -1892,13 +1907,13 @@ mod tests {
             merged
                 .flows
                 .iter()
-                .any(|flow| flow.amount.currency() == Currency::USD)
+                .any(|flow| flow.get_amount().currency() == Currency::USD)
         );
         assert!(
             merged
                 .flows
                 .iter()
-                .any(|flow| flow.amount.currency() == Currency::EUR)
+                .any(|flow| flow.get_amount().currency() == Currency::EUR)
         );
     }
 
@@ -2026,7 +2041,7 @@ mod tests {
         .expect("valid balance replay");
 
         assert_eq!(schedule.flows.len(), 1);
-        assert_eq!(schedule.flows[0].accrual, Some(accrual));
+        assert_eq!(schedule.flows[0].get_accrual(), &Some(accrual));
     }
 
     #[test]
@@ -2189,10 +2204,10 @@ mod tests {
             .expect("normalize");
         schedule.validate().expect("valid normalized state");
         assert_eq!(schedule.get_notional().initial.amount(), 50.0);
-        assert_eq!(schedule.get_flows()[0].amount.amount(), 50.0);
+        assert_eq!(schedule.get_flows()[0].get_amount().amount(), 50.0);
         assert_eq!(
             schedule.get_flows()[0]
-                .principal_delta
+                .get_principal_delta()
                 .map(|delta| delta.amount()),
             Some(0.0)
         );
@@ -2229,10 +2244,10 @@ mod tests {
         schedule.validate().expect("valid normalized state");
         assert_eq!(schedule.get_notional().initial.amount(), 100.0);
         let movement = &schedule.get_flows()[0];
-        assert_eq!(movement.date, economic);
-        assert_eq!(movement.amount.amount(), 0.0);
+        assert_eq!(movement.get_date(), economic);
+        assert_eq!(movement.get_amount().amount(), 0.0);
         assert_eq!(
-            movement.principal_delta.map(|delta| delta.amount()),
+            movement.get_principal_delta().map(|delta| delta.amount()),
             Some(-50.0)
         );
         let balances = schedule

@@ -162,10 +162,10 @@ fn single_revolver_pool_reproduces_the_standalone_schedule() {
     let expected_interest: f64 = standalone
         .get_flows()
         .iter()
-        .filter(|cf| cf.date > closing)
+        .filter(|cf| cf.get_date() > closing)
         .filter(|cf| {
             matches!(
-                cf.kind,
+                cf.get_kind(),
                 CFKind::Fixed
                     | CFKind::Floating
                     | CFKind::Fee
@@ -176,7 +176,7 @@ fn single_revolver_pool_reproduces_the_standalone_schedule() {
                     | CFKind::FrontingFee
             )
         })
-        .map(|cf| cf.amount.amount())
+        .map(|cf| cf.get_amount().amount())
         .sum();
     assert!(expected_interest > 0.0);
 
@@ -274,8 +274,8 @@ fn revolver_repayments_replenish_the_reserve_toward_target() {
         .expect("schedule")
         .get_flows()
         .iter()
-        .filter(|cf| cf.date > closing && !matches!(cf.kind, CFKind::Notional))
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_date() > closing && !matches!(cf.get_kind(), CFKind::Notional))
+        .map(|cf| cf.get_amount().amount())
         .sum();
     assert!((interest + principal - (standalone_interest + 60_000_000.0)).abs() < 1.0);
 }
@@ -641,10 +641,10 @@ fn stepped_revolver_pool_reproduces_the_standalone_schedule() {
     let expected_interest: f64 = standalone
         .get_flows()
         .iter()
-        .filter(|cf| cf.date > closing)
+        .filter(|cf| cf.get_date() > closing)
         .filter(|cf| {
             matches!(
-                cf.kind,
+                cf.get_kind(),
                 CFKind::Fixed
                     | CFKind::Floating
                     | CFKind::Fee
@@ -655,15 +655,15 @@ fn stepped_revolver_pool_reproduces_the_standalone_schedule() {
                     | CFKind::FrontingFee
             )
         })
-        .map(|cf| cf.amount.amount())
+        .map(|cf| cf.get_amount().amount())
         .sum();
     let flat = fixed_revolver(closing, maturity)
         .raw_cashflow_schedule(&market, closing)
         .expect("flat schedule")
         .get_flows()
         .iter()
-        .filter(|cf| cf.date > closing && !matches!(cf.kind, CFKind::Notional))
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_date() > closing && !matches!(cf.get_kind(), CFKind::Notional))
+        .map(|cf| cf.get_amount().amount())
         .sum::<f64>();
     assert!(
         (expected_interest - flat).abs() > 1.0,
@@ -720,15 +720,15 @@ fn revolver_with_letters_of_credit_pool_reproduces_the_standalone_schedule() {
     let lc_fees: f64 = standalone
         .get_flows()
         .iter()
-        .filter(|cf| matches!(cf.kind, CFKind::LcFee | CFKind::FrontingFee))
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| matches!(cf.get_kind(), CFKind::LcFee | CFKind::FrontingFee))
+        .map(|cf| cf.get_amount().amount())
         .sum();
     assert!(lc_fees > 0.0, "the LC sublimit must generate fees");
     let expected_interest: f64 = standalone
         .get_flows()
         .iter()
-        .filter(|cf| cf.date > closing && !matches!(cf.kind, CFKind::Notional))
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_date() > closing && !matches!(cf.get_kind(), CFKind::Notional))
+        .map(|cf| cf.get_amount().amount())
         .sum();
 
     let deal = deal_with(DealSpec {

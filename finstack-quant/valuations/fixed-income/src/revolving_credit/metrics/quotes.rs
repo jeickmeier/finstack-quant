@@ -56,8 +56,8 @@ pub(crate) fn accrued_interest(
     let interest: f64 = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.date == period.payment_date && cf.kind.is_coupon())
-        .map(|cf| cf.amount.amount())
+        .filter(|cf| cf.get_date() == period.payment_date && cf.get_kind().is_coupon())
+        .map(|cf| cf.get_amount().amount())
         .sum();
     if interest == 0.0 {
         return Ok(0.0);
@@ -84,8 +84,8 @@ fn holder_flows(schedule: &CashFlowSchedule, settlement: Date) -> Vec<(Date, f64
     schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.date > settlement && cf.kind.is_cash_settlement())
-        .map(|cf| (cf.date, cf.amount.amount()))
+        .filter(|cf| cf.get_date() > settlement && cf.get_kind().is_cash_settlement())
+        .map(|cf| (cf.get_date(), cf.get_amount().amount()))
         .collect()
 }
 
@@ -123,9 +123,9 @@ fn target_price(
     for cf in schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.date > as_of && cf.date <= settlement)
+        .filter(|cf| cf.get_date() > as_of && cf.get_date() <= settlement)
     {
-        pre_settlement += cf.amount.amount() * disc.df_between_dates(as_of, cf.date)?;
+        pre_settlement += cf.get_amount().amount() * disc.df_between_dates(as_of, cf.get_date())?;
     }
     Ok((context.base_value.amount() - pre_settlement) / carry)
 }

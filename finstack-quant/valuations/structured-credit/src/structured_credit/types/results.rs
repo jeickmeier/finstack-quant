@@ -144,6 +144,7 @@ impl TrancheCashflows {
             &self.total_writedown,
         ]
         .into_iter()
+        .copied()
         .chain(
             [
                 &self.cashflows,
@@ -155,8 +156,8 @@ impl TrancheCashflows {
             ]
             .into_iter()
             .flatten()
-            .map(|(_, amount)| amount)
-            .chain(self.detailed_flows.iter().map(|flow| &flow.amount)),
+            .map(|(_, amount)| *amount)
+            .chain(self.detailed_flows.iter().map(|flow| flow.get_amount())),
         ) {
             if amount.currency() != currency {
                 return Err(finstack_quant_core::Error::CurrencyMismatch {

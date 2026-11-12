@@ -294,7 +294,7 @@ fn test_pik_cashflows() {
         schedule
             .get_flows()
             .iter()
-            .any(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::Pik),
+            .any(|cf| cf.get_kind() == finstack_quant_core::cashflow::CFKind::Pik),
         "canonical schedules must retain PIK for accrued interest and balance replay"
     );
     let settlements = bond.dated_cashflows(&curves, issue).unwrap();
@@ -615,7 +615,7 @@ fn test_actact_isma_daycount_context() {
         .iter()
         .filter(|cf| {
             matches!(
-                cf.kind,
+                cf.get_kind(),
                 finstack_quant_core::cashflow::CFKind::Fixed
                     | finstack_quant_core::cashflow::CFKind::Stub
             )
@@ -640,20 +640,20 @@ fn test_actact_isma_daycount_context() {
         let tolerance = 1e-10; // Very tight tolerance for determinism
 
         assert!(
-            (cf.accrual_factor - expected_accrual).abs() < tolerance,
+            (cf.get_accrual_factor() - expected_accrual).abs() < tolerance,
             "Act/Act ISMA accrual factor mismatch: got {}, expected {} ± {}",
-            cf.accrual_factor,
+            cf.get_accrual_factor(),
             expected_accrual,
             tolerance
         );
 
         // Expected coupon = notional * rate * accrual_factor
         // = 1,000,000 * 0.06 * 0.5 = 30,000 per semi-annual period
-        let expected_coupon = 1_000_000.0 * 0.06 * cf.accrual_factor;
+        let expected_coupon = 1_000_000.0 * 0.06 * cf.get_accrual_factor();
         assert!(
-            (cf.amount.amount() - expected_coupon).abs() < 0.01,
+            (cf.get_amount().amount() - expected_coupon).abs() < 0.01,
             "Coupon amount mismatch: got {}, expected {}",
-            cf.amount.amount(),
+            cf.get_amount().amount(),
             expected_coupon
         );
     }
@@ -704,7 +704,7 @@ fn test_bus252_daycount_with_calendar() {
         .iter()
         .filter(|cf| {
             matches!(
-                cf.kind,
+                cf.get_kind(),
                 finstack_quant_core::cashflow::CFKind::Fixed
                     | finstack_quant_core::cashflow::CFKind::Stub
             )
@@ -728,23 +728,23 @@ fn test_bus252_daycount_with_calendar() {
         // Business days in a quarter: roughly 63 days (252/4)
         // So accrual should be around 0.25, but varies by actual business days
         assert!(
-            cf.accrual_factor > 0.0 && cf.accrual_factor < 0.35,
+            cf.get_accrual_factor() > 0.0 && cf.get_accrual_factor() < 0.35,
             "Bus/252 accrual factor out of reasonable range: {}",
-            cf.accrual_factor
+            cf.get_accrual_factor()
         );
 
         // Coupon should be positive and finite
         assert!(
-            cf.amount.amount() > 0.0 && cf.amount.amount().is_finite(),
+            cf.get_amount().amount() > 0.0 && cf.get_amount().amount().is_finite(),
             "Coupon amount invalid: {}",
-            cf.amount.amount()
+            cf.get_amount().amount()
         );
     }
 
     // The key validation is that Bus/252 with calendar context doesn't error
     // (which it would if calendar wasn't passed to DayCountContext)
     // The actual total can vary based on calendar holidays and stub handling
-    let total_yf: f64 = coupon_flows.iter().map(|cf| cf.accrual_factor).sum();
+    let total_yf: f64 = coupon_flows.iter().map(|cf| cf.get_accrual_factor()).sum();
 
     // Verify total is positive and reasonable (between 0.5 and 1.5 for a year)
     assert!(

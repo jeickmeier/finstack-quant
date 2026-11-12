@@ -34,17 +34,21 @@ fn coupon_pv_from_schedule(
 
     let mut pv_usd = 0.0;
     for flow in schedule.get_flows() {
-        if flow.kind != CFKind::Floating || flow.date <= as_of {
+        if flow.get_kind() != CFKind::Floating || flow.get_date() <= as_of {
             continue;
         }
-        match flow.amount.currency() {
+        match flow.get_amount().currency() {
             Currency::USD => {
-                let df = usd_disc.df_between_dates(as_of, flow.date).expect("usd df");
-                pv_usd += flow.amount.amount() * df;
+                let df = usd_disc
+                    .df_between_dates(as_of, flow.get_date())
+                    .expect("usd df");
+                pv_usd += flow.get_amount().amount() * df;
             }
             Currency::EUR => {
-                let df = eur_disc.df_between_dates(as_of, flow.date).expect("eur df");
-                pv_usd += flow.amount.amount() * df * EURUSD_SPOT;
+                let df = eur_disc
+                    .df_between_dates(as_of, flow.get_date())
+                    .expect("eur df");
+                pv_usd += flow.get_amount().amount() * df * EURUSD_SPOT;
             }
             other => panic!("unexpected flow currency {other}"),
         }

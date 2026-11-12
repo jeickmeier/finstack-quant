@@ -371,18 +371,18 @@ pub fn aggregate_full_cashflows(
                 let events = schedule
                     .get_flows()
                     .iter()
-                    .filter(|flow| flow.kind.is_cash_settlement())
+                    .filter(|flow| flow.get_kind().is_cash_settlement())
                     .map(|flow| {
                         Ok(PortfolioCashflowEvent {
                             position_id: position.position_id.clone(),
                             instrument_id: instrument_id.clone(),
                             instrument_type,
-                            date: flow.date,
-                            amount: position.scale_value(flow.amount)?,
-                            kind: flow.kind,
-                            reset_date: flow.reset_date,
-                            accrual_factor: flow.accrual_factor,
-                            rate: flow.rate,
+                            date: flow.get_date(),
+                            amount: position.scale_value(flow.get_amount())?,
+                            kind: flow.get_kind(),
+                            reset_date: flow.get_reset_date(),
+                            accrual_factor: flow.get_accrual_factor(),
+                            rate: flow.get_rate(),
                         })
                     })
                     .collect::<finstack_quant_core::Result<Vec<_>>>()?;

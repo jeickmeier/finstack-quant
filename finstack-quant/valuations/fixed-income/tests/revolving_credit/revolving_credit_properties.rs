@@ -204,7 +204,7 @@ proptest! {
 
         // Check that cashflows are ordered by date
         for i in 1..schedule.get_flows().len() {
-            prop_assert!(schedule.get_flows()[i].date >= schedule.get_flows()[i-1].date,
+            prop_assert!(schedule.get_flows()[i].get_date() >= schedule.get_flows()[i-1].get_date(),
                 "Cashflows should be ordered by date");
         }
     }
@@ -243,8 +243,8 @@ proptest! {
 
         // All fee cashflows should be non-negative (from lender perspective, fees are paid by borrower)
         for cf in schedule.get_flows() {
-            if cf.kind == finstack_quant_core::cashflow::CFKind::Fee {
-                prop_assert!(cf.amount.amount() >= 0.0,
+            if cf.get_kind() == finstack_quant_core::cashflow::CFKind::Fee {
+                prop_assert!(cf.get_amount().amount() >= 0.0,
                     "Fee cashflows should be non-negative");
             }
         }

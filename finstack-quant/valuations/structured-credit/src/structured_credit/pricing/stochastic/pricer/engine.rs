@@ -1139,12 +1139,12 @@ impl PathTrancheMetrics {
             }
         }
         for flow in &cashflows.detailed_flows {
-            if flow.kind == finstack_quant_core::cashflow::CFKind::Notional
-                && flow.amount.amount() < 0.0
-                && flow.date > as_of
+            if flow.get_kind() == finstack_quant_core::cashflow::CFKind::Notional
+                && flow.get_amount().amount() < 0.0
+                && flow.get_date() > as_of
             {
-                let df = discount_curve.df_between_dates(as_of, flow.date)?;
-                pv += flow.amount.amount() * df;
+                let df = discount_curve.df_between_dates(as_of, flow.get_date())?;
+                pv += flow.get_amount().amount() * df;
             }
         }
 

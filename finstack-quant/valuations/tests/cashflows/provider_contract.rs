@@ -74,8 +74,8 @@ fn verify_provider_contract<T: CashflowProvider>(
     let flattened_schedule_flows: Vec<_> = schedule
         .get_flows()
         .iter()
-        .filter(|cf| cf.kind.is_cash_settlement())
-        .map(|cf| (cf.date, cf.amount))
+        .filter(|cf| cf.get_kind().is_cash_settlement())
+        .map(|cf| (cf.get_date(), cf.get_amount()))
         .collect();
     assert_eq!(
         flows, flattened_schedule_flows,
@@ -99,10 +99,10 @@ fn verify_provider_contract<T: CashflowProvider>(
     // Contract: All flows must be future-only (date >= as_of)
     for cf in schedule.get_flows() {
         assert!(
-            cf.date >= as_of,
+            cf.get_date() >= as_of,
             "[{}] Flow on {} is before as_of {}; public schedule must be future-only",
             type_name,
-            cf.date,
+            cf.get_date(),
             as_of
         );
     }
@@ -142,7 +142,7 @@ fn verify_public_instrument_cashflow_surface<T: PublicInstrument>(
         schedule
             .get_flows()
             .iter()
-            .filter(|flow| flow.kind.is_cash_settlement())
+            .filter(|flow| flow.get_kind().is_cash_settlement())
             .count()
     );
 }
@@ -329,7 +329,7 @@ mod repo_contract {
         let has_negative = schedule
             .get_flows()
             .iter()
-            .any(|cf| cf.amount.amount() < 0.0);
+            .any(|cf| cf.get_amount().amount() < 0.0);
         assert!(
             has_negative,
             "Repo schedule should preserve the negative initial cash outflow"

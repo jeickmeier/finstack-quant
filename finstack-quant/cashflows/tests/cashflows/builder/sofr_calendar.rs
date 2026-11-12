@@ -72,8 +72,8 @@ fn historical_sofr_coupon(start: Date, end: Date) -> f64 {
         .expect("SOFR coupon requires no nonexistent Friday fixing")
         .get_flows()
         .iter()
-        .find(|flow| flow.kind == CFKind::Floating)
+        .find(|flow| flow.get_kind() == CFKind::Floating)
         .expect("one floating coupon")
-        .amount
+        .get_amount()
         .amount()
 }

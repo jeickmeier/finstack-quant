@@ -530,15 +530,15 @@ impl<'a> RedemptionBasis<'a> {
                 .iter()
                 .filter(|flow| {
                     flow.get_balance_date() == Some(exercise_date)
-                        && flow.kind == CFKind::Notional
-                        && flow.amount.amount() > 0.0
+                        && flow.get_kind() == CFKind::Notional
+                        && flow.get_amount().amount() > 0.0
                 })
                 .fold((0.0, 0.0), |(principal, same_day_cash), flow| {
                     (
-                        principal + flow.amount.amount(),
+                        principal + flow.get_amount().amount(),
                         same_day_cash
-                            + if flow.date == exercise_date {
-                                flow.amount.amount()
+                            + if flow.get_date() == exercise_date {
+                                flow.get_amount().amount()
                             } else {
                                 0.0
                             },
@@ -563,10 +563,10 @@ impl<'a> RedemptionBasis<'a> {
             .iter()
             .filter(|flow| {
                 flow.get_balance_date() == Some(maturity)
-                    && flow.kind == CFKind::Notional
-                    && flow.amount.amount() > 0.0
+                    && flow.get_kind() == CFKind::Notional
+                    && flow.get_amount().amount() > 0.0
             })
-            .map(|flow| flow.amount.amount())
+            .map(|flow| flow.get_amount().amount())
             .sum();
         ExitRedemption {
             clean_amount,

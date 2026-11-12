@@ -643,7 +643,7 @@ mod production_mortgage_audit {
             roll.notional.amount() * (roll.front_price / 100.0 + roll.coupon * 10.0 / 360.0);
         let expected_back =
             -roll.notional.amount() * (roll.back_price / 100.0 + roll.coupon * 12.0 / 360.0);
-        assert!((flows[0].amount.amount() - expected_front).abs() < 1e-8);
-        assert!((flows[1].amount.amount() - expected_back).abs() < 1e-8);
+        assert!((flows[0].get_amount().amount() - expected_front).abs() < 1e-8);
+        assert!((flows[1].get_amount().amount() - expected_back).abs() < 1e-8);
     }
 }

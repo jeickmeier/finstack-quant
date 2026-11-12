@@ -215,7 +215,7 @@ fn case_record(periods: usize, shape: Shape, rebuild: bool) -> Value {
     assert_eq!(schedule.get_flows().len(), periods + 2);
     assert_eq!(schedule.coupons().count(), periods);
     assert!(schedule.get_flows().iter().all(|flow| {
-        flow.amount.currency() == Currency::USD && flow.amount.amount().is_finite()
+        flow.get_amount().currency() == Currency::USD && flow.get_amount().amount().is_finite()
     }));
     let unique_dates = dates.iter().copied().collect::<BTreeSet<_>>().len();
     assert_eq!(dates.len(), periods);

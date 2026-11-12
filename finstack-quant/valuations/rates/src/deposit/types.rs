@@ -471,10 +471,10 @@ mod tests {
             .expect("deposit full schedule");
 
         assert_eq!(schedule.get_flows().len(), 3);
-        assert_eq!(schedule.get_flows()[0].kind, CFKind::Notional);
-        assert_eq!(schedule.get_flows()[1].kind, CFKind::Fixed);
-        assert_eq!(schedule.get_flows()[2].kind, CFKind::Notional);
-        assert_eq!(schedule.get_flows()[2].amount, deposit.notional);
+        assert_eq!(schedule.get_flows()[0].get_kind(), CFKind::Notional);
+        assert_eq!(schedule.get_flows()[1].get_kind(), CFKind::Fixed);
+        assert_eq!(schedule.get_flows()[2].get_kind(), CFKind::Notional);
+        assert_eq!(schedule.get_flows()[2].get_amount(), deposit.notional);
         let yf = DayCount::Act360
             .year_fraction(
                 deposit.start_date,
@@ -483,8 +483,8 @@ mod tests {
             )
             .expect("deposit accrual");
         let redemption = schedule.get_flows()[1]
-            .amount
-            .checked_add(schedule.get_flows()[2].amount)
+            .get_amount()
+            .checked_add(schedule.get_flows()[2].get_amount())
             .expect("maturity cash");
         assert_eq!(
             redemption,
