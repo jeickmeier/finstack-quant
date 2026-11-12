@@ -290,7 +290,7 @@ impl CdsIndex {
                     notional_hint: Some(index.notional),
                     ..Default::default()
                 },
-            )?,
+            ),
             None => {
                 let schedules = projected
                     .constituents
@@ -305,7 +305,7 @@ impl CdsIndex {
                             },
                         )
                     })
-                    .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+                    .collect::<Vec<_>>();
                 merge_cashflow_schedules(
                     schedules,
                     Notional::par(index.notional.amount(), index.notional.currency())?,

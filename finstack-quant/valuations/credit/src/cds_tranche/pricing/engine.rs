@@ -122,7 +122,7 @@ impl CdsTranchePricer {
     ) -> Result<CashFlowSchedule> {
         tranche.validate()?;
         if as_of >= tranche.maturity {
-            return finstack_quant_cashflows::schedule_from_classified_flows(
+            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 tranche.day_count,
                 finstack_quant_cashflows::ScheduleBuildOpts {
@@ -141,7 +141,7 @@ impl CdsTranchePricer {
                         maturity: Some(tranche.maturity),
                     },
                 },
-            );
+            ));
         }
         let inputs = self.prepare_projection_inputs(tranche, market, as_of)?;
         let valuation_date = inputs.valuation_date;
@@ -156,7 +156,7 @@ impl CdsTranchePricer {
             .map(|row| row.cashflow)
             .collect();
 
-        finstack_quant_cashflows::schedule_from_classified_flows(
+        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             tranche.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
@@ -175,7 +175,7 @@ impl CdsTranchePricer {
                     maturity: Some(tranche.maturity),
                 },
             },
-        )
+        ))
     }
 
     #[cfg(test)]

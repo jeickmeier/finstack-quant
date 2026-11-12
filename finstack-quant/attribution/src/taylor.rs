@@ -1996,11 +1996,11 @@ mod tests {
                         .expect("valid cashflow")
                 })
                 .collect();
-            finstack_quant_cashflows::schedule_from_classified_flows(
+            Ok(finstack_quant_cashflows::schedule_from_classified_flows(
                 flows,
                 DayCount::Act365F,
                 finstack_quant_cashflows::ScheduleBuildOpts::default(),
-            )
+            ))
         }
     }
 

@@ -672,8 +672,7 @@ fn outstanding_by_date_includes_prepayment() {
             issue_date: Some(prepay_date),
             ..Default::default()
         },
-    )
-    .expect("valid cashflow rows");
+    );
 
     let outstanding = schedule.outstanding_by_date().unwrap();
     assert_eq!(outstanding.len(), 1, "expected one dated balance snapshot");
@@ -721,8 +720,7 @@ fn outstanding_by_date_includes_defaulted_notional() {
             issue_date: Some(default_date),
             ..Default::default()
         },
-    )
-    .expect("valid cashflow rows");
+    );
 
     // Only principal rows replay: the recovery cash has no balance date
     // (record CORE-CONVENTIONS-015 #6, #11).
@@ -786,8 +784,7 @@ fn outstanding_by_date_replays_explicit_deltas_without_an_issue_date() {
             .expect("valid notional fixture"),
         DayCount::Act365F,
         finstack_quant_cashflows::builder::CashFlowMeta::default(),
-    )
-    .expect("valid cashflow rows");
+    );
 
     // Explicit deltas need no issue date to find a funding row
     // (record CORE-CONVENTIONS-015 #4, #5).
@@ -1309,8 +1306,7 @@ fn test_weighted_average_life_two_amort() {
         Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
-    )
-    .expect("valid cashflow rows");
+    );
 
     let wal = schedule.wal(as_of).expect("WAL should succeed");
     // With Act/365F, ~365 days = ~1.0y, ~730 days = ~2.0y
@@ -1346,8 +1342,7 @@ fn test_weighted_average_life_bullet() {
         Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
-    )
-    .expect("valid cashflow rows");
+    );
 
     let wal = schedule.wal(as_of).expect("WAL should succeed");
     // 5 years with Act/365F (1826 or 1827 days depending on leap years)
@@ -1371,8 +1366,7 @@ fn test_weighted_average_life_empty() {
         Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
-    )
-    .expect("valid cashflow rows");
+    );
 
     let wal = schedule.wal(as_of).expect("WAL should succeed");
     assert!(wal == 0.0, "WAL with no flows should be 0.0, got {}", wal);
@@ -1429,8 +1423,7 @@ fn test_weighted_average_life_ignores_coupons() {
         Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
         CashFlowMeta::default(),
-    )
-    .expect("valid cashflow rows");
+    );
 
     let wal = schedule.wal(as_of).expect("WAL should succeed");
     // Should be ~1.0 year (only the notional at maturity counts)

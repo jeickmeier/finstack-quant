@@ -618,8 +618,7 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
                 issue_date: Some(date!(2025 - 01 - 01)),
                 ..Default::default()
             },
-        )
-        .expect("valid cashflow rows");
+        );
         state.residual_schedules.insert("loan".into(), schedule);
         let first_period = dated_period(date!(2025 - 03 - 31), date!(2025 - 04 - 01));
         let loan = flows.get_mut("loan").expect("loan");

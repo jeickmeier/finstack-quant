@@ -268,7 +268,7 @@ impl FxSwap {
         } else {
             vec![(payment_date, amount)]
         };
-        finstack_quant_cashflows::schedule_from_classified_flows(
+        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             flows
                 .into_iter()
                 .map(
@@ -303,7 +303,7 @@ impl FxSwap {
                 notional_hint: Some(Money::new(amount.amount().abs(), amount.currency())?),
                 ..Default::default()
             },
-        )
+        ))
     }
 }
 

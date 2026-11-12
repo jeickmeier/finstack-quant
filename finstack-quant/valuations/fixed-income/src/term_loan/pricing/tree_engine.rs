@@ -1093,8 +1093,7 @@ mod tests {
                     .expect("notional"),
                 finstack_quant_core::dates::DayCount::Act360,
                 Default::default(),
-            )
-            .expect("valid cashflow rows"),
+            ),
         }
     }
 

@@ -701,7 +701,7 @@ impl XccySwap {
                 .build()?,
             );
         }
-        finstack_quant_cashflows::schedule_from_classified_flows(
+        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             leg.leg.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
@@ -711,7 +711,7 @@ impl XccySwap {
                     ..Default::default()
                 },
             },
-        )
+        ))
     }
 
     fn leg_principal_schedule(&self, leg: &XccySwapLeg, anchor: Date) -> Result<CashFlowSchedule> {

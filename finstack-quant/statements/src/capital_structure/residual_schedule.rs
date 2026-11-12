@@ -348,7 +348,7 @@ pub(crate) fn rebuild_residual_interest(
         schedule.get_notional().clone(),
         schedule.get_day_count(),
         schedule.get_meta().clone(),
-    )?)
+    ))
 }
 
 /// Interest a rebuildable row carries: a PIK row's explicit capitalization,
@@ -404,7 +404,6 @@ mod tests {
                 ..CashFlowMeta::default()
             },
         )
-        .expect("valid cashflow rows")
     }
 
     #[test]

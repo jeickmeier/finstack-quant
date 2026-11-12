@@ -526,8 +526,7 @@ mod opening_tests {
                     issue_date: Some(issue),
                     ..CashFlowMeta::default()
                 },
-            )
-            .expect("valid cashflow rows"),
+            ),
         };
 
         let market_ctx = MarketContext::new();
@@ -573,8 +572,7 @@ mod opening_tests {
                         issue_date: Some(issue),
                         ..Default::default()
                     },
-                )
-                .expect("valid cashflow rows"),
+                ),
             };
             let opening = resolve_opening_balance(
                 &instrument,
@@ -608,8 +606,7 @@ mod opening_tests {
                     ),
                     ..Default::default()
                 },
-            )
-            .expect("valid cashflow rows"),
+            ),
         };
         let opening = resolve_opening_balance(
             &instrument,

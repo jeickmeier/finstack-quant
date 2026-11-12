@@ -718,11 +718,11 @@ class CashFlowSchedule:
         meta: CashFlowMeta | None = None,
     ) -> CashFlowSchedule:
         """
-        Build a schedule from ``CashFlow`` rows or a pandas DataFrame,
-        validating every row.
+        Build a schedule from ``CashFlow`` rows or a pandas DataFrame.
 
-        Both input shapes go through Rust ``CashFlowSchedule::from_flows``,
-        which checks each row (``CashFlow.validate``) before sorting.
+        ``CashFlow`` rows are valid by construction; each DataFrame row is
+        built as a ``CashFlow`` (and validated) before Rust
+        ``CashFlowSchedule::from_flows`` sorts them.
 
         Parameters
         ----------
@@ -750,9 +750,9 @@ class CashFlowSchedule:
         ------
         ValueError
             If a required frame column is missing, a currency code, kind
-            label or date cannot be parsed, or a row fails
-            ``CashFlow.validate`` (e.g. a negative or non-finite
-            ``accrual_factor``, or a reset date after the payment date).
+            label or date cannot be parsed, or a frame row is not a valid
+            ``CashFlow`` (e.g. a negative or non-finite ``accrual_factor``,
+            or a reset date after the payment date).
         TypeError
             If ``flows`` is neither a list of ``CashFlow`` nor a DataFrame.
 

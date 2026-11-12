@@ -300,7 +300,7 @@ fn schedule_from_projection(
         }
     }
 
-    finstack_quant_cashflows::schedule_from_classified_flows(
+    Ok(finstack_quant_cashflows::schedule_from_classified_flows(
         flows,
         mbs.day_count,
         finstack_quant_cashflows::ScheduleBuildOpts {
@@ -315,7 +315,7 @@ fn schedule_from_projection(
                 maturity: None,
             },
         },
-    )
+    ))
 }
 
 /// First day of the calendar month after `date`'s.

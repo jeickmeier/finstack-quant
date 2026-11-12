@@ -1538,8 +1538,7 @@ mod tests {
                 maturity: Some(maturity),
                 ..CashFlowMeta::default()
             },
-        )
-        .expect("valid cashflow rows");
+        );
         let mut bond =
             Bond::from_cashflows("SEASONED-PIK", schedule, "USD-OIS", None).expect("custom bond");
         bond.call_put = Some(CallPutSchedule {
@@ -1614,8 +1613,7 @@ mod tests {
                 maturity: Some(maturity),
                 ..CashFlowMeta::default()
             },
-        )
-        .expect("valid cashflow rows");
+        );
         let mut bond =
             Bond::from_cashflows("SAME-DAY-EXERCISE", schedule, "USD-OIS", None).expect("bond");
         bond.call_put = Some(CallPutSchedule {

@@ -604,7 +604,6 @@ mod tests {
                 ..CashFlowMeta::default()
             },
         )
-        .expect("valid cashflow rows")
     }
 
     #[test]

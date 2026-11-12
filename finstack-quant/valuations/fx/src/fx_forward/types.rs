@@ -645,7 +645,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
                     ..Default::default()
                 },
             },
-        )?;
+        );
         Ok(schedule)
     }
 }

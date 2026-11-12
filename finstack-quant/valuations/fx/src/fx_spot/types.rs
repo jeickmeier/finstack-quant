@@ -414,7 +414,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
                     ..Default::default()
                 },
             },
-        )?;
+        );
         Ok(schedule)
     }
 }

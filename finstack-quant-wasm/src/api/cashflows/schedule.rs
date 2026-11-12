@@ -82,13 +82,12 @@ impl JsCashFlowSchedule {
         }
     }
 
-    /// Assemble a schedule from externally supplied flows, validating every row
+    /// Assemble a schedule from classified flows, sorted into canonical order
     /// (Rust `CashFlowSchedule::from_flows`).
     ///
-    /// Each flow must pass `CashFlow::validate` (finite amount and rate, a
-    /// finite non-negative `accrual_factor`, a reset date not after the payment
-    /// date) before the rows are sorted. (Python's `from_flows` also reads a pandas
-    /// DataFrame; WASM takes the flow list.)
+    /// Each flow is validated as it is read from its wire object, so an
+    /// invalid row is rejected before the schedule exists. (Python's
+    /// `from_flows` also reads a pandas DataFrame; WASM takes the flow list.)
     ///
     /// @param flows - `CashFlow` wire objects.
     /// @param notional - `Notional` wire object: initial balance and amortization rule.
@@ -106,14 +105,12 @@ impl JsCashFlowSchedule {
         #[wasm_bindgen(unchecked_optional_param_type = "generated.cashflows.CashFlowMeta | null")]
         meta: Option<JsValue>,
     ) -> Result<JsCashFlowSchedule, JsValue> {
-        CashFlowSchedule::from_flows(
+        Ok(Self::from_inner(CashFlowSchedule::from_flows(
             js_wire::<Vec<CashFlow>>(&flows, "flows")?,
             js_wire::<Notional>(&notional, "notional")?,
             js_wire::<DayCount>(&day_count, "dayCount")?,
             js_opt_wire::<CashFlowMeta>(meta.as_ref(), "meta")?.unwrap_or_default(),
-        )
-        .map(Self::from_inner)
-        .map_err(to_js_err)
+        )))
     }
 
     /// Parse a schedule from its canonical JSON.
@@ -849,8 +846,7 @@ pub fn schedule_from_classified_flows(
             js_wire::<Vec<CashFlow>>(&flows, "flows")?,
             js_wire::<DayCount>(&day_count, "dayCount")?,
             js_opt_wire::<ScheduleBuildOpts>(opts.as_ref(), "opts")?.unwrap_or_default(),
-        )
-        .map_err(to_js_err)?,
+        ),
     ))
 }
 

@@ -482,7 +482,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DollarRoll {
                     ..Default::default()
                 },
             },
-        )?;
+        );
         Ok(schedule)
     }
 }

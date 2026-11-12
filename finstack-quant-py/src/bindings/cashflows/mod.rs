@@ -176,9 +176,9 @@ fn schedule_from_classified_flows(
 ) -> PyResult<PyCashFlowSchedule> {
     let flows = flows.iter().map(|f| f.inner.clone()).collect();
     let opts = opts.map_or_else(ScheduleBuildOpts::default, |o| o.inner.clone());
-    finstack_quant_cashflows::schedule_from_classified_flows(flows, day_count.inner, opts)
-        .map(PyCashFlowSchedule::from_inner)
-        .map_err(crate::errors::core_to_py)
+    Ok(PyCashFlowSchedule::from_inner(
+        finstack_quant_cashflows::schedule_from_classified_flows(flows, day_count.inner, opts),
+    ))
 }
 
 /// Register the `finstack_quant.cashflows` Python namespace.

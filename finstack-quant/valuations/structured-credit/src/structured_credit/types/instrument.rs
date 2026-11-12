@@ -46,7 +46,7 @@ impl StructuredCredit {
         &self,
         detailed_flows: Vec<CashFlow>,
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        schedule_from_classified_flows(
+        Ok(schedule_from_classified_flows(
             detailed_flows,
             self.deal_type.schedule_day_count(),
             ScheduleBuildOpts {
@@ -57,7 +57,7 @@ impl StructuredCredit {
                     ..Default::default()
                 },
             },
-        )
+        ))
     }
 
     /// Deal NPV from one deterministic simulation run, plus that run's flows

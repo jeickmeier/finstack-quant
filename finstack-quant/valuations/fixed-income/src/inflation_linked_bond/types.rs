@@ -476,7 +476,7 @@ impl InflationLinkedBond {
                 .build()?
             });
         }
-        finstack_quant_cashflows::schedule_from_classified_flows(
+        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             flows,
             self.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
@@ -486,7 +486,7 @@ impl InflationLinkedBond {
                     ..Default::default()
                 },
             },
-        )
+        ))
     }
 
     /// Real accrued interest at `as_of` on the real schedule, from the shared
@@ -857,14 +857,14 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
         as_of: Date,
     ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
         if self.issue_date >= self.maturity {
-            return finstack_quant_cashflows::schedule_from_classified_flows(
+            return Ok(finstack_quant_cashflows::schedule_from_classified_flows(
                 Vec::new(),
                 self.day_count,
                 finstack_quant_cashflows::ScheduleBuildOpts {
                     notional_hint: Some(self.notional),
                     ..Default::default()
                 },
-            );
+            ));
         }
         let periods = self.periods()?;
         let coupon_rate = self.real_coupon_rate()?;
@@ -924,7 +924,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
                 notional_hint: Some(self.notional),
                 ..Default::default()
             },
-        )?;
+        );
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))

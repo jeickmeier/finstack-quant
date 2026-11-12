@@ -72,8 +72,7 @@ fn hand_schedule(
             issue_date: Some(date(issue)),
             ..Default::default()
         },
-    )
-    .expect("valid public hand rows");
+    );
     result.validate().expect("valid hand schedule");
     result
 }

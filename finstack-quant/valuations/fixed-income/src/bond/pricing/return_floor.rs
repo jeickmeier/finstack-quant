@@ -533,8 +533,7 @@ mod tests {
                 maturity: Some(maturity),
                 ..CashFlowMeta::default()
             },
-        )
-        .expect("valid cashflow rows");
+        );
         let bond = Bond::from_cashflows("SEASONED-PIK-AMORT", schedule, "USD-OIS", None)
             .expect("custom bond");
 

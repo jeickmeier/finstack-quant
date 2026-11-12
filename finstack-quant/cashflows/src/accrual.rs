@@ -860,8 +860,7 @@ mod tests {
                 issue_date: Some(start),
                 ..Default::default()
             },
-        )
-        .expect("schedule");
+        );
         let accrued =
             accrued_interest_amount(&schedule, make_date(2025, 4, 1), &AccrualConfig::default())
                 .expect("accrued");
@@ -953,8 +952,7 @@ mod tests {
                 maturity: Some(dec1),
                 ..Default::default()
             },
-        )
-        .unwrap();
+        );
 
         for cfg in [
             AccrualConfig::default(),
@@ -1057,8 +1055,7 @@ mod tests {
             schedule.get_notional().clone(),
             DayCount::Act365F,
             schedule.get_meta().clone(),
-        )
-        .unwrap();
+        );
         let index = AccrualIndex::build(&empty, &AccrualConfig::default()).unwrap();
         assert!(index.period_inputs.is_empty());
         assert!(index.suffix_min_coupon_start.is_empty());
@@ -1356,7 +1353,7 @@ mod tests {
                 .expect("payment boundary")
         );
 
-        let schedule = CashFlowSchedule::from_flows_unchecked(
+        let schedule = CashFlowSchedule::from_flows(
             vec![
                 CashFlowParams::new(
                     payment,

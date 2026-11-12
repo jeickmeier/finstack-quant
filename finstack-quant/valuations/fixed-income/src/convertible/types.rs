@@ -914,7 +914,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
             } else {
                 Vec::new()
             };
-            return CashFlowSchedule::from_flows(
+            return Ok(CashFlowSchedule::from_flows(
                 flows,
                 finstack_quant_cashflows::builder::Notional::par(
                     claim.cash.amount(),
@@ -926,7 +926,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
                     maturity: Some(claim.delivery_date),
                     ..Default::default()
                 },
-            );
+            ));
         }
         let mut schedule = pricing::build_convertible_schedule(self, curves)?;
         let mandatory = match self.conversion.policy {

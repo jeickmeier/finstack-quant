@@ -444,7 +444,7 @@ pub(crate) fn generate_cashflows(
                     notional_hint: Some(notional.initial),
                     meta: schedule.get_meta().clone(),
                 },
-            )?
+            )
             .with_notional(notional.clone());
             schedule = merge_cashflow_schedules([schedule, fee_schedule], notional, day_count);
         }

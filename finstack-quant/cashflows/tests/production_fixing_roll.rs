@@ -30,7 +30,6 @@ fn schedule(values: &[Option<f64>]) -> CashFlowSchedule {
             ..Default::default()
         },
     )
-    .expect("valid cashflow rows")
 }
 
 #[test]

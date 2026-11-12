@@ -502,7 +502,7 @@ pub(crate) fn fx_valuation_details(
 pub(crate) fn settled_schedule(
     notional_hint: Option<finstack_quant_core::money::Money>,
 ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-    finstack_quant_cashflows::schedule_from_classified_flows(
+    Ok(finstack_quant_cashflows::schedule_from_classified_flows(
         Vec::new(),
         DayCount::Act365F,
         finstack_quant_cashflows::ScheduleBuildOpts {
@@ -513,7 +513,7 @@ pub(crate) fn settled_schedule(
                 ..Default::default()
             },
         },
-    )
+    ))
 }
 
 /// One volatility scenario: the instrument and market to reprice.

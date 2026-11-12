@@ -448,7 +448,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxVarianceSwap {
         _context: &MarketContext,
         _as_of: Date,
     ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        finstack_quant_cashflows::schedule_from_classified_flows(
+        Ok(finstack_quant_cashflows::schedule_from_classified_flows(
             Vec::new(),
             self.day_count,
             finstack_quant_cashflows::ScheduleBuildOpts {
@@ -459,7 +459,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxVarianceSwap {
                     ..Default::default()
                 },
             },
-        )
+        ))
     }
 }
 

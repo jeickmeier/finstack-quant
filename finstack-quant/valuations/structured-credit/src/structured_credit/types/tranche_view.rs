@@ -70,7 +70,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCreditTranch
         let flows = (self.deal)
             .tranche_cashflows(&self.tranche_id, context, as_of)?
             .detailed_flows;
-        schedule_from_classified_flows(
+        Ok(schedule_from_classified_flows(
             flows,
             self.deal.deal_type.schedule_day_count(),
             ScheduleBuildOpts {
@@ -81,7 +81,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCreditTranch
                     ..Default::default()
                 },
             },
-        )
+        ))
     }
 }
 

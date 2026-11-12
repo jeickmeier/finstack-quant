@@ -1624,8 +1624,7 @@ mod tests {
                 maturity: Some(maturity),
                 ..CashFlowMeta::default()
             },
-        )
-        .expect("valid cashflow rows");
+        );
 
         let (principal, replaced) = RedemptionBasis::new(
             &schedule,

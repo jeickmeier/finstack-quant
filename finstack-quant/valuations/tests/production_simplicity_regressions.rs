@@ -47,8 +47,7 @@ fn tied_custom_coupon_intervals_choose_shorter_frequency() {
             maturity: Some(dates[2]),
             ..CashFlowMeta::default()
         },
-    )
-    .expect("valid cashflow rows");
+    );
     let schedule_json = serde_json::to_string(&schedule).expect("schedule JSON");
     let wire = finstack_quant_valuations::instruments::fixed_income::bond_from_cashflows_json(
         "TIED",

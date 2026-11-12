@@ -129,8 +129,7 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
             raw.get_notional().clone(),
             raw.get_day_count(),
             dated_meta,
-        )
-        .expect("valid cashflow rows");
+        );
         let (_, closing, funding, _) = calculate_period_flows(
             &swap,
             &period,
@@ -420,18 +419,15 @@ fn no_funding_schedule(initial: f64, issue: Date) -> ScheduleInstrument {
     } else {
         vec![]
     };
-    ScheduleInstrument::new(
-        CashFlowSchedule::from_flows(
-            flows,
-            Notional::par(initial, Currency::USD).expect("valid decimal principal"),
-            DayCount::Act365F,
-            CashFlowMeta {
-                issue_date: Some(issue),
-                ..Default::default()
-            },
-        )
-        .expect("valid cashflow rows"),
-    )
+    ScheduleInstrument::new(CashFlowSchedule::from_flows(
+        flows,
+        Notional::par(initial, Currency::USD).expect("valid decimal principal"),
+        DayCount::Act365F,
+        CashFlowMeta {
+            issue_date: Some(issue),
+            ..Default::default()
+        },
+    ))
 }
 
 fn empty_debt_context() -> (
@@ -846,8 +842,7 @@ fn oid_funding_preserves_custom_bond_face_with_separate_cash_dates() {
                     issue_date: Some(issue),
                     ..Default::default()
                 },
-            )
-            .expect("valid cashflow rows");
+            );
             let bond = Bond::fixed(
                 InstrumentId::new("BOND"),
                 Money::from((100_i64, Currency::USD)),
@@ -1333,18 +1328,15 @@ fn newly_funded_balance_capitalizes_pik_on_its_effective_date() {
             .expect("valid cashflow")
         },
     ];
-    let instrument = ScheduleInstrument::new(
-        CashFlowSchedule::from_flows(
-            flows,
-            Notional::par(100.0, Currency::USD).expect("valid decimal principal"),
-            DayCount::Act365F,
-            CashFlowMeta {
-                issue_date: Some(issue),
-                ..Default::default()
-            },
-        )
-        .expect("valid cashflow rows"),
-    );
+    let instrument = ScheduleInstrument::new(CashFlowSchedule::from_flows(
+        flows,
+        Notional::par(100.0, Currency::USD).expect("valid decimal principal"),
+        DayCount::Act365F,
+        CashFlowMeta {
+            issue_date: Some(issue),
+            ..Default::default()
+        },
+    ));
     let market = MarketContext::new();
     let close = |opening: i64| {
         calculate_period_flows(

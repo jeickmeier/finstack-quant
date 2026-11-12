@@ -1018,6 +1018,15 @@ logged under Needs review.
     fixed coupon with a delta) now state complete rows; tests of invalid
     inputs assert `build()` fails. `CashFlowAccrual` keeps public fields
     (not done, see Needs review).
+  - **G5-5f infallible schedule assembly.** With every `CashFlow` valid
+    by construction, the per-row re-validation in
+    `CashFlowSchedule::from_flows` and in schedule `validate` was dead, so
+    `from_flows` and `schedule_from_classified_flows` return the schedule
+    directly; `from_flows_unchecked` (identical once rows are valid) is gone
+    and its callers use `from_flows`. Producers keep their `Result` where
+    other steps can fail. Python `from_flows` still raises for an invalid
+    DataFrame row (rows are built as `CashFlow` first);
+    `schedule_from_classified_flows` no longer raises. No value moved.
 - **Notebooks broken by earlier slices (found during G5, fixed in `NB:`).**
   A full run (`run_all_notebooks.py --timeout 120`) after G5-3b passed 92 of
   101; none of the 9 failures involved PIK or write-down rows, and slice
@@ -1070,15 +1079,13 @@ logged under Needs review.
     attached through the validated `with_accrual` rather than a ninth
     keyword. A host `CashFlowParams` class would mirror Rust more literally
     at the cost of a new public type in both hosts.
-  - **`CashFlowAccrual` fields still public; `from_flows` still fallible
-    (G5-5d, Needs review).** Record 015 #10 also asks for private
+  - **`CashFlowAccrual` fields still public (G5-5d, Needs review).**
+    Record 015 #10 also asks for private
     `CashFlowAccrual` fields with a validated constructor; Python
     construction validates, but Rust code can still build or edit an
     unvalidated slice (a `CashFlow` built from it is still validated).
-    `CashFlowSchedule::from_flows` and the schedule `validate` still re-check
-    every row although a row can no longer be invalid; making `from_flows`
-    infallible reaches 61 Rust call sites and both hosts. Both are queued as
-    G5-5f/G5-5g.
+    `CashFlowSchedule::from_flows` re-checking rows was the other half; the
+    `from_flows` half was done in G5-5f; the accrual half is G5-5g.
   - **Cashflow construction cost not measured (G5-5c).** Every row now runs
     `validate()` once at construction; the `cashflow_scaling` bench was not
     run before and after.

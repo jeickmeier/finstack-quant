@@ -544,8 +544,7 @@ fn previously_paid_redemption_cannot_extinguish_later_pik_principal() {
             issue_date: Some(issue),
             ..Default::default()
         },
-    )
-    .expect("valid cashflow rows");
+    );
     // Redemption cash of 100 was already paid. A subsequent PIK toggle adds
     // 10 to closing principal before that redemption becomes economic.
     let mut state = state_with_balance(schedule, 110.0);

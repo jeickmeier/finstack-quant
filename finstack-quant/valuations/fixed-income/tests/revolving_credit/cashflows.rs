@@ -157,8 +157,7 @@ fn same_date_flows_use_the_canonical_cashflow_order() {
                 ..CashFlowMeta::default()
             },
         },
-    )
-    .expect("valid schedule");
+    );
     assert_eq!(
         schedule
             .get_flows()

@@ -189,16 +189,19 @@ macro_rules! impl_empty_cashflow_provider {
             ) -> finstack_quant_core::Result<
                 $crate::__private::finstack_quant_cashflows::builder::CashFlowSchedule,
             > {
-                $crate::__private::finstack_quant_cashflows::schedule_from_classified_flows(
-                    Vec::new(),
-                    $day_count,
-                    $crate::__private::finstack_quant_cashflows::ScheduleBuildOpts {
-                        notional_hint: self.notional()?,
-                        meta: $crate::__private::finstack_quant_cashflows::builder::CashFlowMeta {
-                            representation: $representation,
-                            ..Default::default()
+                Ok(
+                    $crate::__private::finstack_quant_cashflows::schedule_from_classified_flows(
+                        Vec::new(),
+                        $day_count,
+                        $crate::__private::finstack_quant_cashflows::ScheduleBuildOpts {
+                            notional_hint: self.notional()?,
+                            meta:
+                                $crate::__private::finstack_quant_cashflows::builder::CashFlowMeta {
+                                    representation: $representation,
+                                    ..Default::default()
+                                },
                         },
-                    },
+                    ),
                 )
             }
         }

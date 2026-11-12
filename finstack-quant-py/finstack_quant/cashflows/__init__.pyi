@@ -278,13 +278,8 @@ def schedule_from_classified_flows(
     Returns
     -------
     CashFlowSchedule
-        Canonical schedule holding the sorted rows.
-
-    Raises
-    ------
-    ValueError
-        If a row has a non-finite or negative accrual factor, a non-finite rate,
-        or a reset date after its payment date.
+        Canonical schedule holding the sorted rows. Rows are valid by
+        construction, so this does not raise.
 
     Examples
     --------

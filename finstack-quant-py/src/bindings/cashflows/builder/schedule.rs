@@ -304,14 +304,12 @@ impl PyCashFlowSchedule {
         day_count: PyRef<'_, PyDayCount>,
         meta: Option<PyRef<'_, PyCashFlowMeta>>,
     ) -> PyResult<Self> {
-        CashFlowSchedule::from_flows(
+        Ok(Self::from_inner(CashFlowSchedule::from_flows(
             extract_flows(flows)?,
             notional.inner.clone(),
             day_count.inner,
             meta.map_or_else(CashFlowMeta::default, |m| m.inner.clone()),
-        )
-        .map(Self::from_inner)
-        .map_err(core_to_py)
+        )))
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._schedule", "CashFlowSchedule.with_representation")]

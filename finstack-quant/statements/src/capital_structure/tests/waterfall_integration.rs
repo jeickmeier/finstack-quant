@@ -250,7 +250,6 @@ mod period_flow_waterfall_integration {
                 ..CashFlowMeta::default()
             },
         )
-        .expect("valid cashflow rows")
     }
 
     /// PIK compounding regression (review: SCALE_CLAMP_MAX froze PIK after
