@@ -231,7 +231,9 @@ fn standard_cs01_without_deal_quote_matches_direct_up_down_replay() {
 #[test]
 fn deal_quote_override_is_shared_by_cs01_and_cs_gamma() {
     let as_of = date!(2024 - 01 - 01);
-    let maturity = date!(2029 - 01 - 01);
+    // A deal quote replays at a calibrated pillar date; maturities are literal
+    // (record CALIBRATION-FRAMEWORK-007, O7).
+    let maturity = date!(2028 - 12 - 30);
     let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source, as_of, "CORP", "CORP", "USD_OIS",
@@ -317,7 +319,9 @@ fn risky_pv01_with_deal_quote_does_not_require_replayable_hazard() {
 #[test]
 fn deal_quote_cs_gamma_is_centered_on_override_quote_set() {
     let as_of = date!(2024 - 01 - 01);
-    let maturity = date!(2029 - 03 - 20);
+    // A deal quote replays at a calibrated pillar date; maturities are literal
+    // (record CALIBRATION-FRAMEWORK-007, O7).
+    let maturity = date!(2028 - 12 - 30);
     let discount_id = CurveId::new("USD_OIS");
     let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
@@ -674,7 +678,9 @@ fn test_cds_par_spread_metric_does_not_return_quoted_spread_override() {
 #[test]
 fn test_recovery01_uses_deal_quote_replay_inputs() {
     let as_of = date!(2024 - 01 - 01);
-    let maturity = date!(2029 - 01 - 01);
+    // A deal quote replays at a calibrated pillar date; maturities are literal
+    // (record CALIBRATION-FRAMEWORK-007, O7).
+    let maturity = date!(2028 - 12 - 30);
     let source = MarketContext::new().insert(build_test_discount(0.05, as_of, "USD_OIS"));
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve(
         &source, as_of, "CORP", "CORP", "USD_OIS",

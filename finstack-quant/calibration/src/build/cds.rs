@@ -6,8 +6,7 @@ use crate::quotes::CdsQuote;
 use crate::quotes::Pillar;
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DateExt, Tenor, is_cds_date, next_cds_date,
-    next_semiannual_cds_maturity, prev_cds_date, prev_cds_semiannual_roll,
+    Date, DateExt, Tenor, TenorUnit, is_cds_date, prev_cds_date, prev_cds_semiannual_roll,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
@@ -40,27 +39,50 @@ pub(crate) fn cds_accrual_start(trade_date: Date) -> Result<Date> {
     }
 }
 
-/// Resolve an on-the-run tenor to its post-2015 CDS scheduled termination date.
+/// Resolve a tenor quote to its scheduled termination date under the
+/// post-2015 single-name regime (record CALIBRATION-FRAMEWORK-007, O7).
+///
+/// The maturity is the latest March/September 20 roll on or before the trade
+/// date, plus three months, plus the tenor: a 2015-12-22 trade matures on
+/// 2016-03-20 for 3M and 2016-09-20 for 9M, and whole-year tenors on June or
+/// December 20.
 ///
 /// # Arguments
 ///
 /// * `trade_date` - Trade date selecting the semiannual March/September roll
 ///   on or before the trade, independently of cash settlement.
-/// * `tenor` - Contract tenor added to that unadjusted roll before extending
-///   to the next standard June/December twentieth maturity.
+/// * `tenor` - Positive contract tenor in whole quarters (months or years).
+///
+/// # Errors
+///
+/// Returns an error for a tenor the regime does not determine (days, weeks,
+/// or a month count that is not a positive multiple of three) and for a date
+/// outside the supported range.
 pub(crate) fn resolve_cds_tenor_maturity(trade_date: Date, tenor: &Tenor) -> Result<Date> {
-    let roll = prev_cds_semiannual_roll(trade_date)?;
-    let raw = tenor.add_to_date(roll, None, BusinessDayConvention::Unadjusted)?;
-    next_semiannual_cds_maturity(raw)
+    let months = match tenor.unit() {
+        TenorUnit::Months => i64::from(tenor.count()),
+        TenorUnit::Years => i64::from(tenor.count()) * 12,
+        TenorUnit::Days | TenorUnit::Weeks => 0,
+    };
+    if months <= 0 || months % 3 != 0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "the post-2015 single-name CDS regime determines maturities only for positive \
+             whole-quarter tenors; got {tenor}"
+        )));
+    }
+    let months = i32::try_from(months + 3).map_err(|_| {
+        finstack_quant_core::Error::Validation(format!("CDS tenor {tenor} is out of range"))
+    })?;
+    let maturity = prev_cds_semiannual_roll(trade_date)?.add_months(months)?;
+    debug_assert!(maturity > trade_date);
+    Ok(maturity)
 }
 
 /// Scheduled CDS termination date for a quote pillar.
 ///
-/// Tenor pillars follow the post-2015 semiannual roll
-/// ([`resolve_cds_tenor_maturity`]); explicit date pillars snap to the
-/// quarterly IMM grid from the unadjusted input date (no business-day
-/// adjustment before roll selection, which could push the date past the
-/// 20th and select the next quarter).
+/// Tenor pillars follow the post-2015 single-name regime
+/// ([`resolve_cds_tenor_maturity`]); an explicit date pillar is the literal
+/// contractual maturity (record CALIBRATION-FRAMEWORK-007, O7).
 ///
 /// # Arguments
 ///
@@ -69,7 +91,7 @@ pub(crate) fn resolve_cds_tenor_maturity(trade_date: Date, tenor: &Tenor) -> Res
 pub(crate) fn cds_pillar_maturity(trade_date: Date, pillar: &Pillar) -> Result<Date> {
     match pillar {
         Pillar::Tenor(t) => resolve_cds_tenor_maturity(trade_date, t),
-        Pillar::Date(d) => next_cds_date(d.add_days(-1)?),
+        Pillar::Date(d) => Ok(*d),
     }
 }
 
@@ -322,6 +344,38 @@ mod tests {
             cds.premium_leg.end.month()
         );
 
+        Ok(())
+    }
+
+    /// Post-2015 single-name regime against the official December 2015 table
+    /// (record CALIBRATION-FRAMEWORK-007, O7).
+    #[test]
+    fn post_2015_single_name_tenors_match_the_official_fixtures() -> Result<()> {
+        let trade = Date::from_calendar_date(2015, Month::December, 22).expect("trade date");
+        let tenor = |text: &str| -> Tenor { text.parse().expect("tenor") };
+        assert_eq!(
+            resolve_cds_tenor_maturity(trade, &tenor("3M"))?,
+            Date::from_calendar_date(2016, Month::March, 20).expect("date")
+        );
+        assert_eq!(
+            resolve_cds_tenor_maturity(trade, &tenor("9M"))?,
+            Date::from_calendar_date(2016, Month::September, 20).expect("date")
+        );
+        for text in ["1M", "2W", "10D"] {
+            assert!(
+                resolve_cds_tenor_maturity(trade, &tenor(text)).is_err(),
+                "{text}"
+            );
+        }
+        Ok(())
+    }
+
+    /// An explicit maturity is literal; it is not rolled to a CDS date.
+    #[test]
+    fn explicit_cds_maturity_stays_literal() -> Result<()> {
+        let trade = Date::from_calendar_date(2024, Month::January, 2).expect("trade date");
+        let literal = Date::from_calendar_date(2027, Month::May, 3).expect("maturity");
+        assert_eq!(cds_pillar_maturity(trade, &Pillar::Date(literal))?, literal);
         Ok(())
     }
 
