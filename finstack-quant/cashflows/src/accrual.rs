@@ -300,7 +300,7 @@ impl AccrualIndex {
             Vec::new()
         } else {
             let outstanding_path = schedule.outstanding_by_date()?;
-            build_period_inputs(schedule, &periods, &outstanding_path, cfg.frequency)?
+            build_period_inputs(schedule, &periods, &outstanding_path)?
         };
 
         let mut suffix_min_coupon_start: Vec<Date> = Vec::with_capacity(period_inputs.len());
@@ -389,13 +389,10 @@ struct CouponBucket {
     end_is_termination_date: Option<bool>,
     cash_amount: f64,
     pik_amount: f64,
-    /// Accrual year fraction as reported by the builder.
-    ///
-    /// None means no builder-provided accrual factor; downstream falls back
-    /// to a day-count-based year fraction. Some(af) means the builder
-    /// explicitly set af. We use Option rather than 0.0 as a sentinel so a
-    /// legitimate zero-length period is distinguishable from unset.
-    accrual_factor: Option<f64>,
+    /// Accrual year fraction stated by the first row of the bucket. It is
+    /// always the producer's literal factor; zero is a zero-length accrual,
+    /// never a request to derive one (record CORE-CONVENTIONS-015 #9).
+    accrual_factor: f64,
 }
 
 /// A single coupon period derived from the schedule.
@@ -495,7 +492,7 @@ fn build_coupon_periods(
         // `AccrualIndex::build` validated the schedule: factors are finite
         // and non-negative. A zero factor is a literal zero-length accrual,
         // never "missing, derive it" (record CORE-CONVENTIONS-015 #9).
-        let cf_af = Some(cf.accrual_factor);
+        let cf_af = cf.accrual_factor;
 
         let matching_bucket = buckets
             .iter_mut()
@@ -512,9 +509,6 @@ fn build_coupon_periods(
         if let Some(bucket) = matching_bucket {
             bucket.pik_amount += pik_value;
             bucket.cash_amount += cash_value;
-            if bucket.accrual_factor.is_none() {
-                bucket.accrual_factor = cf_af;
-            }
             continue;
         }
 
@@ -569,7 +563,6 @@ fn build_period_inputs(
     schedule: &CashFlowSchedule,
     periods: &[CouponPeriod],
     outstanding_path: &[(Date, Money)],
-    frequency: Option<Tenor>,
 ) -> finstack_quant_core::Result<Vec<PeriodInputs>> {
     let mut result = Vec::with_capacity(periods.len());
     let mut coupon_starts = finstack_quant_core::FxHashMap::default();
@@ -607,18 +600,7 @@ fn build_period_inputs(
         }
 
         let coupon_period = p.bucket.coupon_period.or(Some((p.start, p.end)));
-        let total_yf = match p.bucket.accrual_factor {
-            Some(af) => af,
-            None => {
-                let ctx = coupon_day_count_context(
-                    p.bucket.calendar_id.as_deref(),
-                    frequency,
-                    coupon_period,
-                    p.bucket.end_is_termination_date,
-                )?;
-                p.day_count.year_fraction(p.start, p.end, ctx)?
-            }
-        };
+        let total_yf = p.bucket.accrual_factor;
 
         if total_yf <= 0.0 {
             continue;
@@ -843,6 +825,45 @@ mod tests {
 
     fn make_date(y: i32, m: u8, d: u8) -> Date {
         Date::from_calendar_date(y, Month::try_from(m).unwrap(), d).unwrap()
+    }
+
+    #[test]
+    fn zero_accrual_factor_is_a_literal_zero_length_accrual() {
+        // Record CORE-CONVENTIONS-015 #9: zero is never "missing, derive it".
+        let start = make_date(2025, 1, 1);
+        let end = make_date(2025, 7, 1);
+        let coupon = CashFlow::new(
+            end,
+            None,
+            Money::from((50_i64, Currency::USD)),
+            CFKind::Fixed,
+            0.0,
+            Some(0.1),
+        )
+        .with_accrual(CashFlowAccrual {
+            start,
+            end,
+            day_count: DayCount::Act360,
+            projected_index_rate: None,
+            context: finstack_quant_core::dates::DayCountContextState {
+                end_is_termination_date: Some(true),
+                ..Default::default()
+            },
+        });
+        let schedule = CashFlowSchedule::from_flows(
+            vec![coupon],
+            Notional::par(1_000.0, Currency::USD).expect("notional"),
+            DayCount::Act360,
+            CashFlowMeta {
+                issue_date: Some(start),
+                ..Default::default()
+            },
+        )
+        .expect("schedule");
+        let accrued =
+            accrued_interest_amount(&schedule, make_date(2025, 4, 1), &AccrualConfig::default())
+                .expect("accrued");
+        assert_eq!(accrued, 0.0);
     }
 
     /// Create a minimal schedule with coupon flows for testing issue date derivation.
@@ -1661,11 +1682,11 @@ mod tests {
                 accrual_day_count: None,
                 cash_amount: f64::NAN,
                 pik_amount: 0.0,
-                accrual_factor: Some(0.5),
+                accrual_factor: 0.5,
             },
         }];
 
-        let err = build_period_inputs(&schedule, &periods, &[], None)
+        let err = build_period_inputs(&schedule, &periods, &[])
             .expect_err("NaN coupon total must be rejected");
         assert!(err.to_string().contains("non-finite"));
     }

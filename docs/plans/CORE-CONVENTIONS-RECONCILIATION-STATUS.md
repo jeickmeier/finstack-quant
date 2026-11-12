@@ -942,6 +942,21 @@ logged under Needs review.
     - **Literal zero factor (record 015 #9).** The accrued-interest engine
       read an accrual factor of zero as "derive it from the day count"; zero
       is now a literal zero-length accrual. No test or value moved.
+      Follow-up (`G5-4b`): the derive branch, now unreachable, is removed
+      with its config frequency input, and a test pins a zero-factor coupon
+      at zero accrued. Exposure checked: the production rows that state
+      `0.0` without metadata (MBS, CMO, structured-credit tranche, ABF and
+      repo interest) never reach this engine (structured credit accrues from
+      its own periods; statements accrues only bond, convertible, term-loan
+      and revolver schedules, all built with real factors). A user-supplied
+      custom bond schedule that states `0.0` now accrues zero instead of a
+      derived amount (Needs review: owners must state the factor).
+    - **LSMC premium redemption (Needs review).** The terminal redemption is
+      the final positive notional whose delta is minus its cash. A custom
+      premium redemption (cash 102, delta -100, record 015 #5) is therefore
+      static, as it already was before G5 (any explicit delta made it
+      static); keying on the delta that extinguishes the balance is left for
+      the bond owner.
     - Producers that did not previously state a frequency or business-day
       basis keep `None` for both, so no factor moved; the goldens equal their
       previous values once the context is flattened back (checked
