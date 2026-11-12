@@ -710,7 +710,7 @@ impl CashFlowSchedule {
     ///     Notional::par(1_000_000.0, Currency::USD).expect("valid notional fixture"),
     ///     DayCount::Act365F,
     ///     CashFlowMeta::default(),
-    /// ).expect("valid cashflow rows");
+    /// );
     ///
     /// let coupons: Vec<_> = schedule.coupons().collect();
     /// assert_eq!(coupons.len(), 1);
@@ -1257,7 +1257,7 @@ impl CashFlowSchedule {
     ///         schedule: ScheduleParams::semiannual_30360(),
     ///     })
     ///     .build(None)?;
-    /// let pvs: Vec<f64> = schedule.get_flows().iter().map(|f| f.amount.amount()).collect();
+    /// let pvs: Vec<f64> = schedule.get_flows().iter().map(|f| f.get_amount().amount()).collect();
     /// let ladder = schedule.calendar_year_ladder(&pvs)?;
     /// assert_eq!(ladder.first().map(|row| row.year), Some(2025));
     /// # Ok(())

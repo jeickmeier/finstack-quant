@@ -175,8 +175,9 @@ fn main() -> finstack_quant_core::Result<()> {
         (date!(2026 - 01 - 01), Money::new(1_025_000.0, Currency::USD)?),
     ];
 
-    // Flows dated on or before `base` are excluded (pricing-standard cutoff).
-    let pv = npv(usd_ois.as_ref(), base, &flows)?;
+    // Past flows are excluded; whether a flow dated `base` counts is an
+    // explicit choice (`include_today`).
+    let pv = npv(usd_ois.as_ref(), base, &flows, false)?;
     assert_eq!(pv.currency(), Currency::USD);
 
     // Currency safety is enforced, not converted away.

@@ -66,11 +66,8 @@
 //!
 //! # See Also
 //!
-//! - [`ScheduleBuilder::cds_imm`] for building CDS payment schedules
 //! - [`next_imm`] for finding the next quarterly IMM date
 //! - [`next_cds_date`] for CDS settlement date calculation
-//!
-//! [`ScheduleBuilder::cds_imm`]: super::ScheduleBuilder::cds_imm
 
 use crate::dates::calendar::algo::nth_weekday_of_month;
 use time::{Date, Month, Weekday};

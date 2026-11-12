@@ -275,8 +275,7 @@ pub fn schedule_from_dated_flows(
 ///         notional_hint: Some(Money::from((1_000_000_i64, Currency::USD))),
 ///         ..Default::default()
 ///     },
-/// )
-/// .expect("valid flows");
+/// );
 /// assert_eq!(schedule.get_flows().len(), 2);
 /// // Original CFKind values are preserved.
 /// assert_eq!(schedule.get_flows()[0].get_kind(), CFKind::Fixed);

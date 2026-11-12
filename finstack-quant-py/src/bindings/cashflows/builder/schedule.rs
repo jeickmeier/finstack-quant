@@ -195,7 +195,7 @@ fn optional_json_field<T: serde::de::DeserializeOwned + Send>(
 /// Extract cashflow rows from ``list[CashFlow]`` or a DataFrame with columns
 /// ``date, amount, currency, kind, accrual_factor`` and optional ``reset_date, rate``.
 ///
-/// Rows are only converted here; `CashFlowSchedule::from_flows` validates them.
+/// Each row is built as a validated `CashFlow`; an invalid row raises here.
 pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
     if let Ok(flows) = obj.extract::<Vec<PyRef<'_, PyCashFlow>>>() {
         return Ok(flows.iter().map(|f| f.inner.clone()).collect());

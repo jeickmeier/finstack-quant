@@ -702,7 +702,7 @@ impl CashFlowBuilder {
     ///     })
     ///     .build(None)?;
     /// assert!(schedule.get_flows().iter().all(|cf| {
-    ///     cf.kind != finstack_quant_core::cashflow::CFKind::Notional
+    ///     cf.get_kind() != finstack_quant_core::cashflow::CFKind::Notional
     /// }));
     /// # Ok(())
     /// # }
