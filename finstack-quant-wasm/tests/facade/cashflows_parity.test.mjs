@@ -383,8 +383,17 @@ const cases = {
           principal_date: '2025-07-11',
         }),
       ],
-      with_accrual: { ...flow, accrual },
-      with_principal_delta: { ...flow, principal_delta: usd('-1000') },
+      with_accrual: core.cashFlowWithAccrual(flow, accrual),
+      with_principal: core.cashFlowWithPrincipal(
+        {
+          ...flow,
+          kind: 'amortization',
+          principal_delta: usd('-30000'),
+          principal_date: '2025-07-15',
+        },
+        usd('-1000'),
+        '2025-07-11'
+      ),
     };
   },
   // --- specs ---------------------------------------------------------------------

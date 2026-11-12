@@ -1,7 +1,7 @@
 //! Economic regressions for simplicity-review corrections.
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
 use finstack_quant_core::{
-    cashflow::{CFKind, CashFlow},
+    cashflow::{CFKind, CashFlowParams},
     currency::Currency,
     dates::{DayCount, Tenor},
     money::Money,
@@ -18,7 +18,7 @@ fn tied_custom_coupon_intervals_choose_shorter_frequency() {
     let mut flows: Vec<_> = dates
         .iter()
         .map(|&date| {
-            CashFlow::new(
+            CashFlowParams::new(
                 date,
                 None,
                 Money::from((10_i64, Currency::USD)),
@@ -26,13 +26,17 @@ fn tied_custom_coupon_intervals_choose_shorter_frequency() {
                 0.25,
                 Some(0.04),
             )
+            .build()
+            .expect("valid cashflow")
         })
         .collect();
     flows.push({
         let cash = Money::from((1000_i64, Currency::USD));
-        CashFlow::new(dates[2], None, cash, CFKind::Notional, 0.0, None)
+        CashFlowParams::new(dates[2], None, cash, CFKind::Notional, 0.0, None)
             .with_principal_delta(cash.checked_neg())
             .with_principal_date(dates[2])
+            .build()
+            .expect("valid cashflow")
     });
     let schedule = CashFlowSchedule::from_flows(
         flows,

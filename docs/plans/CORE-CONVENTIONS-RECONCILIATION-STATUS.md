@@ -984,6 +984,40 @@ logged under Needs review.
     harvested by temporarily marking the fields `#[deprecated]`, which makes
     the compiler report every use across all crates without failing; 44
     direct writes remain for G5-5c. No behaviour change.
+  - **G5-5c validated construction (record 015 #10).** `CashFlowParams`
+    holds the raw, possibly incomplete inputs; `CashFlow::new(params)` and
+    `CashFlowParams::build` are the one constructor and validate the row.
+    `CashFlow::with_accrual` and the atomic `with_principal(delta, date)`
+    return a validated copy and leave the row unchanged on error; the
+    independent infallible `with_principal_delta`/`with_principal_date`
+    setters are gone from `CashFlow` (they remain on the params). All 229
+    construction sites now build params; producers propagate the error
+    (`margin_calls_to_cashflows`, the revolver fee emitter and the
+    structured-credit finalization became fallible), tests use
+    `.expect("valid cashflow")`. `scale_amounts` and `normalize_public`
+    rebuild rows through the params. Python: `CashFlow(...,
+    principal=(delta, date))` validates on construction and
+    `CashFlowAccrual(...)` validates its slice; `with_accrual` and
+    `with_principal` raise `ValueError` on an invalid update. WASM:
+    `core.cashFlowWithAccrual` and `core.cashFlowWithPrincipal` replace the
+    `literal` exclusions in the parity ledger (they validate in Rust). The
+    `primitives` parity golden's `with_principal_delta` case held an invalid
+    row (a fixed coupon carrying a principal delta); it is now
+    `with_principal` on an amortization row.
+  - **G5-5d private fields (record 015 #10).** `CashFlow` fields are
+    private, so a published row can only come from validated construction,
+    deserialization or a validated update. Making them private surfaced the
+    producers that had published a row before completing it, now built in
+    one step: fixed PIK emission (which set its balance date and accrual
+    after the push), the revolver stochastic expected-flow average, the CDS
+    index projected premium, the CDS tranche par-spread rescale and the
+    statements residual split. `CashFlowSchedule::update_flows` now edits each
+    row's `CashFlowParams` and rebuilds atomically (the schedule is unchanged
+    on error); `try_update_flows` is gone. Test fixtures that held invalid
+    rows (principal kinds without their delta, cash on write-down rows, a
+    fixed coupon with a delta) now state complete rows; tests of invalid
+    inputs assert `build()` fails. `CashFlowAccrual` keeps public fields
+    (not done, see Needs review).
 - **Notebooks broken by earlier slices (found during G5, fixed in `NB:`).**
   A full run (`run_all_notebooks.py --timeout 120`) after G5-3b passed 92 of
   101; none of the 9 failures involved PIK or write-down rows, and slice
@@ -1028,6 +1062,26 @@ logged under Needs review.
     margin-call events), and no row carries the call date as its reset date
     (record 015 #6). Margin record 20 #6 should be updated to match when it
     is adopted.
+  - **Python `CashFlow` constructor shape (Needs review, G5-5c).** Record
+    015 #10 asks for host construction from complete inputs. A Python entry
+    point is capped at seven inputs with no suppression, so the constructor
+    takes the coupled principal effect as one `principal=(delta, date)` pair
+    (matching the atomic Rust `with_principal`) and accrual metadata is
+    attached through the validated `with_accrual` rather than a ninth
+    keyword. A host `CashFlowParams` class would mirror Rust more literally
+    at the cost of a new public type in both hosts.
+  - **`CashFlowAccrual` fields still public; `from_flows` still fallible
+    (G5-5d, Needs review).** Record 015 #10 also asks for private
+    `CashFlowAccrual` fields with a validated constructor; Python
+    construction validates, but Rust code can still build or edit an
+    unvalidated slice (a `CashFlow` built from it is still validated).
+    `CashFlowSchedule::from_flows` and the schedule `validate` still re-check
+    every row although a row can no longer be invalid; making `from_flows`
+    infallible reaches 61 Rust call sites and both hosts. Both are queued as
+    G5-5f/G5-5g.
+  - **Cashflow construction cost not measured (G5-5c).** Every row now runs
+    `validate()` once at construction; the `cashflow_scaling` bench was not
+    run before and after.
 - **Dependency added (G2).** `indexmap` (already a workspace dependency, used
   by core and structured credit) was added to `finstack-quant-models` so the
   rating-factor table keeps a deterministic order once `CreditRating` lost

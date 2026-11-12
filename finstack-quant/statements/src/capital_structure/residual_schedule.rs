@@ -5,7 +5,7 @@ use super::PrincipalClaim;
 use crate::error::{Error, Result};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::CFKind;
-use finstack_quant_core::cashflow::{CashFlow, CashFlowAccrual};
+use finstack_quant_core::cashflow::{CashFlow, CashFlowAccrual, CashFlowParams};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::money::Money;
 
@@ -84,7 +84,7 @@ pub(crate) fn rebuild_residual_interest(
     // belong to an already-effective principal movement.
     let mut flows = Vec::with_capacity(schedule.get_flows().len() + 1);
     flows.push(
-        CashFlow::new(
+        CashFlowParams::new(
             from_date,
             None,
             Money::from((0_i64, currency)),
@@ -93,7 +93,8 @@ pub(crate) fn rebuild_residual_interest(
             None,
         )
         .with_principal_delta(Money::new(delta, currency)?)
-        .with_principal_date(from_date),
+        .with_principal_date(from_date)
+        .build()?,
     );
     let mut changes = std::collections::BTreeMap::from([(effective, delta)]);
     let mut new_balance = new_outstanding.amount();
@@ -251,14 +252,13 @@ pub(crate) fn rebuild_residual_interest(
                 let balance_delta: f64 = changes.range(..=bounds[0]).map(|(_, delta)| delta).sum();
                 let factor = original.get_accrual_factor() * fraction;
                 let value = original_value * fraction + balance_delta * rate * factor;
-                let mut flow = original.clone();
+                let mut flow = CashFlowParams::from(original);
                 // A PIK row keeps its zero cash; its value is the delta below.
                 if original.get_kind() != CFKind::Pik {
                     flow.amount = Money::new(value, currency).map_err(|error| {
                         Error::capital_structure(format!(
                             "cannot rebuild {:?} interest on {}: {error}",
-                            flow.get_kind(),
-                            flow.get_date()
+                            flow.kind, flow.date
                         ))
                     })?;
                 }
@@ -293,7 +293,7 @@ pub(crate) fn rebuild_residual_interest(
                         currency,
                     )?);
                 }
-                replacement.push(flow);
+                replacement.push(flow.build()?);
             }
         } else if matches!(
             original.get_kind(),
@@ -320,10 +320,12 @@ pub(crate) fn rebuild_residual_interest(
             } else {
                 original.get_amount().amount().min(available)
             };
+            let mut flow = CashFlowParams::from(&replacement[0]);
             if cash_is_future {
-                replacement[0].amount = Money::new(repayment, currency)?;
+                flow.amount = Money::new(repayment, currency)?;
             }
-            replacement[0].principal_delta = Some(Money::new(-repayment, currency)?);
+            flow.principal_delta = Some(Money::new(-repayment, currency)?);
+            replacement[0] = flow.build()?;
         }
         let original_delta = principal_change(original);
         let revised_delta: f64 = replacement.iter().map(principal_change).sum();
@@ -387,7 +389,7 @@ fn principal_change(flow: &CashFlow) -> f64 {
 mod tests {
     use super::*;
     use finstack_quant_cashflows::builder::{CashFlowMeta, Notional};
-    use finstack_quant_core::cashflow::CashFlow;
+    use finstack_quant_core::cashflow::{CashFlow, CashFlowParams};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use time::Month;
@@ -414,22 +416,26 @@ mod tests {
 
         let original = schedule(
             vec![
-                CashFlow::new(
+                CashFlowParams::new(
                     q1_coupon,
                     None,
                     Money::from((-20_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     Some(0.08),
-                ),
-                CashFlow::new(
+                )
+                .build()
+                .expect("valid cashflow"),
+                CashFlowParams::new(
                     q2_coupon,
                     None,
                     Money::from((-20_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     Some(0.08),
-                ),
+                )
+                .build()
+                .expect("valid cashflow"),
             ],
             1_000_000.0,
             issue,
@@ -484,18 +490,22 @@ mod tests {
             vec![
                 {
                     let cash = Money::from((-1_000_000_i64, Currency::USD));
-                    CashFlow::new(issue, None, cash, CFKind::Notional, 0.0, None)
+                    CashFlowParams::new(issue, None, cash, CFKind::Notional, 0.0, None)
                         .with_principal_delta(Money::zero(Currency::USD))
                         .with_principal_date(issue)
+                        .build()
+                        .expect("valid cashflow")
                 },
-                CashFlow::new(
+                CashFlowParams::new(
                     q2_coupon,
                     None,
                     Money::from((-20_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     None,
-                ),
+                )
+                .build()
+                .expect("valid cashflow"),
             ],
             1_000_000.0,
             issue,
@@ -531,14 +541,18 @@ mod tests {
         // overflow in the rebuilt amount.
         for rate in [10.0, 6e28] {
             let original = schedule(
-                vec![CashFlow::new(
-                    coupon_date,
-                    None,
-                    Money::new(-rate, Currency::USD).expect("representable coupon fixture"),
-                    CFKind::Fixed,
-                    1.0,
-                    Some(rate),
-                )],
+                vec![
+                    CashFlowParams::new(
+                        coupon_date,
+                        None,
+                        Money::new(-rate, Currency::USD).expect("representable coupon fixture"),
+                        CFKind::Fixed,
+                        1.0,
+                        Some(rate),
+                    )
+                    .build()
+                    .expect("valid cashflow"),
+                ],
                 1.0,
                 issue,
             );
@@ -562,19 +576,23 @@ mod tests {
 
         let original = schedule(
             vec![
-                CashFlow::new(
+                CashFlowParams::new(
                     q2,
                     None,
                     Money::from((-20_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     Some(0.08),
-                ),
+                )
+                .build()
+                .expect("valid cashflow"),
                 {
                     let cash = Money::from((100_000_i64, Currency::USD));
-                    CashFlow::new(q2, None, cash, CFKind::Amortization, 0.0, None)
+                    CashFlowParams::new(q2, None, cash, CFKind::Amortization, 0.0, None)
                         .with_principal_delta(cash.checked_neg())
                         .with_principal_date(q2)
+                        .build()
+                        .expect("valid cashflow")
                 },
             ],
             1_000_000.0,

@@ -18,7 +18,7 @@ use super::specs::PrincipalEventSpec;
 use crate::builder::{AmortizationSpec, Notional, PrincipalExchange};
 use crate::fixings::ProjectedFixing;
 use finstack_quant_core::InputError;
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlowParams};
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::decimal::f64_to_decimal;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
@@ -102,7 +102,7 @@ impl CompiledCashFlowPlan {
             // Redemption cash is the outstanding par it extinguishes.
             let cash = Money::new(state.outstanding.as_f64(), self.notional.initial.currency())?;
             state.flows.push(
-                CashFlow::new(
+                CashFlowParams::new(
                     self.redemption_date,
                     None,
                     cash,
@@ -111,7 +111,8 @@ impl CompiledCashFlowPlan {
                     None,
                 )
                 .with_principal_delta(cash.checked_neg())
-                .with_principal_date(d),
+                .with_principal_date(d)
+                .build()?,
             );
             state.outstanding = Decimal::ZERO;
         }
@@ -268,14 +269,10 @@ impl CompiledCashFlowPlan {
         // them by date, so they need no entries in the date grid.
         for (fee_date, amount) in &self.fixed_fees {
             if amount.amount() != 0.0 {
-                state.flows.push(CashFlow::new(
-                    *fee_date,
-                    None,
-                    *amount,
-                    CFKind::Fee,
-                    0.0,
-                    None,
-                ));
+                state.flows.push(
+                    CashFlowParams::new(*fee_date, None, *amount, CFKind::Fee, 0.0, None)
+                        .build()?,
+                );
             }
         }
 

@@ -5,7 +5,7 @@ use finstack_quant_cashflows::builder::RateSpec;
 use finstack_quant_cashflows::{
     CashflowProvider, ScheduleBuildOpts, schedule_from_classified_flows,
 };
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlowParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -118,19 +118,30 @@ fn same_date_flows_use_the_canonical_cashflow_order() {
     // A cash principal row moves the balance by minus its cash.
     let flow = |kind: CFKind, amount| {
         let cash = Money::new(amount, Currency::USD).expect("valid money fixture");
-        let row = CashFlow::new(payment_date, None, cash, kind, 0.0, None);
+        let row = CashFlowParams::new(payment_date, None, cash, kind, 0.0, None);
         if kind.is_principal_like() && kind.is_cash_settlement() {
             row.with_principal_delta(cash.checked_neg())
                 .with_principal_date(payment_date)
         } else {
             row
         }
+        .build()
+        .expect("valid cashflow")
     };
     let flows = vec![
         flow(CFKind::Notional, 5.0),
-        flow(CFKind::Pik, 0.0)
-            .with_principal_delta(Money::new(10.0, Currency::USD).expect("valid PIK delta"))
-            .with_principal_date(payment_date),
+        CashFlowParams::new(
+            payment_date,
+            None,
+            Money::zero(Currency::USD),
+            CFKind::Pik,
+            0.0,
+            None,
+        )
+        .with_principal_delta(Money::new(10.0, Currency::USD).expect("valid PIK delta"))
+        .with_principal_date(payment_date)
+        .build()
+        .expect("valid cashflow"),
         flow(CFKind::Fee, 1.0),
         flow(CFKind::Notional, -30.0),
         flow(CFKind::Amortization, 20.0),

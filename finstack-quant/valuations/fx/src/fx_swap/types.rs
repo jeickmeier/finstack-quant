@@ -284,7 +284,7 @@ impl FxSwap {
                         } else {
                             cash.checked_neg()
                         };
-                        finstack_quant_core::cashflow::CashFlow::new(
+                        finstack_quant_core::cashflow::CashFlowParams::new(
                             date,
                             None,
                             cash,
@@ -294,9 +294,10 @@ impl FxSwap {
                         )
                         .with_principal_delta(delta)
                         .with_principal_date(date)
+                        .build()
                     },
                 )
-                .collect(),
+                .collect::<finstack_quant_core::Result<Vec<_>>>()?,
             finstack_quant_core::dates::DayCount::Act365F,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(Money::new(amount.amount().abs(), amount.currency())?),

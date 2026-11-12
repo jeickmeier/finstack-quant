@@ -419,7 +419,7 @@ impl InflationLinkedBond {
     fn real_cashflow_schedule(
         &self,
     ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
+        use finstack_quant_core::cashflow::{CFKind, CashFlowAccrual, CashFlowParams};
 
         let coupon_rate = self.real_coupon_rate()?;
         let currency = self.notional.currency();
@@ -432,7 +432,7 @@ impl InflationLinkedBond {
         for period in &periods {
             let accrual_factor = period.accrual_year_fraction.max(0.0);
             flows.push(
-                CashFlow::new(
+                CashFlowParams::new(
                     period.payment_date,
                     None,
                     Money::from_model_value(
@@ -455,14 +455,15 @@ impl InflationLinkedBond {
                         frequency: None,
                         bus_basis: None,
                     },
-                }),
+                })
+                .build()?,
             );
         }
         if !periods.is_empty() {
             flows.push({
                 // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                 let cash = self.notional;
-                CashFlow::new(
+                CashFlowParams::new(
                     self.principal_payment_date()?,
                     None,
                     cash,
@@ -472,6 +473,7 @@ impl InflationLinkedBond {
                 )
                 .with_principal_delta(cash.checked_neg())
                 .with_principal_date(self.principal_payment_date()?)
+                .build()?
             });
         }
         finstack_quant_cashflows::schedule_from_classified_flows(
@@ -877,14 +879,17 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
                 as_of,
                 self.deflation_protection == DeflationProtection::AllPayments,
             )?;
-            detailed_flows.push(finstack_quant_core::cashflow::CashFlow::new(
-                period.payment_date,
-                None,
-                Money::from_model_value(base_amount * ratio, self.notional.currency())?,
-                finstack_quant_core::cashflow::CFKind::InflationCoupon,
-                accrual_factor,
-                Some(coupon_rate),
-            ));
+            detailed_flows.push(
+                finstack_quant_core::cashflow::CashFlowParams::new(
+                    period.payment_date,
+                    None,
+                    Money::from_model_value(base_amount * ratio, self.notional.currency())?,
+                    finstack_quant_core::cashflow::CFKind::InflationCoupon,
+                    accrual_factor,
+                    Some(coupon_rate),
+                )
+                .build()?,
+            );
         }
 
         let principal_date = self.principal_payment_date()?;
@@ -898,7 +903,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
             detailed_flows.push({
                 // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                 let cash = self.notional.checked_mul_f64(principal_ratio)?;
-                finstack_quant_core::cashflow::CashFlow::new(
+                finstack_quant_core::cashflow::CashFlowParams::new(
                     principal_date,
                     None,
                     cash,
@@ -908,6 +913,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
                 )
                 .with_principal_delta(cash.checked_neg())
                 .with_principal_date(principal_date)
+                .build()?
             });
         }
 

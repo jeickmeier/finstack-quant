@@ -471,7 +471,7 @@ mod tests {
     #[test]
     fn seasoned_pik_and_amortization_follow_canonical_balance_path() {
         use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-        use finstack_quant_core::cashflow::CashFlow;
+        use finstack_quant_core::cashflow::CashFlowParams;
 
         let issue = date!(2024 - 01 - 01);
         let pik_date = date!(2024 - 07 - 01);
@@ -483,35 +483,47 @@ mod tests {
             vec![
                 {
                     let cash = money(-1_000.0);
-                    CashFlow::new(issue, None, cash, CFKind::Notional, 0.0, None)
+                    CashFlowParams::new(issue, None, cash, CFKind::Notional, 0.0, None)
                         .with_principal_delta(finstack_quant_core::money::Money::zero(
                             cash.currency(),
                         ))
                         .with_principal_date(issue)
+                        .build()
+                        .expect("valid cashflow")
                 },
-                CashFlow::new(pik_date, None, money(0.0), CFKind::Pik, 0.0, None)
+                CashFlowParams::new(pik_date, None, money(0.0), CFKind::Pik, 0.0, None)
                     .with_principal_delta(money(50.0))
-                    .with_principal_date(pik_date),
-                CashFlow::new(
+                    .with_principal_date(pik_date)
+                    .build()
+                    .expect("valid cashflow"),
+                CashFlowParams::new(
                     negative_cash_date,
                     None,
                     money(-25.0),
                     CFKind::Fixed,
                     0.0,
                     None,
-                ),
-                CashFlow::new(amort_date, None, money(50.0), CFKind::Fixed, 0.0, None),
+                )
+                .build()
+                .expect("valid cashflow"),
+                CashFlowParams::new(amort_date, None, money(50.0), CFKind::Fixed, 0.0, None)
+                    .build()
+                    .expect("valid cashflow"),
                 {
                     let cash = money(200.0);
-                    CashFlow::new(amort_date, None, cash, CFKind::Amortization, 0.0, None)
+                    CashFlowParams::new(amort_date, None, cash, CFKind::Amortization, 0.0, None)
                         .with_principal_delta(cash.checked_neg())
                         .with_principal_date(amort_date)
+                        .build()
+                        .expect("valid cashflow")
                 },
                 {
                     let cash = money(850.0);
-                    CashFlow::new(maturity, None, cash, CFKind::Notional, 0.0, None)
+                    CashFlowParams::new(maturity, None, cash, CFKind::Notional, 0.0, None)
                         .with_principal_delta(cash.checked_neg())
                         .with_principal_date(maturity)
+                        .build()
+                        .expect("valid cashflow")
                 },
             ],
             Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),

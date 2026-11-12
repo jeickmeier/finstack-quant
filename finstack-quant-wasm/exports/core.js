@@ -235,6 +235,8 @@ export const core = {
   neumaierSum: wasm.neumaierSum,
   cashFlowGetBalanceDate: wasm.cashFlowGetBalanceDate,
   cashFlowValidate: wasm.cashFlowValidate,
+  cashFlowWithAccrual: wasm.cashFlowWithAccrual,
+  cashFlowWithPrincipal: wasm.cashFlowWithPrincipal,
   cfKindIsCashSettlement: wasm.cfKindIsCashSettlement,
   cfKindIsInterestLike: wasm.cfKindIsInterestLike,
   cfKindIsPrincipalLike: wasm.cfKindIsPrincipalLike,

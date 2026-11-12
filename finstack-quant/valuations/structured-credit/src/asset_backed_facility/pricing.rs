@@ -2,7 +2,7 @@
 //! two-class deal, the facility note's flows, the commitment fee and
 //! the residual, plus the `Instrument` / `CashflowScheduleSource` impls.
 
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
@@ -391,14 +391,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
         };
         for (date, amount) in &projection.facility.interest_flows {
             if amount.amount() > 0.0 {
-                flows.push(CashFlow::new(
-                    *date,
-                    None,
-                    *amount,
-                    interest_kind,
-                    0.0,
-                    None,
-                ));
+                flows.push(
+                    CashFlowParams::new(*date, None, *amount, interest_kind, 0.0, None).build()?,
+                );
             }
         }
         for (date, amount) in &projection.facility.principal_flows {
@@ -406,16 +401,17 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
                 flows.push({
                     // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                     let cash = *amount;
-                    CashFlow::new(*date, None, cash, CFKind::Amortization, 0.0, None)
+                    CashFlowParams::new(*date, None, cash, CFKind::Amortization, 0.0, None)
                         .with_principal_delta(cash.checked_neg())
                         .with_principal_date(*date)
+                        .build()?
                 });
             }
         }
         for (date, amount) in &projection.facility.writedown_flows {
             if amount.amount() > 0.0 {
                 flows.push(
-                    CashFlow::new(
+                    CashFlowParams::new(
                         *date,
                         None,
                         Money::zero(amount.currency()),
@@ -426,19 +422,16 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
                     // A noncash write-down: zero cash and an explicit balance decrease on its event
                     // date (record CORE-CONVENTIONS-015 #4, #6).
                     .with_principal_delta(amount.checked_neg())
-                    .with_principal_date(*date),
+                    .with_principal_date(*date)
+                    .build()?,
                 );
             }
         }
         for (date, amount) in &projection.commitment_fees {
-            flows.push(CashFlow::new(
-                *date,
-                None,
-                *amount,
-                CFKind::CommitmentFee,
-                0.0,
-                None,
-            ));
+            flows.push(
+                CashFlowParams::new(*date, None, *amount, CFKind::CommitmentFee, 0.0, None)
+                    .build()?,
+            );
         }
         // Draws (scheduled and re-advances) are cash the lender pays out.
         for (date, amount) in &projection.draws {
@@ -446,9 +439,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for AssetBackedFacility {
                 flows.push({
                     // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                     let cash = amount.checked_neg();
-                    CashFlow::new(*date, None, cash, CFKind::Notional, 0.0, None)
+                    CashFlowParams::new(*date, None, cash, CFKind::Notional, 0.0, None)
                         .with_principal_delta(cash.checked_neg())
                         .with_principal_date(*date)
+                        .build()?
                 });
             }
         }

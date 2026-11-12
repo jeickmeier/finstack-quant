@@ -1114,6 +1114,7 @@ mod period_aggregation_tests {
 #[cfg(test)]
 mod period_contract_tests {
     use super::*;
+    use finstack_quant_core::cashflow::CashFlowParams;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, Period, PeriodId};
     use finstack_quant_core::money::Money;
@@ -1310,14 +1311,18 @@ mod period_contract_tests {
     #[test]
     fn pv_by_period_errors_on_nan_discount_curve() {
         let base = d(2025, 1, 1);
-        let flows = vec![CashFlow::new(
-            d(2025, 6, 1),
-            None,
-            Money::from((100_i64, Currency::USD)),
-            CFKind::Fixed,
-            0.5,
-            None,
-        )];
+        let flows = vec![
+            CashFlowParams::new(
+                d(2025, 6, 1),
+                None,
+                Money::from((100_i64, Currency::USD)),
+                CFKind::Fixed,
+                0.5,
+                None,
+            )
+            .build()
+            .expect("valid cashflow"),
+        ];
         let periods = vec![period(PeriodId::annual(2025), base, d(2026, 1, 1))];
         let disc = NanDiscount { base };
 
@@ -1348,30 +1353,36 @@ mod period_contract_tests {
         // the DataFrame convention); they still appear in nominal aggregation.
         let base = d(2025, 4, 1);
         let flows = vec![
-            CashFlow::new(
+            CashFlowParams::new(
                 d(2025, 2, 1),
                 None,
                 Money::from((100_i64, Currency::USD)),
                 CFKind::Fixed,
                 0.25,
                 None,
-            ),
-            CashFlow::new(
+            )
+            .build()
+            .expect("valid cashflow"),
+            CashFlowParams::new(
                 base,
                 None,
                 Money::from((50_i64, Currency::USD)),
                 CFKind::Fixed,
                 0.25,
                 None,
-            ),
-            CashFlow::new(
+            )
+            .build()
+            .expect("valid cashflow"),
+            CashFlowParams::new(
                 d(2025, 6, 1),
                 None,
                 Money::from((200_i64, Currency::USD)),
                 CFKind::Fixed,
                 0.25,
                 None,
-            ),
+            )
+            .build()
+            .expect("valid cashflow"),
         ];
         let periods = vec![period(PeriodId::annual(2025), d(2025, 1, 1), d(2026, 1, 1))];
         let disc = UnitDiscount { base };
@@ -1397,6 +1408,7 @@ mod period_contract_tests {
 #[cfg(test)]
 mod credit_pv_tests {
     use super::*;
+    use finstack_quant_core::cashflow::CashFlowParams;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Period, PeriodId};
     use finstack_quant_core::money::Money;
@@ -1450,18 +1462,29 @@ mod credit_pv_tests {
     /// unless the test states another explicit effect.
     fn flow(date: Date, amount: f64, kind: CFKind) -> CashFlow {
         let cash = Money::new(amount, Currency::USD).expect("valid money fixture");
-        let row = CashFlow::new(date, None, cash, kind, 0.0, None);
+        let row = CashFlowParams::new(date, None, cash, kind, 0.0, None);
         if kind.is_principal_like() && kind.is_cash_settlement() {
             row.with_principal_delta(cash.checked_neg())
                 .with_principal_date(date)
         } else {
             row
         }
+        .build()
+        .expect("valid cashflow")
+    }
+
+    /// A fixture principal row with a stated delta and balance date.
+    fn principal_row(date: Date, cash: Money, kind: CFKind, delta: Money, on: Date) -> CashFlow {
+        CashFlowParams::new(date, None, cash, kind, 0.0, None)
+            .with_principal_delta(delta)
+            .with_principal_date(on)
+            .build()
+            .expect("valid cashflow")
     }
 
     /// A PIK capitalization on `date`: zero cash, explicit balance increase.
     fn pik_row(date: Date, amount: f64) -> CashFlow {
-        CashFlow::new(
+        CashFlowParams::new(
             date,
             None,
             Money::zero(Currency::USD),
@@ -1471,6 +1494,8 @@ mod credit_pv_tests {
         )
         .with_principal_delta(Money::new(amount, Currency::USD).expect("valid PIK delta"))
         .with_principal_date(date)
+        .build()
+        .expect("valid cashflow")
     }
 
     fn funded_pvs(flows: &[CashFlow], base: Date) -> Vec<f64> {
@@ -1594,9 +1619,13 @@ mod credit_pv_tests {
     #[test]
     fn funding_is_currency_separated_and_same_day_advances_can_be_repaid() {
         let base = d(2025, 1, 1);
-        let mut euro = flow(d(2027, 1, 1), 100.0, CFKind::Notional);
-        euro.amount = Money::from((100_i64, Currency::EUR));
-        euro.principal_delta = Some(Money::from((-100_i64, Currency::EUR)));
+        let euro = principal_row(
+            d(2027, 1, 1),
+            Money::from((100_i64, Currency::EUR)),
+            CFKind::Notional,
+            Money::from((-100_i64, Currency::EUR)),
+            d(2027, 1, 1),
+        );
         let flows = vec![
             flow(d(2026, 1, 1), 40.0, CFKind::Amortization),
             euro,
@@ -1615,10 +1644,20 @@ mod credit_pv_tests {
         let base = d(2025, 1, 1);
         for repayment_cash in [90.0, 110.0] {
             let flows = vec![
-                flow(d(2026, 1, 1), -90.0, CFKind::Notional)
-                    .with_principal_delta(Money::from((100_i64, Currency::USD))),
-                flow(d(2027, 1, 1), repayment_cash, CFKind::Amortization)
-                    .with_principal_delta(Money::from((-100_i64, Currency::USD))),
+                principal_row(
+                    d(2026, 1, 1),
+                    Money::from((-90_i64, Currency::USD)),
+                    CFKind::Notional,
+                    Money::from((100_i64, Currency::USD)),
+                    d(2026, 1, 1),
+                ),
+                principal_row(
+                    d(2027, 1, 1),
+                    Money::new(repayment_cash, Currency::USD).expect("valid money fixture"),
+                    CFKind::Amortization,
+                    Money::from((-100_i64, Currency::USD)),
+                    d(2027, 1, 1),
+                ),
             ];
             {
                 let actual = funded_pvs(&flows, base).iter().sum::<f64>();
@@ -1635,9 +1674,13 @@ mod credit_pv_tests {
         let capitalization = d(2025, 8, 31);
         // PIK is dated at its capitalization (record CORE-CONVENTIONS-015 #6).
         let pik = pik_row(capitalization, 5.0);
-        let mut redemption = flow(payment, 105.0, CFKind::Notional);
-        redemption.principal_date = Some(capitalization);
-        redemption.principal_delta = Some(Money::from((-105_i64, Currency::USD)));
+        let redemption = principal_row(
+            payment,
+            Money::from((105_i64, Currency::USD)),
+            CFKind::Notional,
+            Money::from((-105_i64, Currency::USD)),
+            capitalization,
+        );
         let pvs = funded_pvs(&[pik.clone(), redemption.clone()], base);
         let survival = 0.8_f64.powf(28.0 / 365.0);
         let expected = 105.0 * survival + 100.0 * 0.4 * (1.0 - survival);
@@ -1645,10 +1688,20 @@ mod credit_pv_tests {
         let settled = funded_pvs(&[pik.clone(), redemption.clone()], d(2025, 8, 30));
         assert_eq!(settled, vec![0.0, 0.0]);
         let replay = [
-            flow(capitalization, 0.0, CFKind::Notional)
-                .with_principal_delta(Money::from((5_i64, Currency::USD))),
-            flow(capitalization, 0.0, CFKind::Notional)
-                .with_principal_delta(Money::from((-105_i64, Currency::USD))),
+            principal_row(
+                capitalization,
+                Money::zero(Currency::USD),
+                CFKind::Notional,
+                Money::from((5_i64, Currency::USD)),
+                capitalization,
+            ),
+            principal_row(
+                capitalization,
+                Money::zero(Currency::USD),
+                CFKind::Notional,
+                Money::from((-105_i64, Currency::USD)),
+                capitalization,
+            ),
         ];
         assert_eq!(funded_pvs(&replay, d(2025, 8, 30)), vec![0.0, 0.0]);
 
@@ -1673,14 +1726,19 @@ mod credit_pv_tests {
     fn pending_settlement_recovery_agrees_before_and_after_normalization() {
         let base = d(2025, 11, 5);
         for cash in [90.0, 110.0] {
-            let mut raw = flow(d(2025, 11, 10), cash, CFKind::Amortization)
-                .with_principal_delta(Money::from((-100_i64, Currency::USD)));
-            raw.principal_date = Some(d(2025, 11, 1));
-            let mut normalized = raw.clone();
-            normalized.principal_delta = Some(Money::from((0_i64, Currency::USD)));
+            let raw = principal_row(
+                d(2025, 11, 10),
+                Money::new(cash, Currency::USD).expect("valid money fixture"),
+                CFKind::Amortization,
+                Money::from((-100_i64, Currency::USD)),
+                d(2025, 11, 1),
+            );
+            let normalized = raw
+                .with_principal(Money::from((0_i64, Currency::USD)), d(2025, 11, 1))
+                .expect("valid cashflow");
             {
-                let raw_pv = funded_pvs(&[raw.clone()], base);
-                let normalized_pv = funded_pvs(&[normalized.clone()], base);
+                let raw_pv = funded_pvs(std::slice::from_ref(&raw), base);
+                let normalized_pv = funded_pvs(std::slice::from_ref(&normalized), base);
                 assert_eq!(raw_pv, normalized_pv);
                 let survival = 0.8_f64.powf(5.0 / 365.0);
                 assert!((raw_pv[0] - cash * (survival + 0.4 * (1.0 - survival))).abs() < 1e-10);
@@ -1793,19 +1851,26 @@ mod credit_pv_tests {
     fn rejects_defaulted_notional_with_recovery_rate() {
         let base = d(2025, 1, 1);
         let flows = vec![
-            CashFlow::new(
+            // A noncash write-down: zero cash, explicit balance decrease.
+            CashFlowParams::new(
                 d(2025, 6, 1),
                 None,
-                Money::from((100_000_i64, Currency::USD)),
+                Money::zero(Currency::USD),
                 CFKind::DefaultedNotional,
                 0.0,
                 None,
-            ),
+            )
+            .with_principal_delta(Money::from((-100_000_i64, Currency::USD)))
+            .with_principal_date(d(2025, 6, 1))
+            .build()
+            .expect("valid cashflow"),
             {
                 let cash = Money::from((900_000_i64, Currency::USD));
-                CashFlow::new(d(2025, 12, 1), None, cash, CFKind::Amortization, 0.0, None)
+                CashFlowParams::new(d(2025, 12, 1), None, cash, CFKind::Amortization, 0.0, None)
                     .with_principal_delta(cash.checked_neg())
                     .with_principal_date(d(2025, 12, 1))
+                    .build()
+                    .expect("valid cashflow")
             },
         ];
         let periods = vec![make_period(base, d(2026, 1, 1))];
@@ -1830,19 +1895,26 @@ mod credit_pv_tests {
     fn allows_defaulted_notional_without_recovery_rate() {
         let base = d(2025, 1, 1);
         let flows = vec![
-            CashFlow::new(
+            // A noncash write-down: zero cash, explicit balance decrease.
+            CashFlowParams::new(
                 d(2025, 6, 1),
                 None,
-                Money::from((100_000_i64, Currency::USD)),
+                Money::zero(Currency::USD),
                 CFKind::DefaultedNotional,
                 0.0,
                 None,
-            ),
+            )
+            .with_principal_delta(Money::from((-100_000_i64, Currency::USD)))
+            .with_principal_date(d(2025, 6, 1))
+            .build()
+            .expect("valid cashflow"),
             {
                 let cash = Money::from((900_000_i64, Currency::USD));
-                CashFlow::new(d(2025, 12, 1), None, cash, CFKind::Amortization, 0.0, None)
+                CashFlowParams::new(d(2025, 12, 1), None, cash, CFKind::Amortization, 0.0, None)
                     .with_principal_delta(cash.checked_neg())
                     .with_principal_date(d(2025, 12, 1))
+                    .build()
+                    .expect("valid cashflow")
             },
         ];
         let periods = vec![make_period(base, d(2026, 1, 1))];

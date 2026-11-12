@@ -11,7 +11,7 @@ use crate::structured_credit::assumptions::embedded_registry;
 use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
 use finstack_quant_core::Result;
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlowParams};
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -142,31 +142,36 @@ pub(crate) fn build_reference_tranche_schedule(
 
     for cf in tranche_cashflows {
         if cf.interest.abs() > f64::EPSILON {
-            flows.push(CashFlow::new(
-                cf.payment_date,
-                None,
-                Money::new(cf.interest, tranche.current_face.currency())?,
-                CFKind::Fixed,
-                0.0,
-                Some(tranche.coupon),
-            ));
+            flows.push(
+                CashFlowParams::new(
+                    cf.payment_date,
+                    None,
+                    Money::new(cf.interest, tranche.current_face.currency())?,
+                    CFKind::Fixed,
+                    0.0,
+                    Some(tranche.coupon),
+                )
+                .build()?,
+            );
         }
         if cf.scheduled_principal.abs() > f64::EPSILON {
             flows.push({
                 // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                 let cash = Money::new(cf.scheduled_principal, tranche.current_face.currency())?;
-                CashFlow::new(cf.payment_date, None, cash, CFKind::Amortization, 0.0, None)
+                CashFlowParams::new(cf.payment_date, None, cash, CFKind::Amortization, 0.0, None)
                     .with_principal_delta(cash.checked_neg())
                     .with_principal_date(cf.payment_date)
+                    .build()?
             });
         }
         if cf.prepayment_principal.abs() > f64::EPSILON {
             flows.push({
                 // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                 let cash = Money::new(cf.prepayment_principal, tranche.current_face.currency())?;
-                CashFlow::new(cf.payment_date, None, cash, CFKind::PrePayment, 0.0, None)
+                CashFlowParams::new(cf.payment_date, None, cash, CFKind::PrePayment, 0.0, None)
                     .with_principal_delta(cash.checked_neg())
                     .with_principal_date(cf.payment_date)
+                    .build()?
             });
         }
     }

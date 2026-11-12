@@ -520,7 +520,7 @@ mod tests {
     use super::*;
     use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
     use finstack_quant_core::cashflow::CFKind;
-    use finstack_quant_core::cashflow::CashFlow;
+    use finstack_quant_core::cashflow::{CashFlow, CashFlowParams};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, PeriodId};
     use finstack_quant_core::money::Money;
@@ -619,14 +619,18 @@ mod tests {
         };
 
         let instrument = SignedFlowInstrument::new(test_schedule(
-            vec![CashFlow::new(
-                Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                None,
-                Money::from((-50_000_i64, Currency::USD)),
-                CFKind::Fixed,
-                0.25,
-                None,
-            )],
+            vec![
+                CashFlowParams::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::from((-50_000_i64, Currency::USD)),
+                    CFKind::Fixed,
+                    0.25,
+                    None,
+                )
+                .build()
+                .expect("valid cashflow"),
+            ],
             1_000_000.0,
             start,
         ));
@@ -670,22 +674,26 @@ mod tests {
         // Pay fixed 4% (outflow), receive floating 5.3% (inflow) => net receipt.
         let instrument = SignedFlowInstrument::new(test_schedule(
             vec![
-                CashFlow::new(
+                CashFlowParams::new(
                     pay_date,
                     None,
                     Money::from((-40_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     None,
-                ),
-                CashFlow::new(
+                )
+                .build()
+                .expect("valid cashflow"),
+                CashFlowParams::new(
                     pay_date,
                     None,
                     Money::from((53_000_i64, Currency::USD)),
                     CFKind::Floating,
                     0.25,
                     None,
-                ),
+                )
+                .build()
+                .expect("valid cashflow"),
             ],
             1_000_000.0,
             start,
@@ -751,18 +759,22 @@ mod tests {
             vec![
                 {
                     let cash = Money::from((1_000_000_i64, Currency::USD));
-                    CashFlow::new(draw_date, None, cash, CFKind::RevolvingDraw, 0.0, None)
+                    CashFlowParams::new(draw_date, None, cash, CFKind::RevolvingDraw, 0.0, None)
                         .with_principal_delta(cash.checked_neg())
                         .with_principal_date(draw_date)
+                        .build()
+                        .expect("valid cashflow")
                 },
-                CashFlow::new(
+                CashFlowParams::new(
                     coupon_date,
                     None,
                     Money::from((20_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     None,
-                ),
+                )
+                .build()
+                .expect("valid cashflow"),
             ],
             1_000_000.0,
             start,
@@ -806,14 +818,18 @@ mod tests {
         let coupon_date = Date::from_calendar_date(2025, Month::February, 15).expect("valid date");
 
         let instrument = SignedFlowInstrument::new(test_schedule(
-            vec![CashFlow::new(
-                coupon_date,
-                None,
-                Money::from((20_000_i64, Currency::USD)),
-                CFKind::Fixed,
-                0.25,
-                None,
-            )],
+            vec![
+                CashFlowParams::new(
+                    coupon_date,
+                    None,
+                    Money::from((20_000_i64, Currency::USD)),
+                    CFKind::Fixed,
+                    0.25,
+                    None,
+                )
+                .build()
+                .expect("valid cashflow"),
+            ],
             1_000_000.0,
             Date::from_calendar_date(2024, Month::December, 1).expect("valid issue date"),
         ));
@@ -859,14 +875,18 @@ mod tests {
 
         // Scheduled notional 1M with a 20k coupon.
         let instrument = SignedFlowInstrument::new(test_schedule(
-            vec![CashFlow::new(
-                Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                None,
-                Money::from((20_000_i64, Currency::USD)),
-                CFKind::Fixed,
-                0.25,
-                None,
-            )],
+            vec![
+                CashFlowParams::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::from((20_000_i64, Currency::USD)),
+                    CFKind::Fixed,
+                    0.25,
+                    None,
+                )
+                .build()
+                .expect("valid cashflow"),
+            ],
             1_000_000.0,
             start,
         ));
@@ -907,14 +927,18 @@ mod tests {
         };
 
         let instrument = SignedFlowInstrument::new(test_schedule(
-            vec![CashFlow::new(
-                Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                None,
-                Money::from((20_000_i64, Currency::USD)),
-                CFKind::Fixed,
-                0.25,
-                None,
-            )],
+            vec![
+                CashFlowParams::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::from((20_000_i64, Currency::USD)),
+                    CFKind::Fixed,
+                    0.25,
+                    None,
+                )
+                .build()
+                .expect("valid cashflow"),
+            ],
             1_000_000.0,
             start,
         ));
@@ -955,22 +979,26 @@ mod tests {
         // Pay fixed 4% (outflow), receive floating 1% (inflow) => net payment.
         let instrument = SignedFlowInstrument::new(test_schedule(
             vec![
-                CashFlow::new(
+                CashFlowParams::new(
                     pay_date,
                     None,
                     Money::from((-40_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     None,
-                ),
-                CashFlow::new(
+                )
+                .build()
+                .expect("valid cashflow"),
+                CashFlowParams::new(
                     pay_date,
                     None,
                     Money::from((10_000_i64, Currency::USD)),
                     CFKind::Floating,
                     0.25,
                     None,
-                ),
+                )
+                .build()
+                .expect("valid cashflow"),
             ],
             1_000_000.0,
             start,
@@ -1008,17 +1036,19 @@ mod tests {
         // repaid. Its original contractual schedule must not resurrect it.
         let instrument = SignedFlowInstrument::new(test_schedule(
             vec![
-                CashFlow::new(
+                CashFlowParams::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
                     Money::from((-50_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     None,
-                ),
+                )
+                .build()
+                .expect("valid cashflow"),
                 {
                     let cash = Money::from((-100_000_i64, Currency::USD));
-                    CashFlow::new(
+                    CashFlowParams::new(
                         Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
                         None,
                         cash,
@@ -1030,6 +1060,8 @@ mod tests {
                     .with_principal_date(
                         Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
                     )
+                    .build()
+                    .expect("valid cashflow")
                 },
             ],
             1_000_000.0,
@@ -1069,7 +1101,7 @@ mod tests {
         let instrument = SignedFlowInstrument::new(test_schedule(
             vec![{
                 let cash = Money::from((-100_000_i64, Currency::USD));
-                CashFlow::new(
+                CashFlowParams::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
                     cash,
@@ -1081,6 +1113,8 @@ mod tests {
                 .with_principal_date(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                 )
+                .build()
+                .expect("valid cashflow")
             }],
             0.0,
             start,
@@ -1129,19 +1163,25 @@ mod tests {
         let mut flows = Vec::new();
         let mut outstanding = 1_000_000.0;
         for q in 2..=4 {
-            flows.push(CashFlow::new(
-                q_start(q),
-                None,
-                Money::new(outstanding * 0.01, Currency::USD).expect("valid money fixture"),
-                CFKind::Fixed,
-                0.25,
-                Some(0.04),
-            ));
+            flows.push(
+                CashFlowParams::new(
+                    q_start(q),
+                    None,
+                    Money::new(outstanding * 0.01, Currency::USD).expect("valid money fixture"),
+                    CFKind::Fixed,
+                    0.25,
+                    Some(0.04),
+                )
+                .build()
+                .expect("valid cashflow"),
+            );
             flows.push({
                 let cash = Money::from((100_000_i64, Currency::USD));
-                CashFlow::new(q_start(q), None, cash, CFKind::Amortization, 0.0, None)
+                CashFlowParams::new(q_start(q), None, cash, CFKind::Amortization, 0.0, None)
                     .with_principal_delta(cash.checked_neg())
                     .with_principal_date(q_start(q))
+                    .build()
+                    .expect("valid cashflow")
             });
             outstanding -= 100_000.0;
         }
@@ -1201,7 +1241,7 @@ mod tests {
             vec![
                 {
                     let cash = Money::from((-100_000_i64, Currency::USD));
-                    CashFlow::new(
+                    CashFlowParams::new(
                         Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                         None,
                         cash,
@@ -1213,10 +1253,12 @@ mod tests {
                     .with_principal_date(
                         Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     )
+                    .build()
+                    .expect("valid cashflow")
                 },
                 {
                     let cash = Money::from((30_000_i64, Currency::USD));
-                    CashFlow::new(
+                    CashFlowParams::new(
                         Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
                         None,
                         cash,
@@ -1228,6 +1270,8 @@ mod tests {
                     .with_principal_date(
                         Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
                     )
+                    .build()
+                    .expect("valid cashflow")
                 },
             ],
             // Scheduled balance is 500k — the stateful balance (zero,
@@ -1271,22 +1315,26 @@ mod tests {
 
         let instrument = SignedFlowInstrument::new(test_schedule(
             vec![
-                CashFlow::new(
+                CashFlowParams::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
                     Money::from((-5_000_i64, Currency::USD)),
                     CFKind::CommitmentFee,
                     0.25,
                     None,
-                ),
-                CashFlow::new(
+                )
+                .build()
+                .expect("valid cashflow"),
+                CashFlowParams::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
                     Money::from((-2_000_i64, Currency::USD)),
                     CFKind::FacilityFee,
                     0.25,
                     None,
-                ),
+                )
+                .build()
+                .expect("valid cashflow"),
             ],
             1_000_000.0,
             start,
@@ -1324,14 +1372,18 @@ mod tests {
         };
 
         let instrument = SignedFlowInstrument::new(test_schedule(
-            vec![CashFlow::new(
-                Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                None,
-                Money::from((50_000_i64, Currency::USD)),
-                CFKind::Fixed,
-                0.25,
-                None,
-            )],
+            vec![
+                CashFlowParams::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::from((50_000_i64, Currency::USD)),
+                    CFKind::Fixed,
+                    0.25,
+                    None,
+                )
+                .build()
+                .expect("valid cashflow"),
+            ],
             0.01,
             start,
         ));
@@ -1411,25 +1463,31 @@ mod tests {
             vec![
                 {
                     let cash = Money::from((-1_000_000_i64, Currency::USD));
-                    CashFlow::new(issue, None, cash, CFKind::Notional, 0.0, None)
+                    CashFlowParams::new(issue, None, cash, CFKind::Notional, 0.0, None)
                         .with_principal_delta(finstack_quant_core::money::Money::zero(
                             cash.currency(),
                         ))
                         .with_principal_date(issue)
+                        .build()
+                        .expect("valid cashflow")
                 },
-                CashFlow::new(
+                CashFlowParams::new(
                     start,
                     None,
                     Money::from((20_000_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.25,
                     Some(0.08),
-                ),
+                )
+                .build()
+                .expect("valid cashflow"),
                 {
                     let cash = Money::from((100_000_i64, Currency::USD));
-                    CashFlow::new(start, None, cash, CFKind::Amortization, 0.0, None)
+                    CashFlowParams::new(start, None, cash, CFKind::Amortization, 0.0, None)
                         .with_principal_delta(cash.checked_neg())
                         .with_principal_date(start)
+                        .build()
+                        .expect("valid cashflow")
                 },
             ],
             1_000_000.0,

@@ -89,5 +89,5 @@ mod primitives;
 mod xirr;
 
 pub use discounting::{flat_discount_factor, npv, npv_amounts};
-pub use primitives::{CFKind, CashFlow, CashFlowAccrual};
+pub use primitives::{CFKind, CashFlow, CashFlowAccrual, CashFlowParams};
 pub use xirr::{irr, xirr};

@@ -1,6 +1,6 @@
 //! Python bindings for `finstack_quant_core::cashflow`.
 
-use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual, CashFlowParams};
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
@@ -205,7 +205,8 @@ impl PyCashFlowAccrual {
     /// Raises
     /// ------
     /// ValueError
-    ///     If either date cannot be parsed.
+    ///     If either date cannot be parsed, ``start`` is not before ``end``,
+    ///     or ``projected_index_rate`` is not finite.
     #[new]
     #[pyo3(signature = (start, end, day_count, context, projected_index_rate=None))]
     fn new(
@@ -215,15 +216,15 @@ impl PyCashFlowAccrual {
         context: PyRef<'_, PyDayCountContext>,
         projected_index_rate: Option<f64>,
     ) -> PyResult<Self> {
-        Ok(Self {
-            inner: CashFlowAccrual {
-                start: py_to_date(start)?,
-                end: py_to_date(end)?,
-                day_count: day_count.inner,
-                projected_index_rate,
-                context: context.inner.clone(),
-            },
-        })
+        let inner = CashFlowAccrual {
+            start: py_to_date(start)?,
+            end: py_to_date(end)?,
+            day_count: day_count.inner,
+            projected_index_rate,
+            context: context.inner.clone(),
+        };
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Inclusive accrual start as a Python date.
@@ -305,10 +306,19 @@ impl PyCashFlow {
     /// rate : float, optional
     ///     Effective annual rate (decimal, ``0.05`` = 5%) used to compute
     ///     this cashflow.
+    /// principal : tuple[Money, datetime.date or str], optional
+    ///     ``(delta, date)``: the signed change in outstanding and its
+    ///     balance-effective date. Required on principal kinds and rejected
+    ///     on others; attach accrual metadata with ``with_accrual``.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If a date or kind cannot be parsed, or the row is invalid.
     #[new]
     #[pyo3(
-        signature = (date, amount, kind, accrual_factor, reset_date=None, rate=None),
-        text_signature = "(date, amount, kind, accrual_factor, reset_date=None, rate=None)"
+        signature = (date, amount, kind, accrual_factor, reset_date=None, rate=None, principal=None),
+        text_signature = "(date, amount, kind, accrual_factor, reset_date=None, rate=None, principal=None)"
     )]
     fn new(
         date: &Bound<'_, PyAny>,
@@ -317,16 +327,22 @@ impl PyCashFlow {
         accrual_factor: f64,
         reset_date: Option<&Bound<'_, PyAny>>,
         rate: Option<f64>,
+        principal: Option<(PyMoney, Bound<'_, PyAny>)>,
     ) -> PyResult<Self> {
-        let reset = reset_date.map(py_to_date).transpose()?;
-        Ok(Self::from_inner(CashFlow::new(
+        let mut params = CashFlowParams::new(
             py_to_date(date)?,
-            reset,
+            reset_date.map(py_to_date).transpose()?,
             amount.inner,
             extract_cf_kind(kind)?,
             accrual_factor,
             rate,
-        )))
+        );
+        if let Some((delta, balance_date)) = principal {
+            params = params
+                .with_principal_delta(delta.inner)
+                .with_principal_date(py_to_date(&balance_date)?);
+        }
+        Ok(Self::from_inner(params.build().map_err(core_to_py)?))
     }
 
     /// Payment date as ``datetime.date``.
@@ -398,25 +414,30 @@ impl PyCashFlow {
             .transpose()
     }
 
-    /// Return a copy with the supplied economic principal date.
+    /// Return a copy with a new principal change and balance date.
     ///
     /// Parameters
     /// ----------
+    /// delta : Money
+    ///     Signed principal change in the cash currency; positive increases it.
     /// date : datetime.date or str
-    ///     Balance-effective date; the cash payment date stays on the original row.
+    ///     Balance-effective date; the cash payment date stays on the row.
     ///
     /// Returns
     /// -------
     /// CashFlow
-    ///     New row with the supplied principal date.
+    ///     The updated row; this row is unchanged.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If the supplied date cannot be parsed.
-    fn with_principal_date(&self, date: &Bound<'_, PyAny>) -> PyResult<Self> {
+    ///     If the date cannot be parsed or the updated row is invalid.
+    fn with_principal(&self, delta: PyMoney, date: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let date = py_to_date(date)?;
         Ok(Self::from_inner(
-            self.inner.clone().with_principal_date(py_to_date(date)?),
+            self.inner
+                .with_principal(delta.inner, date)
+                .map_err(core_to_py)?,
         ))
     }
     /// Return a copy carrying the supplied contractual accrual metadata.
@@ -429,23 +450,18 @@ impl PyCashFlow {
     /// Returns
     /// -------
     /// CashFlow
-    ///     A new row with the supplied metadata; call validate to check it.
-    fn with_accrual(&self, accrual: PyRef<'_, PyCashFlowAccrual>) -> Self {
-        Self::from_inner(self.inner.clone().with_accrual(accrual.inner.clone()))
-    }
-    /// Return a copy with a principal movement separate from settlement cash.
+    ///     The updated row; this row is unchanged.
     ///
-    /// Parameters
-    /// ----------
-    /// delta : Money
-    ///     Signed principal change in the cash currency; positive increases it.
-    ///
-    /// Returns
-    /// -------
-    /// CashFlow
-    ///     A new row with an explicit balance movement; call validate to check currency.
-    fn with_principal_delta(&self, delta: PyMoney) -> Self {
-        Self::from_inner(self.inner.clone().with_principal_delta(delta.inner))
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the updated row is invalid.
+    fn with_accrual(&self, accrual: PyRef<'_, PyCashFlowAccrual>) -> PyResult<Self> {
+        Ok(Self::from_inner(
+            self.inner
+                .with_accrual(accrual.inner.clone())
+                .map_err(core_to_py)?,
+        ))
     }
 
     /// Validate amount, accrual factor, rate, and reset-date ordering.

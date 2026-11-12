@@ -1,6 +1,7 @@
 use super::*;
 use crate::bond::{CallPutSchedule, CashflowSpec};
 use finstack_quant_cashflows::builder::FloatingRateFallback;
+use finstack_quant_core::cashflow::CashFlowParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Tenor};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
@@ -790,7 +791,7 @@ fn explicit_principal_delta_preserves_movements_paid_on_redemption_date() {
     let effective = time::macros::date!(2025 - 04 - 15);
     let payment = time::macros::date!(2025 - 04 - 17);
     let bond = stochastic_test_bond(issue, payment);
-    let draw = CashFlow::new(
+    let draw = CashFlowParams::new(
         payment,
         None,
         Money::from((-10_i64, Currency::USD)),
@@ -799,12 +800,16 @@ fn explicit_principal_delta_preserves_movements_paid_on_redemption_date() {
         None,
     )
     .with_principal_delta(Money::from((25_i64, Currency::USD)))
-    .with_principal_date(effective);
+    .with_principal_date(effective)
+    .build()
+    .expect("valid cashflow");
     let redemption = {
         let cash = Money::from((125_i64, Currency::USD));
-        CashFlow::new(payment, None, cash, CFKind::Notional, 0.0, None)
+        CashFlowParams::new(payment, None, cash, CFKind::Notional, 0.0, None)
             .with_principal_delta(cash.checked_neg())
             .with_principal_date(payment)
+            .build()
+            .expect("valid cashflow")
     };
     assert!(!is_terminal_redemption(&draw, Some(payment)));
     assert!(is_terminal_redemption(&redemption, Some(payment)));
@@ -814,11 +819,13 @@ fn explicit_principal_delta_preserves_movements_paid_on_redemption_date() {
             .expect("balance"),
         125.0
     );
-    let issue_draw = CashFlow {
+    let issue_draw = CashFlowParams {
         date: issue,
         principal_date: Some(issue),
-        ..draw
-    };
+        ..CashFlowParams::from(&draw)
+    }
+    .build()
+    .expect("valid cashflow");
     assert_eq!(
         scheduled_outstanding_after(&bond, &[issue_draw], issue, Some(payment))
             .expect("issue draw"),

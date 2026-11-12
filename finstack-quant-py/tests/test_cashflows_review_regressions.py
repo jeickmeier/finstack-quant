@@ -41,9 +41,13 @@ def test_aggregation_round_trip_preserves_currency_labels() -> None:
 def test_dated_flows_rejects_same_invalid_economics_as_json() -> None:
     schedule = CashFlowSchedule.from_flows(
         [
-            CashFlow(dt.date(2025, 6, 15), Money(150, "USD"), "amortization", 0.0)
-            .with_principal_delta(Money(-150, "USD"))
-            .with_principal_date(dt.date(2025, 6, 15))
+            CashFlow(
+                dt.date(2025, 6, 15),
+                Money(150, "USD"),
+                "amortization",
+                0.0,
+                principal=(Money(-150, "USD"), dt.date(2025, 6, 15)),
+            )
         ],
         Notional.par(100, "USD"),
         DayCount.ACT_360,
@@ -61,10 +65,8 @@ def test_dated_flows_preserves_cash_and_omits_state_rows() -> None:
         [
             CashFlow(date, Money(10, "USD"), "fixed", 0.0),
             # Noncash balance events carry zero cash and an explicit delta.
-            CashFlow(date, Money(0, "USD"), "pik", 0.0).with_principal_delta(Money(5, "USD")).with_principal_date(date),
-            CashFlow(date, Money(0, "USD"), "defaulted_notional", 0.0)
-            .with_principal_delta(Money(-20, "USD"))
-            .with_principal_date(date),
+            CashFlow(date, Money(0, "USD"), "pik", 0.0, principal=(Money(5, "USD"), date)),
+            CashFlow(date, Money(0, "USD"), "defaulted_notional", 0.0, principal=(Money(-20, "USD"), date)),
         ],
         Notional.par(100, "USD"),
         DayCount.ACT_360,
@@ -87,32 +89,21 @@ def _coupon_schedule(flow: CashFlow) -> CashFlowSchedule:
 
 @pytest.mark.parametrize("invalid", [float("nan"), float("inf"), float("-inf")])
 @pytest.mark.parametrize("field", ["rate", "projected_index_rate"])
-def test_nonfinite_coupon_rates_cannot_be_erased_by_serialization(invalid: float, field: str) -> None:
-    flow = CashFlow(
-        dt.date(2025, 7, 1),
-        Money(25, "USD"),
-        "fixed",
-        accrual_factor=181 / 360,
-        rate=invalid if field == "rate" else 0.05,
-    ).with_accrual(
-        CashFlowAccrual(
-            dt.date(2025, 1, 1),
-            dt.date(2025, 7, 1),
-            DayCount.ACT_360,
-            DayCountContext(end_is_termination_date=False),
-            projected_index_rate=invalid if field == "projected_index_rate" else 0.045,
-        )
-    )
-    with pytest.raises(ValueError, match="finite"):
-        flow.validate()
-    with pytest.raises(ValueError, match="finite"):
-        flow.to_json()
-    with pytest.raises(ValueError, match="finite"):
-        pickle.dumps(flow)
-    # Every host schedule constructor validates its rows, so a non-finite
-    # coupon rate cannot reach a schedule (or its accrual) at all.
-    with pytest.raises(ValueError, match="finite"):
-        _coupon_schedule(flow)
+def test_nonfinite_coupon_rates_never_construct(invalid: float, field: str) -> None:
+    # Record CORE-CONVENTIONS-015 #10: rows and accrual slices validate on
+    # construction, so a non-finite rate never reaches serialization or a schedule.
+    if field == "rate":
+        with pytest.raises(ValueError, match="finite"):
+            CashFlow(dt.date(2025, 7, 1), Money(25, "USD"), "fixed", accrual_factor=181 / 360, rate=invalid)
+    else:
+        with pytest.raises(ValueError, match="finite"):
+            CashFlowAccrual(
+                dt.date(2025, 1, 1),
+                dt.date(2025, 7, 1),
+                DayCount.ACT_360,
+                DayCountContext(end_is_termination_date=False),
+                projected_index_rate=invalid,
+            )
 
 
 @pytest.mark.parametrize("wire_format", ["json", "pickle"])

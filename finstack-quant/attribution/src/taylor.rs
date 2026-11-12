@@ -1983,14 +1983,18 @@ mod tests {
             _market: &MarketContext,
             _as_of: Date,
         ) -> Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-            use finstack_quant_core::cashflow::{CFKind, CashFlow};
+            use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
             if let Some(error) = self.cashflow_error {
                 return Err(finstack_quant_core::Error::Validation(error.to_string()));
             }
             let flows: Vec<CashFlow> = self
                 .coupon
                 .iter()
-                .map(|(date, amount)| CashFlow::new(*date, None, *amount, CFKind::Fixed, 0.0, None))
+                .map(|(date, amount)| {
+                    CashFlowParams::new(*date, None, *amount, CFKind::Fixed, 0.0, None)
+                        .build()
+                        .expect("valid cashflow")
+                })
                 .collect();
             finstack_quant_cashflows::schedule_from_classified_flows(
                 flows,

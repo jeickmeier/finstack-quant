@@ -484,20 +484,20 @@ impl CashFlowAccrual {
 pub struct CashFlow {
     /// Payment date (or payment date for principal/fee, or reset date for `CFKind::Floating`).
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
-    pub date: Date,
+    date: Date,
     /// Optional index reset date (for floating coupons).
     #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<crate::wire::DateWire>")
     )]
-    pub reset_date: Option<Date>,
+    reset_date: Option<Date>,
     /// Monetary amount including its currency.
-    pub amount: Money,
+    amount: Money,
     /// Category/kind of cash-flow.
-    pub kind: CFKind,
+    kind: CFKind,
     /// Accrual factor used for coupon amount and sensitivity.
-    pub accrual_factor: f64,
+    accrual_factor: f64,
     /// Effective rate used to calculate this cashflow (None if not rate-based or unknown).
     ///
     /// For interest/fees: the annual rate used in the calculation
@@ -512,16 +512,16 @@ pub struct CashFlow {
         skip_serializing_if = "Option::is_none",
         serialize_with = "serialize_optional_rate"
     )]
-    pub rate: Option<f64>,
+    rate: Option<f64>,
     /// Optional contractual accrual metadata owned by this flow.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub accrual: Option<CashFlowAccrual>,
+    accrual: Option<CashFlowAccrual>,
     /// Explicit change in outstanding principal, in the cashflow currency.
     /// Positive increases outstanding. Required on every principal-like row
     /// (zero included) and absent on every other kind; nothing is inferred
     /// from the amount or kind (record CORE-CONVENTIONS-015 #4, #5).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub principal_delta: Option<Money>,
+    principal_delta: Option<Money>,
     /// Economic date of the principal movement, independent of cash payment.
     /// Required with `principal_delta` on every principal-like row and absent
     /// otherwise; there is no payment-date fallback. PIK and write-down rows
@@ -531,7 +531,7 @@ pub struct CashFlow {
         feature = "json-schema",
         schemars(with = "Option<crate::wire::DateWire>")
     )]
-    pub principal_date: Option<Date>,
+    principal_date: Option<Date>,
 }
 
 /// Wire fields of [`CashFlow`]; deserialization validates them.
@@ -574,17 +574,48 @@ impl TryFrom<CashFlowWire> for CashFlow {
     }
 }
 
-impl CashFlow {
-    /// Construct a cashflow without optional contractual accrual metadata.
+/// Raw, possibly incomplete inputs of a [`CashFlow`].
+///
+/// A builder holds these and publishes them only through [`Self::build`] or
+/// [`CashFlow::new`], which validate the complete row (record
+/// CORE-CONVENTIONS-015 #10). `From<&CashFlow>` gives the inputs of an
+/// existing row for an edit-and-rebuild update.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CashFlowParams {
+    /// Settlement/payment date, or the event date of a noncash balance row.
+    pub date: Date,
+    /// Single index observation date of a floating coupon.
+    pub reset_date: Option<Date>,
+    /// Signed settlement cash; zero for PIK and default write-down rows.
+    pub amount: Money,
+    /// Cashflow classification.
+    pub kind: CFKind,
+    /// Literal nonnegative accrual factor.
+    pub accrual_factor: f64,
+    /// Optional decimal effective rate.
+    pub rate: Option<f64>,
+    /// Optional single-slice contractual accrual metadata.
+    pub accrual: Option<CashFlowAccrual>,
+    /// Explicit principal change, required on principal-like rows.
+    pub principal_delta: Option<Money>,
+    /// Balance-effective date, required with `principal_delta`.
+    pub principal_date: Option<Date>,
+}
+
+impl CashFlowParams {
+    /// Start the inputs of a row without accrual metadata or principal effect.
     ///
     /// # Arguments
     ///
-    /// * `date` - Settlement/payment date of the cashflow.
-    /// * `reset_date` - Optional index observation date, no later than payment.
-    /// * `amount` - Signed settlement cash including its currency.
+    /// * `date` - Settlement/payment date of the cashflow, or the event date of
+    ///   a noncash balance row.
+    /// * `reset_date` - Optional index observation date, no later than `date`.
+    /// * `amount` - Signed settlement cash including its currency; zero for
+    ///   PIK and default write-down rows.
     /// * `kind` - Classification controlling cash settlement and balance treatment.
-    /// * `accrual_factor` - Nonnegative coupon year fraction under its day count.
+    /// * `accrual_factor` - Literal nonnegative coupon year fraction.
     /// * `rate` - Optional decimal annual all-in coupon rate (0.05 means 5%).
+    #[must_use]
     pub fn new(
         date: Date,
         reset_date: Option<Date>,
@@ -606,7 +637,7 @@ impl CashFlow {
         }
     }
 
-    /// Attach a principal balance movement independently of settlement cash.
+    /// Set the explicit principal change.
     ///
     /// # Arguments
     ///
@@ -618,16 +649,101 @@ impl CashFlow {
         self
     }
 
-    /// Set the economic date of this flow's principal balance movement.
+    /// Set the balance-effective date of the principal change.
     ///
     /// # Arguments
     ///
     /// * `date` - Contractual balance-effective date; cash still settles on
-    ///   the flow's payment `date`, which may precede or follow this date.
+    ///   `date`, which may precede or follow it.
     #[must_use]
     pub fn with_principal_date(mut self, date: Date) -> Self {
         self.principal_date = Some(date);
         self
+    }
+
+    /// Set the contractual accrual metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `accrual` - One actual accrual calculation slice and its day-count
+    ///   context, independent of payment timing.
+    #[must_use]
+    pub fn with_accrual(mut self, accrual: CashFlowAccrual) -> Self {
+        self.accrual = Some(accrual);
+        self
+    }
+
+    /// Publish the validated row.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`CashFlow::validate`] errors.
+    pub fn build(self) -> crate::Result<CashFlow> {
+        CashFlow::new(self)
+    }
+}
+
+impl From<&CashFlow> for CashFlowParams {
+    fn from(flow: &CashFlow) -> Self {
+        Self {
+            date: flow.date,
+            reset_date: flow.reset_date,
+            amount: flow.amount,
+            kind: flow.kind,
+            accrual_factor: flow.accrual_factor,
+            rate: flow.rate,
+            accrual: flow.accrual.clone(),
+            principal_delta: flow.principal_delta,
+            principal_date: flow.principal_date,
+        }
+    }
+}
+
+impl CashFlow {
+    /// The one canonical constructor: publish complete inputs only once they
+    /// validate (record CORE-CONVENTIONS-015 #10).
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - The complete row inputs; see [`CashFlowParams`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Self::validate`] errors: nonfinite scalars, invalid
+    /// chronology, a missing or extra principal effect, nonzero cash on a
+    /// noncash kind, or an invalid accrual slice.
+    pub fn new(params: CashFlowParams) -> crate::Result<Self> {
+        let flow = Self {
+            date: params.date,
+            reset_date: params.reset_date,
+            amount: params.amount,
+            kind: params.kind,
+            accrual_factor: params.accrual_factor,
+            rate: params.rate,
+            accrual: params.accrual,
+            principal_delta: params.principal_delta,
+            principal_date: params.principal_date,
+        };
+        flow.validate()?;
+        Ok(flow)
+    }
+
+    /// Return a copy with a new principal change and balance date, updated
+    /// together; on error the original row is unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `delta` - Signed change in outstanding, in the cashflow currency.
+    /// * `date` - Balance-effective date of the change.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Self::validate`] errors for the updated row.
+    pub fn with_principal(&self, delta: Money, date: Date) -> crate::Result<Self> {
+        CashFlowParams::from(self)
+            .with_principal_delta(delta)
+            .with_principal_date(date)
+            .build()
     }
 
     /// Return the payment (cash settlement) date, or the event date of a
@@ -688,16 +804,19 @@ impl CashFlow {
         self.principal_date
     }
 
-    /// Attach contractual accrual metadata to this flow.
+    /// Return a copy with new contractual accrual metadata; on error the
+    /// original row is unchanged.
     ///
     /// # Arguments
     ///
-    /// * `accrual` - Contractual coupon boundaries, day count, optional calendar,
-    ///   and projected decimal index rate, independent of payment timing.
-    #[must_use]
-    pub fn with_accrual(mut self, accrual: CashFlowAccrual) -> Self {
-        self.accrual = Some(accrual);
-        self
+    /// * `accrual` - One actual accrual calculation slice and its day-count
+    ///   context, independent of payment timing.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Self::validate`] errors for the updated row.
+    pub fn with_accrual(&self, accrual: CashFlowAccrual) -> crate::Result<Self> {
+        CashFlowParams::from(self).with_accrual(accrual).build()
     }
 
     /// Validate cashflow amount and fields.
@@ -715,7 +834,7 @@ impl CashFlow {
     ///
     /// # Example
     /// ```rust
-    /// use finstack_quant_core::cashflow::{CashFlow, CFKind};
+    /// use finstack_quant_core::cashflow::{CashFlowParams, CFKind};
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::dates::Date;
     /// use finstack_quant_core::money::Money;
@@ -723,19 +842,13 @@ impl CashFlow {
     ///
     /// let date = Date::from_calendar_date(2025, Month::January, 15).expect("Valid date");
     /// let amount = Money::from((100_i64, Currency::USD));
-    /// let cf = CashFlow::new(date, None, amount, CFKind::Fixed, 0.0, None);
+    /// let cf = CashFlowParams::new(date, None, amount, CFKind::Fixed, 0.0, None).build()?;
     /// assert!(cf.validate().is_ok());
     ///
     /// // Zero amounts are valid (e.g. floored coupons).
-    /// let zero_cf = CashFlow::new(
-    ///     date,
-    ///     None,
-    ///     Money::from((0_i64, Currency::USD)),
-    ///     CFKind::Fixed,
-    ///     0.0,
-    ///     None,
-    /// );
-    /// assert!(zero_cf.validate().is_ok());
+    /// let zero = Money::from((0_i64, Currency::USD));
+    /// assert!(CashFlowParams::new(date, None, zero, CFKind::Fixed, 0.0, None).build().is_ok());
+    /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     ///
     /// # Validation Rules
@@ -855,14 +968,30 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid start");
         let end = Date::from_calendar_date(2025, Month::July, 1).expect("valid end");
         for rate in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-            let mut flow = CashFlow::new(
+            assert!(
+                CashFlowParams::new(
+                    end,
+                    None,
+                    Money::from((25_i64, Currency::USD)),
+                    CFKind::Fixed,
+                    0.5,
+                    Some(rate),
+                )
+                .build()
+                .is_err()
+            );
+            let mut flow = CashFlowParams::new(
                 end,
                 None,
                 Money::from((25_i64, Currency::USD)),
                 CFKind::Fixed,
                 0.5,
-                Some(rate),
-            );
+                Some(0.05),
+            )
+            .build()
+            .expect("valid cashflow");
+            // Bypass the constructor to prove validate and serialize still reject.
+            flow.rate = Some(rate);
             assert!(flow.validate().is_err());
             assert!(serde_json::to_string(&flow).is_err());
             assert!(serde_json::to_value(&flow).is_err());
@@ -908,7 +1037,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid start");
         let end = Date::from_calendar_date(2025, Month::July, 1).expect("valid end");
         for rate in [None, Some(-0.05), Some(0.0), Some(0.05)] {
-            let flow = CashFlow::new(
+            let flow = CashFlowParams::new(
                 end,
                 None,
                 Money::from((-25_i64, Currency::USD)),
@@ -922,7 +1051,9 @@ mod tests {
                 day_count: DayCount::Act360,
                 projected_index_rate: rate,
                 context: DayCountContextState::default(),
-            });
+            })
+            .build()
+            .expect("valid cashflow");
             let json = serde_json::to_value(&flow).expect("finite rates serialize");
             if rate.is_none() {
                 assert!(json.get("rate").is_none());

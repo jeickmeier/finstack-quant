@@ -254,7 +254,7 @@ impl MetricCalculator for AllInRateCalculator {
             flows.push({
                 // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                 let cash = facility.drawn.checked_neg();
-                finstack_quant_core::cashflow::CashFlow::new(
+                finstack_quant_core::cashflow::CashFlowParams::new(
                     facility.issue_date,
                     None,
                     cash,
@@ -264,6 +264,7 @@ impl MetricCalculator for AllInRateCalculator {
                 )
                 .with_principal_delta(cash.checked_neg())
                 .with_principal_date(facility.issue_date)
+                .build()?
             });
             with_opening = finstack_quant_cashflows::schedule_from_classified_flows(
                 flows,

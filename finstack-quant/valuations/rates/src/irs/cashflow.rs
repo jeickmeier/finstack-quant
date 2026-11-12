@@ -192,7 +192,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
     fixings: Option<&ScalarTimeSeries>,
     include_projected_fixings: bool,
 ) -> Result<CashFlowSchedule> {
-    use finstack_quant_core::cashflow::{CFKind, CashFlow};
+    use finstack_quant_core::cashflow::{CFKind, CashFlowParams};
 
     let float = irs.resolved_float_leg()?;
     let periods = build_periods(float.schedule_params(
@@ -298,14 +298,17 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         } else {
             spread_bp * finstack_quant_core::math::units::ONE_BASIS_POINT
         };
-        flows.push(CashFlow::new(
-            period.payment_date,
-            None,
-            Money::new(coupon_amount, irs.notional.currency())?,
-            CFKind::Floating,
-            accrual_year_fraction,
-            Some(all_in_rate),
-        ));
+        flows.push(
+            CashFlowParams::new(
+                period.payment_date,
+                None,
+                Money::new(coupon_amount, irs.notional.currency())?,
+                CFKind::Floating,
+                accrual_year_fraction,
+                Some(all_in_rate),
+            )
+            .build()?,
+        );
     }
 
     finstack_quant_cashflows::schedule_from_classified_flows(
@@ -340,7 +343,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
 /// Returns an error if the cashflow schedule cannot be built (e.g., invalid
 /// date ranges or calendar lookups fail).
 pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSchedule> {
-    use finstack_quant_core::cashflow::{CFKind, CashFlow};
+    use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 
     let fixed = irs.resolved_fixed_leg()?;
     let periods = build_periods(fixed.schedule_params(irs.adjust_fixed_accrual_dates))?;
@@ -355,7 +358,7 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
             } else {
                 CFKind::Fixed
             };
-            Ok(CashFlow::new(
+            CashFlowParams::new(
                 period.payment_date,
                 None,
                 Money::new(
@@ -365,7 +368,8 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
                 kind,
                 period.accrual_year_fraction,
                 Some(rate),
-            ))
+            )
+            .build()
         })
         .collect::<Result<Vec<_>>>()?;
     finstack_quant_cashflows::schedule_from_classified_flows(

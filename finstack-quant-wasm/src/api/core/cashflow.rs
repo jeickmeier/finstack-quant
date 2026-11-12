@@ -5,9 +5,10 @@
 //! free functions taking that value.
 
 use crate::utils::input::js_string;
-use crate::utils::wire::js_wire;
+use crate::utils::wire::{js_date, js_wire};
 use crate::utils::{date_to_iso, to_js_err, to_js_value};
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
+use finstack_quant_core::money::Money;
 use wasm_bindgen::prelude::*;
 
 /// Parse a cashflow kind label into its `CFKind` wire string.
@@ -90,8 +91,11 @@ pub fn cash_flow_get_balance_date(
 
 /// Check a cashflow's invariants.
 ///
+/// Every `CashFlow` the library returns already satisfies them; this is an
+/// idempotent check of a hand-written wire object.
+///
 /// @param flow - `CashFlow` wire object.
-/// @throws If `flow` is not a `CashFlow`, its accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
+/// @throws If `flow` is not a valid `CashFlow`: a non-finite or negative accrual factor, a non-finite rate, a reset date after its payment date, a principal kind without its principal delta and date (or a non-principal kind with them), nonzero cash on a noncash kind, a principal delta in another currency, or an invalid accrual slice (kind `validation`).
 #[wasm_bindgen(js_name = cashFlowValidate)]
 pub fn cash_flow_validate(
     #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CashFlow")] flow: JsValue,
@@ -99,4 +103,52 @@ pub fn cash_flow_validate(
     js_wire::<CashFlow>(&flow, "flow")?
         .validate()
         .map_err(to_js_err)
+}
+
+/// Return a copy of a cashflow carrying new contractual accrual metadata.
+///
+/// Mirrors Rust `CashFlow::with_accrual`: the updated row is validated, and an
+/// invalid update throws without changing `flow`.
+///
+/// @param flow - `CashFlow` wire object.
+/// @param accrual - `CashFlowAccrual` wire object: one actual accrual calculation slice and its day-count context.
+/// @returns The updated `CashFlow` wire object.
+/// @throws If `flow` or `accrual` is not a valid wire value, or the updated row fails `cashFlowValidate` (kind `validation`).
+#[wasm_bindgen(
+    js_name = cashFlowWithAccrual,
+    unchecked_return_type = "generated.cashflows.CashFlow"
+)]
+pub fn cash_flow_with_accrual(
+    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CashFlow")] flow: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CashFlowAccrual")] accrual: JsValue,
+) -> Result<JsValue, JsValue> {
+    let flow = js_wire::<CashFlow>(&flow, "flow")?;
+    let accrual = js_wire::<CashFlowAccrual>(&accrual, "accrual")?;
+    to_js_value(&flow.with_accrual(accrual).map_err(to_js_err)?)
+}
+
+/// Return a copy of a cashflow with a new principal change and balance date.
+///
+/// Mirrors Rust `CashFlow::with_principal`: the delta and date are updated
+/// together and the result is validated; an invalid update throws without
+/// changing `flow`.
+///
+/// @param flow - `CashFlow` wire object of a principal kind.
+/// @param delta - Signed change in outstanding as a `Money` wire object in the cash currency; positive values increase principal.
+/// @param date - ISO-8601 balance-effective date of the change; cash still settles on the flow's `date`.
+/// @returns The updated `CashFlow` wire object.
+/// @throws If an argument is not a valid wire value (kind `invalid_type` or `validation`), or the updated row fails `cashFlowValidate` (kind `validation`).
+#[wasm_bindgen(
+    js_name = cashFlowWithPrincipal,
+    unchecked_return_type = "generated.cashflows.CashFlow"
+)]
+pub fn cash_flow_with_principal(
+    #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CashFlow")] flow: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.valuations.Money")] delta: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] date: JsValue,
+) -> Result<JsValue, JsValue> {
+    let flow = js_wire::<CashFlow>(&flow, "flow")?;
+    let delta = js_wire::<Money>(&delta, "delta")?;
+    let date = js_date(&date, "date")?;
+    to_js_value(&flow.with_principal(delta, date).map_err(to_js_err)?)
 }

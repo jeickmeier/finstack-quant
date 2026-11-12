@@ -1120,7 +1120,7 @@ mod tests {
     use super::*;
     use crate::bond::{CallPut, CallPutSchedule, MakeWholeSpec, ProtectionWindow, ReturnFloorSpec};
     use finstack_quant_cashflows::builder::{CashFlowMeta, Notional};
-    use finstack_quant_core::cashflow::CashFlow;
+    use finstack_quant_core::cashflow::CashFlowParams;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -1590,25 +1590,31 @@ mod tests {
             vec![
                 {
                     let cash = Money::from((-100_i64, Currency::USD));
-                    CashFlow::new(issue, None, cash, CFKind::Notional, 0.0, None)
+                    CashFlowParams::new(issue, None, cash, CFKind::Notional, 0.0, None)
                         .with_principal_delta(finstack_quant_core::money::Money::zero(
                             cash.currency(),
                         ))
                         .with_principal_date(issue)
+                        .build()
+                        .expect("valid cashflow")
                 },
-                CashFlow::new(
+                CashFlowParams::new(
                     maturity,
                     None,
                     Money::from((5_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.0,
                     None,
-                ),
+                )
+                .build()
+                .expect("valid cashflow"),
                 {
                     let cash = Money::from((100_i64, Currency::USD));
-                    CashFlow::new(maturity, None, cash, CFKind::Notional, 0.0, None)
+                    CashFlowParams::new(maturity, None, cash, CFKind::Notional, 0.0, None)
                         .with_principal_delta(cash.checked_neg())
                         .with_principal_date(maturity)
+                        .build()
+                        .expect("valid cashflow")
                 },
             ],
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),

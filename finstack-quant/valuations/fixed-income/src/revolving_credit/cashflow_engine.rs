@@ -25,7 +25,7 @@ use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::money::Money;
 
 use finstack_quant_cashflows::builder::{CashFlowSchedule, SchedulePeriod};
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 
 use super::types::{DrawRepaySpec, RevolvingCredit};
 use finstack_quant_cashflows::builder::RateSpec;
@@ -296,7 +296,7 @@ impl<'a> CashflowEngine<'a> {
             flows.push({
                 // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                 let cash = self.facility.drawn.checked_neg();
-                CashFlow::new(
+                CashFlowParams::new(
                     self.facility.issue_date,
                     None,
                     cash,
@@ -306,6 +306,7 @@ impl<'a> CashflowEngine<'a> {
                 )
                 .with_principal_delta(cash.checked_neg())
                 .with_principal_date(self.facility.issue_date)
+                .build()?
             });
         }
 
@@ -596,20 +597,23 @@ impl<'a> CashflowEngine<'a> {
             };
             let money_zero = finstack_quant_core::config::ZeroKind::Money(ccy);
             if !rc.is_effectively_zero(total_interest.amount(), money_zero) {
-                flows.push(CashFlow::new(
-                    payment_date,
-                    reset_date_opt,
-                    total_interest,
-                    match &self.facility.rate {
-                        RateSpec::Fixed { .. } => CFKind::Fixed,
-                        RateSpec::Floating(_) => CFKind::Floating,
-                    },
-                    total_accrual,
-                    avg_interest_rate,
-                ));
+                flows.push(
+                    CashFlowParams::new(
+                        payment_date,
+                        reset_date_opt,
+                        total_interest,
+                        match &self.facility.rate {
+                            RateSpec::Fixed { .. } => CFKind::Fixed,
+                            RateSpec::Floating(_) => CFKind::Floating,
+                        },
+                        total_accrual,
+                        avg_interest_rate,
+                    )
+                    .build()?,
+                );
             }
 
-            fees.emit(&mut flows, payment_date, total_accrual, &rc);
+            fees.emit(&mut flows, payment_date, total_accrual, &rc)?;
         }
 
         // Add principal flows from draw/repay events
@@ -622,9 +626,10 @@ impl<'a> CashflowEngine<'a> {
                     } else {
                         event.amount
                     };
-                    CashFlow::new(event.date, None, cash, CFKind::Notional, 0.0, None)
+                    CashFlowParams::new(event.date, None, cash, CFKind::Notional, 0.0, None)
                         .with_principal_delta(cash.checked_neg())
                         .with_principal_date(event.date)
+                        .build()?
                 });
             }
         }
@@ -648,7 +653,7 @@ impl<'a> CashflowEngine<'a> {
             flows.push({
                 // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                 let cash = final_balance_for_terminal;
-                CashFlow::new(
+                CashFlowParams::new(
                     terminal_payment_date,
                     None,
                     cash,
@@ -658,6 +663,7 @@ impl<'a> CashflowEngine<'a> {
                 )
                 .with_principal_delta(cash.checked_neg())
                 .with_principal_date(terminal_payment_date)
+                .build()?
             });
         }
 
@@ -793,7 +799,7 @@ impl<'a> CashflowEngine<'a> {
             flows.push({
                 // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                 let cash = self.facility.drawn.checked_neg();
-                CashFlow::new(
+                CashFlowParams::new(
                     self.facility.issue_date,
                     None,
                     cash,
@@ -803,6 +809,7 @@ impl<'a> CashflowEngine<'a> {
                 )
                 .with_principal_delta(cash.checked_neg())
                 .with_principal_date(self.facility.issue_date)
+                .build()?
             });
         }
 
@@ -872,9 +879,10 @@ impl<'a> CashflowEngine<'a> {
                         flows.push({
                             // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                             let cash = Money::from_model_value(-leg, ccy)?;
-                            CashFlow::new(sub_end, None, cash, CFKind::Notional, 0.0, None)
+                            CashFlowParams::new(sub_end, None, cash, CFKind::Notional, 0.0, None)
                                 .with_principal_delta(cash.checked_neg())
                                 .with_principal_date(sub_end)
+                                .build()?
                         });
                         step_legs += leg;
                     }
@@ -1023,19 +1031,22 @@ impl<'a> CashflowEngine<'a> {
 
             if payment_date > self.as_of {
                 if !rc.is_effectively_zero(interest.amount(), ZeroKind::Money(ccy)) {
-                    flows.push(CashFlow::new(
-                        payment_date,
-                        first_fixing,
-                        interest,
-                        match &self.facility.rate {
-                            RateSpec::Fixed { .. } => CFKind::Fixed,
-                            RateSpec::Floating(_) => CFKind::Floating,
-                        },
-                        accrual,
-                        (accrual > 0.0).then(|| weighted_rate / accrual),
-                    ));
+                    flows.push(
+                        CashFlowParams::new(
+                            payment_date,
+                            first_fixing,
+                            interest,
+                            match &self.facility.rate {
+                                RateSpec::Fixed { .. } => CFKind::Fixed,
+                                RateSpec::Floating(_) => CFKind::Floating,
+                            },
+                            accrual,
+                            (accrual > 0.0).then(|| weighted_rate / accrual),
+                        )
+                        .build()?,
+                    );
                 }
-                fees.emit(&mut flows, payment_date, accrual, &rc);
+                fees.emit(&mut flows, payment_date, accrual, &rc)?;
             }
 
             // Principal leg: the change of the drawn balance `C(t) · u(t)`
@@ -1067,9 +1078,10 @@ impl<'a> CashflowEngine<'a> {
                 flows.push({
                     // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                     let cash = Money::from_model_value(-balance_change, ccy)?;
-                    CashFlow::new(principal_date, None, cash, CFKind::Notional, 0.0, None)
+                    CashFlowParams::new(principal_date, None, cash, CFKind::Notional, 0.0, None)
                         .with_principal_delta(cash.checked_neg())
                         .with_principal_date(principal_date)
+                        .build()?
                 });
                 prev_balance = end_balance;
             } else {
@@ -1093,7 +1105,7 @@ impl<'a> CashflowEngine<'a> {
             flows.push({
                 // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                 let cash = final_balance;
-                CashFlow::new(
+                CashFlowParams::new(
                     terminal_payment_date,
                     None,
                     cash,
@@ -1103,6 +1115,7 @@ impl<'a> CashflowEngine<'a> {
                 )
                 .with_principal_delta(cash.checked_neg())
                 .with_principal_date(terminal_payment_date)
+                .build()?
             });
         }
 
@@ -1120,10 +1133,10 @@ impl<'a> CashflowEngine<'a> {
     /// fixed fees (amendment, waiver, extension) dated after `as_of`.
     fn push_scheduled_fees(&self, flows: &mut Vec<CashFlow>) -> Result<()> {
         for (date, fee) in self.facility.commitment_step_fees(self.as_of)? {
-            flows.push(CashFlow::new(date, None, fee, CFKind::Fee, 0.0, None));
+            flows.push(CashFlowParams::new(date, None, fee, CFKind::Fee, 0.0, None).build()?);
         }
         for (date, fee) in self.facility.scheduled_fees_after(self.as_of) {
-            flows.push(CashFlow::new(date, None, fee, CFKind::Fee, 0.0, None));
+            flows.push(CashFlowParams::new(date, None, fee, CFKind::Fee, 0.0, None).build()?);
         }
         Ok(())
     }
@@ -1231,14 +1244,14 @@ impl FeeAccrual {
     }
 
     /// Append one non-zero flow per fee, paid on `payment_date` over `accrual`
-    /// years, with its time-weighted average rate.
+    /// years, with its time-weighted average rate; errors when a row is invalid.
     fn emit(
         self,
         flows: &mut Vec<CashFlow>,
         payment_date: Date,
         accrual: f64,
         rc: &RoundingContext,
-    ) {
+    ) -> finstack_quant_core::Result<()> {
         let avg = |weighted: f64| (accrual > 0.0 && weighted > 0.0).then(|| weighted / accrual);
         for (amount, kind, rate) in [
             (
@@ -1260,16 +1273,12 @@ impl FeeAccrual {
             ),
         ] {
             if !rc.is_effectively_zero(amount.amount(), ZeroKind::Money(amount.currency())) {
-                flows.push(CashFlow::new(
-                    payment_date,
-                    None,
-                    amount,
-                    kind,
-                    accrual,
-                    rate,
-                ));
+                flows.push(
+                    CashFlowParams::new(payment_date, None, amount, kind, accrual, rate).build()?,
+                );
             }
         }
+        Ok(())
     }
 }
 

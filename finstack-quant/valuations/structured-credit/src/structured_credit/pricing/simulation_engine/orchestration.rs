@@ -844,7 +844,7 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
     realize_principal_shortfall(&mut state, final_date)?;
     attach_non_waterfall_payments(&mut state)?;
 
-    let (tranches, diagnostics) = state.finalize_with_diagnostics();
+    let (tranches, diagnostics) = state.finalize_with_diagnostics()?;
     Ok(SimulationRun {
         tranches,
         diagnostics,

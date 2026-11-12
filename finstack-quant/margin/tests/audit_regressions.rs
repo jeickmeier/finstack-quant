@@ -44,7 +44,8 @@ fn vm_cashflows_follow_desk_direction_on_both_sides() {
         let calls = calc
             .generate_margin_calls(&[(date, usd(exposure))], usd(0.0))
             .expect("calls");
-        let flows = finstack_quant_margin::types::margin_calls_to_cashflows(&calls);
+        let flows =
+            finstack_quant_margin::types::margin_calls_to_cashflows(&calls).expect("valid rows");
         assert_eq!(flows.len(), 1);
         assert_eq!(flows[0].get_kind(), expected);
         assert!(flows[0].get_date() > date);

@@ -9,7 +9,7 @@
 //!
 //! - ISDA 2006 Definitions (cashflow semantics)
 
-use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual, CashFlowParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
@@ -22,9 +22,9 @@ fn d(year: i32, month: u8, day: u8) -> Date {
     Date::from_calendar_date(year, Month::try_from(month).unwrap(), day).unwrap()
 }
 
-/// Helper to create a valid base cashflow for testing
-fn valid_cashflow() -> CashFlow {
-    CashFlow {
+/// Helper to create valid base cashflow inputs for testing
+fn valid_params() -> CashFlowParams {
+    CashFlowParams {
         date: d(2025, 1, 15),
         reset_date: None,
         amount: Money::new(100.0, Currency::USD).expect("valid money fixture"),
@@ -41,7 +41,7 @@ fn valid_cashflow() -> CashFlow {
 
 #[test]
 fn cashflow_fixed_construction() {
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         date: d(2025, 1, 15),
         reset_date: None,
         amount: Money::new(1000.0, Currency::USD).expect("valid money fixture"),
@@ -53,6 +53,7 @@ fn cashflow_fixed_construction() {
         principal_date: None,
     };
 
+    let cf = cf.build().expect("valid cashflow");
     assert_eq!(cf.get_date(), d(2025, 1, 15));
     assert_eq!(cf.get_kind(), CFKind::Fixed);
     assert!(cf.get_reset_date().is_none());
@@ -65,7 +66,7 @@ fn cashflow_floating_construction() {
     let reset = d(2025, 1, 5);
     let amount = Money::new(50.0, Currency::USD).expect("valid money fixture");
 
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         date: payment,
         reset_date: Some(reset),
         amount,
@@ -77,6 +78,7 @@ fn cashflow_floating_construction() {
         principal_date: None,
     };
 
+    let cf = cf.build().expect("valid cashflow");
     assert_eq!(cf.get_kind(), CFKind::Floating);
     assert_eq!(cf.get_reset_date(), Some(reset));
     assert!(cf.validate().is_ok());
@@ -107,30 +109,30 @@ fn cashflow_accepts_zero_amount() {
     // Zero amounts are legitimate (e.g. a floating coupon floored at 0% in a
     // negative-rate environment); previously rejected — fixed per the
     // convention.
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         amount: Money::new(0.0, Currency::USD).expect("valid money fixture"),
-        ..valid_cashflow()
+        ..valid_params()
     };
-    assert!(cf.validate().is_ok(), "Zero amount should be accepted");
+    assert!(cf.build().is_ok(), "Zero amount should be accepted");
 }
 
 #[test]
 fn cashflow_accepts_negative_amount() {
     // Negative amounts are valid (represent outflows)
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         amount: Money::new(-100.0, Currency::USD).expect("valid money fixture"),
-        ..valid_cashflow()
+        ..valid_params()
     };
-    assert!(cf.validate().is_ok(), "Negative amount should be accepted");
+    assert!(cf.build().is_ok(), "Negative amount should be accepted");
 }
 
 #[test]
 fn cashflow_accepts_large_amount() {
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         amount: Money::new(1e15, Currency::USD).expect("valid money fixture"),
-        ..valid_cashflow()
+        ..valid_params()
     };
-    assert!(cf.validate().is_ok(), "Large amount should be accepted");
+    assert!(cf.build().is_ok(), "Large amount should be accepted");
 }
 
 #[test]
@@ -138,12 +140,12 @@ fn cashflow_accepts_small_but_nonzero_amount() {
     // Note: Money rounds to currency decimal places (2 for USD).
     // Very small amounts like 1e-10 round to 0.0 (now still valid).
     // 0.01 is the smallest representable non-zero USD amount.
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         amount: Money::new(0.01, Currency::USD).expect("valid money fixture"),
-        ..valid_cashflow()
+        ..valid_params()
     };
     assert!(
-        cf.validate().is_ok(),
+        cf.build().is_ok(),
         "Small but non-zero amount should be accepted"
     );
 }
@@ -152,36 +154,33 @@ fn cashflow_accepts_small_but_nonzero_amount() {
 
 #[test]
 fn cashflow_rejects_nan_accrual_factor() {
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         accrual_factor: f64::NAN,
-        ..valid_cashflow()
+        ..valid_params()
     };
-    assert!(
-        cf.validate().is_err(),
-        "NaN accrual factor should be rejected"
-    );
+    assert!(cf.build().is_err(), "NaN accrual factor should be rejected");
 }
 
 #[test]
 fn cashflow_rejects_positive_infinity_accrual_factor() {
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         accrual_factor: f64::INFINITY,
-        ..valid_cashflow()
+        ..valid_params()
     };
     assert!(
-        cf.validate().is_err(),
+        cf.build().is_err(),
         "Positive infinity accrual factor should be rejected"
     );
 }
 
 #[test]
 fn cashflow_rejects_negative_infinity_accrual_factor() {
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         accrual_factor: f64::NEG_INFINITY,
-        ..valid_cashflow()
+        ..valid_params()
     };
     assert!(
-        cf.validate().is_err(),
+        cf.build().is_err(),
         "Negative infinity accrual factor should be rejected"
     );
 }
@@ -189,25 +188,22 @@ fn cashflow_rejects_negative_infinity_accrual_factor() {
 #[test]
 fn cashflow_accepts_zero_accrual_factor() {
     // Zero accrual factor is valid (e.g., notional flows)
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         accrual_factor: 0.0,
-        ..valid_cashflow()
+        ..valid_params()
     };
-    assert!(
-        cf.validate().is_ok(),
-        "Zero accrual factor should be accepted"
-    );
+    assert!(cf.build().is_ok(), "Zero accrual factor should be accepted");
 }
 
 #[test]
 fn cashflow_rejects_negative_accrual_factor() {
     // Negative accrual factor is invalid
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         accrual_factor: -0.25,
-        ..valid_cashflow()
+        ..valid_params()
     };
     assert!(
-        cf.validate().is_err(),
+        cf.build().is_err(),
         "Negative accrual factor should be rejected"
     );
 }
@@ -216,73 +212,73 @@ fn cashflow_rejects_negative_accrual_factor() {
 
 #[test]
 fn cashflow_rejects_nan_rate() {
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         rate: Some(f64::NAN),
-        ..valid_cashflow()
+        ..valid_params()
     };
-    assert!(cf.validate().is_err(), "NaN rate should be rejected");
+    assert!(cf.build().is_err(), "NaN rate should be rejected");
 }
 
 #[test]
 fn cashflow_rejects_positive_infinity_rate() {
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         rate: Some(f64::INFINITY),
-        ..valid_cashflow()
+        ..valid_params()
     };
     assert!(
-        cf.validate().is_err(),
+        cf.build().is_err(),
         "Positive infinity rate should be rejected"
     );
 }
 
 #[test]
 fn cashflow_rejects_negative_infinity_rate() {
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         rate: Some(f64::NEG_INFINITY),
-        ..valid_cashflow()
+        ..valid_params()
     };
     assert!(
-        cf.validate().is_err(),
+        cf.build().is_err(),
         "Negative infinity rate should be rejected"
     );
 }
 
 #[test]
 fn cashflow_accepts_none_rate() {
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         rate: None,
-        ..valid_cashflow()
+        ..valid_params()
     };
-    assert!(cf.validate().is_ok(), "None rate should be accepted");
+    assert!(cf.build().is_ok(), "None rate should be accepted");
 }
 
 #[test]
 fn cashflow_accepts_zero_rate() {
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         rate: Some(0.0),
-        ..valid_cashflow()
+        ..valid_params()
     };
-    assert!(cf.validate().is_ok(), "Zero rate should be accepted");
+    assert!(cf.build().is_ok(), "Zero rate should be accepted");
 }
 
 #[test]
 fn cashflow_accepts_negative_rate() {
     // Negative rates are valid (negative interest rate environment)
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         rate: Some(-0.005),
-        ..valid_cashflow()
+        ..valid_params()
     };
-    assert!(cf.validate().is_ok(), "Negative rate should be accepted");
+    assert!(cf.build().is_ok(), "Negative rate should be accepted");
 }
 
 #[test]
 fn cashflow_accepts_high_rate() {
     // High rates are valid (distressed debt, VC scenarios)
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         rate: Some(2.5), // 250%
-        ..valid_cashflow()
+        ..valid_params()
     };
-    assert!(cf.validate().is_ok(), "High rate should be accepted");
+    assert!(cf.build().is_ok(), "High rate should be accepted");
 }
 
 // Reset Date Validation Tests
@@ -292,7 +288,7 @@ fn cashflow_rejects_reset_date_after_payment() {
     let payment = d(2025, 1, 10);
     let reset = d(2025, 1, 15); // After payment date
 
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         date: payment,
         reset_date: Some(reset),
         amount: Money::new(100.0, Currency::USD).expect("valid money fixture"),
@@ -304,7 +300,7 @@ fn cashflow_rejects_reset_date_after_payment() {
         principal_date: None,
     };
     assert!(
-        cf.validate().is_err(),
+        cf.build().is_err(),
         "Reset date after payment date should be rejected"
     );
 }
@@ -314,7 +310,7 @@ fn cashflow_accepts_reset_date_before_payment() {
     let payment = d(2025, 1, 15);
     let reset = d(2025, 1, 10); // Before payment date
 
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         date: payment,
         reset_date: Some(reset),
         amount: Money::new(100.0, Currency::USD).expect("valid money fixture"),
@@ -326,7 +322,7 @@ fn cashflow_accepts_reset_date_before_payment() {
         principal_date: None,
     };
     assert!(
-        cf.validate().is_ok(),
+        cf.build().is_ok(),
         "Reset date before payment date should be accepted"
     );
 }
@@ -335,7 +331,7 @@ fn cashflow_accepts_reset_date_before_payment() {
 fn cashflow_accepts_reset_date_equal_to_payment() {
     let date = d(2025, 1, 15);
 
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         date,
         reset_date: Some(date), // Same as payment date
         amount: Money::new(100.0, Currency::USD).expect("valid money fixture"),
@@ -347,14 +343,14 @@ fn cashflow_accepts_reset_date_equal_to_payment() {
         principal_date: None,
     };
     assert!(
-        cf.validate().is_ok(),
+        cf.build().is_ok(),
         "Reset date equal to payment date should be accepted"
     );
 }
 
 #[test]
 fn cashflow_accepts_no_reset_date() {
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         date: d(2025, 1, 15),
         reset_date: None,
         amount: Money::new(100.0, Currency::USD).expect("valid money fixture"),
@@ -366,7 +362,7 @@ fn cashflow_accepts_no_reset_date() {
         principal_date: None,
     };
     assert!(
-        cf.validate().is_ok(),
+        cf.build().is_ok(),
         "No reset date should be accepted for fixed cashflows"
     );
 }
@@ -375,7 +371,7 @@ fn cashflow_accepts_no_reset_date() {
 
 #[test]
 fn cashflow_valid_with_all_fields_populated() {
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         date: d(2025, 6, 15),
         reset_date: Some(d(2025, 6, 1)),
         amount: Money::new(25_000.0, Currency::EUR).expect("valid money fixture"),
@@ -387,7 +383,7 @@ fn cashflow_valid_with_all_fields_populated() {
         principal_date: None,
     };
     assert!(
-        cf.validate().is_ok(),
+        cf.build().is_ok(),
         "Valid cashflow with all fields should be accepted"
     );
 }
@@ -397,7 +393,7 @@ fn cashflow_multiple_invalid_fields_first_error_wins() {
     // Multiple invalid fields: accrual_factor and rate are invalid
     // Validation should fail on the first non-amount check (accrual_factor)
     // Money rejects non-finite input at construction, before cashflow validation.
-    let cf = CashFlow {
+    let cf = CashFlowParams {
         date: d(2025, 1, 15),
         reset_date: Some(d(2025, 1, 20)), // After payment - invalid
         amount: Money::new(100.0, Currency::USD).expect("valid money fixture"),
@@ -409,27 +405,29 @@ fn cashflow_multiple_invalid_fields_first_error_wins() {
         principal_date: None,
     };
     assert!(
-        cf.validate().is_err(),
+        cf.build().is_err(),
         "Cashflow with multiple invalid fields should be rejected"
     );
 }
 
 #[test]
 fn constructor_defaults_accrual_to_none() {
-    let flow = CashFlow::new(
+    let flow = CashFlowParams::new(
         d(2025, 6, 15),
         None,
         Money::new(25_000.0, Currency::EUR).expect("valid money fixture"),
         CFKind::Fixed,
         0.25,
         Some(0.0325),
-    );
+    )
+    .build()
+    .expect("valid cashflow");
     assert!(flow.get_accrual().is_none());
 }
 
 #[test]
 fn json_round_trips_without_optional_accrual_field() {
-    let flow = valid_cashflow();
+    let flow = valid_params().build().expect("valid cashflow");
     let payload = serde_json::to_value(flow).unwrap();
     assert!(payload.get("accrual").is_none());
 
@@ -452,7 +450,7 @@ fn accrual_metadata_round_trips() {
             bus_basis: None,
         },
     };
-    let flow = CashFlow::new(
+    let flow = CashFlowParams::new(
         d(2025, 6, 15),
         Some(d(2025, 3, 13)),
         Money::new(12_500.0, Currency::USD).expect("valid money fixture"),
@@ -460,7 +458,9 @@ fn accrual_metadata_round_trips() {
         0.25,
         Some(0.036),
     )
-    .with_accrual(accrual.clone());
+    .with_accrual(accrual.clone())
+    .build()
+    .expect("valid cashflow");
 
     let encoded = serde_json::to_string(&flow).unwrap();
     let decoded: CashFlow = serde_json::from_str(&encoded).unwrap();
@@ -475,14 +475,16 @@ fn monetary_representation_is_validated_at_construction() {
         rust_decimal::Decimal::ZERO,
         rust_decimal::Decimal::MAX,
     ] {
-        let flow = CashFlow::new(
+        let flow = CashFlowParams::new(
             d(2025, 6, 15),
             None,
             Money::from_decimal(amount, Currency::USD),
             CFKind::Fixed,
             0.25,
             Some(0.03),
-        );
+        )
+        .build()
+        .expect("valid cashflow");
         assert!(flow.validate().is_ok());
         assert_eq!(flow.get_amount().amount_decimal(), amount);
     }

@@ -6,7 +6,7 @@
 use super::AgencyMbsPassthrough;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule};
 use finstack_quant_core::Result;
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlowParams};
 use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -265,32 +265,37 @@ fn schedule_from_projection(
 
     for cf in projected {
         if cf.interest.abs() > f64::EPSILON {
-            flows.push(CashFlow::new(
-                cf.payment_date,
-                None,
-                Money::from_model_value(cf.interest, mbs.current_face.currency())?,
-                CFKind::Fixed,
-                0.0,
-                Some(mbs.coupon),
-            ));
+            flows.push(
+                CashFlowParams::new(
+                    cf.payment_date,
+                    None,
+                    Money::from_model_value(cf.interest, mbs.current_face.currency())?,
+                    CFKind::Fixed,
+                    0.0,
+                    Some(mbs.coupon),
+                )
+                .build()?,
+            );
         }
         if cf.scheduled_principal.abs() > f64::EPSILON {
             flows.push({
                 // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                 let cash =
                     Money::from_model_value(cf.scheduled_principal, mbs.current_face.currency())?;
-                CashFlow::new(cf.payment_date, None, cash, CFKind::Amortization, 0.0, None)
+                CashFlowParams::new(cf.payment_date, None, cash, CFKind::Amortization, 0.0, None)
                     .with_principal_delta(cash.checked_neg())
                     .with_principal_date(cf.payment_date)
+                    .build()?
             });
         }
         if cf.prepayment.abs() > f64::EPSILON {
             flows.push({
                 // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                 let cash = Money::from_model_value(cf.prepayment, mbs.current_face.currency())?;
-                CashFlow::new(cf.payment_date, None, cash, CFKind::PrePayment, 0.0, None)
+                CashFlowParams::new(cf.payment_date, None, cash, CFKind::PrePayment, 0.0, None)
                     .with_principal_delta(cash.checked_neg())
                     .with_principal_date(cf.payment_date)
+                    .build()?
             });
         }
     }

@@ -2,7 +2,7 @@
 
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::CashFlowAccrual;
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
 };
@@ -549,7 +549,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
         let fixed_rate = self.fixed_rate.as_f64();
         let inflation_rate = (accrual_factor > 0.0)
             .then_some(inflation_amount.amount() / self.notional.amount() / accrual_factor);
-        let fixed_flow = CashFlow::new(
+        let fixed_flow = CashFlowParams::new(
             payment_date,
             None,
             Money::from_model_value(fixed_signed, ccy)?,
@@ -569,8 +569,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
                 frequency: None,
                 bus_basis: None,
             },
-        });
-        let inflation_flow = CashFlow::new(
+        })
+        .build()?;
+        let inflation_flow = CashFlowParams::new(
             payment_date,
             Some(self.start_date),
             Money::from_model_value(inflation_signed, ccy)?,
@@ -590,7 +591,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
                 frequency: None,
                 bus_basis: None,
             },
-        });
+        })
+        .build()?;
         let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
             vec![fixed_flow, inflation_flow],
             self.day_count,
@@ -971,7 +973,7 @@ impl YoYInflationSwap {
                 PayReceive::Pay => (-fixed_leg, inflation_leg),
                 PayReceive::Receive => (fixed_leg, -inflation_leg),
             };
-            let fixed_flow = CashFlow::new(
+            let fixed_flow = CashFlowParams::new(
                 pay,
                 None,
                 Money::from_model_value(fixed_signed, self.notional.currency())?,
@@ -991,8 +993,9 @@ impl YoYInflationSwap {
                     frequency: None,
                     bus_basis: None,
                 },
-            });
-            let inflation_flow = CashFlow::new(
+            })
+            .build()?;
+            let inflation_flow = CashFlowParams::new(
                 pay,
                 Some(start),
                 Money::from_model_value(inflation_signed, self.notional.currency())?,
@@ -1012,7 +1015,8 @@ impl YoYInflationSwap {
                     frequency: None,
                     bus_basis: None,
                 },
-            });
+            })
+            .build()?;
             flows.push(fixed_flow);
             flows.push(inflation_flow);
         }

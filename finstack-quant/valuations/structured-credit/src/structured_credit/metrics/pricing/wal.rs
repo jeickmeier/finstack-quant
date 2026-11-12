@@ -94,7 +94,7 @@ impl MetricCalculator for WalCalculator {
 mod tests {
     use super::*;
     use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-    use finstack_quant_core::cashflow::{CFKind, CashFlow};
+    use finstack_quant_core::cashflow::{CFKind, CashFlowParams};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::context::MarketContext;
@@ -179,17 +179,19 @@ mod tests {
             MetricContext::default_config(),
         );
         context.tagged_cashflows = Some(vec![
-            CashFlow::new(
+            CashFlowParams::new(
                 Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
                 None,
                 Money::from((10_i64, Currency::USD)),
                 CFKind::Fixed,
                 0.0,
                 None,
-            ),
+            )
+            .build()
+            .expect("valid cashflow"),
             {
                 let cash = Money::from((100_i64, Currency::USD));
-                CashFlow::new(
+                CashFlowParams::new(
                     Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
                     None,
                     cash,
@@ -201,10 +203,12 @@ mod tests {
                 .with_principal_date(
                     Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
                 )
+                .build()
+                .expect("valid cashflow")
             },
             {
                 let cash = Money::from((50_i64, Currency::USD));
-                CashFlow::new(
+                CashFlowParams::new(
                     Date::from_calendar_date(2027, Month::January, 1).expect("valid date"),
                     None,
                     cash,
@@ -216,6 +220,8 @@ mod tests {
                 .with_principal_date(
                     Date::from_calendar_date(2027, Month::January, 1).expect("valid date"),
                 )
+                .build()
+                .expect("valid cashflow")
             },
         ]);
 
@@ -249,7 +255,7 @@ mod tests {
         context.tagged_cashflows = Some(vec![
             {
                 let cash = Money::from((100_i64, Currency::USD));
-                CashFlow::new(
+                CashFlowParams::new(
                     Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
                     None,
                     cash,
@@ -261,17 +267,26 @@ mod tests {
                 .with_principal_date(
                     Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
                 )
+                .build()
+                .expect("valid cashflow")
             },
             // A large write-down much later: if counted as principal it would
             // drag WAL far above 1y.
-            CashFlow::new(
+            // A noncash write-down: zero cash, explicit balance decrease.
+            CashFlowParams::new(
                 Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
                 None,
-                Money::from((-500_i64, Currency::USD)),
+                Money::zero(Currency::USD),
                 CFKind::DefaultedNotional,
                 0.0,
                 None,
-            ),
+            )
+            .with_principal_delta(Money::from((-500_i64, Currency::USD)))
+            .with_principal_date(
+                Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
+            )
+            .build()
+            .expect("valid cashflow"),
         ]);
 
         let wal = WalCalculator.calculate(&mut context).expect("wal");
@@ -313,9 +328,11 @@ mod tests {
                 .iter()
                 .map(|(date, amount)| {
                     let cash = *amount;
-                    CashFlow::new(*date, None, cash, CFKind::Amortization, 0.0, None)
+                    CashFlowParams::new(*date, None, cash, CFKind::Amortization, 0.0, None)
                         .with_principal_delta(cash.checked_neg())
                         .with_principal_date(*date)
+                        .build()
+                        .expect("valid cashflow")
                 })
                 .collect(),
             Notional::par(100.0, Currency::USD).expect("valid notional fixture"),

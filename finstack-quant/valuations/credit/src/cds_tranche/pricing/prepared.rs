@@ -3,7 +3,7 @@ use super::expected_loss::PreparedExpectedLoss;
 use super::pricer::{CdsTranchePricer, DiscountAt, ElWdPoint, ProjectedDiscountedRow};
 use crate::cds_tranche::CdsTranche;
 use finstack_quant_cashflows::builder::SchedulePeriod;
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlowParams};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{BaseCorrelationCurve, CreditIndexData};
@@ -294,7 +294,7 @@ impl CdsTranchePricer {
 
             if include_tiny_premiums || premium_amount.abs() > f64::EPSILON {
                 rows.push(ProjectedDiscountedRow {
-                    cashflow: CashFlow::new(
+                    cashflow: CashFlowParams::new(
                         payment_date,
                         None,
                         Money::from_model_value(
@@ -304,7 +304,8 @@ impl CdsTranchePricer {
                         CFKind::Fixed,
                         accrual_period,
                         Some(coupon),
-                    ),
+                    )
+                    .build()?,
                     discount_at: DiscountAt::PaymentDate,
                 });
             }
@@ -312,7 +313,7 @@ impl CdsTranchePricer {
             let default_amount = tranche_notional * delta_el_fraction;
             if default_amount.abs() > f64::EPSILON {
                 rows.push(ProjectedDiscountedRow {
-                    cashflow: CashFlow::new(
+                    cashflow: CashFlowParams::new(
                         payment_date,
                         None,
                         Money::from_model_value(
@@ -322,7 +323,8 @@ impl CdsTranchePricer {
                         CFKind::ProtectionPayment,
                         0.0,
                         None,
-                    ),
+                    )
+                    .build()?,
                     // Discount the loss increment at the time the underlying
                     // defaults actually occur, not the period end (ISDA
                     // mid-period protection timing): the within-period loss
@@ -350,14 +352,15 @@ impl CdsTranchePricer {
 
         if let Some((date, amount)) = tranche.upfront.filter(|(date, _)| *date >= as_of) {
             rows.push(ProjectedDiscountedRow {
-                cashflow: CashFlow::new(
+                cashflow: CashFlowParams::new(
                     date,
                     None,
                     Money::from_model_value(amount.amount() * premium_sign, amount.currency())?,
                     CFKind::Fee,
                     0.0,
                     None,
-                ),
+                )
+                .build()?,
                 discount_at: DiscountAt::PaymentDate,
             });
         }

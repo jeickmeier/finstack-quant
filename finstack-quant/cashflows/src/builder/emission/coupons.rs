@@ -3,7 +3,7 @@
 use crate::builder::FloatingLegCompounding;
 use crate::builder::orchestrator::BuildState;
 use finstack_quant_core::InputError;
-use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual, CashFlowParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
@@ -47,6 +47,7 @@ fn add_pik_flow_if_nonzero(
     ccy: Currency,
     rate: Option<f64>,
     accrual_factor: f64,
+    accrual: CashFlowAccrual,
 ) -> finstack_quant_core::Result<f64> {
     if pik_amt < 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -60,7 +61,7 @@ fn add_pik_flow_if_nonzero(
         flows.push(
             // PIK is a noncash balance event: zero cash, explicit capitalization
             // (record CORE-CONVENTIONS-015 #1, #4).
-            CashFlow::new(
+            CashFlowParams::new(
                 date,
                 None,
                 Money::zero(ccy),
@@ -68,7 +69,10 @@ fn add_pik_flow_if_nonzero(
                 accrual_factor,
                 rate,
             )
-            .with_principal_delta(Money::new(pik_amt, ccy)?),
+            .with_principal_delta(Money::new(pik_amt, ccy)?)
+            .with_principal_date(date)
+            .with_accrual(accrual)
+            .build()?,
         );
         Ok(pik_amt)
     } else {
@@ -260,7 +264,7 @@ pub(crate) fn emit_fixed_coupons_on(
                 if cash_fraction_f64 > 0.0 {
                     let kind = if is_stub { CFKind::Stub } else { CFKind::Fixed };
                     out_flows.push(
-                        CashFlow::new(
+                        CashFlowParams::new(
                             d,
                             None,
                             Money::new(cash_amt, ccy)?,
@@ -268,7 +272,8 @@ pub(crate) fn emit_fixed_coupons_on(
                             yf,
                             Some(rate_f64),
                         )
-                        .with_accrual(accrual.clone()),
+                        .with_accrual(accrual.clone())
+                        .build()?,
                     );
                 }
 
@@ -282,13 +287,8 @@ pub(crate) fn emit_fixed_coupons_on(
                     ccy,
                     Some(rate_f64),
                     yf,
+                    accrual,
                 )?;
-                if pik_added > 0.0
-                    && let Some(flow) = out_flows.last_mut()
-                {
-                    flow.principal_date = Some(period.accrual_end);
-                    flow.accrual = Some(accrual);
-                }
                 pik_to_add += pik_added;
             }
         }
@@ -732,7 +732,7 @@ pub(crate) fn emit_float_coupons_on(
                 };
                 if cash_fraction > 0.0 {
                     out_flows.push(
-                        CashFlow::new(
+                        CashFlowParams::new(
                             period.payment_date,
                             Some(reset_date),
                             Money::from_model_value(settlement.cash_amount, ccy)?,
@@ -740,7 +740,8 @@ pub(crate) fn emit_float_coupons_on(
                             segment.year_fraction,
                             Some(settlement.all_in_rate),
                         )
-                        .with_accrual(accrual.clone()),
+                        .with_accrual(accrual.clone())
+                        .build()?,
                     );
                 }
                 if settlement.pik_amount != 0.0 {
@@ -749,7 +750,7 @@ pub(crate) fn emit_float_coupons_on(
                     out_flows.push(
                         // Dated at its capitalization boundary, not the cash
                         // payment date (record CORE-CONVENTIONS-015 #6).
-                        CashFlow::new(
+                        CashFlowParams::new(
                             period.accrual_end,
                             None,
                             Money::zero(ccy),
@@ -759,7 +760,8 @@ pub(crate) fn emit_float_coupons_on(
                         )
                         .with_principal_delta(Money::from_model_value(settlement.pik_amount, ccy)?)
                         .with_principal_date(period.accrual_end)
-                        .with_accrual(accrual),
+                        .with_accrual(accrual)
+                        .build()?,
                     );
                 }
             }

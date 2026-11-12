@@ -446,11 +446,11 @@ impl TermLoanDiscountingPricer {
             last
         };
 
-        schedule.try_update_flows(|flow| {
-            if flow.get_kind() != CFKind::Floating {
+        schedule.update_flows(|flow| {
+            if flow.kind != CFKind::Floating {
                 return Ok(());
             }
-            let reset_date = match flow.get_reset_date() {
+            let reset_date = match flow.reset_date {
                 Some(date) if date < as_of => date,
                 _ => return Ok(()),
             };
@@ -462,7 +462,7 @@ impl TermLoanDiscountingPricer {
                 as_of,
             )?;
             let accrual_start = flow
-                .get_accrual()
+                .accrual
                 .as_ref()
                 .map_or(reset_date, |accrual| accrual.start);
             let active_delta_bp: rust_decimal::Decimal = margin_deltas
@@ -477,14 +477,14 @@ impl TermLoanDiscountingPricer {
             // Rescaling retains the builder's accrual notional and any
             // intra-period balance segmentation. The balance fallback handles
             // a projected coupon whose original rate was exactly zero.
-            let new_amount = match flow.get_rate() {
+            let new_amount = match flow.rate {
                 Some(old_rate) if old_rate.is_finite() && old_rate.abs() > 1.0e-14 => {
-                    flow.get_amount().amount() * all_in_rate / old_rate
+                    flow.amount.amount() * all_in_rate / old_rate
                 }
-                _ => notional_before(flow.get_date()) * all_in_rate * flow.get_accrual_factor(),
+                _ => notional_before(flow.date) * all_in_rate * flow.accrual_factor,
             };
             flow.rate = Some(all_in_rate);
-            flow.amount = Money::from_model_value(new_amount, flow.get_amount().currency())?;
+            flow.amount = Money::from_model_value(new_amount, flow.amount.currency())?;
             Ok(())
         })?;
         Ok(())

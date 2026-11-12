@@ -498,7 +498,7 @@ fn non_finite_speed_multiplier_rejected() {
 fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
     use finstack_quant_cashflows::builder::CashFlowMeta;
     use finstack_quant_cashflows::builder::Notional;
-    use finstack_quant_core::cashflow::{CFKind, CashFlow};
+    use finstack_quant_core::cashflow::{CFKind, CashFlowParams};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -513,7 +513,7 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
     let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
         vec![
             // A noncash write-down: zero cash and an explicit balance decrease.
-            CashFlow::new(
+            CashFlowParams::new(
                 default_date,
                 None,
                 Money::zero(Currency::USD),
@@ -522,15 +522,19 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
                 None,
             )
             .with_principal_delta(Money::new(-500.0, Currency::USD).expect("valid money fixture"))
-            .with_principal_date(default_date),
-            CashFlow::new(
+            .with_principal_date(default_date)
+            .build()
+            .expect("valid cashflow"),
+            CashFlowParams::new(
                 recovery_date,
                 None,
                 Money::new(200.0, Currency::USD).expect("valid money fixture"),
                 CFKind::Recovery,
                 0.0,
                 None,
-            ),
+            )
+            .build()
+            .expect("valid cashflow"),
         ],
         Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,
@@ -565,7 +569,7 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
 fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
     use finstack_quant_cashflows::builder::CashFlowMeta;
     use finstack_quant_cashflows::builder::Notional;
-    use finstack_quant_core::cashflow::{CFKind, CashFlow};
+    use finstack_quant_core::cashflow::{CFKind, CashFlowParams};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Period, PeriodId};
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
@@ -580,7 +584,7 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
     let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
         vec![
             // A noncash write-down: zero cash and an explicit balance decrease.
-            CashFlow::new(
+            CashFlowParams::new(
                 default_date,
                 None,
                 Money::zero(Currency::USD),
@@ -589,15 +593,19 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
                 None,
             )
             .with_principal_delta(Money::new(-500.0, Currency::USD).expect("valid money fixture"))
-            .with_principal_date(default_date),
-            CashFlow::new(
+            .with_principal_date(default_date)
+            .build()
+            .expect("valid cashflow"),
+            CashFlowParams::new(
                 recovery_date,
                 None,
                 Money::new(200.0, Currency::USD).expect("valid money fixture"),
                 CFKind::Recovery,
                 0.0,
                 None,
-            ),
+            )
+            .build()
+            .expect("valid cashflow"),
         ],
         Notional::par(1_000.0, Currency::USD).expect("valid notional fixture"),
         DayCount::Act365F,

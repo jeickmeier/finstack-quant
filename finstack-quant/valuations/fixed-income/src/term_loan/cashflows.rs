@@ -11,7 +11,7 @@ use finstack_quant_cashflows::builder::{
     CouponType, FeeBase, FeeSpec, FloatingCouponSpec, FloatingRateSpec, PrincipalEventSpec,
     StepUpCouponSpec,
 };
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -572,14 +572,15 @@ fn build_commitment_fee_flows(
     by_payment_date
         .into_iter()
         .map(|(date, amount)| {
-            Ok(CashFlow::new(
+            CashFlowParams::new(
                 date,
                 None,
                 Money::new(amount, loan.currency)?,
                 CFKind::CommitmentFee,
                 0.0,
                 Some(fee_rate),
-            ))
+            )
+            .build()
         })
         .collect()
 }

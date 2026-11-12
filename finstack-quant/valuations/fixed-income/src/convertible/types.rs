@@ -899,7 +899,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
                 vec![{
                     // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                     let cash = claim.cash;
-                    finstack_quant_core::cashflow::CashFlow::new(
+                    finstack_quant_core::cashflow::CashFlowParams::new(
                         claim.delivery_date,
                         None,
                         cash,
@@ -909,6 +909,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
                     )
                     .with_principal_delta(cash.checked_neg())
                     .with_principal_date(claim.delivery_date)
+                    .build()?
                 }]
             } else {
                 Vec::new()

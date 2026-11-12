@@ -5,7 +5,7 @@ use crate::capital_structure::waterfall::execute_waterfall;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::{
-    cashflow::CashFlow,
+    cashflow::CashFlowParams,
     currency::Currency,
     dates::{Date, DayCount, Period, PeriodId, PeriodKind},
     money::Money,
@@ -583,7 +583,7 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
             vec![
                 {
                     let cash = usd(50);
-                    CashFlow::new(
+                    CashFlowParams::new(
                         date!(2025 - 04 - 04),
                         None,
                         cash,
@@ -592,12 +592,13 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
                         None,
                     )
                     .with_principal_delta(cash.checked_neg())
-                    .with_principal_date(date!(2025 - 04 - 04))
-                }
-                .with_principal_date(date!(2025 - 04 - 02)),
+                    .with_principal_date(date!(2025 - 04 - 02))
+                    .build()
+                    .expect("valid cashflow")
+                },
                 {
                     let cash = usd(50);
-                    CashFlow::new(
+                    CashFlowParams::new(
                         date!(2025 - 03 - 31),
                         None,
                         cash,
@@ -606,9 +607,10 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
                         None,
                     )
                     .with_principal_delta(cash.checked_neg())
-                    .with_principal_date(date!(2025 - 03 - 31))
-                }
-                .with_principal_date(date!(2025 - 04 - 03)),
+                    .with_principal_date(date!(2025 - 04 - 03))
+                    .build()
+                    .expect("valid cashflow")
+                },
             ],
             Notional::par(100.0, Currency::USD).expect("principal"),
             DayCount::Act365F,

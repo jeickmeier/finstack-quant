@@ -10,7 +10,7 @@ use finstack_quant_cashflows::builder::{
     FloatingRateSpec, Notional, OvernightIndexConstraintApplication, ScheduleParams,
 };
 use finstack_quant_cashflows::{ScheduleBuildOpts, schedule_from_classified_flows};
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, Period, PeriodId, StubKind, Tenor,
@@ -350,7 +350,7 @@ pub fn make_amortizing_schedule(base: Date, n_periods: usize) -> CashFlowSchedul
     let flows: Vec<CashFlow> = (0..n_periods)
         .map(|i| {
             let days = ((i + 1) as i64) * 90;
-            CashFlow::new(
+            CashFlowParams::new(
                 base + time::Duration::days(days),
                 None,
                 Money::new(per, Currency::USD).expect("valid money fixture"),
@@ -358,6 +358,8 @@ pub fn make_amortizing_schedule(base: Date, n_periods: usize) -> CashFlowSchedul
                 0.25,
                 None,
             )
+            .build()
+            .expect("valid cashflow")
         })
         .collect();
 

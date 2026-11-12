@@ -357,14 +357,36 @@ mod tests {
 
     fn test_flow(day: u8, amount: f64, kind: CFKind) -> finstack_quant_core::cashflow::CashFlow {
         use finstack_quant_core::money::Money;
-        finstack_quant_core::cashflow::CashFlow::new(
-            Date::from_calendar_date(2025, Month::January, day).expect("flow date"),
-            None,
+        test_flow_in(
+            day,
             Money::new(amount, Currency::USD).expect("valid money fixture"),
             kind,
-            0.5,
-            None,
         )
+    }
+
+    /// A fixture row; a cash principal row moves the balance by minus its
+    /// cash, and a noncash row (PIK, write-down) carries `amount` as its
+    /// balance change with zero cash.
+    fn test_flow_in(
+        day: u8,
+        amount: finstack_quant_core::money::Money,
+        kind: CFKind,
+    ) -> finstack_quant_core::cashflow::CashFlow {
+        use finstack_quant_core::cashflow::CashFlowParams;
+        use finstack_quant_core::money::Money;
+        let date = Date::from_calendar_date(2025, Month::January, day).expect("flow date");
+        let params = if !kind.is_principal_like() {
+            CashFlowParams::new(date, None, amount, kind, 0.5, None)
+        } else if kind.is_cash_settlement() {
+            CashFlowParams::new(date, None, amount, kind, 0.5, None)
+                .with_principal_delta(amount.checked_neg())
+                .with_principal_date(date)
+        } else {
+            CashFlowParams::new(date, None, Money::zero(amount.currency()), kind, 0.5, None)
+                .with_principal_delta(amount)
+                .with_principal_date(date)
+        };
+        params.build().expect("valid cashflow")
     }
 
     #[test]
@@ -386,10 +408,8 @@ mod tests {
         }
         let market = finstack_quant_core::market_data::context::MarketContext::new()
             .insert_fx(FxMatrix::new(std::sync::Arc::new(DatedFx), None));
-        let mut euro_receipt = test_flow(2, 100.0, CFKind::Fixed);
-        euro_receipt.amount = Money::from((100_i64, Currency::EUR));
-        let mut euro_payment = test_flow(3, -50.0, CFKind::Fixed);
-        euro_payment.amount = Money::from((-50_i64, Currency::EUR));
+        let euro_receipt = test_flow_in(2, Money::from((100_i64, Currency::EUR)), CFKind::Fixed);
+        let euro_payment = test_flow_in(3, Money::from((-50_i64, Currency::EUR)), CFKind::Fixed);
         let flows = [
             euro_receipt,
             euro_payment,

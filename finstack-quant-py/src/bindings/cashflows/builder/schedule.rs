@@ -5,7 +5,7 @@ use finstack_quant_cashflows::builder::{
     CashFlowMeta, CashFlowSchedule, CashflowRepresentation,
     merge_cashflow_schedules as rust_merge_cashflow_schedules,
 };
-use finstack_quant_core::cashflow::CashFlow;
+use finstack_quant_core::cashflow::{CashFlow, CashFlowParams};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use pyo3::prelude::*;
@@ -256,21 +256,23 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
                 Some(r) if !is_missing(r)? => Some(r.extract()?),
                 _ => None,
             };
-            let mut flow = CashFlow::new(
-                py_to_date(date)?,
-                reset,
-                Money::new(amount, currency).map_err(crate::errors::core_to_py)?,
-                extract_cf_kind(&kinds[i])?,
-                accrual_factor,
-                rate,
-            );
-            flow.accrual = optional_json_field(&accruals, i, "CashFlowAccrual")?;
-            flow.principal_delta = optional_json_field(&deltas, i, "principal_delta")?;
-            flow.principal_date = match principal_dates.as_ref().map(|dates| &dates[i]) {
-                Some(date) if !is_missing(date)? => Some(py_to_date(date)?),
-                _ => None,
+            let params = CashFlowParams {
+                accrual: optional_json_field(&accruals, i, "CashFlowAccrual")?,
+                principal_delta: optional_json_field(&deltas, i, "principal_delta")?,
+                principal_date: match principal_dates.as_ref().map(|dates| &dates[i]) {
+                    Some(date) if !is_missing(date)? => Some(py_to_date(date)?),
+                    _ => None,
+                },
+                ..CashFlowParams::new(
+                    py_to_date(date)?,
+                    reset,
+                    Money::new(amount, currency).map_err(crate::errors::core_to_py)?,
+                    extract_cf_kind(&kinds[i])?,
+                    accrual_factor,
+                    rate,
+                )
             };
-            flows.push(flow);
+            flows.push(params.build().map_err(crate::errors::core_to_py)?);
         }
         return Ok(flows);
     }

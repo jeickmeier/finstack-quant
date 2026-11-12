@@ -1,7 +1,7 @@
 //! Amortization cashflow emission.
 
 use crate::builder::orchestrator::{AmortizationSetup, BuildState, PreparedAmortization};
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::decimal::f64_to_decimal;
@@ -29,9 +29,10 @@ fn emit_principal_repayment(
     // (record CORE-CONVENTIONS-015 #4, #5).
     let cash = Money::new(pay.as_f64(), ccy)?;
     new_flows.push(
-        CashFlow::new(payment_date, None, cash, CFKind::Amortization, 0.0, None)
+        CashFlowParams::new(payment_date, None, cash, CFKind::Amortization, 0.0, None)
             .with_principal_delta(cash.checked_neg())
-            .with_principal_date(d),
+            .with_principal_date(d)
+            .build()?,
     );
     *outstanding -= pay;
     Ok(())

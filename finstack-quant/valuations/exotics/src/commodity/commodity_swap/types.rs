@@ -7,7 +7,7 @@
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::Result;
 use finstack_quant_core::cashflow::CashFlowAccrual;
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor, calendar_by_id_strict};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -340,7 +340,7 @@ impl CommoditySwap {
         amount: f64,
         kind: CFKind,
     ) -> Result<CashFlow> {
-        Ok(CashFlow::new(
+        CashFlowParams::new(
             period.payment_date,
             (kind == CFKind::Floating).then_some(period.accrual_start),
             Money::new(amount, self.underlying.currency)?,
@@ -360,7 +360,8 @@ impl CommoditySwap {
                 frequency: None,
                 bus_basis: None,
             },
-        }))
+        })
+        .build()
     }
 }
 

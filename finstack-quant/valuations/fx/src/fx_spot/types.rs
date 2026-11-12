@@ -390,7 +390,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
                     )| {
                         // The exchanged amount is the principal movement (record
                         // CORE-CONVENTIONS-015 #4).
-                        finstack_quant_core::cashflow::CashFlow::new(
+                        finstack_quant_core::cashflow::CashFlowParams::new(
                             date,
                             None,
                             cash,
@@ -400,9 +400,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
                         )
                         .with_principal_delta(cash.checked_neg())
                         .with_principal_date(date)
+                        .build()
                     },
                 )
-                .collect(),
+                .collect::<finstack_quant_core::Result<Vec<_>>>()?,
             finstack_quant_core::dates::DayCount::Act365F,
             // Standard for FX spot
             finstack_quant_cashflows::ScheduleBuildOpts {

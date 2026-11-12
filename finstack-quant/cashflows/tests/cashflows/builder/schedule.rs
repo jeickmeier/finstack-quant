@@ -20,7 +20,7 @@ use finstack_quant_cashflows::builder::{
     CouponType, FeeSpec, FixedCouponSpec, FloatingCouponSpec, FloatingRateFallback,
     FloatingRateSpec, OvernightIndexConstraintApplication,
 };
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
@@ -659,9 +659,11 @@ fn outstanding_by_date_includes_prepayment() {
     let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
         vec![{
             let cash = Money::new(250.0, Currency::USD).expect("valid money fixture");
-            CashFlow::new(prepay_date, None, cash, CFKind::PrePayment, 0.0, None)
+            CashFlowParams::new(prepay_date, None, cash, CFKind::PrePayment, 0.0, None)
                 .with_principal_delta(cash.checked_neg())
                 .with_principal_date(prepay_date)
+                .build()
+                .expect("valid cashflow")
         }],
         finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD)
             .expect("valid notional fixture"),
@@ -689,7 +691,7 @@ fn outstanding_by_date_includes_defaulted_notional() {
     let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
         vec![
             // A noncash write-down: zero cash and an explicit balance decrease.
-            CashFlow::new(
+            CashFlowParams::new(
                 default_date,
                 None,
                 Money::zero(Currency::USD),
@@ -698,15 +700,19 @@ fn outstanding_by_date_includes_defaulted_notional() {
                 None,
             )
             .with_principal_delta(Money::new(-300.0, Currency::USD).expect("valid money fixture"))
-            .with_principal_date(default_date),
-            CashFlow::new(
+            .with_principal_date(default_date)
+            .build()
+            .expect("valid cashflow"),
+            CashFlowParams::new(
                 recovery_date,
                 None,
                 Money::new(120.0, Currency::USD).expect("valid money fixture"),
                 CFKind::Recovery,
                 0.0,
                 None,
-            ),
+            )
+            .build()
+            .expect("valid cashflow"),
         ],
         finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD)
             .expect("valid notional fixture"),
@@ -770,9 +776,11 @@ fn outstanding_by_date_replays_explicit_deltas_without_an_issue_date() {
     let schedule = finstack_quant_cashflows::builder::CashFlowSchedule::from_flows(
         vec![{
             let cash = Money::new(250.0, Currency::USD).expect("valid money fixture");
-            CashFlow::new(prepay_date, None, cash, CFKind::PrePayment, 0.0, None)
+            CashFlowParams::new(prepay_date, None, cash, CFKind::PrePayment, 0.0, None)
                 .with_principal_delta(cash.checked_neg())
                 .with_principal_date(prepay_date)
+                .build()
+                .expect("valid cashflow")
         }],
         finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD)
             .expect("valid notional fixture"),
@@ -1280,15 +1288,19 @@ fn test_weighted_average_life_two_amort() {
     let flows = vec![
         {
             let cash = Money::new(500.0, Currency::USD).expect("valid money fixture");
-            CashFlow::new(d1, None, cash, CFKind::Amortization, 0.0, None)
+            CashFlowParams::new(d1, None, cash, CFKind::Amortization, 0.0, None)
                 .with_principal_delta(cash.checked_neg())
                 .with_principal_date(d1)
+                .build()
+                .expect("valid cashflow")
         },
         {
             let cash = Money::new(500.0, Currency::USD).expect("valid money fixture");
-            CashFlow::new(d2, None, cash, CFKind::Amortization, 0.0, None)
+            CashFlowParams::new(d2, None, cash, CFKind::Amortization, 0.0, None)
                 .with_principal_delta(cash.checked_neg())
                 .with_principal_date(d2)
+                .build()
+                .expect("valid cashflow")
         },
     ];
 
@@ -1322,9 +1334,11 @@ fn test_weighted_average_life_bullet() {
 
     let flows = vec![{
         let cash = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
-        CashFlow::new(maturity, None, cash, CFKind::Notional, 0.0, None)
+        CashFlowParams::new(maturity, None, cash, CFKind::Notional, 0.0, None)
             .with_principal_delta(cash.checked_neg())
             .with_principal_date(maturity)
+            .build()
+            .expect("valid cashflow")
     }];
 
     let schedule = CashFlowSchedule::from_flows(
@@ -1378,29 +1392,35 @@ fn test_weighted_average_life_ignores_coupons() {
 
     let flows = vec![
         // Coupon at 6m - should be ignored
-        CashFlow::new(
+        CashFlowParams::new(
             d1,
             None,
             Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
             CFKind::Fixed,
             0.5,
             Some(0.05),
-        ),
+        )
+        .build()
+        .expect("valid cashflow"),
         // Coupon at 1y - should be ignored
-        CashFlow::new(
+        CashFlowParams::new(
             d2,
             None,
             Money::new(25_000.0, Currency::USD).expect("valid money fixture"),
             CFKind::Fixed,
             0.5,
             Some(0.05),
-        ),
+        )
+        .build()
+        .expect("valid cashflow"),
         // Single principal redemption at maturity - only this counts
         {
             let cash = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
-            CashFlow::new(maturity, None, cash, CFKind::Notional, 0.0, None)
+            CashFlowParams::new(maturity, None, cash, CFKind::Notional, 0.0, None)
                 .with_principal_delta(cash.checked_neg())
                 .with_principal_date(maturity)
+                .build()
+                .expect("valid cashflow")
         },
     ];
 

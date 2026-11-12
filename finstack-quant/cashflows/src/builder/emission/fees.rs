@@ -1,6 +1,6 @@
 //! Fee cashflow emission (periodic and fixed fees on the builder pipeline).
 
-use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual, CashFlowParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
@@ -120,7 +120,7 @@ pub(in crate::builder) fn emit_fees_on(
 
                 if fee_amt != 0.0 {
                     new_flows.push(
-                        CashFlow::new(
+                        CashFlowParams::new(
                             period.payment_date,
                             None,
                             Money::new(fee_amt, ccy)?,
@@ -140,7 +140,8 @@ pub(in crate::builder) fn emit_fees_on(
                                 frequency: None,
                                 bus_basis: None,
                             },
-                        }),
+                        })
+                        .build()?,
                     );
                 }
             }

@@ -8,7 +8,7 @@ use super::schedule::CashFlowSchedule;
 use super::specs::PrincipalEventSpec;
 use crate::builder::{AmortizationSpec, Notional, PrincipalExchange};
 use finstack_quant_core::InputError;
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::decimal::f64_to_decimal;
 use finstack_quant_core::money::Money;
@@ -86,7 +86,7 @@ pub(super) fn apply_principal_event(
         -cash.amount()
     };
     flows.push(
-        CashFlow::new(
+        CashFlowParams::new(
             event.payment_date,
             None,
             Money::new(flow_amount, cash.currency())?,
@@ -95,7 +95,8 @@ pub(super) fn apply_principal_event(
             None,
         )
         .with_principal_delta(event.delta)
-        .with_principal_date(event.date),
+        .with_principal_date(event.date)
+        .build()?,
     );
     *outstanding = outstanding
         .checked_add(f64_to_decimal(event.delta.amount())?)
@@ -271,7 +272,7 @@ pub(super) fn initialize_build_state(
         // funding cash carries an explicit zero delta (record
         // CORE-CONVENTIONS-015 #5).
         flows.push(
-            CashFlow::new(
+            CashFlowParams::new(
                 issue,
                 None,
                 notional.initial.checked_neg(),
@@ -280,7 +281,8 @@ pub(super) fn initialize_build_state(
                 None,
             )
             .with_principal_delta(Money::zero(notional.initial.currency()))
-            .with_principal_date(issue),
+            .with_principal_date(issue)
+            .build()?,
         );
     }
 

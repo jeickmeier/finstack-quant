@@ -679,7 +679,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
                 // The opening notional already holds this principal (record
                 // CORE-CONVENTIONS-015 #5), so its delta is an explicit zero.
                 let cash = cash_outflow;
-                finstack_quant_core::cashflow::CashFlow::new(
+                finstack_quant_core::cashflow::CashFlowParams::new(
                     adj_start,
                     None,
                     cash,
@@ -689,11 +689,12 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
                 )
                 .with_principal_delta(finstack_quant_core::money::Money::zero(cash.currency()))
                 .with_principal_date(adj_start)
+                .build()?
             },
             {
                 // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                 let cash = self.cash_amount;
-                finstack_quant_core::cashflow::CashFlow::new(
+                finstack_quant_core::cashflow::CashFlowParams::new(
                     adj_maturity,
                     None,
                     cash,
@@ -703,15 +704,17 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
                 )
                 .with_principal_delta(cash.checked_neg())
                 .with_principal_date(adj_maturity)
+                .build()?
             },
-            finstack_quant_core::cashflow::CashFlow::new(
+            finstack_quant_core::cashflow::CashFlowParams::new(
                 adj_maturity,
                 None,
                 interest,
                 finstack_quant_core::cashflow::CFKind::Fixed,
                 0.0,
                 None,
-            ),
+            )
+            .build()?,
         ];
 
         let schedule = finstack_quant_cashflows::schedule_from_classified_flows(

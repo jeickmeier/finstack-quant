@@ -16,7 +16,7 @@
 use crate::cms_common::CmsReferenceSwap;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::CashFlowAccrual;
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
@@ -610,7 +610,7 @@ impl CmsSwap {
                 }
             };
             flows.push(
-                CashFlow::new(
+                CashFlowParams::new(
                     payment_date,
                     Some(fixing_date),
                     Money::from_model_value(signed_amount, self.notional.currency())?,
@@ -630,7 +630,8 @@ impl CmsSwap {
                         frequency: None,
                         bus_basis: None,
                     },
-                }),
+                })
+                .build()?,
             );
             accrual_start = payment_date;
         }
@@ -698,7 +699,7 @@ impl CmsSwap {
                 finstack_quant_valuations_core::instruments::PayReceive::Receive => -unsigned,
             };
             flows.push(
-                CashFlow::new(
+                CashFlowParams::new(
                     period.payment_date,
                     reset_date,
                     Money::from_model_value(signed, self.notional.currency())?,
@@ -718,7 +719,8 @@ impl CmsSwap {
                         frequency: None,
                         bus_basis: None,
                     },
-                }),
+                })
+                .build()?,
             );
         }
         Ok(flows)

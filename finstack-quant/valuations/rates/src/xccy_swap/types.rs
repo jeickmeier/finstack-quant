@@ -689,14 +689,17 @@ impl XccySwap {
             )?;
             let all_in = projected.all_in_rate(spread);
             let amount = leg.side.sign() * projected.unsigned_coupon(leg.notional.amount(), spread);
-            flows.push(finstack_quant_core::cashflow::CashFlow::new(
-                period.payment_date,
-                projected.fixing_date.or(period.reset_date),
-                Money::from_model_value(amount, leg.notional.currency())?,
-                finstack_quant_core::cashflow::CFKind::Floating,
-                projected.year_fraction,
-                Some(all_in),
-            ));
+            flows.push(
+                finstack_quant_core::cashflow::CashFlowParams::new(
+                    period.payment_date,
+                    projected.fixing_date.or(period.reset_date),
+                    Money::from_model_value(amount, leg.notional.currency())?,
+                    finstack_quant_core::cashflow::CFKind::Floating,
+                    projected.year_fraction,
+                    Some(all_in),
+                )
+                .build()?,
+            );
         }
         finstack_quant_cashflows::schedule_from_classified_flows(
             flows,

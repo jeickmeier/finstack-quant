@@ -235,8 +235,8 @@ class CashFlowAccrual:
         Raises
         ------
         ValueError
-            If a supplied date cannot be parsed. Call CashFlow.validate() after
-            attachment to check ordering and finite projected rates.
+            If a supplied date cannot be parsed, ``start`` is not before
+            ``end``, or ``projected_index_rate`` is not finite.
         """
         ...
 
@@ -322,9 +322,12 @@ class CashFlow:
         accrual_factor: float,
         reset_date: datetime.date | None = None,
         rate: float | None = None,
+        principal: tuple[Money, datetime.date | str] | None = None,
     ) -> None:
         """
-        Construct a dated cashflow.
+        Construct a validated dated cashflow.
+
+        The row is checked on construction; an invalid row never exists.
 
         Parameters
         ----------
@@ -337,20 +340,28 @@ class CashFlow:
             Cashflow classification, either a ``CFKind`` instance or its
             snake_case label string (e.g. ``"fixed"``).
         accrual_factor : float
-            Accrual year fraction used for the coupon amount; required, as in
-            Rust ``CashFlow::new`` and the JSON wire form (``0.0`` for
-            non-coupon rows). Checked by ``validate`` and
-            ``CashFlowSchedule.from_flows``.
+            Literal nonnegative accrual year fraction used for the coupon
+            amount; required, as in the JSON wire form (``0.0`` for
+            non-coupon rows).
         reset_date : datetime.date, optional
             Index reset date for floating coupons; must not be after *date*.
         rate : float, optional
             Effective annual rate used to compute this cashflow, when known.
+        principal : tuple[Money, datetime.date | str], optional
+            ``(delta, date)``: the signed change in outstanding (positive
+            increases it) in the cash currency, and its balance-effective
+            date. Required on principal kinds and rejected on others; PIK
+            and default write-down rows carry zero cash. Attach accrual
+            metadata with ``with_accrual``.
 
         Raises
         ------
         ValueError
-            If *kind* is a string that does not match a known label, or if
-            *amount* has a non-finite value.
+            If *kind* is a string that does not match a known label, a date
+            cannot be parsed, or the row is invalid: a non-finite or negative
+            accrual factor, a non-finite rate, a reset after *date*, a missing
+            or extra principal pair, a principal delta in another currency,
+            or nonzero cash on a noncash kind.
         """
         ...
 
@@ -499,66 +510,71 @@ class CashFlow:
         """
         ...
 
-    def with_principal_date(self, date: datetime.date | str) -> CashFlow:
-        """Set the economic principal date on a copy of this row.
+    def with_principal(self, delta: Money, date: datetime.date | str) -> CashFlow:
+        """Return a copy with a new principal change and balance date.
+
+        The delta and date update together; this row is unchanged.
 
         Parameters
         ----------
+        delta : Money
+            Signed principal movement in the cashflow currency; positive increases it.
         date : datetime.date | str
             Balance-effective date, independently of this row's cash settlement date.
 
         Returns
         -------
         CashFlow
-            New row with the supplied principal date and original payment date.
+            The updated, validated row.
 
         Raises
         ------
         ValueError
-            If the supplied date cannot be parsed.
+            If the date cannot be parsed or the updated row is invalid (for
+            example a non-principal kind, or a delta in another currency).
+
+        Examples
+        --------
+        >>> from finstack_quant.core.cashflow import CashFlow, CFKind
+        >>> from finstack_quant.core.money import Money
+        >>> row = CashFlow(
+        ...     "2025-06-15", Money(50, "USD"), CFKind.AMORTIZATION, 0.0, principal=(Money(-50, "USD"), "2025-06-15")
+        ... )
+        >>> row.with_principal(Money(-40, "USD"), "2025-06-13").principal_delta
+        Money(-40, 'USD')
         """
         ...
 
     def with_accrual(self, accrual: CashFlowAccrual) -> CashFlow:
-        """Attach contractual metadata to a copy of this row.
+        """Return a copy carrying new contractual accrual metadata.
 
         Parameters
         ----------
         accrual : CashFlowAccrual
-            Coupon boundaries, day count, calendar and optional projected index.
+            One actual accrual calculation slice and its day-count context.
 
         Returns
         -------
         CashFlow
-            New row carrying the metadata. This method does not validate it;
-            call validate() to check dates and finite rates. Attachment does not raise.
-        """
-        ...
+            The updated, validated row; this row is unchanged.
 
-    def with_principal_delta(self, delta: Money) -> CashFlow:
-        """Attach a principal change to a copy of this row.
-
-        Parameters
-        ----------
-        delta : Money
-            Signed principal movement in the cashflow currency; positive increases it.
-
-        Returns
-        -------
-        CashFlow
-            New row with explicit principal movement. Call validate() to check
-            currency; attachment does not raise and performs no domain validation.
+        Raises
+        ------
+        ValueError
+            If the updated row is invalid.
         """
         ...
 
     def validate(self) -> None:
         """
-        Validate accrual inputs, reset-date ordering and principal currency.
+        Re-check the row invariants (idempotent).
 
-        Monetary amounts are already validated by Money construction; zero
-        amounts are allowed. Accrual factors and rates must be finite, the
-        accrual factor must be nonnegative, reset dates cannot follow payment,
-        and principal deltas must share the cashflow currency.
+        Every ``CashFlow`` is validated on construction, update and
+        deserialization, so this never raises for a row the library built.
+        Monetary amounts are validated by Money construction; zero amounts
+        are allowed. Accrual factors and rates must be finite, the accrual
+        factor must be nonnegative, reset dates cannot follow payment, and
+        principal deltas must share the cashflow currency.
 
         Raises
         ------

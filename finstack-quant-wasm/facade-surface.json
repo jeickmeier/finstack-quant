@@ -721,6 +721,8 @@
       "buildPeriods",
       "cashFlowGetBalanceDate",
       "cashFlowValidate",
+      "cashFlowWithAccrual",
+      "cashFlowWithPrincipal",
       "cfKindIsCashSettlement",
       "cfKindIsInterestLike",
       "cfKindIsPrincipalLike",
@@ -1726,6 +1728,12 @@
     "kind": "function"
   },
   "core.cashFlowValidate": {
+    "kind": "function"
+  },
+  "core.cashFlowWithAccrual": {
+    "kind": "function"
+  },
+  "core.cashFlowWithPrincipal": {
     "kind": "function"
   },
   "core.cfKindIsCashSettlement": {

@@ -58,14 +58,13 @@ class TestPrimitives:
     def test_cashflow_validate_rejects_negative_accrual_factor(self) -> None:
         from finstack_quant.core.cashflow import CashFlow, CFKind
 
-        cf = CashFlow(
-            date=dt.date(2025, 6, 15),
-            amount=Money(1.0, "USD"),
-            kind=CFKind.FIXED,
-            accrual_factor=-0.1,
-        )
         with pytest.raises(ValueError, match="accrual_factor"):
-            cf.validate()
+            CashFlow(
+                date=dt.date(2025, 6, 15),
+                amount=Money(1.0, "USD"),
+                kind=CFKind.FIXED,
+                accrual_factor=-0.1,
+            )
 
     def test_is_cash_settlement(self) -> None:
         from finstack_quant.core.cashflow import CFKind
@@ -916,10 +915,12 @@ class TestCashFlowSchedule:
 
         amount = "10000000000000000000000000000" if scale == 10.0 else "1"
         if principal_delta:
-            row = (
-                CashFlow("2025-06-01", Money(0, "USD"), CFKind.NOTIONAL, 0.0)
-                .with_principal_delta(Money.from_decimal(Decimal(amount), "USD"))
-                .with_principal_date("2025-06-01")
+            row = CashFlow(
+                "2025-06-01",
+                Money(0, "USD"),
+                CFKind.NOTIONAL,
+                0.0,
+                principal=(Money.from_decimal(Decimal(amount), "USD"), "2025-06-01"),
             )
         else:
             row = CashFlow("2025-06-01", Money.from_decimal(Decimal(amount), "USD"), CFKind.FIXED, 0.0)
@@ -934,10 +935,12 @@ class TestCashFlowSchedule:
         from finstack_quant.core.cashflow import CashFlow, CFKind
         from finstack_quant.core.dates import DayCount
 
-        row = (
-            CashFlow("2026-01-01", Money(100, "USD"), CFKind.REVOLVING_REPAYMENT, 0.0)
-            .with_principal_delta(Money(-100, "USD"))
-            .with_principal_date("2026-01-01")
+        row = CashFlow(
+            "2026-01-01",
+            Money(100, "USD"),
+            CFKind.REVOLVING_REPAYMENT,
+            0.0,
+            principal=(Money(-100, "USD"), "2026-01-01"),
         )
         schedule = CashFlowSchedule.from_flows([row], Notional.par(100, "USD"), DayCount.ACT_360, CashFlowMeta())
         assert schedule.wal(dt.date(2025, 1, 1)) == pytest.approx(1.0)
@@ -1012,9 +1015,7 @@ class TestCashFlowSchedule:
         rows = [
             CashFlow("2025-01-02", Money(1, "USD"), CFKind.FIXED, 0.0),
             CashFlow("2025-01-05", Money(1, "USD"), CFKind.FIXED, 0.0),
-            CashFlow("2025-01-06", Money(20, "USD"), CFKind.NOTIONAL, 0.0)
-            .with_principal_delta(Money(-20, "USD"))
-            .with_principal_date("2025-01-05"),
+            CashFlow("2025-01-06", Money(20, "USD"), CFKind.NOTIONAL, 0.0, principal=(Money(-20, "USD"), "2025-01-05")),
         ]
         schedule = CashFlowSchedule.from_flows(
             rows, Notional.par(100, "USD"), DayCount.ACT_360, CashFlowMeta(issue_date="2025-01-01")
@@ -1362,10 +1363,12 @@ class TestTypedTwinsAndWire:
         s1 = schedule_from_dated_flows(dated, "fixed", DayCount.ACT_360)
         assert s1.get_flows()[0].kind == CFKind.FIXED
         # A PIK row is a noncash balance event: zero cash, explicit capitalization.
-        flow = (
-            CashFlow(dt.date(2025, 6, 15), Money(0.0, "USD"), CFKind.PIK, 0.0)
-            .with_principal_delta(Money(100.0, "USD"))
-            .with_principal_date(dt.date(2025, 6, 15))
+        flow = CashFlow(
+            dt.date(2025, 6, 15),
+            Money(0.0, "USD"),
+            CFKind.PIK,
+            0.0,
+            principal=(Money(100.0, "USD"), dt.date(2025, 6, 15)),
         )
         opts = ScheduleBuildOpts(notional_hint=Money(500.0, "USD"), meta=CashFlowMeta("projected"))
         s2 = schedule_from_classified_flows([flow], DayCount.ACT_360, opts)
@@ -1409,7 +1412,9 @@ class TestTypedTwinsAndWire:
         from finstack_quant.core.dates import DayCount
 
         notional = Notional.par(1_000.0, "USD")
-        row = CashFlow(dt.date(2025, 6, 15), Money(10.0, "USD"), CFKind.FIXED, accrual_factor, reset_date=reset_date)
+        # A row object rejects the same values at construction.
+        with pytest.raises(ValueError, match=message):
+            CashFlow(dt.date(2025, 6, 15), Money(10.0, "USD"), CFKind.FIXED, accrual_factor, reset_date=reset_date)
         frame = pd.DataFrame({
             "date": [dt.date(2025, 6, 15)],
             "amount": [10.0],
@@ -1418,9 +1423,8 @@ class TestTypedTwinsAndWire:
             "accrual_factor": [accrual_factor],
             "reset_date": [reset_date],
         })
-        for flows in ([row], frame):
-            with pytest.raises(ValueError, match=message):
-                CashFlowSchedule.from_flows(flows, notional, DayCount.ACT_360)
+        with pytest.raises(ValueError, match=message):
+            CashFlowSchedule.from_flows(frame, notional, DayCount.ACT_360)
 
     def test_from_flows_requires_accrual_factor(self) -> None:
         pd = pytest.importorskip("pandas")
@@ -1643,14 +1647,18 @@ def test_cashflow_metadata_dataframe_roundtrip() -> None:
     row = CashFlow("2025-04-03", Money(25, "USD"), CFKind.FIXED, 0.0).with_accrual(metadata)
     assert row.accrual.projected_index_rate == 0.03
     # A principal row states its delta and balance date (record CORE-CONVENTIONS-015 #4).
-    draw = (
-        CashFlow("2025-02-01", Money(-98, "USD"), CFKind.NOTIONAL, 0.0)
-        .with_principal_delta(Money(100, "USD"))
-        .with_principal_date("2025-02-01")
-    )
+    draw = CashFlow("2025-02-01", Money(-98, "USD"), CFKind.NOTIONAL, 0.0, principal=(Money(100, "USD"), "2025-02-01"))
     draw.validate()
     assert CashFlow.from_json(draw.to_json()).principal_delta.amount == 100
-    delayed = draw.with_principal_date("2025-01-31")
+    delayed = draw.with_principal(Money(100, "USD"), "2025-01-31")
+    assert draw.principal_date == dt.date(2025, 2, 1)
+    # Record CORE-CONVENTIONS-015 #10: an invalid row or update never exists.
+    with pytest.raises(ValueError, match="requires an explicit principal_delta"):
+        CashFlow("2025-02-01", Money(-98, "USD"), CFKind.NOTIONAL, 0.0)
+    with pytest.raises(ValueError, match="principal"):
+        row.with_principal(Money(1, "USD"), "2025-04-03")
+    with pytest.raises(ValueError, match=r"(?i)currency"):
+        draw.with_principal(Money(1, "EUR"), "2025-02-01")
     assert delayed.date == dt.date(2025, 2, 1)
     assert delayed.principal_date == dt.date(2025, 1, 31)
     assert delayed.get_balance_date() == dt.date(2025, 1, 31)

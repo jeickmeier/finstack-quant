@@ -7,7 +7,7 @@
 //! ad-hoc flow lists using [`ScheduleBuildOpts`].
 
 use crate::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -221,8 +221,8 @@ pub fn schedule_from_dated_flows(
     }
     let classified = flows
         .into_iter()
-        .map(|(date, amount)| CashFlow::new(date, None, amount, kind, 0.0, None))
-        .collect();
+        .map(|(date, amount)| CashFlowParams::new(date, None, amount, kind, 0.0, None).build())
+        .collect::<finstack_quant_core::Result<Vec<_>>>()?;
     schedule_from_classified_flows(classified, day_count, opts)
 }
 
@@ -256,7 +256,7 @@ pub fn schedule_from_dated_flows(
 ///
 /// ```rust
 /// use finstack_quant_cashflows::{schedule_from_classified_flows, ScheduleBuildOpts};
-/// use finstack_quant_core::cashflow::{CashFlow, CFKind};
+/// use finstack_quant_core::cashflow::{CashFlowParams, CFKind};
 /// use finstack_quant_core::currency::Currency;
 /// use finstack_quant_core::dates::{Date, DayCount};
 /// use finstack_quant_core::money::Money;
@@ -264,11 +264,13 @@ pub fn schedule_from_dated_flows(
 ///
 /// let date = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
 /// let flows = vec![
-///     CashFlow::new(date, None, Money::from((50_000_i64, Currency::USD)), CFKind::Fixed, 0.5, Some(0.05)),
+///     CashFlowParams::new(date, None, Money::from((50_000_i64, Currency::USD)), CFKind::Fixed, 0.5, Some(0.05))
+///         .build()?,
 ///     // PIK carries zero cash; its capitalization is the explicit delta.
-///     CashFlow::new(date, None, Money::zero(Currency::USD), CFKind::Pik, 0.5, Some(0.01))
+///     CashFlowParams::new(date, None, Money::zero(Currency::USD), CFKind::Pik, 0.5, Some(0.01))
 ///         .with_principal_delta(Money::from((10_000_i64, Currency::USD)))
-///         .with_principal_date(date),
+///         .with_principal_date(date)
+///         .build()?,
 /// ];
 /// let schedule = schedule_from_classified_flows(
 ///     flows,
@@ -281,8 +283,9 @@ pub fn schedule_from_dated_flows(
 /// .expect("valid flows");
 /// assert_eq!(schedule.get_flows().len(), 2);
 /// // Original CFKind values are preserved.
-/// assert_eq!(schedule.get_flows()[0].kind, CFKind::Fixed);
-/// assert_eq!(schedule.get_flows()[1].kind, CFKind::Pik);
+/// assert_eq!(schedule.get_flows()[0].get_kind(), CFKind::Fixed);
+/// assert_eq!(schedule.get_flows()[1].get_kind(), CFKind::Pik);
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn schedule_from_classified_flows(
     flows: Vec<CashFlow>,
@@ -317,7 +320,7 @@ mod tests {
         let date = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
         let mut schedule = schedule_from_classified_flows(
             vec![
-                CashFlow::new(
+                CashFlowParams::new(
                     date,
                     None,
                     Money::from((150_i64, Currency::USD)),
@@ -326,7 +329,9 @@ mod tests {
                     None,
                 )
                 .with_principal_delta(Money::from((-150_i64, Currency::USD)))
-                .with_principal_date(date),
+                .with_principal_date(date)
+                .build()
+                .expect("valid cashflow"),
             ],
             DayCount::Act360,
             ScheduleBuildOpts {
@@ -345,16 +350,20 @@ mod tests {
 
         // Foreign fees and zero principal placeholders must not disable
         // reconciliation of the actual USD principal path.
-        schedule.push_flow(CashFlow::new(
-            date,
-            None,
-            Money::from((10_i64, Currency::EUR)),
-            CFKind::Fee,
-            0.0,
-            None,
-        ));
         schedule.push_flow(
-            CashFlow::new(
+            CashFlowParams::new(
+                date,
+                None,
+                Money::from((10_i64, Currency::EUR)),
+                CFKind::Fee,
+                0.0,
+                None,
+            )
+            .build()
+            .expect("valid cashflow"),
+        );
+        schedule.push_flow(
+            CashFlowParams::new(
                 date,
                 None,
                 Money::from((0_i64, Currency::EUR)),
@@ -363,7 +372,9 @@ mod tests {
                 None,
             )
             .with_principal_delta(Money::from((0_i64, Currency::EUR)))
-            .with_principal_date(date),
+            .with_principal_date(date)
+            .build()
+            .expect("valid cashflow"),
         );
         let error = schedule
             .dated_flows()
@@ -384,9 +395,11 @@ mod tests {
             ]
             .into_iter()
             .map(|(date, cash)| {
-                CashFlow::new(date, None, cash, CFKind::Notional, 0.0, None)
+                CashFlowParams::new(date, None, cash, CFKind::Notional, 0.0, None)
                     .with_principal_delta(cash.checked_neg())
                     .with_principal_date(date)
+                    .build()
+                    .expect("valid cashflow")
             })
             .collect(),
             DayCount::Act360,
@@ -434,7 +447,9 @@ mod tests {
         .map(|(kind, amount)| {
             let value = Money::from((amount, Currency::USD));
             if kind.is_cash_settlement() {
-                CashFlow::new(date, None, value, kind, 0.0, None)
+                CashFlowParams::new(date, None, value, kind, 0.0, None)
+                    .build()
+                    .expect("valid cashflow")
             } else {
                 // Noncash balance events carry zero cash and an explicit delta.
                 let delta = if kind == CFKind::Pik {
@@ -442,9 +457,11 @@ mod tests {
                 } else {
                     value.checked_neg()
                 };
-                CashFlow::new(date, None, Money::zero(Currency::USD), kind, 0.0, None)
+                CashFlowParams::new(date, None, Money::zero(Currency::USD), kind, 0.0, None)
                     .with_principal_delta(delta)
                     .with_principal_date(date)
+                    .build()
+                    .expect("valid cashflow")
             }
         })
         .collect();
@@ -527,15 +544,17 @@ mod tests {
             let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
             let future = Date::from_calendar_date(2025, Month::February, 1).expect("valid date");
             let flows = vec![
-                CashFlow::new(
+                CashFlowParams::new(
                     future,
                     None,
                     Money::from((30_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.0,
                     None,
-                ),
-                CashFlow::new(
+                )
+                .build()
+                .expect("valid cashflow"),
+                CashFlowParams::new(
                     future,
                     None,
                     Money::zero(Currency::USD),
@@ -544,24 +563,30 @@ mod tests {
                     None,
                 )
                 .with_principal_delta(Money::from((40_i64, Currency::USD)))
-                .with_principal_date(future),
-                CashFlow::new(
+                .with_principal_date(future)
+                .build()
+                .expect("valid cashflow"),
+                CashFlowParams::new(
                     past,
                     None,
                     Money::from((10_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.0,
                     None,
-                ),
-                CashFlow::new(
+                )
+                .build()
+                .expect("valid cashflow"),
+                CashFlowParams::new(
                     as_of,
                     None,
                     Money::from((20_i64, Currency::USD)),
                     CFKind::Fixed,
                     0.0,
                     None,
-                ),
-                CashFlow::new(
+                )
+                .build()
+                .expect("valid cashflow"),
+                CashFlowParams::new(
                     future,
                     None,
                     Money::zero(Currency::USD),
@@ -570,7 +595,9 @@ mod tests {
                     None,
                 )
                 .with_principal_delta(Money::from((-50_i64, Currency::USD)))
-                .with_principal_date(future),
+                .with_principal_date(future)
+                .build()
+                .expect("valid cashflow"),
             ];
             schedule_from_classified_flows(
                 flows,
@@ -697,11 +724,13 @@ mod tests {
         let flows = vec![
             {
                 let cash = Money::from((20_i64, Currency::USD));
-                CashFlow::new(date, None, cash, CFKind::PrePayment, 0.0, None)
+                CashFlowParams::new(date, None, cash, CFKind::PrePayment, 0.0, None)
                     .with_principal_delta(cash.checked_neg())
                     .with_principal_date(date)
+                    .build()
+                    .expect("valid cashflow")
             },
-            CashFlow::new(
+            CashFlowParams::new(
                 date,
                 None,
                 Money::zero(Currency::USD),
@@ -710,7 +739,9 @@ mod tests {
                 None,
             )
             .with_principal_delta(Money::from((-5_i64, Currency::USD)))
-            .with_principal_date(date),
+            .with_principal_date(date)
+            .build()
+            .expect("valid cashflow"),
         ];
 
         let schedule = schedule_from_classified_flows(
@@ -763,14 +794,18 @@ mod tests {
     #[test]
     fn schedule_from_classified_flows_preserves_notional_and_meta() {
         let date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-        let flows = vec![CashFlow::new(
-            date,
-            None,
-            Money::from((25_i64, Currency::USD)),
-            CFKind::Fee,
-            0.0,
-            None,
-        )];
+        let flows = vec![
+            CashFlowParams::new(
+                date,
+                None,
+                Money::from((25_i64, Currency::USD)),
+                CFKind::Fee,
+                0.0,
+                None,
+            )
+            .build()
+            .expect("valid cashflow"),
+        ];
         let notional = Notional::par(250.0, Currency::USD).expect("valid notional fixture");
         let meta = CashFlowMeta {
             projected_fixings: Vec::new(),

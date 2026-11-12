@@ -7,7 +7,7 @@ use finstack_quant_cashflows::builder::CouponType;
 use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
 use finstack_quant_core::cashflow::CFKind;
-use finstack_quant_core::cashflow::CashFlow;
+use finstack_quant_core::cashflow::CashFlowParams;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::dates::{Date, DayCount, StubKind, build_periods};
@@ -404,7 +404,7 @@ fn no_funding_schedule(initial: f64, issue: Date) -> ScheduleInstrument {
     let flows = if initial > 0.0 {
         vec![{
             let cash = Money::new(initial, Currency::USD).expect("valid redemption principal");
-            CashFlow::new(
+            CashFlowParams::new(
                 date!(2027 - 01 - 01),
                 None,
                 cash,
@@ -414,6 +414,8 @@ fn no_funding_schedule(initial: f64, issue: Date) -> ScheduleInstrument {
             )
             .with_principal_delta(cash.checked_neg())
             .with_principal_date(date!(2027 - 01 - 01))
+            .build()
+            .expect("valid cashflow")
         }]
     } else {
         vec![]
@@ -808,7 +810,7 @@ fn oid_funding_preserves_custom_bond_face_with_separate_cash_dates() {
         date!(2025 - 01 - 15),
     ] {
         for initial_face in [0.0, 100.0] {
-            let funding = CashFlow::new(
+            let funding = CashFlowParams::new(
                 issue.next_day().expect("cash settlement date"),
                 None,
                 Money::from((-98_i64, Currency::USD)),
@@ -819,11 +821,13 @@ fn oid_funding_preserves_custom_bond_face_with_separate_cash_dates() {
             .with_principal_delta(
                 Money::new(100.0 - initial_face, Currency::USD).expect("funded face"),
             )
-            .with_principal_date(issue);
+            .with_principal_date(issue)
+            .build()
+            .expect("valid cashflow");
             let schedule = CashFlowSchedule::from_flows(
                 vec![funding, {
                     let cash = Money::from((100_i64, Currency::USD));
-                    CashFlow::new(
+                    CashFlowParams::new(
                         date!(2027 - 01 - 01),
                         None,
                         cash,
@@ -833,6 +837,8 @@ fn oid_funding_preserves_custom_bond_face_with_separate_cash_dates() {
                     )
                     .with_principal_delta(cash.checked_neg())
                     .with_principal_date(date!(2027 - 01 - 01))
+                    .build()
+                    .expect("valid cashflow")
                 }],
                 Notional::par(initial_face, Currency::USD).expect("initial face"),
                 DayCount::Act365F,
@@ -1298,7 +1304,7 @@ fn newly_funded_balance_capitalizes_pik_on_its_effective_date() {
         .periods;
     let issue = date!(2025 - 01 - 15);
     let flows = vec![
-        CashFlow::new(
+        CashFlowParams::new(
             // Dated at its capitalization (record CORE-CONVENTIONS-015 #6).
             date!(2025 - 03 - 31),
             None,
@@ -1308,10 +1314,12 @@ fn newly_funded_balance_capitalizes_pik_on_its_effective_date() {
             None,
         )
         .with_principal_delta(Money::new(5.0, Currency::USD).expect("valid PIK delta"))
-        .with_principal_date(date!(2025 - 03 - 31)),
+        .with_principal_date(date!(2025 - 03 - 31))
+        .build()
+        .expect("valid cashflow"),
         {
             let cash = Money::new(105.0, Currency::USD).expect("valid redemption principal");
-            CashFlow::new(
+            CashFlowParams::new(
                 date!(2027 - 01 - 01),
                 None,
                 cash,
@@ -1321,6 +1329,8 @@ fn newly_funded_balance_capitalizes_pik_on_its_effective_date() {
             )
             .with_principal_delta(cash.checked_neg())
             .with_principal_date(date!(2027 - 01 - 01))
+            .build()
+            .expect("valid cashflow")
         },
     ];
     let instrument = ScheduleInstrument::new(

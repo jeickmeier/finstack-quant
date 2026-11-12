@@ -15,7 +15,7 @@ use crate::structured_credit::types::{
 use crate::structured_credit::utils::simulation::RecoveryQueue;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::HolidayCalendar;
 use finstack_quant_core::dates::{

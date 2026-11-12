@@ -3691,20 +3691,21 @@
         }
       }
     },
-    "with_principal_delta": {
+    "with_principal": {
       "date": "2025-07-15",
       "reset_date": null,
       "amount": {
         "amount": "30000",
         "currency": "USD"
       },
-      "kind": "fixed",
+      "kind": "amortization",
       "accrual_factor": 0.5,
       "rate": 0.06,
       "principal_delta": {
         "amount": "-1000",
         "currency": "USD"
-      }
+      },
+      "principal_date": "2025-07-11"
     }
   },
   "specs.amortization": [

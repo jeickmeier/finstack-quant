@@ -10,7 +10,7 @@ use crate::revolving_credit::types::{DrawRepaySpec, RevolvingCredit, RevolvingCr
 use crate::revolving_credit::utils::resolve_fixings;
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
 use finstack_quant_cashflows::{ScheduleBuildOpts, schedule_from_classified_flows};
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlowParams};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -121,20 +121,22 @@ impl RevolvingCreditPricer {
             .map(|key| {
                 let flow = &buckets[&key];
                 let rate = (flow.rate_count > 0).then(|| flow.rate_sum / flow.rate_count as f64);
-                let mut expected = CashFlow::new(
-                    key.0,
-                    key.1,
-                    flow.amount.checked_div_f64(num_paths)?,
-                    key.2,
-                    flow.accrual_factor,
-                    rate,
-                );
-                expected.principal_delta = flow
-                    .principal_delta
-                    .map(|sum| sum.checked_div_f64(num_paths))
-                    .transpose()?;
-                expected.principal_date = key.3;
-                Ok(expected)
+                CashFlowParams {
+                    principal_delta: flow
+                        .principal_delta
+                        .map(|sum| sum.checked_div_f64(num_paths))
+                        .transpose()?,
+                    principal_date: key.3,
+                    ..CashFlowParams::new(
+                        key.0,
+                        key.1,
+                        flow.amount.checked_div_f64(num_paths)?,
+                        key.2,
+                        flow.accrual_factor,
+                        rate,
+                    )
+                }
+                .build()
             })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 

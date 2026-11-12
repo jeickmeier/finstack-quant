@@ -394,7 +394,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
                 // The opening notional already holds this principal (record
                 // CORE-CONVENTIONS-015 #5), so its delta is an explicit zero.
                 let cash = self.notional.checked_neg();
-                finstack_quant_core::cashflow::CashFlow::new(
+                finstack_quant_core::cashflow::CashFlowParams::new(
                     effective_start,
                     None,
                     cash,
@@ -404,11 +404,12 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
                 )
                 .with_principal_delta(finstack_quant_core::money::Money::zero(cash.currency()))
                 .with_principal_date(effective_start)
+                .build()?
             },
             {
                 // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                 let cash = self.notional;
-                finstack_quant_core::cashflow::CashFlow::new(
+                finstack_quant_core::cashflow::CashFlowParams::new(
                     effective_end,
                     None,
                     cash,
@@ -418,15 +419,17 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
                 )
                 .with_principal_delta(cash.checked_neg())
                 .with_principal_date(effective_end)
+                .build()?
             },
-            finstack_quant_core::cashflow::CashFlow::new(
+            finstack_quant_core::cashflow::CashFlowParams::new(
                 effective_end,
                 None,
                 interest,
                 finstack_quant_core::cashflow::CFKind::Fixed,
                 yf,
                 Some(r),
-            ),
+            )
+            .build()?,
         ];
 
         let schedule = finstack_quant_cashflows::schedule_from_classified_flows(

@@ -819,7 +819,7 @@ mod performance_work;
 mod tests {
     use super::*;
     use crate::builder::{CashFlowMeta, CashFlowSchedule, Notional};
-    use finstack_quant_core::cashflow::{CashFlow, CashFlowAccrual};
+    use finstack_quant_core::cashflow::{CashFlow, CashFlowAccrual, CashFlowParams};
     use finstack_quant_core::currency::Currency;
     use time::Month;
 
@@ -832,7 +832,7 @@ mod tests {
         // Record CORE-CONVENTIONS-015 #9: zero is never "missing, derive it".
         let start = make_date(2025, 1, 1);
         let end = make_date(2025, 7, 1);
-        let coupon = CashFlow::new(
+        let coupon = CashFlowParams::new(
             end,
             None,
             Money::from((50_i64, Currency::USD)),
@@ -849,7 +849,9 @@ mod tests {
                 end_is_termination_date: Some(true),
                 ..Default::default()
             },
-        });
+        })
+        .build()
+        .expect("valid cashflow");
         let schedule = CashFlowSchedule::from_flows(
             vec![coupon],
             Notional::par(1_000.0, Currency::USD).expect("notional"),
@@ -874,7 +876,7 @@ mod tests {
         let flows: Vec<CashFlow> = coupon_dates
             .iter()
             .map(|(date, af)| {
-                CashFlow::new(
+                CashFlowParams::new(
                     *date,
                     None,
                     Money::from((25000_i64, Currency::USD)),
@@ -882,6 +884,8 @@ mod tests {
                     *af,
                     Some(0.05),
                 )
+                .build()
+                .expect("valid cashflow")
             })
             .collect();
 
@@ -915,7 +919,7 @@ mod tests {
         ]
         .into_iter()
         .map(|(start, end, payment, reference, amount)| {
-            CashFlow::new(
+            CashFlowParams::new(
                 payment,
                 None,
                 Money::from((amount, Currency::USD)),
@@ -936,6 +940,8 @@ mod tests {
                     bus_basis: None,
                 },
             })
+            .build()
+            .expect("valid cashflow")
         })
         .collect();
         let schedule = CashFlowSchedule::from_flows(
@@ -1091,14 +1097,18 @@ mod tests {
 
         schedule.flows.insert(
             0,
-            CashFlow::new(
+            CashFlowParams::new(
                 make_date(2025, 1, 15),
                 None,
                 Money::from((-1_000_000_i64, Currency::USD)),
                 CFKind::Notional,
                 0.0,
                 None,
-            ),
+            )
+            .with_principal_delta(Money::from((1_000_000_i64, Currency::USD)))
+            .with_principal_date(make_date(2025, 1, 15))
+            .build()
+            .expect("valid cashflow"),
         );
 
         let cfg = AccrualConfig::default();
@@ -1135,7 +1145,7 @@ mod tests {
         let as_of = make_date(2025, 4, 1);
         let end = make_date(2025, 7, 1);
         let flows = vec![
-            CashFlow::new(
+            CashFlowParams::new(
                 end,
                 None,
                 Money::from((30_000_i64, Currency::USD)),
@@ -1155,8 +1165,10 @@ mod tests {
                     frequency: None,
                     bus_basis: None,
                 },
-            }),
-            CashFlow::new(
+            })
+            .build()
+            .expect("valid cashflow"),
+            CashFlowParams::new(
                 end,
                 None,
                 Money::from((20_000_i64, Currency::USD)),
@@ -1176,7 +1188,9 @@ mod tests {
                     frequency: None,
                     bus_basis: None,
                 },
-            }),
+            })
+            .build()
+            .expect("valid cashflow"),
         ];
         let schedule = CashFlowSchedule {
             flows,
@@ -1203,19 +1217,21 @@ mod tests {
             make_test_schedule(&[(payment, 0.5), (payment, 3.0 / 360.0)], DayCount::Act360);
         schedule.meta.issue_date = Some(issue);
         for (flow, start) in schedule.flows.iter_mut().zip([issue, later_start]) {
-            flow.accrual = Some(CashFlowAccrual {
-                start,
-                end: payment,
-                day_count: DayCount::Act360,
-                projected_index_rate: None,
-                context: finstack_quant_core::dates::DayCountContextState {
-                    calendar_id: None,
-                    coupon_period: Some((start, payment)),
-                    end_is_termination_date: Some(false),
-                    frequency: None,
-                    bus_basis: None,
-                },
-            });
+            *flow = flow
+                .with_accrual(CashFlowAccrual {
+                    start,
+                    end: payment,
+                    day_count: DayCount::Act360,
+                    projected_index_rate: None,
+                    context: finstack_quant_core::dates::DayCountContextState {
+                        calendar_id: None,
+                        coupon_period: Some((start, payment)),
+                        end_is_termination_date: Some(false),
+                        frequency: None,
+                        bus_basis: None,
+                    },
+                })
+                .expect("valid cashflow");
         }
         let error = accrued_interest_amount(&schedule, make_date(2025, 6, 29), &ex_coupon_cfg(7))
             .expect_err("the later coupon's record date precedes its own accrual start");
@@ -1342,7 +1358,7 @@ mod tests {
 
         let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![
-                CashFlow::new(
+                CashFlowParams::new(
                     payment,
                     None,
                     Money::from((25_000_i64, Currency::GBP)),
@@ -1362,7 +1378,9 @@ mod tests {
                         frequency: None,
                         bus_basis: None,
                     },
-                }),
+                })
+                .build()
+                .expect("valid cashflow"),
             ],
             Notional::par(1_000_000.0, Currency::GBP).expect("notional"),
             DayCount::ActActIsma,

@@ -13,7 +13,7 @@ use finstack_quant_cashflows::accrual::{
 use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
 use finstack_quant_core::Error;
 use finstack_quant_core::canonical::{CANONICAL_VERSION, content_hash};
-use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual, CashFlowParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, Tenor, parse_iso_date};
 use finstack_quant_core::money::Money;
@@ -33,7 +33,7 @@ fn row(
 ) -> CashFlow {
     let start = date(start);
     let end = date(end);
-    CashFlow::new(
+    CashFlowParams::new(
         date(payment),
         None,
         Money::new(amount, Currency::USD).expect("row amount"),
@@ -54,6 +54,8 @@ fn row(
             bus_basis: None,
         },
     })
+    .build()
+    .expect("valid cashflow")
 }
 
 fn hand_schedule(
@@ -309,7 +311,7 @@ fn pik_records() -> Vec<Value> {
         DayCount::Act365F,
         181.0 / 365.0,
     );
-    let mut pik = row(
+    let coupon = row(
         "2025-07-01",
         "2025-01-01",
         "2025-07-01",
@@ -317,10 +319,15 @@ fn pik_records() -> Vec<Value> {
         DayCount::Act365F,
         181.0 / 365.0,
     );
-    pik.kind = CFKind::Pik;
-    pik.principal_delta = Some(pik.get_amount());
-    pik.principal_date = Some(pik.get_date());
-    pik.amount = Money::zero(pik.get_amount().currency());
+    let pik = CashFlowParams {
+        kind: CFKind::Pik,
+        principal_delta: Some(coupon.get_amount()),
+        principal_date: Some(coupon.get_date()),
+        amount: Money::zero(coupon.get_amount().currency()),
+        ..CashFlowParams::from(&coupon)
+    }
+    .build()
+    .expect("valid cashflow");
     let schedule = hand_schedule(
         vec![cash, pik],
         "2025-01-01",
@@ -527,20 +534,21 @@ fn lazy_calendar_records() -> Vec<Value> {
         DayCount::Act365F,
         181.0 / 365.0,
     );
-    let mut future = row(
+    let mut future = CashFlowParams::from(&row(
         "2025-12-01",
         "2025-09-01",
         "2025-12-01",
         9_100.0,
         DayCount::Act365F,
         91.0 / 365.0,
-    );
+    ));
     future
         .accrual
         .as_mut()
         .expect("future accrual")
         .context
         .calendar_id = Some("CCM-NO-SUCH-CALENDAR".into());
+    let future = future.build().expect("valid cashflow");
     let schedule = hand_schedule(
         vec![active, future],
         "2025-01-01",

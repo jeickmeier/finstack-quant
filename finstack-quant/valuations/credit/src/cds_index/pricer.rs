@@ -19,7 +19,7 @@ use finstack_quant_cashflows::builder::{CashFlowSchedule, Notional};
 use finstack_quant_cashflows::{
     CashflowProvider, ScheduleBuildOpts, schedule_from_classified_flows,
 };
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
@@ -316,14 +316,17 @@ impl CdsIndex {
         // The synthetic CDS carries no upfront, so the index upfront is added
         // and signed only here, with the same side convention as `npv`.
         if let Some((dt, amount)) = index.upfront.filter(|(dt, _)| *dt >= as_of) {
-            schedule.push_flow(CashFlow::new(
-                dt,
-                None,
-                Money::new(amount.amount() * index.side.sign(), amount.currency())?,
-                CFKind::Fee,
-                0.0,
-                None,
-            ));
+            schedule.push_flow(
+                CashFlowParams::new(
+                    dt,
+                    None,
+                    Money::new(amount.amount() * index.side.sign(), amount.currency())?,
+                    CFKind::Fee,
+                    0.0,
+                    None,
+                )
+                .build()?,
+            );
         }
         Ok(schedule)
     }
@@ -640,32 +643,39 @@ fn project_cds_flows(
             let projected_survival = conditional_survival + 0.5 * conditional_default;
             let projected_premium = flow.get_amount().amount().abs() * projected_survival;
             if projected_premium.abs() > f64::EPSILON {
-                let mut projected_flow = flow.clone();
-                projected_flow.amount = Money::from_model_value(
-                    projected_premium * premium_sign,
-                    flow.get_amount().currency(),
-                )?;
-                projected_flows.push(projected_flow);
+                projected_flows.push(
+                    finstack_quant_core::cashflow::CashFlowParams {
+                        amount: Money::from_model_value(
+                            projected_premium * premium_sign,
+                            flow.get_amount().currency(),
+                        )?,
+                        ..finstack_quant_core::cashflow::CashFlowParams::from(&flow)
+                    }
+                    .build()?,
+                );
             }
             if delta_default > 0.0 {
                 let default_date =
                     midpoint_default_date(survival, previous_premium_date, flow.get_date())?;
                 let settlement_date =
                     settlement_date_with_delay(default_date, cds.protection_leg.settlement_delay)?;
-                projected_flows.push(CashFlow::new(
-                    settlement_date,
-                    None,
-                    Money::from_model_value(
-                        cds.notional.amount()
-                            * loss_given_default
-                            * conditional_default
-                            * protection_sign,
-                        cds.notional.currency(),
-                    )?,
-                    CFKind::ProtectionPayment,
-                    0.0,
-                    None,
-                ));
+                projected_flows.push(
+                    CashFlowParams::new(
+                        settlement_date,
+                        None,
+                        Money::from_model_value(
+                            cds.notional.amount()
+                                * loss_given_default
+                                * conditional_default
+                                * protection_sign,
+                            cds.notional.currency(),
+                        )?,
+                        CFKind::ProtectionPayment,
+                        0.0,
+                        None,
+                    )
+                    .build()?,
+                );
             }
             previous_premium_date = flow.get_date();
             prev_survival = current_survival;

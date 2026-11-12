@@ -353,11 +353,14 @@ mod tests {
         let mut custom = bond
             .full_cashflow_schedule(&MarketContext::new())
             .expect("custom source");
-        custom.update_flows(|flow| {
-            if flow.get_kind().is_coupon() {
-                flow.date = bond.maturity;
-            }
-        });
+        custom
+            .update_flows(|flow| {
+                if flow.kind.is_coupon() {
+                    flow.date = bond.maturity;
+                }
+                Ok(())
+            })
+            .expect("valid rows");
         let custom_bond = bond.clone().with_custom_cashflows(custom.clone());
         let custom_periods = bond_coupon_periods(&custom_bond).expect("explicit coupon periods");
         assert_eq!(custom_periods, periods);
@@ -416,20 +419,26 @@ mod tests {
         );
         // A subinterval cannot identify its enclosing coupon without full
         // boundaries, and overlapping full coupons are ambiguous.
-        custom.update_flows(|flow| {
-            if let Some(accrual) = &mut flow.accrual {
-                accrual.context.coupon_period = None;
-            }
-        });
+        custom
+            .update_flows(|flow| {
+                if let Some(accrual) = &mut flow.accrual {
+                    accrual.context.coupon_period = None;
+                }
+                Ok(())
+            })
+            .expect("valid rows");
         assert!(bond_coupon_periods(&bond.clone().with_custom_cashflows(custom)).is_err());
         let mut overlap = custom_bond.custom_cashflows.expect("custom schedule");
-        overlap.update_flows(|flow| {
-            if let Some(accrual) = &mut flow.accrual
-                && accrual.start == bond.issue_date
-            {
-                accrual.context.coupon_period = Some((bond.issue_date, bond.maturity));
-            }
-        });
+        overlap
+            .update_flows(|flow| {
+                if let Some(accrual) = &mut flow.accrual
+                    && accrual.start == bond.issue_date
+                {
+                    accrual.context.coupon_period = Some((bond.issue_date, bond.maturity));
+                }
+                Ok(())
+            })
+            .expect("valid rows");
         assert!(bond_coupon_periods(&bond.with_custom_cashflows(overlap)).is_err());
     }
 

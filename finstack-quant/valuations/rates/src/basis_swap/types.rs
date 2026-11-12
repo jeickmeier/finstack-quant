@@ -600,7 +600,7 @@ impl BasisSwap {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<CashFlowSchedule> {
-        use finstack_quant_core::cashflow::{CFKind, CashFlow};
+        use finstack_quant_core::cashflow::{CFKind, CashFlowParams};
 
         let calendar_id = self.resolve_leg_calendar("cashflow", leg)?;
         let calendar =
@@ -658,14 +658,17 @@ impl BasisSwap {
             } else {
                 spread_bp * finstack_quant_core::math::units::ONE_BASIS_POINT
             };
-            flows.push(CashFlow::new(
-                period.payment_date,
-                period.reset_date,
-                Money::from_model_value(coupon_amount, self.notional.currency())?,
-                CFKind::Floating,
-                projection.accrual_year_fraction,
-                Some(all_in_rate),
-            ));
+            flows.push(
+                CashFlowParams::new(
+                    period.payment_date,
+                    period.reset_date,
+                    Money::from_model_value(coupon_amount, self.notional.currency())?,
+                    CFKind::Floating,
+                    projection.accrual_year_fraction,
+                    Some(all_in_rate),
+                )
+                .build()?,
+            );
         }
         finstack_quant_cashflows::schedule_from_classified_flows(
             flows,

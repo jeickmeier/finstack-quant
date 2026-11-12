@@ -152,7 +152,7 @@ fn project_mtm_cashflows(
     Vec<finstack_quant_core::cashflow::CashFlow>,
     finstack_quant_cashflows::builder::CashFlowMeta,
 )> {
-    use finstack_quant_core::cashflow::{CFKind, CashFlow};
+    use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::money::fx::FxQuery;
 
@@ -270,9 +270,10 @@ fn project_mtm_cashflows(
             initial_principal_sign(constant_leg.side) * n_c,
             constant_leg.notional.currency(),
         )?;
-        CashFlow::new(start_c, None, cash, CFKind::Notional, 0.0, None)
+        CashFlowParams::new(start_c, None, cash, CFKind::Notional, 0.0, None)
             .with_principal_delta(cash.checked_neg())
             .with_principal_date(start_c)
+            .build()?
     });
     let cf_initial_amount = initial_principal_sign(resetting_leg.side) * n_r_initial;
     flows.push({
@@ -280,9 +281,10 @@ fn project_mtm_cashflows(
         // is a principal movement equal to its cash (record
         // CORE-CONVENTIONS-015 #4, #5).
         let cash = Money::from_model_value(cf_initial_amount, resetting_leg.notional.currency())?;
-        CashFlow::new(start_r, None, cash, CFKind::Notional, 0.0, None)
+        CashFlowParams::new(start_r, None, cash, CFKind::Notional, 0.0, None)
             .with_principal_delta(cash.checked_neg())
             .with_principal_date(start_r)
+            .build()?
     });
 
     let spread_c = constant_leg.leg.spread_bp.as_f64() / 10_000.0;
@@ -299,17 +301,20 @@ fn project_mtm_cashflows(
             Some(&mut projected_fixings),
         )?;
         let all_in = projected.all_in_rate(spread_c);
-        flows.push(CashFlow::new(
-            period.payment_date,
-            projected.fixing_date.or(period.reset_date),
-            Money::from_model_value(
-                constant_leg.side.sign() * projected.unsigned_coupon(n_c, spread_c),
-                constant_leg.notional.currency(),
-            )?,
-            CFKind::Floating,
-            projected.year_fraction,
-            Some(all_in),
-        ));
+        flows.push(
+            CashFlowParams::new(
+                period.payment_date,
+                projected.fixing_date.or(period.reset_date),
+                Money::from_model_value(
+                    constant_leg.side.sign() * projected.unsigned_coupon(n_c, spread_c),
+                    constant_leg.notional.currency(),
+                )?,
+                CFKind::Floating,
+                projected.year_fraction,
+                Some(all_in),
+            )
+            .build()?,
+        );
     }
 
     let spread_decimal = resetting_leg.leg.spread_bp.as_f64() / 10_000.0;
@@ -381,14 +386,17 @@ fn project_mtm_cashflows(
             )?;
             let coupon_amount =
                 resetting_leg.side.sign() * projected_r.unsigned_coupon(n_r_j, spread_decimal);
-            flows.push(CashFlow::new(
-                period.payment_date,
-                projected_r.fixing_date.or(period.reset_date),
-                Money::from_model_value(coupon_amount, resetting_leg.notional.currency())?,
-                CFKind::Floating,
-                projected_r.year_fraction,
-                Some(projected_r.all_in_rate(spread_decimal)),
-            ));
+            flows.push(
+                CashFlowParams::new(
+                    period.payment_date,
+                    projected_r.fixing_date.or(period.reset_date),
+                    Money::from_model_value(coupon_amount, resetting_leg.notional.currency())?,
+                    CFKind::Floating,
+                    projected_r.year_fraction,
+                    Some(projected_r.all_in_rate(spread_decimal)),
+                )
+                .build()?,
+            );
         }
 
         // Rebalancing at the START of this period (j ≥ 1 only).
@@ -400,7 +408,7 @@ fn project_mtm_cashflows(
                     // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                     let cash =
                         Money::from_model_value(rebal_amount, resetting_leg.notional.currency())?;
-                    CashFlow::new(
+                    CashFlowParams::new(
                         period.accrual_start,
                         None,
                         cash,
@@ -410,6 +418,7 @@ fn project_mtm_cashflows(
                     )
                     .with_principal_delta(cash.checked_neg())
                     .with_principal_date(period.accrual_start)
+                    .build()?
                 });
             }
         }
@@ -424,17 +433,19 @@ fn project_mtm_cashflows(
             constant_leg.side.sign() * n_c,
             constant_leg.notional.currency(),
         )?;
-        CashFlow::new(end_c, None, cash, CFKind::Notional, 0.0, None)
+        CashFlowParams::new(end_c, None, cash, CFKind::Notional, 0.0, None)
             .with_principal_delta(cash.checked_neg())
             .with_principal_date(end_c)
+            .build()?
     });
     let cf_final_amount = resetting_leg.side.sign() * n_r_prev;
     flows.push({
         // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
         let cash = Money::from_model_value(cf_final_amount, resetting_leg.notional.currency())?;
-        CashFlow::new(end_r, None, cash, CFKind::Notional, 0.0, None)
+        CashFlowParams::new(end_r, None, cash, CFKind::Notional, 0.0, None)
             .with_principal_delta(cash.checked_neg())
             .with_principal_date(end_r)
+            .build()?
     });
 
     Ok((

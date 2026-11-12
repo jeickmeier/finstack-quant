@@ -176,7 +176,7 @@ mod period_flow_waterfall_integration {
     use crate::capital_structure::waterfall::execute_waterfall;
     use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
     use finstack_quant_core::cashflow::CFKind;
-    use finstack_quant_core::cashflow::CashFlow;
+    use finstack_quant_core::cashflow::{CashFlow, CashFlowParams};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Period, PeriodId};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -275,14 +275,18 @@ mod period_flow_waterfall_integration {
                 2 => Month::August,
                 _ => Month::November,
             };
-            flows.push(CashFlow::new(
-                Date::from_calendar_date(year, month, 15).expect("valid date"),
-                None,
-                Money::new(notional * rate_q, Currency::USD).expect("valid money fixture"),
-                CFKind::Fixed,
-                0.25,
-                Some(rate_q * 4.0),
-            ));
+            flows.push(
+                CashFlowParams::new(
+                    Date::from_calendar_date(year, month, 15).expect("valid date"),
+                    None,
+                    Money::new(notional * rate_q, Currency::USD).expect("valid money fixture"),
+                    CFKind::Fixed,
+                    0.25,
+                    Some(rate_q * 4.0),
+                )
+                .build()
+                .expect("valid cashflow"),
+            );
         }
         let instrument = ScheduleInstrument::new(schedule(flows, notional, issue));
 
@@ -407,22 +411,26 @@ mod period_flow_waterfall_integration {
 
         let instrument = ScheduleInstrument::new(schedule(
             vec![
-                CashFlow::new(
+                CashFlowParams::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
                     Money::new(20_000.0, Currency::USD).expect("valid money fixture"),
                     CFKind::Fixed,
                     0.25,
                     Some(0.08),
-                ),
-                CashFlow::new(
+                )
+                .build()
+                .expect("valid cashflow"),
+                CashFlowParams::new(
                     Date::from_calendar_date(2025, Month::May, 15).expect("valid date"),
                     None,
                     Money::new(20_000.0, Currency::USD).expect("valid money fixture"),
                     CFKind::Fixed,
                     0.25,
                     Some(0.08),
-                ),
+                )
+                .build()
+                .expect("valid cashflow"),
             ],
             notional,
             issue,
@@ -526,17 +534,19 @@ mod period_flow_waterfall_integration {
 
         let instrument = ScheduleInstrument::new(schedule(
             vec![
-                CashFlow::new(
+                CashFlowParams::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
                     Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
                     CFKind::Fixed,
                     0.25,
                     Some(0.04),
-                ),
+                )
+                .build()
+                .expect("valid cashflow"),
                 {
                     let cash = Money::new(50_000.0, Currency::USD).expect("valid money fixture");
-                    CashFlow::new(
+                    CashFlowParams::new(
                         Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
                         None,
                         cash,
@@ -548,6 +558,8 @@ mod period_flow_waterfall_integration {
                     .with_principal_date(
                         Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
                     )
+                    .build()
+                    .expect("valid cashflow")
                 },
             ],
             1_000_000.0,
@@ -624,18 +636,22 @@ mod period_flow_waterfall_integration {
                 {
                     let cash =
                         Money::new(-1_000_000.0, Currency::USD).expect("valid money fixture");
-                    CashFlow::new(issue, None, cash, CFKind::Notional, 0.0, None)
+                    CashFlowParams::new(issue, None, cash, CFKind::Notional, 0.0, None)
                         .with_principal_delta(cash.checked_neg())
                         .with_principal_date(issue)
+                        .build()
+                        .expect("valid cashflow")
                 },
-                CashFlow::new(
+                CashFlowParams::new(
                     Date::from_calendar_date(2025, Month::November, 15).expect("valid date"),
                     None,
                     Money::new(20_000.0, Currency::USD).expect("valid money fixture"),
                     CFKind::Fixed,
                     0.25,
                     Some(0.08),
-                ),
+                )
+                .build()
+                .expect("valid cashflow"),
             ],
             1_000_000.0,
             issue,

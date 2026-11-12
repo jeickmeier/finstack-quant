@@ -1,6 +1,6 @@
 //! Margin cashflow generation for repos.
 
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 use finstack_quant_core::dates::{Date, DateExt, HolidayCalendar};
 use finstack_quant_core::money::Money;
 
@@ -48,26 +48,32 @@ pub fn generate_margin_cashflows(
 
         if effective_collateral_value < call_trigger {
             let deficit = required_collateral - effective_collateral_value;
-            cashflows.push(CashFlow::new(
-                settlement_date,
-                Some(*date),
-                Money::new(deficit, currency)?,
-                CFKind::VariationMarginPay,
-                0.0,
-                None,
-            ));
+            cashflows.push(
+                CashFlowParams::new(
+                    settlement_date,
+                    Some(*date),
+                    Money::new(deficit, currency)?,
+                    CFKind::VariationMarginPay,
+                    0.0,
+                    None,
+                )
+                .build()?,
+            );
             margin_balance += deficit;
         } else if effective_collateral_value > required_collateral && i > 0 {
             // Opening excess is not a return.
             let excess = effective_collateral_value - required_collateral;
-            cashflows.push(CashFlow::new(
-                settlement_date,
-                Some(*date),
-                Money::new(excess, currency)?,
-                CFKind::VariationMarginReceive,
-                0.0,
-                None,
-            ));
+            cashflows.push(
+                CashFlowParams::new(
+                    settlement_date,
+                    Some(*date),
+                    Money::new(excess, currency)?,
+                    CFKind::VariationMarginReceive,
+                    0.0,
+                    None,
+                )
+                .build()?,
+            );
             margin_balance -= excess;
         }
     }
@@ -127,14 +133,17 @@ pub fn generate_margin_interest_cashflows(
             let interest = prev.1 * rate * year_fraction;
 
             if interest.abs() > 0.01 {
-                cashflows.push(CashFlow::new(
-                    curr.0,
-                    None,
-                    Money::new(interest, currency)?,
-                    CFKind::MarginInterest,
-                    year_fraction,
-                    Some(rate),
-                ));
+                cashflows.push(
+                    CashFlowParams::new(
+                        curr.0,
+                        None,
+                        Money::new(interest, currency)?,
+                        CFKind::MarginInterest,
+                        year_fraction,
+                        Some(rate),
+                    )
+                    .build()?,
+                );
             }
         }
     }
@@ -156,7 +165,14 @@ pub fn generate_margin_interest_cashflows(
 ///
 /// * `calls` - Margin-call events whose settlement date, amount and type are
 ///   mapped into schedule cashflow rows; substitution calls are skipped.
-pub fn margin_calls_to_cashflows(calls: &[MarginCall]) -> Vec<CashFlow> {
+///
+/// # Errors
+///
+/// Returns the [`CashFlow::validate`] error of a call whose row is invalid,
+/// such as a nonfinite amount.
+pub fn margin_calls_to_cashflows(
+    calls: &[MarginCall],
+) -> finstack_quant_core::Result<Vec<CashFlow>> {
     calls
         .iter()
         .filter_map(|call| {
@@ -168,14 +184,10 @@ pub fn margin_calls_to_cashflows(calls: &[MarginCall]) -> Vec<CashFlow> {
                 super::MarginCallType::VariationMarginCollect => CFKind::VariationMarginReceive,
                 super::MarginCallType::Substitution => return None,
             };
-            Some(CashFlow::new(
-                call.settlement_date,
-                None,
-                call.amount,
-                kind,
-                0.0,
-                None,
-            ))
+            Some(
+                CashFlowParams::new(call.settlement_date, None, call.amount, kind, 0.0, None)
+                    .build(),
+            )
         })
         .collect()
 }
@@ -201,7 +213,7 @@ mod tests {
         );
         let mut substitution = post.clone();
         substitution.call_type = super::super::MarginCallType::Substitution;
-        let flows = margin_calls_to_cashflows(&[post, substitution]);
+        let flows = margin_calls_to_cashflows(&[post, substitution]).expect("valid rows");
         assert_eq!(flows.len(), 1);
         assert_eq!(flows[0].get_kind(), CFKind::VariationMarginPay);
         assert_eq!(flows[0].get_date(), settlement);

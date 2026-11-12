@@ -903,10 +903,11 @@ impl<'a> SimulationState<'a> {
         self.pool_outstanding.amount() <= self.pool_balance_cleanup_threshold
     }
 
-    /// Finalize tranche results and return them with the deal-level accounting.
+    /// Finalize tranche results and return them with the deal-level accounting;
+    /// errors when an emitted row is invalid.
     pub(super) fn finalize_with_diagnostics(
         mut self,
-    ) -> (FxHashMap<String, TrancheCashflows>, SimulationDiagnostics) {
+    ) -> Result<(FxHashMap<String, TrancheCashflows>, SimulationDiagnostics)> {
         let periods = std::mem::take(&mut self.period_diagnostics);
         let diagnostics = SimulationDiagnostics {
             first_breaches: first_coverage_breaches(&periods, &self.tranche_triggers),
@@ -934,14 +935,10 @@ impl<'a> SimulationState<'a> {
 
             for (date, amount) in &res.interest_flows {
                 if amount.amount() > 0.0 {
-                    res.detailed_flows.push(CashFlow::new(
-                        *date,
-                        None,
-                        *amount,
-                        CFKind::Fixed,
-                        0.0,
-                        None,
-                    ));
+                    res.detailed_flows.push(
+                        CashFlowParams::new(*date, None, *amount, CFKind::Fixed, 0.0, None)
+                            .build()?,
+                    );
                 }
             }
             for (date, amount) in &res.principal_flows {
@@ -949,9 +946,10 @@ impl<'a> SimulationState<'a> {
                     res.detailed_flows.push({
                         // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                         let cash = *amount;
-                        CashFlow::new(*date, None, cash, CFKind::Amortization, 0.0, None)
+                        CashFlowParams::new(*date, None, cash, CFKind::Amortization, 0.0, None)
                             .with_principal_delta(cash.checked_neg())
                             .with_principal_date(*date)
+                            .build()?
                     });
                 }
             }
@@ -962,7 +960,7 @@ impl<'a> SimulationState<'a> {
             for (date, amount) in &res.writedown_flows {
                 if amount.amount() > 0.0 {
                     res.detailed_flows.push(
-                        CashFlow::new(
+                        CashFlowParams::new(
                             *date,
                             None,
                             Money::zero(amount.currency()),
@@ -973,7 +971,8 @@ impl<'a> SimulationState<'a> {
                         // A noncash write-down: zero cash and an explicit balance decrease on its event
                         // date (record CORE-CONVENTIONS-015 #4, #6).
                         .with_principal_delta(amount.checked_neg())
-                        .with_principal_date(*date),
+                        .with_principal_date(*date)
+                        .build()?,
                     );
                 }
             }
@@ -982,9 +981,10 @@ impl<'a> SimulationState<'a> {
                     res.detailed_flows.push({
                         // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
                         let cash = amount.checked_neg();
-                        CashFlow::new(*date, None, cash, CFKind::Notional, 0.0, None)
+                        CashFlowParams::new(*date, None, cash, CFKind::Notional, 0.0, None)
                             .with_principal_delta(cash.checked_neg())
                             .with_principal_date(*date)
+                            .build()?
                     });
                 }
             }
@@ -999,7 +999,7 @@ impl<'a> SimulationState<'a> {
             res.detailed_flows.sort_by_key(|cf| cf.get_date());
         }
 
-        (self.results, diagnostics)
+        Ok((self.results, diagnostics))
     }
 }
 

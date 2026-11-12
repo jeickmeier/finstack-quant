@@ -614,7 +614,7 @@ impl CreditDefaultSwap {
         let flows = payment_accruals
             .into_iter()
             .map(|(end, accrual)| {
-                Ok(finstack_quant_core::cashflow::CashFlow::new(
+                finstack_quant_core::cashflow::CashFlowParams::new(
                     end,
                     None,
                     Money::from_model_value(
@@ -624,7 +624,8 @@ impl CreditDefaultSwap {
                     finstack_quant_core::cashflow::CFKind::Fixed,
                     accrual,
                     Some(spread),
-                ))
+                )
+                .build()
             })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
@@ -755,26 +756,28 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CreditDefaultSwap {
         let mut schedule = self.build_premium_leg_schedule()?;
 
         if let Some((dt, amount)) = self.upfront {
-            schedule.push_flow(finstack_quant_core::cashflow::CashFlow::new(
-                dt,
-                None,
-                amount,
-                finstack_quant_core::cashflow::CFKind::Fee,
-                0.0,
-                None,
-            ));
+            schedule.push_flow(
+                finstack_quant_core::cashflow::CashFlowParams::new(
+                    dt,
+                    None,
+                    amount,
+                    finstack_quant_core::cashflow::CFKind::Fee,
+                    0.0,
+                    None,
+                )
+                .build()?,
+            );
         }
 
         // Apply holder-view sign: protection buyer (Pay) pays premium,
         // protection seller (Receive) receives premium.
         let sign = self.side.sign();
-        schedule.update_flows(|cf| {
-            cf.amount = if sign < 0.0 {
-                cf.get_amount().checked_neg()
-            } else {
-                cf.get_amount()
-            };
-        });
+        if sign < 0.0 {
+            schedule.update_flows(|cf| {
+                cf.amount = cf.amount.checked_neg();
+                Ok(())
+            })?;
+        }
 
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,

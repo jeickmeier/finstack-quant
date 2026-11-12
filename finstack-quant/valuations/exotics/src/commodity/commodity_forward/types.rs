@@ -565,7 +565,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommodityForward {
                         } else {
                             cash.checked_neg()
                         };
-                        finstack_quant_core::cashflow::CashFlow::new(
+                        finstack_quant_core::cashflow::CashFlowParams::new(
                             date,
                             None,
                             cash,
@@ -575,9 +575,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommodityForward {
                         )
                         .with_principal_delta(delta)
                         .with_principal_date(date)
+                        .build()
                     },
                 )
-                .collect(),
+                .collect::<finstack_quant_core::Result<Vec<_>>>()?,
             finstack_quant_core::dates::DayCount::Act365F,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(Money::new(

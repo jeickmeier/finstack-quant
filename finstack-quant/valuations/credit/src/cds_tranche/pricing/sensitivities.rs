@@ -424,11 +424,15 @@ impl CdsTranchePricer {
         let spread = (-constant_pv / premium_per_bp).clamp(0.0, 100000.0);
         for row in &mut rows {
             if row.cashflow.get_kind() == CFKind::Fixed {
-                row.cashflow.amount = finstack_quant_core::money::Money::new(
-                    row.cashflow.get_amount().amount() * spread,
-                    row.cashflow.get_amount().currency(),
-                )?;
-                row.cashflow.rate = Some(spread / BASIS_POINTS_PER_UNIT);
+                row.cashflow = finstack_quant_core::cashflow::CashFlowParams {
+                    amount: finstack_quant_core::money::Money::new(
+                        row.cashflow.get_amount().amount() * spread,
+                        row.cashflow.get_amount().currency(),
+                    )?,
+                    rate: Some(spread / BASIS_POINTS_PER_UNIT),
+                    ..finstack_quant_core::cashflow::CashFlowParams::from(&row.cashflow)
+                }
+                .build()?;
             }
         }
         rows.retain(|row| {

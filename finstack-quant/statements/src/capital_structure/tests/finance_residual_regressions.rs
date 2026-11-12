@@ -6,7 +6,7 @@ use finstack_quant_cashflows::builder::{
     CashFlowMeta, CashFlowSchedule, CouponType, FixedCouponSpec, Notional, ScheduleParams,
 };
 use finstack_quant_core::cashflow::CFKind;
-use finstack_quant_core::cashflow::CashFlow;
+use finstack_quant_core::cashflow::{CashFlow, CashFlowParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, PeriodId, StubKind, Tenor,
@@ -532,9 +532,11 @@ fn previously_paid_redemption_cannot_extinguish_later_pik_principal() {
     let economic_date = date!(2025 - 04 - 02);
     let schedule = CashFlowSchedule::from_flows(
         vec![
-            CashFlow::new(payment_date, None, usd(100.0), CFKind::Notional, 0.0, None)
+            CashFlowParams::new(payment_date, None, usd(100.0), CFKind::Notional, 0.0, None)
                 .with_principal_delta(usd(-100.0))
-                .with_principal_date(economic_date),
+                .with_principal_date(economic_date)
+                .build()
+                .expect("valid cashflow"),
         ],
         Notional::par(100.0, Currency::USD).expect("initial principal"),
         DayCount::Act365F,
