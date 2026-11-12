@@ -1,6 +1,6 @@
 # MODELS-AND-VALUATIONS-CREDIT-12: CDS conditional survival, premium accrual and protection integration
 
-- Decision status: **Draft — observed implementation, adoption pending**.
+- Decision status: **Accepted for contractual dates — named CDS date regimes (O7), 2026-11-12**; other content remains Draft (observed implementation, adoption pending).
 - Implementation status: Observed in the paths listed below; discrepancies are stated explicitly.
 - Validation status: Evidence inspected or located, **not executed**; no external accuracy certification.
 - Audit date: 2026-11-05.
@@ -41,6 +41,43 @@ The [denominator kernel](../../../../finstack-quant/valuations/credit/src/cds/pr
 ## Conventions
 
 Coupon input and par-spread output are bp, converted to decimal rates by dividing by 10,000. Recovery/survival are decimal fractions; notional/PV use the instrument currency. Hazard and discount each use their own base date/day count, with discount factors relative to as-of; coupon accrual uses instrument day count. Buyer is Pay premium, seller Receive.
+
+## Accepted decision: named CDS contractual date regimes
+
+Accepted on **2026-11-12** as owner resolution O7 of the core-conventions
+reconciliation (closing the register's CDS product-boundary Decision entry).
+Runtime implementation and independent qualification are tracked in the
+register.
+
+1. **No generic CDS grid.** The cashflows roll grid `RollRule::CdsImm` and
+   its frequency/stub overrides are removed. A CDS product (single name,
+   index, tranche, option underlying) and its calibration builder select a
+   named contractual date regime explicitly; nothing falls back to a
+   regime, a valuation date or a core date helper.
+2. **The product resolves five distinct dates.** Premium accrual start,
+   protection start (step-in), upfront cash settlement, maturity and
+   default payment are separate roles. The selected regime owns how each is
+   derived, the stub selection and the endpoint inclusion; one date never
+   stands in for another.
+3. **Post-2015 single-name quoting is a named regime.** A tenor quote under
+   that regime matures on the latest March/September 20 roll on or before
+   the trade date, plus three months, plus the tenor. It is qualified
+   against the official December 2015 dated table: a 2015-12-22 trade gives
+   2016-03-20 for 3M and 2016-09-20 for 9M, and the whole-year points keep
+   their June/December 20 maturities. A maturity on or before the trade
+   date is never accepted for a positive tenor. Tenors that the regime and
+   its fixtures do not determine are errors.
+4. **Literal maturities stay literal.** An explicit contractual maturity
+   date is used as given, without rolling to a CDS date.
+5. **Other regimes need their own selected rules.** A bespoke schedule
+   states its own frequency, stub and boundaries; no other regime is
+   inferred.
+
+The standard premium grid resolves the observed contradiction between the
+pricer's short-front requirement and the short-back generation: under the
+standard regime the grid runs quarterly on CDS roll dates from the accrual
+start roll to an on-grid maturity, so no stub arises; an off-grid maturity is
+a bespoke schedule that states its own stub.
 
 ## Limitations, failure and fallback
 
