@@ -218,14 +218,12 @@ impl TermLoanDiscountingPricer {
         as_of: finstack_quant_core::dates::Date,
         schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
     ) -> finstack_quant_core::Result<(f64, Money)> {
-        use finstack_quant_core::cashflow::CFKind;
-
         let settlement = loan.settlement_date(as_of)?;
         let disc = market.get_discount(loan.discount_curve_id.as_str())?;
         let df_settlement = disc.df_between_dates(as_of, settlement)?;
         let mut pre_settlement = Money::from((0_i64, loan.currency));
         for cf in schedule.get_flows() {
-            if cf.kind != CFKind::Pik && cf.date > as_of && cf.date <= settlement {
+            if cf.kind.is_cash_settlement() && cf.date > as_of && cf.date <= settlement {
                 pre_settlement = pre_settlement.checked_add(
                     cf.amount
                         .checked_mul_f64(disc.df_between_dates(as_of, cf.date)?)?,
@@ -332,13 +330,11 @@ impl TermLoanDiscountingPricer {
         finstack_quant_core::dates::Date,
         Vec<(finstack_quant_core::dates::Date, Money)>,
     )> {
-        use finstack_quant_core::cashflow::CFKind;
-
         let settlement_date = loan.settlement_date(as_of)?;
         let flows = schedule
             .get_flows()
             .iter()
-            .filter(|cf| cf.kind != CFKind::Pik && cf.date > settlement_date)
+            .filter(|cf| cf.kind.is_cash_settlement() && cf.date > settlement_date)
             .map(|cf| (cf.date, cf.amount))
             .collect();
         Ok((settlement_date, flows))

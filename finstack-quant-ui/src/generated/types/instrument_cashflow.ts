@@ -528,9 +528,15 @@ export interface D_674830A94Dacf97E7Ac8 {
    */
   prepayment_smm?: number | null;
   /**
+   * Date on which this flow's principal change takes balance effect, which
+   * may differ from the payment `date`. Absent for a row that moves no
+   * principal (record CORE-CONVENTIONS-015 #6, #11).
+   */
+  principal_date?: Date1 | null;
+  /**
    * Change in outstanding principal carried by this flow, in row currency
-   * (positive increases the balance). Absent when the flow kind and amount
-   * alone determine the balance movement.
+   * (positive increases the balance). Absent for a row that moves no
+   * principal.
    */
   principal_delta?: number | null;
   /**

@@ -1181,7 +1181,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
-      "bytes": 21157,
+      "bytes": 21584,
       "kind": "output",
       "path": "schemas/results/1/instrument_cashflow.schema.json",
       "summary": "Native cashflow rows, reporting-currency PV and reconciliation status.",

@@ -346,11 +346,12 @@ impl Bond {
         )
     }
 
-    /// Whether a schedule row is cash the holder receives: excludes non-cash
-    /// PIK capitalization and the negative initial `Notional` funding draw.
+    /// Whether a schedule row is cash the holder receives: excludes noncash
+    /// balance events (PIK, write-downs) and the negative initial `Notional`
+    /// funding draw.
     pub(crate) fn is_holder_cashflow(cf: &finstack_quant_core::cashflow::CashFlow) -> bool {
         use finstack_quant_core::cashflow::CFKind;
-        cf.kind != CFKind::Pik && !(cf.kind == CFKind::Notional && cf.amount.amount() < 0.0)
+        cf.kind.is_cash_settlement() && !(cf.kind == CFKind::Notional && cf.amount.amount() < 0.0)
     }
 
     fn pricing_dated_cashflows_from_schedule_with_boundary(

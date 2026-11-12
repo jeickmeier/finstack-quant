@@ -1523,7 +1523,10 @@ class InstrumentCashflowEnvelope:
             ``accrual_factor``, ``accrual_start``, ``accrual_end``,
             ``accrual_day_count``, ``accrual_notional`` (outstanding principal
             at accrual start), ``index_rate`` (floating index before spread,
-            gearing, caps and floors), ``principal_delta``, ``year_fraction``,
+            gearing, caps and floors), ``principal_delta`` and
+            ``principal_date`` (a principal row's explicit balance change and
+            its balance-effective date; null for rows that move no principal),
+            ``year_fraction``,
             ``rate``, ``reset_date``, ``discount_factor``,
             ``discount_curve_id``, ``survival_probability``,
             ``conditional_default_prob``, ``inflation_index_ratio``,

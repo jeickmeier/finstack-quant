@@ -5,7 +5,6 @@ use crate::term_loan::{LoanCall, LoanCallType, TermLoan};
 use finstack_quant_cashflows::accrual::AccrualIndex;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::Result;
-use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -76,7 +75,7 @@ pub(crate) fn clean_call_price(
             let flows = schedule
                 .get_flows()
                 .iter()
-                .filter(|flow| flow.kind != CFKind::Pik)
+                .filter(|flow| flow.kind.is_cash_settlement())
                 .map(|flow| (flow.date, flow.amount))
                 .collect::<Vec<_>>();
             BondValuator::make_whole_call_price(

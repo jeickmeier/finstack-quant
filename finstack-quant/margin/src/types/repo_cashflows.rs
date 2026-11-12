@@ -144,34 +144,38 @@ pub fn generate_margin_interest_cashflows(
 
 /// Convert margin calls to cashflows.
 ///
-/// Transforms margin call events into classified cashflows for
-/// inclusion in the full cashflow schedule.
+/// Transforms the monetary margin calls into classified cash rows on their
+/// settlement dates. A collateral substitution exchanges assets in kind: its
+/// amount is a marked collateral value, not a cash transfer, so it produces no
+/// cash row and stays on the margin-call events (record
+/// CORE-CONVENTIONS-015 #2, #11). The call date is a margin event timestamp,
+/// not an index observation, so rows carry no reset date (record
+/// CORE-CONVENTIONS-015 #6).
 ///
 /// # Arguments
 ///
-/// * `calls` - Margin-call events whose settlement date, call date, amount,
-///   and type are mapped into schedule cashflow rows.
+/// * `calls` - Margin-call events whose settlement date, amount and type are
+///   mapped into schedule cashflow rows; substitution calls are skipped.
 pub fn margin_calls_to_cashflows(calls: &[MarginCall]) -> Vec<CashFlow> {
     calls
         .iter()
-        .map(|call| {
+        .filter_map(|call| {
             let kind = match call.call_type {
                 super::MarginCallType::InitialMargin => CFKind::InitialMarginPost,
                 super::MarginCallType::VariationMarginPost | super::MarginCallType::TopUp => {
                     CFKind::VariationMarginPay
                 }
                 super::MarginCallType::VariationMarginCollect => CFKind::VariationMarginReceive,
-                super::MarginCallType::Substitution => CFKind::CollateralSubstitutionOut,
+                super::MarginCallType::Substitution => return None,
             };
-
-            CashFlow::new(
+            Some(CashFlow::new(
                 call.settlement_date,
-                Some(call.call_date),
+                None,
                 call.amount,
                 kind,
                 0.0,
                 None,
-            )
+            ))
         })
         .collect()
 }
@@ -181,6 +185,28 @@ mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
     use time::Month;
+
+    #[test]
+    fn substitution_calls_produce_no_cash_row_and_calls_carry_no_reset_date() {
+        let call_date = Date::from_calendar_date(2025, Month::March, 3).expect("date");
+        let settlement = Date::from_calendar_date(2025, Month::March, 4).expect("date");
+        let usd = |amount: f64| Money::new(amount, Currency::USD).expect("money");
+        let post = MarginCall::vm_post(
+            call_date,
+            settlement,
+            usd(50_000.0),
+            usd(0.0),
+            usd(0.0),
+            usd(0.0),
+        );
+        let mut substitution = post.clone();
+        substitution.call_type = super::super::MarginCallType::Substitution;
+        let flows = margin_calls_to_cashflows(&[post, substitution]);
+        assert_eq!(flows.len(), 1);
+        assert_eq!(flows[0].kind, CFKind::VariationMarginPay);
+        assert_eq!(flows[0].date, settlement);
+        assert_eq!(flows[0].reset_date, None);
+    }
 
     fn test_date(y: i32, m: u8, d: u8) -> Date {
         Date::from_calendar_date(y, Month::try_from(m).expect("valid month"), d)

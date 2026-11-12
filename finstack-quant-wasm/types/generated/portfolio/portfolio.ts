@@ -4650,7 +4650,11 @@ export interface PortfolioAttribution {
   vol_pnl: Money;
 }
 /**
- * One scaled portfolio cashflow event derived from an instrument schedule.
+ * One scaled portfolio cash settlement derived from an instrument schedule.
+ *
+ * The ladder is a cash view: only cash-settlement rows become events, so PIK
+ * capitalization and default write-downs (noncash balance events) are not
+ * exported as amounts (record CORE-CONVENTIONS-015 #11).
  */
 export interface PortfolioCashflowEvent {
   /**
@@ -4696,7 +4700,7 @@ export interface PortfolioCashflowEvent {
  */
 export interface PortfolioCashflowPositionSummary {
   /**
-   * Number of emitted dated events after schedule construction.
+   * Number of emitted cash-settlement events after schedule construction.
    */
   event_count: number;
   /**

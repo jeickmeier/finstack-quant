@@ -1427,7 +1427,7 @@
       "type": "object"
     },
     "PortfolioCashflowEvent": {
-      "description": "One scaled portfolio cashflow event derived from an instrument schedule.",
+      "description": "One scaled portfolio cash settlement derived from an instrument schedule.\n\nThe ladder is a cash view: only cash-settlement rows become events, so PIK\ncapitalization and default write-downs (noncash balance events) are not\nexported as amounts (record CORE-CONVENTIONS-015 #11).",
       "properties": {
         "accrual_factor": {
           "description": "Accrual factor used to compute the event when available.",
@@ -1493,7 +1493,7 @@
       "description": "Per-position cashflow summary, including empty-schedule intent metadata.",
       "properties": {
         "event_count": {
-          "description": "Number of emitted dated events after schedule construction.",
+          "description": "Number of emitted cash-settlement events after schedule construction.",
           "format": "uint",
           "minimum": 0,
           "type": "integer"

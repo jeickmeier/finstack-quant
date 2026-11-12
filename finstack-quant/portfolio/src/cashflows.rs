@@ -88,11 +88,15 @@ pub struct PortfolioCashflowPositionSummary {
     pub instrument_type: InstrumentType,
     /// Schedule representation carried by the instrument.
     pub representation: CashflowRepresentation,
-    /// Number of emitted dated events after schedule construction.
+    /// Number of emitted cash-settlement events after schedule construction.
     pub event_count: usize,
 }
 
-/// One scaled portfolio cashflow event derived from an instrument schedule.
+/// One scaled portfolio cash settlement derived from an instrument schedule.
+///
+/// The ladder is a cash view: only cash-settlement rows become events, so PIK
+/// capitalization and default write-downs (noncash balance events) are not
+/// exported as amounts (record CORE-CONVENTIONS-015 #11).
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PortfolioCashflowEvent {
@@ -319,6 +323,10 @@ pub fn net_in_currency_by_date_json(
 
 /// Aggregate contractual portfolio cashflows while preserving `CFKind` classification.
 ///
+/// The ladder is a cash view: only cash-settlement rows become events; PIK
+/// capitalization and default write-downs are noncash balance events and are
+/// not exported as amounts (record CORE-CONVENTIONS-015 #11).
+///
 /// Successful positions contribute scaled events, deterministic date/currency/
 /// kind aggregates, and per-position summaries. A position whose instrument
 /// cannot build a contractual schedule is recorded as a [`CashflowExtractionIssue`].
@@ -363,6 +371,7 @@ pub fn aggregate_full_cashflows(
                 let events = schedule
                     .get_flows()
                     .iter()
+                    .filter(|flow| flow.kind.is_cash_settlement())
                     .map(|flow| {
                         Ok(PortfolioCashflowEvent {
                             position_id: position.position_id.clone(),

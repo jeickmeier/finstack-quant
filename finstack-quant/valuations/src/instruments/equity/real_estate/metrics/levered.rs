@@ -71,6 +71,7 @@ fn is_scheduled_debt_service(
     match kind {
         CFKind::Notional
         | CFKind::Pik
+        | CFKind::DefaultedNotional
         | CFKind::PrePayment
         | CFKind::RevolvingDraw
         | CFKind::RevolvingRepayment => false,

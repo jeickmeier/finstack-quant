@@ -16,7 +16,8 @@
 //!
 //! Always populated (null-as-needed): `date, amount, currency, kind,
 //! accrual_factor, accrual_start, accrual_end, accrual_day_count,
-//! accrual_notional, index_rate, principal_delta, year_fraction, rate,
+//! accrual_notional, index_rate, principal_delta, principal_date,
+//! year_fraction, rate,
 //! reset_date, discount_factor, survival_probability,
 //! conditional_default_prob, inflation_index_ratio, prepayment_smm,
 //! beginning_balance, ending_balance, native_pv, fx_rate, pv`.
@@ -204,10 +205,19 @@ pub struct CashflowRow {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_rate: Option<f64>,
     /// Change in outstanding principal carried by this flow, in row currency
-    /// (positive increases the balance). Absent when the flow kind and amount
-    /// alone determine the balance movement.
+    /// (positive increases the balance). Absent for a row that moves no
+    /// principal.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub principal_delta: Option<f64>,
+    /// Date on which this flow's principal change takes balance effect, which
+    /// may differ from the payment `date`. Absent for a row that moves no
+    /// principal (record CORE-CONVENTIONS-015 #6, #11).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
+    pub principal_date: Option<Date>,
     /// Year fraction from `as_of` to `date` under the discount curve's day count.
     pub year_fraction: f64,
     /// Projected / contractual rate when present (floats, real-coupon rates, etc.).
@@ -706,6 +716,7 @@ fn envelope_for_priced(
                 .as_ref()
                 .and_then(|accrual| accrual.projected_index_rate),
             principal_delta: flow.principal_delta.map(|delta| delta.amount()),
+            principal_date: flow.principal_date,
             year_fraction,
             rate: flow.rate,
             reset_date: flow.reset_date,

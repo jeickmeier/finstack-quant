@@ -371,6 +371,10 @@ def aggregate_full_cashflows(
     """
     Build the full classified cashflow ladder for the portfolio.
 
+    The ladder is a cash view: only cash-settlement rows become events, so PIK
+    capitalization and default write-downs (noncash balance events) are not
+    exported as amounts.
+
     Returns a typed :class:`PortfolioCashflows` wrapper; call ``to_json()``
     to get the raw ladder or use the typed accessors to drill in.
 

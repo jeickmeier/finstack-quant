@@ -916,6 +916,19 @@ logged under Needs review.
       twin test follow the principal-only path; stub and JSDoc for
       `outstanding_by_date` no longer cite the removed issue-date
       requirement.
+  - **G5-3e cash views and remaining classifiers.**
+    - Portfolio `aggregate_full_cashflows` events are a cash ladder: only
+      cash-settlement rows become events (record 015 #11), so zero-cash PIK
+      and write-down rows no longer appear as empty events.
+    - Bond holder cash, term-loan settlement PV and make-whole reference
+      flows, and the levered real-estate financing pass select
+      `is_cash_settlement` instead of "not PIK", which also excludes
+      write-downs; the levered metric classifier lists `DefaultedNotional`
+      with the other noncash kinds. Values are unchanged (both kinds already
+      carry zero cash).
+    - The instrument cashflow export gained a `principal_date` column beside
+      `principal_delta` (Rust row, schema, Python DataFrame), so full event
+      exports keep each principal row's balance date.
 - **Notebooks broken by earlier slices (found during G5, fixed in `NB:`).**
   A full run (`run_all_notebooks.py --timeout 120`) after G5-3b passed 92 of
   101; none of the 9 failures involved PIK or write-down rows, and slice
@@ -955,8 +968,11 @@ logged under Needs review.
     substitution kinds carry only genuine monetary transfers, never a marked
     collateral value; margin record 20 (Draft, observed only) describes the
     repo conversion emitting the call's marked amount as
-    `CollateralSubstitutionOut`. Record 015 governs; handled in a later G5-3
-    commit.
+    `CollateralSubstitutionOut`. Record 015 governs: since G5-3e
+    `margin_calls_to_cashflows` skips substitution calls (they stay on the
+    margin-call events), and no row carries the call date as its reset date
+    (record 015 #6). Margin record 20 #6 should be updated to match when it
+    is adopted.
 - **Dependency added (G2).** `indexmap` (already a workspace dependency, used
   by core and structured credit) was added to `finstack-quant-models` so the
   rating-factor table keeps a deterministic order once `CreditRating` lost

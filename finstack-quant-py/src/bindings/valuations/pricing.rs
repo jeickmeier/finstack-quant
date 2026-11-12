@@ -600,6 +600,7 @@ const CASHFLOW_ROW_COLUMNS: &[(&str, &str)] = &[
     ("accrual_notional", "float64"),
     ("index_rate", "float64"),
     ("principal_delta", "float64"),
+    ("principal_date", "str"),
     ("year_fraction", "float64"),
     ("rate", "float64"),
     ("reset_date", "str"),
@@ -650,7 +651,13 @@ impl PyInstrumentCashflowEnvelope {
             serde_rows_to_dataframe_with_schema(py, &self.inner.flows, CASHFLOW_ROW_COLUMNS)?;
         let to_datetime = py.import("pandas")?.getattr("to_datetime")?;
         let parsed = pyo3::types::PyDict::new(py);
-        for column in ["date", "reset_date", "accrual_start", "accrual_end"] {
+        for column in [
+            "date",
+            "reset_date",
+            "accrual_start",
+            "accrual_end",
+            "principal_date",
+        ] {
             parsed.set_item(column, to_datetime.call1((frame.get_item(column)?,))?)?;
         }
         frame.call_method("assign", (), Some(&parsed))

@@ -198,9 +198,24 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/principal_date",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/principal_date",
+    "description": "Date on which this flow's principal change takes balance effect, which\nmay differ from the payment `date`. Absent for a row that moves no\nprincipal (record CORE-CONVENTIONS-015 #6, #11)."
+  },
+  {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/principal_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/principal_date/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_674830a94dacf97e7ac8/properties/principal_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/principal_date/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_674830a94dacf97e7ac8/properties/principal_delta",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#/$defs/CashflowRow/properties/principal_delta",
-    "description": "Change in outstanding principal carried by this flow, in row currency\n(positive increases the balance). Absent when the flow kind and amount\nalone determine the balance movement.",
+    "description": "Change in outstanding principal carried by this flow, in row currency\n(positive increases the balance). Absent for a row that moves no\nprincipal.",
     "format": "double"
   },
   {

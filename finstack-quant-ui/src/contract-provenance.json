@@ -1018,7 +1018,7 @@
           "uri": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/results/1/instrument_cashflow.schema.json",
-          "sha256": "6e3e22344d719c507ad0b20fc5c672f5dce724bf3b22e834d1c97f4e3b541266",
+          "sha256": "04917d02b8c00c906733f0100b46b9e1f7f8120c7cc6a56a2cc63456cec5cace",
           "description": "Native cashflow rows, reporting-currency PV and reconciliation status."
         }
       ]
