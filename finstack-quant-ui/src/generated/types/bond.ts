@@ -1762,6 +1762,9 @@ export interface D_7C4149870A1F77E1F644 {
  *
  * Represents a monetary flow at a specific date with metadata
  * for proper classification and risk calculation.
+ *
+ * Deserialization validates the row (record CORE-CONVENTIONS-015 #10), so no
+ * wire format can create an invalid cashflow.
  */
 export interface D_5Fdd6C8Cd626De8799Fe {
   /**
@@ -1807,15 +1810,16 @@ export interface D_5Fdd6C8Cd626De8799Fe {
     | "collateral_substitution_out";
   /**
    * Economic date of the principal movement, independent of cash payment.
-   * When absent, principal changes on `date`. Scheduled amortization and
-   * PIK use the contractual accrual boundary even when payment is adjusted.
+   * Required with `principal_delta` on every principal-like row and absent
+   * otherwise; there is no payment-date fallback. PIK and write-down rows
+   * are dated at it (record CORE-CONVENTIONS-015 #6).
    */
   principal_date?: Date2 | null;
   /**
    * Explicit change in outstanding principal, in the cashflow currency.
-   * Positive increases outstanding. When absent, the flow kind and amount
-   * determine the balance movement. Initial funding remains represented by
-   * the schedule's initial notional rather than being counted twice.
+   * Positive increases outstanding. Required on every principal-like row
+   * (zero included) and absent on every other kind; nothing is inferred
+   * from the amount or kind (record CORE-CONVENTIONS-015 #4, #5).
    */
   principal_delta?: Money1 | null;
   /**
@@ -1837,6 +1841,8 @@ export interface D_5Fdd6C8Cd626De8799Fe {
 }
 /**
  * Contractual accrual metadata attached to one cashflow.
+ *
+ * Deserialization validates the slice (record CORE-CONVENTIONS-015 #10).
  */
 export interface D_931Ca4Fd1B880C77B04D {
   context: D_2Cf3Cdafb96F82A3C0C4;

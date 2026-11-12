@@ -362,9 +362,12 @@ impl CFKind {
 }
 
 /// Contractual accrual metadata attached to one cashflow.
+///
+/// Deserialization validates the slice (record CORE-CONVENTIONS-015 #10).
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, try_from = "CashFlowAccrualWire")]
+#[cfg_attr(feature = "json-schema", schemars(!try_from, deny_unknown_fields))]
 pub struct CashFlowAccrual {
     /// Contractual accrual-period start date.
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
@@ -393,7 +396,69 @@ pub struct CashFlowAccrual {
     pub context: DayCountContextState,
 }
 
+/// Wire fields of [`CashFlowAccrual`]; deserialization validates them.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CashFlowAccrualWire {
+    start: Date,
+    end: Date,
+    day_count: DayCount,
+    #[serde(default)]
+    projected_index_rate: Option<f64>,
+    context: DayCountContextState,
+}
+
+impl TryFrom<CashFlowAccrualWire> for CashFlowAccrual {
+    type Error = crate::Error;
+
+    fn try_from(wire: CashFlowAccrualWire) -> crate::Result<Self> {
+        let accrual = Self {
+            start: wire.start,
+            end: wire.end,
+            day_count: wire.day_count,
+            projected_index_rate: wire.projected_index_rate,
+            context: wire.context,
+        };
+        accrual.validate()?;
+        Ok(accrual)
+    }
+}
+
 impl CashFlowAccrual {
+    /// Check this accrual slice: actual endpoints strictly increasing, a
+    /// strictly increasing reference coupon period when present, and a finite
+    /// projected index rate when present (record CORE-CONVENTIONS-015 #7, #9).
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for an inverted or empty interval and a
+    /// non-finite-value error for a non-finite projected rate.
+    pub fn validate(&self) -> crate::Result<()> {
+        if self
+            .context
+            .coupon_period
+            .is_some_and(|(start, end)| start >= end)
+        {
+            return Err(crate::Error::Validation(
+                "CashFlow: reference coupon period start must be before end".into(),
+            ));
+        }
+        if self.start >= self.end {
+            return Err(crate::Error::Validation(
+                "CashFlow: accrual start must be before accrual end".into(),
+            ));
+        }
+        if let Some(projected_index_rate) = self.projected_index_rate
+            && !projected_index_rate.is_finite()
+        {
+            return Err(InputError::NonFiniteValue {
+                kind: NonFiniteKind::classify(projected_index_rate),
+            }
+            .into());
+        }
+        Ok(())
+    }
+
     /// Resolve this slice's day-count context, looking up its calendar.
     ///
     /// # Errors
@@ -409,9 +474,13 @@ impl CashFlowAccrual {
 ///
 /// Represents a monetary flow at a specific date with metadata
 /// for proper classification and risk calculation.
+///
+/// Deserialization validates the row (record CORE-CONVENTIONS-015 #10), so no
+/// wire format can create an invalid cashflow.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, try_from = "CashFlowWire")]
+#[cfg_attr(feature = "json-schema", schemars(!try_from, deny_unknown_fields))]
 pub struct CashFlow {
     /// Payment date (or payment date for principal/fee, or reset date for `CFKind::Floating`).
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
@@ -448,20 +517,61 @@ pub struct CashFlow {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accrual: Option<CashFlowAccrual>,
     /// Explicit change in outstanding principal, in the cashflow currency.
-    /// Positive increases outstanding. When absent, the flow kind and amount
-    /// determine the balance movement. Initial funding remains represented by
-    /// the schedule's initial notional rather than being counted twice.
+    /// Positive increases outstanding. Required on every principal-like row
+    /// (zero included) and absent on every other kind; nothing is inferred
+    /// from the amount or kind (record CORE-CONVENTIONS-015 #4, #5).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub principal_delta: Option<Money>,
     /// Economic date of the principal movement, independent of cash payment.
-    /// When absent, principal changes on `date`. Scheduled amortization and
-    /// PIK use the contractual accrual boundary even when payment is adjusted.
+    /// Required with `principal_delta` on every principal-like row and absent
+    /// otherwise; there is no payment-date fallback. PIK and write-down rows
+    /// are dated at it (record CORE-CONVENTIONS-015 #6).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<crate::wire::DateWire>")
     )]
     pub principal_date: Option<Date>,
+}
+
+/// Wire fields of [`CashFlow`]; deserialization validates them.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CashFlowWire {
+    date: Date,
+    #[serde(default)]
+    reset_date: Option<Date>,
+    amount: Money,
+    kind: CFKind,
+    accrual_factor: f64,
+    #[serde(default)]
+    rate: Option<f64>,
+    #[serde(default)]
+    accrual: Option<CashFlowAccrual>,
+    #[serde(default)]
+    principal_delta: Option<Money>,
+    #[serde(default)]
+    principal_date: Option<Date>,
+}
+
+impl TryFrom<CashFlowWire> for CashFlow {
+    type Error = crate::Error;
+
+    fn try_from(wire: CashFlowWire) -> crate::Result<Self> {
+        let flow = Self {
+            date: wire.date,
+            reset_date: wire.reset_date,
+            amount: wire.amount,
+            kind: wire.kind,
+            accrual_factor: wire.accrual_factor,
+            rate: wire.rate,
+            accrual: wire.accrual,
+            principal_delta: wire.principal_delta,
+            principal_date: wire.principal_date,
+        };
+        flow.validate()?;
+        Ok(flow)
+    }
 }
 
 impl CashFlow {
@@ -660,28 +770,7 @@ impl CashFlow {
             }
         }
         if let Some(accrual) = &self.accrual {
-            if accrual
-                .context
-                .coupon_period
-                .is_some_and(|(start, end)| start >= end)
-            {
-                return Err(crate::Error::Validation(
-                    "CashFlow: reference coupon period start must be before end".into(),
-                ));
-            }
-            if accrual.start >= accrual.end {
-                return Err(crate::Error::Validation(
-                    "CashFlow: accrual start must be before accrual end".into(),
-                ));
-            }
-            if let Some(projected_index_rate) = accrual.projected_index_rate
-                && !projected_index_rate.is_finite()
-            {
-                return Err(InputError::NonFiniteValue {
-                    kind: NonFiniteKind::classify(projected_index_rate),
-                }
-                .into());
-            }
+            accrual.validate()?;
         }
 
         Ok(())
@@ -743,6 +832,26 @@ mod tests {
             assert!(serde_json::to_string(&flow).is_err());
             assert!(serde_json::to_value(&flow).is_err());
         }
+    }
+
+    #[test]
+    fn deserialization_validates_rows_and_accrual_slices() {
+        // Record CORE-CONVENTIONS-015 #10: no wire route creates an invalid row.
+        let pik_with_cash = r#"{"date":"2025-07-01","amount":{"amount":"5","currency":"USD"},
+            "kind":"pik","accrual_factor":0.0,
+            "principal_delta":{"amount":"5","currency":"USD"},"principal_date":"2025-07-01"}"#;
+        assert!(serde_json::from_str::<CashFlow>(pik_with_cash).is_err());
+        let amortization_without_delta = r#"{"date":"2025-07-01",
+            "amount":{"amount":"5","currency":"USD"},"kind":"amortization","accrual_factor":0.0}"#;
+        assert!(serde_json::from_str::<CashFlow>(amortization_without_delta).is_err());
+        let inverted_accrual = r#"{"start":"2025-07-01","end":"2025-01-01","day_count":"act_360",
+            "context":{"calendar_id":null,"frequency":null,"bus_basis":null,
+            "coupon_period":null,"end_is_termination_date":false}}"#;
+        assert!(serde_json::from_str::<CashFlowAccrual>(inverted_accrual).is_err());
+        let valid = r#"{"date":"2025-07-01","amount":{"amount":"0","currency":"USD"},
+            "kind":"pik","accrual_factor":0.0,
+            "principal_delta":{"amount":"5","currency":"USD"},"principal_date":"2025-07-01"}"#;
+        assert!(serde_json::from_str::<CashFlow>(valid).is_ok());
     }
 
     #[test]

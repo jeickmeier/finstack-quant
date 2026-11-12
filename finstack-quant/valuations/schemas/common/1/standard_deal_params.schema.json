@@ -1341,7 +1341,7 @@
     },
     "CashFlow": {
       "additionalProperties": false,
-      "description": "A single dated cash-flow (payment or reset).\n\nRepresents a monetary flow at a specific date with metadata\nfor proper classification and risk calculation.",
+      "description": "A single dated cash-flow (payment or reset).\n\nRepresents a monetary flow at a specific date with metadata\nfor proper classification and risk calculation.\n\nDeserialization validates the row (record CORE-CONVENTIONS-015 #10), so no\nwire format can create an invalid cashflow.",
       "properties": {
         "accrual": {
           "anyOf": [
@@ -1380,7 +1380,7 @@
               "type": "null"
             }
           ],
-          "description": "Economic date of the principal movement, independent of cash payment.\nWhen absent, principal changes on `date`. Scheduled amortization and\nPIK use the contractual accrual boundary even when payment is adjusted."
+          "description": "Economic date of the principal movement, independent of cash payment.\nRequired with `principal_delta` on every principal-like row and absent\notherwise; there is no payment-date fallback. PIK and write-down rows\nare dated at it (record CORE-CONVENTIONS-015 #6)."
         },
         "principal_delta": {
           "anyOf": [
@@ -1391,7 +1391,7 @@
               "type": "null"
             }
           ],
-          "description": "Explicit change in outstanding principal, in the cashflow currency.\nPositive increases outstanding. When absent, the flow kind and amount\ndetermine the balance movement. Initial funding remains represented by\nthe schedule's initial notional rather than being counted twice."
+          "description": "Explicit change in outstanding principal, in the cashflow currency.\nPositive increases outstanding. Required on every principal-like row\n(zero included) and absent on every other kind; nothing is inferred\nfrom the amount or kind (record CORE-CONVENTIONS-015 #4, #5)."
         },
         "rate": {
           "description": "Effective rate used to calculate this cashflow (None if not rate-based or unknown).\n\nFor interest/fees: the annual rate used in the calculation\nFor notional/amortization/PIK: typically None\n\nThis is stored at cashflow creation time when available.\nFor instruments with intra-period events (e.g., revolving credit with draws/repays),\nthis may represent a time-weighted average rate across sub-periods.\nSerialization rejects non-finite rates instead of encoding them as absent.",
@@ -1424,7 +1424,7 @@
     },
     "CashFlowAccrual": {
       "additionalProperties": false,
-      "description": "Contractual accrual metadata attached to one cashflow.",
+      "description": "Contractual accrual metadata attached to one cashflow.\n\nDeserialization validates the slice (record CORE-CONVENTIONS-015 #10).",
       "properties": {
         "context": {
           "$ref": "#/$defs/DayCountContextState",

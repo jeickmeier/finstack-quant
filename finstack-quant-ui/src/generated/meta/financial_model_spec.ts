@@ -3665,7 +3665,7 @@ export default [
   {
     "path": "#/$defs/d_63aec3d47748d9f3d86a",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CashFlowAccrual",
-    "description": "Contractual accrual metadata attached to one cashflow."
+    "description": "Contractual accrual metadata attached to one cashflow.\n\nDeserialization validates the slice (record CORE-CONVENTIONS-015 #10)."
   },
   {
     "path": "#/$defs/d_63aec3d47748d9f3d86a/properties/context",
@@ -7768,7 +7768,7 @@ export default [
   {
     "path": "#/$defs/d_ce740ebb40b6a9a3bc22",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CashFlow",
-    "description": "A single dated cash-flow (payment or reset).\n\nRepresents a monetary flow at a specific date with metadata\nfor proper classification and risk calculation."
+    "description": "A single dated cash-flow (payment or reset).\n\nRepresents a monetary flow at a specific date with metadata\nfor proper classification and risk calculation.\n\nDeserialization validates the row (record CORE-CONVENTIONS-015 #10), so no\nwire format can create an invalid cashflow."
   },
   {
     "path": "#/$defs/d_ce740ebb40b6a9a3bc22/properties/accrual",
@@ -7815,7 +7815,7 @@ export default [
   {
     "path": "#/$defs/d_ce740ebb40b6a9a3bc22/properties/principal_date",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CashFlow/properties/principal_date",
-    "description": "Economic date of the principal movement, independent of cash payment.\nWhen absent, principal changes on `date`. Scheduled amortization and\nPIK use the contractual accrual boundary even when payment is adjusted."
+    "description": "Economic date of the principal movement, independent of cash payment.\nRequired with `principal_delta` on every principal-like row and absent\notherwise; there is no payment-date fallback. PIK and write-down rows\nare dated at it (record CORE-CONVENTIONS-015 #6)."
   },
   {
     "path": "#/$defs/d_ce740ebb40b6a9a3bc22/properties/principal_date/anyOf/0",
@@ -7830,7 +7830,7 @@ export default [
   {
     "path": "#/$defs/d_ce740ebb40b6a9a3bc22/properties/principal_delta",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CashFlow/properties/principal_delta",
-    "description": "Explicit change in outstanding principal, in the cashflow currency.\nPositive increases outstanding. When absent, the flow kind and amount\ndetermine the balance movement. Initial funding remains represented by\nthe schedule's initial notional rather than being counted twice."
+    "description": "Explicit change in outstanding principal, in the cashflow currency.\nPositive increases outstanding. Required on every principal-like row\n(zero included) and absent on every other kind; nothing is inferred\nfrom the amount or kind (record CORE-CONVENTIONS-015 #4, #5)."
   },
   {
     "path": "#/$defs/d_ce740ebb40b6a9a3bc22/properties/principal_delta/anyOf/0",

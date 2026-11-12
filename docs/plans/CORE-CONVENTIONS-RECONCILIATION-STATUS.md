@@ -970,6 +970,14 @@ logged under Needs review.
       rows without it; LSMC fills an absent calendar from the bond schedule.
       Each is an owner-input choice for the CASHFLOWS-001/013 work (E6), not
       a primitive-shape change.
+  - **G5-5a validated deserialization (record 015 #10).** `CashFlow` and
+    `CashFlowAccrual` deserialize through private wire mirrors that run
+    `validate()`, so JSON, pickle and host wire input cannot create an
+    invalid row or accrual slice; `CashFlowAccrual::validate` carries the
+    slice checks `CashFlow::validate` used to inline. Field docs no longer
+    describe the removed amount/payment-date inference. The cross-host
+    balance-date parity case now uses an amortization row (a fixed coupon
+    cannot carry a principal date). No value or golden moved.
 - **Notebooks broken by earlier slices (found during G5, fixed in `NB:`).**
   A full run (`run_all_notebooks.py --timeout 120`) after G5-3b passed 92 of
   101; none of the 9 failures involved PIK or write-down rows, and slice

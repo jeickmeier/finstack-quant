@@ -344,7 +344,13 @@ def _primitives() -> Any:
         ],
         "balance_date": [
             wire(flow.get_balance_date()),
-            wire(flow.with_principal_date(dt.date(2025, 7, 11)).get_balance_date()),
+            # Only a principal row carries a balance date (record CORE-CONVENTIONS-015 #6).
+            wire(
+                CashFlow(dt.date(2025, 7, 15), usd(30_000), "amortization", accrual_factor=0.5, rate=0.06)
+                .with_principal_delta(usd(-1000))
+                .with_principal_date(dt.date(2025, 7, 11))
+                .get_balance_date()
+            ),
         ],
         "with_accrual": wire(flow.with_accrual(accrual)),
         "with_principal_delta": wire(flow.with_principal_delta(usd(-1000))),

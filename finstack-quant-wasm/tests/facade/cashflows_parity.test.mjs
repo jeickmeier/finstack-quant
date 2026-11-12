@@ -375,7 +375,13 @@ const cases = {
       ),
       balance_date: [
         core.cashFlowGetBalanceDate(flow),
-        core.cashFlowGetBalanceDate({ ...flow, principal_date: '2025-07-11' }),
+        // Only a principal row carries a balance date (record CORE-CONVENTIONS-015 #6).
+        core.cashFlowGetBalanceDate({
+          ...flow,
+          kind: 'amortization',
+          principal_delta: usd('-1000'),
+          principal_date: '2025-07-11',
+        }),
       ],
       with_accrual: { ...flow, accrual },
       with_principal_delta: { ...flow, principal_delta: usd('-1000') },
