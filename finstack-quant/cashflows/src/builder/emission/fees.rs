@@ -88,7 +88,7 @@ pub(in crate::builder) fn emit_fees_on(
                     pf.calendar,
                     crate::builder::periods::AccrualConventions::from_schedule(&pf.schedule),
                     is_termination_date,
-                );
+                )?;
                 let coupon_period = day_count_ctx.coupon_period;
                 let yf = crate::builder::periods::contractual_accrual(
                     pf.schedule.day_count,

@@ -253,7 +253,7 @@ CASES: dict[str, Callable[[], Any]] = {
         .grid("natural")
         .unadjusted()
         .frequency("3M")
-        .cds_imm()
+        .stub_rule("short_back")
         .build()
         .dates
     ),

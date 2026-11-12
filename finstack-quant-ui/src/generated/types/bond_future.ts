@@ -1326,8 +1326,8 @@ export interface FixedCouponSpec {
    *
    * [`RollRule::None`] (default) keeps plain tenor stepping.
    * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-   * [`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA
-   * quarterly / short-back grid. See [`RollRule`].
+   * [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
+   * a regular anchor on a CDS roll date. See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
@@ -1414,8 +1414,8 @@ export interface D_0555F752Dff2D680B0B6 {
    *
    * [`RollRule::None`] (default) keeps plain tenor stepping.
    * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-   * [`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA
-   * quarterly / short-back grid. See [`RollRule`].
+   * [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
+   * a regular anchor on a CDS roll date. See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
@@ -1671,8 +1671,8 @@ export interface D_7Fdd8D325754C89E8272 {
    *
    * [`RollRule::None`] (default) keeps plain tenor stepping.
    * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-   * [`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA
-   * quarterly / short-back grid. See [`RollRule`].
+   * [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
+   * a regular anchor on a CDS roll date. See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.

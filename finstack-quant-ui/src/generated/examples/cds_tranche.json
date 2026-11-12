@@ -26,7 +26,7 @@
       "series": 42,
       "side": "pay",
       "start_date": null,
-      "stub": "short_front",
+      "stub": "short_back",
       "upfront": null
     },
     "type": "cds_tranche"

@@ -31,8 +31,8 @@ use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 
 use super::date_generation::{
-    CompiledPeriod, build_schedule_period, compile_periods, effective_frequency, effective_stub,
-    generate_periods_with_adjustment, validate_accrual_grid, validate_unique_payment_dates,
+    CompiledPeriod, build_schedule_period, compile_periods, generate_periods_with_adjustment,
+    validate_accrual_grid, validate_unique_payment_dates,
 };
 use super::periods::BuildPeriodsParams;
 use super::rate_helpers::FloatingRateParams;
@@ -119,11 +119,16 @@ impl DateWindow {
 }
 
 /// Build periods and compiler metadata using the private date generator.
+///
+/// `is_first` and `is_last` say whether the window starts at the issue date
+/// or ends at maturity; any other boundary is an interior cut of the leg.
 fn build_compiled_periods(
     window: DateWindow,
     params: &ScheduleParams,
-    allow_front_accrual: bool,
+    is_first: bool,
+    is_last: bool,
 ) -> finstack_quant_core::Result<Vec<CompiledPeriod>> {
+    use finstack_quant_core::dates::{StubKind, is_cds_date, next_cds_date, prev_cds_date};
     validate_accrual_grid(
         window.start,
         window.end,
@@ -132,26 +137,52 @@ fn build_compiled_periods(
         params.day_count,
         params.roll_rule,
     )?;
+    // An interior cut keeps the leg's CDS roll grid: the window is generated
+    // from the adjacent roll on the anchor side and clipped back to the cut
+    // below. The instrument's own start and maturity are never moved (record
+    // CORE-CONVENTIONS-008); an off-roll anchor there is rejected by the
+    // period generator.
+    let cds = params.roll_rule == crate::builder::specs::RollRule::CdsImm;
+    let front = matches!(params.stub, StubKind::ShortFront | StubKind::LongFront);
+    let grid_start = if cds && !front && !is_first && !is_cds_date(window.start) {
+        prev_cds_date(window.start)?
+    } else {
+        window.start
+    };
+    let grid_end = if cds && front && !is_last && !is_cds_date(window.end) {
+        next_cds_date(window.end)?
+    } else {
+        window.end
+    };
     let mut periods = generate_periods_with_adjustment(&BuildPeriodsParams::from_schedule(
-        params,
-        window.start,
-        window.end,
-        None,
+        params, grid_start, grid_end, None,
     ))?;
-    // CDS front accrual belongs to the instrument's initial window only.
-    // Reapplying it after a coupon or settlement-type change would charge the
-    // portion before the change twice. Keep the next roll and clip the start.
-    if !allow_front_accrual
-        && let Some(first) = periods
-            .first_mut()
-            .filter(|period| period.unadjusted_start < window.start)
+    let calendar = || calendar_by_id_strict(&params.calendar_id);
+    // Clip the generated grid back to the window, so the portion on the far
+    // side of a coupon or settlement-type change is not charged twice.
+    if let Some(first) = periods
+        .first_mut()
+        .filter(|period| period.unadjusted_start < window.start)
     {
         *first = build_schedule_period(
             window.start,
             first.unadjusted_end,
             params.business_day_convention,
             params.payment_lag_days,
-            calendar_by_id_strict(&params.calendar_id)?,
+            calendar()?,
+            params.adjust_accrual_dates,
+        )?;
+    }
+    if let Some(last) = periods
+        .last_mut()
+        .filter(|period| period.unadjusted_end > window.end)
+    {
+        *last = build_schedule_period(
+            last.unadjusted_start,
+            window.end,
+            params.business_day_convention,
+            params.payment_lag_days,
+            calendar()?,
             params.adjust_accrual_dates,
         )?;
     }
@@ -252,8 +283,12 @@ pub(super) fn build_fee_schedules(
                     adjust_accrual_dates: false,
                     roll_rule: crate::builder::specs::RollRule::None,
                 };
-                let periods =
-                    build_compiled_periods(DateWindow::new(issue, maturity), &schedule, true)?;
+                let periods = build_compiled_periods(
+                    DateWindow::new(issue, maturity),
+                    &schedule,
+                    true,
+                    true,
+                )?;
                 if periods.is_empty() {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "periodic fee ({bp} bp, {frequency} on '{calendar_id}') produced an empty \
@@ -532,11 +567,10 @@ pub(super) fn compute_coupon_schedules(
         let chosen_coupon = select_coupon_piece(&coupon_pieces, s, e)?;
         let split =
             select_payment_split(&payment_pieces, s, e, chosen_coupon.coupon.coupon_type())?;
-        let mut schedule = chosen_coupon.coupon.schedule().clone();
-        schedule.frequency = effective_frequency(schedule.frequency, schedule.roll_rule);
-        schedule.stub = effective_stub(schedule.stub, schedule.roll_rule);
+        let schedule = chosen_coupon.coupon.schedule().clone();
 
-        let periods = build_compiled_periods(DateWindow::new(s, e), &schedule, s == issue)?;
+        let periods =
+            build_compiled_periods(DateWindow::new(s, e), &schedule, s == issue, e == maturity)?;
         if periods.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }

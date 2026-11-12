@@ -76,6 +76,7 @@ fn create_tranche(attach_pct: f64, detach_pct: f64, tenor_years: i32) -> CdsTran
     )
     .expect("Valid tranche parameters");
     tranche.roll_rule = finstack_quant_cashflows::builder::RollRule::CdsImm;
+    tranche.stub = finstack_quant_core::dates::StubKind::ShortBack;
     tranche
 }
 

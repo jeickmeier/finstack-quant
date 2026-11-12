@@ -5004,7 +5004,7 @@
         },
         {
           "const": "cds_imm",
-          "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual.",
+          "description": "CDS roll dates: the 20th of Mar/Jun/Sep/Dec at the leg's own frequency and\nstub; the start must itself be a CDS roll date (no start is substituted).",
           "type": "string"
         }
       ]

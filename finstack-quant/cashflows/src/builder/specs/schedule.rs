@@ -59,7 +59,8 @@ pub enum RollRule {
     None,
     /// Standard IMM dates: third Wednesday of Mar/Jun/Sep/Dec.
     Imm,
-    /// CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual.
+    /// CDS roll dates: the 20th of Mar/Jun/Sep/Dec at the leg's own frequency and
+    /// stub; the start must itself be a CDS roll date (no start is substituted).
     CdsImm,
 }
 
@@ -135,8 +136,8 @@ pub struct ScheduleParams {
     ///
     /// [`RollRule::None`] (default) keeps plain tenor stepping.
     /// [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-    /// [`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA
-    /// quarterly / short-back grid. See [`RollRule`].
+    /// [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
+    /// a regular anchor on a CDS roll date. See [`RollRule`].
     ///
     /// Serialized only when not `None`, so existing wire payloads are
     /// unchanged.

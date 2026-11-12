@@ -549,7 +549,7 @@ export default [
     "path": "#/$defs/d_265d9a24c72cc01c3986/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_index.schema.json#/$defs/RollRule/oneOf/2",
     "const": "cds_imm",
-    "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual."
+    "description": "CDS roll dates: the 20th of Mar/Jun/Sep/Dec at the leg's own frequency and\nstub; the start must itself be a CDS roll date (no start is substituted)."
   },
   {
     "path": "#/$defs/d_2701caf4934336a2dd86",

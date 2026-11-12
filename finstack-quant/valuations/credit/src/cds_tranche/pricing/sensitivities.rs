@@ -309,7 +309,14 @@ impl CdsTranchePricer {
         tranche: &CdsTranche,
         as_of: Date,
     ) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
-        let start = tranche.contractual_start_date(as_of).unwrap_or(as_of);
+        // No valuation-date fallback: a tranche off the CDS roll grid states
+        // its start (record CORE-CONVENTIONS-008).
+        let start = tranche.contractual_start_date(as_of).ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "CDS tranche {} needs a start_date when its roll rule is not cds_imm",
+                tranche.id
+            ))
+        })?;
         if start >= tranche.maturity {
             return Ok(Vec::new());
         }

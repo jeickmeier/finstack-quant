@@ -1008,7 +1008,7 @@
         },
         "roll_rule": {
           "$ref": "#/$defs/d_66cec9e6c4e451f96890",
-          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA\nquarterly / short-back grid. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
+          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from\na regular anchor on a CDS roll date. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
         },
         "stub": {
           "$ref": "#/$defs/d_c42c718f1562da8096a4",
@@ -3764,7 +3764,7 @@
         },
         {
           "const": "cds_imm",
-          "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual.",
+          "description": "CDS roll dates: the 20th of Mar/Jun/Sep/Dec at the leg's own frequency and\nstub; the start must itself be a CDS roll date (no start is substituted).",
           "type": "string"
         }
       ]
@@ -4497,7 +4497,7 @@
         },
         "roll_rule": {
           "$ref": "#/$defs/d_66cec9e6c4e451f96890",
-          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA\nquarterly / short-back grid. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
+          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from\na regular anchor on a CDS roll date. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
         },
         "step_schedule": {
           "description": "Step schedule: (effective_date, new_rate). Must be sorted by date.\nEach entry sets the rate from that date forward until the next step.\n\n**Date convention:** `effective_date` is compared against each\naccrual period's *unadjusted* `accrual_start`. Specify dates as\nunadjusted accrual-period boundaries (typically the issue date plus\ninteger multiples of `frequency`); business-day adjustment is not\napplied here. The rate is set at accrual start (per market\nconvention for step-up bonds).",
@@ -7234,7 +7234,7 @@
         },
         "roll_rule": {
           "$ref": "#/$defs/d_66cec9e6c4e451f96890",
-          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA\nquarterly / short-back grid. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
+          "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from\na regular anchor on a CDS roll date. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
         },
         "stub": {
           "$ref": "#/$defs/d_c42c718f1562da8096a4",

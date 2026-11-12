@@ -989,6 +989,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         )
         .expect("Valid tranche parameters");
         tranche.roll_rule = finstack_quant_cashflows::builder::RollRule::CdsImm;
+        tranche.stub = finstack_quant_core::dates::StubKind::ShortBack;
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(
             Position::new(

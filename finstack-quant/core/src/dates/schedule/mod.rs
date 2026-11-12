@@ -45,26 +45,6 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
-//! CDS IMM schedule (quarterly on 20-Mar/Jun/Sep/Dec):
-//! ```rust
-//! use finstack_quant_core::dates::{GridMode, Schedule};
-//! use time::{Date, Month};
-//!
-//! let start = Date::from_calendar_date(2025, Month::January, 15)?;
-//! let end = Date::from_calendar_date(2025, Month::December, 20)?;
-//!
-//! let sched = Schedule::builder(start, end)?
-//!     .cds_imm()  // Anchors at the CDS roll preceding start (front accrual)
-//!     .grid(GridMode::Natural)
-//!     .unadjusted()
-//!     .build()?;
-//!
-//! let dates: Vec<_> = sched.into_iter().collect();
-//! // Dec-20-2024 (prior roll), Mar-20, Jun-20, Sep-20, Dec-20 (2025)
-//! assert_eq!(dates.len(), 5);
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! ```
-//!
 //! Standard IMM schedule (quarterly rolls on the third Wednesday):
 //! ```rust
 //! use finstack_quant_core::dates::{GridMode, Schedule, StubKind, Tenor};
@@ -129,7 +109,7 @@
 use smallvec::SmallVec;
 use time::Date;
 
-use super::{BusinessDayConvention, DateExt, HolidayCalendar, adjust, prev_cds_date};
+use super::{BusinessDayConvention, DateExt, HolidayCalendar, adjust};
 use crate::InputError;
 
 use crate::dates::Tenor;

@@ -17,9 +17,6 @@ fn eom_rejects_incompatible_schedule_rules() {
     for frequency in [Tenor::daily(), Tenor::weekly()] {
         assert!(builder().frequency(frequency).grid(eom).build().is_err());
     }
-    // CDS IMM mode needs the natural grid, in either call order.
-    assert!(builder().cds_imm().grid(eom).build().is_err());
-    assert!(builder().grid(eom).cds_imm().build().is_err());
     let weekly = Schedule::builder(make_date(2025, 1, 1), make_date(2025, 1, 29))
         .unwrap()
         .stub_rule(finstack_quant_core::dates::StubKind::None)
@@ -29,8 +26,6 @@ fn eom_rejects_incompatible_schedule_rules() {
         .build()
         .unwrap();
     assert_eq!(weekly.get_dates().len(), 5);
-    let cds = builder().cds_imm().build().unwrap();
-    assert!(cds.get_dates().iter().all(|date| date.day() == 20));
 }
 
 #[test]
@@ -1202,136 +1197,32 @@ fn imm_schedule_without_stubs_requires_on_cycle_endpoints() {
 }
 
 #[test]
-fn test_cds_imm_schedule_basic() {
-    // CDS IMM schedule: 20th of Mar/Jun/Sep/Dec.
-    //
-    // Post-Big-Bang convention :
-    // the schedule anchors at the CDS roll PRECEDING the start date, so the
-    // first period carries the standard front accrual from 2024-12-20.
-    let start = make_date(2025, 1, 15);
-    let end = make_date(2025, 12, 20);
-
-    let dates: Vec<_> = Schedule::builder(start, end)
-        .unwrap()
-        .grid(finstack_quant_core::dates::GridMode::Natural)
-        .unadjusted()
-        .cds_imm()
-        .build()
-        .unwrap()
-        .into_iter()
-        .collect();
-
-    // Should get 5 dates: Dec 20 (prior roll), Mar 20, Jun 20, Sep 20, Dec 20
-    assert_eq!(dates.len(), 5);
-    assert_eq!(dates[0], make_date(2024, 12, 20));
-    assert_eq!(dates[1], make_date(2025, 3, 20));
-    assert_eq!(dates[2], make_date(2025, 6, 20));
-    assert_eq!(dates[3], make_date(2025, 9, 20));
-    assert_eq!(dates[4], make_date(2025, 12, 20));
-}
-
-#[test]
-fn test_cds_imm_schedule_start_on_roll_date_has_no_front_accrual() {
-    // When the start date IS a CDS roll date, the schedule anchors on it
-    // directly (no prior-roll front accrual period).
-    let start = make_date(2025, 3, 20);
-    let end = make_date(2025, 12, 20);
-
-    let dates: Vec<_> = Schedule::builder(start, end)
-        .unwrap()
-        .grid(finstack_quant_core::dates::GridMode::Natural)
-        .unadjusted()
-        .cds_imm()
-        .build()
-        .unwrap()
-        .into_iter()
-        .collect();
-
-    assert_eq!(dates.len(), 4);
-    assert_eq!(dates[0], make_date(2025, 3, 20));
-    assert_eq!(dates[3], make_date(2025, 12, 20));
-}
-
-#[test]
-fn test_imm_vs_cds_imm_difference() {
-    // Verify that IMM and CDS IMM produce different dates.
-    let start = make_date(2025, 3, 19); // on the IMM lattice
-    let end = make_date(2025, 6, 20); // Exactly on CDS roll date
-
-    let imm_dates: Vec<_> = Schedule::builder(start, end)
-        .unwrap()
-        .unadjusted()
-        .grid(finstack_quant_core::dates::GridMode::QuarterlyImm)
-        .frequency(finstack_quant_core::dates::Tenor::quarterly())
-        .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
-        .build()
-        .unwrap()
-        .into_iter()
-        .collect();
-
-    let cds_dates: Vec<_> = Schedule::builder(start, end)
-        .unwrap()
-        .grid(finstack_quant_core::dates::GridMode::Natural)
-        .unadjusted()
-        .cds_imm()
-        .build()
-        .unwrap()
-        .into_iter()
-        .collect();
-
-    // IMM rolls on third Wednesdays to a short final stub; CDS anchors at
-    // the prior roll for the standard front accrual.
-    assert_eq!(imm_dates, vec![start, make_date(2025, 6, 18), end]);
+fn schedule_never_substitutes_a_cds_roll_for_the_start() {
+    // Record CORE-CONVENTIONS-008: no generic CDS mode or start substitution;
+    // a CDS product passes its own accrual start.
+    let builder = |start| {
+        Schedule::builder(start, make_date(2025, 12, 20))
+            .unwrap()
+            .frequency(Tenor::quarterly())
+            .stub_rule(StubKind::ShortFront)
+            .grid(finstack_quant_core::dates::GridMode::Natural)
+            .unadjusted()
+            .build()
+            .unwrap()
+    };
+    let off_roll = builder(make_date(2025, 1, 15));
+    assert_eq!(off_roll.get_dates()[0], make_date(2025, 1, 15));
+    let on_roll = builder(make_date(2024, 12, 20));
     assert_eq!(
-        cds_dates,
-        vec![make_date(2024, 12, 20), make_date(2025, 3, 20), end]
+        on_roll.get_dates(),
+        &[
+            make_date(2024, 12, 20),
+            make_date(2025, 3, 20),
+            make_date(2025, 6, 20),
+            make_date(2025, 9, 20),
+            make_date(2025, 12, 20),
+        ]
     );
-}
-
-#[test]
-fn cds_imm_mode_requires_the_natural_grid() {
-    use finstack_quant_core::dates::GridMode;
-    let start = make_date(2025, 3, 19);
-    let end = make_date(2025, 9, 30);
-    let builder = || Schedule::builder(start, end).unwrap().unadjusted();
-
-    // The grid and CDS IMM mode are independent selections; combining CDS
-    // with a non-natural grid is an error in either call order.
-    assert!(
-        builder()
-            .cds_imm()
-            .grid(GridMode::QuarterlyImm)
-            .build()
-            .is_err()
-    );
-    assert!(
-        builder()
-            .grid(GridMode::QuarterlyImm)
-            .cds_imm()
-            .build()
-            .is_err()
-    );
-
-    let cds_dates = builder()
-        .cds_imm()
-        .grid(GridMode::Natural)
-        .build()
-        .expect("CDS IMM on the natural grid")
-        .get_dates()
-        .to_vec();
-    let imm_dates = builder()
-        .frequency(Tenor::quarterly())
-        .stub_rule(StubKind::ShortBack)
-        .grid(GridMode::QuarterlyImm)
-        .build()
-        .expect("standard IMM grid")
-        .get_dates()
-        .to_vec();
-
-    assert!(cds_dates.contains(&make_date(2025, 3, 20)));
-    assert!(!cds_dates.contains(&make_date(2025, 3, 19)));
-    assert!(imm_dates.contains(&make_date(2025, 3, 19)));
-    assert!(!imm_dates.contains(&make_date(2025, 3, 20)));
 }
 
 #[test]
@@ -1443,34 +1334,6 @@ fn test_zero_count_tenor_rejected_via_serde() {
     let tenor: Tenor =
         serde_json::from_str(r#"{"count":3,"unit":"months"}"#).expect("valid tenor deserializes");
     assert_eq!(tenor, Tenor::quarterly());
-}
-
-#[test]
-fn cds_imm_accrual_20ths_stay_unadjusted() {
-    let start = make_date(2025, 1, 15);
-    let end = make_date(2025, 12, 20);
-    // Thursday 20 Mar 2025 is Japan's Vernal Equinox Day (a JPTO holiday).
-
-    let schedule = Schedule::builder(start, end)
-        .unwrap()
-        .grid(finstack_quant_core::dates::GridMode::Natural)
-        .cds_imm()
-        .adjust_with(BusinessDayConvention::Following, "jpto")
-        .build()
-        .unwrap();
-
-    assert!(
-        schedule.get_dates().contains(&make_date(2025, 3, 20)),
-        "CDS 20ths stay on the unadjusted accrual grid: {:?}",
-        schedule.get_dates()
-    );
-    assert!(
-        schedule
-            .get_payment_dates()
-            .contains(&make_date(2025, 3, 21)),
-        "holiday 20th pays Following: {:?}",
-        schedule.get_payment_dates()
-    );
 }
 
 #[test]

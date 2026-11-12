@@ -241,7 +241,7 @@ pub fn synthetic_underlying_cds(
                 option.notional.currency(),
             )?,
             side: PayReceive::Pay,
-            start: option.effective_underlying_effective_date(as_of),
+            start: option.effective_underlying_effective_date(as_of)?,
             end: option.underlying_maturity,
             recovery_rate: option.recovery_rate,
             discount_curve_id: option.discount_curve_id.to_owned(),

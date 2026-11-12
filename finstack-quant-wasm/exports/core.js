@@ -108,7 +108,6 @@ chain(wasm.ScheduleBuilder, [
   'unadjusted',
   'paymentLagDays',
   'fixingLagBusinessDays',
-  'cdsImm',
 ]);
 
 /**

@@ -26,42 +26,17 @@ fn close(actual: f64, expected: f64) {
 }
 
 #[test]
-fn cds_front_accrual_replays_pre_issue_and_later_balance_changes() {
-    for pre_issue_draw in [false, true] {
-        let mut value = spec("1000000");
-        value["coupon_program"] = json!([{"kind": "fixed", "spec": {
-            "coupon_type": "cash", "rate": "0.1", "frequency": {"count": 3, "unit": "months"},
-            "day_count": "act_360", "business_day_convention": "unadjusted",
-            "calendar_id": "weekends_only", "stub": "short_back", "roll_rule": "cds_imm"
-        }}]);
-        let mut events = vec![json!({
-            "date": "2024-02-01", "payment_date": "2024-02-01", "kind": "amortization",
-            "delta": {"amount": "-500000", "currency": "USD"}
-        })];
-        if pre_issue_draw {
-            events.push(json!({
-                "date": "2024-01-01", "payment_date": "2024-01-01", "kind": "notional",
-                "delta": {"amount": "500000", "currency": "USD"}
-            }));
-        }
-        value["principal_events"] = json!(events);
-        let schedule = build(value).expect("funded schedule");
-        let first_coupon: f64 = schedule
-            .get_flows()
-            .iter()
-            .filter(|flow| {
-                flow.get_kind().is_coupon() && flow.get_date().to_string() == "2024-03-20"
-            })
-            .map(|flow| flow.get_amount().amount())
-            .sum();
-        let expected = if pre_issue_draw {
-            // Dec 20-Jan 1: 12 days; Jan 1-Feb 1: 31; Feb 1-Mar 20: 48.
-            (1_000_000.0 * 12.0 + 1_500_000.0 * 31.0 + 1_000_000.0 * 48.0) * 0.1 / 360.0
-        } else {
-            (1_000_000.0 * 43.0 + 500_000.0 * 48.0) * 0.1 / 360.0
-        };
-        close(first_coupon, expected);
-    }
+fn cds_roll_program_rejects_an_off_roll_issue() {
+    // Record CORE-CONVENTIONS-008: no front accrual from the roll before an
+    // off-roll issue date; the schedule builder never substitutes the start.
+    let mut value = spec("1000000");
+    value["coupon_program"] = json!([{"kind": "fixed", "spec": {
+        "coupon_type": "cash", "rate": "0.1", "frequency": {"count": 3, "unit": "months"},
+        "day_count": "act_360", "business_day_convention": "unadjusted",
+        "calendar_id": "weekends_only", "stub": "short_back", "roll_rule": "cds_imm"
+    }}]);
+    let error = build(value).expect_err("an off-roll CDS issue is rejected");
+    assert!(error.to_string().contains("CDS roll date"), "{error}");
 }
 
 #[test]

@@ -35,9 +35,7 @@ pub(crate) enum AccrualDayCountPolicy {
 impl CdsPricer {
     /// Generate contractual accrual and payment dates from the premium terms.
     fn premium_schedule(&self, cds: &CreditDefaultSwap) -> Result<Schedule> {
-        let mut builder = Schedule::builder(cds.premium_leg.start, cds.premium_leg.end)?
-            .grid(finstack_quant_core::dates::GridMode::Natural);
-        builder = match cds.premium_leg.roll_rule {
+        let builder = match cds.premium_leg.roll_rule {
             RollRule::CdsImm => {
                 if cds.premium_leg.frequency != Tenor::quarterly()
                     || cds.premium_leg.stub != StubKind::ShortFront
@@ -49,9 +47,21 @@ impl CdsPricer {
                             .into(),
                     ));
                 }
-                builder.cds_imm()
+                // The standard grid runs quarterly on CDS roll dates from the
+                // roll on or before the premium start; the schedule generator
+                // substitutes no start, so the product states that anchor
+                // (record CORE-CONVENTIONS-008). Its short-back generation is
+                // the existing behaviour; the complete CDS date regime is E4b.
+                let anchor = if finstack_quant_core::dates::is_cds_date(cds.premium_leg.start) {
+                    cds.premium_leg.start
+                } else {
+                    finstack_quant_core::dates::prev_cds_date(cds.premium_leg.start)?
+                };
+                Schedule::builder(anchor, cds.premium_leg.end)?
+                    .frequency(Tenor::quarterly())
+                    .stub_rule(StubKind::ShortBack)
             }
-            RollRule::None => builder
+            RollRule::None => Schedule::builder(cds.premium_leg.start, cds.premium_leg.end)?
                 .frequency(cds.premium_leg.frequency)
                 .stub_rule(cds.premium_leg.stub),
             other => {
@@ -60,6 +70,7 @@ impl CdsPricer {
                 )));
             }
         };
+        let mut builder = builder.grid(finstack_quant_core::dates::GridMode::Natural);
         // The CDS product adjusts premium dates only when the leg names a
         // calendar; without one its dates stay unadjusted, stated explicitly
         // here. Whether a convention without a calendar should be accepted is

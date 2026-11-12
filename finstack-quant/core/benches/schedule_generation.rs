@@ -248,7 +248,11 @@ fn bench_end_of_month(c: &mut Criterion) {
 /// First date of an IMM schedule: CDS accrues from the prior roll; a
 /// standard IMM grid starts on its own on-cycle anchor (2025-03-19).
 fn imm_start(cds: bool) -> Date {
-    if cds { start_date() } else { date(2025, 3, 19) }
+    if cds {
+        date(2024, 12, 20)
+    } else {
+        date(2025, 3, 19)
+    }
 }
 
 fn imm_dates(years: u32, cds: bool) -> Vec<Date> {
@@ -293,7 +297,9 @@ fn bench_imm_schedules(c: &mut Criterion) {
                                 .grid(finstack_quant_core::dates::GridMode::Natural)
                                 .unadjusted();
                             let builder = if cds {
-                                builder.cds_imm()
+                                builder
+                                    .frequency(finstack_quant_core::dates::Tenor::quarterly())
+                                    .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
                             } else {
                                 builder
                                     .grid(finstack_quant_core::dates::GridMode::QuarterlyImm)

@@ -87,7 +87,6 @@ pub struct ScheduleBuilder {
     frequency: Option<Tenor>,
     stub: Option<StubKind>,
     grid: Option<GridMode>,
-    cds_imm_mode: bool,
     business_day_convention: Option<BusinessDayConvention>,
     calendar_id: Option<String>,
     payment_lag_days: i32,
@@ -138,7 +137,6 @@ impl Schedule {
             frequency: None,
             stub: None,
             grid: None,
-            cds_imm_mode: false,
             business_day_convention: None,
             calendar_id: None,
             payment_lag_days: 0,
@@ -157,7 +155,6 @@ impl From<ScheduleSpec> for ScheduleBuilder {
             frequency: Some(spec.frequency),
             stub: Some(spec.stub),
             grid: Some(spec.grid),
-            cds_imm_mode: spec.cds_imm_mode,
             business_day_convention: Some(spec.business_day_convention),
             calendar_id: spec.calendar_id,
             payment_lag_days: spec.payment_lag_days,
@@ -204,25 +201,6 @@ impl ScheduleBuilder {
     #[must_use]
     pub fn grid(mut self, grid: GridMode) -> Self {
         self.grid = Some(grid);
-        self
-    }
-
-    /// Create a CDS IMM schedule (quarterly on the 20th: 20-Mar, 20-Jun, 20-Sep, 20-Dec).
-    ///
-    /// Sets the frequency to quarterly and the stub rule to
-    /// [`StubKind::ShortBack`] and turns CDS IMM mode on; it requires the
-    /// natural grid. When the start date is not itself a CDS roll date the
-    /// schedule is anchored at the roll date immediately **preceding** the
-    /// start, so the first period carries the standard front accrual.
-    ///
-    /// The generated 20ths are **unadjusted** roll dates; payment-date
-    /// business-day adjustment is applied separately via
-    /// [`adjust_with`](Self::adjust_with).
-    #[must_use]
-    pub fn cds_imm(mut self) -> Self {
-        self.frequency = Some(Tenor::quarterly());
-        self.stub = Some(StubKind::ShortBack);
-        self.cds_imm_mode = true;
         self
     }
 
@@ -346,7 +324,6 @@ impl ScheduleBuilder {
             frequency,
             stub,
             grid,
-            cds_imm_mode: self.cds_imm_mode,
             business_day_convention,
             calendar_id: self.calendar_id.clone(),
             payment_lag_days: self.payment_lag_days,
@@ -390,34 +367,14 @@ fn build_spec(spec: &ScheduleSpec) -> crate::Result<Schedule> {
         .map(calendar_by_id_strict)
         .transpose()?;
 
-    let dates = if spec.cds_imm_mode {
-        // CDS IMM: 20th of quarterly months (unadjusted; any business-day
-        // adjustment is applied separately below). Post-Big-Bang standard
-        // CDS contracts accrue from the CDS roll date immediately PRECEDING
-        // the start date.
-        let start = if crate::dates::imm::is_cds_date(spec.start) {
-            spec.start
-        } else {
-            prev_cds_date(spec.start)?
-        };
-        BuilderInternal {
-            start,
-            end: spec.end,
-            frequency: spec.frequency,
-            stub: spec.stub,
-            roll: GridMode::Natural,
-        }
-        .generate()?
-    } else {
-        BuilderInternal {
-            start: spec.start,
-            end: spec.end,
-            frequency: spec.frequency,
-            stub: spec.stub,
-            roll: spec.grid,
-        }
-        .generate()?
-    };
+    let dates = BuilderInternal {
+        start: spec.start,
+        end: spec.end,
+        frequency: spec.frequency,
+        stub: spec.stub,
+        roll: spec.grid,
+    }
+    .generate()?;
 
     let (payment_dates, fixing_dates) = build_payment_and_fixing_dates(
         &dates,

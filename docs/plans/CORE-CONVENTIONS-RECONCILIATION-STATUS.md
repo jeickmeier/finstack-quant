@@ -108,7 +108,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 20 | E2 | **E2a committed** (`E2a:` in git log); **E2c (O6 compounding) not executed (scope)**; `from_years` removal **blocked (owner decision)** | E2a: workspace rust-lint; gen-write; workspace rust-test; core doctests; python-test; python-lint; wasm-test; wasm-lint; ui-check | 014/007 entry: `months_until` and roll rule recorded; remaining narrowed | E2a: `months_until -> Result<u32>` (greatest `k` with `add_months(k) <= end`; reversed errors) in core, Python and WASM; structured-credit sites moved to a named site-local `ClampedMonths::clamped_months_until` keeping the pre-007 count (E2b assigns meanings); bond future uses the checked core measure (day-1 start, identical values); `Tenor::add_to_date` errors without a calendar unless `Unadjusted` |
 | 21 | E2b | committed (`E2b:` in git log); documentation only | docs (no code change) | 014/007 entry links the stated meanings | All 16 structured-credit sites have a stated meaning (seasoning, remaining term, simulation index/grid length, lock-out months, domain bound) in the structured-credit README. None migrated: no accepted record selects a measure, and O13 forbids assuming completed months. All stay on `ClampedMonths::clamped_months_until` |
 | 22 | E3 | committed (`E3a:`, `E3b-1:`, `E3b-2:`, `E3b-3:` in git log) | E3b: lint, gen-check, rust-test, python-test, wasm-test, ui-check (slice-gate per commit; after gen-write); notebooks schedule_building, dates_calendars_schedules, credit_factor_hierarchy | 008 entry narrowed to CDS mode (E4) and the CDS premium calendar regime (E4b); record 008 and 009 #10 status updated | E3b-1 strict EOM/IMM anchors and final-date ceiling, IMM searches removed; E3b-2 private validated `Schedule`; E3b-3 `GridMode`, complete `ScheduleSpec`, explicit builder, hosts; see Needs review |
-| 23 | E4 | not started (dep E3 met) | | | |
+| 23 | E4 | committed (`E4:` in git log) | lint, gen-check, rust-test, python-test, wasm-test, ui-check (slice-gate after gen-write); notebooks | 008 entry: CDS-mode removal recorded, E4b named as remaining | `cds_imm()`/`cds_imm_mode` and start substitution removed (Rust, Python, WASM, schema); `RollRule::CdsImm` uses the leg frequency/stub and needs its regular anchor on a CDS roll; interior cuts anchor on the adjacent roll and are clipped; the standard tranche states its short-back stub; reference-period and valuation-date fallbacks are errors; see Needs review |
 | 24 | E4b | skipped (dep E4) | | | O7 decision not recorded in this run |
 | 25 | G1 | committed (`G1:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16,366 (16,365 + the mid-coupon make-whole re-expectation, re-run 19/19); python-test 14,008 / 112 skip; wasm-test 1,087; ui-check 1,527; doctests and the Linux run skipped by owner request | 017 entry: runtime reconciliation recorded (qualification remains); context-free-XIRR entry removed; record 017 status updated | Guess-free `irr`/`xirr`, fixed ACT/365F clock, canonical per-date net, full log bracket via fallible shared `solve_in_bracket`, one acceptance gate; `YieldBasis` (ACT/365F, ACT/360) with explicit loan `yield_basis` (O11); bond floor `day_count` removed; MC path IRR removed; see Needs review |
 | 26 | G2 | committed (`G2:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16358; core doctests 285; python-test 13988; python-lint; wasm-test 1085; wasm-lint; ui-check | 019 entry: CreditRating part recorded; record 019 partly reconciled | `D` = 21 and `NR` off the ladder; no `Ord`, hand-written `PartialOrd` (`NR` incomparable with rated values, equal to itself); `ladder_position()`; `notches_to`/`to_moodys_string -> Result` (`NR` arithmetic and Moody's `D` error); finite canonical/Moody's/status alias tables replace suffix stripping; the models rating-factor table and the structured-credit `rating_haircuts` move from `BTreeMap` to `IndexMap` (ladder order / wire order); Python ordering of `NR` against a rated value raises `TypeError` |
@@ -1088,6 +1088,21 @@ logged under Needs review.
     attached through the validated `with_accrual` rather than a ninth
     keyword. A host `CashFlowParams` class would mirror Rust more literally
     at the cost of a new public type in both hosts.
+  - **CDS rows built on an off-roll anchor now fail (E4, Needs review).**
+    With no start substitution and no quarterly/short-back override, a
+    cashflows leg with `RollRule::CdsImm` needs its regular anchor on a CDS
+    roll date: the start for back or no stub, the maturity for front stubs
+    (a short-front leg anchored on an off-roll maturity used to be forced to
+    short-back silently). `CdsTranche::standard` now states the short-back
+    stub it effectively had, so no value moved; fixtures that paired
+    `CdsImm` with the short-front default state short-back too. A CDS tranche
+    with `roll_rule = none` and no `start_date` is rejected (it used the
+    valuation date). The
+    CDS pricer keeps generating its quarterly grid from the roll on or
+    before the premium start (now stated in the pricer, not the schedule
+    builder) with the short-back generation that contradicts its own
+    short-front validation; both belong to the E4b date regime. Tranche
+    test fixtures now state `start_date = as_of` explicitly.
   - **Cashflow construction cost not measured (G5-5c).** Every row now runs
     `validate()` once at construction; the `cashflow_scaling` bench was not
     run before and after.

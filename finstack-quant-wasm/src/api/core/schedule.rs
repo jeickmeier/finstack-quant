@@ -78,7 +78,7 @@ impl JsSchedule {
     ///
     /// * `spec` - `ScheduleSpec` JSON text or plain object, such as
     ///   `ScheduleBuilder.toSpec()` output: ISO `start`/`end`, `frequency`
-    ///   (a `{ count, unit }` tenor), `stub`, `grid`, `cds_imm_mode`,
+    ///   (a `{ count, unit }` tenor), `stub`, `grid`,
     ///   `business_day_convention`, `calendar_id`, and the optional
     ///   `payment_lag_days` and `fixing_lag_business_days`. Unknown fields are
     ///   rejected.
@@ -354,19 +354,6 @@ impl JsScheduleBuilder {
             .clone()
             .fixing_lag_business_days(js_int(&lag, "lag")?);
         Ok(())
-    }
-
-    /// Use CDS IMM dates (the 20th of March, June, September and December).
-    ///
-    /// Same semantics as the Rust `ScheduleBuilder::cds_imm`: sets the
-    /// frequency to quarterly and the stub rule to `short_back` and turns CDS
-    /// IMM mode on (it requires the natural grid). A later `frequency` or
-    /// `stubRule` call wins, and `toSpec()` reports what `build()` uses.
-    ///
-    /// @returns This builder, with CDS IMM mode on.
-    #[wasm_bindgen(js_name = cdsImm)]
-    pub fn cds_imm(&mut self) {
-        self.inner = self.inner.clone().cds_imm();
     }
 
     /// The complete specification these choices describe.

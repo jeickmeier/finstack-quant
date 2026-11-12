@@ -328,7 +328,9 @@ impl CdsTranche {
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::Following,
             calendar_id: "weekends_only".into(),
-            stub: StubKind::ShortFront,
+            // The CDS grid runs forward from the start roll with a short final
+            // stub; the product states it (record CORE-CONVENTIONS-008).
+            stub: StubKind::ShortBack,
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,

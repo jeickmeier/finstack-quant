@@ -217,7 +217,7 @@ pub(crate) fn emit_fixed_coupons_on(
                     calendar,
                     crate::builder::periods::AccrualConventions::from_schedule(&spec.schedule),
                     is_termination_date,
-                );
+                )?;
                 let coupon_period = day_count_ctx.coupon_period;
                 let yf = crate::builder::periods::contractual_accrual(
                     spec.schedule.day_count,
@@ -323,7 +323,7 @@ fn floating_accrual_context(
     schedule: &FloatSchedule,
     period: &SchedulePeriod,
     end: Date,
-) -> finstack_quant_core::dates::DayCountContext<'static> {
+) -> finstack_quant_core::Result<finstack_quant_core::dates::DayCountContext<'static>> {
     crate::builder::periods::period_day_count_context(
         period,
         schedule.calendar,
@@ -343,7 +343,7 @@ fn floating_year_fraction(
         (period.accrual_start, period.accrual_end),
         start,
         end,
-        floating_accrual_context(schedule, period, end),
+        floating_accrual_context(schedule, period, end)?,
     )
 }
 
@@ -669,7 +669,7 @@ pub(crate) fn emit_float_coupons_on(
                         schedule,
                         period,
                         period.accrual_end,
-                    ),
+                    )?,
                     accrual_factor: floating_year_fraction(
                         schedule,
                         period,
@@ -721,7 +721,7 @@ pub(crate) fn emit_float_coupons_on(
                     Some(settlement.projected_index_rate),
                     finstack_quant_core::dates::DayCountContextState {
                         calendar_id: Some(spec.schedule.calendar_id.to_string()),
-                        coupon_period: floating_accrual_context(schedule, period, segment.end)
+                        coupon_period: floating_accrual_context(schedule, period, segment.end)?
                             .coupon_period,
                         end_is_termination_date: Some(
                             schedule.terminal_accrual_end == Some(segment.end),

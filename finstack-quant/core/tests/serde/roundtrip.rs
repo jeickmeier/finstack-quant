@@ -83,7 +83,6 @@ fn schedule_spec_builds_expected_dates() {
         frequency: Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"),
         stub: StubKind::None,
         grid: GridMode::Natural,
-        cds_imm_mode: false,
         business_day_convention: BusinessDayConvention::Following,
         calendar_id: Some("target2".to_string()),
         payment_lag_days: 0,
@@ -119,7 +118,6 @@ const SPEC_BASE: &str = r#"{
         "frequency":{"count":3,"unit":"months"},
         "stub":"short_back",
         "grid":"natural",
-        "cds_imm_mode":false,
         "business_day_convention":"unadjusted",
         "calendar_id":"weekends_only""#;
 
@@ -146,13 +144,7 @@ fn schedule_spec_requires_every_financial_choice() {
         ),
         (0, None)
     );
-    for field in [
-        "frequency",
-        "stub",
-        "grid",
-        "cds_imm_mode",
-        "business_day_convention",
-    ] {
+    for field in ["frequency", "stub", "grid", "business_day_convention"] {
         let mut value: serde_json::Value = serde_json::from_str(&format!("{SPEC_BASE}}}")).unwrap();
         value.as_object_mut().unwrap().remove(field);
         assert!(
@@ -188,61 +180,19 @@ fn schedule_spec_rejects_retired_payment_lag_business_days() {
 }
 
 #[test]
-fn schedule_spec_rejects_cds_imm_on_a_non_natural_grid() {
+fn schedule_spec_has_no_cds_imm_mode() {
+    // Record CORE-CONVENTIONS-008: the generic CDS mode is removed, so its
+    // wire field is an unknown field.
     let mut value: serde_json::Value = serde_json::from_str(&format!("{SPEC_BASE}}}")).unwrap();
-    value["grid"] = "quarterly_imm".into();
-    value["cds_imm_mode"] = true.into();
+    value["cds_imm_mode"] = false.into();
     assert!(serde_json::from_value::<ScheduleSpec>(value).is_err());
-
-    let spec = ScheduleSpec {
-        start: Date::from_calendar_date(2025, Month::March, 19).unwrap(),
-        end: Date::from_calendar_date(2025, Month::September, 30).unwrap(),
-        frequency: Tenor::quarterly(),
-        stub: StubKind::ShortBack,
-        grid: GridMode::QuarterlyImm,
-        cds_imm_mode: true,
-        business_day_convention: BusinessDayConvention::Unadjusted,
-        calendar_id: None,
-        payment_lag_days: 0,
-        fixing_lag_business_days: None,
-    };
-    assert!(ScheduleBuilder::from(spec).build().is_err());
 }
 
-/// `ScheduleBuilder::to_spec` captures exactly what `build` uses, including
-/// `cds_imm`'s quarterly/ShortBack settings and a later override.
+/// `ScheduleBuilder::to_spec` captures exactly what `build` uses.
 #[test]
 fn builder_to_spec_matches_build_semantics() {
     let start = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let end = Date::from_calendar_date(2026, Month::January, 15).unwrap();
-    let choices = |builder: ScheduleBuilder| builder.grid(GridMode::Natural).unadjusted();
-
-    // Bare CDS IMM: the spec carries quarterly/ShortBack.
-    let builder = choices(Schedule::builder(start, end).unwrap().cds_imm());
-    let spec = builder.to_spec().unwrap();
-    assert_eq!(spec.frequency, Tenor::quarterly());
-    assert_eq!(spec.stub, StubKind::ShortBack);
-    assert_eq!(
-        ScheduleBuilder::from(spec).build().unwrap().get_dates(),
-        builder.build().unwrap().get_dates()
-    );
-
-    // CDS IMM then monthly: the later frequency wins on both paths.
-    let builder = choices(
-        Schedule::builder(start, end)
-            .unwrap()
-            .cds_imm()
-            .frequency(Tenor::monthly()),
-    );
-    let spec = builder.to_spec().unwrap();
-    assert_eq!(spec.frequency, Tenor::monthly());
-    let built = ScheduleBuilder::from(spec)
-        .build()
-        .unwrap()
-        .get_dates()
-        .to_vec();
-    assert_eq!(built, builder.build().unwrap().get_dates());
-    assert!(built.len() > 6, "monthly CDS schedule, got {built:?}");
 
     // Standard IMM from an on-cycle start.
     let imm_start = Date::from_calendar_date(2025, Month::March, 19).unwrap();

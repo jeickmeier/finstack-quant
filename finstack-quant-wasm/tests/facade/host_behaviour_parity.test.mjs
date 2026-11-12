@@ -39,10 +39,9 @@ test('ScheduleBuilder setters update the builder in place and return it', () => 
   builder.grid('end_of_month');
   assert.equal(builder.stubRule('short_front').adjustWith('following', 'nyse'), builder);
   assert.equal(builder.paymentLagDays(2).fixingLagBusinessDays(1), builder);
-  assert.equal(builder.grid('natural').cdsImm(), builder);
+  assert.equal(builder.grid('natural').frequency('3M').stubRule('short_back'), builder);
   assert.equal(builder.unadjusted().adjustWith('following', 'nyse'), builder);
   const spec = builder.toSpec();
-  // cdsImm() sets quarterly frequency and the short_back stub (Rust semantics).
   assert.deepEqual(spec.frequency, { count: 3, unit: 'months' });
   assert.equal(spec.stub, 'short_back');
   assert.equal(spec.grid, 'natural');
@@ -50,7 +49,7 @@ test('ScheduleBuilder setters update the builder in place and return it', () => 
   assert.equal(spec.calendar_id, 'nyse');
   assert.equal(spec.payment_lag_days, 2);
   assert.equal(spec.fixing_lag_business_days, 1);
-  assert.equal(spec.cds_imm_mode, true);
+  assert.equal('cds_imm_mode' in spec, false);
 
   // A rejected setter leaves the builder unchanged and usable.
   throwsKind(() => builder.frequency('nope'), 'validation');

@@ -28,7 +28,6 @@ use super::*;
 ///     frequency: Tenor::quarterly(),
 ///     stub: StubKind::None,
 ///     grid: GridMode::Natural,
-///     cds_imm_mode: false,
 ///     business_day_convention: BusinessDayConvention::Unadjusted,
 ///     calendar_id: None,
 ///     payment_lag_days: 0,
@@ -51,9 +50,6 @@ pub struct ScheduleSpec {
     pub stub: StubKind,
     /// Regular-grid selection.
     pub grid: GridMode,
-    /// CDS IMM mode (20th of quarterly months, front accrual from the prior
-    /// roll); requires the natural grid.
-    pub cds_imm_mode: bool,
     /// Payment-date business-day convention, including a deliberate
     /// `Unadjusted`.
     pub business_day_convention: BusinessDayConvention,
@@ -79,7 +75,6 @@ struct ScheduleSpecWire {
     frequency: Tenor,
     stub: StubKind,
     grid: GridMode,
-    cds_imm_mode: bool,
     business_day_convention: BusinessDayConvention,
     calendar_id: Option<String>,
     #[serde(default)]
@@ -98,7 +93,6 @@ impl TryFrom<ScheduleSpecWire> for ScheduleSpec {
             frequency: wire.frequency,
             stub: wire.stub,
             grid: wire.grid,
-            cds_imm_mode: wire.cds_imm_mode,
             business_day_convention: wire.business_day_convention,
             calendar_id: wire.calendar_id,
             payment_lag_days: wire.payment_lag_days,
@@ -116,19 +110,13 @@ impl ScheduleSpec {
     /// # Errors
     ///
     /// Returns an error when `start` is not before `end`, the frequency does
-    /// not suit the grid, CDS IMM mode is combined with a non-natural grid, a
-    /// lag is negative, or a calendar is required but absent.
+    /// not suit the grid, a lag is negative, or a calendar is required but
+    /// absent.
     pub fn validate(&self) -> crate::Result<()> {
         if self.start >= self.end {
             return Err(crate::InputError::InvalidDateRange.into());
         }
         self.grid.check_frequency(self.frequency)?;
-        if self.cds_imm_mode && self.grid != GridMode::Natural {
-            return Err(crate::Error::Validation(format!(
-                "CDS IMM mode requires the natural grid, got {}",
-                self.grid
-            )));
-        }
         for lag in [self.payment_lag_days]
             .into_iter()
             .chain(self.fixing_lag_business_days)
@@ -159,18 +147,11 @@ impl ScheduleSpec {
     ///
     /// # Errors
     ///
-    /// Returns an error when the specification is invalid, or (CDS IMM mode)
-    /// when the prior CDS roll cannot be computed.
+    /// Returns an error when the specification is invalid.
     pub fn nominal_reference(&self) -> crate::Result<NominalReference> {
         self.validate()?;
         let front = matches!(self.stub, StubKind::ShortFront | StubKind::LongFront);
-        let anchor = if front {
-            self.end
-        } else if self.cds_imm_mode && !crate::dates::imm::is_cds_date(self.start) {
-            prev_cds_date(self.start)?
-        } else {
-            self.start
-        };
+        let anchor = if front { self.end } else { self.start };
         Ok(NominalReference {
             anchor,
             frequency: self.frequency,

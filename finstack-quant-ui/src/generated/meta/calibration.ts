@@ -7636,7 +7636,7 @@ export default [
     "path": "#/$defs/d_fa1f99a63e484452eafa/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RollRule/oneOf/2",
     "const": "cds_imm",
-    "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual."
+    "description": "CDS roll dates: the 20th of Mar/Jun/Sep/Dec at the leg's own frequency and\nstub; the start must itself be a CDS roll date (no start is substituted)."
   },
   {
     "path": "#/$defs/d_fb5d44c23c59cc156917",

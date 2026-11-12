@@ -1290,7 +1290,6 @@
     "methods": [
       "adjustWith",
       "build",
-      "cdsImm",
       "fixingLagBusinessDays",
       "free",
       "frequency",

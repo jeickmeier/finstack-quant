@@ -212,7 +212,7 @@ class Schedule:
         spec : dict | str
             Mapping or JSON string with the canonical fields ``start``,
             ``end`` (ISO dates), ``frequency``, ``stub``, ``grid``,
-            ``cds_imm_mode``, ``business_day_convention``, ``calendar_id``,
+            ``business_day_convention``, ``calendar_id``,
             and the optional ``payment_lag_days`` and
             ``fixing_lag_business_days`` (as produced by
             :meth:`ScheduleBuilder.to_spec`).
@@ -636,34 +636,6 @@ class ScheduleBuilder:
         """
         ...
 
-    def cds_imm(self) -> ScheduleBuilder:
-        """
-        Use CDS IMM dates (the 20th of March, June, September and December).
-
-        Same semantics as the Rust ``ScheduleBuilder::cds_imm``: sets the
-        frequency to quarterly and the stub rule to ``short_back`` and turns
-        CDS IMM mode on; it requires the natural grid. A later ``frequency`` or
-        ``stub_rule`` call wins, and ``to_spec()`` reports exactly what
-        ``build()`` uses.
-
-        Returns
-        -------
-        ScheduleBuilder
-            This builder.
-
-        Notes
-        -----
-        This method does not raise; it returns the same instance for chaining.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.dates import Schedule
-        >>> spec = Schedule.builder("2025-01-15", "2026-01-15").grid("natural").unadjusted().cds_imm().to_spec()
-        >>> spec["frequency"], spec["stub"]
-        ({'count': 3, 'unit': 'months'}, 'short_back')
-        """
-        ...
-
     def to_spec(self) -> dict[str, object]:
         """
         The complete ``ScheduleSpec`` mapping these choices describe.
@@ -672,7 +644,7 @@ class ScheduleBuilder:
         -------
         dict[str, object]
             The canonical spec fields (``start``, ``end``, ``frequency``,
-            ``stub``, ``grid``, ``cds_imm_mode``, ``business_day_convention``,
+            ``stub``, ``grid``, ``business_day_convention``,
             ``calendar_id``, ``payment_lag_days``,
             ``fixing_lag_business_days``), accepted by
             :meth:`Schedule.from_spec`.

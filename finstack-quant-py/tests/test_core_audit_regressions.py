@@ -38,14 +38,12 @@ def test_hazard_interpolation_rejects_inconsistent_survival() -> None:
         HazardCurve("HZ", "2025-01-01", [(1.0, 0.02), (2.0, 1.0)], recovery_rate=0.4, interp="linear")
 
 
-@pytest.mark.parametrize(("rule", "message"), [("weekly", "end-of-month"), ("cds", "natural grid")])
-def test_eom_rejects_incompatible_schedules(rule: str, message: str) -> None:
+def test_eom_rejects_incompatible_schedules() -> None:
     builder = (
         Schedule.builder("2025-01-31", "2025-12-31").frequency("1M").stub_rule("none").grid("end_of_month").unadjusted()
     )
-    builder = builder.frequency("1W") if rule == "weekly" else builder.cds_imm()
-    with pytest.raises(ValueError, match=message):
-        builder.build()
+    with pytest.raises(ValueError, match="end-of-month"):
+        builder.frequency("1W").build()
 
 
 def test_market_roll_preserves_price_and_cpi_near_origin() -> None:
@@ -88,29 +86,6 @@ def test_curve_day_count_rejects_non_daycount_types() -> None:
 
     with pytest.raises(TypeError, match="DayCount or str"):
         DiscountCurve("D", "2025-01-01", [(0.0, 1.0), (1.0, 0.95)], day_count=360)
-
-
-# CORE-005: ScheduleBuilder IMM setters follow Rust ScheduleBuilder semantics.
-def test_schedule_builder_cds_imm_later_frequency_wins_and_to_spec_matches_build() -> None:
-    builder = Schedule.builder("2025-01-15", "2026-01-15").grid("natural").unadjusted().cds_imm().frequency("1M")
-    spec = builder.to_spec()
-    assert spec["frequency"] == {"count": 1, "unit": "months"}
-    assert spec["stub"] == "short_back"
-    dates = [d.isoformat() for d in builder.build().dates]
-    assert dates[:3] == ["2024-12-20", "2025-01-20", "2025-02-20"]
-    assert [d.isoformat() for d in Schedule.from_spec(spec).dates] == dates
-
-
-def test_schedule_builder_cds_imm_reports_quarterly_short_back() -> None:
-    builder = (
-        Schedule.builder("2025-01-15", "2026-01-15").frequency("1M").stub_rule("none").grid("natural").unadjusted()
-    )
-    builder = builder.cds_imm()
-    spec = builder.to_spec()
-    assert spec["frequency"] == {"count": 3, "unit": "months"}
-    assert spec["stub"] == "short_back"
-    assert spec["cds_imm_mode"] is True
-    assert [d.isoformat() for d in Schedule.from_spec(spec).dates] == [d.isoformat() for d in builder.build().dates]
 
 
 def test_schedule_builder_grid_selection_keeps_frequency_and_stub() -> None:

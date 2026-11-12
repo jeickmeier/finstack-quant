@@ -145,7 +145,6 @@
     {
       "business_day_convention": "unadjusted",
       "calendar_id": null,
-      "cds_imm_mode": false,
       "end": "2026-01-15",
       "fixing_lag_business_days": null,
       "frequency": {
@@ -167,9 +166,6 @@
         "string",
         "null"
       ]
-    },
-    "cds_imm_mode": {
-      "type": "boolean"
     },
     "end": {
       "$ref": "#/$defs/DateWire"
@@ -206,7 +202,6 @@
     "frequency",
     "stub",
     "grid",
-    "cds_imm_mode",
     "business_day_convention"
   ],
   "title": "ScheduleSpec",

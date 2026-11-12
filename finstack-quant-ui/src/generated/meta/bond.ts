@@ -1064,7 +1064,7 @@ export default [
   {
     "path": "#/$defs/d_336250c98cf023a4b5e2/properties/roll_rule",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json#/$defs/StepUpCouponSpec/properties/roll_rule",
-    "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA\nquarterly / short-back grid. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
+    "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from\na regular anchor on a CDS roll date. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
     "ref": "#/$defs/RollRule",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json#/$defs/RollRule"
   },
@@ -1196,7 +1196,7 @@ export default [
     "path": "#/$defs/d_41e4cae128a1dd3269e5/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/RollRule/oneOf/2",
     "const": "cds_imm",
-    "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual."
+    "description": "CDS roll dates: the 20th of Mar/Jun/Sep/Dec at the leg's own frequency and\nstub; the start must itself be a CDS roll date (no start is substituted)."
   },
   {
     "path": "#/$defs/d_46455be5cce6b8020e50",
@@ -1861,7 +1861,7 @@ export default [
   {
     "path": "#/$defs/d_67346ed55fd8e55563e7/properties/roll_rule",
     "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/properties/roll_rule",
-    "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA\nquarterly / short-back grid. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
+    "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from\na regular anchor on a CDS roll date. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
     "ref": "#/$defs/RollRule",
     "resolvedRef": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/RollRule"
   },
@@ -2112,7 +2112,7 @@ export default [
     "path": "#/$defs/d_691c796b9b17decaa2ff/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json#/$defs/RollRule/oneOf/2",
     "const": "cds_imm",
-    "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual."
+    "description": "CDS roll dates: the 20th of Mar/Jun/Sep/Dec at the leg's own frequency and\nstub; the start must itself be a CDS roll date (no start is substituted)."
   },
   {
     "path": "#/$defs/d_749f715e8def49c687d9",
@@ -5064,7 +5064,7 @@ export default [
   {
     "path": "#/$defs/d_bf3d60b7aa736f436254/properties/roll_rule",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json#/$defs/FloatingCouponSpec/properties/roll_rule",
-    "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA\nquarterly / short-back grid. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
+    "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from\na regular anchor on a CDS roll date. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
     "ref": "#/$defs/RollRule",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json#/$defs/RollRule"
   },

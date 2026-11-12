@@ -1995,7 +1995,6 @@ export interface Schedule {
 export interface ScheduleSpec {
   business_day_convention: BusinessDayConvention;
   calendar_id?: string | null;
-  cds_imm_mode: boolean;
   end: DateWire;
   fixing_lag_business_days?: number | null;
   frequency: Tenor;

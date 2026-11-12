@@ -98,23 +98,10 @@ def test_aligned_long_stubs_preserve_boundary_anchors(stub: str, expected: list[
     assert schedule.dates == expected
 
 
-def test_cds_imm_mode_requires_the_natural_grid() -> None:
-    start = date(2025, 3, 19)  # on the IMM lattice
-    end = date(2025, 9, 30)
-
-    # The grid and CDS IMM mode are independent; combining them is an error.
-    with pytest.raises(ValueError, match="natural grid"):
-        Schedule.builder(start, end).unadjusted().grid("quarterly_imm").cds_imm().build()
-
-    cds_dates = Schedule.builder(start, end).unadjusted().grid("natural").cds_imm().build().dates
-    imm_dates = (
-        Schedule.builder(start, end).frequency("3M").stub_rule("short_back").grid("quarterly_imm").unadjusted().build()
-    ).dates
-
-    assert date(2025, 3, 20) in cds_dates
-    assert date(2025, 3, 19) not in cds_dates
-    assert date(2025, 3, 19) in imm_dates
-    assert date(2025, 3, 20) not in imm_dates
+def test_schedule_builder_has_no_cds_mode() -> None:
+    # Record CORE-CONVENTIONS-008: no generic CDS mode or start substitution.
+    builder = Schedule.builder(date(2025, 1, 15), date(2026, 1, 15))
+    assert not hasattr(builder, "cds_imm")
 
 
 def test_schedule_builder_setters_are_fluent_and_mutate_in_place() -> None:
@@ -133,11 +120,10 @@ def test_schedule_builder_setters_are_fluent_and_mutate_in_place() -> None:
         .stub_rule(StubKind.SHORT_BACK)
         .adjust_with(BusinessDayConvention.MODIFIED_FOLLOWING, "usny")
         .grid("natural")
-        .cds_imm()
     )
 
     assert result is builder
-    assert date(2025, 3, 20) in builder.build().dates
+    assert date(2025, 4, 15) in builder.build().dates
 
 
 def test_schedule_payment_and_fixing_dates() -> None:

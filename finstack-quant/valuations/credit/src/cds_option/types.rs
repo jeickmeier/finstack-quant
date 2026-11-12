@@ -517,9 +517,17 @@ impl CdsOption {
     /// convention selects either standard spot-protection accrual from the
     /// prior CDS roll relative to valuation date, or forward accrual from
     /// legal option expiry.
-    pub(crate) fn effective_underlying_effective_date(&self, as_of: Date) -> Date {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the prior CDS roll before `as_of` is outside the
+    /// date range.
+    pub(crate) fn effective_underlying_effective_date(
+        &self,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Date> {
         if let Some(date) = self.underlying_start_date {
-            return date;
+            return Ok(date);
         }
         match self.protection_start_convention {
             ProtectionStartConvention::Spot => {
@@ -527,11 +535,11 @@ impl CdsOption {
                 let roll = if finstack_quant_core::dates::is_cds_date(as_of) {
                     as_of
                 } else {
-                    finstack_quant_core::dates::prev_cds_date(as_of).unwrap_or(as_of)
+                    finstack_quant_core::dates::prev_cds_date(as_of)?
                 };
-                roll.saturating_add(time::Duration::days(1)).min(as_of)
+                Ok(roll.saturating_add(time::Duration::days(1)).min(as_of))
             }
-            ProtectionStartConvention::Forward => self.expiry,
+            ProtectionStartConvention::Forward => Ok(self.expiry),
         }
     }
 
@@ -744,7 +752,9 @@ mod tests {
         // No explicit underlying_start_date → default Spot convention uses
         // the standard prior CDS roll relative to valuation date.
         assert_eq!(
-            option.effective_underlying_effective_date(as_of),
+            option
+                .effective_underlying_effective_date(as_of)
+                .expect("prior roll"),
             date!(2026 - 03 - 21)
         );
     }

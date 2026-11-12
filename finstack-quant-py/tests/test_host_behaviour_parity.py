@@ -40,10 +40,9 @@ def test_schedule_builder_setters_update_the_builder_in_place_and_return_it() ->
     builder.grid("end_of_month")
     assert builder.stub_rule("short_front").adjust_with("following", "nyse") is builder
     assert builder.payment_lag_days(2).fixing_lag_business_days(1) is builder
-    assert builder.grid("natural").cds_imm() is builder
+    assert builder.grid("natural").frequency("3M").stub_rule("short_back") is builder
     assert builder.unadjusted().adjust_with("following", "nyse") is builder
     spec = builder.to_spec()
-    # cds_imm() sets quarterly frequency and the short_back stub (Rust semantics).
     assert spec["frequency"] == {"count": 3, "unit": "months"}
     assert spec["stub"] == "short_back"
     assert spec["grid"] == "natural"
@@ -51,7 +50,7 @@ def test_schedule_builder_setters_update_the_builder_in_place_and_return_it() ->
     assert spec["calendar_id"] == "nyse"
     assert spec["payment_lag_days"] == 2
     assert spec["fixing_lag_business_days"] == 1
-    assert spec["cds_imm_mode"] is True
+    assert "cds_imm_mode" not in spec
 
     with pytest.raises(ValueError, match="nope"):
         builder.frequency("nope")

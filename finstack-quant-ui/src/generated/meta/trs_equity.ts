@@ -606,7 +606,7 @@ export default [
   {
     "path": "#/$defs/d_176cce21985eadf0161c/properties/roll_rule",
     "source": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json#/properties/roll_rule",
-    "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA\nquarterly / short-back grid. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
+    "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from\na regular anchor on a CDS roll date. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
     "ref": "#/$defs/RollRule",
     "resolvedRef": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json#/$defs/RollRule"
   },
@@ -1861,7 +1861,7 @@ export default [
     "path": "#/$defs/d_7bbbddac6f6b1d1f4de1/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json#/$defs/RollRule/oneOf/2",
     "const": "cds_imm",
-    "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual."
+    "description": "CDS roll dates: the 20th of Mar/Jun/Sep/Dec at the leg's own frequency and\nstub; the start must itself be a CDS roll date (no start is substituted)."
   },
   {
     "path": "#/$defs/d_7dd9bdea4c4382f447f9",

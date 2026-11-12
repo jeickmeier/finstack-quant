@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/dates/1/schedule_spec.schema.json",
-      "bytes": 11319,
+      "bytes": 11217,
       "kind": "input",
       "path": "schemas/dates/1/schedule_spec.schema.json",
       "summary": "Persisted inputs of a date schedule: range, frequency, stub, adjustment and lags.",

@@ -229,7 +229,7 @@ const CASES = {
         .grid('natural')
         .unadjusted()
         .frequency('3M')
-        .cdsImm()
+        .stubRule('short_back')
         .build().dates
     ),
   // --- math -----------------------------------------------------------------------
@@ -629,20 +629,11 @@ test('ScheduleBuilder setters update the builder in place and round-trip its spe
   assert.deepEqual(base.toSpec().frequency, { count: 3, unit: 'months' });
   assert.equal(quarterly.build().dates.length, 3);
   assert.equal(core.Schedule.fromSpec(quarterly.toSpec()).toJson(), quarterly.build().toJson());
-  const cds = base.cdsImm().toSpec();
-  assert.deepEqual([cds.grid, cds.cds_imm_mode], ['natural', true]);
+  // Record CORE-CONVENTIONS-008: no generic CDS mode.
+  assert.equal('cdsImm' in base, false);
 });
 
-test('cdsImm sets quarterly short_back like Rust ScheduleBuilder; grid() resets nothing', () => {
-  const builder = core.Schedule.builder(ep('2025-01-15'), ep('2026-01-15'))
-    .grid('natural')
-    .unadjusted()
-    .cdsImm()
-    .frequency('1M');
-  const spec = builder.toSpec();
-  assert.deepEqual([spec.frequency, spec.stub], [{ count: 1, unit: 'months' }, 'short_back']);
-  assert.equal(core.Schedule.fromSpec(spec).toJson(), builder.build().toJson());
-  assert.equal(builder.build().dates.length, 14);
+test('an IMM grid spec records its frequency, stub and grid', () => {
   const imm = core.Schedule.builder(ep('2025-03-19'), ep('2026-03-18'))
     .frequency('6M')
     .stubRule('short_back')

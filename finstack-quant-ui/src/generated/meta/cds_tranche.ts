@@ -33,7 +33,7 @@ export default [
             "series": 42,
             "side": "pay",
             "start_date": null,
-            "stub": "short_front",
+            "stub": "short_back",
             "upfront": null
           },
           "type": "cds_tranche"
@@ -219,7 +219,7 @@ export default [
     "path": "#/$defs/d_0fb63ab4f431d629f4d9/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/cds_tranche.schema.json#/$defs/RollRule/oneOf/2",
     "const": "cds_imm",
-    "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual."
+    "description": "CDS roll dates: the 20th of Mar/Jun/Sep/Dec at the leg's own frequency and\nstub; the start must itself be a CDS roll date (no start is substituted)."
   },
   {
     "path": "#/$defs/d_10a2b628165f3f3e10e7",

@@ -314,17 +314,6 @@ declare module './pkg/finstack_quant_wasm.js' {
      */
     adjustWith(convention: string, calendar: string): this;
     /**
-     * Use CDS IMM dates (the 20th of March, June, September and December).
-     *
-     * Same semantics as the Rust `ScheduleBuilder::cds_imm`: sets the
-     * frequency to quarterly and the stub rule to `short_back` and turns CDS
-     * IMM mode on (it requires the natural grid). A later `frequency` or
-     * `stubRule` call wins, and `toSpec()` reports what `build()` uses.
-     *
-     * @returns This builder, with CDS IMM mode on.
-     */
-    cdsImm(): this;
-    /**
      * Set the fixing lag in business days before each period's accrual start.
      *
      * # Arguments

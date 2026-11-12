@@ -45,41 +45,16 @@ fn roll_params(start: Date, end: Date, roll_rule: RollRule) -> BuildPeriodsParam
 }
 
 #[test]
-fn cds_imm_roll_rule_pins_post_big_bang_grid_with_front_accrual() {
-    // Start is not a roll date: the first period must accrue from the
-    // PRECEDING roll date (2023-12-20), per post-Big-Bang convention.
-    let periods = build_periods(roll_params(
+fn cds_imm_roll_rule_rejects_an_off_roll_start() {
+    // Record CORE-CONVENTIONS-008: no start is substituted; the leg states an
+    // accrual start on a CDS roll date.
+    let error = build_periods(roll_params(
         d(2024, 1, 10),
         d(2024, 12, 20),
         RollRule::CdsImm,
     ))
-    .expect("CDS IMM schedule builds");
-
-    let starts: Vec<Date> = periods.iter().map(|p| p.accrual_start).collect();
-    let ends: Vec<Date> = periods.iter().map(|p| p.accrual_end).collect();
-    assert_eq!(
-        starts,
-        vec![
-            d(2023, 12, 20),
-            d(2024, 3, 20),
-            d(2024, 6, 20),
-            d(2024, 9, 20)
-        ],
-        "front accrual must anchor at the preceding CDS roll date"
-    );
-    assert_eq!(
-        ends,
-        vec![
-            d(2024, 3, 20),
-            d(2024, 6, 20),
-            d(2024, 9, 20),
-            d(2024, 12, 20)
-        ]
-    );
-    // All 2024 roll dates are business days: payment dates are unadjusted.
-    for period in &periods {
-        assert_eq!(period.payment_date, period.accrual_end);
-    }
+    .expect_err("an off-roll CDS start is rejected");
+    assert!(error.to_string().contains("CDS roll date"), "{error}");
 }
 
 #[test]
@@ -289,41 +264,13 @@ fn cds_interior_payment_windows_never_repeat_front_accrual() {
 }
 
 #[test]
-fn cds_effective_frequency_controls_day_counts_and_coupon_kinds() {
-    let start = d(2024, 3, 20);
-    let end = d(2024, 12, 20);
-    for day_count in [DayCount::ActActIsma, DayCount::Act365L] {
-        let mut params = ScheduleParams::quarterly_act360();
-        params.roll_rule = RollRule::CdsImm;
-        params.day_count = day_count;
-        params.business_day_convention = BusinessDayConvention::Unadjusted;
-        let reference = fixed_schedule(start, end, params.clone(), None);
-        let reference_periods =
-            build_periods(BuildPeriodsParams::from_schedule(&params, start, end, None))
-                .expect("quarterly periods");
-        for frequency in [Tenor::monthly(), Tenor::semi_annual(), Tenor::annual()] {
-            params.frequency = frequency;
-            params.stub = StubKind::LongFront;
-            let schedule = fixed_schedule(start, end, params.clone(), None);
-            assert!((coupon_total(&schedule) - coupon_total(&reference)).abs() < 1e-8);
-            assert!(
-                !schedule
-                    .get_flows()
-                    .iter()
-                    .any(|flow| flow.get_kind() == CFKind::Stub)
-            );
-            let periods =
-                build_periods(BuildPeriodsParams::from_schedule(&params, start, end, None))
-                    .expect("effective quarterly periods");
-            assert_eq!(periods.len(), reference_periods.len());
-            for (period, reference) in periods.iter().zip(&reference_periods) {
-                assert_eq!(
-                    period.accrual_year_fraction,
-                    reference.accrual_year_fraction
-                );
-            }
-        }
-    }
+fn cds_imm_roll_rule_uses_the_leg_frequency() {
+    // Record CORE-CONVENTIONS-008: no quarterly/short-back override.
+    let mut params = roll_params(d(2024, 3, 20), d(2024, 12, 20), RollRule::CdsImm);
+    params.frequency = Tenor::monthly();
+    let periods = build_periods(params).expect("monthly CDS-roll schedule");
+    assert_eq!(periods.len(), 9);
+    assert!(periods.iter().all(|period| period.accrual_end.day() == 20));
 }
 
 #[test]

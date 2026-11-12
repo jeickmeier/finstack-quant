@@ -294,6 +294,8 @@ def cds_tranche(idx: int) -> tuple[str, dict]:
             "side": "pay",
             "realized_loss": 0.0,
             "roll_rule": "none",
+            # Off the CDS roll grid the tranche states its accrual start.
+            "start_date": AS_OF_STR,
             "attributes": {"tags": ["structured-credit"], "meta": {}},
         },
     }

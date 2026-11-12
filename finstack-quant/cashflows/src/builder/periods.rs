@@ -9,8 +9,8 @@ use finstack_quant_core::dates::{
 };
 
 use super::date_generation::{
-    build_schedule_period, effective_frequency, effective_stub, generate_periods_with_adjustment,
-    icma_coupon_period, validate_accrual_grid, validate_unique_payment_dates,
+    build_schedule_period, generate_periods_with_adjustment, icma_coupon_period,
+    validate_accrual_grid, validate_unique_payment_dates,
 };
 use super::specs::{RollRule, ScheduleParams};
 use finstack_quant_core::dates::calendar_by_id_strict;
@@ -120,8 +120,8 @@ pub struct BuildPeriodsParams<'a> {
     /// Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
     ///
     /// [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-    /// [`RollRule::CdsImm`] overrides `frequency`/`stub` with the ISDA
-    /// quarterly / short-back grid. Third-Wednesday IMM with ACT/ACT ICMA is unsupported
+    /// [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
+    /// a regular anchor on a CDS roll date. Third-Wednesday IMM with ACT/ACT ICMA is unsupported
     /// because that day count requires nominal month-grid reference coupons.
     pub roll_rule: RollRule,
 }
@@ -144,11 +144,7 @@ impl<'a> BuildPeriodsParams<'a> {
                 "reset_lag_days must be non-negative".into(),
             ));
         }
-        let effective = Self {
-            frequency: effective_frequency(self.frequency, self.roll_rule),
-            stub: effective_stub(self.stub, self.roll_rule),
-            ..self
-        };
+        let effective = self;
         validate_accrual_grid(
             effective.start,
             effective.end,
@@ -232,7 +228,7 @@ pub(crate) fn period_day_count_context<'a>(
     calendar: &'a dyn finstack_quant_core::dates::HolidayCalendar,
     conventions: AccrualConventions,
     end_is_termination_date: bool,
-) -> DayCountContext<'a> {
+) -> finstack_quant_core::Result<DayCountContext<'a>> {
     let AccrualConventions {
         frequency,
         day_count,
@@ -242,7 +238,7 @@ pub(crate) fn period_day_count_context<'a>(
     } = conventions;
     // Regularity uses unadjusted dates (ISDA 2006 §4.16(c)); ICMA stubs use the adjacent regular coupon.
     let coupon_period = if day_count == DayCount::Act365L {
-        Some((period.accrual_start, period.accrual_end))
+        (period.accrual_start, period.accrual_end)
     } else {
         icma_coupon_period(
             period.unadjusted_start,
@@ -251,15 +247,15 @@ pub(crate) fn period_day_count_context<'a>(
             stub,
             end_of_month,
             roll_rule,
-        )
+        )?
     };
-    DayCountContext {
+    Ok(DayCountContext {
         calendar: Some(calendar),
         frequency: Some(frequency),
         bus_basis: None,
-        coupon_period,
+        coupon_period: Some(coupon_period),
         end_is_termination_date: Some(end_is_termination_date),
-    }
+    })
 }
 
 /// Calculate accrual over a subinterval using the original period's reference grid.
@@ -298,7 +294,7 @@ pub fn period_accrual(
             roll_rule: params.roll_rule,
         },
         period.unadjusted_end == params.end,
-    );
+    )?;
     contractual_accrual(
         params.day_count,
         (period.accrual_start, period.accrual_end),

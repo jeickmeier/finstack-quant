@@ -163,7 +163,7 @@ impl PySchedule {
 
     /// Build a schedule from a serialized spec (``dict`` or JSON string)
     /// with the canonical ``ScheduleSpec`` fields (``start``, ``end``,
-    /// ``frequency``, ``stub``, ``grid``, ``cds_imm_mode``,
+    /// ``frequency``, ``stub``, ``grid``,
     /// ``business_day_convention``, ``calendar_id``, and the optional
     /// ``payment_lag_days`` and ``fixing_lag_business_days``).
     ///
@@ -366,17 +366,6 @@ impl PyScheduleBuilder {
     /// Set a T-minus fixing lag from each period's unadjusted accrual start.
     fn fixing_lag_business_days(mut slf: PyRefMut<'_, Self>, lag: i32) -> PyRefMut<'_, Self> {
         slf.inner = slf.inner.clone().fixing_lag_business_days(lag);
-        slf
-    }
-
-    /// Use CDS IMM dates (the 20th of March, June, September and December).
-    ///
-    /// Same semantics as the Rust ``ScheduleBuilder::cds_imm``: sets the
-    /// frequency to quarterly and the stub rule to ``short_back`` and turns
-    /// CDS IMM mode on (it requires the natural grid). A later ``frequency`` or
-    /// ``stub_rule`` call wins, and ``to_spec()`` reports what ``build()`` uses.
-    fn cds_imm(mut slf: PyRefMut<'_, Self>) -> PyRefMut<'_, Self> {
-        slf.inner = slf.inner.clone().cds_imm();
         slf
     }
 
