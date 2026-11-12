@@ -120,9 +120,9 @@ fiscal defaults, sparse-grid completeness and ordering are not certified.
 Accepted record 015 requires signed settlement cash only in amount, explicit principal delta/date
 and zero-cash noncash events, exhaustive kind/predicate semantics, distinct date
 roles, complete single-slice day-count context, atomic validated state and faithful
-cash/event exports. Runtime/product/host/state reconciliation and independent
-qualification remain pending; existing inferred balance changes, partial accrual
-metadata and protection/margin classifications are not certified. The endpoint
+cash/event exports. Runtime, product, host and state reconciliation was done on
+2026-11-11 (G5), except the record's #8 accrual fallbacks, which remain owner input
+for CASHFLOWS-001/013; independent qualification remains pending. The endpoint
 wording was clarified on2026-11-08 with accepted CASHFLOWS-001: metadata start/end
 are actual calculation endpoints, including explicit accrual adjustment; nominal
 references remain distinct, with the single-context/formula boundary unchanged.
