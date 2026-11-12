@@ -36,7 +36,7 @@ pub(crate) fn bond_coupon_dates(bond: &Bond) -> Result<Vec<(Date, Date, Date)>> 
                     "ACT/365L bond timing requires contractual coupon accrual metadata".into(),
                 )
             })?;
-            let period = accrual.coupon_period.ok_or_else(|| {
+            let period = accrual.context.coupon_period.ok_or_else(|| {
                 finstack_quant_core::Error::Validation(
                     "ACT/365L custom bond timing requires explicit full coupon_period metadata"
                         .into(),
@@ -415,7 +415,7 @@ mod tests {
         // boundaries, and overlapping full coupons are ambiguous.
         custom.update_flows(|flow| {
             if let Some(accrual) = &mut flow.accrual {
-                accrual.coupon_period = None;
+                accrual.context.coupon_period = None;
             }
         });
         assert!(bond_coupon_periods(&bond.clone().with_custom_cashflows(custom)).is_err());
@@ -424,7 +424,7 @@ mod tests {
             if let Some(accrual) = &mut flow.accrual
                 && accrual.start == bond.issue_date
             {
-                accrual.coupon_period = Some((bond.issue_date, bond.maturity));
+                accrual.context.coupon_period = Some((bond.issue_date, bond.maturity));
             }
         });
         assert!(bond_coupon_periods(&bond.with_custom_cashflows(overlap)).is_err());

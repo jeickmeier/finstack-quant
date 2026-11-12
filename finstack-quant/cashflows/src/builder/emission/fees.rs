@@ -129,13 +129,17 @@ pub(in crate::builder) fn emit_fees_on(
                             Some(rate),
                         )
                         .with_accrual(CashFlowAccrual {
-                            coupon_period,
-                            end_is_termination_date: is_termination_date,
-                            calendar_id: Some(pf.schedule.calendar_id.to_string()),
                             start: accrual_start,
                             end: accrual_end,
                             day_count: pf.schedule.day_count,
                             projected_index_rate: None,
+                            context: finstack_quant_core::dates::DayCountContextState {
+                                calendar_id: Some(pf.schedule.calendar_id.to_string()),
+                                end_is_termination_date: Some(is_termination_date),
+                                coupon_period,
+                                frequency: None,
+                                bus_basis: None,
+                            },
                         }),
                     );
                 }

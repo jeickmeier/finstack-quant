@@ -558,13 +558,17 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
             Some(fixed_rate),
         )
         .with_accrual(CashFlowAccrual {
-            coupon_period: None,
-            end_is_termination_date: false,
-            calendar_id: None,
             start: self.start_date,
             end: self.maturity,
             day_count: self.day_count,
             projected_index_rate: None,
+            context: finstack_quant_core::dates::DayCountContextState {
+                calendar_id: None,
+                coupon_period: None,
+                end_is_termination_date: Some(false),
+                frequency: None,
+                bus_basis: None,
+            },
         });
         let inflation_flow = CashFlow::new(
             payment_date,
@@ -575,13 +579,17 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
             inflation_rate,
         )
         .with_accrual(CashFlowAccrual {
-            coupon_period: None,
-            end_is_termination_date: false,
-            calendar_id: None,
             start: self.start_date,
             end: self.maturity,
             day_count: self.day_count,
             projected_index_rate: inflation_rate,
+            context: finstack_quant_core::dates::DayCountContextState {
+                calendar_id: None,
+                coupon_period: None,
+                end_is_termination_date: Some(false),
+                frequency: None,
+                bus_basis: None,
+            },
         });
         let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
             vec![fixed_flow, inflation_flow],
@@ -972,13 +980,17 @@ impl YoYInflationSwap {
                 Some(fixed_rate),
             )
             .with_accrual(CashFlowAccrual {
-                coupon_period: None,
-                end_is_termination_date: false,
-                calendar_id: None,
                 start,
                 end,
                 day_count: self.day_count,
                 projected_index_rate: None,
+                context: finstack_quant_core::dates::DayCountContextState {
+                    calendar_id: None,
+                    coupon_period: None,
+                    end_is_termination_date: Some(false),
+                    frequency: None,
+                    bus_basis: None,
+                },
             });
             let inflation_flow = CashFlow::new(
                 pay,
@@ -989,13 +1001,17 @@ impl YoYInflationSwap {
                 Some(inflation_rate),
             )
             .with_accrual(CashFlowAccrual {
-                coupon_period: None,
-                end_is_termination_date: false,
-                calendar_id: None,
                 start,
                 end,
                 day_count: self.day_count,
                 projected_index_rate: Some(inflation_rate),
+                context: finstack_quant_core::dates::DayCountContextState {
+                    calendar_id: None,
+                    coupon_period: None,
+                    end_is_termination_date: Some(false),
+                    frequency: None,
+                    bus_basis: None,
+                },
             });
             flows.push(fixed_flow);
             flows.push(inflation_flow);

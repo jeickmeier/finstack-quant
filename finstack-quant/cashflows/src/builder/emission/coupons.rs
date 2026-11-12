@@ -243,13 +243,17 @@ pub(crate) fn emit_fixed_coupons_on(
 
                 let rate_f64 = spec.rate.as_f64();
                 let accrual = CashFlowAccrual {
-                    coupon_period,
-                    end_is_termination_date: is_termination_date,
-                    calendar_id: Some(spec.schedule.calendar_id.to_string()),
                     start: accrual_start,
                     end: accrual_end,
                     day_count: spec.schedule.day_count,
                     projected_index_rate: None,
+                    context: finstack_quant_core::dates::DayCountContextState {
+                        calendar_id: Some(spec.schedule.calendar_id.to_string()),
+                        end_is_termination_date: Some(is_termination_date),
+                        coupon_period,
+                        frequency: None,
+                        bus_basis: None,
+                    },
                 };
 
                 // Gate on cash split, not amount sign, so negative-rate coupons emit.
@@ -711,14 +715,20 @@ pub(crate) fn emit_float_coupons_on(
             }
             for (segment, settlement) in segments.iter().zip(settlements) {
                 let accrual = CashFlowAccrual {
-                    coupon_period: floating_accrual_context(schedule, period, segment.end)
-                        .coupon_period,
-                    end_is_termination_date: schedule.terminal_accrual_end == Some(segment.end),
-                    calendar_id: Some(spec.schedule.calendar_id.to_string()),
                     start: segment.start,
                     end: segment.end,
                     day_count: spec.schedule.day_count,
                     projected_index_rate: Some(settlement.projected_index_rate),
+                    context: finstack_quant_core::dates::DayCountContextState {
+                        calendar_id: Some(spec.schedule.calendar_id.to_string()),
+                        coupon_period: floating_accrual_context(schedule, period, segment.end)
+                            .coupon_period,
+                        end_is_termination_date: Some(
+                            schedule.terminal_accrual_end == Some(segment.end),
+                        ),
+                        frequency: None,
+                        bus_basis: None,
+                    },
                 };
                 if cash_fraction > 0.0 {
                     out_flows.push(

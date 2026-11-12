@@ -517,7 +517,7 @@ test('cashflows preserves principal deltas and accrual calendars through JSON', 
   assert.equal(Number(draw.principal_delta.amount), 100);
   assert.equal(Number(draw.amount.amount), -98);
   assert.equal(
-    built.flows.find((flow) => flow.kind === 'fixed').accrual.calendar_id,
+    built.flows.find((flow) => flow.kind === 'fixed').accrual.context.calendar_id,
     'weekends_only'
   );
   assert.ok(Math.abs(accruedInterest(raw, '2025-02-01', null) - (100000 * 23) / 252) < 1e-8);

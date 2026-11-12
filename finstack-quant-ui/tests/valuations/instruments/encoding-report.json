@@ -1646,7 +1646,7 @@
         "calendar-id": [
           "#/$defs/AssetBackedFacility/properties/calendar_id",
           "#/$defs/FloatingRateSpec/properties/fixing_calendar_id",
-          "#/$defs/CashFlowAccrual/properties/calendar_id",
+          "#/$defs/DayCountContextState/properties/calendar_id",
           "#/$defs/Bond/properties/ex_coupon_calendar_id",
           "#/$defs/RevolvingCredit/properties/calendar_id",
           "#/$defs/TermLoan/properties/calendar_id"
@@ -2314,18 +2314,20 @@
         ],
         "nullable-array": [
           "#/$defs/PoolAsset/properties/delinquency_buckets",
-          "#/$defs/CashFlowAccrual/properties/coupon_period",
+          "#/$defs/DayCountContextState/properties/coupon_period",
           "#/$defs/McConfig/properties/correlation_matrix",
           "#/$defs/AssetPool/properties/rep_lines",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/severity_vector"
         ],
         "nullable-boolean": [
+          "#/$defs/DayCountContextState/properties/end_is_termination_date",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
         ],
         "nullable-integer": [
           "#/$defs/EligibilityRule/properties/max_days_past_due",
           "#/$defs/PoolAsset/properties/amortization_term_months",
           "#/$defs/PoolAsset/properties/io_months",
+          "#/$defs/DayCountContextState/properties/bus_basis",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
           "#/$defs/RepLine/properties/amortization_term_months",
@@ -2408,7 +2410,7 @@
           "#/$defs/PoolAsset/properties/forward_curve_id",
           "#/$defs/PoolAsset/properties/industry",
           "#/$defs/PoolAsset/properties/obligor_id",
-          "#/$defs/CashFlowAccrual/properties/calendar_id",
+          "#/$defs/DayCountContextState/properties/calendar_id",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario",
           "#/$defs/ReinvestmentAssumptions/properties/forward_curve_id",
           "#/$defs/RepLine/properties/forward_curve_id"
@@ -2546,6 +2548,10 @@
           },
           {
             "pointer": "#/$defs/CashFlow/properties/accrual",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/DayCountContextState/properties/frequency",
             "keyword": "anyOf"
           },
           {
@@ -2793,6 +2799,7 @@
           "#/$defs/d_2c88e4d1e2e4f7c22e02",
           "#/$defs/EligibilityRule",
           "#/$defs/InstrumentCollateral",
+          "#/$defs/DayCountContextState",
           "#/$defs/d_c08279a20372931820e0",
           "#/$defs/d_b0a5fc543381da6a5722",
           "#/$defs/d_572ad1befb7d94914652",
@@ -2821,12 +2828,13 @@
           "#/$defs/StepUpCouponSpec/properties/step_schedule/items",
           "#/$defs/AmortizationSpec/oneOf/2/properties/step_remaining/properties/schedule/items",
           "#/$defs/AmortizationSpec/oneOf/6/properties/custom_principal/properties/items/items",
-          "#/$defs/CashFlowAccrual/properties/coupon_period"
+          "#/$defs/DayCountContextState/properties/coupon_period"
         ],
         "uint": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
+        "uint16": ["#/$defs/DayCountContextState/properties/bus_basis"],
         "uint32": [
           "#/$defs/EligibilityRule/properties/max_days_past_due",
           "#/$defs/PoolAsset/properties/amortization_term_months",
@@ -4358,7 +4366,7 @@
         ],
         "calendar-id": [
           "#/$defs/FloatingRateSpec/properties/fixing_calendar_id",
-          "#/$defs/CashFlowAccrual/properties/calendar_id",
+          "#/$defs/DayCountContextState/properties/calendar_id",
           "#/$defs/Bond/properties/ex_coupon_calendar_id",
           "#/$defs/InflationLinkedBond/properties/calendar_id",
           "#/$defs/TermLoan/properties/calendar_id",
@@ -5394,7 +5402,7 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
         ],
         "nullable-array": [
-          "#/$defs/CashFlowAccrual/properties/coupon_period",
+          "#/$defs/DayCountContextState/properties/coupon_period",
           "#/$defs/McConfig/properties/correlation_matrix",
           "#/$defs/CapFloor/properties/premium",
           "#/$defs/CreditDefaultSwap/properties/upfront",
@@ -5408,6 +5416,7 @@
           "#/$defs/d_6f4088f89d6bfc98e242/properties/severity_vector"
         ],
         "nullable-boolean": [
+          "#/$defs/DayCountContextState/properties/end_is_termination_date",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic",
           "#/$defs/BarrierOption/properties/observed_barrier_breached",
           "#/$defs/FxTouchOption/properties/observed_barrier_breached",
@@ -5416,6 +5425,7 @@
           "#/$defs/Tranche/properties/non_deferrable"
         ],
         "nullable-integer": [
+          "#/$defs/DayCountContextState/properties/bus_basis",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
           "#/$defs/ConvertibleBond/properties/settlement_days",
@@ -5585,7 +5595,7 @@
           "#/$defs/BasketConstituent/properties/units"
         ],
         "nullable-string": [
-          "#/$defs/CashFlowAccrual/properties/calendar_id",
+          "#/$defs/DayCountContextState/properties/calendar_id",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario",
           "#/$defs/CollateralEligibility/properties/min_rating",
           "#/$defs/VarianceSwap/properties/close_series_id",
@@ -5660,6 +5670,10 @@
           },
           {
             "pointer": "#/$defs/CashFlow/properties/accrual",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/DayCountContextState/properties/frequency",
             "keyword": "anyOf"
           },
           {
@@ -6838,6 +6852,7 @@
         ],
         "optional-property-record": [
           "#/$defs/d_2c88e4d1e2e4f7c22e02",
+          "#/$defs/DayCountContextState",
           "#/$defs/d_c08279a20372931820e0",
           "#/$defs/d_b0a5fc543381da6a5722",
           "#/$defs/d_572ad1befb7d94914652",
@@ -6921,7 +6936,7 @@
           "#/$defs/StepUpCouponSpec/properties/step_schedule/items",
           "#/$defs/AmortizationSpec/oneOf/2/properties/step_remaining/properties/schedule/items",
           "#/$defs/AmortizationSpec/oneOf/6/properties/custom_principal/properties/items/items",
-          "#/$defs/CashFlowAccrual/properties/coupon_period",
+          "#/$defs/DayCountContextState/properties/coupon_period",
           "#/$defs/CapFloor/properties/premium",
           "#/$defs/CreditDefaultSwap/properties/upfront",
           "#/$defs/CdsIndex/properties/upfront",
@@ -6956,6 +6971,7 @@
           "#/$defs/WeightingMethod/oneOf/3/properties/min_observations"
         ],
         "uint16": [
+          "#/$defs/DayCountContextState/properties/bus_basis",
           "#/$defs/InflationLag/oneOf/1/properties/days",
           "#/$defs/ProtectionLegSpec/properties/settlement_delay",
           "#/$defs/CdsIndex/properties/series",
@@ -7591,7 +7607,7 @@
         ],
         "calendar-id": [
           "#/$defs/d_afaff9b4b34177ac633e/properties/fixing_calendar_id",
-          "#/$defs/d_931ca4fd1b880c77b04d/properties/calendar_id",
+          "#/$defs/d_2cf3cdafb96f82a3c0c4/properties/calendar_id",
           "#/$defs/d_67c3f0fee95f47938ab4/properties/ex_coupon_calendar_id"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
@@ -7847,12 +7863,14 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
         ],
         "nullable-array": [
-          "#/$defs/d_931ca4fd1b880c77b04d/properties/coupon_period"
+          "#/$defs/d_2cf3cdafb96f82a3c0c4/properties/coupon_period"
         ],
         "nullable-boolean": [
+          "#/$defs/d_2cf3cdafb96f82a3c0c4/properties/end_is_termination_date",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
         ],
         "nullable-integer": [
+          "#/$defs/d_2cf3cdafb96f82a3c0c4/properties/bus_basis",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
@@ -7893,7 +7911,7 @@
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
         "nullable-string": [
-          "#/$defs/d_931ca4fd1b880c77b04d/properties/calendar_id",
+          "#/$defs/d_2cf3cdafb96f82a3c0c4/properties/calendar_id",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario"
         ],
         "nullable-union": [
@@ -7947,6 +7965,10 @@
           },
           {
             "pointer": "#/$defs/d_5fdd6c8cd626de8799fe/properties/accrual",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_2cf3cdafb96f82a3c0c4/properties/frequency",
             "keyword": "anyOf"
           },
           {
@@ -8046,6 +8068,7 @@
         ],
         "optional-property-record": [
           "#/$defs/d_2c88e4d1e2e4f7c22e02",
+          "#/$defs/d_2cf3cdafb96f82a3c0c4",
           "#/$defs/d_c08279a20372931820e0",
           "#/$defs/d_b0a5fc543381da6a5722",
           "#/$defs/d_572ad1befb7d94914652",
@@ -8073,12 +8096,13 @@
           "#/$defs/d_336250c98cf023a4b5e2/properties/step_schedule/items",
           "#/$defs/d_2aa2f1b15784c3fa7d81/oneOf/2/properties/step_remaining/properties/schedule/items",
           "#/$defs/d_2aa2f1b15784c3fa7d81/oneOf/6/properties/custom_principal/properties/items/items",
-          "#/$defs/d_931ca4fd1b880c77b04d/properties/coupon_period"
+          "#/$defs/d_2cf3cdafb96f82a3c0c4/properties/coupon_period"
         ],
         "uint": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
+        "uint16": ["#/$defs/d_2cf3cdafb96f82a3c0c4/properties/bus_basis"],
         "uint32": [
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
           "#/$defs/d_21bc542d2146358a7021/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
@@ -8142,7 +8166,7 @@
         ],
         "calendar-id": [
           "#/$defs/d_0067baa6b86c47f45a9e/properties/fixing_calendar_id",
-          "#/$defs/d_7658f074507acce0d3be/properties/calendar_id",
+          "#/$defs/d_b6e0e2b400c3317cb7fe/properties/calendar_id",
           "#/$defs/d_0e4f6595f5e014bbb86a/properties/ex_coupon_calendar_id"
         ],
         "currency": [
@@ -8582,12 +8606,14 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
         ],
         "nullable-array": [
-          "#/$defs/d_7658f074507acce0d3be/properties/coupon_period"
+          "#/$defs/d_b6e0e2b400c3317cb7fe/properties/coupon_period"
         ],
         "nullable-boolean": [
+          "#/$defs/d_b6e0e2b400c3317cb7fe/properties/end_is_termination_date",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
         ],
         "nullable-integer": [
+          "#/$defs/d_b6e0e2b400c3317cb7fe/properties/bus_basis",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
@@ -8630,7 +8656,7 @@
           "#/$defs/d_55a54d75602dabdf9121/properties/settlement_price"
         ],
         "nullable-string": [
-          "#/$defs/d_7658f074507acce0d3be/properties/calendar_id",
+          "#/$defs/d_b6e0e2b400c3317cb7fe/properties/calendar_id",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario"
         ],
         "nullable-union": [
@@ -8688,6 +8714,10 @@
           },
           {
             "pointer": "#/$defs/d_26255163cf9c21445d19/properties/accrual",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_b6e0e2b400c3317cb7fe/properties/frequency",
             "keyword": "anyOf"
           },
           {
@@ -8796,6 +8826,7 @@
         ],
         "optional-property-record": [
           "#/$defs/d_2c88e4d1e2e4f7c22e02",
+          "#/$defs/d_b6e0e2b400c3317cb7fe",
           "#/$defs/d_c08279a20372931820e0",
           "#/$defs/d_b0a5fc543381da6a5722",
           "#/$defs/d_572ad1befb7d94914652",
@@ -8823,12 +8854,13 @@
           "#/$defs/d_7fdd8d325754c89e8272/properties/step_schedule/items",
           "#/$defs/d_3c60928e1d0f7a794057/oneOf/2/properties/step_remaining/properties/schedule/items",
           "#/$defs/d_3c60928e1d0f7a794057/oneOf/6/properties/custom_principal/properties/items/items",
-          "#/$defs/d_7658f074507acce0d3be/properties/coupon_period"
+          "#/$defs/d_b6e0e2b400c3317cb7fe/properties/coupon_period"
         ],
         "uint": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
+        "uint16": ["#/$defs/d_b6e0e2b400c3317cb7fe/properties/bus_basis"],
         "uint32": [
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
           "#/$defs/d_74e12b9de60a5731f116/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
@@ -16038,7 +16070,7 @@
         ],
         "calendar-id": [
           "#/$defs/FloatingRateSpec/properties/fixing_calendar_id",
-          "#/$defs/CashFlowAccrual/properties/calendar_id",
+          "#/$defs/DayCountContextState/properties/calendar_id",
           "#/$defs/Bond/properties/ex_coupon_calendar_id",
           "#/$defs/InflationLinkedBond/properties/calendar_id",
           "#/$defs/TermLoan/properties/calendar_id",
@@ -17074,7 +17106,7 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
         ],
         "nullable-array": [
-          "#/$defs/CashFlowAccrual/properties/coupon_period",
+          "#/$defs/DayCountContextState/properties/coupon_period",
           "#/$defs/McConfig/properties/correlation_matrix",
           "#/$defs/CapFloor/properties/premium",
           "#/$defs/CreditDefaultSwap/properties/upfront",
@@ -17089,6 +17121,7 @@
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic",
+          "#/$defs/DayCountContextState/properties/end_is_termination_date",
           "#/$defs/BarrierOption/properties/observed_barrier_breached",
           "#/$defs/FxTouchOption/properties/observed_barrier_breached",
           "#/$defs/FxBarrierOption/properties/observed_barrier_breached",
@@ -17098,6 +17131,7 @@
         "nullable-integer": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
+          "#/$defs/DayCountContextState/properties/bus_basis",
           "#/$defs/ConvertibleBond/properties/settlement_days",
           "#/$defs/AgencyMbsPassthrough/properties/stated_delay_days",
           "#/$defs/AgencyCmo/properties/collateral_wam_months",
@@ -17266,7 +17300,7 @@
         ],
         "nullable-string": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario",
-          "#/$defs/CashFlowAccrual/properties/calendar_id",
+          "#/$defs/DayCountContextState/properties/calendar_id",
           "#/$defs/CollateralEligibility/properties/min_rating",
           "#/$defs/VarianceSwap/properties/close_series_id",
           "#/$defs/VarianceSwap/properties/high_series_id",
@@ -17392,6 +17426,10 @@
           },
           {
             "pointer": "#/$defs/CashFlow/properties/accrual",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/DayCountContextState/properties/frequency",
             "keyword": "anyOf"
           },
           {
@@ -18525,6 +18563,7 @@
           "#/$defs/d_e49387f97c0f9d510642",
           "#/$defs/d_f80c8a31d359e1cb5dd4",
           "#/$defs/d_2c88e4d1e2e4f7c22e02",
+          "#/$defs/DayCountContextState",
           "#/$defs/OidEirSpec",
           "#/$defs/MaturityConstraints",
           "#/$defs/CollateralType/oneOf/1/properties/special",
@@ -18601,7 +18640,7 @@
           "#/$defs/StepUpCouponSpec/properties/step_schedule/items",
           "#/$defs/AmortizationSpec/oneOf/2/properties/step_remaining/properties/schedule/items",
           "#/$defs/AmortizationSpec/oneOf/6/properties/custom_principal/properties/items/items",
-          "#/$defs/CashFlowAccrual/properties/coupon_period",
+          "#/$defs/DayCountContextState/properties/coupon_period",
           "#/$defs/CapFloor/properties/premium",
           "#/$defs/CreditDefaultSwap/properties/upfront",
           "#/$defs/CdsIndex/properties/upfront",
@@ -18636,6 +18675,7 @@
           "#/$defs/WeightingMethod/oneOf/3/properties/min_observations"
         ],
         "uint16": [
+          "#/$defs/DayCountContextState/properties/bus_basis",
           "#/$defs/InflationLag/oneOf/1/properties/days",
           "#/$defs/ProtectionLegSpec/properties/settlement_delay",
           "#/$defs/CdsIndex/properties/series",
@@ -31190,7 +31230,7 @@
         ],
         "calendar-id": [
           "#/$defs/d_11e2bbdddad8dbf2f7f3/properties/fixing_calendar_id",
-          "#/$defs/d_380d6451b5a9b6d4b9ca/properties/calendar_id",
+          "#/$defs/d_db5d202a6e0d023133f4/properties/calendar_id",
           "#/$defs/d_bead93058da9e6b7d476/properties/ex_coupon_calendar_id",
           "#/$defs/d_b0a7458b7623f012eb4b/properties/calendar_id",
           "#/$defs/d_bef55fa450b231d7b330/properties/calendar_id",
@@ -31669,15 +31709,17 @@
         ],
         "nullable-array": [
           "#/$defs/d_42ef997031425d58ca65/properties/capex_schedule",
-          "#/$defs/d_380d6451b5a9b6d4b9ca/properties/coupon_period",
+          "#/$defs/d_db5d202a6e0d023133f4/properties/coupon_period",
           "#/$defs/d_7ab5bac7015d046b3dfb/properties/correlation_matrix"
         ],
         "nullable-boolean": [
-          "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
+          "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic",
+          "#/$defs/d_db5d202a6e0d023133f4/properties/end_is_termination_date"
         ],
         "nullable-integer": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
-          "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
+          "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
+          "#/$defs/d_db5d202a6e0d023133f4/properties/bus_basis"
         ],
         "nullable-number": [
           "#/$defs/d_42ef997031425d58ca65/properties/cap_rate",
@@ -31732,7 +31774,7 @@
         ],
         "nullable-string": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario",
-          "#/$defs/d_380d6451b5a9b6d4b9ca/properties/calendar_id",
+          "#/$defs/d_db5d202a6e0d023133f4/properties/calendar_id",
           "#/$defs/d_cd303d1f2f04810390be/properties/min_rating"
         ],
         "nullable-union": [
@@ -31858,6 +31900,10 @@
           },
           {
             "pointer": "#/$defs/d_561c56f793cc06bf015e/properties/accrual",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_db5d202a6e0d023133f4/properties/frequency",
             "keyword": "anyOf"
           },
           {
@@ -32005,6 +32051,7 @@
           "#/$defs/d_1d0c1815f8dd0715bd12",
           "#/$defs/d_e49387f97c0f9d510642",
           "#/$defs/d_f80c8a31d359e1cb5dd4",
+          "#/$defs/d_db5d202a6e0d023133f4",
           "#/$defs/d_ba65527bb807631cd58f",
           "#/$defs/d_f6cd37823263ec927700/oneOf/1/properties/special",
           "#/$defs/d_7a409347a5a5b95b218d"
@@ -32030,12 +32077,13 @@
           "#/$defs/d_c40e1d7b8b06c6a5365d/properties/step_schedule/items",
           "#/$defs/d_b68d80acd3bb73b369bf/oneOf/2/properties/step_remaining/properties/schedule/items",
           "#/$defs/d_b68d80acd3bb73b369bf/oneOf/6/properties/custom_principal/properties/items/items",
-          "#/$defs/d_380d6451b5a9b6d4b9ca/properties/coupon_period"
+          "#/$defs/d_db5d202a6e0d023133f4/properties/coupon_period"
         ],
         "uint": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
+        "uint16": ["#/$defs/d_db5d202a6e0d023133f4/properties/bus_basis"],
         "uint32": [
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
@@ -36656,7 +36704,7 @@
           "#/$defs/FloatLegSpec/properties/fixing_calendar_id",
           "#/$defs/CsaSpec/properties/calendar_id",
           "#/$defs/FloatingRateSpec/properties/fixing_calendar_id",
-          "#/$defs/CashFlowAccrual/properties/calendar_id",
+          "#/$defs/DayCountContextState/properties/calendar_id",
           "#/$defs/Bond/properties/ex_coupon_calendar_id",
           "#/$defs/RevolvingCredit/properties/calendar_id",
           "#/$defs/TermLoan/properties/calendar_id"
@@ -37381,13 +37429,14 @@
         ],
         "nullable-array": [
           "#/$defs/PoolAsset/properties/delinquency_buckets",
-          "#/$defs/CashFlowAccrual/properties/coupon_period",
+          "#/$defs/DayCountContextState/properties/coupon_period",
           "#/$defs/McConfig/properties/correlation_matrix",
           "#/$defs/AssetPool/properties/rep_lines",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/severity_vector"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic",
+          "#/$defs/DayCountContextState/properties/end_is_termination_date",
           "#/$defs/StructuredCredit/properties/principal_covers_senior_interest",
           "#/$defs/Tranche/properties/non_deferrable"
         ],
@@ -37398,6 +37447,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
           "#/$defs/PoolAsset/properties/amortization_term_months",
           "#/$defs/PoolAsset/properties/io_months",
+          "#/$defs/DayCountContextState/properties/bus_basis",
           "#/$defs/RepLine/properties/amortization_term_months",
           "#/$defs/RepLine/properties/io_months"
         ],
@@ -37499,7 +37549,7 @@
           "#/$defs/PoolAsset/properties/forward_curve_id",
           "#/$defs/PoolAsset/properties/industry",
           "#/$defs/PoolAsset/properties/obligor_id",
-          "#/$defs/CashFlowAccrual/properties/calendar_id",
+          "#/$defs/DayCountContextState/properties/calendar_id",
           "#/$defs/ReinvestmentAssumptions/properties/forward_curve_id",
           "#/$defs/RepLine/properties/forward_curve_id"
         ],
@@ -37772,6 +37822,10 @@
           },
           {
             "pointer": "#/$defs/CashFlow/properties/accrual",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/DayCountContextState/properties/frequency",
             "keyword": "anyOf"
           },
           {
@@ -38069,6 +38123,7 @@
           "#/$defs/d_e49387f97c0f9d510642",
           "#/$defs/d_f80c8a31d359e1cb5dd4",
           "#/$defs/InstrumentCollateral",
+          "#/$defs/DayCountContextState",
           "#/$defs/OidEirSpec",
           "#/$defs/WaterfallRules",
           "#/$defs/EarlyAmortizationSpec"
@@ -38100,7 +38155,7 @@
           "#/$defs/StepUpCouponSpec/properties/step_schedule/items",
           "#/$defs/AmortizationSpec/oneOf/2/properties/step_remaining/properties/schedule/items",
           "#/$defs/AmortizationSpec/oneOf/6/properties/custom_principal/properties/items/items",
-          "#/$defs/CashFlowAccrual/properties/coupon_period",
+          "#/$defs/DayCountContextState/properties/coupon_period",
           "#/$defs/ReserveTarget/oneOf/3/properties/max"
         ],
         "uint": [
@@ -38108,6 +38163,7 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
           "#/$defs/WaterfallTier/properties/priority"
         ],
+        "uint16": ["#/$defs/DayCountContextState/properties/bus_basis"],
         "uint32": [
           "#/$defs/CallAssumption/properties/after_early_amortization_months",
           "#/$defs/EligibilityRule/properties/max_days_past_due",

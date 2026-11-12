@@ -349,13 +349,17 @@ impl CommoditySwap {
             None,
         )
         .with_accrual(CashFlowAccrual {
-            coupon_period: None,
-            end_is_termination_date: period.accrual_end == self.maturity,
-            calendar_id: self.calendar_id.as_deref().map(str::to_owned),
             start: period.accrual_start,
             end: period.accrual_end,
             day_count: finstack_quant_core::dates::DayCount::Act365F,
             projected_index_rate: None,
+            context: finstack_quant_core::dates::DayCountContextState {
+                calendar_id: self.calendar_id.as_deref().map(str::to_owned),
+                coupon_period: None,
+                end_is_termination_date: Some(period.accrual_end == self.maturity),
+                frequency: None,
+                bus_basis: None,
+            },
         }))
     }
 }

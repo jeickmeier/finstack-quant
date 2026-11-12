@@ -448,9 +448,13 @@ impl InflationLinkedBond {
                     end: period.accrual_end,
                     day_count: self.day_count,
                     projected_index_rate: None,
-                    calendar_id: None,
-                    coupon_period: Some((period.accrual_start, period.accrual_end)),
-                    end_is_termination_date: false,
+                    context: finstack_quant_core::dates::DayCountContextState {
+                        calendar_id: None,
+                        coupon_period: Some((period.accrual_start, period.accrual_end)),
+                        end_is_termination_date: Some(false),
+                        frequency: None,
+                        bus_basis: None,
+                    },
                 }),
             );
         }
@@ -533,7 +537,7 @@ impl InflationLinkedBond {
                 let (start, end) = flow
                     .accrual
                     .as_ref()
-                    .and_then(|accrual| accrual.coupon_period)
+                    .and_then(|accrual| accrual.context.coupon_period)
                     .ok_or_else(|| {
                         finstack_quant_core::Error::Validation(
                             "ACT/365L real yield requires full contractual coupon metadata".into(),

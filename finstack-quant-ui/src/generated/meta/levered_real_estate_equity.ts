@@ -1227,26 +1227,11 @@ export default [
     "description": "Contractual accrual metadata attached to one cashflow."
   },
   {
-    "path": "#/$defs/d_380d6451b5a9b6d4b9ca/properties/calendar_id",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/CashFlowAccrual/properties/calendar_id",
-    "description": "Calendar identifier for calendar-dependent day counts, including BUS/252.\nRequired for BUS/252; otherwise optional. Joint calendars use `+`."
-  },
-  {
-    "path": "#/$defs/d_380d6451b5a9b6d4b9ca/properties/coupon_period",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/CashFlowAccrual/properties/coupon_period",
-    "description": "Unadjusted regular reference coupon period for ACT/ACT ICMA, or the\nactual full contractual coupon period for ACT/365L, including when\nthis flow represents only a rate or balance subinterval.\nACT/365L metadata must retain these boundaries to select the original\ncoupon's denominator; other conventions may leave this field `None`."
-  },
-  {
-    "path": "#/$defs/d_380d6451b5a9b6d4b9ca/properties/coupon_period/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/CashFlowAccrual/properties/coupon_period/prefixItems/0",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_380d6451b5a9b6d4b9ca/properties/coupon_period/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/CashFlowAccrual/properties/coupon_period/prefixItems/1",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+    "path": "#/$defs/d_380d6451b5a9b6d4b9ca/properties/context",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/CashFlowAccrual/properties/context",
+    "description": "The complete day-count context the accrual factor was calculated with\n(record CORE-CONVENTIONS-015 #7): the calendar for calendar-dependent\nconventions (BUS/252 requires it; joint calendars use `+`), the coupon\nfrequency and the regular ICMA reference period or full ACT/365L coupon\nbounds (`coupon_period`, retained for every subinterval of that\ncoupon), and whether `end` is the instrument termination date for the\n30E/360 ISDA February exception (`None` is unspecified, which that\nconvention rejects).",
+    "ref": "#/$defs/DayCountContextState",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/DayCountContextState"
   },
   {
     "path": "#/$defs/d_380d6451b5a9b6d4b9ca/properties/day_count",
@@ -1261,12 +1246,6 @@ export default [
     "description": "Contractual accrual-period end date.",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_380d6451b5a9b6d4b9ca/properties/end_is_termination_date",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/CashFlowAccrual/properties/end_is_termination_date",
-    "default": false,
-    "description": "Whether `end` is the instrument termination date, for the 30E/360 ISDA\nFebruary exception. Intermediate coupon and rate-step ends are false."
   },
   {
     "path": "#/$defs/d_380d6451b5a9b6d4b9ca/properties/projected_index_rate",
@@ -8736,6 +8715,63 @@ export default [
     "description": "Utilization process specification.",
     "ref": "#/$defs/UtilizationProcess",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/UtilizationProcess"
+  },
+  {
+    "path": "#/$defs/d_db5d202a6e0d023133f4",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/DayCountContextState",
+    "description": "Serializable snapshot of [`DayCountContext`] state for persistence and interchange.\n\nThis struct captures the optional context parameters (calendar, frequency, business-day basis)\nneeded to reconstruct a [`DayCountContext`] at runtime using the built-in calendar lookup.\n`Default` is the empty context (no calendar, frequency, basis, coupon\nperiod or termination status), the snapshot of\n[`DayCountContext::default`]."
+  },
+  {
+    "path": "#/$defs/d_db5d202a6e0d023133f4/properties/bus_basis",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/DayCountContextState/properties/bus_basis",
+    "description": "Optional custom business-day divisor (defaults to 252 when `None`).",
+    "format": "uint16",
+    "maximum": 65535,
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_db5d202a6e0d023133f4/properties/calendar_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/DayCountContextState/properties/calendar_id",
+    "description": "Optional calendar code (e.g. \"target2\")."
+  },
+  {
+    "path": "#/$defs/d_db5d202a6e0d023133f4/properties/coupon_period",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/DayCountContextState/properties/coupon_period",
+    "default": null,
+    "description": "Optional unadjusted regular ICMA reference period or ACT/365L enclosing\ncoupon `(start, end)`, serialized as two ISO dates.\n\nRequired for exact ICMA accrual on round-trip. `None` selects the\nfrequency-only ICMA calculation path; ACT/365L requires these dates."
+  },
+  {
+    "path": "#/$defs/d_db5d202a6e0d023133f4/properties/coupon_period/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/DayCountContextState/properties/coupon_period/prefixItems/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_db5d202a6e0d023133f4/properties/coupon_period/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/DayCountContextState/properties/coupon_period/prefixItems/1",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_db5d202a6e0d023133f4/properties/end_is_termination_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/DayCountContextState/properties/end_is_termination_date",
+    "default": null,
+    "description": "Whether the later accrual endpoint is the contractual termination\ndate; `None` (omitted or `null` on the wire) means unspecified, which\n30E/360 ISDA rejects."
+  },
+  {
+    "path": "#/$defs/d_db5d202a6e0d023133f4/properties/frequency",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/DayCountContextState/properties/frequency",
+    "description": "Optional coupon frequency, required for ACT/ACT ISMA."
+  },
+  {
+    "path": "#/$defs/d_db5d202a6e0d023133f4/properties/frequency/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/DayCountContextState/properties/frequency/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_db5d202a6e0d023133f4/properties/frequency/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/DayCountContextState/properties/frequency/anyOf/1"
   },
   {
     "path": "#/$defs/d_e03f269a2f027f942f8f",

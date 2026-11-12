@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import pytest
 
-from finstack_quant.core.dates import Tenor
+from finstack_quant.core.dates import DayCountContext, Tenor
 from finstack_quant.core.money import Money
 
 if TYPE_CHECKING:
@@ -1632,9 +1632,13 @@ def test_cashflow_metadata_dataframe_roundtrip() -> None:
     )
     coupon = original.coupons()[0]
     assert coupon.accrual.start == dt.date(2025, 1, 1)
-    assert coupon.accrual.calendar_id == "weekends_only"
+    assert coupon.accrual.context.calendar_id == "weekends_only"
     metadata = CashFlowAccrual(
-        "2025-01-01", "2025-04-01", DayCount.ACT_360, projected_index_rate=0.03, calendar_id="weekends_only"
+        "2025-01-01",
+        "2025-04-01",
+        DayCount.ACT_360,
+        DayCountContext("weekends_only", end_is_termination_date=False),
+        projected_index_rate=0.03,
     )
     row = CashFlow("2025-04-03", Money(25, "USD"), CFKind.FIXED, 0.0).with_accrual(metadata)
     assert row.accrual.projected_index_rate == 0.03

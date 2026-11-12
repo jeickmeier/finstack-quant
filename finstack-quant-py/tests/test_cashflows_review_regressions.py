@@ -11,7 +11,7 @@ from finstack_quant.cashflows.accrual import AccrualConfig, accrued_interest_amo
 from finstack_quant.cashflows.aggregation import PeriodAggregation
 from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule, Notional
 from finstack_quant.core.cashflow import CashFlow, CashFlowAccrual
-from finstack_quant.core.dates import DayCount
+from finstack_quant.core.dates import DayCount, DayCountContext
 from finstack_quant.core.money import Money
 
 
@@ -99,6 +99,7 @@ def test_nonfinite_coupon_rates_cannot_be_erased_by_serialization(invalid: float
             dt.date(2025, 1, 1),
             dt.date(2025, 7, 1),
             DayCount.ACT_360,
+            DayCountContext(end_is_termination_date=False),
             projected_index_rate=invalid if field == "projected_index_rate" else 0.045,
         )
     )
@@ -131,6 +132,7 @@ def test_coupon_rate_round_trip_preserves_metadata_and_accrual(
             dt.date(2025, 1, 1),
             dt.date(2025, 7, 1),
             DayCount.ACT_360,
+            DayCountContext(end_is_termination_date=False),
             projected_index_rate=projected_rate,
         )
     )

@@ -201,8 +201,8 @@ type PrincipalDates = Extract<
   { custom_principal: unknown }
 >['custom_principal']['items'];
 const principalDates: PrincipalDates = [['2025-01-15', { amount: '100', currency: 'USD' }]];
-const couponDates: CashFlowAccrual['coupon_period'] = ['2025-01-15', '2025-07-15'];
-const absentCouponDates: CashFlowAccrual['coupon_period'] = null;
+const couponDates: CashFlowAccrual['context']['coupon_period'] = ['2025-01-15', '2025-07-15'];
+const absentCouponDates: CashFlowAccrual['context']['coupon_period'] = null;
 const couponSteps: StepUpCouponSpec['step_schedule'] = [['2025-01-15', '0.05']];
 // @ts-expect-error date-money pairs require a Money object in the second position
 const badPrincipalAmount: PrincipalDates = [['2025-01-15', '100']];

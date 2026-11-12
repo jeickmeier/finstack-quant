@@ -672,14 +672,15 @@ impl ReplayTemplate {
                 entry.day_count_context = Some(DayCountContext {
                     calendar: Some(calendar_by_id_strict(
                         accrual
+                            .context
                             .calendar_id
                             .as_deref()
                             .unwrap_or(&spec.schedule.calendar_id),
                     )?),
                     frequency: Some(spec.schedule.frequency),
                     bus_basis: None,
-                    coupon_period: accrual.coupon_period,
-                    end_is_termination_date: Some(accrual.end_is_termination_date),
+                    coupon_period: accrual.context.coupon_period,
+                    end_is_termination_date: accrual.context.end_is_termination_date,
                 });
                 entry.accrual = flow.accrual_factor;
                 entry.base_index_rate = accrual.projected_index_rate;
@@ -1159,14 +1160,15 @@ impl ReplayTemplate {
                     day_count_context: DayCountContext {
                         calendar: Some(calendar_by_id_strict(
                             accrual
+                                .context
                                 .calendar_id
                                 .as_deref()
                                 .unwrap_or(&bond.cashflow_spec.schedule().calendar_id),
                         )?),
                         frequency: Some(bond.cashflow_spec.schedule().frequency),
                         bus_basis: None,
-                        coupon_period: accrual.coupon_period,
-                        end_is_termination_date: Some(accrual.end_is_termination_date),
+                        coupon_period: accrual.context.coupon_period,
+                        end_is_termination_date: accrual.context.end_is_termination_date,
                     },
                     // A PIK claim is its explicit capitalization, not its cash
                     // amount (record CORE-CONVENTIONS-015 #1, #4).

@@ -9,7 +9,7 @@
 //! - [`CashFlow`]: Single dated payment with classification
 //! - [`CFKind`]: Cashflow type enumeration (fixed, floating, principal, etc.)
 
-use crate::dates::{Date, DayCount};
+use crate::dates::{Date, DayCount, DayCountContext, DayCountContextState};
 use crate::money::Money;
 use crate::{InputError, NonFiniteKind};
 
@@ -382,25 +382,27 @@ pub struct CashFlowAccrual {
         serialize_with = "serialize_optional_rate"
     )]
     pub projected_index_rate: Option<f64>,
-    /// Calendar identifier for calendar-dependent day counts, including BUS/252.
-    /// Required for BUS/252; otherwise optional. Joint calendars use `+`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub calendar_id: Option<String>,
-    /// Unadjusted regular reference coupon period for ACT/ACT ICMA, or the
-    /// actual full contractual coupon period for ACT/365L, including when
-    /// this flow represents only a rate or balance subinterval.
-    /// ACT/365L metadata must retain these boundaries to select the original
-    /// coupon's denominator; other conventions may leave this field `None`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Option<(crate::wire::DateWire, crate::wire::DateWire)>")
-    )]
-    pub coupon_period: Option<(Date, Date)>,
-    /// Whether `end` is the instrument termination date, for the 30E/360 ISDA
-    /// February exception. Intermediate coupon and rate-step ends are false.
-    #[serde(default)]
-    pub end_is_termination_date: bool,
+    /// The complete day-count context the accrual factor was calculated with
+    /// (record CORE-CONVENTIONS-015 #7): the calendar for calendar-dependent
+    /// conventions (BUS/252 requires it; joint calendars use `+`), the coupon
+    /// frequency and the regular ICMA reference period or full ACT/365L coupon
+    /// bounds (`coupon_period`, retained for every subinterval of that
+    /// coupon), and whether `end` is the instrument termination date for the
+    /// 30E/360 ISDA February exception (`None` is unspecified, which that
+    /// convention rejects).
+    pub context: DayCountContextState,
+}
+
+impl CashFlowAccrual {
+    /// Resolve this slice's day-count context, looking up its calendar.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the context fields are invalid or the calendar id
+    /// names an unknown calendar.
+    pub fn day_count_context(&self) -> crate::Result<DayCountContext<'static>> {
+        self.context.to_ctx()
+    }
 }
 
 /// A single dated cash-flow (payment or reset).
@@ -659,6 +661,7 @@ impl CashFlow {
         }
         if let Some(accrual) = &self.accrual {
             if accrual
+                .context
                 .coupon_period
                 .is_some_and(|(start, end)| start >= end)
             {
@@ -732,9 +735,7 @@ mod tests {
                 end,
                 day_count: DayCount::Act360,
                 projected_index_rate: Some(rate),
-                calendar_id: None,
-                coupon_period: None,
-                end_is_termination_date: false,
+                context: DayCountContextState::default(),
             };
             assert!(serde_json::to_string(&accrual).is_err());
             flow.accrual = Some(accrual);
@@ -762,9 +763,7 @@ mod tests {
                 end,
                 day_count: DayCount::Act360,
                 projected_index_rate: rate,
-                calendar_id: None,
-                coupon_period: None,
-                end_is_termination_date: false,
+                context: DayCountContextState::default(),
             });
             let json = serde_json::to_value(&flow).expect("finite rates serialize");
             if rate.is_none() {

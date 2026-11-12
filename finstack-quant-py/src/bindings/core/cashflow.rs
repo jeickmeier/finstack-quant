@@ -5,7 +5,7 @@ use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
 
-use crate::bindings::core::dates::daycount::PyDayCount;
+use crate::bindings::core::dates::daycount::{PyDayCount, PyDayCountContext};
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::wire_methods;
@@ -197,42 +197,31 @@ impl PyCashFlowAccrual {
     ///     Convention used to calculate the year fraction.
     /// projected_index_rate : float, optional
     ///     Decimal index rate before spread, gearing and constraints.
-    /// calendar_id : str, optional
-    ///     Registered calendar identifier; required for BUS/252 accrual.
-    /// coupon_period : tuple[datetime.date or str, datetime.date or str], optional
-    ///     Regular reference period for ACT/ACT ICMA stub accrual; None leaves
-    ///     reference-period selection to the schedule accrual caller.
-    /// end_is_termination_date : bool, optional
-    ///     True only when end is the instrument termination date, for the
-    ///     30E/360 ISDA February exception. Defaults to False.
+    /// context : DayCountContext
+    ///     The complete day-count context the accrual factor was calculated
+    ///     with: calendar, frequency, business-day basis, regular ICMA or
+    ///     full ACT/365L coupon period, and termination status.
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If either date cannot be parsed.
     #[new]
-    #[pyo3(signature = (start, end, day_count, projected_index_rate=None, calendar_id=None, coupon_period=None, end_is_termination_date=false))]
+    #[pyo3(signature = (start, end, day_count, context, projected_index_rate=None))]
     fn new(
         start: &Bound<'_, PyAny>,
         end: &Bound<'_, PyAny>,
         day_count: PyRef<'_, PyDayCount>,
+        context: PyRef<'_, PyDayCountContext>,
         projected_index_rate: Option<f64>,
-        calendar_id: Option<String>,
-        coupon_period: Option<(Bound<'_, PyAny>, Bound<'_, PyAny>)>,
-        end_is_termination_date: bool,
     ) -> PyResult<Self> {
-        let coupon_period = coupon_period
-            .map(|(start, end)| Ok::<_, PyErr>((py_to_date(&start)?, py_to_date(&end)?)))
-            .transpose()?;
         Ok(Self {
             inner: CashFlowAccrual {
-                coupon_period,
-                end_is_termination_date,
                 start: py_to_date(start)?,
                 end: py_to_date(end)?,
                 day_count: day_count.inner,
                 projected_index_rate,
-                calendar_id,
+                context: context.inner.clone(),
             },
         })
     }
@@ -261,28 +250,12 @@ impl PyCashFlowAccrual {
         self.inner.projected_index_rate
     }
 
-    /// Regular ACT/ACT ICMA reference dates, or None when unspecified.
+    /// The complete day-count context the accrual factor was calculated with.
     #[getter]
-    fn coupon_period<'py>(
-        &self,
-        py: Python<'py>,
-    ) -> PyResult<Option<(Bound<'py, PyAny>, Bound<'py, PyAny>)>> {
-        self.inner
-            .coupon_period
-            .map(|(start, end)| Ok((date_to_py(py, start)?, date_to_py(py, end)?)))
-            .transpose()
-    }
-
-    /// Whether accrual end is the instrument termination date.
-    #[getter]
-    fn end_is_termination_date(&self) -> bool {
-        self.inner.end_is_termination_date
-    }
-
-    /// Registered accrual calendar identifier, or None when unused.
-    #[getter]
-    fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.clone()
+    fn context(&self) -> PyDayCountContext {
+        PyDayCountContext {
+            inner: self.inner.context.clone(),
+        }
     }
 }
 

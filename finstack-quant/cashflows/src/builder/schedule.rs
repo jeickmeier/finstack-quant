@@ -127,12 +127,20 @@ fn compare_accrual(
             .start
             .cmp(&right.start)
             .then_with(|| left.end.cmp(&right.end))
-            .then_with(|| left.calendar_id.cmp(&right.calendar_id))
-            .then_with(|| left.coupon_period.cmp(&right.coupon_period))
+            .then_with(|| left.context.calendar_id.cmp(&right.context.calendar_id))
+            .then_with(|| left.context.coupon_period.cmp(&right.context.coupon_period))
             .then_with(|| {
-                left.end_is_termination_date
-                    .cmp(&right.end_is_termination_date)
+                left.context
+                    .end_is_termination_date
+                    .cmp(&right.context.end_is_termination_date)
             })
+            .then_with(|| {
+                left.context
+                    .frequency
+                    .map(|tenor| tenor.to_string())
+                    .cmp(&right.context.frequency.map(|tenor| tenor.to_string()))
+            })
+            .then_with(|| left.context.bus_basis.cmp(&right.context.bus_basis))
             .then_with(|| day_count_rank(left.day_count).cmp(&day_count_rank(right.day_count)))
             .then_with(
                 || match (left.projected_index_rate, right.projected_index_rate) {
@@ -1453,9 +1461,13 @@ mod tests {
                 end,
                 day_count,
                 projected_index_rate: None,
-                calendar_id: Some("weekends_only".into()),
-                coupon_period: Some((start, end)),
-                end_is_termination_date: false,
+                context: finstack_quant_core::dates::DayCountContextState {
+                    calendar_id: Some("weekends_only".into()),
+                    coupon_period: Some((start, end)),
+                    end_is_termination_date: Some(false),
+                    frequency: None,
+                    bus_basis: None,
+                },
             })
         };
         for (index, first) in conventions.iter().enumerate() {
@@ -1569,9 +1581,13 @@ mod tests {
             end: maturity,
             day_count: DayCount::Thirty360,
             projected_index_rate: None,
-            calendar_id: None,
-            coupon_period: None,
-            end_is_termination_date: true,
+            context: finstack_quant_core::dates::DayCountContextState {
+                calendar_id: None,
+                coupon_period: None,
+                end_is_termination_date: Some(true),
+                frequency: None,
+                bus_basis: None,
+            },
         });
         let raw = CashFlowSchedule::from_flows_unchecked(
             vec![pik, flow(maturity, 106.0, CFKind::Notional)],
@@ -1759,13 +1775,17 @@ mod tests {
         let left = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(d2, 4.0, CFKind::Recovery).with_accrual(CashFlowAccrual {
-                    coupon_period: None,
-                    end_is_termination_date: false,
-                    calendar_id: None,
                     start: d1,
                     end: d2,
                     day_count: DayCount::Thirty360,
                     projected_index_rate: None,
+                    context: finstack_quant_core::dates::DayCountContextState {
+                        calendar_id: None,
+                        coupon_period: None,
+                        end_is_termination_date: Some(false),
+                        frequency: None,
+                        bus_basis: None,
+                    },
                 }),
             ],
             Notional::par(50.0, Currency::USD).expect("valid notional fixture"),
@@ -1782,13 +1802,17 @@ mod tests {
         let right = CashFlowSchedule::from_flows_unchecked(
             vec![
                 flow(d1, 10.0, CFKind::Amortization).with_accrual(CashFlowAccrual {
-                    coupon_period: None,
-                    end_is_termination_date: false,
-                    calendar_id: None,
                     start: d1,
                     end: d2,
                     day_count: DayCount::Act360,
                     projected_index_rate: None,
+                    context: finstack_quant_core::dates::DayCountContextState {
+                        calendar_id: None,
+                        coupon_period: None,
+                        end_is_termination_date: Some(false),
+                        frequency: None,
+                        bus_basis: None,
+                    },
                 }),
             ],
             Notional::par(50.0, Currency::USD).expect("valid notional fixture"),
@@ -1977,13 +2001,17 @@ mod tests {
         let d1 = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
         let d2 = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
         let accrual = CashFlowAccrual {
-            coupon_period: None,
-            end_is_termination_date: false,
-            calendar_id: None,
             start: d1,
             end: d2,
             day_count: DayCount::Act360,
             projected_index_rate: Some(0.031),
+            context: finstack_quant_core::dates::DayCountContextState {
+                calendar_id: None,
+                coupon_period: None,
+                end_is_termination_date: Some(false),
+                frequency: None,
+                bus_basis: None,
+            },
         };
         let schedule = CashFlowSchedule::from_flows_unchecked(
             vec![

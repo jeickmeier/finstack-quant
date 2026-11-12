@@ -385,7 +385,8 @@ struct CouponBucket {
     accrual_day_count: Option<DayCount>,
     calendar_id: Option<String>,
     coupon_period: Option<(Date, Date)>,
-    end_is_termination_date: bool,
+    /// Termination status from the accrual context; `None` is unspecified.
+    end_is_termination_date: Option<bool>,
     cash_amount: f64,
     pik_amount: f64,
     /// Accrual year fraction as reported by the builder.
@@ -414,7 +415,7 @@ struct PeriodInputs {
     coupon_start: Date,
     calendar_id: Option<String>,
     coupon_period: Option<(Date, Date)>,
-    end_is_termination_date: bool,
+    end_is_termination_date: Option<bool>,
     start: Date,
     end: Date,
     day_count: DayCount,
@@ -428,13 +429,13 @@ fn coupon_day_count_context(
     calendar_id: Option<&str>,
     frequency: Option<Tenor>,
     coupon_period: Option<(Date, Date)>,
-    end_is_termination_date: bool,
+    end_is_termination_date: Option<bool>,
 ) -> finstack_quant_core::Result<DayCountContext<'static>> {
     Ok(DayCountContext {
         calendar: calendar_id.map(calendar_by_id_strict).transpose()?,
         frequency,
         coupon_period,
-        end_is_termination_date: Some(end_is_termination_date),
+        end_is_termination_date,
         ..Default::default()
     })
 }
@@ -485,15 +486,16 @@ fn build_coupon_periods(
         };
         let accrual = cf.accrual.as_ref();
         let true_period = accrual.map(|accrual| (accrual.start, accrual.end));
-        let calendar_id = accrual.and_then(|accrual| accrual.calendar_id.clone());
-        let coupon_period = accrual.and_then(|accrual| accrual.coupon_period);
+        let calendar_id = accrual.and_then(|accrual| accrual.context.calendar_id.clone());
+        let coupon_period = accrual.and_then(|accrual| accrual.context.coupon_period);
         let end_is_termination_date =
-            accrual.is_some_and(|accrual| accrual.end_is_termination_date);
+            accrual.and_then(|accrual| accrual.context.end_is_termination_date);
         let flow_day_count = accrual.map(|accrual| accrual.day_count);
 
         // `AccrualIndex::build` validated the schedule: factors are finite
-        // and non-negative, and zero means "derive from the day count".
-        let cf_af = (cf.accrual_factor > 0.0).then_some(cf.accrual_factor);
+        // and non-negative. A zero factor is a literal zero-length accrual,
+        // never "missing, derive it" (record CORE-CONVENTIONS-015 #9).
+        let cf_af = Some(cf.accrual_factor);
 
         let matching_bucket = buckets
             .iter_mut()
@@ -703,9 +705,9 @@ fn find_active_periods_and_elapsed<'a>(
                 inputs.end_is_termination_date,
             )?;
             let elapsed_context = DayCountContext {
-                end_is_termination_date: Some(
-                    inputs.end_is_termination_date && as_of >= inputs.end,
-                ),
+                end_is_termination_date: inputs
+                    .end_is_termination_date
+                    .map(|termination| termination && as_of >= inputs.end),
                 ..day_count_context
             };
             let elapsed_end = as_of.clamp(inputs.start, inputs.end);
@@ -905,9 +907,13 @@ mod tests {
                 end,
                 day_count: DayCount::Act365F,
                 projected_index_rate: None,
-                calendar_id: None,
-                coupon_period: Some(reference),
-                end_is_termination_date: false,
+                context: finstack_quant_core::dates::DayCountContextState {
+                    calendar_id: None,
+                    coupon_period: Some(reference),
+                    end_is_termination_date: Some(false),
+                    frequency: None,
+                    bus_basis: None,
+                },
             })
         })
         .collect();
@@ -1117,13 +1123,17 @@ mod tests {
                 Some(0.06),
             )
             .with_accrual(CashFlowAccrual {
-                coupon_period: None,
-                end_is_termination_date: false,
-                calendar_id: None,
                 start: issue,
                 end,
                 day_count: DayCount::Thirty360,
                 projected_index_rate: None,
+                context: finstack_quant_core::dates::DayCountContextState {
+                    calendar_id: None,
+                    coupon_period: None,
+                    end_is_termination_date: Some(false),
+                    frequency: None,
+                    bus_basis: None,
+                },
             }),
             CashFlow::new(
                 end,
@@ -1134,13 +1144,17 @@ mod tests {
                 Some(0.048666666666666664),
             )
             .with_accrual(CashFlowAccrual {
-                coupon_period: None,
-                end_is_termination_date: false,
-                calendar_id: None,
                 start: second_start,
                 end,
                 day_count: DayCount::Act365F,
                 projected_index_rate: None,
+                context: finstack_quant_core::dates::DayCountContextState {
+                    calendar_id: None,
+                    coupon_period: None,
+                    end_is_termination_date: Some(false),
+                    frequency: None,
+                    bus_basis: None,
+                },
             }),
         ];
         let schedule = CashFlowSchedule {
@@ -1172,10 +1186,14 @@ mod tests {
                 start,
                 end: payment,
                 day_count: DayCount::Act360,
-                calendar_id: None,
-                coupon_period: Some((start, payment)),
-                end_is_termination_date: false,
                 projected_index_rate: None,
+                context: finstack_quant_core::dates::DayCountContextState {
+                    calendar_id: None,
+                    coupon_period: Some((start, payment)),
+                    end_is_termination_date: Some(false),
+                    frequency: None,
+                    bus_basis: None,
+                },
             });
         }
         let error = accrued_interest_amount(&schedule, make_date(2025, 6, 29), &ex_coupon_cfg(7))
@@ -1315,10 +1333,14 @@ mod tests {
                     start: issue,
                     end: payment,
                     day_count: DayCount::ActActIsma,
-                    coupon_period: Some((issue, payment)),
-                    calendar_id: None,
                     projected_index_rate: None,
-                    end_is_termination_date: false,
+                    context: finstack_quant_core::dates::DayCountContextState {
+                        calendar_id: None,
+                        coupon_period: Some((issue, payment)),
+                        end_is_termination_date: Some(false),
+                        frequency: None,
+                        bus_basis: None,
+                    },
                 }),
             ],
             Notional::par(1_000_000.0, Currency::GBP).expect("notional"),
@@ -1378,7 +1400,7 @@ mod tests {
         PeriodInputs {
             calendar_id: None,
             coupon_period: None,
-            end_is_termination_date: false,
+            end_is_termination_date: Some(false),
             payment_date: make_date(2025, 7, 5),
             coupon_start: make_date(2025, 1, 1),
             start: make_date(2025, 1, 1),
@@ -1428,7 +1450,7 @@ mod tests {
         let inputs = PeriodInputs {
             calendar_id: None,
             coupon_period: None,
-            end_is_termination_date: false,
+            end_is_termination_date: Some(false),
             payment_date: make_date(2025, 7, 1),
             start: make_date(2025, 1, 1),
             coupon_start: make_date(2025, 1, 1),
@@ -1483,7 +1505,7 @@ mod tests {
         PeriodInputs {
             calendar_id: None,
             coupon_period: None,
-            end_is_termination_date: false,
+            end_is_termination_date: Some(false),
             payment_date: make_date(2025, 7, 1),
             start: make_date(2025, 1, 1),
             coupon_start: make_date(2025, 1, 1),
@@ -1632,7 +1654,7 @@ mod tests {
             bucket: CouponBucket {
                 calendar_id: None,
                 coupon_period: None,
-                end_is_termination_date: false,
+                end_is_termination_date: Some(false),
                 date: make_date(2025, 7, 1),
                 accrual_start: None,
                 accrual_end: None,
@@ -1653,7 +1675,7 @@ mod tests {
         let inputs = PeriodInputs {
             calendar_id: None,
             coupon_period: None,
-            end_is_termination_date: false,
+            end_is_termination_date: Some(false),
             payment_date: make_date(2025, 2, 1),
             coupon_start: make_date(2025, 1, 1),
             start: make_date(2025, 1, 1),

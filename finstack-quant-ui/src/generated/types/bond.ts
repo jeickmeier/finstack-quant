@@ -1839,35 +1839,56 @@ export interface D_5Fdd6C8Cd626De8799Fe {
  * Contractual accrual metadata attached to one cashflow.
  */
 export interface D_931Ca4Fd1B880C77B04D {
-  /**
-   * Calendar identifier for calendar-dependent day counts, including BUS/252.
-   * Required for BUS/252; otherwise optional. Joint calendars use `+`.
-   */
-  calendar_id?: string | null;
-  /**
-   * Unadjusted regular reference coupon period for ACT/ACT ICMA, or the
-   * actual full contractual coupon period for ACT/365L, including when
-   * this flow represents only a rate or balance subinterval.
-   * ACT/365L metadata must retain these boundaries to select the original
-   * coupon's denominator; other conventions may leave this field `None`.
-   *
-   * @minItems 2
-   * @maxItems 2
-   */
-  coupon_period?: [Date2, Date2] | null;
+  context: D_2Cf3Cdafb96F82A3C0C4;
   day_count: DayCount5;
   end: Date5;
-  /**
-   * Whether `end` is the instrument termination date, for the 30E/360 ISDA
-   * February exception. Intermediate coupon and rate-step ends are false.
-   */
-  end_is_termination_date?: boolean;
   /**
    * Projected index rate before spread, gearing, caps, or floors.
    * Serialization rejects non-finite rates instead of encoding them as absent.
    */
   projected_index_rate?: number | null;
   start: Date6;
+}
+/**
+ * The complete day-count context the accrual factor was calculated with
+ * (record CORE-CONVENTIONS-015 #7): the calendar for calendar-dependent
+ * conventions (BUS/252 requires it; joint calendars use `+`), the coupon
+ * frequency and the regular ICMA reference period or full ACT/365L coupon
+ * bounds (`coupon_period`, retained for every subinterval of that
+ * coupon), and whether `end` is the instrument termination date for the
+ * 30E/360 ISDA February exception (`None` is unspecified, which that
+ * convention rejects).
+ */
+export interface D_2Cf3Cdafb96F82A3C0C4 {
+  /**
+   * Optional custom business-day divisor (defaults to 252 when `None`).
+   */
+  bus_basis?: number | null;
+  /**
+   * Optional calendar code (e.g. "target2").
+   */
+  calendar_id?: string | null;
+  /**
+   * Optional unadjusted regular ICMA reference period or ACT/365L enclosing
+   * coupon `(start, end)`, serialized as two ISO dates.
+   *
+   * Required for exact ICMA accrual on round-trip. `None` selects the
+   * frequency-only ICMA calculation path; ACT/365L requires these dates.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  coupon_period?: [Date2, Date2] | null;
+  /**
+   * Whether the later accrual endpoint is the contractual termination
+   * date; `None` (omitted or `null` on the wire) means unspecified, which
+   * 30E/360 ISDA rejects.
+   */
+  end_is_termination_date?: boolean | null;
+  /**
+   * Optional coupon frequency, required for ACT/ACT ISMA.
+   */
+  frequency?: Tenor2 | null;
 }
 /**
  * Currency-tagged monetary amount.

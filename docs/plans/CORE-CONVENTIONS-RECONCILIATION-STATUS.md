@@ -929,6 +929,32 @@ logged under Needs review.
     - The instrument cashflow export gained a `principal_date` column beside
       `principal_delta` (Rust row, schema, Python DataFrame), so full event
       exports keep each principal row's balance date.
+  - **G5-4 accrual metadata context.** `CashFlowAccrual` keeps `start`,
+    `end`, `day_count` and `projected_index_rate` and replaces its parallel
+    `calendar_id`, `coupon_period` and `end_is_termination_date` fields with
+    the existing complete `context: DayCountContextState` (record 015 #7),
+    resolved through `CashFlowAccrual::day_count_context`. The termination
+    status is now `Option<bool>` end to end in the accrual engine, so an
+    unspecified status is no longer read as `false`. Python
+    `CashFlowAccrual(start, end, day_count, context, projected_index_rate=None)`
+    takes a `DayCountContext` and exposes `.context`; WASM and the generated
+    types carry the nested object.
+    - **Literal zero factor (record 015 #9).** The accrued-interest engine
+      read an accrual factor of zero as "derive it from the day count"; zero
+      is now a literal zero-length accrual. No test or value moved.
+    - Producers that did not previously state a frequency or business-day
+      basis keep `None` for both, so no factor moved; the goldens equal their
+      previous values once the context is flattened back (checked
+      mechanically), and the schema golden gained the `DayCountContextState`
+      definition.
+    - **Not done (Needs review, record 015 #8).** The accrued-interest engine
+      still falls back to the period bounds as the reference coupon period
+      when metadata omits one, takes the ICMA frequency from the accrual
+      config rather than the context, and the statements residual rebuild
+      still synthesizes accrual metadata from the previous same-kind row for
+      rows without it; LSMC fills an absent calendar from the bond schedule.
+      Each is an owner-input choice for the CASHFLOWS-001/013 work (E6), not
+      a primitive-shape change.
 - **Notebooks broken by earlier slices (found during G5, fixed in `NB:`).**
   A full run (`run_all_notebooks.py --timeout 120`) after G5-3b passed 92 of
   101; none of the 9 failures involved PIK or write-down rows, and slice

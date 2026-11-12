@@ -35,7 +35,7 @@ from typing import Any
 import datetime
 
 from finstack_quant.core.money import Money
-from finstack_quant.core.dates import DayCount
+from finstack_quant.core.dates import DayCount, DayCountContext
 
 __all__ = ["CFKind", "CashFlow", "CashFlowAccrual"]
 
@@ -197,9 +197,10 @@ class CashFlowAccrual:
     Examples
     --------
     >>> from finstack_quant.core.cashflow import CashFlowAccrual
-    >>> from finstack_quant.core.dates import DayCount
-    >>> a = CashFlowAccrual("2025-01-01", "2025-04-01", DayCount.BUS_252, calendar_id="weekends_only")
-    >>> a.calendar_id
+    >>> from finstack_quant.core.dates import DayCount, DayCountContext
+    >>> context = DayCountContext("weekends_only", end_is_termination_date=False)
+    >>> a = CashFlowAccrual("2025-01-01", "2025-04-01", DayCount.BUS_252, context)
+    >>> a.context.calendar_id
     'weekends_only'
     """
 
@@ -208,10 +209,8 @@ class CashFlowAccrual:
         start: datetime.date | str,
         end: datetime.date | str,
         day_count: DayCount,
+        context: DayCountContext,
         projected_index_rate: float | None = None,
-        calendar_id: str | None = None,
-        coupon_period: tuple[datetime.date | str, datetime.date | str] | None = None,
-        end_is_termination_date: bool = False,
     ) -> None:
         """Create coupon accrual metadata.
 
@@ -223,17 +222,15 @@ class CashFlowAccrual:
             Exclusive accrual end, independent of the cash payment date.
         day_count : DayCount
             Convention used to compute year fractions.
+        context : DayCountContext
+            The complete day-count context the accrual factor was calculated
+            with: calendar (required for BUS/252; '+' joint identifiers),
+            coupon frequency, business-day basis, regular ACT/ACT ICMA
+            reference period or full ACT/365L coupon bounds, and whether end is
+            the instrument termination date (the 30E/360 ISDA February
+            exception requires it stated, not left as None).
         projected_index_rate : float, optional
             Decimal index rate before spread, gearing, floors and caps.
-        calendar_id : str, optional
-            Registered calendar identifier, including '+' joint identifiers.
-            Required for BUS/252 accrued interest; otherwise optional.
-        coupon_period : tuple[datetime.date or str, datetime.date or str], optional
-            Regular ACT/ACT ICMA reference period for stub accrual. None leaves
-            reference-period selection to the schedule accrual caller.
-        end_is_termination_date : bool, optional
-            Whether end is instrument maturity, for the 30E/360 ISDA February
-            exception. False for intermediate coupon periods by default.
 
         Raises
         ------
@@ -288,35 +285,14 @@ class CashFlowAccrual:
         ...
 
     @property
-    def calendar_id(self) -> str | None:
-        """Return the calendar used for calendar-dependent accrual.
+    def context(self) -> DayCountContext:
+        """Return the day-count context the accrual factor was calculated with.
 
         Returns
         -------
-        str or None
-            Registered identifier, or None if unspecified. Access does not raise; no lookup is performed.
-        """
-        ...
-
-    @property
-    def coupon_period(self) -> tuple[datetime.date, datetime.date] | None:
-        """Return regular reference dates for ACT/ACT ICMA accrual.
-
-        Returns
-        -------
-        tuple[datetime.date, datetime.date] or None
-            Regular coupon anchors, or None when unspecified. Access does not raise domain errors.
-        """
-        ...
-
-    @property
-    def end_is_termination_date(self) -> bool:
-        """Return whether accrual ends at instrument termination.
-
-        Returns
-        -------
-        bool
-            True applies the 30E/360 ISDA February maturity exception. Access does not raise domain errors.
+        DayCountContext
+            Calendar, frequency, business-day basis, reference coupon period
+            and termination status. Access does not raise domain errors.
         """
         ...
 

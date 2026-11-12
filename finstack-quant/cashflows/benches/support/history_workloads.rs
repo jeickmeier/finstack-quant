@@ -344,8 +344,14 @@ pub(super) fn check(fixture: &Fixture, schedule: &CashFlowSchedule) -> Reference
         let accrual = flow.accrual.as_ref().expect("explicit floating accrual");
         assert_eq!((accrual.start, accrual.end), (start, end));
         assert_eq!(accrual.day_count, DayCount::Act360);
-        assert_eq!(accrual.calendar_id.as_deref(), Some("weekends_only"));
-        assert_eq!(accrual.end_is_termination_date, quarter + 1 == COUPONS);
+        assert_eq!(
+            accrual.context.calendar_id.as_deref(),
+            Some("weekends_only")
+        );
+        assert_eq!(
+            accrual.context.end_is_termination_date,
+            Some(quarter + 1 == COUPONS)
+        );
         assert_eq!(flow.date, payment(end));
         assert_eq!(flow.reset_date, Some(reset));
         close(flow.accrual_factor, accrual_factor, 1e-12);

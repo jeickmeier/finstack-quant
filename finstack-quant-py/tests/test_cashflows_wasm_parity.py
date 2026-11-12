@@ -51,7 +51,7 @@ from finstack_quant.cashflows.builder import (
 )
 from finstack_quant.cashflows.fixings import materialize_fixings
 from finstack_quant.core.cashflow import CashFlow, CashFlowAccrual, CFKind
-from finstack_quant.core.dates import DayCount, Tenor, build_periods
+from finstack_quant.core.dates import DayCount, DayCountContext, Tenor, build_periods
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 
@@ -327,7 +327,12 @@ def _aggregation() -> Any:
 
 def _primitives() -> Any:
     flow = CashFlow(dt.date(2025, 7, 15), usd(30_000), "fixed", accrual_factor=0.5, rate=0.06)
-    accrual = CashFlowAccrual(dt.date(2025, 1, 15), dt.date(2025, 7, 15), DayCount.THIRTY_360)
+    accrual = CashFlowAccrual(
+        dt.date(2025, 1, 15),
+        dt.date(2025, 7, 15),
+        DayCount.THIRTY_360,
+        DayCountContext(end_is_termination_date=False),
+    )
     return {
         "parse": [CFKind.parse(name).name for name in ("fixed", "pre_payment", "collateral_substitution_out")],
         "interest_like": [CFKind.parse(kind).is_coupon() for kind in ("fixed", "floating", "fee", "notional")],

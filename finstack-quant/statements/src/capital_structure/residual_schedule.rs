@@ -164,13 +164,17 @@ pub(crate) fn rebuild_residual_interest(
                         .max()
                         .or(schedule.get_meta().issue_date)?;
                     Some(CashFlowAccrual {
-                        coupon_period: None,
-                        end_is_termination_date: false,
                         start,
                         end: original.date,
                         day_count: schedule.get_day_count(),
                         projected_index_rate: None,
-                        calendar_id: None,
+                        context: finstack_quant_core::dates::DayCountContextState {
+                            calendar_id: None,
+                            coupon_period: None,
+                            end_is_termination_date: Some(false),
+                            frequency: None,
+                            bus_basis: None,
+                        },
                     })
                 })
                 .ok_or_else(|| {
@@ -185,16 +189,8 @@ pub(crate) fn rebuild_residual_interest(
                 flows.extend(replacement);
                 continue;
             }
-            let context = DayCountContext {
-                calendar: accrual
-                    .calendar_id
-                    .as_deref()
-                    .map(finstack_quant_core::dates::calendar_by_id_strict)
-                    .transpose()?,
-                coupon_period: accrual.coupon_period.or(Some((accrual.start, accrual.end))),
-                end_is_termination_date: Some(accrual.end_is_termination_date),
-                ..Default::default()
-            };
+            let mut context = accrual.day_count_context()?;
+            context.coupon_period = context.coupon_period.or(Some((accrual.start, accrual.end)));
             let total = accrual
                 .day_count
                 .year_fraction(accrual.start, accrual.end, context)?;
@@ -242,9 +238,10 @@ pub(crate) fn rebuild_residual_interest(
                     bounds[0],
                     bounds[1],
                     DayCountContext {
-                        end_is_termination_date: Some(
-                            accrual.end_is_termination_date && bounds[1] == accrual.end,
-                        ),
+                        end_is_termination_date: accrual
+                            .context
+                            .end_is_termination_date
+                            .map(|termination| termination && bounds[1] == accrual.end),
                         ..context
                     },
                 )? / total;
@@ -267,10 +264,15 @@ pub(crate) fn rebuild_residual_interest(
                 flow.rate = Some(rate);
                 flow.accrual_factor = factor;
                 flow.accrual = Some(CashFlowAccrual {
-                    end_is_termination_date: accrual.end_is_termination_date
-                        && bounds[1] == accrual.end,
                     start: bounds[0],
                     end: bounds[1],
+                    context: finstack_quant_core::dates::DayCountContextState {
+                        end_is_termination_date: accrual
+                            .context
+                            .end_is_termination_date
+                            .map(|termination| termination && bounds[1] == accrual.end),
+                        ..accrual.context.clone()
+                    },
                     ..accrual.clone()
                 });
                 // A PIK row capitalizes exactly its reprojected interest; any

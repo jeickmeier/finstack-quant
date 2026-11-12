@@ -425,18 +425,17 @@ def test_accrual_retains_contractual_day_count_context(
 
 def test_typed_accrual_reference_metadata_roundtrips() -> None:
     from finstack_quant.core.cashflow import CashFlow, CashFlowAccrual, CFKind
-    from finstack_quant.core.dates import DayCount
+    from finstack_quant.core.dates import DayCount, DayCountContext
     from finstack_quant.core.money import Money
 
     metadata = CashFlowAccrual(
         "2025-01-15",
         "2025-10-15",
         DayCount.ACT_ACT_ISMA,
-        coupon_period=("2025-01-15", "2025-07-15"),
-        end_is_termination_date=True,
+        DayCountContext(coupon_period=("2025-01-15", "2025-07-15"), end_is_termination_date=True),
     )
     flow = CashFlow("2025-10-15", Money(75_000, "USD"), CFKind.STUB, 0.0).with_accrual(metadata)
     restored = CashFlow.from_json(flow.to_json()).accrual
     assert restored is not None
-    assert restored.coupon_period == (datetime.date(2025, 1, 15), datetime.date(2025, 7, 15))
-    assert restored.end_is_termination_date is True
+    assert restored.context.coupon_period == (datetime.date(2025, 1, 15), datetime.date(2025, 7, 15))
+    assert restored.context.end_is_termination_date is True

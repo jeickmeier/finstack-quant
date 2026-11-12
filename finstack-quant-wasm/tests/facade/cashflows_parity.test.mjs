@@ -352,7 +352,13 @@ const cases = {
       start: '2025-01-15',
       end: '2025-07-15',
       day_count: '30_360',
-      end_is_termination_date: false,
+      context: {
+        calendar_id: null,
+        frequency: null,
+        bus_basis: null,
+        coupon_period: null,
+        end_is_termination_date: false,
+      },
     };
     return {
       parse: ['fixed', 'pre_payment', 'collateral_substitution_out'].map((name) =>

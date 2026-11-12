@@ -45,10 +45,14 @@ fn row(
         start,
         end,
         day_count,
-        calendar_id: None,
-        coupon_period: Some((start, end)),
-        end_is_termination_date: false,
         projected_index_rate: None,
+        context: finstack_quant_core::dates::DayCountContextState {
+            calendar_id: None,
+            coupon_period: Some((start, end)),
+            end_is_termination_date: Some(false),
+            frequency: None,
+            bus_basis: None,
+        },
     })
 }
 
@@ -531,8 +535,12 @@ fn lazy_calendar_records() -> Vec<Value> {
         DayCount::Act365F,
         91.0 / 365.0,
     );
-    future.accrual.as_mut().expect("future accrual").calendar_id =
-        Some("CCM-NO-SUCH-CALENDAR".into());
+    future
+        .accrual
+        .as_mut()
+        .expect("future accrual")
+        .context
+        .calendar_id = Some("CCM-NO-SUCH-CALENDAR".into());
     let schedule = hand_schedule(
         vec![active, future],
         "2025-01-01",

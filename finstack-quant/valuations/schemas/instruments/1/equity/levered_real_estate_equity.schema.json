@@ -625,29 +625,9 @@
       "additionalProperties": false,
       "description": "Contractual accrual metadata attached to one cashflow.",
       "properties": {
-        "calendar_id": {
-          "description": "Calendar identifier for calendar-dependent day counts, including BUS/252.\nRequired for BUS/252; otherwise optional. Joint calendars use `+`.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "coupon_period": {
-          "description": "Unadjusted regular reference coupon period for ACT/ACT ICMA, or the\nactual full contractual coupon period for ACT/365L, including when\nthis flow represents only a rate or balance subinterval.\nACT/365L metadata must retain these boundaries to select the original\ncoupon's denominator; other conventions may leave this field `None`.",
-          "maxItems": 2,
-          "minItems": 2,
-          "prefixItems": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            },
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
-            }
-          ],
-          "type": [
-            "array",
-            "null"
-          ]
+        "context": {
+          "$ref": "#/$defs/DayCountContextState",
+          "description": "The complete day-count context the accrual factor was calculated with\n(record CORE-CONVENTIONS-015 #7): the calendar for calendar-dependent\nconventions (BUS/252 requires it; joint calendars use `+`), the coupon\nfrequency and the regular ICMA reference period or full ACT/365L coupon\nbounds (`coupon_period`, retained for every subinterval of that\ncoupon), and whether `end` is the instrument termination date for the\n30E/360 ISDA February exception (`None` is unspecified, which that\nconvention rejects)."
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
@@ -656,11 +636,6 @@
         "end": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Contractual accrual-period end date."
-        },
-        "end_is_termination_date": {
-          "default": false,
-          "description": "Whether `end` is the instrument termination date, for the 30E/360 ISDA\nFebruary exception. Intermediate coupon and rate-step ends are false.",
-          "type": "boolean"
         },
         "projected_index_rate": {
           "description": "Projected index rate before spread, gearing, caps, or floors.\nSerialization rejects non-finite rates instead of encoding them as absent.",
@@ -678,7 +653,8 @@
       "required": [
         "start",
         "end",
-        "day_count"
+        "day_count",
+        "context"
       ],
       "type": "object"
     },
@@ -1242,6 +1218,67 @@
           "type": "object"
         }
       ]
+    },
+    "DayCountContextState": {
+      "additionalProperties": false,
+      "description": "Serializable snapshot of [`DayCountContext`] state for persistence and interchange.\n\nThis struct captures the optional context parameters (calendar, frequency, business-day basis)\nneeded to reconstruct a [`DayCountContext`] at runtime using the built-in calendar lookup.\n`Default` is the empty context (no calendar, frequency, basis, coupon\nperiod or termination status), the snapshot of\n[`DayCountContext::default`].",
+      "properties": {
+        "bus_basis": {
+          "description": "Optional custom business-day divisor (defaults to 252 when `None`).",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "calendar_id": {
+          "description": "Optional calendar code (e.g. \"target2\").",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "coupon_period": {
+          "default": null,
+          "description": "Optional unadjusted regular ICMA reference period or ACT/365L enclosing\ncoupon `(start, end)`, serialized as two ISO dates.\n\nRequired for exact ICMA accrual on round-trip. `None` selects the\nfrequency-only ICMA calculation path; ACT/365L requires these dates.",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            }
+          ],
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "end_is_termination_date": {
+          "default": null,
+          "description": "Whether the later accrual endpoint is the contractual termination\ndate; `None` (omitted or `null` on the wire) means unspecified, which\n30E/360 ISDA rejects.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "frequency": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional coupon frequency, required for ACT/ACT ISMA."
+        }
+      },
+      "type": "object"
     },
     "DdtlSpec": {
       "additionalProperties": false,

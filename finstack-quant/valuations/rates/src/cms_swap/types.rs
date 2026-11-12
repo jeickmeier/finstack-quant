@@ -619,13 +619,17 @@ impl CmsSwap {
                     Some(coupon_rate),
                 )
                 .with_accrual(CashFlowAccrual {
-                    coupon_period: None,
-                    end_is_termination_date: false,
-                    calendar_id: None,
                     start: accrual_start,
                     end: payment_date,
                     day_count: self.day_count,
                     projected_index_rate: None,
+                    context: finstack_quant_core::dates::DayCountContextState {
+                        calendar_id: None,
+                        coupon_period: None,
+                        end_is_termination_date: Some(false),
+                        frequency: None,
+                        bus_basis: None,
+                    },
                 }),
             );
             accrual_start = payment_date;
@@ -703,13 +707,17 @@ impl CmsSwap {
                     Some(rate),
                 )
                 .with_accrual(CashFlowAccrual {
-                    coupon_period: None,
-                    end_is_termination_date: false,
-                    calendar_id: None,
                     start: period.accrual_start,
                     end: period.accrual_end,
                     day_count,
                     projected_index_rate: index_rate,
+                    context: finstack_quant_core::dates::DayCountContextState {
+                        calendar_id: None,
+                        coupon_period: None,
+                        end_is_termination_date: Some(false),
+                        frequency: None,
+                        bus_basis: None,
+                    },
                 }),
             );
         }

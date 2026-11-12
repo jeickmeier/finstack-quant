@@ -39,8 +39,10 @@ def test_json_accrual_uses_settlement_after_record_date() -> None:
                     "start": "2025-01-01",
                     "end": "2025-07-01",
                     "day_count": "act_act_isma",
-                    "coupon_period": ["2025-01-01", "2025-07-01"],
-                    "end_is_termination_date": False,
+                    "context": {
+                        "coupon_period": ["2025-01-01", "2025-07-01"],
+                        "end_is_termination_date": False,
+                    },
                 },
             }
         ],

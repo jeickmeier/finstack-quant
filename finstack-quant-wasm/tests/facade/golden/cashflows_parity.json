@@ -30,9 +30,13 @@
           "start": "2025-01-15",
           "end": "2025-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-01-15", "2025-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-01-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -49,9 +53,13 @@
           "start": "2025-07-15",
           "end": "2026-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-07-15", "2026-01-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-07-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -68,9 +76,13 @@
           "start": "2026-01-15",
           "end": "2026-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-01-15", "2026-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-01-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -87,9 +99,13 @@
           "start": "2026-07-15",
           "end": "2027-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-07-15", "2027-01-15"],
-          "end_is_termination_date": true
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-07-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
         }
       },
       {
@@ -155,9 +171,13 @@
           "start": "2025-01-15",
           "end": "2025-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-01-15", "2025-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-01-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -214,9 +234,13 @@
           "start": "2025-10-15",
           "end": "2026-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-07-15", "2026-01-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-07-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -233,9 +257,13 @@
           "start": "2025-07-15",
           "end": "2025-10-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-07-15", "2026-01-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-07-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -267,9 +295,13 @@
           "start": "2026-01-15",
           "end": "2026-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-01-15", "2026-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-01-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -301,9 +333,13 @@
           "start": "2026-07-15",
           "end": "2027-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-07-15", "2027-01-15"],
-          "end_is_termination_date": true
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-07-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
         }
       },
       {
@@ -391,9 +427,13 @@
           "start": "2025-01-15",
           "end": "2025-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-01-15", "2025-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-01-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -410,9 +450,13 @@
           "start": "2025-07-15",
           "end": "2026-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-07-15", "2026-01-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-07-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -429,9 +473,13 @@
           "start": "2026-01-15",
           "end": "2026-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-01-15", "2026-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-01-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -448,9 +496,13 @@
           "start": "2026-07-15",
           "end": "2027-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-07-15", "2027-01-15"],
-          "end_is_termination_date": true
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-07-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
         }
       },
       {
@@ -516,9 +568,13 @@
           "start": "2025-01-15",
           "end": "2025-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-01-15", "2025-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-01-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
         },
         "principal_delta": {
           "amount": "20000",
@@ -540,9 +596,13 @@
           "start": "2025-07-15",
           "end": "2026-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-07-15", "2026-01-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-07-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
         },
         "principal_delta": {
           "amount": "20400",
@@ -564,9 +624,13 @@
           "start": "2026-01-15",
           "end": "2026-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-01-15", "2026-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-01-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -583,9 +647,13 @@
           "start": "2026-01-15",
           "end": "2026-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-01-15", "2026-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-01-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
         },
         "principal_delta": {
           "amount": "20808",
@@ -607,9 +675,13 @@
           "start": "2026-07-15",
           "end": "2027-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-07-15", "2027-01-15"],
-          "end_is_termination_date": true
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-07-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
         }
       },
       {
@@ -626,9 +698,13 @@
           "start": "2026-07-15",
           "end": "2027-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-07-15", "2027-01-15"],
-          "end_is_termination_date": true
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-07-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
         },
         "principal_delta": {
           "amount": "21224.16",
@@ -699,9 +775,13 @@
           "start": "2025-01-15",
           "end": "2025-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-01-15", "2025-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-01-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
         },
         "principal_delta": {
           "amount": "30000",
@@ -723,9 +803,13 @@
           "start": "2025-07-15",
           "end": "2026-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-07-15", "2026-01-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-07-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
         },
         "principal_delta": {
           "amount": "30900",
@@ -747,9 +831,13 @@
           "start": "2026-01-15",
           "end": "2026-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-01-15", "2026-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-01-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -766,9 +854,13 @@
           "start": "2026-07-15",
           "end": "2027-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-07-15", "2027-01-15"],
-          "end_is_termination_date": true
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-07-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
         }
       },
       {
@@ -835,9 +927,13 @@
           "end": "2025-04-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04019444444444444,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-01-15", "2025-04-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-01-15", "2025-04-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -855,9 +951,13 @@
           "end": "2025-07-15",
           "day_count": "act_360",
           "projected_index_rate": 0.041444444444444443,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-04-15", "2025-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-04-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -875,9 +975,13 @@
           "end": "2025-10-15",
           "day_count": "act_360",
           "projected_index_rate": 0.042708333333333334,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-07-15", "2025-10-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-07-15", "2025-10-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -895,9 +999,13 @@
           "end": "2026-01-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04398611111111111,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-10-15", "2026-01-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-10-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -915,9 +1023,13 @@
           "end": "2026-04-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04513194444444444,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-01-15", "2026-04-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-01-15", "2026-04-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -935,9 +1047,13 @@
           "end": "2026-07-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04575694444444444,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-04-15", "2026-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-04-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -955,9 +1071,13 @@
           "end": "2026-10-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04638888888888889,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-07-15", "2026-10-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-07-15", "2026-10-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -975,9 +1095,13 @@
           "end": "2027-01-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04702777777777778,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-10-15", "2027-01-15"],
-          "end_is_termination_date": true
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-10-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
         }
       },
       {
@@ -1085,9 +1209,13 @@
           "start": "2025-01-15",
           "end": "2025-04-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-01-15", "2025-04-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-01-15", "2025-04-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -1104,9 +1232,13 @@
           "start": "2025-04-15",
           "end": "2025-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-04-15", "2025-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-04-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -1123,9 +1255,13 @@
           "start": "2025-07-15",
           "end": "2025-10-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-07-15", "2025-10-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-07-15", "2025-10-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -1142,9 +1278,13 @@
           "start": "2025-10-15",
           "end": "2026-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-10-15", "2026-01-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-10-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -1162,9 +1302,13 @@
           "end": "2026-04-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04513194444444444,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-01-15", "2026-04-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-01-15", "2026-04-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -1182,9 +1326,13 @@
           "end": "2026-07-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04575694444444444,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-04-15", "2026-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-04-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -1202,9 +1350,13 @@
           "end": "2026-10-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04638888888888889,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-07-15", "2026-10-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-07-15", "2026-10-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -1222,9 +1374,13 @@
           "end": "2027-01-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04702777777777778,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-10-15", "2027-01-15"],
-          "end_is_termination_date": true
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-10-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
         }
       },
       {
@@ -1314,9 +1470,13 @@
             "end": "2025-04-15",
             "day_count": "act_360",
             "projected_index_rate": 0.04019444444444444,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2025-01-15", "2025-04-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2025-01-15", "2025-04-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -1334,9 +1494,13 @@
             "end": "2025-07-15",
             "day_count": "act_360",
             "projected_index_rate": 0.041444444444444443,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2025-04-15", "2025-07-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2025-04-15", "2025-07-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -1354,9 +1518,13 @@
             "end": "2025-10-15",
             "day_count": "act_360",
             "projected_index_rate": 0.042708333333333334,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2025-07-15", "2025-10-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2025-07-15", "2025-10-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -1374,9 +1542,13 @@
             "end": "2026-01-15",
             "day_count": "act_360",
             "projected_index_rate": 0.04398611111111111,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2025-10-15", "2026-01-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2025-10-15", "2026-01-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -1394,9 +1566,13 @@
             "end": "2026-04-15",
             "day_count": "act_360",
             "projected_index_rate": 0.04513194444444444,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2026-01-15", "2026-04-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2026-01-15", "2026-04-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -1414,9 +1590,13 @@
             "end": "2026-07-15",
             "day_count": "act_360",
             "projected_index_rate": 0.04575694444444444,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2026-04-15", "2026-07-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2026-04-15", "2026-07-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -1434,9 +1614,13 @@
             "end": "2026-10-15",
             "day_count": "act_360",
             "projected_index_rate": 0.04638888888888889,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2026-07-15", "2026-10-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2026-07-15", "2026-10-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -1454,9 +1638,13 @@
             "end": "2027-01-15",
             "day_count": "act_360",
             "projected_index_rate": 0.04702777777777778,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2026-10-15", "2027-01-15"],
-            "end_is_termination_date": true
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2026-10-15", "2027-01-15"],
+              "end_is_termination_date": true
+            }
           }
         },
         {
@@ -1565,9 +1753,13 @@
             "end": "2025-04-15",
             "day_count": "act_360",
             "projected_index_rate": 0.04019444444444444,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2025-01-15", "2025-04-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2025-01-15", "2025-04-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -1585,9 +1777,13 @@
             "end": "2025-07-15",
             "day_count": "act_360",
             "projected_index_rate": 0.041444444444444443,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2025-04-15", "2025-07-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2025-04-15", "2025-07-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -1605,9 +1801,13 @@
             "end": "2025-10-15",
             "day_count": "act_360",
             "projected_index_rate": 0.042708333333333334,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2025-07-15", "2025-10-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2025-07-15", "2025-10-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -1625,9 +1825,13 @@
             "end": "2026-01-15",
             "day_count": "act_360",
             "projected_index_rate": 0.04398611111111111,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2025-10-15", "2026-01-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2025-10-15", "2026-01-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -1645,9 +1849,13 @@
             "end": "2026-04-15",
             "day_count": "act_360",
             "projected_index_rate": 0.04513194444444444,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2026-01-15", "2026-04-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2026-01-15", "2026-04-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -1665,9 +1873,13 @@
             "end": "2026-07-15",
             "day_count": "act_360",
             "projected_index_rate": 0.04575694444444444,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2026-04-15", "2026-07-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2026-04-15", "2026-07-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -1685,9 +1897,13 @@
             "end": "2026-10-15",
             "day_count": "act_360",
             "projected_index_rate": 0.04638888888888889,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2026-07-15", "2026-10-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2026-07-15", "2026-10-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -1705,9 +1921,13 @@
             "end": "2027-01-15",
             "day_count": "act_360",
             "projected_index_rate": 0.04702777777777778,
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2026-10-15", "2027-01-15"],
-            "end_is_termination_date": true
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2026-10-15", "2027-01-15"],
+              "end_is_termination_date": true
+            }
           }
         },
         {
@@ -1816,9 +2036,13 @@
           "start": "2025-01-15",
           "end": "2025-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-01-15", "2025-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-01-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -1835,9 +2059,13 @@
           "start": "2025-07-15",
           "end": "2026-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-07-15", "2026-01-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-07-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -1854,9 +2082,13 @@
           "start": "2026-01-15",
           "end": "2026-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-01-15", "2026-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-01-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -1873,9 +2105,13 @@
           "start": "2026-07-15",
           "end": "2027-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-07-15", "2027-01-15"],
-          "end_is_termination_date": true
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-07-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
         }
       },
       {
@@ -1909,9 +2145,13 @@
           "start": "2025-01-15",
           "end": "2025-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-01-15", "2025-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-01-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -1928,9 +2168,13 @@
           "start": "2025-07-15",
           "end": "2026-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-07-15", "2026-01-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-07-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -1947,9 +2191,13 @@
           "start": "2026-01-15",
           "end": "2026-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-01-15", "2026-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-01-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -1966,9 +2214,13 @@
           "start": "2026-07-15",
           "end": "2027-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-07-15", "2027-01-15"],
-          "end_is_termination_date": true
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-07-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
         }
       }
     ],
@@ -2037,9 +2289,13 @@
           "start": "2025-01-15",
           "end": "2025-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-01-15", "2025-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-01-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2056,9 +2312,13 @@
           "start": "2025-07-15",
           "end": "2026-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-07-15", "2026-01-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-07-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2075,9 +2335,13 @@
           "start": "2026-01-15",
           "end": "2026-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-01-15", "2026-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-01-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2094,9 +2358,13 @@
           "start": "2026-07-15",
           "end": "2027-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-07-15", "2027-01-15"],
-          "end_is_termination_date": true
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-07-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
         }
       },
       {
@@ -2162,9 +2430,13 @@
           "start": "2025-01-15",
           "end": "2025-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-01-15", "2025-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-01-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2181,9 +2453,13 @@
           "start": "2025-07-15",
           "end": "2026-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-07-15", "2026-01-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-07-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2200,9 +2476,13 @@
           "start": "2026-01-15",
           "end": "2026-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-01-15", "2026-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-01-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2219,9 +2499,13 @@
           "start": "2026-07-15",
           "end": "2027-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-07-15", "2027-01-15"],
-          "end_is_termination_date": true
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-07-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
         }
       },
       {
@@ -2287,9 +2571,13 @@
           "start": "2025-01-15",
           "end": "2025-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-01-15", "2025-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-01-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2306,9 +2594,13 @@
           "start": "2025-07-15",
           "end": "2026-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-07-15", "2026-01-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-07-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2325,9 +2617,13 @@
           "start": "2026-01-15",
           "end": "2026-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-01-15", "2026-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-01-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2344,9 +2640,13 @@
           "start": "2026-07-15",
           "end": "2027-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-07-15", "2027-01-15"],
-          "end_is_termination_date": true
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-07-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
         }
       },
       {
@@ -2465,9 +2765,13 @@
             "start": "2025-01-15",
             "end": "2025-07-15",
             "day_count": "30_360",
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2025-01-15", "2025-07-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2025-01-15", "2025-07-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -2484,9 +2788,13 @@
             "start": "2025-07-15",
             "end": "2026-01-15",
             "day_count": "30_360",
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2025-07-15", "2026-01-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2025-07-15", "2026-01-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -2503,9 +2811,13 @@
             "start": "2026-01-15",
             "end": "2026-07-15",
             "day_count": "30_360",
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2026-01-15", "2026-07-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2026-01-15", "2026-07-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -2522,9 +2834,13 @@
             "start": "2026-07-15",
             "end": "2027-01-15",
             "day_count": "30_360",
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2026-07-15", "2027-01-15"],
-            "end_is_termination_date": true
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2026-07-15", "2027-01-15"],
+              "end_is_termination_date": true
+            }
           }
         },
         {
@@ -2575,9 +2891,13 @@
             "start": "2025-01-15",
             "end": "2025-07-15",
             "day_count": "30_360",
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2025-01-15", "2025-07-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2025-01-15", "2025-07-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -2594,9 +2914,13 @@
             "start": "2025-07-15",
             "end": "2026-01-15",
             "day_count": "30_360",
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2025-07-15", "2026-01-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2025-07-15", "2026-01-15"],
+              "end_is_termination_date": false
+            }
           }
         }
       ],
@@ -2647,9 +2971,13 @@
           "end": "2025-04-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04019444444444444,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-01-15", "2025-04-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-01-15", "2025-04-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2667,9 +2995,13 @@
           "end": "2025-07-15",
           "day_count": "act_360",
           "projected_index_rate": 0.041444444444444443,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-04-15", "2025-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-04-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2687,9 +3019,13 @@
           "end": "2025-10-15",
           "day_count": "act_360",
           "projected_index_rate": 0.042708333333333334,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-07-15", "2025-10-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-07-15", "2025-10-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2707,9 +3043,13 @@
           "end": "2026-01-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04398611111111111,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-10-15", "2026-01-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-10-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2727,9 +3067,13 @@
           "end": "2026-04-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04513194444444444,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-01-15", "2026-04-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-01-15", "2026-04-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2747,9 +3091,13 @@
           "end": "2026-07-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04575694444444444,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-04-15", "2026-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-04-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2767,9 +3115,13 @@
           "end": "2026-10-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04638888888888889,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-07-15", "2026-10-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-07-15", "2026-10-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -2787,9 +3139,13 @@
           "end": "2027-01-15",
           "day_count": "act_360",
           "projected_index_rate": 0.04702777777777778,
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-10-15", "2027-01-15"],
-          "end_is_termination_date": true
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-10-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
         }
       },
       {
@@ -3016,9 +3372,13 @@
             "start": "2025-01-15",
             "end": "2025-07-15",
             "day_count": "30_360",
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2025-01-15", "2025-07-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2025-01-15", "2025-07-15"],
+              "end_is_termination_date": false
+            }
           }
         },
         {
@@ -3035,9 +3395,13 @@
             "start": "2025-07-15",
             "end": "2026-01-15",
             "day_count": "30_360",
-            "calendar_id": "weekends_only",
-            "coupon_period": ["2025-07-15", "2026-01-15"],
-            "end_is_termination_date": false
+            "context": {
+              "calendar_id": "weekends_only",
+              "frequency": null,
+              "bus_basis": null,
+              "coupon_period": ["2025-07-15", "2026-01-15"],
+              "end_is_termination_date": false
+            }
           }
         }
       ],
@@ -3097,9 +3461,13 @@
           "start": "2025-01-15",
           "end": "2025-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-01-15", "2025-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-01-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -3116,9 +3484,13 @@
           "start": "2025-07-15",
           "end": "2026-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2025-07-15", "2026-01-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2025-07-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -3135,9 +3507,13 @@
           "start": "2026-01-15",
           "end": "2026-07-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-01-15", "2026-07-15"],
-          "end_is_termination_date": false
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-01-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
         }
       },
       {
@@ -3154,9 +3530,13 @@
           "start": "2026-07-15",
           "end": "2027-01-15",
           "day_count": "30_360",
-          "calendar_id": "weekends_only",
-          "coupon_period": ["2026-07-15", "2027-01-15"],
-          "end_is_termination_date": true
+          "context": {
+            "calendar_id": "weekends_only",
+            "frequency": null,
+            "bus_basis": null,
+            "coupon_period": ["2026-07-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
         }
       },
       {
@@ -3302,7 +3682,13 @@
         "start": "2025-01-15",
         "end": "2025-07-15",
         "day_count": "30_360",
-        "end_is_termination_date": false
+        "context": {
+          "calendar_id": null,
+          "frequency": null,
+          "bus_basis": null,
+          "coupon_period": null,
+          "end_is_termination_date": false
+        }
       }
     },
     "with_principal_delta": {
