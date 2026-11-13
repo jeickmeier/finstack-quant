@@ -226,6 +226,132 @@ Complete best-to-worst bands cover [0,100], boundaries belong to the better band
 and every representative classifies to its own band. Normalized IDs/labels and
 threshold/minimum references are strict; NR aliases cannot be numeric bands.
 
+Financial distress scoring requires an explicit model and prepared ratios.
+Apply screening or probability links only to a checked finite score.
+Altman screens and the historical Ohlson and Zmijewski model probabilities
+carry their declared meanings and no automatic master-scale grade.
+[Accepted distress-score contract](docs/decisions/financial/models-and-valuations-credit/01-financial-distress-scores.md#accepted-decision-for-checked-financial-distress-scores).
+
+Gaussian PD conditioning preserves the declared one-year event and
+probability basis. Master-scale bands cover the full probability domain
+and classify their own representative values. PD scales and rating
+factors require explicitly selected immutable source snapshots.
+[Accepted PD and rating-data contract](docs/decisions/financial/models-and-valuations-credit/02-pd-scales-and-rating-data.md#accepted-decision-for-checked-pd-transforms-and-explicit-rating-data).
+
+Rating migration uses an explicit ordered state space and default designation.
+Supplied matrices preserve exact default absorption and use one checked exit
+rate per generator row. Durations are elapsed model years. Restricted
+principal-log fitting requires explicit mode, correction and reconstruction
+budgets. Projection and computed transition rows expose bounded numerical
+correction. A shared checked jump law uses explicit seed, stream and work
+controls, with conditional frequencies tied to their start and horizon.
+[Accepted rating migration contract](docs/decisions/financial/models-and-valuations-credit/03-rating-migration.md#accepted-decision-for-checked-rating-migration-generator-fitting-and-paths).
+
+Structural default requires an explicit law and probability measure. Tail
+arithmetic and jump omission are checked. CreditGrades preserves its
+origin mass and separates barrier recovery from obligation loss recovery.
+Calibrations reprice their actual outputs. Hazard export and the CDS proxy
+carry explicit origin, clock and approximation semantics. Asset paths
+carry no default events, and reports use no automatic EDF or rating map.
+[Accepted structural default contract](docs/decisions/financial/models-and-valuations-credit/04-structural-default.md#accepted-decision-for-checked-structural-default-models-and-calibrated-outputs).
+
+Leverage hazard uses checked uncapped maps and same-basis post-PIK leverage.
+Market anchoring uses the local integral on the retained source clock.
+PIK decision rules require their selected features. Nested equity comparison
+uses separately supplied cash and PIK amounts, inclusive discrete monitoring,
+explicit paired replay and a cash tie. Contractual eligibility, coupon cash
+and capitalization, and the bond's outer structural default remain product-owned.
+[Accepted leverage hazard and PIK contract](docs/decisions/financial/models-and-valuations-credit/05-hazard-and-toggle.md#accepted-decision-for-checked-leverage-hazard-and-pik-election-models).
+
+Projected exposure requires an explicit conversion factor. Workout and
+downturn LGD use their stated scenario inputs and bounds. Beta recovery
+uses checked moments, replay and returned-tail acceptance, with explicit
+frozen data selection. Priority allocation validates full exclusive pool
+values against one inclusive net estate and pays general deficiencies
+by supplied rank. Settlement, legal priority and empirical applicability
+remain separately owned.
+[Accepted exposure, loss and recovery contract](docs/decisions/financial/models-and-valuations-credit/06-recovery-and-lgd.md#accepted-decision-for-checked-exposure-loss-and-recovery-allocations).
+
+Pool defaults use an explicit monthly model and one checked period copula
+law for both finite names and conditional fractions. Probability endpoints
+remain literal and paired draws align by name, period and role. The static
+intensity law integrates conditional probability for expected MDR. Factor
+dynamics, period aggregation, eligibility and recovery stay product-owned.
+[Accepted pool default contract](docs/decisions/financial/models-and-valuations-credit/07-pool-defaults.md#accepted-decision-for-checked-pool-default-rates-and-period-copula-resolution).
+
+Pool prepayment uses explicit annual CPR shocks, checked monthly conversion
+and bounded SMM expectations. Refinance burnout uses a named baseline,
+and each regime transition advances with its applied month. Correlation
+structures preserve authored dependence. Scalar routes and factor coupling
+require explicit choices, and shocks revalidate the full resulting structure.
+[Accepted prepayment and pool correlation contract](docs/decisions/financial/models-and-valuations-credit/08-prepayment-and-pool-correlation.md#accepted-decision-for-checked-prepayment-and-pool-correlation).
+
+Credit copulas preserve literal PD endpoints, explicit conditional factor
+geometry and one shared Student-t scale. Random factor loading is calibrated
+to its stated squared-loading moment. Fixed integration uses the selected
+measure and order. Validated latent factors apply the complete original-coordinate
+shock vector. Marginals, measure, dates and model use remain product-owned.
+[Accepted copula and latent factor contract](docs/decisions/financial/models-and-valuations-credit/09-copula-kernels.md#accepted-decision-for-checked-copula-laws-and-latent-factors).
+
+Fixed-horizon portfolio loss uses authored signed loadings and explicit
+severity. Systematic recovery uses a selected coordinate. Recovery on
+default differs from unconditional recovery. Replay addresses each path and
+role independently. Empirical VaR and ES share exact confidence geometry;
+tranche events compare amounts before rounding.
+[Accepted portfolio loss and recovery contract](docs/decisions/financial/models-and-valuations-credit/10-portfolio-loss-and-correlated-recovery.md#accepted-decision-for-checked-portfolio-loss-and-correlated-recovery).
+
+Liquidity estimates distinguish cash turnover from traded quantity and quote
+mid from arrival price. Execution models require explicit impact coefficients
+and report costs separately from timing risk. Liquidity VaR applies a supplied
+spread stress. Known zero liquidation capacity differs from missing data and
+finite days; tier cutoffs are explicit caller policy.
+[Accepted liquidity and execution contract](docs/decisions/financial/models-and-valuations-credit/11-liquidity.md#accepted-decision-for-checked-liquidity-and-execution-estimates).
+
+Single-name CDS uses explicit dated terms and a valuation-close clock with
+the final covered day included. The same covered interval governs protection
+and accrual on default. Earned coupons retain their payment dates. Default
+settlement is distinct from upfront settlement. Local hazard and checked
+discounting produce one set of legs for economic PV and matching quotes.
+[Accepted CDS legs and quote basis](docs/decisions/financial/models-and-valuations-credit/12-cds-legs.md#accepted-decision-for-checked-cds-legs-and-quote-basis).
+
+CDS and index risk reprice one economic mark with frozen effective exposures.
+Quote, rate and recovery bases are explicit. Expected loss uses covered
+default mass. Jump-to-default subtracts the dirty mark of terminated
+rights from settlement PV. Margin consumes deltas at explicit factors.
+[Accepted CDS and index risk contract](docs/decisions/financial/models-and-valuations-credit/13-cds-and-index-risk.md#accepted-decision-for-checked-cds-and-index-risk).
+
+CDS index pricing resolves live exposure once from the selected curve or
+original member weights. Confirmed event cash and earned coupons keep
+their own entitlements and dates. Residual quotes use aggregate analytic
+legs. Prospective cash and analytic PV use the same pricing geometry.
+[Accepted CDS index valuation and cashflows](docs/decisions/financial/models-and-valuations-credit/14-index-valuation.md#accepted-decision-for-checked-cds-index-valuation-and-cashflows).
+
+CDS options anchor the forward to dated CDS legs and use a bounded
+increasing spread-state mark. Exercise cash and default entitlements are
+explicit. Index exercise uses original-notional amounts. Volatility is bound
+to the selected model and clock. Confirmed exercise state governs settlement.
+[Accepted CDS option valuation](docs/decisions/financial/models-and-valuations-credit/15-cds-option-quadrature.md#accepted-decision-for-checked-cds-option-valuation).
+
+CDS option risk reprices the same resolved lifecycle for both strike types.
+Keep matched quote replay, hedge basis, annual model-volatility risk, and
+diffusion-only time decay explicit. Standalone implied volatility requires
+an identified total premium in contract currency and an independent repricing
+gate; unavailable volatility is not zero.
+[Accepted CDS option risk and implied volatility](docs/decisions/financial/models-and-valuations-credit/16-cds-option-risk-and-inversion.md#accepted-decision-for-checked-cds-option-risk-and-implied-volatility).
+
+Synthetic tranches retain original pool exposure, observed seasoning, and the
+explicit dependence law and maturity-bound correlation source. Check bottom-up
+loss and top-down recovery erosion for capacity and time consistency at every
+requested date. Carry grid and integration allowances through original-width
+normalization and report infeasible results as errors.
+[Accepted finite-pool tranche losses](docs/decisions/financial/models-and-valuations-credit/17-tranche-loss-distribution.md#accepted-decision-for-checked-finite-pool-tranche-losses).
+
+Tranche projection uses checked daily loss increments for protection
+and opening outstanding for premium. Preserve confirmed cash and explicit
+same-day entitlement through maturity and wipeout. Price and export use
+the same signed native cash and payment dates.
+[Accepted tranche cashflows and settlement](docs/decisions/financial/models-and-valuations-credit/18-tranche-projection.md#accepted-decision-for-checked-tranche-cashflows-and-settlement).
+
 Construct and restore private validated state atomically; preserve complete model
 values/order/identity/source in snapshots and distinguish lossy presentation tables.
 Metric weighting/missing-factor policy, empirical PD/transition/recovery/WARF,
@@ -2207,6 +2333,313 @@ uncertainty and actual work. Reconcile callable range accrual, risk
 and existing host routes.
 [Clause map M299–M302](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
 
+### 1.76 Checked Nelson–Siegel factors and VAR forecasts
+
+**Detailed decision:** [MODELS-ANALYTIC-27](docs/decisions/financial/models-analytic/diebold-li-var.md#accepted-decision-for-checked-nelsonsiegel-factors-and-var-forecasts) was accepted on 2026-11-10.
+
+Use qualified decimal zero-yield panels, explicit observation
+cadence and fixed decay in inverse maturity-years. Fit Nelson–Siegel
+factors with checked full-rank least squares. Constant tenor
+histories have unavailable R².
+
+Fit the one-step affine VAR with positive residual degrees of
+freedom and strict stability of the represented transition. Admit
+singular innovation covariance. Propagate its root and the affine
+mean to the requested observation horizon. Report fixed-parameter
+marginal fitted-yield prediction intervals and reconcile validated
+state and existing host paths.
+[Clause map M303–M306](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.77 Checked yield-change PCA and scenarios
+
+**Detailed decision:** [MODELS-ANALYTIC-28](docs/decisions/financial/models-analytic/yield-pca.md#accepted-decision-for-checked-yield-change-pca-and-scenarios) was accepted on 2026-11-11.
+
+Use actual maturity coordinates and one declared observation
+interval. Center decimal yield changes in their original units
+and use bounded SVD with checked numerical retention. Keep fitted
+axis orientation and account for the full represented spectrum,
+including the omitted tail in variance thresholds and views.
+
+Reconstruct changes with their mean and apply one-interval
+standard-deviation shocks on the exact fitted maturity grid.
+Preserve checked scale, validated fit and view state, and
+existing host paths.
+[Clause map M307–M310](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.78 Checked CRR and Leisen–Reimer lattices
+
+**Detailed decision:** [MODELS-NUMERICAL-001](docs/decisions/financial/models-numerical/equity-binomial-construction.md#accepted-decision-for-checked-crr-and-leisenreimer-lattices) was accepted on 2026-11-11.
+
+Require a selected law, literal positive count and explicit work
+budget. Use homogeneous indexed times with exact expiry and
+one-state zero-volatility limits. Require strict stochastic support,
+checked CRR transitions and odd-count strike-centered LR with
+Peizer–Pratt method 2 and complementary weights.
+
+Compare checked intrinsic with discounted continuation only at
+qualified exercise nodes. Return the selected finite lattice's
+premium in per-unit native units. Carry method and grid through
+product pricing and risk, and qualify accuracy at the intended
+configurations.
+[Clause map M311–M314](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.79 Checked escrowed dividends and lattice exercise
+
+**Detailed decision:** [MODELS-NUMERICAL-002](docs/decisions/financial/models-numerical/dividends-and-lattice-exercise.md#accepted-decision-for-checked-escrowed-dividends-and-lattice-exercise) was accepted on 2026-11-11.
+
+Value qualified cash per share at its actual ex boundary using
+its actual payment date. Carry deterministic claims through a
+declared underlying reserve horizon and apply volatility to the
+positive risky component. Center stochastic LR on the positive
+strike less terminal reserve and evaluate payoff on full spot.
+
+Place live jumps and explicit exercise opportunities exactly on
+the selected lattice. Use owner-qualified origin, terminal and
+exercise phases. Roll back through each instantaneous ex event
+in reverse chronological order. Reuse the dated preparation in
+actual pricing and risk and retain the existing host boundary.
+[Clause map M315–M318](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.80 Checked tree discounting and rollback
+
+**Detailed decision:** [MODELS-NUMERICAL-003](docs/decisions/financial/models-numerical/tree-discounting-and-induction.md#accepted-decision-for-checked-tree-discounting-and-rollback) was accepted on 2026-11-11.
+
+Use the same prepared intervals, checked base discounts and
+transitions for calibration and rollback. Apply a selected
+Continuous or nodewise Periodic OAS on its own quote basis.
+Check the lattice and work budget, discount the signed child
+expectation once and propagate callback failures.
+
+Expose raw signed model state and the applied outgoing discount
+where needed. Terminal state supplies no outgoing interval or
+converted spread. Use the same selected spread law for PV,
+fallible inversion and risk. Product owners qualify dated
+cash and exercise treatment.
+[Clause map M319–M322](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.81 Checked Ho–Lee curve fitting
+
+**Detailed decision:** [MODELS-NUMERICAL-004](docs/decisions/financial/models-numerical/ho-lee-curve-fit.md#accepted-decision-for-checked-holee-curve-fitting) was accepted on 2026-11-11.
+
+Fit one captured origin-relative discount table on a checked
+uniform grid. Keep additive rate centers, equal branch weights,
+exact zero mean reversion and explicit quote-basis volatility.
+Use exact deterministic limits, a direct continuous fit and
+bounded, valid-domain noncontinuous row solves.
+
+Replay all maturities on the fitted quotes with one inclusive
+relative-DF tolerance. Publish the complete candidate atomically.
+Keep the terminal factor separate from departing interval quotes.
+Qualify product and risk accuracy independently of curve fit.
+[Clause map M323–M326](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.82 Checked Black–Derman–Toy curve fitting
+
+**Detailed decision:** [MODELS-NUMERICAL-005](docs/decisions/financial/models-numerical/bdt-lognormal-curve-fit.md#accepted-decision-for-checked-bdt-curve-fitting) was accepted on 2026-11-11.
+
+Use the selected uniform grid and strictly decreasing
+origin-relative base targets. Fit positive, unclamped log-rate
+rows with explicit quote basis and scalar volatility. Check
+target feasibility against actual incoming state-price mass.
+Use one deterministic path at exact zero volatility.
+
+Replay the actual stored tree with one inclusive relative-DF
+tolerance and publish the candidate atomically. The terminal
+factor supplies no outgoing rate. Use the same prepared grid
+for callable-bond pricing, OAS and risk, and qualify option
+accuracy independently.
+[Clause map M327–M330](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.83 Checked Black–Karasinski trinomial fitting
+
+**Detailed decision:** [MODELS-NUMERICAL-006](docs/decisions/financial/models-numerical/black-karasinski-trinomial.md#accepted-decision-for-checked-bk-trinomial-fitting) was accepted on 2026-11-11.
+
+Use the selected uniform grid, positive mean reversion and
+explicit log-rate volatility. Match exact conditional OU moments
+on the checked capped trinomial and preserve its stored branches.
+Fit positive base rates to strictly decreasing origin-relative
+targets and use the same-grid exact zero-volatility path.
+
+Replay the stored candidate against one inclusive relative-DF
+tolerance before publication. Expose genuine terminal factor
+state without an outgoing quote. Keep one prepared grid for bond
+pricing, OAS and risk. Qualify cap switches and option accuracy
+independently.
+[Clause map M331–M334](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.84 Checked Hull–White event lattices and node bonds
+
+**Detailed decision:** [MODELS-NUMERICAL-007](docs/decisions/financial/models-numerical/hull-white-event-grid-and-affine-bonds.md#accepted-decision-for-checked-hullwhite-event-lattices-and-node-bonds) was accepted on 2026-11-11.
+
+Use a prepared exact event grid, actual interval widths and
+one bound origin-relative discount source and volatility form.
+Match exact conditional OU moments, preserve deterministic
+zero-noise transitions and check the required state geometry.
+Fit Continuous base discounts and replay with one inclusive
+relative-DF tolerance before publication.
+
+Expose the centered factor separately from outgoing interval
+quotes. Use the stated finite-lattice or continuous affine
+payoff basis. Reuse the qualified grid and operator in live
+pricing, exercise diagnostics and risk.
+[Clause map M335–M338](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.85 Checked rates-credit marginal calibration
+
+**Detailed decision:** [MODELS-NUMERICAL-008](docs/decisions/financial/models-numerical/rates-credit-marginal-calibration.md#accepted-decision-for-checked-rates-credit-marginal-calibration) was accepted on 2026-11-11.
+
+Use one prepared uniform grid with origin-relative discounts
+and local integrated hazard on the qualified source clocks.
+Preserve centered binary support and the explicit raw variance
+retention limits. Each deterministic axis has one state.
+
+Fit signed Continuous rates and positive-part effective hazard.
+Use exact zero-loss rows, checked positive-loss fits and bounded
+floor mass where applicable. Replay the stored discount and
+survival marginals before publication. Qualify joint pricing and
+risk with the owning coupling and payoff contracts.
+[Clause map M339–M342](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.86 Checked rates-credit coupling and path sampling
+
+**Detailed decision:** [MODELS-NUMERICAL-009](docs/decisions/financial/models-numerical/rates-credit-coupling-and-sampling.md#accepted-decision-for-checked-rates-credit-coupling-and-path-sampling) was accepted on 2026-11-11.
+
+Use one checked joint law for rollback and sampling. Require
+explicit innovation correlation for two stochastic axes and
+undefined correlation for a deterministic axis. Check the
+whole-lattice signed range and preserve the admitted marginals.
+
+Assign Philox midpoints by effective seed, base path and step.
+Use checked cutoffs and exact antithetic reflection. Bind
+checkpoints to their prepared model and path. Expose actual
+departing interval terms and genuine terminal state.
+[Clause map M343–M346](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.87 Checked joint credit rollback and coupon folding
+
+**Detailed decision:** [MODELS-NUMERICAL-010](docs/decisions/financial/models-numerical/rates-credit-coupon-folding.md#accepted-decision-for-checked-joint-credit-rollback-and-coupon-folding) was accepted on 2026-11-11.
+
+Use one prepared joint law, raw signed rate and canonical applied
+discount and local hazard. Pass pre-survival continuation and apply
+survival once. Use eligible par and canonical interval exponents for
+qualified recovery at default. The product orders cash and exercise.
+
+Use exact index dates and a market-source gross normalized on the
+fitted rate tree. Compose and fold one full settlement coupon only
+when the fixing determines the amount and the qualified exercise and
+recovery terms preserve the specified entitlement. Preserve legal
+exercise dates. Reprice the same eligible cash and recovery for OAS
+and propagate price and risk failures.
+[Clause map M347–M350](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.88 Checked PDE grids, interpolation and coordinate Greeks
+
+**Detailed decision:** [MODELS-NUMERICAL-011](docs/decisions/financial/models-numerical/pde-grids-interpolation-and-greeks.md#accepted-decision-for-checked-pde-grids-interpolation-and-coordinate-greeks) was accepted on 2026-11-11.
+
+Use immutable finite spatial axes, exact endpoints and actual positive
+widths. Check tensor geometry, sizes and solution shape. Use linear
+or bilinear values within the closed solved domain, with exact
+stored values at knots and fallible queries.
+
+Interpolate local quadratic nodal derivatives, including inward
+endpoint triples. The product owns coordinate conversion, market
+risk, domain choice and accuracy qualification. Propagate errors
+through the existing equity, Heston and barrier product routes.
+[Clause map M351–M354](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.89 Checked directional and mixed PDE stencils
+
+**Detailed decision:** [MODELS-NUMERICAL-012](docs/decisions/financial/models-numerical/pde-spatial-stencils.md#accepted-decision-for-checked-directional-and-mixed-pde-stencils) was accepted on 2026-11-11.
+
+Admit coherent finite coefficient samples and positive semidefinite
+represented diffusion. Use actual widths, a checked inclusive
+central-to-one-sided drift switch and nonnegative directional
+neighbor coefficients before boundary elimination.
+
+Use the full 1D reaction and source and their equal directional
+split in 2D. Apply the centered tensor mixed stencil explicitly
+to the boundary-inclusive field at the same time and stage.
+Check full-scale row arithmetic, cache identity and caller error
+propagation. Qualify full-scheme stability and prices separately.
+[Clause map M355–M358](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.90 Checked PDE boundary elimination and reconstruction
+
+**Detailed decision:** [MODELS-NUMERICAL-013](docs/decisions/financial/models-numerical/pde-boundary-elimination.md#accepted-decision-for-checked-pde-boundary-elimination-and-reconstruction) was accepted on 2026-11-11.
+
+Use one checked edge relation for row elimination and full-field
+reconstruction. Use increasing-coordinate Neumann signs and the
+selected law's inward stencil. Apply affine boundary forcing
+once. Evaluate the full boundary effect at its required scale.
+
+Use actual time and event phase, and reconstruct each field from
+its own interior. The x edges own 2D corners after y-edge
+reconstruction. Refresh scalar data for reusable rows and
+re-eliminate when the boundary form changes. Products own domain,
+payoff and rebate economics and closure qualification.
+[Clause map M359–M362](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.91 Checked theta marching and tridiagonal solves
+
+**Detailed decision:** [MODELS-NUMERICAL-014](docs/decisions/financial/models-numerical/theta-time-march-and-thomas.md#accepted-decision-for-checked-theta-marching-and-tridiagonal-solves) was accepted on 2026-11-11.
+
+March over exact prepared knots and actual adjacent widths. Use
+finite theta in [1/2,1] with the appropriate endpoint operators
+and affine terms. Damped Crank–Nicolson starts with full backward-Euler
+intervals and restarts only on designated projections.
+
+Use one checked unpivoted Thomas kernel for 1D and ADI lines.
+Admit resolved finite nonzero pivots and gate each completed solve
+by componentwise backward error at most 64 times binary64 epsilon.
+Publish only successful steps. Keep full-scheme stability and
+product price and risk accuracy separately qualified.
+[Clause map M363–M366](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.92 Checked grid-based PDE exercise
+
+**Detailed decision:** [MODELS-NUMERICAL-015](docs/decisions/financial/models-numerical/pde-exercise-projection.md#accepted-decision-for-checked-grid-based-pde-exercise) was accepted on 2026-11-11.
+
+Use the exact post-step maximum at eligible interior knots with a
+checked grid-bound payoff and continuation on ties. Preserve exact
+exercise times and product event phases. Record strict exercise
+preference brackets and reconstruct edges from the projected interior.
+
+Where immediate exercise is eligible, compare the checked unit grid
+premium with literal exercise at the actual spot before signed
+quantity. Keep grid diagnostics and live bump-and-reprice risk distinct.
+Qualify American time-grid and fixed-date Bermudan prices separately.
+[Clause map M367–M370](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.93 Checked Modified Craig–Sneyd ADI
+
+**Detailed decision:** [MODELS-NUMERICAL-016](docs/decisions/financial/models-numerical/mcs-adi-time-march.md#accepted-decision-for-checked-modified-craigsneyd-adi) was accepted on 2026-11-11.
+
+Use actual prepared time widths and full MCS at theta 1/3. Apply
+both x-then-y sweep pairs with matched endpoint affine data. Use
+the explicit mixed term on the matching boundary-inclusive field
+and the checked Thomas kernel for every line.
+
+For startup, require a representable interior midpoint and
+execute two factorized backward-Euler substeps. Publish matched
+fields atomically for the whole parent interval. Qualify stability,
+startup, price and risk on the actual operator and financial route.
+[Clause map M371–M374](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
+### 1.94 Checked Black–Scholes and Heston PDE coefficient bridges
+
+**Detailed decision:** [MODELS-NUMERICAL-017](docs/decisions/financial/models-numerical/black-scholes-and-heston-pde-bridges.md#accepted-decision-for-checked-pde-coefficient-bridges) was accepted on 2026-11-11.
+
+Use immutable checked model parameters, explicit model clocks and
+curve-native terminal discount. Construct Heston diffusion with
+directed rounding and the strict represented PSD check. Use checked
+payoffs, explicit truncated edge laws and actual admitted queries.
+
+Select the exact deterministic branches at zero volatility or
+zero vol-of-vol. Check per-unit financial bounds before signed
+quantity. Preserve owner lifecycle and product risk rules, and
+qualify price, risk and numerical domains independently.
+[Clause map M375–M378](docs/decisions/INVARIANT_MAP.md#1-money-and-model-numerics).
+
 ## 2. Determinism and floating point
 
 **Authority:** [ADR 0021](docs/decisions/standards/0021-reproducibility-guarantees.md)
@@ -2269,6 +2702,194 @@ is accepted for the concrete RNG and execution conditions.
 
 **Required:** library code MUST use explicit seeds. Do not use
 `thread_rng()` or `rand::random()`.
+
+The primary pseudorandom pricing engine uses an explicit fixed budget of
+independent estimator units, exact stored grid knots and one positive
+deterministic Money discount per trajectory. A complete antithetic pair
+contributes one observation. Fixed-sample 95% uncertainty uses these
+observations, and the generic engine runs without width-based stopping.
+[Accepted engine and estimation contract](docs/decisions/financial/models-monte-carlo/01-engine-and-estimation.md#accepted-decision-for-checked-monte-carlo-execution-and-estimation).
+
+Shared Philox uses explicit seed and stream IDs, exact open midpoints and
+the checked reflected Box–Muller pair. Draws fail on exhaustion without
+counter wrap. Products explicitly select any instrument-and-scenario seed
+derivation and own the draw assignment used for replay.
+[Accepted Philox streams and seed derivation](docs/decisions/financial/models-monte-carlo/02-random-streams.md#accepted-decision-for-checked-philox-streams-and-seed-derivation).
+
+Dedicated Sobol pricing uses equal complete power-of-two blocks and
+checked whole-path construction on actual grid knots. The deterministic
+seed schedule supports replay. Its reported replicate spread is
+descriptive and sampling standard error and confidence bounds are
+unavailable.
+[Accepted Sobol pricing contract](docs/decisions/financial/models-monte-carlo/03-randomized-qmc.md#accepted-decision-for-whole-path-sobol-pricing-and-replicate-diagnostics).
+
+GBM uses checked exact transitions and explicit carry coverage. Piecewise
+coefficient breaks bind to exact grid knots and the dated ATM bootstrap
+preserves variance on the active volatility source clock. Local volatility
+uses a qualified grid, explicit boundary and checked left-node log-Euler.
+[Accepted GBM and local-volatility contract](docs/decisions/financial/models-monte-carlo/04-lognormal-diffusions.md#accepted-decision-for-checked-gbm-and-local-volatility-paths).
+
+Generic Euler requires an explicit coordinatewise loading contract and
+commits only a complete checked step. Additive Brownian uses its exact
+constant-coefficient update. Multi-OU uses an exact Gaussian transition
+with nonnegative mean reversion and one internal step covariance transform.
+[Accepted Euler and Gaussian steps](docs/decisions/financial/models-monte-carlo/05-generic-steppers.md#accepted-decision-for-checked-coordinatewise-euler-and-exact-gaussian-steps).
+
+The full-spot discrete-dividend model binds jumps to exact knots and
+observes post-ex spot. Cash drops are capped at the pre-jump stock value
+and depletion is absorbing. The model consumes one normal per actual
+interval and keeps delayed-cash claims at the dated adapter boundary.
+[Accepted dividend jump contract](docs/decisions/financial/models-monte-carlo/06-cash-dividend-jumps.md#accepted-decision-for-checked-discrete-dividend-jumps-on-exact-grid-knots).
+
+Explicit mean-level Hull–White paths use checked exact endpoints and
+one normal per actual interval. Dated curve-fitted paths use the accepted
+centered process and joint pathwise discount law.
+[Accepted Hull–White endpoint contract](docs/decisions/financial/models-monte-carlo/07-hull-white.md#accepted-decision-for-checked-hullwhite-endpoints-and-curve-fit-boundaries).
+
+CIR and CIR++ use checked QE with a fixed branch threshold and normal
+log-tail inversion. CIR++ starts from an unshifted factor and publishes
+the checked signed rate on the actual grid.
+[Accepted CIR and CIR++ contract](docs/decisions/financial/models-monte-carlo/08-cir-qe.md#accepted-decision-for-checked-cir-and-cir-quadratic-exponential-paths).
+
+Classical Heston paths use checked QE-M with the sampled variance law's
+centered log-moment correction. The run fails on moment divergence or
+unresolved arithmetic. Exact zero vol-of-vol uses analytically integrated
+deterministic variance and the full spot loading.
+[Accepted Heston QE-M contract](docs/decisions/financial/models-monte-carlo/09-heston-qe.md#accepted-decision-for-checked-heston-qe-m-paths).
+
+Displaced LMM uses checked terminal-measure log predictor-corrector on
+exact fixing and loading knots. A fixing is frozen after its receiving
+node. Bond projections specify their reference tenor, and an absolute
+off-tenor bond price requires an owner-qualified stub discount.
+[Accepted displaced LMM contract](docs/decisions/financial/models-monte-carlo/10-lmm.md#accepted-decision-for-checked-terminal-measure-lmm-paths).
+
+Revolving-credit paths use the dedicated checked transition. Zero
+utilization volatility preserves deterministic reversion, and a constant
+spread holds its supplied level. Joint fitted-rate discounting samples the
+Hull–White rate integral with the shared endpoint normal and an independent
+residual. The declared correlation applies to latent step normals.
+[Accepted revolving-credit contract](docs/decisions/financial/models-monte-carlo/11-credit-line.md#accepted-decision-for-checked-revolving-credit-paths).
+
+Schwartz–Smith paths use the checked exact Gaussian transition with
+explicit factor state and drifts. The spot expectation uses the same
+scaled covariance. A futures interpretation requires a qualified
+pricing measure and quote convention.
+[Accepted Schwartz–Smith contract](docs/decisions/financial/models-monte-carlo/12-schwartz-smith.md#accepted-decision-for-checked-schwartzsmith-paths-and-expectations).
+
+The named rough Bergomi and rough Cheyette paths use the checked
+actual-grid Riemann–Liouville driver. Leverage uses its Brownian draw,
+and Gaussian normalization uses the variance of the sampled level.
+Stationary-increment fractional Brownian motion remains a standalone
+checked Cholesky sampler.
+[Accepted fractional-noise contract](docs/decisions/financial/models-monte-carlo/13-fractional-noise.md#accepted-decision-for-checked-fractional-noise-and-volterra-drivers).
+
+Rough Bergomi freezes variance at the left node on the checked grid,
+uses sampled variance for Gaussian normalization and aligns ending-interval
+variance changes exactly. Live stochastic equity pricing admits nonpositive
+correlation and estimates European calls from bounded puts and grid parity.
+[Accepted rough Bergomi contract](docs/decisions/financial/models-monte-carlo/14-rough-bergomi.md#accepted-decision-for-checked-rough-bergomi-spot-and-pricing).
+
+Rough Heston uses the actual grid and full Gamma-normalized Volterra
+history with the newest-cell Gaussian residual. Its discrete variance
+projects by positive part, and the checked log-spot step uses left-node
+variance and the actual Brownian drive. Direct European estimation
+reports fixed-grid sampling uncertainty within its qualified moment domain.
+[Accepted rough Heston contract](docs/decisions/financial/models-monte-carlo/15-rough-heston.md#accepted-decision-for-checked-rough-heston-paths-and-pricing).
+
+Rough Cheyette uses a model-owned base amplitude, a separate signed
+short-rate shift and sampled RL variance compensation. Its frozen-amplitude
+transition preserves nonnegative auxiliary state, the exact frozen state
+marginals and Brownian increment covariance. The finite-grid law omits
+the additional covariance with the newest-cell fractional residual.
+Product pricing requires a separately qualified curve and discount law.
+[Accepted rough Cheyette contract](docs/decisions/financial/models-monte-carlo/16-rough-cheyette.md#accepted-decision-for-checked-rough-cheyette-paths).
+
+Terminal and Asian Monte Carlo settlement requires complete observations
+on exact stored nodes. Cash digitals pay zero at equality. Asian multipliers
+scale contractual fixing levels, with one count per row including ties and
+history. Geometric zero is literal and negative levels error. Partial
+averages are diagnostics, and the geometric control matches the observed
+fixing law and payment factor.
+[Accepted terminal and Asian contract](docs/decisions/financial/models-monte-carlo/17-vanilla-and-asian.md#accepted-decision-for-checked-terminal-and-asian-payoffs).
+
+Monte Carlo barriers bind inclusive touch to exact eligible observations.
+Continuous GBM uses an unshifted conditional log bridge, and continuous
+Heston uses an explicitly qualified integrated-variance approximation.
+Live at-hit rebates use the recognized node or sampled first-passage
+time and one qualified discount source for hit and settlement. Prior
+hit evidence and payment status remain distinct.
+[Accepted Monte Carlo barrier contract](docs/decisions/financial/models-monte-carlo/18-barrier-monitoring.md#accepted-decision-for-checked-monte-carlo-barrier-monitoring-and-rebates).
+
+Monte Carlo lookbacks explicitly select exact discrete observations or a
+qualified continuous GBM extremum bridge. Qualified history and eligible
+observations determine the selected extremum. Floating settlement also
+requires the terminal fixing, which enters the extremum only when eligible.
+Payoff arithmetic preserves small excursions through the requested amount.
+[Accepted Monte Carlo lookback contract](docs/decisions/financial/models-monte-carlo/19-lookback-monitoring.md#accepted-decision-for-checked-monte-carlo-lookback-extrema).
+
+Monte Carlo autocallables consume exact contractual observation rows.
+Independent coupon and memory eligibility is evaluated before the call.
+The first eligible call terminates future observations and retains
+earned cash. Uncalled redemption uses the final eligible fixing and
+discrete downside history. Coupons and principal retain their own
+payment dates under one qualified discount source.
+[Accepted Monte Carlo autocallable contract](docs/decisions/financial/models-monte-carlo/20-autocallable.md#accepted-decision-for-checked-monte-carlo-autocallable-payoffs).
+
+Monte Carlo cliquets anchor each period to the preceding contractual
+fixing and consume exact period-end nodes. Apply local bounds before
+the selected additive or multiplicative accumulation and apply global
+bounds once. Historical and simulated resets use the same transition.
+A fully observed claim retains its locked return and actual payment date.
+[Accepted Monte Carlo cliquet contract](docs/decisions/financial/models-monte-carlo/21-cliquet.md#accepted-decision-for-checked-monte-carlo-cliquet-payoffs).
+
+Monte Carlo range accrual counts every exact contractual observation
+once, including qualified tied rows and certified history, against
+the fixed full-period denominator. The band is inclusive and a
+relative band retains its contractual reference. Final coupon cash
+requires complete coverage and uses the actual payment date.
+[Accepted Monte Carlo range accrual contract](docs/decisions/financial/models-monte-carlo/22-range-accrual.md#accepted-decision-for-checked-monte-carlo-range-accrual).
+
+Standalone holder LSMC binds exact exercise nodes, including maturity,
+to a checked GBM grid. Backward fitting and the optional origin decision
+use training paths only. Sparse dates have explicit continue-only rules.
+Pricing replays the immutable policy on disjoint Philox groups and
+reports sampling uncertainty conditional on that policy.
+[Accepted Monte Carlo holder exercise contract](docs/decisions/financial/models-monte-carlo/23-lsmc-exercise.md#accepted-decision-for-checked-holder-exercise-policy-training-and-pricing).
+
+Continuation regression uses fixed ordered features and training-only
+transforms. A dense fit scales the design and response, requires a
+bounded full-rank SVD and freezes its scales and coefficients for
+checked replay. An explicitly selected intercept uses the checked
+training mean. Each exercise owner supplies eligibility and cash units.
+[Accepted continuation regression contract](docs/decisions/financial/models-monte-carlo/24-regression-policies.md#accepted-decision-for-checked-continuation-regression).
+
+Paired Monte Carlo spot Greeks use the actual rounded spot nodes and
+the same logical draws at every node of every scenario. Each trajectory
+supplies a checked discounted Money PV. One complete stencil group
+supplies one sampling observation, including both legs when paired.
+Report uncertainty for the finite stencil and distinguish groups,
+trajectories per scenario and total scenario valuations.
+[Accepted paired spot Greek contract](docs/decisions/financial/models-monte-carlo/25-finite-difference-greeks.md#accepted-decision-for-checked-paired-monte-carlo-spot-greeks).
+
+GBM likelihood-ratio Greeks score the consumed normals on actual
+positive intervals for a qualified density-only payoff. Each leg
+supplies one discounted Money PV and its delta and native-vega
+contributions. Price and both Greeks use the same complete groups
+and report marginal sampling uncertainty.
+[Accepted GBM likelihood-ratio contract](docs/decisions/financial/models-monte-carlo/26-likelihood-ratio-greeks.md#accepted-decision-for-checked-gbm-likelihood-ratio-greeks).
+
+Monte Carlo control pricing uses complete same-path target and control
+PVs and a control expectation matched to the pricing law. Freeze the
+coefficient before pricing and separate fitted pilot groups from pricing
+groups. Compute uncertainty from the held-out adjusted observations.
+[Accepted single-control contract](docs/decisions/financial/models-monte-carlo/27-control-variate.md#accepted-decision-for-checked-single-control-monte-carlo-pricing).
+
+Pricing capture retains a checked exact subset of physical paths and
+leaves pricing draws, event order, settlement and uncertainty intact.
+Captured cash preserves payment timing and component identity. Raw
+simulation returns owner-defined coordinates on stored knots with
+explicit schemes and checked replay metadata.
+[Accepted path capture and raw simulation contract](docs/decisions/financial/models-monte-carlo/28-capture-and-simulation-contracts.md#accepted-decision-for-checked-path-capture-and-raw-simulation).
 
 **Required for the primary Monte Carlo engine's bit-identity guarantee:**
 within the supported target and fixed declared inputs and configuration,

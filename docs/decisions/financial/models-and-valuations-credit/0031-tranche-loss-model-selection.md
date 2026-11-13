@@ -15,6 +15,10 @@ generators not rerun for this documentation audit.
 
 ## Observed choice and rationale
 
+The [accepted CREDIT-17 package](17-tranche-loss-distribution.md#accepted-decision-for-checked-finite-pool-tranche-losses)
+owns pool and copula selection and the numerical loss contract.
+The dispatch descriptions below record observed behavior.
+
 `CdsTranche` uses base-correlation equity-tranche decomposition with a one-factor
 Gaussian copula by default. Recovered principal amortizes senior tranche
 notional, while only losses trigger protection payments. The
@@ -57,7 +61,7 @@ migration are outside scope.
 | --- | --- |
 | Conditional distributions, factor representations and generic quadrature | [Copula kernels](09-copula-kernels.md) |
 | Finite-pool dispatch, realized-state erosion, smoothing, resource/accuracy controls and loss repairs | [Tranche loss distribution](17-tranche-loss-distribution.md) |
-| Premium/protection timing, recovery writedown, settlement overrides and public projection limitations | [Tranche projection](18-tranche-projection.md) |
+| Premium and protection timing, realized settlement and the native valuation trace | [Accepted tranche projection](18-tranche-projection.md#accepted-decision-for-checked-tranche-cashflows-and-settlement) |
 | Quote/payoff risk, copula propagation and issuer-recovery limitations | [Tranche risk](19-tranche-risk.md) |
 | Stored correlation interpolation, shocks and shape diagnostics | [Base-correlation representation](../core-market/base-correlation.md) |
 | Fixed-maturity correlation fitting and single-tranche tail-parameter fitting | [Base-correlation calibration](../calibration-targets/15-base-correlation.md) and [Student-t calibration](../calibration-targets/16-student-t.md) |

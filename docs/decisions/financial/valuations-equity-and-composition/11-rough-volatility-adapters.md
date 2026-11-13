@@ -48,6 +48,18 @@ qualify break alignment while retaining adaptedness. Record 17 was accepted on *
 pending. Its acceptance does not adopt this record's ATM-forward/tail model, rough parameters,
 simulation, error budgets or price acceptance.
 
+The rough Bergomi model owner has since accepted exact variance break
+alignment, sampled-variance normalization, the stochastic pricing
+correlation domain and the bounded European call estimator. Adapter
+reconciliation and product qualification are pending.
+[Accepted rough Bergomi package](../models-monte-carlo/14-rough-bergomi.md#accepted-decision-for-checked-rough-bergomi-spot-and-pricing).
+
+The rough Heston Monte Carlo owner has accepted actual-grid hybrid
+history, positive-part variance and direct fixed-grid European
+estimation under its stated moment rules. Reconcile the Monte Carlo
+adapter against that contract and qualify the equity route.
+[Accepted rough Heston package](../models-monte-carlo/15-rough-heston.md#accepted-decision-for-checked-rough-heston-paths-and-pricing).
+
 ## Follow-up tracking
 
 Pending decisions, implementation reconciliation and validation work are tracked in

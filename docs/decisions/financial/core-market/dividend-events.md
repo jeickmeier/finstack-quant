@@ -35,9 +35,9 @@ validation must not invent a universal ordering of those two authoritative dates
 The current enum also mixes a cash magnitude, an annual continuous yield with
 no accrual interval, and additional shares/share under one dated event. The
 located production reader already rejects both noncash variants. Numerical
-Monte Carlo proportional cash payout S*(1-p) is not a stock distribution
-changing share basis. Removing those ambiguous paths is smaller and clearer
-than adding corporate-action modes to this cash source.
+Monte Carlo uses `p*S` as the proportional cash drop and `(1-p)*S` as the
+remaining stock value on the same share basis. Stock distributions belong
+to corporate-action owners.
 
 Optional ticker/currency metadata cannot establish the underlying or units.
 Same-ex-date ordinary/special distributions may be distinct, especially when
@@ -148,8 +148,9 @@ qualification remain pending; observed implementation stays separate below.
    Convert Money to a model value only at the checked numerical boundary after
    currency/unit admission. Do not mechanically map the new events into a
    tree/MC/PDE's existing instantaneous-cash assumption. Model floors, grid
-   rounding, depleted-stock behavior, escrow and exercise approximations remain
-   Draft; accepting this source does not certify them.
+   timing, depleted-stock behavior, escrow and exercise approximations are
+   separately reviewed in the pricing records. The accepted lattice contract is in
+   [MODELS-NUMERICAL-002](../models-numerical/dividends-and-lattice-exercise.md#accepted-decision-for-checked-escrowed-dividends-and-lattice-exercise).
 
 9. **Keep strict state and existing host transport.** Canonical state contains
    required schedule identity/currency, ordered identified cash events and their
