@@ -79,7 +79,8 @@ flag "--release" help="Also run the nightly tier and the release gates (publish 
 # One stage per job of .github/workflows/checks.yml, which runs the same tasks
 # split across runners (scripts/tests/test_gate_parity.py keeps the two equal);
 # full-checks.yml is `--full`. The only local/CI difference is CI's per-test
-# time cap (NEXTEST_PROFILE=ci).
+# time cap (NEXTEST_PROFILE=ci). The slow suites (`--slow`) run under nextest's
+# `slow` profile, a 10-minute per-test cap instead of the 60 s one.
 #
 # The Lint stage may format (pre-commit runs the *-fmt tasks); nothing here
 # regenerates. After touching a generator or a wire type, run
@@ -227,7 +228,7 @@ if [ "${usage_slow:-false}" = "true" ]; then
   export CCM_CONSUMER_EXPORT_DIR="${CCM_CONSUMER_EXPORT_DIR:-$slow_exports/consumer}"
   export CCM_CASHFLOW_CONSUMER_EXPORT="${CCM_CASHFLOW_CONSUMER_EXPORT:-$slow_exports/cashflow-consumer}"
 fi
-ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only --no-tests pass"
+ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only --no-tests pass --profile slow"
 if [ "${usage_coverage:-false}" = "true" ]; then
   cargo llvm-cov clean --workspace
   run_tests() { cargo llvm-cov nextest --no-report --remap-path-prefix "$@"; }
@@ -256,7 +257,7 @@ arg "<package>" help="Cargo package (e.g. finstack-quant-core)"
 flag "--slow" help="Run only the ignored (slow) tests"
 '''
 run = '''
-ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only"
+ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only --profile slow"
 cargo nextest run -p "${usage_package?}" --lib --test '*' $ignored --no-fail-fast
 '''
 
@@ -268,7 +269,7 @@ arg "<test>" help="Integration test binary (e.g. valuations)"
 flag "--slow" help="Run only the ignored (slow) tests"
 '''
 run = '''
-ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only"
+ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only --profile slow"
 cargo nextest run -p "${usage_package?}" --test "${usage_test?}" $ignored --no-fail-fast
 '''
 
@@ -282,7 +283,7 @@ flag "--lib" help="Only library unit tests"
 flag "--slow" help="Run only the ignored (slow) tests"
 '''
 run = '''
-ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only"
+ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only --profile slow"
 if [ -n "${usage_integration:-}" ] && [ "${usage_lib:-false}" = "true" ]; then
   echo "--lib and --integration are mutually exclusive" >&2
   exit 2

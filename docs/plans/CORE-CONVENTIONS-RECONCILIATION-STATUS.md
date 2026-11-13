@@ -826,7 +826,10 @@ logged under Needs review.
     (up to 58 s), and `mc_atm_price_matches_fourier_pricer` (rough Heston,
     O(n^2) Volterra history, untouched by this run) passes in 147 s. The cap
     added this run applies to the `#[ignore]` slow suite, which the nextest
-    config comment names as the home for longer tests.
+    config comment names as the home for longer tests. Owner chose a slow
+    profile: `.config/nextest.toml` `[profile.slow]` (SLOW at 60 s, killed at
+    10 min) and every `--slow` mise rust-test task passes `--profile slow`;
+    the PR gate keeps the 60 s cap.
 - **H1 Frankfurt is no longer a TARGET copy.** `defr` closes on Ascension,
   Whit Monday, Corpus Christi, October 3 and December 24/31, so anything
   rolled on `defr` moves on those days; `target2` is unchanged for euro

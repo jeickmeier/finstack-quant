@@ -14,11 +14,24 @@ store-failure-output = true
 [profile.ci]
 # Report a test as SLOW at 20 s and kill it at 60 s, the per-test budget of
 # the PR gate. Longer tests belong in the `#[ignore]` slow suite, which the
-# full tier runs.
+# full tier runs under the `slow` profile below.
 slow-timeout = { period = "20s", terminate-after = 3 }
 fail-fast = false
 
 [profile.ci.junit]
+path = "junit.xml"
+store-success-output = false
+store-failure-output = true
+
+[profile.slow]
+# The `#[ignore]` slow suite (`--slow` on the mise rust-test* tasks): tests too
+# long for the 60 s PR-gate budget. Report SLOW at 60 s and kill at 10 min
+# (10 x 60 s; the longest, rough Heston, takes ~260 s under full load), so
+# a hung test still fails and the run moves on.
+slow-timeout = { period = "60s", terminate-after = 10 }
+fail-fast = false
+
+[profile.slow.junit]
 path = "junit.xml"
 store-success-output = false
 store-failure-output = true

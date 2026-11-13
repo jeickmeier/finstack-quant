@@ -35,7 +35,9 @@ CI does not reimplement the build. Almost every job provisions the pinned
 toolchain with `jdx/mise-action` and then runs a canonical `mise` task, so
 those jobs run exactly the commands you can run locally. The exception is the
 per-test time cap, which is CI-only; reproduce it with
-`NEXTEST_PROFILE=ci mise run rust-test`. Toolchain versions live in
+`NEXTEST_PROFILE=ci mise run rust-test`. The ignored slow suite (`mise run rust-test --slow`)
+runs under nextest's `slow` profile, locally and in CI, which kills a test at
+10 minutes instead of 60 s. Toolchain versions live in
 [`../../mise.toml`](../../mise.toml); nothing here pins a compiler.
 
 ## Workflows
