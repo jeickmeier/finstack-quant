@@ -769,7 +769,7 @@ impl JsMarketContext {
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
-/// const fx = new core.FxMatrix();
+/// const fx = new core.FxMatrix(null); // no pivot: direct quotes only
 /// fx.setQuotes([["EUR", "USD", 1.1]]);
 /// const market = new core.MarketContext();
 /// market.insertFx(fx);
@@ -782,7 +782,7 @@ impl JsMarketContext {
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
-/// const fx = new core.FxMatrix();
+/// const fx = new core.FxMatrix(null); // no pivot: direct quotes only
 /// fx.setQuotes([["EUR", "USD", 1.1]]);
 /// const market = new core.MarketContext();
 /// market.insertFx(fx);

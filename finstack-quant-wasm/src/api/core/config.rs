@@ -186,7 +186,7 @@ fn scale_overrides(overrides: &BTreeMap<Currency, u32>) -> Result<JsValue, JsVal
 /// config.outputScale("JPY"); // 2
 /// config.outputScale("USD"); // 2 (the ISO-4217 minor units)
 /// const copy = core.FinstackConfig.fromJson(config.toJson());
-/// copy.roundingMode.toString(); // "midpoint_away_from_zero"
+/// copy.roundingMode?.toString(); // "midpoint_away_from_zero"
 /// ```
 #[wasm_bindgen(js_name = FinstackConfig)]
 #[derive(Clone, Debug)]

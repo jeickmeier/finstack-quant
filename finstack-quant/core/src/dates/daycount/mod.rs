@@ -699,8 +699,10 @@ impl DayCount {
     ///
     /// # Arguments
     ///
-    /// * `start` - Reference date
-    /// * `end` - Target date
+    /// * `start` - Reference date the fraction is measured from; it may lie
+    ///   after `end`.
+    /// * `end` - Target date; a date before `start` gives a negative fraction
+    ///   of the same magnitude as the forward measure.
     /// * `ctx` - Optional context providing calendar or frequency as needed
     ///
     /// # Returns

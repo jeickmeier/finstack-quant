@@ -20,7 +20,7 @@ use wasm_bindgen::prelude::*;
 ///
 /// @example
 /// ```javascript
-/// import init, { statements, statements_analytics } from "finstack-quant-wasm";
+/// import init, { core, statements, statements_analytics } from "finstack-quant-wasm";
 /// await init();
 /// const builder = new statements.ModelBuilder("demo");
 /// builder.periods("2025Q1..Q1");
@@ -195,7 +195,7 @@ impl JsDependencyTracer {
 ///
 /// @example
 /// ```javascript
-/// import init, { statements, statements_analytics } from "finstack-quant-wasm";
+/// import init, { core, statements, statements_analytics } from "finstack-quant-wasm";
 /// await init();
 /// const builder = new statements.ModelBuilder("demo");
 /// builder.periods("2025Q1..Q2");
@@ -275,7 +275,7 @@ impl JsCorkscrewExtension {
 ///
 /// @example
 /// ```javascript
-/// import init, { statements, statements_analytics } from "finstack-quant-wasm";
+/// import init, { core, statements, statements_analytics } from "finstack-quant-wasm";
 /// await init();
 /// const builder = new statements.ModelBuilder("demo");
 /// builder.periods("2025Q1..Q1");

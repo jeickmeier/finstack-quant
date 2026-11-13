@@ -176,7 +176,10 @@ impl NeumaierAccumulator {
 
     /// Add a value to the running total.
     ///
-    /// `x` must be finite. NaN or infinity corrupts the compensation term.
+    /// # Arguments
+    ///
+    /// * `x` - Value to add, in the accumulator's own units; must be finite,
+    ///   since NaN or infinity corrupts the compensation term.
     #[inline]
     pub fn add(&mut self, x: f64) {
         let t = self.sum + x;

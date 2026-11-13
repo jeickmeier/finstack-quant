@@ -2,7 +2,7 @@
 //!
 //! There is no embedded scale and no default (record CORE-CONVENTIONS-019
 //! #7–#11): every registry is supplied by the caller, directly or through the
-//! [`RATING_SCALES_EXTENSION_KEY`] configuration extension, and validated on
+//! [`RATING_SCALES_EXTENSION_KEY`](crate::rating_scales::RATING_SCALES_EXTENSION_KEY) configuration extension, and validated on
 //! every construction and restore path. A scale's numbers are the scorecard
 //! author's utility policy, not an agency calibration.
 

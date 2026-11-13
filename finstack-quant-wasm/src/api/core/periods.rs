@@ -149,8 +149,8 @@ impl JsPeriodKind {
 /// await init();
 /// const q1 = core.PeriodId.quarter(2025, 1);
 /// q1.toString(); // "2025Q1"
-/// q1.shift(1).toString(); // "2025Q2"
-/// core.PeriodId.parse("2025M12").shift(1).toString(); // "2026M01"
+/// q1.shift(1, "gregorian").toString(); // "2025Q2"
+/// core.PeriodId.parse("2025M12").shift(1, "gregorian").toString(); // "2026M01"
 /// ```
 ///
 /// @example
@@ -159,8 +159,8 @@ impl JsPeriodKind {
 /// await init();
 /// const q1 = core.PeriodId.quarter(2025, 1);
 /// q1.toString(); // "2025Q1"
-/// q1.shift(1).toString(); // "2025Q2"
-/// core.PeriodId.parse("2025M12").shift(1).toString(); // "2026M01"
+/// q1.shift(1, "gregorian").toString(); // "2025Q2"
+/// core.PeriodId.parse("2025M12").shift(1, "gregorian").toString(); // "2026M01"
 /// ```
 #[wasm_bindgen(js_name = PeriodId)]
 #[derive(Clone, Copy, Debug)]
