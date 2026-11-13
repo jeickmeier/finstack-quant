@@ -204,9 +204,10 @@ changes. maturin turns `-rc.N` into `rcN` and `-dev.N` into
 locally; it is also how `master` is bumped after a release branch is cut.
 
 - **Wheels**: `PyO3/maturin-action@v1` across linux-x64, linux-arm64,
-  macos-arm64, and windows-x64 for CPython 3.12, 3.13, and 3.14. Every wheel
-  except linux-arm64 (build-only until a native arm64 runner is selected) is
-  installed and smoke-tested with `scripts/smoke_python_wheel.py`.
+  macos-arm64 (GitHub `macos-15`), and windows-x64 for CPython 3.12, 3.13,
+  and 3.14. Every wheel except linux-arm64 (build-only until a native arm64
+  runner is selected) is installed and smoke-tested with
+  `scripts/smoke_python_wheel.py`.
 - **Source dist**: `maturin sdist`.
 - **WASM / npm**: `mise run wasm-pkg` (the size-optimized web package and the
   Node package), then the npm tarball plus one archive per target.
