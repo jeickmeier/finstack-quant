@@ -983,19 +983,20 @@ export interface CoreNamespace {
    */
   readonly prevCdsSemiannualRoll: typeof wasm.prevCdsSemiannualRoll;
   /**
-   * Standard semi-annual CDS maturity on or after a date (Rust
+   * The 20 June or 20 December on or after a date (Rust
    * `next_semiannual_cds_maturity`).
    *
    * # Arguments
    *
-   * * `date` - Unadjusted candidate maturity (roll date plus tenor) as days
-   *   since 1970-01-01.
+   * * `date` - Unadjusted reference date as days since 1970-01-01.
    *
    * @returns The first 20 June or 20 December on or after `date`, as epoch
-   * days; a date already on that grid is returned unchanged.
+   * days; a date already on that grid is returned unchanged. This is one
+   * selected lattice, not every standard CDS maturity (3M/9M quotes mature on
+   * 20 March or 20 September).
    * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
    * `validation`) if it is outside the supported date range.
-   * @param date - Unadjusted candidate maturity (roll date plus tenor) as days since 1970-01-01.
+   * @param date - Unadjusted reference date as days since 1970-01-01.
    */
   readonly nextSemiannualCdsMaturity: typeof wasm.nextSemiannualCdsMaturity;
   /**

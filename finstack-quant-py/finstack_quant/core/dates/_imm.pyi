@@ -233,9 +233,12 @@ def prev_cds_date(date: datetime.date | str) -> datetime.date:
 
 def prev_cds_semiannual_roll(date: datetime.date | str) -> datetime.date:
     """
-    Return the most recent semi-annual CDS roll on or before *date*.
+    Return the latest 20 March or 20 September on or before *date*.
 
-    Semi-annual rolls are the March and September dates only.
+    Inclusive: a date on that lattice is returned unchanged. This selects one
+    explicitly chosen unadjusted lattice; it does not determine a premium
+    accrual, protection or settlement date, and composing it with a tenor is
+    a product regime's rule.
 
     Parameters
     ----------
@@ -268,17 +271,22 @@ def prev_cds_semiannual_roll(date: datetime.date | str) -> datetime.date:
 
 def next_semiannual_cds_maturity(date: datetime.date | str) -> datetime.date:
     """
-    Return the next semi-annual CDS maturity date on or after *date*.
+    Return the earliest 20 June or 20 December on or after *date*.
+
+    Inclusive: a date on that lattice is returned unchanged. This selects one
+    explicitly chosen unadjusted lattice, not every standard CDS maturity
+    (3M and 9M quotes mature on 20 March or 20 September); a product regime
+    composes trade dates and tenors into maturities.
 
     Parameters
     ----------
     date : datetime.date | str
-        Reference date.
+        Unadjusted date from which the next 20 June or 20 December is selected.
 
     Returns
     -------
     datetime.date
-        Next semi-annual CDS maturity date.
+        The selected 20 June or 20 December.
 
     Raises
     ------

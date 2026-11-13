@@ -259,20 +259,15 @@ pub fn prev_cds_date(date: Date) -> crate::Result<Date> {
     scan_months(date, &QUARTERLY_MONTHS, Scan::Before, twentieth)
 }
 
-/// Return the **semi-annual CDS roll date** (20-Mar / 20-Sep) **on or before**
-/// `date`.
+/// Return the latest **20 March or 20 September** on or before `date`
+/// (inclusive: a date on that lattice is returned unchanged).
 ///
-/// Since December 2015, single-name CDS (and the CDX/iTraxx indices) roll
-/// **semi-annually** on 20 March and 20 September rather than quarterly. A
-/// benchmark tenor quote (e.g. "5Y") references a contract whose term runs
-/// from the semi-annual roll date on or before the trade date. A trade dated
-/// exactly on 20-Mar/20-Sep uses that same date as its roll anchor.
-///
-/// # Standards Reference
-///
-/// - ISDA, "Amendments to Single Name CDS Roll Dates" (2015): effective
-///   20 December 2015, new on-the-run maturities are created only twice a
-///   year, on 20 March and 20 September.
+/// This selects one explicitly chosen unadjusted lattice (record
+/// CORE-CONVENTIONS-009 #5). It does not determine a premium accrual start,
+/// a protection start or a settlement date, and composing it with a tenor
+/// into a maturity is a product regime's rule, not this helper's (#6; for
+/// example the post-2015 single-name regime of record
+/// CALIBRATION-FRAMEWORK-007).
 ///
 /// # Examples
 /// ```rust
@@ -297,19 +292,13 @@ pub fn prev_cds_semiannual_roll(date: Date) -> crate::Result<Date> {
     scan_months(date, &SEMIANNUAL_ROLL_MONTHS, Scan::OnOrBefore, twentieth)
 }
 
-/// Return the **standard CDS scheduled termination date** (20-Jun / 20-Dec)
-/// **on or after** `date`.
+/// Return the earliest **20 June or 20 December** on or after `date`
+/// (inclusive: a date on that lattice is returned unchanged).
 ///
-/// Under the post-2015 semi-annual roll, on-the-run CDS maturities fall only
-/// on 20 June and 20 December (the semi-annual roll anchor plus the tenor
-/// lands on 20-Mar/20-Sep and is then extended to the following standard
-/// maturity month). This helper snaps an unadjusted "roll + tenor" date to
-/// that standard maturity grid. A date already on 20-Jun/20-Dec is returned
-/// unchanged.
-///
-/// # Standards Reference
-///
-/// - ISDA, "Amendments to Single Name CDS Roll Dates" (2015).
+/// This selects one explicitly chosen unadjusted lattice (record
+/// CORE-CONVENTIONS-009 #5), not every standard CDS maturity: 3M and 9M
+/// quotes mature on 20 March or 20 September. A product regime composes trade
+/// dates and tenors into maturities (record CALIBRATION-FRAMEWORK-007).
 ///
 /// # Examples
 /// ```rust
@@ -327,8 +316,8 @@ pub fn prev_cds_semiannual_roll(date: Date) -> crate::Result<Date> {
 ///
 /// # Arguments
 ///
-/// * `date` - Unadjusted candidate maturity to snap forward to the standard
-///   semi-annual maturity grid.
+/// * `date` - Unadjusted date from which the next 20 June or 20 December is
+///   selected.
 /// # Errors
 /// Returns `Error::Validation` when no CDS maturity on or after `date` is representable.
 pub fn next_semiannual_cds_maturity(date: Date) -> crate::Result<Date> {
