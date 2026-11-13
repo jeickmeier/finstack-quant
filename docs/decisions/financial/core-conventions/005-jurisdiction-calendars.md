@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-005: Jurisdiction-specific substitutions and maintained holiday selections
 
 - Decision status: **Accepted — complete jurisdiction-calendar package, 2026-11-07**.
-- Implementation status: **Partly reconciled 2026-11-08**: the generic `cme` and `cnbe` IDs are retired and commodity forwards take their contract's settlement calendar (rejecting `nerc` for settlement); the remaining calendar corrections, annual-notice data and metadata purposes are pending, scoped to `dates/calendar/jurisdictions.rs` and all 28 audited `core/data/calendars/*.json` definitions.
+- Implementation status: **Partly reconciled 2026-11-08**: the generic `cme` and `cnbe` IDs are retired and commodity forwards take their contract's settlement calendar (rejecting `nerc` for settlement). On 2026-11-13 (status H1) `defr` became the Frankfurt/Hesse bank-centre calendar (TARGET days plus Ascension, Whit Monday, Corpus Christi, October 3 and Bundesbank December 24/31) and `auce` gained the dated NSW Anzac additions 2026-04-27 and 2027-04-26, each pinned to its source (URL, edition, retrieval date, SHA-256) in the calendar JSON `sources` list; the remaining calendar corrections, annual-notice data and metadata purposes are pending, scoped to `dates/calendar/jurisdictions.rs` and all 28 audited `core/data/calendars/*.json` definitions.
 - Validation status: **Evidence inspected/located; independent qualification pending**. Documentation and independent date-example checks passed; production calendar tests, data generators and fixture refreshes were not executed for this review.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 

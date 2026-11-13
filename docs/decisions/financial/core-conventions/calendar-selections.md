@@ -23,6 +23,8 @@ Data-owner scope/provenance note (not externally revalidated): ASX cash-market t
 
 ## auce: Australia (Sydney / New South Wales) Banking Holidays
 
+> Reconciled 2026-11-13 (status H1): dated NSW ANZAC Additional Days 2026-04-27 and 2027-04-26 added (not extrapolated, not ASX), pinned to the NSW 2026-2027 table. The snapshot below records the audited input.
+
 Source: [auce.json](../../../../finstack-quant/core/data/calendars/auce.json); `ignore_weekends=false`; 10 rules.
 
 Data-owner scope/provenance note (not externally revalidated): Sydney/NSW banking calendar, including the August bank holiday and October Labour Day. It is not a universal Australian state or ASX trading calendar. Modern Australia Day observance is January 26, Mondayized only on weekends; exceptional historical notices require dated maintenance.
@@ -230,6 +232,8 @@ Data-owner scope/provenance note (not externally revalidated): Mainland China ba
 | National Day / Mid-Autumn merged 8th day (2025) | 2025-10-08 |
 
 ## defr: Germany (Frankfurt) Holiday Calendar
+
+> Reconciled 2026-11-13 (status H1): `defr` is now the Frankfurt/Hesse bank-centre calendar with 12 rules (adds Ascension, Whit Monday, Corpus Christi, October 3, December 24 and December 31), pinned to the Bundesbank 2027 publication. The snapshot below records the audited input.
 
 Source: [defr.json](../../../../finstack-quant/core/data/calendars/defr.json); `ignore_weekends=false`; 6 rules.
 

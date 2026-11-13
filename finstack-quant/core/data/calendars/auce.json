@@ -2,17 +2,22 @@
   "id": "auce",
   "name": "Australia (Sydney / New South Wales) Banking Holidays",
   "ignore_weekends": false,
+  "sources": [
+    { "name": "NSW Government, Public holidays in NSW 2026 to 2027", "url": "https://www.nsw.gov.au/about-nsw/public-holidays", "edition": "2026-2027 table", "retrieved": "2026-11-13", "sha256": "2487d90f45ce69030dc7dc5ea1631c2eed9a647efdf403a3a210eb458c07a450" }
+  ],
   "rules": [
     { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "next_monday" },
     { "type": "fixed", "name": "Australia Day", "month": "january", "day": 26, "observed": "next_monday" },
     { "type": "easter_offset", "name": "Good Friday", "days": -3 },
     { "type": "easter_offset", "name": "Easter Monday", "days": 0 },
     { "type": "fixed", "name": "ANZAC Day", "month": "april", "day": 25, "observed": "none" },
+    { "type": "exact_date", "name": "Additional Day for ANZAC Day (NSW trial, 2026)", "year": 2026, "month": "april", "day": 27 },
+    { "type": "exact_date", "name": "Additional Day for ANZAC Day (NSW trial, 2027)", "year": 2027, "month": "april", "day": 26 },
     { "type": "nth_weekday", "name": "King's Birthday", "n": 2, "weekday": "monday", "month": "june" },
     { "type": "nth_weekday", "name": "Bank Holiday", "n": 1, "weekday": "monday", "month": "august" },
     { "type": "nth_weekday", "name": "Labour Day", "n": 1, "weekday": "monday", "month": "october" },
     { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "mon_if_sat_tue_if_sun" },
     { "type": "fixed", "name": "Boxing Day", "month": "december", "day": 26, "observed": "mon_if_sat_tue_if_sun" }
   ],
-  "notes": "Sydney/NSW banking calendar, including the August bank holiday and October Labour Day. It is not a universal Australian state or ASX trading calendar. Modern Australia Day observance is January 26, Mondayized only on weekends; exceptional historical notices require dated maintenance."
+  "notes": "Sydney/NSW banking calendar, including the August bank holiday and October Labour Day. It is not a universal Australian state or ASX trading calendar. Modern Australia Day observance is January 26, Mondayized only on weekends; exceptional historical notices require dated maintenance. The ANZAC Additional Days of 2026-04-27 and 2027-04-26 are dated NSW additions under the published two-year trial (record CORE-CONVENTIONS-005 #3); they are not extrapolated to later years and do not apply to the separate ASX convention."
 }

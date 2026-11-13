@@ -1,14 +1,23 @@
 {
   "id": "defr",
-  "name": "Germany (Frankfurt) Holiday Calendar",
+  "name": "Germany (Frankfurt/Hesse) Bank-Centre Holiday Calendar",
   "ignore_weekends": false,
-  "comment": "Same holiday set as TARGET2 (New Year's Day, Good Friday, Easter Monday, Labour Day, Christmas, St Stephen's Day), as noted in eurex.json. German practice does not move a holiday that falls on a weekend.",
+  "comment": "Frankfurt/Hesse weekday bank-centre convention (record CORE-CONVENTIONS-005 #3): the six TARGET closing days plus the national holidays Ascension, Whit Monday and Day of German Unity, Hesse's Corpus Christi, and the Bundesbank's additional non-business days December 24 and 31. Not a TARGET calendar: T2 and every euro payment system close only on TARGET days (use target2). German practice does not move a holiday that falls on a weekend. Easter offsets are counted from Easter Monday.",
+  "sources": [
+    { "name": "Deutsche Bundesbank, Public holidays in Germany in 2027", "url": "https://www.bundesbank.de/resource/blob/764518/84d26dc9e3e0cc1e6e3042290df060ff/472B63F073F071307366337C94F8C870/feiertage-in-deutschland-1-data.pdf", "edition": "2027 publication", "retrieved": "2026-11-13", "sha256": "9c92d62d9dd2b00ef14ece536de184dcb22f947109ec97820bfb42175ab0b68b" }
+  ],
   "rules": [
     { "type": "fixed", "name": "Neujahr (New Year's Day)", "month": "january", "day": 1, "observed": "none" },
     { "type": "easter_offset", "name": "Karfreitag (Good Friday)", "days": -3 },
     { "type": "easter_offset", "name": "Ostermontag (Easter Monday)", "days": 0 },
     { "type": "fixed", "name": "Tag der Arbeit (Labour Day)", "month": "may", "day": 1, "observed": "none" },
+    { "type": "easter_offset", "name": "Christi Himmelfahrt (Ascension Day)", "days": 38 },
+    { "type": "easter_offset", "name": "Pfingstmontag (Whit Monday)", "days": 49 },
+    { "type": "easter_offset", "name": "Fronleichnam (Corpus Christi, Hesse)", "days": 59 },
+    { "type": "fixed", "name": "Tag der Deutschen Einheit (Day of German Unity)", "month": "october", "day": 3, "observed": "none" },
+    { "type": "fixed", "name": "Heiligabend (Christmas Eve, Bundesbank non-business day)", "month": "december", "day": 24, "observed": "none" },
     { "type": "fixed", "name": "Erster Weihnachtstag (Christmas Day)", "month": "december", "day": 25, "observed": "none" },
-    { "type": "fixed", "name": "Zweiter Weihnachtstag (St. Stephen's Day)", "month": "december", "day": 26, "observed": "none" }
+    { "type": "fixed", "name": "Zweiter Weihnachtstag (St. Stephen's Day)", "month": "december", "day": 26, "observed": "none" },
+    { "type": "fixed", "name": "Silvester (New Year's Eve, Bundesbank non-business day)", "month": "december", "day": 31, "observed": "none" }
   ]
 }

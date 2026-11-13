@@ -567,13 +567,19 @@ const CASES: &[CalendarCase] = &[
         checks: &[
             YearCheck {
                 year: 2024,
-                expected_count: Some(6),
-                must_have: &[(2024, 5, 1), (2024, 12, 25)],
+                expected_count: Some(12),
+                must_have: &[
+                    (2024, 5, 1),
+                    (2024, 5, 9),
+                    (2024, 5, 30),
+                    (2024, 10, 3),
+                    (2024, 12, 24),
+                ],
             },
             YearCheck {
                 year: 2025,
-                expected_count: Some(6),
-                must_have: &[(2025, 5, 1), (2025, 12, 25)],
+                expected_count: Some(12),
+                must_have: &[(2025, 5, 1), (2025, 5, 29), (2025, 6, 19), (2025, 12, 31)],
             },
         ],
     },
@@ -826,13 +832,26 @@ fn exchange_calendars_are_not_aliases() {
     let nye = make_date(2025, 12, 31);
     assert!(by_id("eurex").is_holiday(eve).expect("calendar lookup"));
     assert!(by_id("eurex").is_holiday(nye).expect("calendar lookup"));
+    // Frankfurt/Hesse bank-centre days are not Eurex trading days: Eurex
+    // trades on Ascension and Corpus Christi, when Frankfurt banks close.
+    let ascension = make_date(2025, 5, 29);
+    let corpus_christi = make_date(2025, 6, 19);
+    for day in [ascension, corpus_christi] {
+        assert!(
+            by_id("eurex")
+                .is_business_day(day)
+                .expect("calendar lookup"),
+            "{day}"
+        );
+        assert!(
+            by_id("defr").is_holiday(day).expect("calendar lookup"),
+            "{day}"
+        );
+    }
     assert!(
-        by_id("defr").is_business_day(eve).expect("calendar lookup"),
-        "defr must remain open on Christmas Eve (eurex is not an alias)"
-    );
-    assert!(
-        by_id("defr").is_business_day(nye).expect("calendar lookup"),
-        "defr must remain open on New Year's Eve (eurex is not an alias)"
+        by_id("target2")
+            .is_business_day(ascension)
+            .expect("calendar lookup")
     );
 
     let truth = make_date(2025, 9, 30);

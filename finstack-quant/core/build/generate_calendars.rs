@@ -17,7 +17,22 @@ struct CalendarDef {
     ignore_weekends: bool,
     notes: Option<String>,
     comment: Option<String>,
+    /// Pinned primary sources for the dated data (record CORE-CONVENTIONS-005).
+    #[serde(default)]
+    sources: Vec<SourceDef>,
     rules: Vec<RuleDef>,
+}
+
+/// One pinned primary source: where it is, which edition, when it was
+/// retrieved and the SHA-256 of the retrieved bytes.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceDef {
+    name: String,
+    url: String,
+    edition: String,
+    retrieved: String,
+    sha256: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -505,6 +520,12 @@ pub(crate) fn generate() -> io::Result<()> {
             for line in note.lines() {
                 output.push_str(&format!("/// {line}\n"));
             }
+        }
+        for source in &cal.sources {
+            output.push_str(&format!(
+                "///\n/// Source: {} ({}), <{}>, retrieved {}, sha256 `{}`.\n",
+                source.name, source.edition, source.url, source.retrieved, source.sha256
+            ));
         }
         // Market calendars are reached by id (`calendar_by_id_strict`); only the
         // weekends-only fallback is a public static (`dates::WEEKENDS_ONLY`).

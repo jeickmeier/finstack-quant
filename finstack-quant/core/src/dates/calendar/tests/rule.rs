@@ -1006,12 +1006,12 @@ fn japan_public_holidays_match_cabinet_office_1970_through_2027() {
 fn builtin_holiday_tables_match_the_golden_digest() {
     const EXPECTED: &[(&str, usize, u64)] = &[
         ("asx", 407, 0x562f94d9a8395ae3),
-        ("auce", 509, 0xbeb88898d2c85e67),
+        ("auce", 511, 0x93a3ba8008ace0b1),
         ("brbd", 628, 0xfaf34cc79f97c0b0),
         ("bse", 344, 0x4f6940e3aeb6d601),
         ("cato", 563, 0x84a81d6ece4493e3),
         ("chzh", 509, 0x69249a421ace77c3),
-        ("defr", 306, 0xf4652cf9740900e2),
+        ("defr", 611, 0x23d85b00a52ec849),
         ("eurex", 408, 0x9a43f685f48d4bd9),
         ("gblo", 412, 0x20ad8d358e2c4db6),
         ("hkex", 871, 0x51f4ba82d3a2a091),

@@ -125,11 +125,11 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 37 | G5 | committed (`G5-1:` … `G5-5g:` in git log) | per sub-slice: lint, gen-check, rust-test (16,437), python-test, wasm-test, ui-check (slice-gate after gen-write); all 101 notebooks after G5-3b, G5-3d2 and G5-5c/d | 015 entry: reconciliation recorded, remaining #8 fallbacks/ILB par delta/LSMC premium named; record 015 status updated; 016 scope unchanged (reconciled in G4) | Kinds (`Floating`, `ProtectionPayment`); zero-cash PIK/write-downs with explicit paired delta/date on every principal row; no inferred principal; cash-only views; complete `DayCountContextState`; literal factors; validated `CashFlowParams` construction, private `CashFlow`/`CashFlowAccrual` fields, atomic updates, validated deserialization; see Needs review |
 | 38 | E5 | committed (`E5:` in git log) | lint and doc checks (slice-gate) | 006/009 entry: 009 items recorded as reconciled; 006 fallbacks assigned to F5 with the FX date callers | Semiannual CDS helper docs (Rust, Python, WASM) state lattice and inclusivity only; no code change |
 | 39 | E6 | skipped (dep CASHFLOWS-001: contained ICMA long-stub composition is not reconciled by any slice of this plan; G5 is met) | | | Removing the grid walk first would break long-stub bonds that rely on `cashflows/src/builder/periods.rs`; E4b removed the CASHFLOWS-001 CDS-mode parts |
-| 40 | H1 | not attempted (run budget) | | | Data slice; needs primary sources fetched in-run |
-| 41 | H3 | not attempted (run budget) | | | Data slice |
-| 42 | H4 | not attempted (run budget) | | | Data slice |
-| 43 | H5 | not attempted (run budget) | | | Data slice |
-| 44 | H6 | not started (dep B5 met) | | | |
+| 40 | H1 | committed (`H1:` in git log) | core rust-test-crate 2,237 incl. published-year rows (defr 2027, auce 2026/2027) and the holiday-table digest; slice-gate | 004/005 entry: Frankfurt/Hesse and NSW Anzac recorded as landed; record 005 status and calendar-selections annotated | `defr` adds Ascension, Whit Monday, Corpus Christi (Hesse), October 3 and Bundesbank December 24/31 (Bundesbank 2027 publication); `auce` adds 2026-04-27 and 2027-04-26 as dated rows (NSW 2026-2027 table); calendar JSON gains a `sources` list (URL, edition, retrieval date, SHA-256) emitted into the generated docs; see Needs review |
+| 41 | H3 | not attempted (run budget) | | | Data slice; SSE annual notices (sse.com.cn), NSE and BSE circulars and the SGSI coverage bound; sources reachable, per-year transcription not done |
+| 42 | H4 | not attempted (run budget) | | | Data slice; Cabinet Office equinox and citizens' holiday tables, lunar generator pinning, HK era bound; sources reachable, not done |
+| 43 | H5 | not attempted (run budget) | | | Data slice; SIFMA per-year closures and the pinned MBS settlement edition; source reachable, not done |
+| 44 | H6 | committed (`H6:` in git log) | core currency tests; gen-write (schemas, UI and WASM types carry the two codes); slice-gate | 012 entry: XCG/ZWG recorded as landed; record 012 status updated | XCG (532, 2) and ZWG (924, 2) added; numeric 532 is ambiguous (ANG, XCG) and errors naming both; `iso_4217.provenance.json` pins SIX List One/Three and amendments 176/177 (URL, edition, retrieval, SHA-256) and records exclusions; see Needs review |
 
 ## Phase gates
 
@@ -751,6 +751,18 @@ logged under Needs review.
     allowlisted known gaps. Fourteen slow tests hit the 60 s runner cap under
     full-tier parallel load (Monte Carlo, LSMC and copula panels); none is a
     value failure.
+- **H1 Frankfurt is no longer a TARGET copy.** `defr` closes on Ascension,
+  Whit Monday, Corpus Christi, October 3 and December 24/31, so anything
+  rolled on `defr` moves on those days; `target2` is unchanged for euro
+  settlement. The old `exchange_calendars_are_not_aliases` test pinned `defr`
+  open on December 24/31; it now distinguishes Eurex and Frankfurt on
+  Ascension and Corpus Christi. The accepted record names the 2027
+  Bundesbank publication; the recurring rules are tagged to it, not to a
+  per-year notice for every year.
+- **H6 SVC and other List One codes stay out.** The selection keeps its
+  audited scope: SVC (El Salvador Colon, still on List One) and fund, metal
+  and unit codes are listed as exclusions in the provenance file, not added.
+  Numeric 532 now errors as ambiguous; no fixture used `Currency::try_from(532)`.
 - **F5 spot dates now count joint business days.** Each product's explicit
   rule adds its stated `settlement_days` on the joint calendar of its two
   stated calendars. The removed helper's CLS-style exception (a US holiday on

@@ -14,6 +14,8 @@
 # NZAU: https://www.govt.nz/browse/work-and-tax/public-holidays-and-work/dates-for-public-holidays-and-anniversary-days/ (national plus Auckland)
 # TSX: https://tsx.com/fr/trading/calendars-and-trading-hours/calendar?lang=fr
 # BRBD: https://www.anbima.com.br/feriados/fer_nacionais/2025.asp (accrual, not B3 trading)
+# AUCE: https://www.nsw.gov.au/about-nsw/public-holidays (2026-2027 table, retrieved 2026-11-13, sha256 2487d90f45ce69030dc7dc5ea1631c2eed9a647efdf403a3a210eb458c07a450) plus the first-Monday-in-August Bank Holiday
+# DEFR: https://www.bundesbank.de/resource/blob/764518/84d26dc9e3e0cc1e6e3042290df060ff/472B63F073F071307366337C94F8C870/feiertage-in-deutschland-1-data.pdf (2027, retrieved 2026-11-13, sha256 9c92d62d9dd2b00ef14ece536de184dcb22f947109ec97820bfb42175ab0b68b): TARGET, national, Hesse Corpus Christi and Bundesbank December 24/31
 calendar,year,weekday_closures_mm_dd
 asx,2024,01-01;01-26;03-29;04-01;04-25;06-10;12-25;12-26
 asx,2026,01-01;01-26;04-03;04-06;06-08;12-25;12-28
@@ -32,3 +34,6 @@ nzau,2026,01-01;01-02;01-26;02-06;04-03;04-06;04-27;06-01;07-10;10-26;12-25;12-2
 nzau,2027,01-01;01-04;02-01;02-08;03-26;03-29;04-26;06-07;06-25;10-25;12-27;12-28
 tsx,2026,01-01;02-16;04-03;05-18;07-01;08-03;09-07;10-12;12-25;12-28
 brbd,2025,01-01;03-03;03-04;04-18;04-21;05-01;06-19;11-20;12-25
+auce,2026,01-01;01-26;04-03;04-06;04-27;06-08;08-03;10-05;12-25;12-28
+auce,2027,01-01;01-26;03-26;03-29;04-26;06-14;08-02;10-04;12-27;12-28
+defr,2027,01-01;03-26;03-29;05-06;05-17;05-27;12-24;12-31
