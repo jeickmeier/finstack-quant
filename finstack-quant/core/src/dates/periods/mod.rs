@@ -723,6 +723,8 @@ pub struct Period {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PeriodPlan {
+    /// Calendar context of every period in the plan, retained once.
+    pub calendar: PeriodCalendar,
     /// Ordered periods produced by the parser.
     pub periods: Vec<Period>,
 }
@@ -870,6 +872,7 @@ mod ltm;
 mod parse;
 #[cfg(test)]
 mod tests;
+pub use calendar::PeriodCalendar;
 use calendar::*;
 pub use ltm::{LtmWindow, ltm_window};
 use parse::*;

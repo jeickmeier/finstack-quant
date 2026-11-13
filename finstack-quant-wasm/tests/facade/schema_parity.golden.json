@@ -11,7 +11,7 @@
             "$id": "https://finstack_quant.dev/schemas/dates/1/period_plan.schema.json",
             "type_name": "PeriodPlan",
             "kind": "output",
-            "bytes": 1889
+            "bytes": 3645
           },
           {
             "path": "schemas/dates/1/schedule.schema.json",
@@ -79,7 +79,7 @@
           "title",
           "type"
         ],
-        "definitions": ["Period", "PeriodId"]
+        "definitions": ["FiscalConfig", "Period", "PeriodCalendar", "PeriodId"]
       },
       "llm": {
         "id": "https://finstack_quant.dev/schemas/dates/1/period_plan.schema.json",
@@ -96,11 +96,15 @@
           "title",
           "type"
         ],
-        "definitions": ["Period", "PeriodId"]
+        "definitions": ["FiscalConfig", "Period", "PeriodCalendar", "PeriodId"]
       },
       "report": [
         {
           "message": "Additional properties are not allowed ('not_a_field' was unexpected)",
+          "pointer": ""
+        },
+        {
+          "message": "\"calendar\" is a required property",
           "pointer": ""
         },
         {
@@ -4098,7 +4102,7 @@
             "$id": "https://finstack_quant.dev/schemas/dates/1/period_plan.schema.json",
             "type_name": "PeriodPlan",
             "kind": "output",
-            "bytes": 1889
+            "bytes": 3645
           },
           {
             "domain": "core",

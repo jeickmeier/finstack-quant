@@ -1,5 +1,28 @@
 {
   "$defs": {
+    "FiscalConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for fiscal year periods.\n\nAlways holds a start month in `1..=12` and a start day in `1..=31`;\ndeserialization applies the same validation as [`FiscalConfig::new`].",
+      "properties": {
+        "start_day": {
+          "format": "uint8",
+          "maximum": 31,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "start_month": {
+          "format": "uint8",
+          "maximum": 12,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start_month",
+        "start_day"
+      ],
+      "type": "object"
+    },
     "Period": {
       "additionalProperties": false,
       "description": "A concrete period with start/end dates and actual/forecast flag.",
@@ -31,6 +54,29 @@
       ],
       "type": "object"
     },
+    "PeriodCalendar": {
+      "description": "Calendar context that bounds and steps period identifiers.\n\nAn unprefixed identifier belongs to `Gregorian`, an `FY` identifier to\n`Fiscal(config)`. A [`PeriodPlan`] retains its calendar once; operations\nthat resolve or step an identifier take this context explicitly (record\nCORE-CONVENTIONS-014 #4).",
+      "oneOf": [
+        {
+          "const": "gregorian",
+          "description": "Gregorian years with ISO 8601 weeks.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Fiscal years opening on the configured month and day.",
+          "properties": {
+            "fiscal": {
+              "$ref": "#/$defs/FiscalConfig"
+            }
+          },
+          "required": [
+            "fiscal"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "PeriodId": {
       "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
       "type": "string"
@@ -42,6 +88,7 @@
   "description": "Ordered reporting periods with their calendar bounds and actual/forecast flags.",
   "examples": [
     {
+      "calendar": "gregorian",
       "periods": [
         {
           "end": "2025-04-01",
@@ -59,6 +106,10 @@
     }
   ],
   "properties": {
+    "calendar": {
+      "$ref": "#/$defs/PeriodCalendar",
+      "description": "Calendar context of every period in the plan, retained once."
+    },
     "periods": {
       "description": "Ordered periods produced by the parser.",
       "items": {
@@ -68,6 +119,7 @@
     }
   },
   "required": [
+    "calendar",
     "periods"
   ],
   "title": "PeriodPlan",

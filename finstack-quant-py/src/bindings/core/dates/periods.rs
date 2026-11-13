@@ -357,6 +357,13 @@ impl PyPeriodPlan {
 
 #[pymethods]
 impl PyPeriodPlan {
+    /// Calendar context of the plan in serde form: ``"gregorian"`` or
+    /// ``{"fiscal": {"start_month": m, "start_day": d}}``.
+    #[getter]
+    fn calendar<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.calendar)
+    }
+
     /// List of periods in ascending order.
     #[getter]
     fn periods(&self) -> Vec<PyPeriod> {

@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/dates/1/period_plan.schema.json",
-      "bytes": 1889,
+      "bytes": 3645,
       "kind": "output",
       "path": "schemas/dates/1/period_plan.schema.json",
       "summary": "Ordered reporting periods with their calendar bounds and actual/forecast flags.",

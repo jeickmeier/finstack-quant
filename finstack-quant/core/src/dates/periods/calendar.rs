@@ -2,18 +2,36 @@
 
 use super::*;
 
-/// Year convention used to bound and step period identifiers.
-#[derive(Clone, Copy, Debug)]
-pub(super) enum PeriodCalendar {
+/// Calendar context that bounds and steps period identifiers.
+///
+/// An unprefixed identifier belongs to `Gregorian`, an `FY` identifier to
+/// `Fiscal(config)`. A [`PeriodPlan`] retains its calendar once; operations
+/// that resolve or step an identifier take this context explicitly (record
+/// CORE-CONVENTIONS-014 #4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum PeriodCalendar {
     /// Gregorian years with ISO 8601 weeks.
     Gregorian,
-    /// Fiscal years starting on the configured month and day.
+    /// Fiscal years opening on the configured month and day.
     Fiscal(FiscalConfig),
 }
 
 impl PeriodCalendar {
-    pub(super) fn is_fiscal(self) -> bool {
+    /// Whether this is a fiscal calendar.
+    #[must_use]
+    pub fn is_fiscal(self) -> bool {
         matches!(self, Self::Fiscal(_))
+    }
+
+    /// The fiscal configuration, or `None` for the Gregorian calendar.
+    #[must_use]
+    pub fn fiscal_config(self) -> Option<FiscalConfig> {
+        match self {
+            Self::Gregorian => None,
+            Self::Fiscal(config) => Some(config),
+        }
     }
 
     fn year_start(self, year: i32) -> crate::Result<Date> {
@@ -132,7 +150,7 @@ pub(super) fn build_periods_with_calendar(
             current = step(current, calendar, true)?;
         }
     }
-    Ok(PeriodPlan { periods })
+    Ok(PeriodPlan { calendar, periods })
 }
 
 const MAX_PERIODS: usize = 100_000;

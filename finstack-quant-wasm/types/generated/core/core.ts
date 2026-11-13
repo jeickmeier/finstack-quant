@@ -1119,6 +1119,19 @@ export type NonFiniteSentinel = "inf" | "-inf" | "nan";
  */
 export type PeriodId = string;
 /**
+ * Calendar context that bounds and steps period identifiers.
+ *
+ * An unprefixed identifier belongs to `Gregorian`, an `FY` identifier to
+ * `Fiscal(config)`. A [`PeriodPlan`] retains its calendar once; operations
+ * that resolve or step an identifier take this context explicitly (record
+ * CORE-CONVENTIONS-014 #4).
+ */
+export type PeriodCalendar =
+  | "gregorian"
+  | {
+      fiscal: FiscalConfig;
+    };
+/**
  * Stub period handling when start/end dates don't align with payment frequency.
  *
  * Controls how schedules are generated when the start and end dates don't
@@ -1487,6 +1500,16 @@ export interface DividendSchedule {
    * Optional display symbol/ticker for convenience.
    */
   underlying?: string | null;
+}
+/**
+ * Configuration for fiscal year periods.
+ *
+ * Always holds a start month in `1..=12` and a start day in `1..=31`;
+ * deserialization applies the same validation as [`FiscalConfig::new`].
+ */
+export interface FiscalConfig {
+  start_day: number;
+  start_month: number;
 }
 /**
  * Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour
@@ -1949,6 +1972,10 @@ export interface Period {
  * Ordered reporting periods with their calendar bounds and actual/forecast flags.
  */
 export interface PeriodPlan {
+  /**
+   * Calendar context of every period in the plan, retained once.
+   */
+  calendar: PeriodCalendar;
   /**
    * Ordered periods produced by the parser.
    */

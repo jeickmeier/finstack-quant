@@ -35,6 +35,12 @@
     "id": "CDX-IG"
   },
   "build_fiscal_periods": {
+    "calendar": {
+      "fiscal": {
+        "start_day": 1,
+        "start_month": 10
+      }
+    },
     "periods": [
       {
         "end": "2025-01-01",
@@ -51,6 +57,7 @@
     ]
   },
   "build_periods": {
+    "calendar": "gregorian",
     "periods": [
       {
         "end": "2025-04-01",

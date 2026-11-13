@@ -666,6 +666,22 @@ class PeriodPlan:
     """
 
     @property
+    def calendar(self) -> str | dict[str, dict[str, int]]:
+        """
+        Calendar context of the plan, retained once for all its periods.
+
+        Returns
+        -------
+        str | dict[str, dict[str, int]]
+            ``"gregorian"`` for a Gregorian plan, or
+            ``{"fiscal": {"start_month": m, "start_day": d}}`` for a fiscal plan.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def periods(self) -> list[Period]:
         """
         List of periods in ascending order.
