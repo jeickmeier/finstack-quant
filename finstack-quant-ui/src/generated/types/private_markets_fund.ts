@@ -158,11 +158,13 @@ export type Currency =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -437,11 +439,13 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day count for LP/fund IRR year fractions and hurdle compounding
@@ -767,11 +771,13 @@ export interface Money {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -1889,11 +1895,13 @@ export interface Money1 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**

@@ -158,11 +158,13 @@ export type Currency =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * SIMM credit sector for bucket assignment.
@@ -341,11 +343,13 @@ export type Currency1 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 
 /**

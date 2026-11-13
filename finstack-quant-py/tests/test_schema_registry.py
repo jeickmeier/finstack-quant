@@ -176,7 +176,7 @@ def test_llm_profile_flattens_unit_enums() -> None:
     projected = json.loads(valuations_schema.get("money.schema.json", profile="llm"))
     currency = projected["$defs"]["Currency"]
 
-    assert "oneOf" not in currency, "a 159-branch union is not something to decode against"
+    assert "oneOf" not in currency, "a 161-branch union is not something to decode against"
     assert len(currency["enum"]) > 100
     assert "USD" in currency["enum"]
 

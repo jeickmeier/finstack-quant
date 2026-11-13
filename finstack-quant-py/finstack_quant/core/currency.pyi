@@ -181,11 +181,13 @@ __all__ = [
     "WST",
     "XAF",
     "XCD",
+    "XCG",
     "XOF",
     "XPF",
     "YER",
     "ZAR",
     "ZMW",
+    "ZWG",
     "ZWL",
 ]
 
@@ -519,9 +521,11 @@ VUV: Currency
 WST: Currency
 XAF: Currency
 XCD: Currency
+XCG: Currency
 XOF: Currency
 XPF: Currency
 YER: Currency
 ZAR: Currency
 ZMW: Currency
+ZWG: Currency
 ZWL: Currency

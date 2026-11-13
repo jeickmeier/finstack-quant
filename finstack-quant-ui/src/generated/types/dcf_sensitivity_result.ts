@@ -204,11 +204,13 @@ export interface D_51Da99D04112182A6A5D {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**

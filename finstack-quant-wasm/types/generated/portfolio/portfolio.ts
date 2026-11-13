@@ -273,11 +273,13 @@ export type Currency =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Size and shape of one applied shock.

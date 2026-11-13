@@ -362,11 +362,13 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Pool identifier (CUSIP or internal pool ID).
@@ -785,11 +787,13 @@ export type Currency =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day count convention
@@ -1167,11 +1171,13 @@ export type Currency1 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -1901,11 +1907,13 @@ export type Currency2 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -2982,11 +2990,13 @@ export type Currency3 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -3738,11 +3748,13 @@ export type Currency4 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -3944,11 +3956,13 @@ export type Currency5 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Business day convention for payment date adjustment.
@@ -4433,11 +4447,13 @@ export type Currency6 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * ISO 8601 calendar date string.
@@ -4608,11 +4624,13 @@ export type Currency7 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -5236,11 +5254,13 @@ export type Currency8 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -5407,11 +5427,13 @@ export type Currency9 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -5616,11 +5638,13 @@ export type Currency10 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -5880,11 +5904,13 @@ export type Currency11 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -6047,11 +6073,13 @@ export type Currency12 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Base currency (foreign)
@@ -6210,11 +6238,13 @@ export type Currency13 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -6393,11 +6423,13 @@ export type Currency14 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Base currency (foreign currency, numerator of the pair).
@@ -6556,11 +6588,13 @@ export type Currency15 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -6735,11 +6769,13 @@ export type Currency16 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Base currency (restricted/non-deliverable currency, numerator).
@@ -6898,11 +6934,13 @@ export type Currency17 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -7129,11 +7167,13 @@ export type Currency18 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Base currency (foreign currency)
@@ -7292,11 +7332,13 @@ export type Currency19 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -7473,11 +7515,13 @@ export type Currency20 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -7652,11 +7696,13 @@ export type Currency21 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -7819,11 +7865,13 @@ export type Currency22 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -8016,11 +8064,13 @@ export type Currency23 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -8183,11 +8233,13 @@ export type Currency24 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -8380,11 +8432,13 @@ export type Currency25 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -8547,11 +8601,13 @@ export type Currency26 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -8744,11 +8800,13 @@ export type Currency27 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -8915,11 +8973,13 @@ export type Currency28 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -9121,11 +9181,13 @@ export type Currency29 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * ISO 8601 calendar date string.
@@ -9292,11 +9354,13 @@ export type Currency30 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -9489,11 +9553,13 @@ export type Currency31 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -9660,11 +9726,13 @@ export type Currency32 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -9869,11 +9937,13 @@ export type Currency33 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -10101,11 +10171,13 @@ export type Currency34 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -10285,11 +10357,13 @@ export type Currency35 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -10473,11 +10547,13 @@ export type Currency36 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -10682,11 +10758,13 @@ export type Currency37 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -10907,11 +10985,13 @@ export type Currency38 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -11094,11 +11174,13 @@ export type Currency39 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -11273,11 +11355,13 @@ export type Currency40 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -11749,11 +11833,13 @@ export type Currency41 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -11920,11 +12006,13 @@ export type Currency42 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -12087,11 +12175,13 @@ export type Currency43 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * ISO 8601 calendar date string.
@@ -12324,11 +12414,13 @@ export type Currency44 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Day-count convention.
@@ -12517,11 +12609,13 @@ export type Currency45 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -12942,11 +13036,13 @@ export type Currency46 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Collection account(s) a waterfall tier draws on.
@@ -13205,11 +13301,13 @@ export type Currency47 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Financing instruments supported by levered real-estate valuation and metrics.
@@ -13412,11 +13510,13 @@ export type Currency48 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Opaque string identifier.
@@ -13672,11 +13772,13 @@ export type Currency49 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Type of asset in the basket
@@ -16254,11 +16356,13 @@ export type D_9Bbbe0Cc70B45831Cb71 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Coupon cashflow type for fixed/floating coupons.
@@ -16473,11 +16577,13 @@ export type Currency50 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Cashflow default-model specification.
@@ -17448,11 +17554,13 @@ export interface Money {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -18572,11 +18680,13 @@ export interface Money1 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -18883,11 +18993,13 @@ export interface Money2 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -19058,11 +19170,13 @@ export interface Money3 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -19463,11 +19577,13 @@ export interface Money4 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -19666,11 +19782,13 @@ export interface Money5 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -19844,11 +19962,13 @@ export interface Money6 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -20831,11 +20951,13 @@ export interface Money7 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -21164,11 +21286,13 @@ export interface Money8 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -21339,11 +21463,13 @@ export interface Money9 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -21514,11 +21640,13 @@ export interface Money10 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -21689,11 +21817,13 @@ export interface Money11 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -21864,11 +21994,13 @@ export interface Money12 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -22039,11 +22171,13 @@ export interface Money13 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -23178,11 +23312,13 @@ export interface Money14 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -23477,11 +23613,13 @@ export interface Money15 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -23689,11 +23827,13 @@ export interface Money16 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -24265,11 +24405,13 @@ export interface Money17 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -24461,11 +24603,13 @@ export interface Money18 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -24650,11 +24794,13 @@ export interface Money19 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -24996,11 +25142,13 @@ export interface Money20 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -25323,11 +25471,13 @@ export interface Money21 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -25498,11 +25648,13 @@ export interface Money22 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -25673,11 +25825,13 @@ export interface Money23 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -26144,11 +26298,13 @@ export interface Money24 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -26664,11 +26820,13 @@ export interface Money25 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -26934,11 +27092,13 @@ export interface Money26 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -27123,11 +27283,13 @@ export interface Money27 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -27350,11 +27512,13 @@ export interface Money28 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -27862,11 +28026,13 @@ export interface Money29 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -28037,11 +28203,13 @@ export interface Money30 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -28212,11 +28380,13 @@ export interface Money31 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -28484,11 +28654,13 @@ export interface Money32 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -28728,11 +28900,13 @@ export interface Money33 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -29291,11 +29465,13 @@ export interface Money34 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -29826,11 +30002,13 @@ export interface Money35 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -30726,11 +30904,13 @@ export interface Money36 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -30922,11 +31102,13 @@ export interface Money37 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -31097,11 +31279,13 @@ export interface Money38 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -31430,11 +31614,13 @@ export interface Money39 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -31834,11 +32020,13 @@ export interface Money40 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -32584,11 +32772,13 @@ export interface Money41 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -32759,11 +32949,13 @@ export interface Money42 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -32957,11 +33149,13 @@ export interface Money43 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -33132,11 +33326,13 @@ export interface Money44 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -33307,11 +33503,13 @@ export interface Money45 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -33482,11 +33680,13 @@ export interface Money46 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -33687,11 +33887,13 @@ export interface Money47 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -34093,11 +34295,13 @@ export interface Money48 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -34452,11 +34656,13 @@ export interface Money49 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -34769,11 +34975,13 @@ export interface Money50 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -35091,11 +35299,13 @@ export interface Money51 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -35407,11 +35617,13 @@ export interface Money52 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -35714,11 +35926,13 @@ export interface Money53 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -36239,11 +36453,13 @@ export interface Money54 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -37272,11 +37488,13 @@ export interface Money55 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -37752,11 +37970,13 @@ export interface Money56 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -38082,11 +38302,13 @@ export interface Money57 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -38387,11 +38609,13 @@ export interface Money58 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -38649,11 +38873,13 @@ export interface Money59 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -39212,11 +39438,13 @@ export interface Money60 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -39638,11 +39866,13 @@ export interface Money61 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -40025,11 +40255,13 @@ export interface Money62 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -40419,11 +40651,13 @@ export interface Money63 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -41313,11 +41547,13 @@ export interface Money64 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -42022,11 +42258,13 @@ export interface Money65 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -42315,11 +42553,13 @@ export interface Money66 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -42644,11 +42884,13 @@ export interface Money67 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -43029,11 +43271,13 @@ export interface Money68 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -43336,11 +43580,13 @@ export interface Money69 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -43645,11 +43891,13 @@ export interface Money70 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -43820,11 +44068,13 @@ export interface Money71 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -44169,11 +44419,13 @@ export interface Money72 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -44523,11 +44775,13 @@ export interface Money73 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -44869,11 +45123,13 @@ export interface Money74 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -45219,11 +45475,13 @@ export interface Money75 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -48012,11 +48270,13 @@ export interface Money76 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -48373,11 +48633,13 @@ export interface Money77 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -48709,11 +48971,13 @@ export interface Money78 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -49091,11 +49355,13 @@ export interface Money79 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -49443,11 +49709,13 @@ export interface Money80 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -49909,11 +50177,13 @@ export interface Money81 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -50435,11 +50705,13 @@ export interface Money82 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -50744,11 +51016,13 @@ export interface Money83 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -51684,11 +51958,13 @@ export interface Money84 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -52949,11 +53225,13 @@ export interface Money85 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -53139,11 +53417,13 @@ export interface Money86 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -53417,11 +53697,13 @@ export interface Money87 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -53592,11 +53874,13 @@ export interface Money88 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -53806,11 +54090,13 @@ export interface Money89 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -54200,11 +54486,13 @@ export interface Money90 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -54375,11 +54663,13 @@ export interface Money91 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -54550,11 +54840,13 @@ export interface Money92 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -54857,11 +55149,13 @@ export interface Money93 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -55626,11 +55920,13 @@ export interface Money94 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -56147,11 +56443,13 @@ export interface Money95 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -56814,11 +57112,13 @@ export interface Money96 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**

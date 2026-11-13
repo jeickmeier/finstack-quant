@@ -309,11 +309,13 @@ export type DB556Bbeb1Ecf96C44C5A =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Repo rate (annual, as decimal)
@@ -563,11 +565,13 @@ export interface Money {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**

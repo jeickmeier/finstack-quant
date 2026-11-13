@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/capital_structure_summary.schema.json",
-      "bytes": 29680,
+      "bytes": 29928,
       "kind": "output",
       "path": "schemas/statements_analytics/1/capital_structure_summary.schema.json",
       "summary": "Debt stack by seniority at one period: leverage and coverage through each payment class, and the maturity wall.",
@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corporate_analysis.schema.json",
-      "bytes": 37092,
+      "bytes": 37340,
       "kind": "output",
       "path": "schemas/statements_analytics/1/corporate_analysis.schema.json",
       "summary": "Unified analysis result combining statement, equity, and credit perspectives.",
@@ -128,7 +128,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
-      "bytes": 23900,
+      "bytes": 24148,
       "kind": "output",
       "path": "schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
       "summary": "Enterprise-value tornado for the headline DCF assumptions.",
@@ -263,7 +263,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
-      "bytes": 35327,
+      "bytes": 35575,
       "kind": "output",
       "path": "schemas/statements_analytics/1/lbo_result.schema.json",
       "summary": "Outputs of an LBO evaluation.",
@@ -407,7 +407,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json",
-      "bytes": 27533,
+      "bytes": 27781,
       "kind": "component",
       "path": "schemas/statements_analytics/1/scenario_set.schema.json",
       "summary": "Registry of named scenarios built on top of a base model.",

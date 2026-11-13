@@ -598,7 +598,7 @@ test('every ISO-4217 currency has a Currency static', () => {
   const statics = Object.getOwnPropertyNames(core.Currency).filter(
     (name) => /^[a-z]{3}$/.test(name) && typeof core.Currency[name] === 'function'
   );
-  assert.equal(statics.length, 159);
+  assert.equal(statics.length, 161); // data/iso_4217.csv rows, incl. XCG and ZWG
   for (const name of statics) assert.equal(core.Currency[name]().toString(), name.toUpperCase());
 });
 

@@ -2511,6 +2511,11 @@
           "type": "string"
         },
         {
+          "const": "XCG",
+          "description": "Caribbean Guilder (532)",
+          "type": "string"
+        },
+        {
           "const": "XOF",
           "description": "CFA Franc BCEAO (952)",
           "type": "string"
@@ -2533,6 +2538,11 @@
         {
           "const": "ZMW",
           "description": "Zambian Kwacha (967)",
+          "type": "string"
+        },
+        {
+          "const": "ZWG",
+          "description": "Zimbabwe Gold (924)",
           "type": "string"
         },
         {
@@ -3317,6 +3327,11 @@
           "type": "string"
         },
         {
+          "const": "XCG",
+          "description": "Caribbean Guilder (532)",
+          "type": "string"
+        },
+        {
           "const": "XOF",
           "description": "CFA Franc BCEAO (952)",
           "type": "string"
@@ -3339,6 +3354,11 @@
         {
           "const": "ZMW",
           "description": "Zambian Kwacha (967)",
+          "type": "string"
+        },
+        {
+          "const": "ZWG",
+          "description": "Zimbabwe Gold (924)",
           "type": "string"
         },
         {

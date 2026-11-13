@@ -250,6 +250,31 @@ mod tests {
         assert!(err.to_string().contains("999"), "{err}");
     }
 
+    /// ISO 4217 amendments 176 and 177 (pinned in `data/iso_4217.provenance.json`):
+    /// XCG shares 532 with historical ANG; ZWG is 924 beside historical ZWL 932.
+    #[test]
+    fn caribbean_guilder_and_zimbabwe_gold_are_distinct_identities() {
+        assert_eq!("XCG".parse::<Currency>(), Ok(Currency::XCG));
+        assert_eq!("ZWG".parse::<Currency>(), Ok(Currency::ZWG));
+        assert_eq!(
+            (Currency::XCG.numeric(), Currency::XCG.decimals()),
+            (532, 2)
+        );
+        assert_eq!(
+            (Currency::ZWG.numeric(), Currency::ZWG.decimals()),
+            (924, 2)
+        );
+        assert_ne!(Currency::XCG, Currency::ANG);
+        assert_eq!(Currency::ANG.numeric(), 532);
+        assert_eq!(Currency::try_from(924u16), Ok(Currency::ZWG));
+        assert_eq!(Currency::try_from(932u16), Ok(Currency::ZWL));
+        let err = Currency::try_from(532u16).expect_err("ANG and XCG share 532");
+        assert!(
+            err.to_string().contains("ANG") && err.to_string().contains("XCG"),
+            "{err}"
+        );
+    }
+
     #[test]
     fn test_currency_display() {
         assert_eq!(format!("{}", Currency::USD), "USD");

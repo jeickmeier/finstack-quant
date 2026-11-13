@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json",
-      "bytes": 89746,
+      "bytes": 89994,
       "kind": "input",
       "path": "schemas/factor_model/1/credit_factor_model.schema.json",
       "summary": "Calibrated credit factor hierarchy, loadable as pricing input.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/factor_model/1/factor_model_config.schema.json",
-      "bytes": 59093,
+      "bytes": 59341,
       "kind": "input",
       "path": "schemas/factor_model/1/factor_model_config.schema.json",
       "summary": "Factor definitions, matchers and covariance settings.",
@@ -335,7 +335,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/gbm_european_fd_spec.schema.json",
-      "bytes": 22576,
+      "bytes": 22824,
       "kind": "input",
       "path": "schemas/models/1/gbm_european_fd_spec.schema.json",
       "summary": "Inputs of the GBM European Monte Carlo finite-difference Greeks.",
@@ -353,7 +353,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/heston_mc_settings.schema.json",
-      "bytes": 20568,
+      "bytes": 20816,
       "kind": "input",
       "path": "schemas/models/1/heston_mc_settings.schema.json",
       "summary": "Monte Carlo run settings of the Heston European pricer.",
@@ -497,7 +497,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/lrm_greeks.schema.json",
-      "bytes": 28877,
+      "bytes": 29125,
       "kind": "output",
       "path": "schemas/models/1/lrm_greeks.schema.json",
       "summary": "Monte Carlo price with likelihood-ratio delta and vega from the same paths.",
@@ -515,7 +515,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/market_dependency.schema.json",
-      "bytes": 25891,
+      "bytes": 26139,
       "kind": "component",
       "path": "schemas/models/1/market_dependency.schema.json",
       "summary": "A single market dependency extracted from an instrument.",
@@ -587,7 +587,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/monte_carlo_result.schema.json",
-      "bytes": 35953,
+      "bytes": 36201,
       "kind": "output",
       "path": "schemas/models/1/monte_carlo_result.schema.json",
       "summary": "Monte Carlo pricing result with optional captured paths.",

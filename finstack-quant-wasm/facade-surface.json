@@ -971,11 +971,13 @@
       "wst",
       "xaf",
       "xcd",
+      "xcg",
       "xof",
       "xpf",
       "yer",
       "zar",
       "zmw",
+      "zwg",
       "zwl"
     ],
     "methods": ["free", "toJson", "toString"],

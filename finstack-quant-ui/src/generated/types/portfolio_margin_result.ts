@@ -162,11 +162,13 @@ export type D_6314E719Da96C7D5F5Cd =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Initial margin calculation methodology.
@@ -435,11 +437,13 @@ export interface D_5Dda37218F207E54719D {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -609,11 +613,13 @@ export interface D_5Dda37218F207E54719D1 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -783,11 +789,13 @@ export interface D_5Dda37218F207E54719D2 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -958,11 +966,13 @@ export interface D_5Dda37218F207E54719D3 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 export interface D_5E419836737Da524669D {
@@ -1171,11 +1181,13 @@ export interface D_5Dda37218F207E54719D4 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -1343,11 +1355,13 @@ export interface D_9C6B2Dea099Ebb450Ba0 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
   /**
    * Commodity delta buckets as `(bucket, amount)`.

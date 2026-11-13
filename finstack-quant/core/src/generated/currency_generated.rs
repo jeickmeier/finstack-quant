@@ -312,6 +312,8 @@ pub enum Currency {
     XAF,
     /// East Caribbean Dollar (951)
     XCD,
+    /// Caribbean Guilder (532)
+    XCG,
     /// CFA Franc BCEAO (952)
     XOF,
     /// CFP Franc (953)
@@ -322,12 +324,14 @@ pub enum Currency {
     ZAR,
     /// Zambian Kwacha (967)
     ZMW,
+    /// Zimbabwe Gold (924)
+    ZWG,
     /// Zimbabwe Dollar (932)
     ZWL,
 }
 
 /// Every supported currency, in alphabetic code order (the enum declaration order).
-pub(crate) static ALL_CURRENCIES: [Currency; 159] = [
+pub(crate) static ALL_CURRENCIES: [Currency; 161] = [
     Currency::AED,
     Currency::AFN,
     Currency::ALL,
@@ -481,17 +485,19 @@ pub(crate) static ALL_CURRENCIES: [Currency; 159] = [
     Currency::WST,
     Currency::XAF,
     Currency::XCD,
+    Currency::XCG,
     Currency::XOF,
     Currency::XPF,
     Currency::YER,
     Currency::ZAR,
     Currency::ZMW,
+    Currency::ZWG,
     Currency::ZWL,
 ];
 
 /// Per-currency metadata `(alphabetic code, ISO numeric code, minor units)`,
 /// indexed by declaration position.
-const METADATA: [(&str, u16, u8); 159] = [
+const METADATA: [(&str, u16, u8); 161] = [
     ("AED", 784, 2),
     ("AFN", 971, 2),
     ("ALL", 8, 2),
@@ -645,11 +651,13 @@ const METADATA: [(&str, u16, u8); 159] = [
     ("WST", 882, 2),
     ("XAF", 950, 0),
     ("XCD", 951, 2),
+    ("XCG", 532, 2),
     ("XOF", 952, 0),
     ("XPF", 953, 0),
     ("YER", 886, 2),
     ("ZAR", 710, 2),
     ("ZMW", 967, 2),
+    ("ZWG", 924, 2),
     ("ZWL", 932, 2),
 ];
 
@@ -767,7 +775,7 @@ impl TryFrom<u16> for Currency {
             512 => Ok(Currency::OMR),
             516 => Ok(Currency::NAD),
             524 => Ok(Currency::NPR),
-            532 => Ok(Currency::ANG),
+            532 => Err(crate::Error::Validation(format!("ambiguous ISO 4217 numeric currency code {code}: ANG, XCG"))),
             533 => Ok(Currency::AWG),
             548 => Ok(Currency::VUV),
             554 => Ok(Currency::NZD),
@@ -812,6 +820,7 @@ impl TryFrom<u16> for Currency {
             882 => Ok(Currency::WST),
             886 => Ok(Currency::YER),
             901 => Ok(Currency::TWD),
+            924 => Ok(Currency::ZWG),
             925 => Ok(Currency::SLE),
             926 => Ok(Currency::VED),
             928 => Ok(Currency::VES),

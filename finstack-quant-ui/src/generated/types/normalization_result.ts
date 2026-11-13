@@ -183,11 +183,13 @@ export interface NormalizationResultWire {
           | "WST"
           | "XAF"
           | "XCD"
+          | "XCG"
           | "XOF"
           | "XPF"
           | "YER"
           | "ZAR"
           | "ZMW"
+          | "ZWG"
           | "ZWL";
         type: "monetary";
         [k: string]: unknown;

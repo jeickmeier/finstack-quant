@@ -207,11 +207,13 @@ export type D_3Aecc8Cf7202Ad79B690 =
         | "WST"
         | "XAF"
         | "XCD"
+        | "XCG"
         | "XOF"
         | "XPF"
         | "YER"
         | "ZAR"
         | "ZMW"
+        | "ZWG"
         | "ZWL";
       kind: "fx";
       /**
@@ -371,11 +373,13 @@ export type D_3Aecc8Cf7202Ad79B690 =
         | "WST"
         | "XAF"
         | "XCD"
+        | "XCG"
         | "XOF"
         | "XPF"
         | "YER"
         | "ZAR"
         | "ZMW"
+        | "ZWG"
         | "ZWL";
     };
 /**
@@ -953,11 +957,13 @@ export interface D_385E5Bf7A6A74E2A0572 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -1143,11 +1149,13 @@ export interface D_385E5Bf7A6A74E2A05721 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -1423,11 +1431,13 @@ export interface D_10E2Fa80D54Cbc200Df9 {
                 | "WST"
                 | "XAF"
                 | "XCD"
+                | "XCG"
                 | "XOF"
                 | "XPF"
                 | "YER"
                 | "ZAR"
                 | "ZMW"
+                | "ZWG"
                 | "ZWL";
               kind: "fx";
               /**
@@ -1587,11 +1597,13 @@ export interface D_10E2Fa80D54Cbc200Df9 {
                 | "WST"
                 | "XAF"
                 | "XCD"
+                | "XCG"
                 | "XOF"
                 | "XPF"
                 | "YER"
                 | "ZAR"
                 | "ZMW"
+                | "ZWG"
                 | "ZWL";
             };
       }

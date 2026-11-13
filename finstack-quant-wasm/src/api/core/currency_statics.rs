@@ -647,6 +647,10 @@ currency_factories! {
     ///
     /// @returns The `XCD` currency.
     xcd as "xcd" => XCD,
+    /// Caribbean Guilder (`XCG`, ISO-4217 numeric 532).
+    ///
+    /// @returns The `XCG` currency.
+    xcg as "xcg" => XCG,
     /// CFA Franc BCEAO (`XOF`, ISO-4217 numeric 952).
     ///
     /// @returns The `XOF` currency.
@@ -667,6 +671,10 @@ currency_factories! {
     ///
     /// @returns The `ZMW` currency.
     zmw as "zmw" => ZMW,
+    /// Zimbabwe Gold (`ZWG`, ISO-4217 numeric 924).
+    ///
+    /// @returns The `ZWG` currency.
+    zwg as "zwg" => ZWG,
     /// Zimbabwe Dollar (`ZWL`, ISO-4217 numeric 932).
     ///
     /// @returns The `ZWL` currency.

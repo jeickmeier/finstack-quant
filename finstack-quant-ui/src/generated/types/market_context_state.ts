@@ -777,11 +777,13 @@ export type DB6A74Bd737Ef1567B144 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Seniority level for credit exposures.
@@ -1155,11 +1157,13 @@ export interface D_17Ffcd7842A3F40268B1 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
   /**
    * Day count used for the curve's time axis.
@@ -1695,11 +1699,13 @@ export interface DD99050870612E8Bfc3D3 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -2130,11 +2136,13 @@ export interface DE771E792357014C84Cb9 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
   /**
    * Unique identifier

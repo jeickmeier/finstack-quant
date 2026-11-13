@@ -199,11 +199,13 @@ export type D_9E50E1B9698Ebe0E1126 =
   | "WST"
   | "XAF"
   | "XCD"
+  | "XCG"
   | "XOF"
   | "XPF"
   | "YER"
   | "ZAR"
   | "ZMW"
+  | "ZWG"
   | "ZWL";
 /**
  * Warning emitted during evaluation.
@@ -557,11 +559,13 @@ export type D_8B741636Dd21D9F7Ad3F =
         | "WST"
         | "XAF"
         | "XCD"
+        | "XCG"
         | "XOF"
         | "XPF"
         | "YER"
         | "ZAR"
         | "ZMW"
+        | "ZWG"
         | "ZWL";
       type: "monetary";
       [k: string]: unknown;
@@ -1114,11 +1118,13 @@ export interface D_1B5716Dde9957A614F3C {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -1388,11 +1394,13 @@ export interface D_1B5716Dde9957A614F3C1 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -1578,11 +1586,13 @@ export interface D_1B5716Dde9957A614F3C2 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -1768,11 +1778,13 @@ export interface D_1B5716Dde9957A614F3C3 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -1958,11 +1970,13 @@ export interface D_1B5716Dde9957A614F3C4 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -2148,11 +2162,13 @@ export interface D_1B5716Dde9957A614F3C5 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**
@@ -2338,11 +2354,13 @@ export interface D_1B5716Dde9957A614F3C6 {
     | "WST"
     | "XAF"
     | "XCD"
+    | "XCG"
     | "XOF"
     | "XPF"
     | "YER"
     | "ZAR"
     | "ZMW"
+    | "ZWG"
     | "ZWL";
 }
 /**

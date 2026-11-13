@@ -508,44 +508,56 @@ export default [
   {
     "path": "#/$defs/d_be98333e68c25ab5ae57/oneOf/153",
     "source": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#/oneOf/153",
-    "const": "XOF",
-    "description": "CFA Franc BCEAO (952)"
+    "const": "XCG",
+    "description": "Caribbean Guilder (532)"
   },
   {
     "path": "#/$defs/d_be98333e68c25ab5ae57/oneOf/154",
     "source": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#/oneOf/154",
-    "const": "XPF",
-    "description": "CFP Franc (953)"
+    "const": "XOF",
+    "description": "CFA Franc BCEAO (952)"
   },
   {
     "path": "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
     "source": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#/oneOf/155",
-    "const": "YER",
-    "description": "Yemeni Rial (886)"
+    "const": "XPF",
+    "description": "CFP Franc (953)"
   },
   {
     "path": "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
     "source": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#/oneOf/156",
-    "const": "ZAR",
-    "description": "Rand (710)"
+    "const": "YER",
+    "description": "Yemeni Rial (886)"
   },
   {
     "path": "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
     "source": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#/oneOf/157",
-    "const": "ZMW",
-    "description": "Zambian Kwacha (967)"
+    "const": "ZAR",
+    "description": "Rand (710)"
   },
   {
     "path": "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
     "source": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#/oneOf/158",
-    "const": "ZWL",
-    "description": "Zimbabwe Dollar (932)"
+    "const": "ZMW",
+    "description": "Zambian Kwacha (967)"
+  },
+  {
+    "path": "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+    "source": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#/oneOf/159",
+    "const": "ZWG",
+    "description": "Zimbabwe Gold (924)"
   },
   {
     "path": "#/$defs/d_be98333e68c25ab5ae57/oneOf/16",
     "source": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#/oneOf/16",
     "const": "BMD",
     "description": "Bermudian Dollar (60)"
+  },
+  {
+    "path": "#/$defs/d_be98333e68c25ab5ae57/oneOf/160",
+    "source": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#/oneOf/160",
+    "const": "ZWL",
+    "description": "Zimbabwe Dollar (932)"
   },
   {
     "path": "#/$defs/d_be98333e68c25ab5ae57/oneOf/17",

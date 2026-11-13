@@ -1,0 +1,44 @@
+{
+  "data": "iso_4217.csv",
+  "authority": "ISO 4217 Maintenance Agency (SIX Financial Information AG)",
+  "selection": "Maintained deliverable-currency selection (record CORE-CONVENTIONS-012 #13), not the complete List One: rows are currencies admitted for Money plus admitted historical identities. Excluded: fund and indexed-unit codes (BOV, CHE, CHW, COU, MXV, USN, UYI, UYW), precious metals (XAG, XAU, XPD, XPT), bond-market units, SDR and supranational accounting units (XAD, XBA, XBB, XBC, XBD, XDR, XSU, XUA), the testing and no-currency codes (XTS, XXX), and SVC (El Salvador Colon, still on List One; not admitted to the selection).",
+  "historical_identities": {
+    "ANG": "List Three, withdrawn 2025-03 (replaced by XCG with the same numeric 532, amendment 176)",
+    "BGN": "List Three, withdrawn 2026-01",
+    "CUC": "List Three, withdrawn 2021-06",
+    "HRK": "List Three, withdrawn 2023-01",
+    "SLL": "List Three, withdrawn 2023-12",
+    "ZWL": "List Three, withdrawn 2024-09 (replaced by ZWG, amendment 177)"
+  },
+  "sources": [
+    {
+      "name": "List One: Currency, fund and precious metal codes",
+      "url": "https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml",
+      "edition": "Pblshd 2026-09-17",
+      "retrieved": "2026-11-13",
+      "sha256": "33139b438657d1cee116ba737807ea71d19d6de4b90f799a09c56f0cc6a1b0ff"
+    },
+    {
+      "name": "List Three: Codes for historic denominations of currencies and funds",
+      "url": "https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-three.xml",
+      "edition": "Pblshd 2026-01-01",
+      "retrieved": "2026-11-13",
+      "sha256": "98fde2423cdb916dd59dcf5fe96222edad8fa198d865c1c83dbc464b9cc52387"
+    },
+    {
+      "name": "ISO 4217 Amendment 176 (XCG, 532, 2; ANG to List Three)",
+      "url": "https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/amendments/dl-currency-iso-amendment-176.pdf",
+      "edition": "2023-12-06, effective 2025-03-31",
+      "retrieved": "2026-11-13",
+      "sha256": "0d0c77c9a51e014599a17365917e6b0b0ce60a59a3ae9c8d583392b75d664c08"
+    },
+    {
+      "name": "ISO 4217 Amendment 177 (ZWG, 924, 2; ZWL to List Three)",
+      "url": "https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/amendments/dl-currency-iso-amendment-177.pdf",
+      "edition": "2024-06-20, effective 2024-06-25",
+      "retrieved": "2026-11-13",
+      "sha256": "130bbe979446b1c2f0a873752bc7e5ea29f6fe515b4551fa20734d3dd3fbd62e"
+    }
+  ],
+  "verification": "Every selected current row matches List One's numeric code and minor unit; every historical row matches List Three. Checked offline against the pinned files on 2026-11-13; no live data is fetched at build time."
+}

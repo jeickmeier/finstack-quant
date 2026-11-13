@@ -177,11 +177,13 @@ export type D_4A1Bd77A72C86Da677De =
         | "WST"
         | "XAF"
         | "XCD"
+        | "XCG"
         | "XOF"
         | "XPF"
         | "YER"
         | "ZAR"
         | "ZMW"
+        | "ZWG"
         | "ZWL";
       kind: "market_fx_pct";
       /**
@@ -345,11 +347,13 @@ export type D_4A1Bd77A72C86Da677De =
         | "WST"
         | "XAF"
         | "XCD"
+        | "XCG"
         | "XOF"
         | "XPF"
         | "YER"
         | "ZAR"
         | "ZMW"
+        | "ZWG"
         | "ZWL";
     }
   | {

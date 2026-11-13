@@ -565,7 +565,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "5b7f6735e60c44e09e41e5c1986ef4b788992718f91992db70d3053cea1907eb",
+          "sha256": "5633d2e45fd816815f1e0a13f46b7487188ea25f4fae32a77d68a96d63b4b526",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -1352,7 +1352,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "5b7f6735e60c44e09e41e5c1986ef4b788992718f91992db70d3053cea1907eb",
+          "sha256": "5633d2e45fd816815f1e0a13f46b7487188ea25f4fae32a77d68a96d63b4b526",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -1419,7 +1419,7 @@
           "uri": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
           "pointer": "#",
           "source": "finstack-quant/scenarios/schemas/scenarios/1/scenario_spec.schema.json",
-          "sha256": "55af30e996c193a43c310d62ab56cccfd3473d81ed3ac3e7b18dd2027d8bb19a",
+          "sha256": "84053084b4bf087cffa71b19d98e124a6a41fe2c38c752a320ac30d5528fd20c",
           "description": "Bare scenario specification: the ordered operations the scenario engine applies."
         }
       ]
@@ -1983,7 +1983,7 @@
           "uri": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json",
           "pointer": "#",
           "source": "finstack-quant/portfolio/schemas/portfolio/1/portfolio_margin_result.schema.json",
-          "sha256": "29998d76aba2b340ee90163267ffc2ce0ab403eaec2da6049a63aec75baf13c1",
+          "sha256": "3b2a6db2828ab42a18cc1903f5138a6c3eaba853cd5243e2967feed3f98bd1d3",
           "description": "Portfolio-wide margin calculation results."
         }
       ]
@@ -2152,7 +2152,7 @@
           "uri": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
           "pointer": "#",
           "source": "finstack-quant/portfolio/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
-          "sha256": "9dc054d09d9b87515bae4be4151f81388d4a73a4098b7de9937a0a4af15e2571",
+          "sha256": "78c88e9e9ad7bdcd7018439b4466a46972d73bb14ab92641f50a9319ecb8bf23",
           "description": "One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`."
         }
       ]
@@ -2842,7 +2842,7 @@
   ],
   "hostContract": {
     "source": "finstack-quant-wasm/schemas/host/1/valuation_result.schema.json",
-    "sha256": "f4cdb6c0ff2cd13ab77cd54568406357472ef9477b78f666cbb95e2cc89c9657"
+    "sha256": "30e31471a55dddca2669158cf351cc16062417e9e6bb473e3a1d9c4af94e35e3"
   },
   "details": [
     {

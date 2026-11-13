@@ -255,7 +255,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -664,7 +666,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -1060,7 +1064,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -1397,7 +1403,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -1811,7 +1819,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -2311,7 +2321,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-array": [
           "#/$defs/PoolAsset/properties/delinquency_buckets",
@@ -3152,7 +3164,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -3466,7 +3480,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -3699,7 +3715,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic",
@@ -4102,7 +4120,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -4564,7 +4584,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -5402,7 +5424,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-array": [
           "#/$defs/DayCountContextState/properties/coupon_period",
@@ -7417,7 +7441,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -7866,7 +7892,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-array": [
           "#/$defs/d_2cf3cdafb96f82a3c0c4/properties/coupon_period"
@@ -8336,7 +8364,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -8611,7 +8641,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-array": [
           "#/$defs/d_b6e0e2b400c3317cb7fe/properties/coupon_period"
@@ -9082,7 +9114,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -9309,7 +9343,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -9738,7 +9774,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-array": ["#/$defs/d_0f0bc7eb50b67f9d73d0/properties/premium"],
         "nullable-boolean": [
@@ -10095,7 +10133,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -10337,7 +10377,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-array": ["#/$defs/d_765a4643a287f5eb4b9d/properties/upfront"],
         "nullable-boolean": [
@@ -10763,7 +10805,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -11160,7 +11204,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-array": ["#/$defs/d_acd6c3d775d926e416ed/properties/upfront"],
         "nullable-boolean": [
@@ -11559,7 +11605,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -11939,7 +11987,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -12339,7 +12389,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -12752,7 +12804,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -13097,7 +13151,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -13479,7 +13535,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "double": [
@@ -13855,7 +13913,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "double": [
@@ -14227,7 +14287,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -14618,7 +14680,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -14999,7 +15063,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -15379,7 +15445,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "double": [
@@ -15761,7 +15829,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -16275,7 +16345,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -17113,7 +17185,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-array": [
           "#/$defs/DayCountContextState/properties/coupon_period",
@@ -19152,7 +19226,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -19571,7 +19647,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -19810,7 +19888,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-array": ["#/$defs/d_8af4c7b7cd300c5c83f1/properties/upfront"],
         "nullable-boolean": [
@@ -20260,7 +20340,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -20576,7 +20658,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "double": [
@@ -21030,7 +21114,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -21363,7 +21449,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "double": [
@@ -21725,7 +21813,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "double": [
@@ -22103,7 +22193,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -22495,7 +22587,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -22879,7 +22973,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -23334,7 +23430,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -23655,7 +23753,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -23886,7 +23986,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic",
@@ -24212,7 +24314,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -24435,7 +24539,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -24747,7 +24853,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "double": [
@@ -24954,7 +25062,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -25269,7 +25379,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "double": [
@@ -25632,7 +25744,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -26022,7 +26136,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -26245,7 +26361,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -26557,7 +26675,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "double": [
@@ -26763,7 +26883,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -27091,7 +27213,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "double": [
@@ -27298,7 +27422,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -27613,7 +27739,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -27836,7 +27964,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic",
@@ -28159,7 +28289,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -28383,7 +28515,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -28790,7 +28924,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -29201,7 +29337,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -29607,7 +29745,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -29933,7 +30073,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -30345,7 +30487,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -30750,7 +30894,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -30994,7 +31140,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -31398,7 +31546,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -31708,7 +31858,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-array": [
           "#/$defs/d_42ef997031425d58ca65/properties/capex_schedule",
@@ -32310,7 +32462,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -32699,7 +32853,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "double": [
@@ -32908,7 +33064,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -33236,7 +33394,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -33465,7 +33625,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -33790,7 +33952,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -34016,7 +34180,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -34338,7 +34504,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -34564,7 +34732,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -34912,7 +35082,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -35142,7 +35314,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-array": [
           "#/$defs/d_f056a252f953016e9606/properties/capex_schedule"
@@ -35574,7 +35748,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -36027,7 +36203,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-array": [
           "#/$defs/d_672e934a739b8903870e/properties/correlation_matrix"
@@ -36499,7 +36677,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -36875,7 +37055,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -37432,7 +37614,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-array": [
           "#/$defs/PoolAsset/properties/delinquency_buckets",
@@ -38520,7 +38704,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -38930,7 +39116,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -39266,7 +39454,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -39508,7 +39698,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -39926,7 +40118,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -40170,7 +40364,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -40551,7 +40747,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -40792,7 +40990,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -41232,7 +41432,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -41564,7 +41766,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "double": [
@@ -41925,7 +42129,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -42328,7 +42534,9 @@
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/155",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/156",
           "#/$defs/d_be98333e68c25ab5ae57/oneOf/157",
-          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158"
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/158",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/159",
+          "#/$defs/d_be98333e68c25ab5ae57/oneOf/160"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -42558,7 +42766,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
@@ -42966,7 +43176,9 @@
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/155",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/156",
           "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/157",
-          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158"
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/158",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/159",
+          "#/$defs/d_9bbbe0cc70b45831cb71/oneOf/160"
         ],
         "nullable-boolean": [
           "#/$defs/d_572ad1befb7d94914652/properties/mc_antithetic"
