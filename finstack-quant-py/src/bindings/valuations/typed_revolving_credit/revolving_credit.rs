@@ -208,6 +208,9 @@ crate::bindings::macros::py_getters!(PyRevolvingCredit |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.quote_compounding")]
+    quote_compounding -> String = s.inner.quote_compounding.to_string();
+
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCredit.is_stochastic")]
     is_stochastic -> bool = s.inner.is_stochastic();
 
@@ -370,6 +373,22 @@ impl PyRevolvingCreditBuilder {
             yield_basis,
             format!("{value:?}"),
             |b: RevolvingCreditBuilder| b.yield_basis(basis)
+        )
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_revolving_credit.revolving_credit", "RevolvingCreditBuilder.quote_compounding")]
+    #[pyo3(text_signature = "($self, value)")]
+    fn quote_compounding<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &str,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let compounding: finstack_quant_core::math::Compounding =
+            value.parse().map_err(crate::errors::core_to_py)?;
+        builder_set!(
+            slf,
+            quote_compounding,
+            compounding.to_string(),
+            |b: RevolvingCreditBuilder| b.quote_compounding(compounding)
         )
     }
 

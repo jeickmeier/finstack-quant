@@ -65,6 +65,9 @@
       "maturity": "2027-01-01",
       "oid_eir": null,
       "payment_lag_days": 0,
+      "quote_compounding": {
+        "periodic": 4
+      },
       "rate": {
         "floating": {
           "all_in_cap_bp": null,

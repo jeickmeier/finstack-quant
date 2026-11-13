@@ -41,6 +41,7 @@ fn term_loan_fixed_with_draws_and_fees() {
         .maturity(maturity)
         .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.08 })
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(
@@ -116,6 +117,7 @@ fn term_loan_commitment_fee_step_downs() {
         .maturity(maturity)
         .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.07 })
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(
@@ -198,6 +200,7 @@ fn term_loan_commitment_fee_windowed_to_availability() {
         .maturity(maturity)
         .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.065 })
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(
@@ -256,6 +259,7 @@ fn term_loan_oid_eir_amortization_schedule() {
         .maturity(maturity)
         .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(
@@ -342,6 +346,7 @@ fn term_loan_pik_toggle_and_cash_sweep() {
         .maturity(maturity)
         .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(
@@ -433,6 +438,7 @@ fn fixed_rate_margin_step_up_changes_coupon_from_effective_period() {
         .maturity(maturity)
         .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(
@@ -488,6 +494,7 @@ fn term_loan_golden_pv_and_metrics() {
         .maturity(maturity)
         .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.05 }) // 5%
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -571,6 +578,7 @@ fn term_loan_amortizing_outstanding_path() {
         .maturity(maturity)
         .rate(finstack_quant_cashflows::builder::RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)

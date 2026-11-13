@@ -691,6 +691,9 @@ crate::bindings::macros::py_getters!(PyTermLoan |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "TermLoan.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "TermLoan.quote_compounding")]
+    quote_compounding -> String = s.inner.quote_compounding.to_string();
+
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "TermLoan.day_count")]
     day_count -> PyDayCount = PyDayCount::from_inner(s.inner.day_count);
 
@@ -815,6 +818,22 @@ impl PyTermLoanBuilder {
         let tenor = crate::bindings::core::dates::tenor::extract_tenor(value)?;
         builder_set!(slf, frequency, tenor.to_string(), |b: TermLoanBuilder| b
             .frequency(tenor))
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "TermLoanBuilder.quote_compounding")]
+    #[pyo3(text_signature = "($self, value)")]
+    fn quote_compounding<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &str,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let compounding: finstack_quant_core::math::Compounding =
+            value.parse().map_err(crate::errors::core_to_py)?;
+        builder_set!(
+            slf,
+            quote_compounding,
+            compounding.to_string(),
+            |b: TermLoanBuilder| b.quote_compounding(compounding)
+        )
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "TermLoanBuilder.day_count")]

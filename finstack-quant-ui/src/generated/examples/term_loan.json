@@ -29,6 +29,9 @@
         "currency": "USD"
       },
       "oid_eir": null,
+      "quote_compounding": {
+        "periodic": 4
+      },
       "rate": {
         "fixed": {
           "rate": 0.06

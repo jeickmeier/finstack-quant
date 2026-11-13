@@ -7955,6 +7955,12 @@ export interface TermLoan {
    */
   oid_eir?: OidEirSpec | null;
   /**
+   * Quote compounding of the discount margin and z-spread (pricing,
+   * quote inversion and CS01), stated independently of `frequency`
+   * (record CORE-CONVENTIONS-007 #9, O6). Required: there is no default.
+   */
+  quote_compounding: Compounding;
+  /**
    * Rate specification (fixed or floating)
    */
   rate: RateSpec;
@@ -8383,6 +8389,12 @@ export interface RevolvingCredit {
    * `calendar_id`. `0` (the default) pays on the adjusted accrual end.
    */
   payment_lag_days?: number;
+  /**
+   * Quote compounding of the discount margin and z-spread (pricing,
+   * quote inversion and CS01), stated independently of `frequency`
+   * (record CORE-CONVENTIONS-007 #9, O6). Required: there is no default.
+   */
+  quote_compounding: Compounding;
   /**
    * Base rate specification (fixed or floating).
    */

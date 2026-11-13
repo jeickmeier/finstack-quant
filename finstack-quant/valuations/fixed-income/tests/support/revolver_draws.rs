@@ -95,6 +95,7 @@ pub(crate) fn revolver(
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).expect("fees"))
         .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
             StochasticUtilizationSpec {

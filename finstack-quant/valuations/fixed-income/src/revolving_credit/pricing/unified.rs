@@ -253,6 +253,9 @@ mod tests {
             .day_count(DayCount::Act365F)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
             .frequency(Tenor::annual())
+            .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                std::num::NonZeroU32::MIN,
+            ))
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
             .discount_curve_id("USD-OIS".into())
@@ -325,6 +328,9 @@ mod tests {
             .day_count(DayCount::Act365F)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
             .frequency(Tenor::annual())
+            .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                std::num::NonZeroU32::MIN,
+            ))
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
             .discount_curve_id("USD-OIS".into())
@@ -393,6 +399,7 @@ mod tests {
             .day_count(DayCount::Act365F)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Deterministic(vec![DrawRepayEvent {
                 date: start,
@@ -554,6 +561,7 @@ mod tests {
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
                 StochasticUtilizationSpec {
@@ -622,6 +630,7 @@ mod tests {
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
                 StochasticUtilizationSpec {
@@ -668,6 +677,7 @@ mod tests {
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
                 StochasticUtilizationSpec {
@@ -790,6 +800,7 @@ mod tests {
                 .day_count(DayCount::Act360)
                 .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
                 .frequency(Tenor::quarterly())
+                .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
                 .fees(RevolvingCreditFees::default())
                 .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
                     StochasticUtilizationSpec {
@@ -889,6 +900,7 @@ mod tests {
                 .day_count(DayCount::Act360)
                 .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
                 .frequency(Tenor::quarterly())
+                .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
                 .fees(RevolvingCreditFees::default())
                 .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
                     StochasticUtilizationSpec {
@@ -986,6 +998,7 @@ mod tests {
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
                 StochasticUtilizationSpec {

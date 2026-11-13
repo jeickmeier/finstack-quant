@@ -48,6 +48,7 @@ fn term_loan_capital_structure_evaluates_with_market() {
         .maturity(maturity)
         .rate(RateSpec::Fixed { rate: 0.08 })
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)

@@ -890,6 +890,17 @@ export interface D_5F6Cd145395C86Ce73B6 {
    */
   oid_eir?: DE805C3231C7C576C5303 | null;
   /**
+   * Quote compounding of the discount margin and z-spread (pricing,
+   * quote inversion and CS01), stated independently of `frequency`
+   * (record CORE-CONVENTIONS-007 #9, O6). Required: there is no default.
+   */
+  quote_compounding:
+    | "continuous"
+    | {
+        periodic: number;
+      }
+    | "simple";
+  /**
    * Rate specification (fixed or floating)
    */
   rate:

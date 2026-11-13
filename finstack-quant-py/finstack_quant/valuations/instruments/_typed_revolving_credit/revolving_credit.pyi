@@ -466,6 +466,25 @@ class RevolvingCredit:
         """
         ...
     @property
+    def quote_compounding(self) -> str:
+        """
+        Quote compounding of the discount margin and z-spread.
+
+        Shared by pricing, quote inversion and CS01; stated independently of
+        the payment frequency, never derived from it.
+
+        Returns
+        -------
+        str
+            ``"continuous"``, ``"simple"``, ``"semi_annual"``, ``"quarterly"``,
+            ``"monthly"`` or ``"periodic(n)"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def fees(self) -> dict[str, Any]:
         """
         Fee structure as its serde ``dict`` (including dated ``steps``).
@@ -1043,6 +1062,28 @@ class RevolvingCreditBuilder:
         ValueError
             If ``value`` is not a supported basis or the builder was already
             consumed by ``build()``.
+        """
+        ...
+    def quote_compounding(self, value: str) -> RevolvingCreditBuilder:
+        """
+        Set the quote compounding of the discount margin and z-spread (required).
+
+        Parameters
+        ----------
+        value : str
+            ``"continuous"``, ``"simple"``, ``"semi_annual"``, ``"quarterly"``,
+            ``"monthly"`` or ``"periodic(n)"``; stated independently of the
+            payment frequency.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the label is unknown or the builder was already consumed by ``build()``.
         """
         ...
     def frequency(self, value: Tenor | str) -> RevolvingCreditBuilder:

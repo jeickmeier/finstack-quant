@@ -35,6 +35,7 @@ fn term_loan(upfront_fee: Option<Money>, callable: bool) -> TermLoan {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::semi_annual())
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)

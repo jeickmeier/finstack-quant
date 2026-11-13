@@ -145,6 +145,11 @@ pub struct TermLoan {
     /// Payment frequency for coupons/fees
     pub frequency: Tenor,
 
+    /// Quote compounding of the discount margin and z-spread (pricing,
+    /// quote inversion and CS01), stated independently of `frequency`
+    /// (record CORE-CONVENTIONS-007 #9, O6). Required: there is no default.
+    pub quote_compounding: finstack_quant_core::math::Compounding,
+
     /// Day count convention
     pub day_count: DayCount,
 
@@ -627,6 +632,7 @@ impl TermLoan {
             .maturity(date!(2029 - 01 - 01))
             .rate(RateSpec::Fixed { rate: 0.06 })
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -711,6 +717,7 @@ impl TermLoan {
             .maturity(date!(2031 - 01 - 15))
             .rate(RateSpec::Floating(floating_rate))
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -772,6 +779,7 @@ impl TermLoan {
             .maturity(date!(2031 - 01 - 15))
             .rate(RateSpec::Fixed { rate: 0.045 })
             .frequency(Tenor::semi_annual())
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .day_count(DayCount::Thirty360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)

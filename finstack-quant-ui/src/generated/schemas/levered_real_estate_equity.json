@@ -4755,6 +4755,10 @@
           ],
           "description": "Optional EIR amortization settings for reporting schedules"
         },
+        "quote_compounding": {
+          "$ref": "#/$defs/d_dc2d43b27d7716f8ad60",
+          "description": "Quote compounding of the discount margin and z-spread (pricing,\nquote inversion and CS01), stated independently of `frequency`\n(record CORE-CONVENTIONS-007 #9, O6). Required: there is no default."
+        },
         "rate": {
           "$ref": "#/$defs/d_9028c5ae285d759c7873",
           "description": "Rate specification (fixed or floating)"
@@ -4799,6 +4803,7 @@
         "maturity",
         "rate",
         "frequency",
+        "quote_compounding",
         "day_count",
         "yield_basis",
         "discount_curve_id",
@@ -7096,6 +7101,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "quote_compounding": {
+          "$ref": "#/$defs/d_dc2d43b27d7716f8ad60",
+          "description": "Quote compounding of the discount margin and z-spread (pricing,\nquote inversion and CS01), stated independently of `frequency`\n(record CORE-CONVENTIONS-007 #9, O6). Required: there is no default."
+        },
         "rate": {
           "$ref": "#/$defs/d_9028c5ae285d759c7873",
           "description": "Base rate specification (fixed or floating)."
@@ -7144,6 +7153,7 @@
         "day_count",
         "yield_basis",
         "frequency",
+        "quote_compounding",
         "fees",
         "draw_repay_spec",
         "discount_curve_id",
@@ -8042,6 +8052,36 @@
         }
       },
       "type": "object"
+    },
+    "d_dc2d43b27d7716f8ad60": {
+      "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Periodic(1)]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor a common discount factor below one, annual and simple rates both exceed\nthe continuous rate. Their ordering depends on the maturity `t` in years:\n`r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and\n`r_simple > r_annual` for `t > 1`.",
+      "oneOf": [
+        {
+          "const": "continuous",
+          "description": "Continuous compounding: r = -ln(DF) / t\n\nMost common for internal calculations, curve construction, and\nquantitative finance models. Provides the simplest mathematical\nproperties (additive over time).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Periodic compounding with n periods per year: r = n × (DF^(-1/(n×t)) - 1)\n\nCommon values:\n- n=1: Annual (UK gilts, European government bonds and annual zero rates)\n- n=2: Semi-annual (US Treasury, corporate bonds)\n- n=4: Quarterly (some FRNs)\n- n=12: Monthly (rare, some retail products)\n\nNote: Uses [`NonZeroU32`] to prevent division by zero at compile time.",
+          "properties": {
+            "periodic": {
+              "format": "uint32",
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "periodic"
+          ],
+          "type": "object"
+        },
+        {
+          "const": "simple",
+          "description": "Simple interest (no compounding): r = (1/DF - 1) / t\n\nUsed for money market instruments with maturity < 1 year, including:\n- Interbank deposits\n- T-bills and commercial paper\n- SOFR, SONIA, €STR fixings\n\nTypically paired with ACT/360 (USD, EUR) or ACT/365F (GBP) day counts.",
+          "type": "string"
+        }
+      ]
     },
     "d_e03f269a2f027f942f8f": {
       "description": "Type of borrower call provision on a term loan.\n\nInstitutional term loans use several types of call provisions:\n- **Hard call**: Non-callable until the call date, then callable at the stated price.\n- **Soft call**: Callable at any time, but subject to a premium (call protection).\n  Typically applies for the first 6-24 months (\"non-call period\").\n- **Make-whole**: Borrower must pay the present value of remaining cashflows\n  discounted at a reference rate (typically a Treasury rate) plus a spread.\n  This ensures the lender receives full economic value upon early prepayment.\n\n# Industry Practice\n\nLeveraged term loans typically have 6-12 months of soft call protection\n(101% of par, sometimes called \"soft call 101\"), after which they become\ncallable at par. Make-whole provisions are more common in investment-grade\nterm loans and private placements.",

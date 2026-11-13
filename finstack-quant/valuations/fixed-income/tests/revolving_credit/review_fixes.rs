@@ -110,6 +110,7 @@ fn facility(
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(draw_repay)
         .instrument_pricing_overrides(two_estimators())
@@ -231,6 +232,7 @@ fn stochastic_facility_with_credit_curve_requires_market_anchored_process() {
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(drifting_stochastic(0.6, Some(explicit_cir)))
         .instrument_pricing_overrides(two_estimators())
@@ -265,6 +267,7 @@ fn stochastic_facility_with_credit_curve_requires_market_anchored_process() {
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(drifting_stochastic(0.6, Some(other_curve)))
         .instrument_pricing_overrides(two_estimators())
@@ -317,6 +320,7 @@ fn intra_period_resets_refix_the_coupon_in_both_engines() {
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
         .discount_curve_id("USD-OIS".into())
@@ -352,6 +356,7 @@ fn intra_period_resets_refix_the_coupon_in_both_engines() {
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(drifting_stochastic(1.0, Some(no_credit_config())))
         .instrument_pricing_overrides(two_estimators())
@@ -493,6 +498,9 @@ fn leq_prices_the_draw_at_default() {
             .day_count(DayCount::Act365F)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
             .frequency(Tenor::annual())
+            .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                std::num::NonZeroU32::MIN,
+            ))
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
             .discount_curve_id("USD-OIS".into())
@@ -617,6 +625,7 @@ fn recovery_exposure_changes_after_each_deterministic_event() {
             .day_count(DayCount::Act365F)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
             .frequency(Tenor::monthly())
+            .quote_compounding(finstack_quant_core::math::Compounding::MONTHLY)
             .fees(RevolvingCreditFees::default())
             .draw_repay_spec(DrawRepaySpec::Deterministic(vec![DrawRepayEvent {
                 date: event_date,

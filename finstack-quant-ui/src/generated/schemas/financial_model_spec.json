@@ -4298,6 +4298,10 @@
           "minimum": 0,
           "type": "integer"
         },
+        "quote_compounding": {
+          "$ref": "#/$defs/d_91709081651bb45619b0",
+          "description": "Quote compounding of the discount margin and z-spread (pricing,\nquote inversion and CS01), stated independently of `frequency`\n(record CORE-CONVENTIONS-007 #9, O6). Required: there is no default."
+        },
         "rate": {
           "$ref": "#/$defs/d_4a383f6cb9efb2814065",
           "description": "Base rate specification (fixed or floating)."
@@ -4346,6 +4350,7 @@
         "day_count",
         "yield_basis",
         "frequency",
+        "quote_compounding",
         "fees",
         "draw_repay_spec",
         "discount_curve_id",
@@ -5565,6 +5570,10 @@
           ],
           "description": "Optional EIR amortization settings for reporting schedules"
         },
+        "quote_compounding": {
+          "$ref": "#/$defs/d_91709081651bb45619b0",
+          "description": "Quote compounding of the discount margin and z-spread (pricing,\nquote inversion and CS01), stated independently of `frequency`\n(record CORE-CONVENTIONS-007 #9, O6). Required: there is no default."
+        },
         "rate": {
           "$ref": "#/$defs/d_4a383f6cb9efb2814065",
           "description": "Rate specification (fixed or floating)"
@@ -5609,6 +5618,7 @@
         "maturity",
         "rate",
         "frequency",
+        "quote_compounding",
         "day_count",
         "yield_basis",
         "discount_curve_id",

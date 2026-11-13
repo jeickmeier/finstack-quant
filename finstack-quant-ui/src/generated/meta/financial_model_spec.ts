@@ -4570,6 +4570,13 @@ export default [
     "minimum": 0
   },
   {
+    "path": "#/$defs/d_756aabf913f51b821a96/properties/quote_compounding",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RevolvingCredit/properties/quote_compounding",
+    "description": "Quote compounding of the discount margin and z-spread (pricing,\nquote inversion and CS01), stated independently of `frequency`\n(record CORE-CONVENTIONS-007 #9, O6). Required: there is no default.",
+    "ref": "#/$defs/Compounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Compounding"
+  },
+  {
     "path": "#/$defs/d_756aabf913f51b821a96/properties/rate",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RevolvingCredit/properties/rate",
     "description": "Base rate specification (fixed or floating).",
@@ -5922,6 +5929,13 @@ export default [
   {
     "path": "#/$defs/d_8dd62d29564577ef6f97/properties/oid_eir/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoan/properties/oid_eir/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_8dd62d29564577ef6f97/properties/quote_compounding",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TermLoan/properties/quote_compounding",
+    "description": "Quote compounding of the discount margin and z-spread (pricing,\nquote inversion and CS01), stated independently of `frequency`\n(record CORE-CONVENTIONS-007 #9, O6). Required: there is no default.",
+    "ref": "#/$defs/Compounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Compounding"
   },
   {
     "path": "#/$defs/d_8dd62d29564577ef6f97/properties/rate",

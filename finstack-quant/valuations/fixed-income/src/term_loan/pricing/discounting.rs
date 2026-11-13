@@ -200,7 +200,7 @@ impl TermLoanDiscountingPricer {
                 &flows,
                 settlement_date,
                 disc.as_ref(),
-                crate::loan_quotes::legacy_frequency_compounding(loan.frequency),
+                loan.quote_compounding,
                 spread,
             )?;
             Money::from_model_value(pv, loan.currency)
@@ -621,6 +621,7 @@ mod tests {
             .maturity(date(2026, 1, 1))
             .rate(RateSpec::Floating(floating_rate))
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)

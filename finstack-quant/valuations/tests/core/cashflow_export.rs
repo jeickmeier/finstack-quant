@@ -79,6 +79,9 @@ fn revolving_credit_credit_risk_export_fails_instead_of_returning_false_reconcil
         .day_count(DayCount::Act365F)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
         .frequency(Tenor::annual())
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
         .discount_curve_id("USD-OIS".into())

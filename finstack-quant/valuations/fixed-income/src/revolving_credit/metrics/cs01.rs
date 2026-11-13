@@ -40,9 +40,9 @@ impl ZSpreadCs01 for RevolvingCredit {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<ZSpreadCs01Inputs> {
-        // Compounding frequency for the z-spread shift = coupon/fee payments per
-        // year, mirroring the term-loan and bond z-spread convention.
-        let compounding = crate::loan_quotes::legacy_frequency_compounding(self.frequency);
+        // The facility's stated quote compounding, never derived from its
+        // payment frequency (record CORE-CONVENTIONS-007 #9, O6).
+        let compounding = self.quote_compounding;
 
         let flows = match &self.draw_repay_spec {
             DrawRepaySpec::Deterministic(_) => {

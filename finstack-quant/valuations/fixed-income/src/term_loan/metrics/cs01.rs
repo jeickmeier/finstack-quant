@@ -34,9 +34,9 @@ impl ZSpreadCs01 for TermLoan {
         let schedule = TermLoanDiscountingPricer::pricing_schedule(self, curves, as_of)?;
         let (settlement, flows) = TermLoanDiscountingPricer::pricing_flows(self, &schedule, as_of)?;
 
-        // Compounding frequency for the z-spread shift = coupon payments/year,
-        // mirroring the bond z-spread convention.
-        let compounding = crate::loan_quotes::legacy_frequency_compounding(self.frequency);
+        // The facility's stated quote compounding, never derived from its
+        // payment frequency (record CORE-CONVENTIONS-007 #9, O6).
+        let compounding = self.quote_compounding;
 
         Ok(ZSpreadCs01Inputs {
             settlement,

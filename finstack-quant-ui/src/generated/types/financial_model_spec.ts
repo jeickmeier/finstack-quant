@@ -6607,6 +6607,17 @@ export interface D_756Aabf913F51B821A96 {
    */
   payment_lag_days?: number;
   /**
+   * Quote compounding of the discount margin and z-spread (pricing,
+   * quote inversion and CS01), stated independently of `frequency`
+   * (record CORE-CONVENTIONS-007 #9, O6). Required: there is no default.
+   */
+  quote_compounding:
+    | "continuous"
+    | {
+        periodic: number;
+      }
+    | "simple";
+  /**
    * Base rate specification (fixed or floating).
    */
   rate:
@@ -9635,6 +9646,17 @@ export interface D_8Dd62D29564577Ef6F97 {
    * Optional EIR amortization settings for reporting schedules
    */
   oid_eir?: D_3B1170Fe3280Aa725Fb4 | null;
+  /**
+   * Quote compounding of the discount margin and z-spread (pricing,
+   * quote inversion and CS01), stated independently of `frequency`
+   * (record CORE-CONVENTIONS-007 #9, O6). Required: there is no default.
+   */
+  quote_compounding:
+    | "continuous"
+    | {
+        periodic: number;
+      }
+    | "simple";
   /**
    * Rate specification (fixed or floating)
    */

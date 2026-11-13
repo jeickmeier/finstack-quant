@@ -113,6 +113,7 @@ fn callable_credit_loan() -> TermLoan {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)

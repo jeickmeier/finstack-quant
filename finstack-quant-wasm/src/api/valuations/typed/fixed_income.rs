@@ -736,6 +736,9 @@ getters!(JsTermLoan, "TermLoan", |i| {
         /// Payment frequency.
         /// @returns The payment tenor.
         frequency as frequency: "Tenor" => tenor(i.frequency),
+        /// Quote compounding of the discount margin and z-spread (pricing, quote inversion and CS01), stated independently of the payment frequency.
+        /// @returns The `Compounding` wire value.
+        quote_compounding as quoteCompounding: "generated.valuations.TermLoan['quote_compounding']" => json(i.quote_compounding),
         /// Accrual day-count convention.
         /// @returns The day count.
         day_count as dayCount: "DayCount" => day_count(i.day_count),
@@ -813,6 +816,11 @@ builder_class!(
 );
 
 setters!(JsTermLoanBuilder, "TermLoanBuilder", {
+        /// Set the quote compounding of the discount margin and z-spread (required; never derived from the payment frequency).
+        /// @param value - `Compounding` wire value: `"continuous"`, `"simple"` or `{ periodic: n }`.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        quote_compounding as quoteCompounding: "generated.valuations.TermLoan['quote_compounding']" => from_js_json,
         /// Set the instrument identifier.
         /// @param value - Instrument identifier.
         /// @returns The builder, for chaining.
@@ -962,6 +970,9 @@ getters!(JsRevolvingCredit, "RevolvingCredit", |i| {
         /// Payment frequency for interest and fees.
         /// @returns The payment tenor.
         frequency as frequency: "Tenor" => tenor(i.frequency),
+        /// Quote compounding of the discount margin and z-spread (pricing, quote inversion and CS01), stated independently of the payment frequency.
+        /// @returns The `Compounding` wire value.
+        quote_compounding as quoteCompounding: "generated.valuations.RevolvingCredit['quote_compounding']" => json(i.quote_compounding),
         /// Fee structure as its serde plain object (including dated `steps`).
         /// @returns `upfront_fee`, `commitment_fee_tiers`, `usage_fee_tiers`, `facility_fee_bp` and `steps`.
         fees as fees: "generated.valuations.RevolvingCredit['fees']" => json(i.fees),
@@ -1045,6 +1056,11 @@ builder_class!(
 );
 
 setters!(JsRevolvingCreditBuilder, "RevolvingCreditBuilder", {
+        /// Set the quote compounding of the discount margin and z-spread (required; never derived from the payment frequency).
+        /// @param value - `Compounding` wire value: `"continuous"`, `"simple"` or `{ periodic: n }`.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        quote_compounding as quoteCompounding: "generated.valuations.RevolvingCredit['quote_compounding']" => from_js_json,
         /// Set the instrument identifier.
         /// @param value - Unique identifier for the facility.
         /// @returns The builder, for chaining.

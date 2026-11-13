@@ -28,6 +28,7 @@ fn test_zero_coupon_loan() {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.0 }) // Zero coupon
         .frequency(Tenor::semi_annual())
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -68,6 +69,7 @@ fn test_very_short_maturity() {
         .maturity(date!(2025 - 04 - 01)) // 3 months
         .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -105,6 +107,7 @@ fn test_very_long_maturity() {
         .maturity(date!(2055 - 01 - 01)) // 30 years
         .rate(RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::semi_annual())
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -142,6 +145,7 @@ fn test_negative_rate_environment() {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::semi_annual())
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -183,6 +187,7 @@ fn build_ddtl_loan(ddtl: DdtlSpec) -> finstack_quant_core::Result<TermLoan> {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::semi_annual())
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)

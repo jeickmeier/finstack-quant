@@ -83,6 +83,7 @@ def builder(draw_repay_spec: dict[str, object] | None = None, *, credit: bool = 
         .day_count("act_360")
         .yield_basis("act_360")
         .frequency("3M")
+        .quote_compounding("quarterly")
         .fees({
             "commitment_fee_tiers": [{"threshold": "0", "bp": "25"}],
             "usage_fee_tiers": [{"threshold": "0", "bp": "10"}],

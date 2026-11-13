@@ -2146,8 +2146,8 @@
           { "pointer": "#/$defs/d_5c13df5a55f1da604df2", "keyword": "oneOf" },
           { "pointer": "#/$defs/IssuePrice", "keyword": "oneOf" },
           { "pointer": "#/$defs/ProtectionWindow", "keyword": "oneOf" },
-          { "pointer": "#/$defs/LoanCallType", "keyword": "oneOf" },
-          { "pointer": "#/$defs/Compounding", "keyword": "oneOf" }
+          { "pointer": "#/$defs/Compounding", "keyword": "oneOf" },
+          { "pointer": "#/$defs/LoanCallType", "keyword": "oneOf" }
         ],
         "money": [
           "#/$defs/d_4ba43030fede59fe5993",
@@ -2852,6 +2852,7 @@
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/Bond/properties/settlement_days",
           "#/$defs/RevolvingCredit/properties/payment_lag_days",
+          "#/$defs/Compounding/oneOf/1/properties/periodic",
           "#/$defs/RevolvingCredit/properties/settlement_days",
           "#/$defs/TermLoan/properties/settlement_days",
           "#/$defs/ReinvestmentAssumptions/properties/maturity_months",
@@ -2860,7 +2861,6 @@
           "#/$defs/RepLine/properties/seasoning_months",
           "#/$defs/ModificationSpec/properties/term_extension_months",
           "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months",
-          "#/$defs/Compounding/oneOf/1/properties/periodic",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/recovery_lag",
           "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/lockout_months",
           "#/$defs/TermOutSpec/properties/months"
@@ -5229,6 +5229,7 @@
           { "pointer": "#/$defs/ConversionEvent", "keyword": "oneOf" },
           { "pointer": "#/$defs/InflationLag", "keyword": "oneOf" },
           { "pointer": "#/$defs/LoanCallType", "keyword": "oneOf" },
+          { "pointer": "#/$defs/Compounding", "keyword": "oneOf" },
           { "pointer": "#/$defs/ClearingStatus", "keyword": "oneOf" },
           { "pointer": "#/$defs/NotionalExchange", "keyword": "oneOf" },
           { "pointer": "#/$defs/CollateralType", "keyword": "oneOf" },
@@ -5237,8 +5238,7 @@
           { "pointer": "#/$defs/DefaultedValuation", "keyword": "oneOf" },
           { "pointer": "#/$defs/SwapNotional", "keyword": "oneOf" },
           { "pointer": "#/$defs/PaymentCalculation", "keyword": "oneOf" },
-          { "pointer": "#/$defs/RecipientType", "keyword": "oneOf" },
-          { "pointer": "#/$defs/Compounding", "keyword": "oneOf" }
+          { "pointer": "#/$defs/RecipientType", "keyword": "oneOf" }
         ],
         "money": [
           "#/$defs/d_4ba43030fede59fe5993",
@@ -6993,6 +6993,7 @@
           "#/$defs/PriceTrigger/properties/observation_days",
           "#/$defs/PriceTrigger/properties/required_days_above",
           "#/$defs/ConvertibleBond/properties/settlement_days",
+          "#/$defs/Compounding/oneOf/1/properties/periodic",
           "#/$defs/TermLoan/properties/settlement_days",
           "#/$defs/RevolvingCredit/properties/payment_lag_days",
           "#/$defs/RevolvingCredit/properties/settlement_days",
@@ -7022,7 +7023,6 @@
           "#/$defs/d_6f4088f89d6bfc98e242/properties/recovery_lag",
           "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/lockout_months",
           "#/$defs/ShiftingInterestStep/properties/months_from_closing",
-          "#/$defs/Compounding/oneOf/1/properties/periodic",
           "#/$defs/TermOutSpec/properties/months"
         ],
         "uint8": [
@@ -16936,6 +16936,7 @@
           { "pointer": "#/$defs/ConversionEvent", "keyword": "oneOf" },
           { "pointer": "#/$defs/InflationLag", "keyword": "oneOf" },
           { "pointer": "#/$defs/LoanCallType", "keyword": "oneOf" },
+          { "pointer": "#/$defs/Compounding", "keyword": "oneOf" },
           { "pointer": "#/$defs/ClearingStatus", "keyword": "oneOf" },
           { "pointer": "#/$defs/NotionalExchange", "keyword": "oneOf" },
           { "pointer": "#/$defs/CollateralType", "keyword": "oneOf" },
@@ -16944,8 +16945,7 @@
           { "pointer": "#/$defs/DefaultedValuation", "keyword": "oneOf" },
           { "pointer": "#/$defs/SwapNotional", "keyword": "oneOf" },
           { "pointer": "#/$defs/PaymentCalculation", "keyword": "oneOf" },
-          { "pointer": "#/$defs/RecipientType", "keyword": "oneOf" },
-          { "pointer": "#/$defs/Compounding", "keyword": "oneOf" }
+          { "pointer": "#/$defs/RecipientType", "keyword": "oneOf" }
         ],
         "money": [
           "#/$defs/d_4ba43030fede59fe5993",
@@ -18700,6 +18700,7 @@
           "#/$defs/PriceTrigger/properties/observation_days",
           "#/$defs/PriceTrigger/properties/required_days_above",
           "#/$defs/ConvertibleBond/properties/settlement_days",
+          "#/$defs/Compounding/oneOf/1/properties/periodic",
           "#/$defs/TermLoan/properties/settlement_days",
           "#/$defs/RevolvingCredit/properties/payment_lag_days",
           "#/$defs/RevolvingCredit/properties/settlement_days",
@@ -18729,7 +18730,6 @@
           "#/$defs/d_6f4088f89d6bfc98e242/properties/recovery_lag",
           "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/lockout_months",
           "#/$defs/ShiftingInterestStep/properties/months_from_closing",
-          "#/$defs/Compounding/oneOf/1/properties/periodic",
           "#/$defs/TermOutSpec/properties/months"
         ],
         "uint8": [
@@ -31549,6 +31549,7 @@
           { "pointer": "#/$defs/d_a17044a63bbc3e26d65a", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_d9fddfbed6df77bc2818", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_e03f269a2f027f942f8f", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_dc2d43b27d7716f8ad60", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_f6cd37823263ec927700", "keyword": "oneOf" }
         ],
         "money": [
@@ -32101,6 +32102,7 @@
           "#/$defs/d_681b85f6e74d81aae8d2/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
           "#/$defs/d_bead93058da9e6b7d476/properties/ex_coupon_days",
           "#/$defs/d_bead93058da9e6b7d476/properties/settlement_days",
+          "#/$defs/d_dc2d43b27d7716f8ad60/oneOf/1/properties/periodic",
           "#/$defs/d_b0a7458b7623f012eb4b/properties/settlement_days",
           "#/$defs/d_bef55fa450b231d7b330/properties/payment_lag_days",
           "#/$defs/d_bef55fa450b231d7b330/properties/settlement_days",
@@ -35865,6 +35867,7 @@
         "map": ["#/$defs/d_2c88e4d1e2e4f7c22e02/properties/meta"],
         "mixed-unit-external-union": [
           { "pointer": "#/$defs/d_5c13df5a55f1da604df2", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_301810df3ed02630df07", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_553b276d4726518cb3ad", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_8a16d1e28595b063e4d2", "keyword": "oneOf" }
         ],
@@ -36234,6 +36237,7 @@
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_2d9b65cc4d957fd6344e/properties/payment_lag_days",
+          "#/$defs/d_301810df3ed02630df07/oneOf/1/properties/periodic",
           "#/$defs/d_553b276d4726518cb3ad/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
           "#/$defs/d_553b276d4726518cb3ad/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
           "#/$defs/d_553b276d4726518cb3ad/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",
@@ -37267,6 +37271,7 @@
           { "pointer": "#/$defs/AmortizationSpec", "keyword": "oneOf" },
           { "pointer": "#/$defs/IssuePrice", "keyword": "oneOf" },
           { "pointer": "#/$defs/ProtectionWindow", "keyword": "oneOf" },
+          { "pointer": "#/$defs/Compounding", "keyword": "oneOf" },
           { "pointer": "#/$defs/LoanCallType", "keyword": "oneOf" },
           { "pointer": "#/$defs/PaymentCalculation", "keyword": "oneOf" },
           { "pointer": "#/$defs/RecipientType", "keyword": "oneOf" }
@@ -38192,6 +38197,7 @@
           "#/$defs/Bond/properties/ex_coupon_days",
           "#/$defs/Bond/properties/settlement_days",
           "#/$defs/RevolvingCredit/properties/payment_lag_days",
+          "#/$defs/Compounding/oneOf/1/properties/periodic",
           "#/$defs/RevolvingCredit/properties/settlement_days",
           "#/$defs/TermLoan/properties/settlement_days",
           "#/$defs/ReinvestmentAssumptions/properties/maturity_months",
@@ -39342,6 +39348,7 @@
           { "pointer": "#/$defs/d_5f3291ce40eb93e27799", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_c35eb82ebede5e9fd461", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_5c13df5a55f1da604df2", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_3c96817dfc7700fe5865", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_7ce89bf77e1734d78fe6", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_48b450a5545cd94d698f", "keyword": "oneOf" }
         ],
@@ -39710,6 +39717,7 @@
           "#/$defs/d_47e5e74524615b78a19f/properties/count",
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/1/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
+          "#/$defs/d_3c96817dfc7700fe5865/oneOf/1/properties/periodic",
           "#/$defs/d_7ce89bf77e1734d78fe6/oneOf/2/properties/compounded_in_arrears/properties/lookback_days",
           "#/$defs/d_7ce89bf77e1734d78fe6/oneOf/3/properties/compounded_with_observation_shift/properties/shift_days",
           "#/$defs/d_7ce89bf77e1734d78fe6/oneOf/4/properties/compounded_with_rate_cutoff/properties/cutoff_days",

@@ -51,7 +51,10 @@ fn test_pricing_recovery_consistency() {
         .rate(RateSpec::Fixed { rate: 0.07 }) // 7% Coupon
         .day_count(DayCount::Act365F)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act365F)
-        .frequency(Tenor::annual()) // Single payment at end
+        .frequency(Tenor::annual())
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        )) // Single payment at end
         .fees(RevolvingCreditFees::default()) // No extra fees
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![])) // No changes
         .discount_curve_id("USD-OIS".into())
@@ -126,6 +129,7 @@ fn test_floating_rcf_declares_forward_dependency() {
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
         .discount_curve_id("USD-OIS".into())
@@ -162,6 +166,7 @@ fn test_floating_rcf_declares_forward_dependency() {
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .fees(RevolvingCreditFees::default())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
         .discount_curve_id("USD-OIS".into())
@@ -220,6 +225,7 @@ fn test_floating_rcf_dv01_bumps_forward_curve() {
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
         .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
         .discount_curve_id("USD-OIS".into())
@@ -292,6 +298,7 @@ fn test_upfront_fee_excluded_after_commitment() {
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .fees({
             let mut fees = RevolvingCreditFees::flat(0.0, 0.0, 0.0).unwrap();
             fees.upfront_fee = Some(UpfrontFee::Amount(

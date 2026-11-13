@@ -543,6 +543,7 @@ mod tests {
             day_count: DayCount::Act360,
             yield_basis: finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360,
             frequency: payment_frequency,
+            quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
             commitment_steps: Vec::new(),
             margin_steps: Vec::new(),
             lc: None,

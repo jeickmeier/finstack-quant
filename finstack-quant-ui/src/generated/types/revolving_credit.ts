@@ -588,6 +588,17 @@ export interface D_2D9B65Cc4D957Fd6344E {
    */
   payment_lag_days?: number;
   /**
+   * Quote compounding of the discount margin and z-spread (pricing,
+   * quote inversion and CS01), stated independently of `frequency`
+   * (record CORE-CONVENTIONS-007 #9, O6). Required: there is no default.
+   */
+  quote_compounding:
+    | "continuous"
+    | {
+        periodic: number;
+      }
+    | "simple";
+  /**
    * Base rate specification (fixed or floating).
    */
   rate:

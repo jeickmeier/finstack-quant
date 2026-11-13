@@ -126,6 +126,11 @@ pub struct RevolvingCredit {
     /// Payment frequency for interest and fees.
     pub frequency: Tenor,
 
+    /// Quote compounding of the discount margin and z-spread (pricing,
+    /// quote inversion and CS01), stated independently of `frequency`
+    /// (record CORE-CONVENTIONS-007 #9, O6). Required: there is no default.
+    pub quote_compounding: finstack_quant_core::math::Compounding,
+
     /// Fee structure for the facility.
     pub fees: RevolvingCreditFees,
 
@@ -290,6 +295,7 @@ impl RevolvingCredit {
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .fees(fees)
             .draw_repay_spec(draw_repay)
             .discount_curve_id(CurveId::new("USD-OIS"))

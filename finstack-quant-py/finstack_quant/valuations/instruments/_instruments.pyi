@@ -1948,6 +1948,25 @@ class TermLoan:
         """
         ...
     @property
+    def quote_compounding(self) -> str:
+        """
+        Quote compounding of the discount margin and z-spread.
+
+        Shared by pricing, quote inversion and CS01; stated independently of
+        the payment frequency, never derived from it.
+
+        Returns
+        -------
+        str
+            ``"continuous"``, ``"simple"``, ``"semi_annual"``, ``"quarterly"``,
+            ``"monthly"`` or ``"periodic(n)"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def day_count(self) -> DayCount:
         """
         Accrual day-count convention.
@@ -2453,6 +2472,28 @@ class TermLoanBuilder:
             deserialize as a ``RateSpec``.
         TypeError
             If ``value`` has an unsupported type.
+        """
+        ...
+    def quote_compounding(self, value: str) -> TermLoanBuilder:
+        """
+        Set the quote compounding of the discount margin and z-spread (required).
+
+        Parameters
+        ----------
+        value : str
+            ``"continuous"``, ``"simple"``, ``"semi_annual"``, ``"quarterly"``,
+            ``"monthly"`` or ``"periodic(n)"``; stated independently of the
+            payment frequency.
+
+        Returns
+        -------
+        TermLoanBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the label is unknown or the builder was already consumed by ``build()``.
         """
         ...
     def frequency(self, value: Tenor | str) -> TermLoanBuilder:

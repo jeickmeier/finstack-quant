@@ -25,6 +25,7 @@ fn test_par_loan_pricing() {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.05 }) // 5%
         .frequency(Tenor::semi_annual())
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -65,6 +66,7 @@ fn test_discount_pricing() {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.03 }) // 3%
         .frequency(Tenor::semi_annual())
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -106,6 +108,7 @@ fn test_premium_pricing() {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.07 }) // 7%
         .frequency(Tenor::semi_annual())
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -166,6 +169,7 @@ fn pv_is_discounted_to_as_of_and_includes_flows_before_settlement() {
         .maturity(date!(2026 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::Unadjusted)

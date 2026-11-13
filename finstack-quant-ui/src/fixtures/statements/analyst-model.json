@@ -587,6 +587,7 @@
               "count": 3,
               "unit": "months"
             },
+            "quote_compounding": { "periodic": 4 },
             "id": "TLB",
             "issue_date": "2024-01-01",
             "maturity": "2030-01-01",
@@ -641,6 +642,7 @@
               "count": 3,
               "unit": "months"
             },
+            "quote_compounding": { "periodic": 4 },
             "id": "RCF",
             "issue_date": "2024-01-01",
             "lc": null,

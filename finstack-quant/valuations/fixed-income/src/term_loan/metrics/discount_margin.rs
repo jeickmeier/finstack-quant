@@ -79,8 +79,8 @@ impl MetricCalculator for DiscountMarginCalculator {
         // The loan's unchanged contractual flows (coupons at the contractual
         // margin including step-ups; PIK and pre-settlement flows excluded),
         // built once and repriced at each margin. Each flow is discounted
-        // from settlement with the DM added to the periodically compounded
-        // zero rate at the coupon frequency (z-spread mechanics), so DM = 0
+        // from settlement with the DM added to the zero rate in the loan's
+        // quote compounding (z-spread mechanics), so DM = 0
         // gives the settlement-date model value.
         let (settlement_date, flows) =
             TermLoanDiscountingPricer::pricing_flows(loan, &schedule, as_of)?;
@@ -91,7 +91,7 @@ impl MetricCalculator for DiscountMarginCalculator {
         let disc = context
             .curves
             .get_discount(loan.discount_curve_id.as_str())?;
-        let compounding = crate::loan_quotes::legacy_frequency_compounding(loan.frequency);
+        let compounding = loan.quote_compounding;
         let pv_given_dm = |dm: f64| {
             pv_with_discount_margin(&flows, settlement_date, disc.as_ref(), compounding, dm)
         };

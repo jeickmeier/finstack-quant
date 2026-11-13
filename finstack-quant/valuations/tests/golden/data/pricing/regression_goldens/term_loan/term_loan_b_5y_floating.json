@@ -570,6 +570,7 @@
           "count": 3,
           "unit": "months"
         },
+        "quote_compounding": {"periodic": 4},
         "day_count": "act_360",
         "yield_basis": "act_360",
         "stub": "none",

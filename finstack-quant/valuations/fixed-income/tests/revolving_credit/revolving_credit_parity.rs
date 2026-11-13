@@ -119,6 +119,7 @@ mod tests {
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
             .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
             .discount_curve_id("USD-OIS".into())
@@ -137,6 +138,7 @@ mod tests {
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
             .draw_repay_spec(DrawRepaySpec::Stochastic(
                 create_zero_vol_stochastic(0.5), // 50% utilization
@@ -207,6 +209,7 @@ mod tests {
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
             .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
             .discount_curve_id("USD-OIS".into())
@@ -244,6 +247,7 @@ mod tests {
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
             .draw_repay_spec(DrawRepaySpec::Stochastic(create_zero_vol_stochastic(0.5)))
             .instrument_pricing_overrides(
@@ -296,6 +300,7 @@ mod tests {
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
             .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
             .discount_curve_id("USD-OIS".into())
@@ -314,6 +319,7 @@ mod tests {
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
             .draw_repay_spec(DrawRepaySpec::Stochastic(create_zero_vol_stochastic(0.5)))
             .instrument_pricing_overrides(
@@ -412,6 +418,7 @@ mod tests {
                 .day_count(DayCount::Act360)
                 .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
                 .frequency(Tenor::quarterly())
+                .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
                 .fees(fees.clone())
                 .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
                 .discount_curve_id("USD-OIS".into())
@@ -429,6 +436,7 @@ mod tests {
                 .day_count(DayCount::Act360)
                 .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
                 .frequency(Tenor::quarterly())
+                .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
                 .fees(fees.clone())
                 .draw_repay_spec(DrawRepaySpec::Stochastic(create_zero_vol_stochastic(
                     utilization,
@@ -500,6 +508,7 @@ mod tests {
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
             .draw_repay_spec(DrawRepaySpec::Deterministic(events))
             .discount_curve_id("USD-OIS".into())
@@ -520,6 +529,7 @@ mod tests {
             .day_count(DayCount::Act360)
             .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
             .draw_repay_spec(DrawRepaySpec::Stochastic(create_zero_vol_stochastic(0.45)))
             .instrument_pricing_overrides(
@@ -585,6 +595,7 @@ mod tests {
                 .day_count(DayCount::Act360)
                 .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
                 .frequency(frequency)
+                .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
                 .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
                 .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
                 .discount_curve_id("USD-OIS".into())
@@ -602,6 +613,7 @@ mod tests {
                 .day_count(DayCount::Act360)
                 .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
                 .frequency(frequency)
+                .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
                 .fees(RevolvingCreditFees::flat(25.0, 10.0, 5.0).unwrap())
                 .draw_repay_spec(DrawRepaySpec::Stochastic(create_zero_vol_stochastic(0.5)))
                 .instrument_pricing_overrides(

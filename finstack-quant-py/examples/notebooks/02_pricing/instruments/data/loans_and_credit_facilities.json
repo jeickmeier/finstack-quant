@@ -66,6 +66,7 @@
         "count": 3,
         "unit": "months"
       },
+      "quote_compounding": {"periodic": 4},
       "id": "RCF-USD-3Y",
       "maturity": "2027-01-01",
       "recovery_rate": 0.7,
@@ -95,6 +96,7 @@
         "count": 3,
         "unit": "months"
       },
+      "quote_compounding": {"periodic": 4},
       "id": "TERM-LOAN-USD-5Y",
       "issue_date": "2024-01-01",
       "maturity": "2029-01-01",

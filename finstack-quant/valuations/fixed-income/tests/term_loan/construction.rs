@@ -22,6 +22,7 @@ fn test_builder_fixed_rate_loan() {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.05 }) // 5%
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -72,6 +73,7 @@ fn test_builder_floating_rate_loan() {
             fallback: Default::default(),
         }))
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -103,6 +105,7 @@ fn test_builder_with_amortization() {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.06 })
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -155,6 +158,7 @@ fn test_builder_with_callability() {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.055 })
         .frequency(Tenor::semi_annual())
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -190,6 +194,7 @@ fn test_builder_validation_maturity_after_issue() {
         .maturity(date!(2025 - 01 - 01)) // Before issue!
         .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -219,6 +224,7 @@ fn test_pik_coupon_type() {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.08 }) // Higher rate for PIK
         .frequency(Tenor::semi_annual())
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
@@ -249,6 +255,7 @@ fn lsta_par_trade_sets_settlement_days_to_seven() {
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Fixed { rate: 0.05 })
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .day_count(DayCount::Act360)
         .yield_basis(finstack_quant_valuations_core::metrics::returns::YieldBasis::Act360)
         .business_day_convention(BusinessDayConvention::ModifiedFollowing)
