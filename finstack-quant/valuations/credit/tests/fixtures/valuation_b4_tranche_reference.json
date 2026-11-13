@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "input_hash": "sha256:7912a121b3322e451192084af9b71fdf7c159aa26de580bdee4f404185f7d839",
+  "input_hash": "sha256:9e4d0535e43705f954beabe70097c922f40ae8feb70b165f207e8869b6d70071",
   "provenance": {
     "scipy_version": "1.18.1",
     "numpy_version": "2.5.1",
@@ -17,7 +17,7 @@
     {
       "id": "cds_tranche_all_metrics/all_metrics",
       "aliases": ["cds_tranche_all_metrics/all_metrics", "cds_tranche_correlation_delta/correlation_delta", "cds_tranche_cs01/cs01", "cds_tranche_jump_to_default/jump_to_default", "cds_tranche_npv/junior_mezz_3_7", "cds_tranche_par_spread/par_spread"],
-      "fixture_hash": "sha256:c86b411dfcd4efa993310cc945f93d5e79b1c2ee3fbfd71cc6fb641c3a1cebf9",
+      "fixture_hash": "sha256:14f88966cf5a207f9c75b3314c5afd7473701b3421758468fbc5c78793eaed9e",
       "copula": {
         "type": "gaussian"
       },
@@ -5140,7 +5140,7 @@
     {
       "id": "cds_tranche_heterogeneous/correlation_delta/125",
       "aliases": ["cds_tranche_heterogeneous/correlation_delta/125", "cds_tranche_heterogeneous/npv_hetero/125"],
-      "fixture_hash": "sha256:ca0d0934d389228e5497998ba167ca80afe12f8950b026e2ff21c8b69eb6f669",
+      "fixture_hash": "sha256:498f7d90e50fcf653b2f539531ca5b5fb4c18773e1856c4499ee7f294657be16",
       "copula": {
         "type": "gaussian"
       },
@@ -10263,7 +10263,7 @@
     {
       "id": "cds_tranche_heterogeneous/correlation_delta/18",
       "aliases": ["cds_tranche_heterogeneous/correlation_delta/18", "cds_tranche_heterogeneous/npv_hetero/18"],
-      "fixture_hash": "sha256:75afcdfc26e83896c87a37f8788fc8ea82579a976b5f35132d3e3e6511b8bd3d",
+      "fixture_hash": "sha256:747cbb95cb0e0e26d78048f657c96c47dda4cf426283a3b16b8969e789643178",
       "copula": {
         "type": "gaussian"
       },
@@ -15386,7 +15386,7 @@
     {
       "id": "cds_tranche_heterogeneous/npv_hetero/10",
       "aliases": ["cds_tranche_heterogeneous/npv_hetero/10"],
-      "fixture_hash": "sha256:1e46a32f8a529f416b73012abcd551f10d8218b8e82945ffcacbf1e9c97c5fed",
+      "fixture_hash": "sha256:7a6fa45799e2f961c43c14c235ab33b7057712d5500157ec530abfef5c94d05f",
       "copula": {
         "type": "gaussian"
       },
@@ -17101,7 +17101,7 @@
     {
       "id": "cds_tranche_heterogeneous/npv_hetero/16",
       "aliases": ["cds_tranche_heterogeneous/npv_hetero/16"],
-      "fixture_hash": "sha256:05b5ef3f0615d0d15dfd415e62e23b9ae7036c1b8c4ba1e59888d2fd70d89068",
+      "fixture_hash": "sha256:fd1bfb69f6ef59174201a218b7ec396a581bbbef1b92ca635c6e096a9c3dba12",
       "copula": {
         "type": "gaussian"
       },
@@ -18816,7 +18816,7 @@
     {
       "id": "cds_tranche_heterogeneous/npv_hetero/17",
       "aliases": ["cds_tranche_heterogeneous/npv_hetero/17"],
-      "fixture_hash": "sha256:180a7f494b67c0457923709e2add966c64d1fcda62899c80e03463daeba37e4f",
+      "fixture_hash": "sha256:c10598681f2f5d551855f5a240dca8ab8942d10efd315361632e31c6ed875f9b",
       "copula": {
         "type": "gaussian"
       },
@@ -20531,7 +20531,7 @@
     {
       "id": "cds_tranche_heterogeneous/npv_hetero/50",
       "aliases": ["cds_tranche_heterogeneous/npv_hetero/50"],
-      "fixture_hash": "sha256:b4c1b506009141208988d18b749373f959d87fbd490b8b151d5bda6c73cd672b",
+      "fixture_hash": "sha256:7d1d23f953b150664c94eb76cbfd469a7af45e9bb9175f3553da5a5192a9bd7e",
       "copula": {
         "type": "gaussian"
       },
@@ -22246,7 +22246,7 @@
     {
       "id": "cds_tranche_npv/equity_0_3",
       "aliases": ["cds_tranche_npv/equity_0_3"],
-      "fixture_hash": "sha256:9372fade6b7638bad3f9d253b5b2ad675cacd84e0f6d747dfc089bbc878b0158",
+      "fixture_hash": "sha256:06e464aa61af10068ac4d8cc163f82741a7d31401e8e2624e73910f6bc2f13d7",
       "copula": {
         "type": "gaussian"
       },
@@ -23961,7 +23961,7 @@
     {
       "id": "cds_tranche_npv/senior_10_15",
       "aliases": ["cds_tranche_npv/senior_10_15"],
-      "fixture_hash": "sha256:43304c535a120ba06512cf8b73baf1da0d64946564b3c04601f1d2dea077476c",
+      "fixture_hash": "sha256:f0ae32615e27ac691d3468d26d443c5baf6162fb221a7cd60f998793a0625c94",
       "copula": {
         "type": "gaussian"
       },
@@ -25676,7 +25676,7 @@
     {
       "id": "cds_tranche_npv/senior_mezz_7_10",
       "aliases": ["cds_tranche_npv/senior_mezz_7_10"],
-      "fixture_hash": "sha256:b0bd96173299e725184552eba93495bb58c4123a09e9c6583cc53fc6fa293f8c",
+      "fixture_hash": "sha256:62b327ecdd3700176e8c5bc92b9bf2698f46cf4e9f567fab2ad1cfa4ae93459e",
       "copula": {
         "type": "gaussian"
       },
@@ -27391,7 +27391,7 @@
     {
       "id": "cds_tranche_p5_controls/gaussian_concentrated_50_3_7",
       "aliases": ["cds_tranche_p5_controls/gaussian_concentrated_50_3_7"],
-      "fixture_hash": "sha256:615656f8d7c4af8c4a8e7f461a1cd8597f0584a97fe0330dc011ca1c814d25a2",
+      "fixture_hash": "sha256:ac32ce0b78b56ac213b31a8ea969f4eba23b88c4123a099cf39852b2f2171086",
       "copula": {
         "type": "gaussian"
       },
@@ -27410,7 +27410,7 @@
           "original_tranche_width": 0.04,
           "premium_sign": 1.0,
           "protection_sign": -1.0,
-          "baseline_pv_bits": "c13c0e51d700628d",
+          "baseline_pv_bits": "c13c0e51d7006288",
           "student_accumulation_allowance": null,
           "student_accumulation_operation_budget": null,
           "periods": [
@@ -29106,7 +29106,7 @@
     {
       "id": "cds_tranche_p5_controls/gaussian_equal_exposure_125_40_80",
       "aliases": ["cds_tranche_p5_controls/gaussian_equal_exposure_125_40_80"],
-      "fixture_hash": "sha256:00b10520db68c11fb597cc038bbac2f9bb062c48e93153ae8e5b9c19b62bebbd",
+      "fixture_hash": "sha256:9b60532a47c53261fd16a8523fbc1243cde14c387e270a5bc029aa9c1c216a00",
       "copula": {
         "type": "gaussian"
       },
@@ -30821,7 +30821,7 @@
     {
       "id": "cds_tranche_p5_controls/gaussian_heterogeneous_four_3_7",
       "aliases": ["cds_tranche_p5_controls/gaussian_heterogeneous_four_3_7"],
-      "fixture_hash": "sha256:a8a6c9495d35a33c95f61de1280d257413b9e902c73d0396fbd8ed1a7034f823",
+      "fixture_hash": "sha256:010aeed488e2dad6cb2a8201c2041f4cba04e265b0c3b202c678a73a71184c41",
       "copula": {
         "type": "gaussian"
       },
@@ -30840,7 +30840,7 @@
           "original_tranche_width": 0.04,
           "premium_sign": 1.0,
           "protection_sign": -1.0,
-          "baseline_pv_bits": "c15a026124f5b828",
+          "baseline_pv_bits": "c15a026124f5b82b",
           "student_accumulation_allowance": null,
           "student_accumulation_operation_budget": null,
           "periods": [
@@ -32536,7 +32536,7 @@
     {
       "id": "cds_tranche_p5_controls/gaussian_homogeneous_125_40_80",
       "aliases": ["cds_tranche_p5_controls/gaussian_homogeneous_125_40_80"],
-      "fixture_hash": "sha256:a038b09175f6d58ee99484e32b4573bf0cef81246f5de236bfea7e33c8347ace",
+      "fixture_hash": "sha256:b938bf8e341dd52854cd40c64885954f7cc02bf1a6b9b465714b2c8868fac647",
       "copula": {
         "type": "gaussian"
       },
@@ -34251,7 +34251,7 @@
     {
       "id": "cds_tranche_p5_controls/gaussian_homogeneous_125_60_100",
       "aliases": ["cds_tranche_p5_controls/gaussian_homogeneous_125_60_100"],
-      "fixture_hash": "sha256:640913dfadf7771eaaf2acd8da2dd363b9bddb65267731b38ccb75defd084579",
+      "fixture_hash": "sha256:75d2d6204717666a8bd4417ef96b4e3047d5bad12a040a42b2397e00e57825d8",
       "copula": {
         "type": "gaussian"
       },
@@ -35966,7 +35966,7 @@
     {
       "id": "cds_tranche_p5_controls/gaussian_recovery_dispersion_50_3_7",
       "aliases": ["cds_tranche_p5_controls/gaussian_recovery_dispersion_50_3_7"],
-      "fixture_hash": "sha256:4b88e75657818c56db0f0be6a745d421e6a68125280d7ce941bac1959e89e0a8",
+      "fixture_hash": "sha256:208958f5ce7376d14773f1838bd1646cb304b8205ec1c9e1d84f9f0adaedb0bc",
       "copula": {
         "type": "gaussian"
       },
@@ -35985,7 +35985,7 @@
           "original_tranche_width": 0.04,
           "premium_sign": 1.0,
           "protection_sign": -1.0,
-          "baseline_pv_bits": "c136e8cf1bd9259c",
+          "baseline_pv_bits": "c136e8cf1bd92599",
           "student_accumulation_allowance": null,
           "student_accumulation_operation_budget": null,
           "periods": [
@@ -37028,7 +37028,7 @@
     {
       "id": "cds_tranche_p5_controls/student_t_equal_exposure_50_3_7_df6",
       "aliases": ["cds_tranche_p5_controls/student_t_equal_exposure_50_3_7_df6"],
-      "fixture_hash": "sha256:6b84a827df8e7dd8dd16ae2ebcd5239299fee5888830964af27a230c234c0529",
+      "fixture_hash": "sha256:d220eedc344487dd0f2d68c5a47fcce7dc1cc200f945dcc9d731ebbb88500773",
       "copula": {
         "degrees_of_freedom": 6.0,
         "type": "student_t"
@@ -46535,7 +46535,7 @@
     {
       "id": "cds_tranche_student_t_npv/junior_mezz_3_7_df6",
       "aliases": ["cds_tranche_student_t_npv/junior_mezz_3_7_df6"],
-      "fixture_hash": "sha256:ab505b1cc7637c472d0527eddbacad902216ea94742aab306f1656b0de095179",
+      "fixture_hash": "sha256:e49f273a0d31ee5595aeea3e907bfbd0663d40001018c74048e66c62a8fbd08e",
       "copula": {
         "degrees_of_freedom": 6.0,
         "type": "student_t"
@@ -46555,7 +46555,7 @@
           "original_tranche_width": 0.04,
           "premium_sign": 1.0,
           "protection_sign": -1.0,
-          "baseline_pv_bits": "c12162abfeec1ddc",
+          "baseline_pv_bits": "c12162abfeec1ddd",
           "student_accumulation_allowance": 3.4504399337732575e-13,
           "student_accumulation_operation_budget": 1602,
           "periods": [

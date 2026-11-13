@@ -809,23 +809,24 @@ logged under Needs review.
     without its scale (G3), `PeriodId.shift` without a calendar (F3),
     `FxMatrix.rate` without a policy and the old FX quote order and repr
     (F6–F8, B5). Rust doctests were not run (owner request).
-  - **Rust and Python slow tier: two CDS goldens still fail; not re-pinned.**
-    `regression_goldens/cds/usd_5y_cds_self_test.json` errors in DV01/CS01:
-    "no exact spread-risk replay pillar for contractual date 2031-04-30".
-    Its standard-regime CDS matures off-roll on 2031-04-30 while the 5Y quote
-    pillar is now the post-2015 roll date 2031-06-20; this matches the E4b-2
-    case where three deal-quote tests had to mature on the pillar date, so
-    E4b-2 is the likely cause. `regression_goldens/cds_tranche/cdx_ig_5y_3_7_mezz.json`
-    moved by about 1.7e-4 relative (NPV 2,453,526.36 → 2,453,935.88; DV01
-    −700.38 → −699.80; CS01 26,207.04 → 26,205.18; par spread 705.016 →
-    705.092 bp). The commit that moved it was not bisected; E4/E4b-4 (tranche
-    schedule regime) are the candidates, and E4b-4's "no value moves" claim
-    held only for the non-slow suites. Both need an owner to choose: fix the
-    fixture inputs (mature on the pillar) or accept the moves and re-bless.
-    The Bloomberg BHCCN and CDX IG 46 option mismatches in the same run are
-    allowlisted known gaps. Fourteen slow tests hit the 60 s runner cap under
-    full-tier parallel load (Monte Carlo, LSMC and copula panels); none is a
-    value failure.
+  - **Slow tier, follow-up 2026-11-13: fixed.** `usd_5y_cds_self_test` now
+    matures on its standard 5Y date 2031-06-20 (E4b-2 made the 2031-04-30
+    contract replay-less) and `cdx_ig_5y_3_7_mezz` was bisected to E4b-2
+    (index CDS tenor quotes dated by the post-2015 rule); both re-blessed with
+    old/new values in `source_detail`. A timeout had also hidden a real slow
+    failure: `tranche_check_exact_reference` pinned the hash of inputs that
+    E4b-4 (`date_regime`) and F6 (explicit pivot) migrated without resealing.
+    The input and 18 per-case hashes are resealed; every accuracy gate against
+    the independent references passes; four baseline PV bit pins moved by
+    1-5 ulp (not bisected) and are resealed. A full-tier sweep also fixed one
+    Rust doctest (F3), one broken intra-doc link and two argument docs, and
+    four WASM doc samples. Python slow suite: 246 passed.
+  - **Slow tier vs the 60 s cap (owner decision).** Under full-tier parallel
+    load 14 slow tests hit the per-test 60 s cap; run one at a time, 13 pass
+    (up to 58 s), and `mc_atm_price_matches_fourier_pricer` (rough Heston,
+    O(n^2) Volterra history, untouched by this run) passes in 147 s. The cap
+    added this run applies to the `#[ignore]` slow suite, which the nextest
+    config comment names as the home for longer tests.
 - **H1 Frankfurt is no longer a TARGET copy.** `defr` closes on Ascension,
   Whit Monday, Corpus Christi, October 3 and December 24/31, so anything
   rolled on `defr` moves on those days; `target2` is unchanged for euro
