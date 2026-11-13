@@ -3,7 +3,6 @@
 
 use pyo3::prelude::*;
 
-use crate::bindings::cashflows::builder::specs::PyRollRule;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
@@ -292,8 +291,8 @@ crate::bindings::macros::py_getters!(PyCdsTranche |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.realized_loss")]
     realized_loss -> f64 = s.inner.realized_loss;
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.roll_rule")]
-    roll_rule -> PyRollRule = PyRollRule { inner: s.inner.roll_rule };
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.date_regime")]
+    date_regime -> String = s.inner.date_regime.to_string();
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTranche.stub")]
     stub -> PyStubKind = PyStubKind::from_inner(s.inner.stub);
@@ -521,18 +520,19 @@ impl PyCdsTrancheBuilder {
         )
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.roll_rule")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_credit.cds_tranche", "CdsTrancheBuilder.date_regime")]
     #[pyo3(text_signature = "($self, value)")]
-    fn roll_rule<'py>(
+    fn date_regime<'py>(
         mut slf: PyRefMut<'py, Self>,
-        value: PyRef<'_, PyRollRule>,
+        value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let rule = value.inner;
+        let regime: finstack_quant_valuations::instruments::CdsDateRegime =
+            value.parse().map_err(crate::errors::core_to_py)?;
         builder_set!(
             slf,
-            roll_rule,
-            format!("{rule:?}"),
-            |b: CdsTrancheBuilder| b.roll_rule(rule)
+            date_regime,
+            regime.to_string(),
+            |b: CdsTrancheBuilder| b.date_regime(regime)
         )
     }
 

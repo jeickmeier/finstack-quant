@@ -39,11 +39,6 @@ impl PyRollRule {
     const IMM: PyRollRule = PyRollRule {
         inner: RollRule::Imm,
     };
-    /// CDS IMM dates: 20th of Mar/Jun/Sep/Dec with Big-Bang front accrual.
-    #[classattr]
-    const CDS_IMM: PyRollRule = PyRollRule {
-        inner: RollRule::CdsImm,
-    };
 
     /// Python-style representation (``RollRule.IMM``).
     fn __repr__(&self) -> String {

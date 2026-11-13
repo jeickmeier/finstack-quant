@@ -1,6 +1,6 @@
 //! The credit family shares one wire vocabulary: the CDS running coupon is
 //! `coupon_bp` (on `premium` for CDS/CDS index, at the root for tranches and
-//! CDS options), the roll grid is `roll_rule` (`cds_imm` or `none`), settled
+//! CDS options), the date regime is `date_regime` (`standard` or `bespoke`), settled
 //! index loss is `realized_loss`, the contractual upfront is the dated
 //! `upfront` field and structured-credit tranche bounds are
 //! `attach_pct`/`detach_pct`. Each retired spelling is rejected by
@@ -121,17 +121,7 @@ fn structured_credit_tranche_retired_bounds_are_rejected() {
 }
 
 #[test]
-fn cds_premium_rejects_futures_imm_roll_rule() {
-    let mut cds = CreditDefaultSwap::example().expect("example");
-    cds.premium_leg.roll_rule = RollRule::Imm;
-    let err = cds
-        .isda_coupon_schedule()
-        .expect_err("imm roll grid is not a CDS grid");
-    assert!(err.to_string().contains("premium.roll_rule"), "{err}");
-}
-
-#[test]
-fn cds_tranche_new_carries_schedule_stub_and_roll_rule() {
+fn cds_tranche_new_carries_schedule_stub_and_date_regime() {
     let params = CdsTrancheParams::equity_tranche(
         "CDX.NA.IG",
         42,
@@ -145,21 +135,38 @@ fn cds_tranche_new_carries_schedule_stub_and_roll_rule() {
         "TR-STUB",
         &params,
         &schedule,
+        finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
         "USD-OIS",
         "CDX.NA.IG.HAZARD",
         PayReceive::Pay,
     )
     .expect("tranche");
     assert_eq!(tranche.stub, StubKind::LongFront);
-    assert_eq!(tranche.roll_rule, RollRule::None);
+    assert_eq!(
+        tranche.date_regime,
+        finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke
+    );
 
     let standard = CdsTranche::example().expect("example");
-    assert_eq!(standard.roll_rule, RollRule::CdsImm);
+    assert_eq!(
+        standard.date_regime,
+        finstack_quant_valuations_core::instruments::CdsDateRegime::Standard
+    );
 
-    let mut imm = standard;
-    imm.roll_rule = RollRule::Imm;
-    let err = imm.validate().expect_err("imm roll grid is rejected");
-    assert!(err.to_string().contains("roll_rule"), "{err}");
+    // The tranche grid comes from its date regime, never a cashflows roll rule.
+    schedule.roll_rule = RollRule::Imm;
+    assert!(
+        CdsTranche::new(
+            "TR-IMM",
+            &params,
+            &schedule,
+            finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
+            "USD-OIS",
+            "CDX.NA.IG.HAZARD",
+            PayReceive::Pay,
+        )
+        .is_err()
+    );
 }
 
 #[test]

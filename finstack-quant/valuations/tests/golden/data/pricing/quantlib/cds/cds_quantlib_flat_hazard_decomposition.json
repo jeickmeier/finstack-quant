@@ -45,7 +45,7 @@
             "count": 3,
             "unit": "months"
           },
-          "roll_rule": "cds_imm",
+          "date_regime": "standard",
           "start": "2025-09-22"
         },
         "protection_effective_date": "2026-01-05",

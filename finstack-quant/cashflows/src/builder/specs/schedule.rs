@@ -21,18 +21,13 @@ pub(crate) fn stub_short_front() -> StubKind {
 ///   `ScheduleBuilder::imm`. The contractual start and maturity are always
 ///   kept, so an off-cycle date becomes a stub period, and a schedule with no
 ///   IMM date strictly inside it is a single period.
-/// - **`CdsImm`**: the ISDA standard CDS grid: 20th of Mar/Jun/Sep/Dec,
-///   quarterly with a short final stub, overriding the configured `frequency`
-///   and `stub`. When the start date is not itself a roll date, the first
-///   period accrues from the roll date immediately **preceding** the start
-///   (standard front accrual per the ISDA Big Bang Protocol, April 2009).
-///   Interior coupon or payment-program windows start at their declared
-///   boundary; front accrual is applied only once at the instrument start.
 ///
-/// Explicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA
-/// supports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is
-/// rejected because the available ICMA reference calculation requires nominal
-/// month-grid coupons.
+/// There is no generic CDS grid: a CDS product selects its own named date
+/// regime (record CALIBRATION-FRAMEWORK-007, O7).
+///
+/// An IMM roll grid cannot be combined with `end_of_month`. Third-Wednesday
+/// IMM with ACT/ACT ICMA is rejected because the available ICMA reference
+/// calculation requires nominal month-grid coupons.
 ///
 /// # Examples
 ///
@@ -59,9 +54,6 @@ pub enum RollRule {
     None,
     /// Standard IMM dates: third Wednesday of Mar/Jun/Sep/Dec.
     Imm,
-    /// CDS roll dates: the 20th of Mar/Jun/Sep/Dec at the leg's own frequency and
-    /// stub; the start must itself be a CDS roll date (no start is substituted).
-    CdsImm,
 }
 
 impl RollRule {
@@ -132,12 +124,11 @@ pub struct ScheduleParams {
     /// Serialized only when `true`, so existing wire payloads are unchanged.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub adjust_accrual_dates: bool,
-    /// Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
+    /// Roll-date rule for schedule anchors (plain or standard IMM grid).
     ///
     /// [`RollRule::None`] (default) keeps plain tenor stepping.
     /// [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-    /// [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
-    /// a regular anchor on a CDS roll date. See [`RollRule`].
+    /// See [`RollRule`].
     ///
     /// Serialized only when not `None`, so existing wire payloads are
     /// unchanged.

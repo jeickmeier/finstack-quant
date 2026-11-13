@@ -10,12 +10,12 @@ use crate::quotes::CdsTrancheQuote;
 use crate::quotes::{ExtractQuotes, MarketQuote};
 use crate::solver::bootstrap;
 use crate::solver::traits::BootstrapTarget;
-use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DateExt, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
+use finstack_quant_valuations_core::instruments::CdsDateRegime;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use finstack_quant_valuations_credit::cds_tranche::{CdsTranchePricer, PreparedTranche};
 use std::sync::Arc;
@@ -74,7 +74,7 @@ fn validate_maturity(
     maturity: Date,
     base_date: Date,
     maturity_years: f64,
-    roll_rule: RollRule,
+    date_regime: CdsDateRegime,
 ) -> Result<()> {
     let months = maturity_years * 12.0;
     if !months.is_finite()
@@ -87,20 +87,15 @@ fn validate_maturity(
         )));
     }
     let months = months.round() as i32;
-    let expected = match roll_rule {
-        RollRule::CdsImm => {
+    let expected = match date_regime {
+        CdsDateRegime::Standard => {
             resolve_cds_tenor_maturity(base_date, &Tenor::new(months as u32, TenorUnit::Months)?)?
         }
-        RollRule::None => base_date.add_months(months)?,
-        other => {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "CDS tranche roll_rule must be cds_imm or none, got {other:?}"
-            )));
-        }
+        CdsDateRegime::Bespoke => base_date.add_months(months)?,
     };
     if maturity != expected {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "Tranche maturity {maturity} does not match the {months}M contractual maturity {expected} for {roll_rule:?}"
+            "Tranche maturity {maturity} does not match the {months}M contractual maturity {expected} for the {date_regime} date regime"
         )));
     }
     Ok(())
@@ -184,7 +179,7 @@ impl BaseCorrelationTarget {
             day_count: self.params.day_count,
             business_day_convention: self.params.business_day_convention,
             calendar_id: self.params.calendar_id.clone(),
-            roll_rule: self.params.roll_rule,
+            date_regime: self.params.date_regime,
         }
     }
 
@@ -255,7 +250,7 @@ impl BaseCorrelationTarget {
                 q.maturity,
                 self.params.base_date,
                 self.params.maturity_years,
-                self.params.roll_rule,
+                self.params.date_regime,
             )?;
 
             let calib_quote = self.build_calibration_quote(&q, &build_ctx, &overrides)?;
@@ -497,7 +492,7 @@ mod tests {
             business_day_convention: Some(BusinessDayConvention::Following),
             calendar_id: None,
             detachment_points: vec![0.03, 0.07],
-            roll_rule: RollRule::None,
+            date_regime: CdsDateRegime::Bespoke,
         }
     }
 
@@ -577,25 +572,25 @@ mod tests {
 
         let base_date = Date::from_calendar_date(2025, Month::January, 2).expect("base date");
         let expected = base_date.add_months(60).expect("valid date shift");
-        assert!(validate_maturity(expected, base_date, 5.0, RollRule::None).is_ok());
+        assert!(validate_maturity(expected, base_date, 5.0, CdsDateRegime::Bespoke).is_ok());
         assert!(
             validate_maturity(
                 expected + time::Duration::days(1),
                 base_date,
                 5.0,
-                RollRule::None
+                CdsDateRegime::Bespoke
             )
             .is_err()
         );
         for years in [0.0, -1.0, f64::NAN, f64::INFINITY, 5.1] {
-            assert!(validate_maturity(expected, base_date, years, RollRule::None).is_err());
+            assert!(validate_maturity(expected, base_date, years, CdsDateRegime::Bespoke).is_err());
         }
         assert!(
             validate_maturity(
                 base_date.add_months(6).expect("six months"),
                 base_date,
                 0.5,
-                RollRule::None
+                CdsDateRegime::Bespoke
             )
             .is_ok()
         );
@@ -614,13 +609,13 @@ mod tests {
             let trade = Date::from_calendar_date(2025, month, day).expect("trade date");
             let maturity = Date::from_calendar_date(maturity_year, maturity_month, 20)
                 .expect("standard maturity");
-            assert!(validate_maturity(maturity, trade, 5.0, RollRule::CdsImm).is_ok());
+            assert!(validate_maturity(maturity, trade, 5.0, CdsDateRegime::Standard).is_ok());
             assert!(
                 validate_maturity(
                     trade.add_months(60).expect("anniversary"),
                     trade,
                     5.0,
-                    RollRule::CdsImm
+                    CdsDateRegime::Standard
                 )
                 .is_err()
             );
@@ -689,7 +684,7 @@ mod tests {
             overrides.business_day_convention,
             target.params.business_day_convention
         );
-        assert_eq!(overrides.roll_rule, target.params.roll_rule);
+        assert_eq!(overrides.date_regime, target.params.date_regime);
 
         assert!(target.validate_knot(7.0, 0.5).is_ok());
         assert!(target.validate_knot(7.0, 1.1).is_err());

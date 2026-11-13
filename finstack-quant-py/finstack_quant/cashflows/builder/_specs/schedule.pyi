@@ -30,17 +30,15 @@ class RollRule:
     Roll-date rule applied when generating schedule anchors.
 
     Immutable, hashable enum-style type with one class attribute per
-    Rust variant (``NONE``, ``IMM``, ``CDS_IMM``). ``IMM`` is a roll
-    convention on the schedule's own frequency and stub rule; ``CDS_IMM`` is
-    the ISDA standard CDS grid and overrides them with quarterly and
-    short-back conventions for date generation and accrual. Neither supports
-    end-of-month rolling. Schedule construction checks these convention
-    combinations.
+    Rust variant (``NONE``, ``IMM``). ``IMM`` is a roll convention on the
+    schedule's own frequency and stub rule and does not support end-of-month
+    rolling. There is no generic CDS grid: a CDS product selects its own
+    date regime. Schedule construction checks these convention combinations.
 
     Examples
     --------
     >>> from finstack_quant.cashflows.builder import RollRule
-    >>> RollRule.NONE != RollRule.CDS_IMM
+    >>> RollRule.NONE != RollRule.IMM
     True
     """
 
@@ -55,13 +53,6 @@ class RollRule:
     off-grid date produces a stub. A horizon with no interior IMM date
     produces one stub over the full horizon. ACT/ACT ICMA is rejected because
     this third-Wednesday grid has no supported nominal reference grid.
-    """
-    CDS_IMM: RollRule
-    """Twentieths of Mar/Jun/Sep/Dec, supporting ACT/ACT ICMA accrual.
-
-    The first coupon at the initial instrument horizon accrues from the
-    preceding CDS roll date. Interior coupon-program windows start at their
-    declared boundary and do not extend accrual backward before that window.
     """
 
 class ScheduleParams:
@@ -103,25 +94,24 @@ class ScheduleParams:
         Parameters
         ----------
         frequency : Tenor
-            Accrual and payment frequency (e.g. ``Tenor.parse("3M")``). IMM and CDS_IMM
-            replace it with quarterly frequency for date generation and accrual.
+            Accrual and payment frequency (e.g. ``Tenor.parse("3M")``). With
+            IMM it must be a whole number of quarters.
         day_count : DayCount | str
             Day-count convention for accrual year fractions. ACT_ACT_ISMA
-            (ACT/ACT ICMA) supports the CDS_IMM twentieth grid but rejects
-            the IMM third-Wednesday grid at schedule construction.
+            (ACT/ACT ICMA) rejects the IMM third-Wednesday grid at schedule
+            construction.
         calendar_id : str
             Holiday calendar id (``"weekends_only"`` for weekend-only
             rolling).
         business_day_convention : BusinessDayConvention | str
             Payment-date rolling convention (default ``"modified_following"``).
         stub : StubKind | str
-            Stub rule (default ``"short_front"``). CDS_IMM uses short-back
-            regardless of this input; IMM honours it. For a plain ACT/ACT ICMA grid, short-front
+            Stub rule (default ``"short_front"``); IMM honours it. For a plain ACT/ACT ICMA grid, short-front
             and long-front anchor regular periods on maturity; other rules
             anchor them on the start date.
         end_of_month : bool
-            Preserve end-of-month rolling (default ``False``). Both IMM modes
-            reject True at schedule construction. A plain ACT/ACT ICMA grid
+            Preserve end-of-month rolling (default ``False``). IMM rejects
+            True at schedule construction. A plain ACT/ACT ICMA grid
             requires its regular anchor, selected by *stub*, to be month-end;
             the opposite endpoint may be irregular.
         payment_lag_days : int
@@ -130,10 +120,9 @@ class ScheduleParams:
             Roll accrual boundaries with *business_day_convention*, i.e. swap/ISDA convention
             (default ``False``, bond convention).
         roll_rule : RollRule | str
-            IMM/CDS-IMM anchor grid (default ``"none"``). These modes use quarterly,
-            short-back conventions; see :class:`RollRule` for horizon and
-            front-accrual behavior. Grid compatibility is checked when building
-            the schedule, after its start and maturity dates are known.
+            IMM anchor grid or none (default ``"none"``); see :class:`RollRule`.
+            Grid compatibility is checked when building the schedule, after
+            its start and maturity dates are known.
 
         Raises
         ------
@@ -511,12 +500,12 @@ class ScheduleParams:
     @property
     def roll_rule(self) -> RollRule:
         """
-        Roll-date rule (IMM / CDS-IMM grid or none).
+        Roll-date rule (IMM grid or none).
 
         Returns
         -------
         RollRule
-            Roll-date rule (IMM / CDS-IMM grid or none).
+            Roll-date rule (IMM grid or none).
 
         Notes
         -----

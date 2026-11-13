@@ -9,7 +9,7 @@ use finstack_quant_calibration::api::schema::{
 use finstack_quant_calibration::quotes::CdsTrancheQuote;
 use finstack_quant_calibration::quotes::MarketQuote;
 use finstack_quant_calibration::quotes::QuoteId;
-use finstack_quant_cashflows::builder::RollRule;
+
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     Date, DateExt, DayCount, adjust, calendar_by_id_strict, prev_cds_date,
@@ -111,7 +111,7 @@ fn build_tranche(quote: &CdsTrancheQuote, base_date: Date, notional: f64) -> Cds
             prev_cds_date(base_date).expect("prior quarterly roll"),
         ))
         .realized_loss(0.0)
-        .roll_rule(RollRule::CdsImm)
+        .date_regime(finstack_quant_valuations_core::instruments::CdsDateRegime::Standard)
         .stub(convention.stub)
         .attributes(Attributes::new())
         .build()
@@ -216,7 +216,8 @@ fn envelope(
                     business_day_convention: None,
                     calendar_id: None,
                     detachment_points: quotes.iter().map(|q| q.detachment).collect(),
-                    roll_rule: RollRule::CdsImm,
+                    date_regime:
+                        finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
                 }),
             }],
         },

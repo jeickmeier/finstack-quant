@@ -27,7 +27,7 @@ pub fn maturity_5y() -> Date {
 }
 
 fn with_imm_dates(mut tranche: CdsTranche) -> CdsTranche {
-    tranche.roll_rule = finstack_quant_cashflows::builder::RollRule::CdsImm;
+    tranche.date_regime = finstack_quant_valuations_core::instruments::CdsDateRegime::Standard;
     tranche.stub = finstack_quant_core::dates::StubKind::ShortBack;
     tranche
 }
@@ -202,6 +202,7 @@ pub fn mezzanine_tranche() -> CdsTranche {
             "CDX_IG42_3_7_5Y",
             &tranche_params,
             &schedule_params,
+            finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
             finstack_quant_core::types::CurveId::from("USD-OIS"),
             finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
             PayReceive::Receive,
@@ -225,6 +226,7 @@ pub fn equity_tranche() -> CdsTranche {
             "CDX_IG42_0_3_5Y",
             &tranche_params,
             &schedule_params,
+            finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
             finstack_quant_core::types::CurveId::from("USD-OIS"),
             finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
             PayReceive::Receive,
@@ -250,6 +252,7 @@ pub fn senior_tranche() -> CdsTranche {
             "CDX_IG42_7_10_5Y",
             &tranche_params,
             &schedule_params,
+            finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
             finstack_quant_core::types::CurveId::from("USD-OIS"),
             finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
             PayReceive::Receive,
@@ -280,6 +283,7 @@ pub fn custom_tranche(
             "CDX_IG42_CUSTOM",
             &tranche_params,
             &schedule_params,
+            finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
             finstack_quant_core::types::CurveId::from("USD-OIS"),
             finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
             side,

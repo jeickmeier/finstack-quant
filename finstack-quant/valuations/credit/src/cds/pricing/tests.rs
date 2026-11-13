@@ -436,7 +436,7 @@ fn test_doc_clause_default_when_omitted() {
         .convention(finstack_quant_valuations_core::market::conventions::CdsConvention::IsdaNa)
         .premium_leg(
             finstack_quant_valuations_core::instruments::PremiumLegSpec {
-                roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
+                date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
                 start: as_of,
                 end: as_of.add_months(60).expect("valid fixture date"),
                 frequency: finstack_quant_core::dates::Tenor::quarterly(),
@@ -915,7 +915,8 @@ fn production_cds_option_audit_premium_frequency_and_stub_are_effective() {
     let start = date!(2025 - 01 - 01);
     let end = date!(2026 - 04 - 01);
     let mut cds = create_test_cds("BESPOKE-SCHEDULE", start, end, 100.0, 0.4);
-    cds.premium_leg.roll_rule = finstack_quant_cashflows::builder::RollRule::None;
+    cds.premium_leg.date_regime =
+        finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke;
     cds.premium_leg.calendar_id = None;
     cds.premium_leg.frequency = Tenor::semi_annual();
     cds.premium_leg.stub = StubKind::ShortFront;

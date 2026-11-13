@@ -21,7 +21,6 @@ from __future__ import annotations
 import datetime
 import json
 
-from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext, ScalarTimeSeries
@@ -227,7 +226,7 @@ def test_cds_tranche_builder_setters_accept_keyword_value() -> None:
         .side(value="pay")
         .start_date(value=datetime.date(2024, 6, 20))
         .realized_loss(value=0.01)
-        .roll_rule(value=RollRule.NONE)
+        .date_regime("bespoke")
         .build()
     )
     assert tranche.id == "CDXTR-KW"
@@ -273,7 +272,7 @@ def test_premium_and_protection_leg_spec_accept_keyword_arguments() -> None:
         stub="short_front",
         business_day_convention="modified_following",
         calendar_id=None,
-        roll_rule=RollRule.NONE,
+        date_regime="bespoke",
     )
     protection = ProtectionLegSpec(
         credit_curve_id="ACME-CDS",

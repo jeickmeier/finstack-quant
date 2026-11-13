@@ -327,7 +327,7 @@
       "business_day_convention": null,
       "calendar_id": null,
       "detachment_points": [],
-      "roll_rule": "none"
+      "date_regime": "bespoke"
     },
     "student_t": {
       "id": "T",

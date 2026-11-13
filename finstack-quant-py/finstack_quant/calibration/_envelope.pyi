@@ -450,8 +450,8 @@ class CalibrationStep:
               convention.
             - ``calendar_id`` (str | None, optional, default ``None``): Holiday calendar for schedule
               generation.
-            - ``roll_rule`` (str, optional, default ``"none"``): Coupon roll grid: ``"cds_imm"`` (20
-              Mar/Jun/Sep/Dec) or ``"none"``; ``"imm"`` is rejected.
+            - ``date_regime`` (str, required): Contractual date regime of the synthetic tranches:
+              ``"standard"`` CDS roll dates (20 Mar/Jun/Sep/Dec) or ``"bespoke"``.
 
         quote_set : str | None, default None
             Name of a quote set declared in ``CalibrationPlan.quote_sets``; ``None`` uses ``id``.

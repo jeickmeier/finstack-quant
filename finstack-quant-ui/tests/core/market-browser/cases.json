@@ -1,6 +1,6 @@
 {
   "source": "finstack-quant/calibration/examples/market_bootstrap/05_cdx_base_correlation.json",
-  "sha256": "ac094f2f8b7ce90b1d44127c22d6e5b8aa1ab7ca3d3e0705c535317cfe192cbf",
+  "sha256": "c5e51fdc7198ca32615641c1358f5d81a7e3949722943547b9c19bb6d96d09d2",
   "calibrated": {
     "schema_version": 1,
     "curves": [

@@ -7,12 +7,11 @@ use crate::quotes::CdsTrancheQuote;
 use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_cashflows::builder::ScheduleParams;
 use finstack_quant_core::dates::calendar_by_id_strict;
-use finstack_quant_core::dates::{
-    BusinessDayConvention, DateExt, DayCount, Tenor, adjust, next_cds_date,
-};
+use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor, adjust, is_cds_date};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::{Error, Result};
+use finstack_quant_valuations_core::instruments::CdsDateRegime;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
 use finstack_quant_valuations_credit::cds_tranche::{CdsTranche, CdsTrancheParams};
@@ -39,22 +38,26 @@ pub(crate) struct CdsTrancheBuildOverrides {
     ///
     /// If `None`, uses the calendar ID from the CDS convention.
     pub(crate) calendar_id: Option<String>,
-    /// Coupon roll-date grid for the built tranche.
-    ///
-    /// `CdsImm` aligns payment dates to CDS IMM dates (20th of
-    /// Mar/Jun/Sep/Dec); `None` follows the convention frequency and stub.
-    /// `Imm` is rejected.
-    pub(crate) roll_rule: RollRule,
+    /// Contractual date regime of the built tranche (record
+    /// CALIBRATION-FRAMEWORK-007, O7): `Standard` CDS roll dates or a
+    /// `Bespoke` schedule from the convention frequency and stub.
+    pub(crate) date_regime: CdsDateRegime,
 }
 
-impl Default for CdsTrancheBuildOverrides {
-    fn default() -> Self {
+impl CdsTrancheBuildOverrides {
+    /// Overrides that keep every convention-registry choice and select
+    /// `date_regime` explicitly.
+    ///
+    /// # Arguments
+    ///
+    /// * `date_regime` - Contractual date regime of the built tranche.
+    pub(crate) fn for_regime(date_regime: CdsDateRegime) -> Self {
         Self {
             frequency: None,
             day_count: None,
             business_day_convention: None,
             calendar_id: None,
-            roll_rule: RollRule::CdsImm,
+            date_regime,
         }
     }
 }
@@ -107,24 +110,24 @@ pub(crate) fn build_cds_tranche_instrument(
         })
         .transpose()?;
 
-    let (effective_date, maturity_date) = match overrides.roll_rule {
-        RollRule::CdsImm => {
+    let (effective_date, maturity_date) = match overrides.date_regime {
+        CdsDateRegime::Standard => {
             // Premium accrual follows the trade-date coupon period, even when
-            // upfront cash settlement crosses the next quarterly roll.
-            let effective_date = cds_accrual_start(ctx.as_of())?;
-            // Use unadjusted maturity date for IMM roll selection to prevent BDC
-            // from pushing the date past the 20th into the next quarter.
-            let maturity_imm = next_cds_date(maturity.add_days(-1)?)?;
-            (effective_date, maturity_imm)
+            // upfront cash settlement crosses the next quarterly roll. The
+            // quoted maturity is literal and must be a CDS roll date (record
+            // CALIBRATION-FRAMEWORK-007, O7).
+            if !is_cds_date(maturity) {
+                return Err(Error::Validation(format!(
+                    "CDS tranche quote {}: the standard date regime matures on a CDS roll \
+                     date, got {maturity}",
+                    quote.id
+                )));
+            }
+            (cds_accrual_start(ctx.as_of())?, maturity)
         }
-        RollRule::None => {
+        CdsDateRegime::Bespoke => {
             let maturity_adj = adjust(maturity, conv.business_day_convention, cal)?;
             (spot, maturity_adj)
-        }
-        other => {
-            return Err(Error::Validation(format!(
-                "CDS tranche roll_rule must be cds_imm or none, got {other:?}"
-            )));
         }
     };
 
@@ -154,7 +157,7 @@ pub(crate) fn build_cds_tranche_instrument(
         end_of_month: false,
         payment_lag_days: 0,
         adjust_accrual_dates: false,
-        roll_rule: overrides.roll_rule,
+        roll_rule: RollRule::None,
     };
 
     // Quote-built tranches are constructed as buy-protection (pay premium),
@@ -165,6 +168,7 @@ pub(crate) fn build_cds_tranche_instrument(
         InstrumentId::new(id.as_str()),
         &tranche_params,
         &schedule_params,
+        overrides.date_regime,
         CurveId::new(discount_id),
         CurveId::new(credit_id),
         side,
@@ -214,16 +218,13 @@ mod tests {
             convention: convention_key.clone(),
         };
 
-        let overrides = CdsTrancheBuildOverrides {
-            roll_rule: RollRule::None,
-            ..CdsTrancheBuildOverrides::default()
-        };
+        let overrides = CdsTrancheBuildOverrides::for_regime(CdsDateRegime::Bespoke);
 
         let instrument = build_cds_tranche_instrument(&quote, &ctx, &overrides)
             .expect("non-IMM tranche build should succeed");
         let tranche = instrument;
 
-        assert_eq!(tranche.roll_rule, RollRule::None);
+        assert_eq!(tranche.date_regime, CdsDateRegime::Bespoke);
 
         let conv = ConventionRegistry::try_global()
             .expect("registry")
@@ -273,7 +274,7 @@ mod tests {
             convention: convention_key,
         };
 
-        let overrides = CdsTrancheBuildOverrides::default();
+        let overrides = CdsTrancheBuildOverrides::for_regime(CdsDateRegime::Standard);
         let instrument = build_cds_tranche_instrument(&quote, &ctx, &overrides)
             .expect("tranche build should succeed");
         let tranche = instrument;
@@ -325,7 +326,7 @@ mod tests {
             convention: convention_key,
         };
 
-        let overrides = CdsTrancheBuildOverrides::default();
+        let overrides = CdsTrancheBuildOverrides::for_regime(CdsDateRegime::Standard);
         let result = build_cds_tranche_instrument(&quote, &ctx, &overrides);
 
         assert!(result.is_err(), "Should reject upfront_pct with abs > 1.0");
@@ -365,7 +366,7 @@ mod tests {
             convention: convention_key,
         };
 
-        let overrides = CdsTrancheBuildOverrides::default();
+        let overrides = CdsTrancheBuildOverrides::for_regime(CdsDateRegime::Standard);
         let instrument = build_cds_tranche_instrument(&quote, &ctx, &overrides)
             .expect("tranche build should succeed");
         let tranche = instrument;

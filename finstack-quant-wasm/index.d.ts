@@ -2788,7 +2788,7 @@ export interface CalibrationNamespace {
    *   - `day_count` (string | null, optional, default `null`): Premium accrual day count (convention default).
    *   - `business_day_convention` (string | null, optional, default `null`): Schedule business-day convention.
    *   - `calendar_id` (string | null, optional, default `null`): Holiday calendar for schedule generation.
-   *   - `roll_rule` (string, optional, default `"none"`): Coupon roll grid: `"cds_imm"` (20 Mar/Jun/Sep/Dec) or `"none"`; `"imm"` is rejected.
+   *   - `date_regime` (string, required): Contractual date regime of the synthetic tranches: `"standard"` CDS roll dates (20 Mar/Jun/Sep/Dec) or `"bespoke"`.
    * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
    * @returns A `CalibrationStep` object with `kind: "base_correlation"`.
    *
@@ -3237,10 +3237,9 @@ export interface CashflowsNamespace {
   /**
    * Build a cashflow schedule from a JSON spec and return canonical schedule JSON.
    *
-   * IMM/CDS IMM roll rules use quarterly accrual and short-back stubs, regardless
-   * of the supplied frequency/stub. IMM retains contractual maturity through a
-   * terminal stub. Both modes reject end-of-month rolling; ACT/ACT ICMA rejects
-   * third-Wednesday IMM but supports CDS IMM. Plain ACT/ACT ICMA end-of-month
+   * The IMM roll rule rolls on third Wednesdays at the supplied frequency and
+   * stub, keeps the contractual maturity through a terminal stub and rejects
+   * end-of-month rolling; ACT/ACT ICMA rejects it. Plain ACT/ACT ICMA end-of-month
    * schedules require a month-end regular anchor (maturity for front stubs,
    * start otherwise); the opposite endpoint may be irregular. Negative payment
    * and reset lags are rejected.

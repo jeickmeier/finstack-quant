@@ -866,7 +866,9 @@ mod tests {
         let instrument = crate::build::cds_tranche::build_cds_tranche_instrument(
             &quote,
             &build_context,
-            &crate::build::cds_tranche::CdsTrancheBuildOverrides::default(),
+            &crate::build::cds_tranche::CdsTrancheBuildOverrides::for_regime(
+                finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+            ),
         )
         .expect("shared tranche builder");
         let tranche = instrument;

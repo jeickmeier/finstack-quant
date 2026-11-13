@@ -287,8 +287,8 @@ pub(super) fn initialize_build_state(
     }
 
     let mut outstanding = f64_to_decimal(notional.initial.amount())?;
-    // CDS IMM front periods can accrue before issue. Preserve the opening
-    // balance and every pre-issue movement over that actual accrual interval.
+    // Preserve the opening balance and every pre-issue movement over the
+    // actual accrual interval.
     let history_start = principal_events
         .first()
         .map_or(accrual_start.min(issue), |event| {

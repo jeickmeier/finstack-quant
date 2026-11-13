@@ -212,7 +212,7 @@ fn step_params_v2_roundtrip_for_all_variants() {
         business_day_convention: Some(BusinessDayConvention::Following),
         calendar_id: Some("usny".to_string()),
         detachment_points: vec![0.03, 0.07, 0.1],
-        roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
+        date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
     });
     let _ = roundtrip_json(&base_corr);
 }
@@ -378,10 +378,10 @@ fn base_correlation_params_reject_use_imm_dates() {
         business_day_convention: None,
         calendar_id: None,
         detachment_points: vec![0.03, 0.07],
-        roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
+        date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
     };
     let mut json = serde_json::to_value(&params).expect("serialize");
-    assert_eq!(json["roll_rule"], "cds_imm");
+    assert_eq!(json["date_regime"], "standard");
     json.as_object_mut()
         .expect("object")
         .insert("use_imm_dates".to_string(), serde_json::json!(true));

@@ -77,7 +77,7 @@
           0.15,
           0.3
         ],
-        "roll_rule": "cds_imm"
+        "date_regime": "standard"
       }
     ],
     "settings": {}

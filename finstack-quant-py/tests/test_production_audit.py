@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.market_data import DiscountCurve, FxMatrix, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.valuations import ValuationResult
@@ -478,7 +477,7 @@ def test_bespoke_cds_frequency_and_stub_price_the_configured_payments() -> None:
     ]:
         premium = f["instrument"]["instrument"]["spec"]["premium_leg"]
         premium["stub"] = stub
-        assert PremiumLegSpec.from_json(json.dumps(premium)).roll_rule == RollRule.NONE
+        assert PremiumLegSpec.from_json(json.dumps(premium)).date_regime == "bespoke"
         value = price_instrument(
             json.dumps(f["instrument"]), json.dumps(f["market"]), f["as_of"], "hazard_rate", []
         ).value.amount

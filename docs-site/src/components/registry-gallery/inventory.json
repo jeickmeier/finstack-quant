@@ -1696,7 +1696,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/core/market-browser/cases.json",
-      "sha256": "9b131fb17fc8df5ce26b4d9f1db8cfbb06a4d62bba37b59a5a55bfd3fea15962"
+      "sha256": "e5c266afe8a1c81c33a427c16230a13a5306de31dfba23d6e605ba753e4a50f3"
     },
     {
       "path": "finstack-quant-ui/tests/core/curve-query/cases.json",
@@ -1708,7 +1708,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/calibration/cases.json",
-      "sha256": "924001a02e8e31725a66465257c1dc1375770c2db1f7704474581dcc85e2e12a"
+      "sha256": "0aa343a1d7d6d0aeaa7339fc8a3336869b513dae3f1ec6fdba0b4e89e2efe4d7"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/cases.json",
@@ -1856,7 +1856,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "e912c20a8da94a27f09bc2165792576bee70c98bd26d3427c1f233826555299f"
+      "sha256": "e16509fe75fb6bcaab5735b3fa533b45a033eba9c8556769e7d2552674b1d6ff"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",

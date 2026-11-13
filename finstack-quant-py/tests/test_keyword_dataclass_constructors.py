@@ -25,7 +25,6 @@ from finstack_quant.cashflows.builder import (
     FloatingRateFallback,
     FloatingRateSpec,
     OvernightIndexConstraintApplication,
-    RollRule,
     ScheduleParams,
 )
 from finstack_quant.core.currency import Currency
@@ -168,7 +167,7 @@ CASES: dict[str, Any] = {
         end_of_month=True,
         payment_lag_days=2,
         adjust_accrual_dates=True,
-        roll_rule=RollRule.CDS_IMM,
+        roll_rule="imm",
     ),
     "FeeSpec.periodic_bp.min": lambda: FeeSpec.periodic_bp(
         base=FeeBase.DRAWN,
@@ -331,7 +330,7 @@ CASES: dict[str, Any] = {
         day_count=DayCount.ACT_360,
         coupon_bp="100",
         discount_curve_id="USD-OIS",
-        roll_rule=RollRule.CDS_IMM,
+        date_regime="standard",
     ),
     "PremiumLegSpec.full": lambda: PremiumLegSpec(
         start="2025-03-20",
@@ -342,7 +341,7 @@ CASES: dict[str, Any] = {
         discount_curve_id="USD-OIS",
         calendar_id="usny",
         business_day_convention="following",
-        roll_rule=RollRule.CDS_IMM,
+        date_regime="standard",
         stub="long_front",
     ),
     "CdsTrancheParams.min": lambda: CdsTrancheParams(

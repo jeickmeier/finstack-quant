@@ -12,6 +12,7 @@ use finstack_quant_core::market_data::{context::MarketContext, term_structures::
 use finstack_quant_core::math::distributions::BinomialPmf;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_core::{Error, Result};
+use finstack_quant_valuations_core::instruments::CdsDateRegime;
 
 #[cfg(test)]
 thread_local! {
@@ -309,14 +310,23 @@ impl CdsTranchePricer {
         tranche: &CdsTranche,
         as_of: Date,
     ) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
-        // No valuation-date fallback: a tranche off the CDS roll grid states
-        // its start (record CORE-CONVENTIONS-008).
+        // No valuation-date fallback: a bespoke tranche states its start, and
+        // a standard one accrues from a CDS roll date (records
+        // CORE-CONVENTIONS-008, CALIBRATION-FRAMEWORK-007 O7).
         let start = tranche.contractual_start_date(as_of).ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
-                "CDS tranche {} needs a start_date when its roll rule is not cds_imm",
+                "CDS tranche {} needs a start_date under the bespoke date regime",
                 tranche.id
             ))
         })?;
+        if tranche.date_regime == CdsDateRegime::Standard
+            && !finstack_quant_core::dates::is_cds_date(start)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CDS tranche {}: the standard date regime accrues from a CDS roll date, got {start}",
+                tranche.id
+            )));
+        }
         if start >= tranche.maturity {
             return Ok(Vec::new());
         }
@@ -325,7 +335,12 @@ impl CdsTranchePricer {
                 start,
                 end: tranche.maturity,
                 frequency: tranche.frequency,
-                stub: tranche.stub,
+                // The standard regime owns its stub: a short final period for
+                // an off-grid maturity (record CALIBRATION-FRAMEWORK-007, O7).
+                stub: match tranche.date_regime {
+                    CdsDateRegime::Standard => finstack_quant_core::dates::StubKind::ShortBack,
+                    CdsDateRegime::Bespoke => tranche.stub,
+                },
                 business_day_convention: tranche.business_day_convention,
                 calendar_id: tranche
                     .calendar_id
@@ -336,7 +351,7 @@ impl CdsTranchePricer {
                 payment_lag_days: 0,
                 reset_lag_days: None,
                 adjust_accrual_dates: false,
-                roll_rule: tranche.roll_rule,
+                roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         )
     }

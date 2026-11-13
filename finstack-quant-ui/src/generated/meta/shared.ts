@@ -4255,6 +4255,23 @@ export default [
     "description": "Custom convention."
   },
   {
+    "path": "#/$defs/CdsDateRegime",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsDateRegime",
+    "description": "Named contractual date regime of a CDS product (record\nCALIBRATION-FRAMEWORK-007, O7).\n\nThe regime owns how the premium grid, its stub and its endpoints are\nderived; no regime is inferred and none is a default."
+  },
+  {
+    "path": "#/$defs/CdsDateRegime/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsDateRegime/oneOf/0",
+    "const": "standard",
+    "description": "Standard quarterly CDS roll dates (20 March, June, September and\nDecember): the premium grid runs quarterly from an accrual start on a\nroll date, with a short final period when the maturity is off the\ngrid. The leg's `frequency` must be quarterly; its `stub` is not used."
+  },
+  {
+    "path": "#/$defs/CdsDateRegime/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsDateRegime/oneOf/1",
+    "const": "bespoke",
+    "description": "A bespoke schedule from the leg's own `frequency`, `stub` and\nboundaries."
+  },
+  {
     "path": "#/$defs/CdsDocClause",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsDocClause",
     "description": "CDS market standard documentation clauses.\n\nRepresents the ISDA documentation clause used for CDS contracts. Different clauses\ndefine different restructuring events and settlement procedures. Used as part of\n[`CdsConventionKey`] to look up CDS conventions.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations_core::market::conventions::ids::CdsDocClause;\n\nlet clause = CdsDocClause::Cr14; // Cum-Restructuring 2014\n```"
@@ -4790,6 +4807,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
+    "path": "#/$defs/CdsTranche/properties/date_regime",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/date_regime",
+    "description": "Contractual date regime of the coupon schedule (record\nCALIBRATION-FRAMEWORK-007, O7): `standard` CDS roll dates (20th of Mar,\nJun, Sep, Dec) from an on-roll accrual start, or a `bespoke` schedule\nfrom `frequency` and `stub`. Required; there is no default regime.",
+    "ref": "#/$defs/CdsDateRegime",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsDateRegime"
+  },
+  {
     "path": "#/$defs/CdsTranche/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/day_count",
     "description": "Day count (typically Act/360)",
@@ -4863,14 +4887,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/CdsTranche/properties/roll_rule",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/roll_rule",
-    "default": "none",
-    "description": "Coupon roll-date grid. `cds_imm` selects the standard CDS roll dates\n(20th of Mar, Jun, Sep, Dec); `none` (the default) generates a bespoke\nschedule from `frequency` and `stub`. The equity-futures `imm` grid is\nrejected. Use [`Self::standard`] for the IMM constructor.",
-    "ref": "#/$defs/RollRule",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RollRule"
-  },
-  {
     "path": "#/$defs/CdsTranche/properties/scenario_pricing_overrides",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/scenario_pricing_overrides",
     "description": "Scenario-only pricing adjustments.",
@@ -4912,7 +4928,7 @@ export default [
     "path": "#/$defs/CdsTranche/properties/stub",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsTranche/properties/stub",
     "default": "short_front",
-    "description": "Stub convention for a bespoke (`roll_rule = none`) coupon schedule.\nDefaults to `short_front`.",
+    "description": "Stub convention of a bespoke coupon schedule; the standard regime owns\nits own stub. Defaults to `short_front`.",
     "ref": "#/$defs/StubKind",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StubKind"
   },
@@ -9547,7 +9563,7 @@ export default [
   {
     "path": "#/$defs/d_176cce21985eadf0161c/properties/roll_rule",
     "source": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json#/properties/roll_rule",
-    "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from\na regular anchor on a CDS roll date. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
+    "description": "Roll-date rule for schedule anchors (plain or standard IMM grid).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\nSee [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
     "ref": "#/$defs/RollRule",
     "resolvedRef": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json#/$defs/RollRule"
   },
@@ -9894,7 +9910,7 @@ export default [
   {
     "path": "#/$defs/d_41e4cae128a1dd3269e5",
     "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/RollRule",
-    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on\n  the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which\n  must be a whole number of quarters; the `stub` rule picks forward or\n  backward generation and short or long stubs, as in\n  `ScheduleBuilder::imm`. The contractual start and maturity are always\n  kept, so an off-cycle date becomes a stub period, and a schedule with no\n  IMM date strictly inside it is a single period.\n- **`CdsImm`**: the ISDA standard CDS grid: 20th of Mar/Jun/Sep/Dec,\n  quarterly with a short final stub, overriding the configured `frequency`\n  and `stub`. When the start date is not itself a roll date, the first\n  period accrues from the roll date immediately **preceding** the start\n  (standard front accrual per the ISDA Big Bang Protocol, April 2009).\n  Interior coupon or payment-program windows start at their declared\n  boundary; front accrual is applied only once at the instrument start.\n\nExplicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA\nsupports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is\nrejected because the available ICMA reference calculation requires nominal\nmonth-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
+    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on\n  the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which\n  must be a whole number of quarters; the `stub` rule picks forward or\n  backward generation and short or long stubs, as in\n  `ScheduleBuilder::imm`. The contractual start and maturity are always\n  kept, so an off-cycle date becomes a stub period, and a schedule with no\n  IMM date strictly inside it is a single period.\n\nThere is no generic CDS grid: a CDS product selects its own named date\nregime (record CALIBRATION-FRAMEWORK-007, O7).\n\nAn IMM roll grid cannot be combined with `end_of_month`. Third-Wednesday\nIMM with ACT/ACT ICMA is rejected because the available ICMA reference\ncalculation requires nominal month-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
   },
   {
     "path": "#/$defs/d_41e4cae128a1dd3269e5/oneOf/0",
@@ -9907,12 +9923,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/RollRule/oneOf/1",
     "const": "imm",
     "description": "Standard IMM dates: third Wednesday of Mar/Jun/Sep/Dec."
-  },
-  {
-    "path": "#/$defs/d_41e4cae128a1dd3269e5/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/RollRule/oneOf/2",
-    "const": "cds_imm",
-    "description": "CDS roll dates: the 20th of Mar/Jun/Sep/Dec at the leg's own frequency and\nstub; the start must itself be a CDS roll date (no start is substituted)."
   },
   {
     "path": "#/$defs/d_46455be5cce6b8020e50",
@@ -10411,7 +10421,7 @@ export default [
   {
     "path": "#/$defs/d_67346ed55fd8e55563e7/properties/roll_rule",
     "source": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/properties/roll_rule",
-    "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from\na regular anchor on a CDS roll date. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
+    "description": "Roll-date rule for schedule anchors (plain or standard IMM grid).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\nSee [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
     "ref": "#/$defs/RollRule",
     "resolvedRef": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json#/$defs/RollRule"
   },
@@ -10516,7 +10526,7 @@ export default [
   {
     "path": "#/$defs/d_7bbbddac6f6b1d1f4de1",
     "source": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json#/$defs/RollRule",
-    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on\n  the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which\n  must be a whole number of quarters; the `stub` rule picks forward or\n  backward generation and short or long stubs, as in\n  `ScheduleBuilder::imm`. The contractual start and maturity are always\n  kept, so an off-cycle date becomes a stub period, and a schedule with no\n  IMM date strictly inside it is a single period.\n- **`CdsImm`**: the ISDA standard CDS grid: 20th of Mar/Jun/Sep/Dec,\n  quarterly with a short final stub, overriding the configured `frequency`\n  and `stub`. When the start date is not itself a roll date, the first\n  period accrues from the roll date immediately **preceding** the start\n  (standard front accrual per the ISDA Big Bang Protocol, April 2009).\n  Interior coupon or payment-program windows start at their declared\n  boundary; front accrual is applied only once at the instrument start.\n\nExplicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA\nsupports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is\nrejected because the available ICMA reference calculation requires nominal\nmonth-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
+    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on\n  the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which\n  must be a whole number of quarters; the `stub` rule picks forward or\n  backward generation and short or long stubs, as in\n  `ScheduleBuilder::imm`. The contractual start and maturity are always\n  kept, so an off-cycle date becomes a stub period, and a schedule with no\n  IMM date strictly inside it is a single period.\n\nThere is no generic CDS grid: a CDS product selects its own named date\nregime (record CALIBRATION-FRAMEWORK-007, O7).\n\nAn IMM roll grid cannot be combined with `end_of_month`. Third-Wednesday\nIMM with ACT/ACT ICMA is rejected because the available ICMA reference\ncalculation requires nominal month-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
   },
   {
     "path": "#/$defs/d_7bbbddac6f6b1d1f4de1/oneOf/0",
@@ -10529,12 +10539,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json#/$defs/RollRule/oneOf/1",
     "const": "imm",
     "description": "Standard IMM dates: third Wednesday of Mar/Jun/Sep/Dec."
-  },
-  {
-    "path": "#/$defs/d_7bbbddac6f6b1d1f4de1/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json#/$defs/RollRule/oneOf/2",
-    "const": "cds_imm",
-    "description": "CDS roll dates: the 20th of Mar/Jun/Sep/Dec at the leg's own frequency and\nstub; the start must itself be a CDS roll date (no start is substituted)."
   },
   {
     "path": "#/$defs/d_7dd9bdea4c4382f447f9",
@@ -17202,7 +17206,7 @@ export default [
   {
     "path": "#/$defs/FloatingCouponSpec/properties/roll_rule",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingCouponSpec/properties/roll_rule",
-    "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from\na regular anchor on a CDS roll date. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
+    "description": "Roll-date rule for schedule anchors (plain or standard IMM grid).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\nSee [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
     "ref": "#/$defs/RollRule",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RollRule"
   },
@@ -24864,6 +24868,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
+    "path": "#/$defs/PremiumLegSpec/properties/date_regime",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PremiumLegSpec/properties/date_regime",
+    "description": "Contractual date regime of the premium schedule: `standard` CDS roll\ndates or a `bespoke` schedule from `frequency` and `stub`.",
+    "ref": "#/$defs/CdsDateRegime",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsDateRegime"
+  },
+  {
     "path": "#/$defs/PremiumLegSpec/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PremiumLegSpec/properties/day_count",
     "description": "Day count convention",
@@ -24892,13 +24903,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
   },
   {
-    "path": "#/$defs/PremiumLegSpec/properties/roll_rule",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PremiumLegSpec/properties/roll_rule",
-    "description": "Premium roll-date grid. `cds_imm` selects the standard quarterly CDS\nroll grid (20 March, June, September and December), including a final\nmaturity stub, and requires quarterly `frequency` and `short_front`\n`stub`. `none` generates a bespoke schedule from the supplied\n`frequency` and `stub`. The equity-futures `imm` grid is rejected.",
-    "ref": "#/$defs/RollRule",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RollRule"
-  },
-  {
     "path": "#/$defs/PremiumLegSpec/properties/start",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PremiumLegSpec/properties/start",
     "description": "Start date of protection",
@@ -24909,7 +24913,7 @@ export default [
     "path": "#/$defs/PremiumLegSpec/properties/stub",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PremiumLegSpec/properties/stub",
     "default": "short_front",
-    "description": "Stub convention",
+    "description": "Stub convention of a bespoke schedule; the standard regime owns its\nown stub.",
     "ref": "#/$defs/StubKind",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StubKind"
   },
@@ -27686,7 +27690,7 @@ export default [
   {
     "path": "#/$defs/RollRule",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RollRule",
-    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on\n  the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which\n  must be a whole number of quarters; the `stub` rule picks forward or\n  backward generation and short or long stubs, as in\n  `ScheduleBuilder::imm`. The contractual start and maturity are always\n  kept, so an off-cycle date becomes a stub period, and a schedule with no\n  IMM date strictly inside it is a single period.\n- **`CdsImm`**: the ISDA standard CDS grid: 20th of Mar/Jun/Sep/Dec,\n  quarterly with a short final stub, overriding the configured `frequency`\n  and `stub`. When the start date is not itself a roll date, the first\n  period accrues from the roll date immediately **preceding** the start\n  (standard front accrual per the ISDA Big Bang Protocol, April 2009).\n  Interior coupon or payment-program windows start at their declared\n  boundary; front accrual is applied only once at the instrument start.\n\nExplicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA\nsupports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is\nrejected because the available ICMA reference calculation requires nominal\nmonth-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
+    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on\n  the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which\n  must be a whole number of quarters; the `stub` rule picks forward or\n  backward generation and short or long stubs, as in\n  `ScheduleBuilder::imm`. The contractual start and maturity are always\n  kept, so an off-cycle date becomes a stub period, and a schedule with no\n  IMM date strictly inside it is a single period.\n\nThere is no generic CDS grid: a CDS product selects its own named date\nregime (record CALIBRATION-FRAMEWORK-007, O7).\n\nAn IMM roll grid cannot be combined with `end_of_month`. Third-Wednesday\nIMM with ACT/ACT ICMA is rejected because the available ICMA reference\ncalculation requires nominal month-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
   },
   {
     "path": "#/$defs/RollRule/oneOf/0",
@@ -27699,12 +27703,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RollRule/oneOf/1",
     "const": "imm",
     "description": "Standard IMM dates: third Wednesday of Mar/Jun/Sep/Dec."
-  },
-  {
-    "path": "#/$defs/RollRule/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RollRule/oneOf/2",
-    "const": "cds_imm",
-    "description": "CDS roll dates: the 20th of Mar/Jun/Sep/Dec at the leg's own frequency and\nstub; the start must itself be a CDS roll date (no start is substituted)."
   },
   {
     "path": "#/$defs/RoundingConvention",
@@ -28375,7 +28373,7 @@ export default [
   {
     "path": "#/$defs/StepUpCouponSpec/properties/roll_rule",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StepUpCouponSpec/properties/roll_rule",
-    "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\n[`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from\na regular anchor on a CDS roll date. See [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
+    "description": "Roll-date rule for schedule anchors (plain or standard IMM grid).\n\n[`RollRule::None`] (default) keeps plain tenor stepping.\n[`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;\nSee [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged.",
     "ref": "#/$defs/RollRule",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RollRule"
   },
@@ -31898,6 +31896,12 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CdsConvention",
     "ref": "#/$defs/CdsConvention",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsConvention"
+  },
+  {
+    "path": "#/properties/CdsDateRegime",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/CdsDateRegime",
+    "ref": "#/$defs/CdsDateRegime",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CdsDateRegime"
   },
   {
     "path": "#/properties/CdsDocClause",

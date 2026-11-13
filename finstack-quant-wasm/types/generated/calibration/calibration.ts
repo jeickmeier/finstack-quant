@@ -1228,6 +1228,13 @@ export type CalibrationStep =
        */
       currency: valuations.Currency;
       /**
+       * Contractual date regime of the synthetic tranches (record
+       * CALIBRATION-FRAMEWORK-007, O7): `standard` CDS roll dates (20th of
+       * Mar/Jun/Sep/Dec) or `bespoke` for a schedule from the convention
+       * frequency and stub. Required; there is no default regime.
+       */
+      date_regime: CdsDateRegime;
+      /**
        * Day count convention for synthetic tranche premium accrual.
        */
       day_count?: valuations.DayCount | null;
@@ -1262,13 +1269,6 @@ export type CalibrationStep =
        * as unit-notional unless you have a specific reason to change it.
        */
       notional?: number;
-      /**
-       * Coupon roll-date grid for the synthetic tranches: `cds_imm` for the
-       * standard CDS roll dates (20th of Mar/Jun/Sep/Dec) or `none` (the
-       * default) for a schedule generated from the convention frequency and
-       * stub. `imm` is rejected.
-       */
-      roll_rule?: RollRule;
       /**
        * Series number of the credit index.
        */
@@ -1713,39 +1713,13 @@ export type SwaptionVolConvention =
       };
     };
 /**
- * Roll-date rule applied when generating schedule anchors.
+ * Named contractual date regime of a CDS product (record
+ * CALIBRATION-FRAMEWORK-007, O7).
  *
- * Selects the core `ScheduleBuilder` date-generation mode.
- *
- * # Variants
- *
- * - **`None`**: plain tenor stepping from the schedule boundaries (default).
- * - **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on
- *   the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which
- *   must be a whole number of quarters; the `stub` rule picks forward or
- *   backward generation and short or long stubs, as in
- *   `ScheduleBuilder::imm`. The contractual start and maturity are always
- *   kept, so an off-cycle date becomes a stub period, and a schedule with no
- *   IMM date strictly inside it is a single period.
- * - **`CdsImm`**: the ISDA standard CDS grid: 20th of Mar/Jun/Sep/Dec,
- *   quarterly with a short final stub, overriding the configured `frequency`
- *   and `stub`. When the start date is not itself a roll date, the first
- *   period accrues from the roll date immediately **preceding** the start
- *   (standard front accrual per the ISDA Big Bang Protocol, April 2009).
- *   Interior coupon or payment-program windows start at their declared
- *   boundary; front accrual is applied only once at the instrument start.
- *
- * Explicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA
- * supports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is
- * rejected because the available ICMA reference calculation requires nominal
- * month-grid coupons.
- *
- * # References
- *
- * - `docs/REFERENCES.md#isda-cds-standard-model`
- * - CME IMM date rules (third Wednesday of the contract month)
+ * The regime owns how the premium grid, its stub and its endpoints are
+ * derived; no regime is inferred and none is a default.
  */
-export type RollRule = "none" | "imm" | "cds_imm";
+export type CdsDateRegime = "standard" | "bespoke";
 /**
  * Parameters for Hull-White 1-factor calibration to cap/floor volatility quotes.
  */
@@ -3998,6 +3972,13 @@ export type StepParams =
        */
       currency: valuations.Currency;
       /**
+       * Contractual date regime of the synthetic tranches (record
+       * CALIBRATION-FRAMEWORK-007, O7): `standard` CDS roll dates (20th of
+       * Mar/Jun/Sep/Dec) or `bespoke` for a schedule from the convention
+       * frequency and stub. Required; there is no default regime.
+       */
+      date_regime: CdsDateRegime;
+      /**
        * Day count convention for synthetic tranche premium accrual.
        */
       day_count?: valuations.DayCount | null;
@@ -4032,13 +4013,6 @@ export type StepParams =
        * as unit-notional unless you have a specific reason to change it.
        */
       notional?: number;
-      /**
-       * Coupon roll-date grid for the synthetic tranches: `cds_imm` for the
-       * standard CDS roll dates (20th of Mar/Jun/Sep/Dec) or `none` (the
-       * default) for a schedule generated from the convention frequency and
-       * stub. `imm` is rejected.
-       */
-      roll_rule?: RollRule;
       /**
        * Series number of the credit index.
        */

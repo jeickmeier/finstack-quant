@@ -19,6 +19,7 @@ export default [
               "business_day_convention": "modified_following",
               "calendar_id": "nyse",
               "coupon_bp": "100",
+              "date_regime": "standard",
               "day_count": "act_360",
               "discount_curve_id": "USD-OIS",
               "end": "2029-03-20",
@@ -26,7 +27,6 @@ export default [
                 "count": 3,
                 "unit": "months"
               },
-              "roll_rule": "cds_imm",
               "start": "2024-03-20",
               "stub": "short_front"
             },
@@ -3079,6 +3079,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json#"
   },
   {
+    "path": "#/$defs/d_aa1b03a4b2041456f32b/properties/date_regime",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/PremiumLegSpec/properties/date_regime",
+    "description": "Contractual date regime of the premium schedule: `standard` CDS roll\ndates or a `bespoke` schedule from `frequency` and `stub`.",
+    "ref": "#/$defs/CdsDateRegime",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/CdsDateRegime"
+  },
+  {
     "path": "#/$defs/d_aa1b03a4b2041456f32b/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/PremiumLegSpec/properties/day_count",
     "description": "Day count convention",
@@ -3107,13 +3114,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#"
   },
   {
-    "path": "#/$defs/d_aa1b03a4b2041456f32b/properties/roll_rule",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/PremiumLegSpec/properties/roll_rule",
-    "description": "Premium roll-date grid. `cds_imm` selects the standard quarterly CDS\nroll grid (20 March, June, September and December), including a final\nmaturity stub, and requires quarterly `frequency` and `short_front`\n`stub`. `none` generates a bespoke schedule from the supplied\n`frequency` and `stub`. The equity-futures `imm` grid is rejected.",
-    "ref": "#/$defs/RollRule",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/RollRule"
-  },
-  {
     "path": "#/$defs/d_aa1b03a4b2041456f32b/properties/start",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/PremiumLegSpec/properties/start",
     "description": "Start date of protection",
@@ -3124,7 +3124,7 @@ export default [
     "path": "#/$defs/d_aa1b03a4b2041456f32b/properties/stub",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/PremiumLegSpec/properties/stub",
     "default": "short_front",
-    "description": "Stub convention",
+    "description": "Stub convention of a bespoke schedule; the standard regime owns its\nown stub.",
     "ref": "#/$defs/StubKind",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/StubKind"
   },
@@ -5359,6 +5359,23 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig"
   },
   {
+    "path": "#/$defs/d_c1d0ca0f757ac92424ce",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/CdsDateRegime",
+    "description": "Named contractual date regime of a CDS product (record\nCALIBRATION-FRAMEWORK-007, O7).\n\nThe regime owns how the premium grid, its stub and its endpoints are\nderived; no regime is inferred and none is a default."
+  },
+  {
+    "path": "#/$defs/d_c1d0ca0f757ac92424ce/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/CdsDateRegime/oneOf/0",
+    "const": "standard",
+    "description": "Standard quarterly CDS roll dates (20 March, June, September and\nDecember): the premium grid runs quarterly from an accrual start on a\nroll date, with a short final period when the maturity is off the\ngrid. The leg's `frequency` must be quarterly; its `stub` is not used."
+  },
+  {
+    "path": "#/$defs/d_c1d0ca0f757ac92424ce/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/CdsDateRegime/oneOf/1",
+    "const": "bespoke",
+    "description": "A bespoke schedule from the leg's own `frequency`, `stub` and\nboundaries."
+  },
+  {
     "path": "#/$defs/d_c2858bf6fa776e358e8a",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/CdsConvention",
     "description": "Regional ISDA CDS schedule family.\n\nExact documentation clauses stay on the instrument or quote. This enum\nidentifies the regional schedule family used to resolve calendars,\nday-count, frequency, stub, and settlement from the convention registry."
@@ -5460,29 +5477,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/DynamicRecoveryModel/oneOf/4/properties/linear_decline/properties/sensitivity",
     "description": "Sensitivity of recovery to leverage increase (`beta`).",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/d_c4f0f60f0c3e41bff146",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/RollRule",
-    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on\n  the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which\n  must be a whole number of quarters; the `stub` rule picks forward or\n  backward generation and short or long stubs, as in\n  `ScheduleBuilder::imm`. The contractual start and maturity are always\n  kept, so an off-cycle date becomes a stub period, and a schedule with no\n  IMM date strictly inside it is a single period.\n- **`CdsImm`**: the ISDA standard CDS grid: 20th of Mar/Jun/Sep/Dec,\n  quarterly with a short final stub, overriding the configured `frequency`\n  and `stub`. When the start date is not itself a roll date, the first\n  period accrues from the roll date immediately **preceding** the start\n  (standard front accrual per the ISDA Big Bang Protocol, April 2009).\n  Interior coupon or payment-program windows start at their declared\n  boundary; front accrual is applied only once at the instrument start.\n\nExplicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA\nsupports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is\nrejected because the available ICMA reference calculation requires nominal\nmonth-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
-  },
-  {
-    "path": "#/$defs/d_c4f0f60f0c3e41bff146/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/RollRule/oneOf/0",
-    "const": "none",
-    "description": "Plain tenor stepping from the schedule boundaries (no roll-date grid)."
-  },
-  {
-    "path": "#/$defs/d_c4f0f60f0c3e41bff146/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/RollRule/oneOf/1",
-    "const": "imm",
-    "description": "Standard IMM dates: third Wednesday of Mar/Jun/Sep/Dec."
-  },
-  {
-    "path": "#/$defs/d_c4f0f60f0c3e41bff146/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/RollRule/oneOf/2",
-    "const": "cds_imm",
-    "description": "CDS roll dates: the 20th of Mar/Jun/Sep/Dec at the leg's own frequency and\nstub; the start must itself be a CDS roll date (no start is substituted)."
   },
   {
     "path": "#/$defs/d_cc8ed166abbb10ad4451",

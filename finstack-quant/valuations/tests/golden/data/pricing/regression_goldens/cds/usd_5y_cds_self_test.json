@@ -361,7 +361,7 @@
           "day_count": "act_360",
           "coupon_bp": "100.0",
           "discount_curve_id": "USD-OIS",
-          "roll_rule": "cds_imm"
+          "date_regime": "standard"
         },
         "protection_leg": {
           "credit_curve_id": "ACME-HZD",

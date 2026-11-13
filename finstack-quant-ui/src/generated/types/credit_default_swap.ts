@@ -3129,21 +3129,19 @@ export interface DAa1B03A4B2041456F32B {
    */
   calendar_id?: Id2 | null;
   coupon_bp: Decimal;
+  /**
+   * Contractual date regime of the premium schedule: `standard` CDS roll
+   * dates or a `bespoke` schedule from `frequency` and `stub`.
+   */
+  date_regime: "standard" | "bespoke";
   day_count: DayCount;
   discount_curve_id: Id3;
   end: Date;
   frequency: Tenor;
-  /**
-   * Premium roll-date grid. `cds_imm` selects the standard quarterly CDS
-   * roll grid (20 March, June, September and December), including a final
-   * maturity stub, and requires quarterly `frequency` and `short_front`
-   * `stub`. `none` generates a bespoke schedule from the supplied
-   * `frequency` and `stub`. The equity-futures `imm` grid is rejected.
-   */
-  roll_rule: "none" | "imm" | "cds_imm";
   start: Date1;
   /**
-   * Stub convention
+   * Stub convention of a bespoke schedule; the standard regime owns its
+   * own stub.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }

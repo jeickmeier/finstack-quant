@@ -3425,17 +3425,16 @@ export interface ScheduleParams {
    */
   payment_lag_days?: number;
   /**
-   * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
+   * Roll-date rule for schedule anchors (plain or standard IMM grid).
    *
    * [`RollRule::None`] (default) keeps plain tenor stepping.
    * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-   * [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
-   * a regular anchor on a CDS roll date. See [`RollRule`].
+   * See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
    */
-  roll_rule?: "none" | "imm" | "cds_imm";
+  roll_rule?: "none" | "imm";
   /**
    * Stub-handling rule used when the start/end dates do not fit an exact
    * whole number of periods.

@@ -12,6 +12,7 @@
         "business_day_convention": "modified_following",
         "calendar_id": "nyse",
         "coupon_bp": "100",
+        "date_regime": "standard",
         "day_count": "act_360",
         "discount_curve_id": "USD-OIS",
         "end": "2029-03-20",
@@ -19,7 +20,6 @@
           "count": 3,
           "unit": "months"
         },
-        "roll_rule": "cds_imm",
         "start": "2024-03-20",
         "stub": "short_front"
       },

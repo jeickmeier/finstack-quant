@@ -124,9 +124,9 @@ pub use legs::FinancingLegSpec;
 pub use legs::FixedLegSpec;
 pub use legs::FloatLegSpec;
 pub use legs::PayReceive;
-pub use legs::PremiumLegSpec;
 pub use legs::ProtectionLegSpec;
 pub use legs::TotalReturnLegSpec;
+pub use legs::{CdsDateRegime, PremiumLegSpec};
 
 pub use common_impl::parameters::bond_quote::BondQuoteInput;
 pub use common_impl::parameters::convertible::{

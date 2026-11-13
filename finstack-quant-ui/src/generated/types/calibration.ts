@@ -1913,6 +1913,13 @@ export type D_08Aea844Abd10Cb00E40 =
       calendar_id?: string | null;
       currency: Currency10;
       /**
+       * Contractual date regime of the synthetic tranches (record
+       * CALIBRATION-FRAMEWORK-007, O7): `standard` CDS roll dates (20th of
+       * Mar/Jun/Sep/Dec) or `bespoke` for a schedule from the convention
+       * frequency and stub. Required; there is no default regime.
+       */
+      date_regime: "standard" | "bespoke";
+      /**
        * Day count convention for synthetic tranche premium accrual.
        */
       day_count?: DayCount | null;
@@ -1944,13 +1951,6 @@ export type D_08Aea844Abd10Cb00E40 =
        * as unit-notional unless you have a specific reason to change it.
        */
       notional?: number;
-      /**
-       * Coupon roll-date grid for the synthetic tranches: `cds_imm` for the
-       * standard CDS roll dates (20th of Mar/Jun/Sep/Dec) or `none` (the
-       * default) for a schedule generated from the convention frequency and
-       * stub. `imm` is rejected.
-       */
-      roll_rule?: "none" | "imm" | "cds_imm";
       /**
        * Series number of the credit index.
        */

@@ -135,7 +135,13 @@ fn test_all_quote_types_instrument_construction() {
             series: 40,
             attachment: 0.0,
             detachment: 0.03, // 0-3% Equity
-            maturity: base_date.add_months(60).expect("valid fixture date"),
+            // A standard-regime tranche matures on its literal CDS roll date
+            // (record CALIBRATION-FRAMEWORK-007, O7).
+            maturity: crate::build::cds::resolve_cds_tenor_maturity(
+                base_date,
+                &"5Y".parse().expect("5Y tenor"),
+            )
+            .expect("standard 5Y maturity"),
             upfront_pct: 0.10,
             coupon_bp: 500.0,
             convention: CdsConventionKey {
@@ -152,7 +158,11 @@ fn test_all_quote_types_instrument_construction() {
             series: 40,
             attachment: 0.03,
             detachment: 0.07, // 3-7% Mezz
-            maturity: base_date.add_months(60).expect("valid fixture date"),
+            maturity: crate::build::cds::resolve_cds_tenor_maturity(
+                base_date,
+                &"5Y".parse().expect("5Y tenor"),
+            )
+            .expect("standard 5Y maturity"),
             upfront_pct: 0.0,
             coupon_bp: 300.0,
             convention: CdsConventionKey {
@@ -223,7 +233,9 @@ fn test_all_quote_types_instrument_construction() {
             assert!(*detachment <= 1.0, "detachment should be capped at 100%");
         }
         if let MarketQuote::CdsTranche(tranche) = q {
-            let overrides = CdsTrancheBuildOverrides::default();
+            let overrides = CdsTrancheBuildOverrides::for_regime(
+                finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+            );
             build_cds_tranche_instrument(tranche, &build_ctx, &overrides)
                 .expect("cds tranche instrument build");
         }

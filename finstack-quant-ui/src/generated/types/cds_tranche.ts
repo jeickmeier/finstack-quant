@@ -350,6 +350,13 @@ export interface DAcd6C3D775D926E416Ed {
    */
   coupon_bp: number;
   credit_index_id: Id1;
+  /**
+   * Contractual date regime of the coupon schedule (record
+   * CALIBRATION-FRAMEWORK-007, O7): `standard` CDS roll dates (20th of Mar,
+   * Jun, Sep, Dec) from an on-roll accrual start, or a `bespoke` schedule
+   * from `frequency` and `stub`. Required; there is no default regime.
+   */
+  date_regime: "standard" | "bespoke";
   day_count: DayCount;
   /**
    * Detachment point in percent (e.g., 3.0 for 0-3% tranche)
@@ -371,13 +378,6 @@ export interface DAcd6C3D775D926E416Ed {
    * the original portfolio notional, in `[0, 1]`.
    */
   realized_loss: number;
-  /**
-   * Coupon roll-date grid. `cds_imm` selects the standard CDS roll dates
-   * (20th of Mar, Jun, Sep, Dec); `none` (the default) generates a bespoke
-   * schedule from `frequency` and `stub`. The equity-futures `imm` grid is
-   * rejected. Use [`Self::standard`] for the IMM constructor.
-   */
-  roll_rule?: "none" | "imm" | "cds_imm";
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
    * Series number (e.g., 37)
@@ -393,8 +393,8 @@ export interface DAcd6C3D775D926E416Ed {
    */
   start_date?: Date1 | null;
   /**
-   * Stub convention for a bespoke (`roll_rule = none`) coupon schedule.
-   * Defaults to `short_front`.
+   * Stub convention of a bespoke coupon schedule; the standard regime owns
+   * its own stub. Defaults to `short_front`.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
   /**

@@ -86,7 +86,7 @@ impl JsSchedule {
     /// @returns The generated `Schedule`.
     /// @throws `TypeError` if `spec` is not a JSON string or plain object;
     /// `FinstackError` (kind `validation`) for an invalid spec (missing choice,
-    /// CDS IMM on a non-natural grid, a convention without a calendar) or a
+    /// a convention without a calendar) or a
     /// generation failure; kind `not_found` for an unknown calendar.
     /// @param spec - `ScheduleSpec` JSON text or plain object, such as `ScheduleBuilder.toSpec()` output: ISO `start`/`end`, `frequency` (a `{ count, unit }` tenor), `stub`, `grid`, `cds_imm_mode`, `business_day_convention`, `calendar_id`, and the optional `payment_lag_days` and `fixing_lag_business_days`. Unknown fields are rejected.
     #[wasm_bindgen(js_name = fromSpec)]

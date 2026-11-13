@@ -17,7 +17,6 @@ import datetime
 import json
 from pathlib import Path
 
-from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.money import Money
@@ -181,7 +180,7 @@ def cds_legs() -> tuple[PremiumLegSpec, ProtectionLegSpec]:
             day_count=DayCount.ACT_360,
             coupon_bp="100",
             discount_curve_id="USD-OIS",
-            roll_rule=RollRule.CDS_IMM,
+            date_regime="standard",
         ),
         ProtectionLegSpec("ACME-CDS", 0.4, 3),
     )
@@ -293,6 +292,7 @@ def build_cds_tranche() -> CdsTranche:
         .discount_curve_id("USD-OIS")
         .credit_index_id("CDX-IG-42-CURVE")
         .side("pay")
+        .date_regime("bespoke")
         .build()
     )
 

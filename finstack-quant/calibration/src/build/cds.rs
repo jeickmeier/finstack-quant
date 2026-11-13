@@ -214,7 +214,7 @@ pub(crate) fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<C
         side: PayReceive::Pay,
         convention: conv.family,
         premium_leg: PremiumLegSpec {
-            roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
+            date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
             start: dates.start,
             end: dates.maturity,
             frequency: conv.frequency,

@@ -26,20 +26,6 @@ fn close(actual: f64, expected: f64) {
 }
 
 #[test]
-fn cds_roll_program_rejects_an_off_roll_issue() {
-    // Record CORE-CONVENTIONS-008: no front accrual from the roll before an
-    // off-roll issue date; the schedule builder never substitutes the start.
-    let mut value = spec("1000000");
-    value["coupon_program"] = json!([{"kind": "fixed", "spec": {
-        "coupon_type": "cash", "rate": "0.1", "frequency": {"count": 3, "unit": "months"},
-        "day_count": "act_360", "business_day_convention": "unadjusted",
-        "calendar_id": "weekends_only", "stub": "short_back", "roll_rule": "cds_imm"
-    }}]);
-    let error = build(value).expect_err("an off-roll CDS issue is rejected");
-    assert!(error.to_string().contains("CDS roll date"), "{error}");
-}
-
-#[test]
 fn custom_principal_preserves_exact_cents_and_rejects_real_overpayment() {
     let mut value = spec("0.3");
     value["notional"]["amort"] = json!({"custom_principal": {"items": [

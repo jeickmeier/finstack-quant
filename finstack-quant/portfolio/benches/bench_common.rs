@@ -657,7 +657,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         let cds_id = format!("CDS_{}", i);
         let convention = CdsConvention::IsdaNa;
         let premium = PremiumLegSpec {
-            roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
+            date_regime: finstack_quant_valuations::instruments::CdsDateRegime::Standard,
             start: base,
             end: maturity_5y(),
             frequency: convention.get_spec().expect("CDS registry").frequency,
@@ -983,12 +983,13 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             tranche_id.clone(),
             &tranche_params,
             &schedule_params,
+            finstack_quant_valuations::instruments::CdsDateRegime::Bespoke,
             "USD-OIS",
             "CORP-HAZARD",
             PayReceive::Pay,
         )
         .expect("Valid tranche parameters");
-        tranche.roll_rule = finstack_quant_cashflows::builder::RollRule::CdsImm;
+        tranche.date_regime = finstack_quant_valuations::instruments::CdsDateRegime::Standard;
         tranche.stub = finstack_quant_core::dates::StubKind::ShortBack;
         let entity_id = format!("FUND_{}", (i % 5) + 1);
         builder = builder.position(

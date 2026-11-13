@@ -379,7 +379,7 @@
         "side": "pay",
         "start_date": "2026-04-30",
         "realized_loss": 0.0,
-        "roll_rule": "none",
+        "date_regime": "bespoke",
         "attributes": {
           "tags": [
             "golden"

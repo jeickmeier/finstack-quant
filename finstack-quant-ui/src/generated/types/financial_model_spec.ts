@@ -1526,17 +1526,16 @@ export interface DCdca3F67B974113083De {
    */
   rate: string;
   /**
-   * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
+   * Roll-date rule for schedule anchors (plain or standard IMM grid).
    *
    * [`RollRule::None`] (default) keeps plain tenor stepping.
    * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-   * [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
-   * a regular anchor on a CDS roll date. See [`RollRule`].
+   * See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
    */
-  roll_rule?: "none" | "imm" | "cds_imm";
+  roll_rule?: "none" | "imm";
   /**
    * Stub-handling rule used when the start/end dates do not fit an exact
    * whole number of periods.
@@ -1655,17 +1654,16 @@ export interface D_210Ab4B44Ffb533F1266 {
   payment_lag_days?: number;
   rate_spec: D_7Af15F20A258D1Def9Dd;
   /**
-   * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
+   * Roll-date rule for schedule anchors (plain or standard IMM grid).
    *
    * [`RollRule::None`] (default) keeps plain tenor stepping.
    * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-   * [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
-   * a regular anchor on a CDS roll date. See [`RollRule`].
+   * See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
    */
-  roll_rule?: "none" | "imm" | "cds_imm";
+  roll_rule?: "none" | "imm";
   /**
    * Stub-handling rule used when the start/end dates do not fit an exact
    * whole number of periods.
@@ -2281,17 +2279,16 @@ export interface D_78D4B16242Febe84F62B {
    */
   payment_lag_days?: number;
   /**
-   * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
+   * Roll-date rule for schedule anchors (plain or standard IMM grid).
    *
    * [`RollRule::None`] (default) keeps plain tenor stepping.
    * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-   * [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
-   * a regular anchor on a CDS roll date. See [`RollRule`].
+   * See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
    */
-  roll_rule?: "none" | "imm" | "cds_imm";
+  roll_rule?: "none" | "imm";
   /**
    * Step schedule: (effective_date, new_rate). Must be sorted by date.
    * Each entry sets the rate from that date forward until the next step.

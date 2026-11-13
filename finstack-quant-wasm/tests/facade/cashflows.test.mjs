@@ -128,28 +128,11 @@ const EXPORTED_KEYS = [
   'validateCashflowScheduleJson',
 ];
 
-test('cashflows CDS roll conserves interest across an unchanged payment election', () => {
+test('cashflows schedules have no generic CDS roll grid', () => {
+  // Record CALIBRATION-FRAMEWORK-007 (O7): CDS products select their own date regime.
   const spec = JSON.parse(cashflowSpec);
-  spec.issue_date = '2024-03-20';
-  spec.maturity = '2024-12-20';
-  Object.assign(spec.coupon_program[0].spec, {
-    rate: '0.05',
-    frequency: { count: 3, unit: 'months' },
-    day_count: 'act_360',
-    business_day_convention: 'unadjusted',
-    stub: 'short_back',
-    roll_rule: 'cds_imm',
-  });
-  const couponTotal = (value) =>
-    JSON.parse(cashflows.buildCashflowScheduleJson(JSON.stringify(value), null))
-      .flows.filter((flow) => flow.kind === 'fixed' || flow.kind === 'stub')
-      .reduce((total, flow) => total + Number(flow.amount.amount), 0);
-  const before = couponTotal(spec);
-  spec.payment_program = [
-    { kind: 'window', start: '2024-06-10', end: spec.maturity, split: 'cash' },
-  ];
-  assert.ok(Math.abs(before - (1000000 * 0.05 * 275) / 360) < 1e-8);
-  assert.ok(Math.abs(couponTotal(spec) - before) < 1e-8);
+  spec.coupon_program[0].spec.roll_rule = 'cds_imm';
+  assert.throws(() => cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null));
 });
 
 test('cashflows IMM coupons cover the contractual off-roll maturity', () => {

@@ -349,17 +349,57 @@ impl FloatLegSpec {
     }
 }
 
+/// Named contractual date regime of a CDS product (record
+/// CALIBRATION-FRAMEWORK-007, O7).
+///
+/// The regime owns how the premium grid, its stub and its endpoints are
+/// derived; no regime is inferred and none is a default.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum CdsDateRegime {
+    /// Standard quarterly CDS roll dates (20 March, June, September and
+    /// December): the premium grid runs quarterly from an accrual start on a
+    /// roll date, with a short final period when the maturity is off the
+    /// grid. The leg's `frequency` must be quarterly; its `stub` is not used.
+    Standard,
+    /// A bespoke schedule from the leg's own `frequency`, `stub` and
+    /// boundaries.
+    Bespoke,
+}
+
+impl std::fmt::Display for CdsDateRegime {
+    /// Writes the serde label (`standard`, `bespoke`).
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Standard => "standard",
+            Self::Bespoke => "bespoke",
+        })
+    }
+}
+
+impl std::str::FromStr for CdsDateRegime {
+    type Err = finstack_quant_core::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "standard" => Ok(Self::Standard),
+            "bespoke" => Ok(Self::Bespoke),
+            other => Err(finstack_quant_core::Error::Validation(format!(
+                "unknown CDS date regime '{other}'; expected 'standard' or 'bespoke'"
+            ))),
+        }
+    }
+}
+
 /// Specification for CDS premium legs
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PremiumLegSpec {
-    /// Premium roll-date grid. `cds_imm` selects the standard quarterly CDS
-    /// roll grid (20 March, June, September and December), including a final
-    /// maturity stub, and requires quarterly `frequency` and `short_front`
-    /// `stub`. `none` generates a bespoke schedule from the supplied
-    /// `frequency` and `stub`. The equity-futures `imm` grid is rejected.
-    pub roll_rule: finstack_quant_cashflows::builder::RollRule,
+    /// Contractual date regime of the premium schedule: `standard` CDS roll
+    /// dates or a `bespoke` schedule from `frequency` and `stub`.
+    pub date_regime: CdsDateRegime,
     /// Start date of protection
     #[cfg_attr(
         feature = "json-schema",
@@ -374,7 +414,8 @@ pub struct PremiumLegSpec {
     pub end: Date,
     /// Payment frequency
     pub frequency: Tenor,
-    /// Stub convention
+    /// Stub convention of a bespoke schedule; the standard regime owns its
+    /// own stub.
     #[serde(default = "crate::serde_defaults::stub_short_front")]
     pub stub: StubKind,
     /// Business day convention

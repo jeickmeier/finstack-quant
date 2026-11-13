@@ -96,12 +96,13 @@ fn sample_tranche() -> CdsTranche {
             "CDX_IG42_3_7_5Y",
             &tranche_params,
             &schedule_params,
+            finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
             finstack_quant_core::types::CurveId::from("USD-OIS"),
             finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
             PayReceive::Receive,
         )
         .expect("Valid tranche parameters");
-        tranche.roll_rule = finstack_quant_cashflows::builder::RollRule::CdsImm;
+        tranche.date_regime = finstack_quant_valuations_core::instruments::CdsDateRegime::Standard;
         tranche.stub = finstack_quant_core::dates::StubKind::ShortBack;
         tranche
     }
@@ -312,6 +313,7 @@ fn test_equity_helper_matches_explicit_params_pv() {
         "CDX_IG42_0_3_HELPER",
         &helper_params,
         &schedule_params,
+        finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
         PayReceive::Receive,
@@ -319,7 +321,8 @@ fn test_equity_helper_matches_explicit_params_pv() {
     .expect("Valid tranche parameters");
     // No as_of fallback for the accrual start (record CORE-CONVENTIONS-008).
     if helper_tranche.start_date.is_none()
-        && helper_tranche.roll_rule != finstack_quant_cashflows::builder::RollRule::CdsImm
+        && helper_tranche.date_regime
+            != finstack_quant_valuations_core::instruments::CdsDateRegime::Standard
     {
         helper_tranche.start_date = Some(as_of);
     }
@@ -337,6 +340,7 @@ fn test_equity_helper_matches_explicit_params_pv() {
         "CDX_IG42_0_3_EXPLICIT",
         &explicit_params,
         &schedule_params,
+        finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
         PayReceive::Receive,
@@ -344,7 +348,8 @@ fn test_equity_helper_matches_explicit_params_pv() {
     .expect("Valid tranche parameters");
     // No as_of fallback for the accrual start (record CORE-CONVENTIONS-008).
     if explicit_tranche.start_date.is_none()
-        && explicit_tranche.roll_rule != finstack_quant_cashflows::builder::RollRule::CdsImm
+        && explicit_tranche.date_regime
+            != finstack_quant_valuations_core::instruments::CdsDateRegime::Standard
     {
         explicit_tranche.start_date = Some(as_of);
     }
@@ -602,6 +607,7 @@ fn homogeneity_detection_uses_consistent_tolerance() {
         "CDX_IG42_0_3_5Y",
         &params,
         &schedule_params,
+        finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
         PayReceive::Receive,
@@ -609,7 +615,8 @@ fn homogeneity_detection_uses_consistent_tolerance() {
     .expect("Valid tranche parameters");
     // No as_of fallback for the accrual start (record CORE-CONVENTIONS-008).
     if tranche.start_date.is_none()
-        && tranche.roll_rule != finstack_quant_cashflows::builder::RollRule::CdsImm
+        && tranche.date_regime
+            != finstack_quant_valuations_core::instruments::CdsDateRegime::Standard
     {
         tranche.start_date = Some(as_of);
     }
@@ -678,7 +685,7 @@ fn test_payment_schedule_imm_vs_non_imm() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
 
     let mut imm_tranche = sample_tranche();
-    imm_tranche.roll_rule = finstack_quant_cashflows::builder::RollRule::CdsImm;
+    imm_tranche.date_regime = finstack_quant_valuations_core::instruments::CdsDateRegime::Standard;
     imm_tranche.stub = finstack_quant_core::dates::StubKind::ShortBack;
     imm_tranche.start_date =
         Some(Date::from_calendar_date(2025, Month::March, 20).expect("cds date"));
@@ -711,7 +718,8 @@ fn test_payment_schedule_imm_vs_non_imm() {
     }
 
     let mut non_imm_tranche = sample_tranche();
-    non_imm_tranche.roll_rule = finstack_quant_cashflows::builder::RollRule::None;
+    non_imm_tranche.date_regime =
+        finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke;
     non_imm_tranche.start_date =
         Some(Date::from_calendar_date(2025, Month::January, 15).expect("valid date"));
     non_imm_tranche.maturity =
@@ -748,6 +756,7 @@ fn new_honors_monthly_schedule_params() {
         "CDX_MONTHLY",
         &tranche_params,
         &schedule_params,
+        finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
         PayReceive::Receive,
@@ -755,13 +764,14 @@ fn new_honors_monthly_schedule_params() {
     .expect("Valid tranche parameters");
     // No as_of fallback for the accrual start (record CORE-CONVENTIONS-008).
     if tranche.start_date.is_none()
-        && tranche.roll_rule != finstack_quant_cashflows::builder::RollRule::CdsImm
+        && tranche.date_regime
+            != finstack_quant_valuations_core::instruments::CdsDateRegime::Standard
     {
         tranche.start_date = Some(as_of);
     }
 
     assert!(
-        tranche.roll_rule != finstack_quant_cashflows::builder::RollRule::CdsImm,
+        tranche.date_regime != finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
         "CdsTranche::new must honor ScheduleParams rather than implicit IMM"
     );
     assert_eq!(
@@ -811,8 +821,8 @@ fn standard_constructor_uses_imm_cds_dates() {
     .expect("Valid tranche parameters");
 
     assert_eq!(
-        tranche.roll_rule,
-        finstack_quant_cashflows::builder::RollRule::CdsImm
+        tranche.date_regime,
+        finstack_quant_valuations_core::instruments::CdsDateRegime::Standard
     );
     assert!(tranche.calendar_id.is_none());
 
@@ -1158,7 +1168,7 @@ fn test_realized_loss_impact() {
     tranche.detach_pct = 3.0;
     tranche.series = 42;
     tranche.realized_loss = 0.0;
-    tranche.roll_rule = finstack_quant_cashflows::builder::RollRule::CdsImm;
+    tranche.date_regime = finstack_quant_valuations_core::instruments::CdsDateRegime::Standard;
     tranche.stub = finstack_quant_core::dates::StubKind::ShortBack;
 
     let market_ctx = sample_market_context();
@@ -1217,6 +1227,7 @@ fn test_thin_tranche_stability() {
         "THIN_TRANCHE",
         &tranche_params,
         &schedule_params,
+        finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
         PayReceive::Receive,
@@ -1224,7 +1235,8 @@ fn test_thin_tranche_stability() {
     .expect("Valid tranche parameters");
     // No as_of fallback for the accrual start (record CORE-CONVENTIONS-008).
     if tranche.start_date.is_none()
-        && tranche.roll_rule != finstack_quant_cashflows::builder::RollRule::CdsImm
+        && tranche.date_regime
+            != finstack_quant_valuations_core::instruments::CdsDateRegime::Standard
     {
         tranche.start_date = Some(as_of);
     }
@@ -1260,6 +1272,7 @@ fn test_super_senior_tranche() {
         "SUPER_SENIOR",
         &tranche_params,
         &schedule_params,
+        finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
         PayReceive::Receive,
@@ -1267,7 +1280,8 @@ fn test_super_senior_tranche() {
     .expect("Valid tranche parameters");
     // No as_of fallback for the accrual start (record CORE-CONVENTIONS-008).
     if tranche.start_date.is_none()
-        && tranche.roll_rule != finstack_quant_cashflows::builder::RollRule::CdsImm
+        && tranche.date_regime
+            != finstack_quant_valuations_core::instruments::CdsDateRegime::Standard
     {
         tranche.start_date = Some(as_of);
     }
@@ -1453,6 +1467,7 @@ fn par_spread_ok_result_is_always_a_true_par() {
                 "PAR_SPREAD_TEST",
                 &params,
                 &schedule_params,
+                finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
                 finstack_quant_core::types::CurveId::from("USD-OIS"),
                 finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
                 side,
@@ -1460,7 +1475,8 @@ fn par_spread_ok_result_is_always_a_true_par() {
             .expect("Valid tranche parameters");
             // No as_of fallback for the accrual start (record CORE-CONVENTIONS-008).
             if tranche.start_date.is_none()
-                && tranche.roll_rule != finstack_quant_cashflows::builder::RollRule::CdsImm
+                && tranche.date_regime
+                    != finstack_quant_valuations_core::instruments::CdsDateRegime::Standard
             {
                 tranche.start_date = Some(as_of);
             }
@@ -1721,6 +1737,7 @@ fn well_formed_base_correlation_prices_without_arbitrage_error() {
             "ARB_FREE_TEST",
             &params,
             &schedule_params,
+            finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
             finstack_quant_core::types::CurveId::from("USD-OIS"),
             finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
             PayReceive::Receive,
@@ -1728,7 +1745,8 @@ fn well_formed_base_correlation_prices_without_arbitrage_error() {
         .expect("Valid tranche parameters");
         // No as_of fallback for the accrual start (record CORE-CONVENTIONS-008).
         if tranche.start_date.is_none()
-            && tranche.roll_rule != finstack_quant_cashflows::builder::RollRule::CdsImm
+            && tranche.date_regime
+                != finstack_quant_valuations_core::instruments::CdsDateRegime::Standard
         {
             tranche.start_date = Some(as_of);
         }
@@ -1816,6 +1834,7 @@ fn realistic_base_correlation_skew_prices_every_tranche() {
             "SKEW_TEST",
             &params,
             &finstack_quant_cashflows::builder::ScheduleParams::quarterly_act360(),
+            finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
             finstack_quant_core::types::CurveId::from("USD-OIS"),
             finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
             PayReceive::Receive,
@@ -1823,7 +1842,8 @@ fn realistic_base_correlation_skew_prices_every_tranche() {
         .expect("Valid tranche parameters");
         // No as_of fallback for the accrual start (record CORE-CONVENTIONS-008).
         if tranche.start_date.is_none()
-            && tranche.roll_rule != finstack_quant_cashflows::builder::RollRule::CdsImm
+            && tranche.date_regime
+                != finstack_quant_valuations_core::instruments::CdsDateRegime::Standard
         {
             tranche.start_date = Some(base_date);
         }
@@ -2273,6 +2293,7 @@ fn super_senior_tranche(attach: f64, detach: f64) -> CdsTranche {
         "SS_TEST",
         &params,
         &schedule_params,
+        finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
         finstack_quant_core::types::CurveId::from("USD-OIS"),
         finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
         PayReceive::Receive,
@@ -2290,7 +2311,8 @@ fn zero_recovery_has_no_senior_writedown() {
     let mut tranche = super_senior_tranche(60.0, 100.0);
     // No as_of fallback for the accrual start (record CORE-CONVENTIONS-008).
     if tranche.start_date.is_none()
-        && tranche.roll_rule != finstack_quant_cashflows::builder::RollRule::CdsImm
+        && tranche.date_regime
+            != finstack_quant_valuations_core::instruments::CdsDateRegime::Standard
     {
         tranche.start_date = Some(as_of);
     }
@@ -2328,7 +2350,8 @@ fn super_senior_premium_falls_as_hazard_rises() {
     let mut tranche = super_senior_tranche(60.0, 100.0);
     // No as_of fallback for the accrual start (record CORE-CONVENTIONS-008).
     if tranche.start_date.is_none()
-        && tranche.roll_rule != finstack_quant_cashflows::builder::RollRule::CdsImm
+        && tranche.date_regime
+            != finstack_quant_valuations_core::instruments::CdsDateRegime::Standard
     {
         tranche.start_date = Some(Date::from_calendar_date(2025, Month::January, 1).expect("date"));
     }
@@ -2420,7 +2443,7 @@ fn seasoned_first_period_default_timing_starts_at_valuation_date() {
     let start_date = Date::from_calendar_date(2024, Month::December, 20).expect("date");
     let mut tranche = sample_tranche();
     tranche.start_date = Some(start_date);
-    tranche.roll_rule = finstack_quant_cashflows::builder::RollRule::None;
+    tranche.date_regime = finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke;
     tranche.coupon_bp = 0.0;
 
     let pricer = CdsTranchePricer::new();
@@ -2532,7 +2555,7 @@ fn expired_protection_keeps_rolled_coupon_and_later_upfront() {
     let mut tranche = sample_tranche();
     tranche.start_date = Some(date!(2025 - 03 - 29));
     tranche.maturity = date!(2025 - 06 - 29);
-    tranche.roll_rule = finstack_quant_cashflows::builder::RollRule::None;
+    tranche.date_regime = finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke;
     tranche.business_day_convention = finstack_quant_core::dates::BusinessDayConvention::Following;
     tranche.calendar_id = Some("weekends_only".into());
     tranche.upfront = Some((
@@ -2598,7 +2621,7 @@ fn seasoned_aod_reduces_only_the_remaining_day_of_accrual() {
     let mut tranche = sample_tranche();
     tranche.start_date = Some(date!(2024 - 10 - 04));
     tranche.maturity = date!(2025 - 01 - 02);
-    tranche.roll_rule = finstack_quant_cashflows::builder::RollRule::None;
+    tranche.date_regime = finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke;
     tranche.attach_pct = 0.0;
     tranche.detach_pct = 100.0;
     let rows = CdsTranchePricer::new()
@@ -2789,7 +2812,8 @@ fn credit_performance_numerical_baseline() {
         let mut tranche = sample_tranche();
         // No as_of fallback for the accrual start (record CORE-CONVENTIONS-008).
         if tranche.start_date.is_none()
-            && tranche.roll_rule != finstack_quant_cashflows::builder::RollRule::CdsImm
+            && tranche.date_regime
+                != finstack_quant_valuations_core::instruments::CdsDateRegime::Standard
         {
             tranche.start_date = Some(as_of);
         }

@@ -9,6 +9,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
+use finstack_quant_valuations_core::instruments::CdsDateRegime;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 
@@ -75,15 +76,13 @@ pub struct CdsTranche {
     /// Realized (settled) loss on the reference pool as a decimal fraction of
     /// the original portfolio notional, in `[0, 1]`.
     pub realized_loss: f64,
-    /// Coupon roll-date grid. `cds_imm` selects the standard CDS roll dates
-    /// (20th of Mar, Jun, Sep, Dec); `none` (the default) generates a bespoke
-    /// schedule from `frequency` and `stub`. The equity-futures `imm` grid is
-    /// rejected. Use [`Self::standard`] for the IMM constructor.
-    #[builder(default)]
-    #[serde(default)]
-    pub roll_rule: RollRule,
-    /// Stub convention for a bespoke (`roll_rule = none`) coupon schedule.
-    /// Defaults to `short_front`.
+    /// Contractual date regime of the coupon schedule (record
+    /// CALIBRATION-FRAMEWORK-007, O7): `standard` CDS roll dates (20th of Mar,
+    /// Jun, Sep, Dec) from an on-roll accrual start, or a `bespoke` schedule
+    /// from `frequency` and `stub`. Required; there is no default regime.
+    pub date_regime: CdsDateRegime,
+    /// Stub convention of a bespoke coupon schedule; the standard regime owns
+    /// its own stub. Defaults to `short_front`.
     #[builder(default = StubKind::ShortFront)]
     #[serde(default = "finstack_quant_valuations_core::serde_defaults::stub_short_front")]
     pub stub: StubKind,
@@ -128,7 +127,7 @@ impl CdsTranche {
             return Some(start_date);
         }
 
-        if self.roll_rule != RollRule::CdsImm {
+        if self.date_regime != CdsDateRegime::Standard {
             return None;
         }
 
@@ -203,10 +202,11 @@ impl CdsTranche {
                 currency
             )));
         }
-        if self.roll_rule == RollRule::Imm {
-            return Err(finstack_quant_core::Error::Validation(
-                "CDS tranche roll_rule must be cds_imm or none, got imm".to_string(),
-            ));
+        if self.date_regime == CdsDateRegime::Standard && self.frequency != Tenor::quarterly() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CDS tranche {}: the standard date regime pays quarterly, got {}",
+                self.id, self.frequency
+            )));
         }
         Ok(())
     }
@@ -242,8 +242,10 @@ impl CdsTranche {
     /// * `tranche_params` - Attachment/detachment points (percent), notional,
     ///   maturity, running coupon in basis points, and index identity.
     /// * `schedule_params` - Coupon frequency, day count, business-day
-    ///   convention, calendar, `stub` and `roll_rule` (`cds_imm` or `none`;
-    ///   `imm` is rejected by [`Self::validate`]).
+    ///   convention, calendar and `stub`; its `roll_rule` must be `none`
+    ///   (the date regime selects the CDS grid).
+    /// * `date_regime` - `Standard` CDS roll dates or a `Bespoke` schedule
+    ///   from `schedule_params` (record CALIBRATION-FRAMEWORK-007, O7).
     /// * `discount_curve_id` - Discount curve identifier in the tranche quote
     ///   currency.
     /// * `credit_index_id` - Credit-index / hazard identifier used for
@@ -256,14 +258,23 @@ impl CdsTranche {
     /// - `attach_pct` must be less than `detach_pct`
     /// - Both must be in [0, 100] (percent, not fraction)
     /// - Notional must be positive
+    /// - `schedule_params.roll_rule` must be `none`
+    /// - the standard regime needs a quarterly frequency
     pub fn new(
         id: impl Into<InstrumentId>,
         tranche_params: &CdsTrancheParams,
         schedule_params: &ScheduleParams,
+        date_regime: CdsDateRegime,
         discount_curve_id: impl Into<CurveId>,
         credit_index_id: impl Into<CurveId>,
         side: PayReceive,
     ) -> finstack_quant_core::Result<Self> {
+        if schedule_params.roll_rule != RollRule::None {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "a CDS tranche takes its grid from its date regime, not a {:?} roll rule",
+                schedule_params.roll_rule
+            )));
+        }
         let tranche = Self {
             id: id.into(),
             index_name: tranche_params.index_name.to_owned(),
@@ -282,7 +293,7 @@ impl CdsTranche {
             side,
             start_date: None,
             realized_loss: tranche_params.realized_loss,
-            roll_rule: schedule_params.roll_rule,
+            date_regime,
             stub: schedule_params.stub,
             upfront: None,
             instrument_pricing_overrides:
@@ -297,7 +308,7 @@ impl CdsTranche {
 
     /// Create a standard CDS tranche with IMM coupon dates and market conventions.
     ///
-    /// Builds with `roll_rule = cds_imm` (CDS roll dates, 20th of
+    /// Builds with the standard date regime (CDS roll dates, 20th of
     /// Mar/Jun/Sep/Dec) and no `calendar_id`.
     ///
     /// # Arguments
@@ -321,26 +332,23 @@ impl CdsTranche {
         credit_index_id: impl Into<CurveId>,
         side: PayReceive,
     ) -> finstack_quant_core::Result<Self> {
-        use finstack_quant_cashflows::builder::RollRule;
-        use finstack_quant_cashflows::builder::ScheduleParams;
         let sched = ScheduleParams {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::Following,
             calendar_id: "weekends_only".into(),
-            // The CDS grid runs forward from the start roll with a short final
-            // stub; the product states it (record CORE-CONVENTIONS-008).
-            stub: StubKind::ShortBack,
+            stub: StubKind::ShortFront,
             end_of_month: false,
             payment_lag_days: 0,
             adjust_accrual_dates: false,
-            roll_rule: RollRule::CdsImm,
+            roll_rule: RollRule::None,
         };
 
         let mut tranche = Self::new(
             id,
             tranche_params,
             &sched,
+            CdsDateRegime::Standard,
             discount_curve_id,
             credit_index_id,
             side,

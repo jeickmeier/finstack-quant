@@ -215,7 +215,7 @@ def cds(idx: int) -> tuple[str, dict]:
             "side": side,
             "convention": "isda_na",
             "premium_leg": {
-                "roll_rule": "cds_imm",
+                "date_regime": "standard",
                 "start": "2025-03-20",
                 "end": f"{mat_year}-03-20",
                 "frequency": {"count": 3, "unit": "months"},
@@ -250,7 +250,7 @@ def cds_index(idx: int) -> tuple[str, dict]:
             "side": side,
             "convention": "isda_na",
             "premium_leg": {
-                "roll_rule": "cds_imm",
+                "date_regime": "standard",
                 "start": "2025-03-20",
                 "end": f"{mat_year}-12-20",
                 "frequency": {"count": 3, "unit": "months"},
@@ -293,7 +293,7 @@ def cds_tranche(idx: int) -> tuple[str, dict]:
             "credit_index_id": "CDX.NA.IG.HAZARD",
             "side": "pay",
             "realized_loss": 0.0,
-            "roll_rule": "none",
+            "date_regime": "bespoke",
             # Off the CDS roll grid the tranche states its accrual start.
             "start_date": AS_OF_STR,
             "attributes": {"tags": ["structured-credit"], "meta": {}},

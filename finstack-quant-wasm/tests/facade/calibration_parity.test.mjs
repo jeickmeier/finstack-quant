@@ -219,6 +219,7 @@ const STEPS = {
       series: 42,
       maturity_years: 5.0,
       discount_curve_id: 'USD-OIS',
+      date_regime: 'bespoke',
     }),
   student_t: () =>
     calibration.calibrationStepStudentT('T', {

@@ -205,7 +205,7 @@ impl CdsIndex {
             side: PayReceive::Pay,
             convention,
             premium_leg: PremiumLegSpec {
-                roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
+                date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
                 start: date!(2024 - 03 - 20),
                 end: date!(2029 - 12 - 20),
                 frequency,
@@ -315,7 +315,7 @@ impl CdsIndex {
             side,
             convention,
             premium_leg: PremiumLegSpec {
-                roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
+                date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
                 start,
                 end,
                 frequency,

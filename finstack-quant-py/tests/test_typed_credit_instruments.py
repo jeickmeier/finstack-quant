@@ -7,7 +7,6 @@ import json
 
 import pytest
 
-from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.money import Money
@@ -97,7 +96,7 @@ def _cds_hand_written_json() -> str:
                 "side": "pay",
                 "convention": "isda_na",
                 "premium_leg": {
-                    "roll_rule": "cds_imm",
+                    "date_regime": "standard",
                     "start": "2024-03-20",
                     "end": "2029-06-20",
                     "frequency": {"count": 3, "unit": "months"},
@@ -282,7 +281,7 @@ class TestPremiumLegSpecTyped:
             coupon_bp="100",
             discount_curve_id="USD-OIS",
             stub=stub,
-            roll_rule=RollRule.NONE,
+            date_regime="bespoke",
         )
         assert "coupon_bp=100" in repr(leg)
 

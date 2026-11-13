@@ -212,7 +212,7 @@ def structured_index_inputs() -> dict[str, dict[str, Any]]:
             "coupon_bp": 500.0,
             "series": 43,
             "side": "pay",
-            "roll_rule": "cds_imm",
+            "date_regime": "standard",
             "upfront": None,
         },
     }

@@ -28,7 +28,7 @@
         "coupon_bp": 0.0,
         "series": 42,
         "side": "pay",
-        "roll_rule": "none",
+        "date_regime": "bespoke",
         "upfront": null
       },
       "type": "cds_tranche"

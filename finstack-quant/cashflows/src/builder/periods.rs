@@ -117,11 +117,10 @@ pub struct BuildPeriodsParams<'a> {
     pub reset_lag_days: Option<i32>,
     /// Adjust accrual start/end boundaries with the business-day convention.
     pub adjust_accrual_dates: bool,
-    /// Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
+    /// Roll-date rule for schedule anchors (plain or standard IMM grid).
     ///
     /// [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-    /// [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
-    /// a regular anchor on a CDS roll date. Third-Wednesday IMM with ACT/ACT ICMA is unsupported
+    /// Third-Wednesday IMM with ACT/ACT ICMA is unsupported
     /// because that day count requires nominal month-grid reference coupons.
     pub roll_rule: RollRule,
 }
@@ -204,8 +203,6 @@ pub(crate) struct AccrualConventions {
     pub(crate) stub: StubKind,
     /// Whether nominal dates roll to month-end.
     pub(crate) end_of_month: bool,
-    /// Roll-date rule of the schedule anchors.
-    pub(crate) roll_rule: RollRule,
 }
 
 impl AccrualConventions {
@@ -216,7 +213,6 @@ impl AccrualConventions {
             day_count: schedule.day_count,
             stub: schedule.stub,
             end_of_month: schedule.end_of_month,
-            roll_rule: schedule.roll_rule,
         }
     }
 }
@@ -234,7 +230,6 @@ pub(crate) fn period_day_count_context<'a>(
         day_count,
         stub,
         end_of_month,
-        roll_rule,
     } = conventions;
     // Regularity uses unadjusted dates (ISDA 2006 §4.16(c)); ICMA stubs use the adjacent regular coupon.
     let coupon_period = if day_count == DayCount::Act365L {
@@ -246,7 +241,6 @@ pub(crate) fn period_day_count_context<'a>(
             frequency,
             stub,
             end_of_month,
-            roll_rule,
         )?
     };
     Ok(DayCountContext {
@@ -291,7 +285,6 @@ pub fn period_accrual(
             day_count: params.day_count,
             stub: params.stub,
             end_of_month: params.end_of_month,
-            roll_rule: params.roll_rule,
         },
         period.unadjusted_end == params.end,
     )?;
@@ -476,8 +469,7 @@ pub fn build_single_period(
 /// # Returns
 ///
 /// Ordered schedule periods ending at `params.end`, including an off-IMM
-/// terminal stub. CDS IMM schedules may begin before `params.start` to include
-/// the initial front accrual from the preceding CDS roll.
+/// terminal stub; the first period starts at `params.start`.
 ///
 /// # Errors
 ///

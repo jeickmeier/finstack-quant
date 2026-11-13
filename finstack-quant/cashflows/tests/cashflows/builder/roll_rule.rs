@@ -1,16 +1,12 @@
-//! Roll-rule schedule tests: standard IMM and post-Big-Bang CDS IMM grids.
+//! Roll-rule schedule tests for the standard IMM grid.
 //!
 //! Pins the date grids produced when `ScheduleParams::roll_rule` /
-//! `BuildPeriodsParams::roll_rule` selects the core `ScheduleBuilder` IMM
-//! modes:
+//! `BuildPeriodsParams::roll_rule` selects `RollRule::Imm`: the IMM roll
+//! convention (third Wednesdays of Mar/Jun/Sep/Dec at the leg frequency,
+//! contractual ends kept). There is no generic CDS grid; CDS products select
+//! their own date regime (record CALIBRATION-FRAMEWORK-007, O7).
 //!
-//! - `RollRule::Imm`: the IMM roll convention (third Wednesdays of
-//!   Mar/Jun/Sep/Dec at the leg frequency, contractual ends kept)
-//! - `RollRule::CdsImm`: 20th of Mar/Jun/Sep/Dec with the post-Big-Bang
-//!   (2009) front accrual anchored at the roll date preceding the start
-//!
-//! References: ISDA CDS Standard Model conventions (Big Bang Protocol,
-//! April 2009); CME IMM date rules.
+//! Reference: CME IMM date rules.
 
 use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
 use finstack_quant_cashflows::builder::{CashFlowSchedule, ScheduleParams};
@@ -42,40 +38,6 @@ fn roll_params(start: Date, end: Date, roll_rule: RollRule) -> BuildPeriodsParam
         adjust_accrual_dates: false,
         roll_rule,
     }
-}
-
-#[test]
-fn cds_imm_roll_rule_rejects_an_off_roll_start() {
-    // Record CORE-CONVENTIONS-008: no start is substituted; the leg states an
-    // accrual start on a CDS roll date.
-    let error = build_periods(roll_params(
-        d(2024, 1, 10),
-        d(2024, 12, 20),
-        RollRule::CdsImm,
-    ))
-    .expect_err("an off-roll CDS start is rejected");
-    assert!(error.to_string().contains("CDS roll date"), "{error}");
-}
-
-#[test]
-fn cds_imm_roll_rule_start_on_roll_date_has_no_front_accrual() {
-    let periods = build_periods(roll_params(
-        d(2024, 3, 20),
-        d(2024, 12, 20),
-        RollRule::CdsImm,
-    ))
-    .expect("CDS IMM schedule builds");
-
-    let starts: Vec<Date> = periods.iter().map(|p| p.accrual_start).collect();
-    assert_eq!(
-        starts,
-        vec![d(2024, 3, 20), d(2024, 6, 20), d(2024, 9, 20)],
-        "a start on a roll date is its own anchor (no front accrual)"
-    );
-    assert_eq!(
-        periods.last().expect("periods").accrual_end,
-        d(2024, 12, 20)
-    );
 }
 
 #[test]
@@ -228,52 +190,6 @@ fn imm_roll_rule_honours_the_leg_frequency_and_stub() {
 }
 
 #[test]
-fn cds_interior_payment_windows_never_repeat_front_accrual() {
-    let start = d(2024, 3, 20);
-    let end = d(2024, 12, 20);
-    let switch = d(2024, 6, 10);
-    for day_count in [DayCount::Act360, DayCount::ActActIsma] {
-        let mut params = ScheduleParams::quarterly_act360();
-        params.roll_rule = RollRule::CdsImm;
-        params.day_count = day_count;
-        params.business_day_convention = BusinessDayConvention::Unadjusted;
-        let baseline = fixed_schedule(start, end, params.clone(), None);
-        let overridden =
-            fixed_schedule(start, end, params.clone(), Some((switch, CouponType::Cash)));
-        assert!((coupon_total(&baseline) - coupon_total(&overridden)).abs() < 1e-8);
-        for split in [CouponType::Cash, CouponType::Pik] {
-            let schedule = fixed_schedule(start, end, params.clone(), Some((switch, split)));
-            let mut intervals: Vec<_> = schedule
-                .get_flows()
-                .iter()
-                .filter_map(|flow| {
-                    flow.get_accrual()
-                        .as_ref()
-                        .map(|accrual| (accrual.get_start(), accrual.get_end()))
-                })
-                .collect();
-            intervals.sort_unstable();
-            assert_eq!(intervals.first().expect("first coupon").0, start);
-            assert_eq!(intervals.last().expect("last coupon").1, end);
-            assert!(
-                intervals.windows(2).all(|pair| pair[0].1 == pair[1].0),
-                "overlapping or missing coupon accrual: {intervals:?}"
-            );
-        }
-    }
-}
-
-#[test]
-fn cds_imm_roll_rule_uses_the_leg_frequency() {
-    // Record CORE-CONVENTIONS-008: no quarterly/short-back override.
-    let mut params = roll_params(d(2024, 3, 20), d(2024, 12, 20), RollRule::CdsImm);
-    params.frequency = Tenor::monthly();
-    let periods = build_periods(params).expect("monthly CDS-roll schedule");
-    assert_eq!(periods.len(), 9);
-    assert!(periods.iter().all(|period| period.accrual_end.day() == 20));
-}
-
-#[test]
 fn roll_rule_none_preserves_plain_tenor_grid() {
     let periods = build_periods(roll_params(d(2024, 1, 10), d(2024, 7, 10), RollRule::None))
         .expect("plain schedule builds");
@@ -300,18 +216,6 @@ fn schedule_params_roll_rule_defaults_to_none_and_is_omitted_on_wire() {
 }
 
 #[test]
-fn schedule_params_roll_rule_roundtrips_cds_imm() {
-    let mut params = ScheduleParams::quarterly_act360();
-    params.roll_rule = RollRule::CdsImm;
-
-    let wire = serde_json::to_value(&params).expect("serializes");
-    assert_eq!(wire["roll_rule"], serde_json::json!("cds_imm"));
-
-    let back: ScheduleParams = serde_json::from_value(wire).expect("roundtrips");
-    assert_eq!(back.roll_rule, RollRule::CdsImm);
-}
-
-#[test]
 fn schedule_params_still_denies_unknown_fields() {
     let json = r#"{
         "frequency": {"count": 3, "unit": "months"},
@@ -323,36 +227,15 @@ fn schedule_params_still_denies_unknown_fields() {
 }
 
 #[test]
-fn cds_imm_schedule_params_reach_the_cashflow_compiler() {
-    // Reachability through the canonical builder: coupons must land on the
-    // CDS roll grid, not the plain quarterly-from-issue grid.
-    let mut schedule = ScheduleParams::quarterly_act360();
-    schedule.stub = StubKind::ShortBack;
-    schedule.roll_rule = RollRule::CdsImm;
-
-    let mut builder = CashFlowSchedule::builder();
-    let _ = builder
-        .principal(
-            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-            d(2024, 3, 20),
-            d(2024, 12, 20),
-        )
-        .fixed_cf(FixedCouponSpec {
-            coupon_type: CouponType::Cash,
-            rate: Decimal::new(5, 2),
-            schedule,
-        });
-    let flows = builder.build(None).expect("cashflow schedule builds");
-
-    let coupon_dates: Vec<Date> = flows
-        .get_flows()
-        .iter()
-        .filter(|flow| flow.get_kind() == CFKind::Fixed)
-        .map(|flow| flow.get_date())
-        .collect();
-    assert_eq!(
-        coupon_dates,
-        vec![d(2024, 6, 20), d(2024, 9, 20), d(2024, 12, 20)],
-        "coupons must follow the CDS IMM roll grid"
-    );
+fn schedule_params_have_no_generic_cds_grid() {
+    // Record CALIBRATION-FRAMEWORK-007 (O7): a CDS product selects its own
+    // date regime; the cashflows roll rule has no CDS grid.
+    let json = r#"{
+        "frequency": {"count": 3, "unit": "months"},
+        "day_count": "act_360",
+        "business_day_convention": "modified_following",
+        "calendar_id": "weekends_only",
+        "roll_rule": "cds_imm"
+    }"#;
+    assert!(serde_json::from_str::<ScheduleParams>(json).is_err());
 }

@@ -463,10 +463,10 @@ getters!(JsCdsTranche, "CdsTranche", |i| {
         /// Realized portfolio loss so far.
         /// @returns Fraction of the original portfolio notional.
         realized_loss as realizedLoss: "generated.valuations.CdsTranche['realized_loss']" => json(i.realized_loss),
-        /// Coupon roll-date grid.
-        /// @returns `"cds_imm"` for the CDS roll dates (20th of Mar/Jun/Sep/Dec); `"none"` for a bespoke `frequency`/`stub` schedule.
-        roll_rule as rollRule: "NonNullable<generated.valuations.CdsTranche['roll_rule']>" => json(i.roll_rule),
-        /// Stub convention for a bespoke (`"none"`) coupon schedule.
+        /// Contractual date regime of the coupon schedule.
+        /// @returns `"standard"` for the CDS roll dates (20th of Mar/Jun/Sep/Dec); `"bespoke"` for a `frequency`/`stub` schedule.
+        date_regime as dateRegime: "generated.valuations.CdsTranche['date_regime']" => json(i.date_regime),
+        /// Stub convention for a bespoke coupon schedule.
         /// @returns The stub rule (`short_front` by default).
         stub as stub: "NonNullable<generated.valuations.CdsTranche['stub']>" => json(i.stub),
         /// Upfront payment as `(payment_date, amount)`.
@@ -569,7 +569,7 @@ setters!(JsCdsTrancheBuilder, "CdsTrancheBuilder", {
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         side as side: "generated.valuations.CdsTranche['side']" => js_wire,
         /// Set the contract start (effective) date for schedule anchoring.
-        /// @param value - Effective date; if never set, uses the as-of date (or the prior CDS roll date when `roll_rule` is `"cds_imm"`).
+        /// @param value - Effective date. Required for the bespoke regime; under the standard regime it defaults to the CDS roll date on or before the valuation date and must be a roll date.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         start_date as startDate: "string" => js_date,
@@ -578,13 +578,13 @@ setters!(JsCdsTrancheBuilder, "CdsTrancheBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         realized_loss as realizedLoss: "number" => js_f64,
-        /// Set the coupon roll-date grid.
-        /// @param value - `"cds_imm"` for the CDS roll dates (20th of Mar, Jun, Sep, Dec) or `"none"` (the default) for a schedule from `frequency` and `stub`; `"imm"` is rejected by `build()`.
+        /// Set the contractual date regime of the coupon schedule (required).
+        /// @param value - `"standard"` for the CDS roll dates (20th of Mar, Jun, Sep, Dec), which pay quarterly, or `"bespoke"` for a schedule from `frequency` and `stub`.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        roll_rule as rollRule: "NonNullable<generated.valuations.CdsTranche['roll_rule']>" => js_wire,
+        date_regime as dateRegime: "generated.valuations.CdsTranche['date_regime']" => js_wire,
         /// Set the stub convention for a bespoke coupon schedule.
-        /// @param value - Stub rule used when `roll_rule` is `"none"`; `"short_front"` when never set.
+        /// @param value - Stub rule of a bespoke schedule; `"short_front"` when never set.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         stub as stub: "NonNullable<generated.valuations.CdsTranche['stub']>" => js_wire,

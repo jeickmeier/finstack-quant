@@ -7,7 +7,6 @@ import json
 
 import pytest
 
-from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.money import Money
@@ -144,7 +143,7 @@ class TestCdsTrancheTyped:
             .side("receive")
             .start_date(datetime.date(2024, 6, 20))
             .realized_loss(0.01)
-            .roll_rule(RollRule.NONE)
+            .date_regime("bespoke")
             .build()
         )
         payload = json.loads(tranche.to_json())

@@ -148,7 +148,7 @@
         "side": "pay",
         "start_date": "2006-09-01",
         "realized_loss": 0.0,
-        "roll_rule": "none",
+        "date_regime": "bespoke",
         "attributes": {
           "tags": [
             "golden"

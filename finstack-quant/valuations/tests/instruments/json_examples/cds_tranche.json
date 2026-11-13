@@ -7,6 +7,7 @@
       "calendar_id": null,
       "coupon_bp": 100.0,
       "credit_index_id": "CDX.NA.IG.HAZARD",
+      "date_regime": "standard",
       "day_count": "act_360",
       "detach_pct": 3.0,
       "discount_curve_id": "USD-OIS",
@@ -22,11 +23,10 @@
         "currency": "USD"
       },
       "realized_loss": 0.0,
-      "roll_rule": "cds_imm",
       "series": 42,
       "side": "pay",
       "start_date": null,
-      "stub": "short_back",
+      "stub": "short_front",
       "upfront": null
     },
     "type": "cds_tranche"

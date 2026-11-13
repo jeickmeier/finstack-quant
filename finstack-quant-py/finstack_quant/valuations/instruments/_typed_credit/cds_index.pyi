@@ -778,7 +778,6 @@ class CdsIndexBuilder:
     ...     PremiumLegSpec,
     ...     ProtectionLegSpec,
     ... )
-    >>> from finstack_quant.cashflows.builder import RollRule
     >>> premium = PremiumLegSpec(
     ...     start=datetime.date(2024, 3, 20),
     ...     end=datetime.date(2029, 6, 20),
@@ -786,7 +785,7 @@ class CdsIndexBuilder:
     ...     day_count=DayCount.ACT_360,
     ...     coupon_bp="100",
     ...     discount_curve_id="USD-OIS",
-    ...     roll_rule=RollRule.CDS_IMM,
+    ...     date_regime="standard",
     ... )
     >>> index = (
     ...     CdsIndex

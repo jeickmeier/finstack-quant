@@ -13948,6 +13948,17 @@ export type CatchUpMode = "full" | "partial";
  */
 export type CdsConvention = "isda_na" | "isda_eu" | "isda_as" | "custom";
 /**
+ * Named contractual date regime of a CDS product (record
+ * CALIBRATION-FRAMEWORK-007, O7).
+ *
+ * The regime owns how the premium grid, its stub and its endpoints are
+ * derived; no regime is inferred and none is a default.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "CdsDateRegime".
+ */
+export type CdsDateRegime = "standard" | "bespoke";
+/**
  * Typed CDS-option strike: forward-spread or clean-price convention.
  *
  * Wire format: externally tagged JSON — `{"spread": "0.0325"}` or
@@ -15236,18 +15247,13 @@ export type ReturnFloorKind =
  *   `ScheduleBuilder::imm`. The contractual start and maturity are always
  *   kept, so an off-cycle date becomes a stub period, and a schedule with no
  *   IMM date strictly inside it is a single period.
- * - **`CdsImm`**: the ISDA standard CDS grid: 20th of Mar/Jun/Sep/Dec,
- *   quarterly with a short final stub, overriding the configured `frequency`
- *   and `stub`. When the start date is not itself a roll date, the first
- *   period accrues from the roll date immediately **preceding** the start
- *   (standard front accrual per the ISDA Big Bang Protocol, April 2009).
- *   Interior coupon or payment-program windows start at their declared
- *   boundary; front accrual is applied only once at the instrument start.
  *
- * Explicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA
- * supports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is
- * rejected because the available ICMA reference calculation requires nominal
- * month-grid coupons.
+ * There is no generic CDS grid: a CDS product selects its own named date
+ * regime (record CALIBRATION-FRAMEWORK-007, O7).
+ *
+ * An IMM roll grid cannot be combined with `end_of_month`. Third-Wednesday
+ * IMM with ACT/ACT ICMA is rejected because the available ICMA reference
+ * calculation requires nominal month-grid coupons.
  *
  * # Examples
  *
@@ -15266,7 +15272,7 @@ export type ReturnFloorKind =
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "RollRule".
  */
-export type RollRule = "none" | "imm" | "cds_imm";
+export type RollRule = "none" | "imm";
 /**
  * Settlement type for options
  *
@@ -15763,18 +15769,13 @@ export type D_305C1A38Cfd98Cc3Ea44 =
  *   `ScheduleBuilder::imm`. The contractual start and maturity are always
  *   kept, so an off-cycle date becomes a stub period, and a schedule with no
  *   IMM date strictly inside it is a single period.
- * - **`CdsImm`**: the ISDA standard CDS grid: 20th of Mar/Jun/Sep/Dec,
- *   quarterly with a short final stub, overriding the configured `frequency`
- *   and `stub`. When the start date is not itself a roll date, the first
- *   period accrues from the roll date immediately **preceding** the start
- *   (standard front accrual per the ISDA Big Bang Protocol, April 2009).
- *   Interior coupon or payment-program windows start at their declared
- *   boundary; front accrual is applied only once at the instrument start.
  *
- * Explicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA
- * supports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is
- * rejected because the available ICMA reference calculation requires nominal
- * month-grid coupons.
+ * There is no generic CDS grid: a CDS product selects its own named date
+ * regime (record CALIBRATION-FRAMEWORK-007, O7).
+ *
+ * An IMM roll grid cannot be combined with `end_of_month`. Third-Wednesday
+ * IMM with ACT/ACT ICMA is rejected because the available ICMA reference
+ * calculation requires nominal month-grid coupons.
  *
  * # Examples
  *
@@ -15793,7 +15794,7 @@ export type D_305C1A38Cfd98Cc3Ea44 =
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "d_41e4cae128a1dd3269e5".
  */
-export type D_41E4Cae128A1Dd3269E5 = "none" | "imm" | "cds_imm";
+export type D_41E4Cae128A1Dd3269E5 = "none" | "imm";
 /**
  * Asset dynamics specification for the Merton model.
  *
@@ -15934,18 +15935,13 @@ export type D_780B68Ee5D41351B65Ca =
  *   `ScheduleBuilder::imm`. The contractual start and maturity are always
  *   kept, so an off-cycle date becomes a stub period, and a schedule with no
  *   IMM date strictly inside it is a single period.
- * - **`CdsImm`**: the ISDA standard CDS grid: 20th of Mar/Jun/Sep/Dec,
- *   quarterly with a short final stub, overriding the configured `frequency`
- *   and `stub`. When the start date is not itself a roll date, the first
- *   period accrues from the roll date immediately **preceding** the start
- *   (standard front accrual per the ISDA Big Bang Protocol, April 2009).
- *   Interior coupon or payment-program windows start at their declared
- *   boundary; front accrual is applied only once at the instrument start.
  *
- * Explicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA
- * supports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is
- * rejected because the available ICMA reference calculation requires nominal
- * month-grid coupons.
+ * There is no generic CDS grid: a CDS product selects its own named date
+ * regime (record CALIBRATION-FRAMEWORK-007, O7).
+ *
+ * An IMM roll grid cannot be combined with `end_of_month`. Third-Wednesday
+ * IMM with ACT/ACT ICMA is rejected because the available ICMA reference
+ * calculation requires nominal month-grid coupons.
  *
  * # Examples
  *
@@ -15964,7 +15960,7 @@ export type D_780B68Ee5D41351B65Ca =
  * This interface was referenced by `SharedDefs`'s JSON-Schema
  * via the `definition` "d_7bbbddac6f6b1d1f4de1".
  */
-export type D_7Bbbddac6F6B1D1F4De1 = "none" | "imm" | "cds_imm";
+export type D_7Bbbddac6F6B1D1F4De1 = "none" | "imm";
 /**
  * Finite JSON number in the open interval `(0, 1)`.
  *
@@ -16665,6 +16661,7 @@ export interface SharedDefs {
   CatchUpMode?: CatchUpMode;
   CccBucketRule?: CccBucketRule;
   CdsConvention?: CdsConvention;
+  CdsDateRegime?: CdsDateRegime;
   CdsDocClause?: CdsDocClause;
   CdsIndex?: CdsIndex;
   CdsIndexConstituent?: CdsIndexConstituent;
@@ -22403,17 +22400,16 @@ export interface FixedCouponSpec {
   payment_lag_days?: number;
   rate: Decimal2;
   /**
-   * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
+   * Roll-date rule for schedule anchors (plain or standard IMM grid).
    *
    * [`RollRule::None`] (default) keeps plain tenor stepping.
    * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-   * [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
-   * a regular anchor on a CDS roll date. See [`RollRule`].
+   * See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
    */
-  roll_rule?: "none" | "imm" | "cds_imm";
+  roll_rule?: "none" | "imm";
   /**
    * Stub-handling rule used when the start/end dates do not fit an exact
    * whole number of periods.
@@ -22494,17 +22490,16 @@ export interface FloatingCouponSpec {
   payment_lag_days?: number;
   rate_spec: FloatingRateSpec;
   /**
-   * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
+   * Roll-date rule for schedule anchors (plain or standard IMM grid).
    *
    * [`RollRule::None`] (default) keeps plain tenor stepping.
    * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-   * [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
-   * a regular anchor on a CDS roll date. See [`RollRule`].
+   * See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
    */
-  roll_rule?: "none" | "imm" | "cds_imm";
+  roll_rule?: "none" | "imm";
   /**
    * Stub-handling rule used when the start/end dates do not fit an exact
    * whole number of periods.
@@ -22757,17 +22752,16 @@ export interface StepUpCouponSpec {
    */
   payment_lag_days?: number;
   /**
-   * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
+   * Roll-date rule for schedule anchors (plain or standard IMM grid).
    *
    * [`RollRule::None`] (default) keeps plain tenor stepping.
    * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-   * [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
-   * a regular anchor on a CDS roll date. See [`RollRule`].
+   * See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
    */
-  roll_rule?: "none" | "imm" | "cds_imm";
+  roll_rule?: "none" | "imm";
   /**
    * Step schedule: (effective_date, new_rate). Must be sorted by date.
    * Each entry sets the rate from that date forward until the next step.
@@ -39161,21 +39155,19 @@ export interface PremiumLegSpec {
    */
   calendar_id?: Id9 | null;
   coupon_bp: Decimal30;
+  /**
+   * Contractual date regime of the premium schedule: `standard` CDS roll
+   * dates or a `bespoke` schedule from `frequency` and `stub`.
+   */
+  date_regime: "standard" | "bespoke";
   day_count: DayCount31;
   discount_curve_id: Id96;
   end: Date85;
   frequency: Tenor16;
-  /**
-   * Premium roll-date grid. `cds_imm` selects the standard quarterly CDS
-   * roll grid (20 March, June, September and December), including a final
-   * maturity stub, and requires quarterly `frequency` and `short_front`
-   * `stub`. `none` generates a bespoke schedule from the supplied
-   * `frequency` and `stub`. The equity-futures `imm` grid is rejected.
-   */
-  roll_rule: "none" | "imm" | "cds_imm";
   start: Date86;
   /**
-   * Stub convention
+   * Stub convention of a bespoke schedule; the standard regime owns its
+   * own stub.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
@@ -39589,21 +39581,19 @@ export interface PremiumLegSpec1 {
    */
   calendar_id?: Id9 | null;
   coupon_bp: Decimal30;
+  /**
+   * Contractual date regime of the premium schedule: `standard` CDS roll
+   * dates or a `bespoke` schedule from `frequency` and `stub`.
+   */
+  date_regime: "standard" | "bespoke";
   day_count: DayCount31;
   discount_curve_id: Id96;
   end: Date85;
   frequency: Tenor16;
-  /**
-   * Premium roll-date grid. `cds_imm` selects the standard quarterly CDS
-   * roll grid (20 March, June, September and December), including a final
-   * maturity stub, and requires quarterly `frequency` and `short_front`
-   * `stub`. `none` generates a bespoke schedule from the supplied
-   * `frequency` and `stub`. The equity-futures `imm` grid is rejected.
-   */
-  roll_rule: "none" | "imm" | "cds_imm";
   start: Date86;
   /**
-   * Stub convention
+   * Stub convention of a bespoke schedule; the standard regime owns its
+   * own stub.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
@@ -39671,6 +39661,13 @@ export interface CdsTranche {
    */
   coupon_bp: number;
   credit_index_id: Id100;
+  /**
+   * Contractual date regime of the coupon schedule (record
+   * CALIBRATION-FRAMEWORK-007, O7): `standard` CDS roll dates (20th of Mar,
+   * Jun, Sep, Dec) from an on-roll accrual start, or a `bespoke` schedule
+   * from `frequency` and `stub`. Required; there is no default regime.
+   */
+  date_regime: "standard" | "bespoke";
   day_count: DayCount32;
   /**
    * Detachment point in percent (e.g., 3.0 for 0-3% tranche)
@@ -39692,13 +39689,6 @@ export interface CdsTranche {
    * the original portfolio notional, in `[0, 1]`.
    */
   realized_loss: number;
-  /**
-   * Coupon roll-date grid. `cds_imm` selects the standard CDS roll dates
-   * (20th of Mar, Jun, Sep, Dec); `none` (the default) generates a bespoke
-   * schedule from `frequency` and `stub`. The equity-futures `imm` grid is
-   * rejected. Use [`Self::standard`] for the IMM constructor.
-   */
-  roll_rule?: "none" | "imm" | "cds_imm";
   scenario_pricing_overrides?: ScenarioPricingOverrides31;
   /**
    * Series number (e.g., 37)
@@ -39714,8 +39704,8 @@ export interface CdsTranche {
    */
   start_date?: Date | null;
   /**
-   * Stub convention for a bespoke (`roll_rule = none`) coupon schedule.
-   * Defaults to `short_front`.
+   * Stub convention of a bespoke coupon schedule; the standard regime owns
+   * its own stub. Defaults to `short_front`.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
   /**
@@ -49934,17 +49924,16 @@ export interface ScheduleParams {
    */
   payment_lag_days?: number;
   /**
-   * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
+   * Roll-date rule for schedule anchors (plain or standard IMM grid).
    *
    * [`RollRule::None`] (default) keeps plain tenor stepping.
    * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-   * [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
-   * a regular anchor on a CDS roll date. See [`RollRule`].
+   * See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
    */
-  roll_rule?: "none" | "imm" | "cds_imm";
+  roll_rule?: "none" | "imm";
   /**
    * Stub-handling rule used when the start/end dates do not fit an exact
    * whole number of periods.
@@ -58066,21 +58055,19 @@ export interface PremiumLegSpec2 {
    */
   calendar_id?: Id9 | null;
   coupon_bp: Decimal30;
+  /**
+   * Contractual date regime of the premium schedule: `standard` CDS roll
+   * dates or a `bespoke` schedule from `frequency` and `stub`.
+   */
+  date_regime: "standard" | "bespoke";
   day_count: DayCount31;
   discount_curve_id: Id96;
   end: Date85;
   frequency: Tenor16;
-  /**
-   * Premium roll-date grid. `cds_imm` selects the standard quarterly CDS
-   * roll grid (20 March, June, September and December), including a final
-   * maturity stub, and requires quarterly `frequency` and `short_front`
-   * `stub`. `none` generates a bespoke schedule from the supplied
-   * `frequency` and `stub`. The equity-futures `imm` grid is rejected.
-   */
-  roll_rule: "none" | "imm" | "cds_imm";
   start: Date86;
   /**
-   * Stub convention
+   * Stub convention of a bespoke schedule; the standard regime owns its
+   * own stub.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
 }
@@ -58553,17 +58540,16 @@ export interface ScheduleParams1 {
    */
   payment_lag_days?: number;
   /**
-   * Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
+   * Roll-date rule for schedule anchors (plain or standard IMM grid).
    *
    * [`RollRule::None`] (default) keeps plain tenor stepping.
    * [`RollRule::Imm`] rolls on IMM dates at `frequency` with `stub`;
-   * [`RollRule::CdsImm`] rolls on CDS dates at `frequency` with `stub`, from
-   * a regular anchor on a CDS roll date. See [`RollRule`].
+   * See [`RollRule`].
    *
    * Serialized only when not `None`, so existing wire payloads are
    * unchanged.
    */
-  roll_rule?: "none" | "imm" | "cds_imm";
+  roll_rule?: "none" | "imm";
   /**
    * Stub-handling rule used when the start/end dates do not fit an exact
    * whole number of periods.

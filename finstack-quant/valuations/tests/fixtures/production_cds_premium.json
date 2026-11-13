@@ -24,7 +24,7 @@
           "coupon_bp": "100",
           "start": "2025-01-01",
           "stub": "short_front",
-          "roll_rule": "none"
+          "date_regime": "bespoke"
         },
         "protection_leg": {
           "credit_curve_id": "HZ",

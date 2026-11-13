@@ -151,7 +151,9 @@ fn credit_coupon_anchors_follow_trade_date_across_all_quarterly_rolls() {
             let tranche_instrument = build_cds_tranche_instrument(
                 &tranche_quote,
                 &ctx,
-                &CdsTrancheBuildOverrides::default(),
+                &CdsTrancheBuildOverrides::for_regime(
+                    finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+                ),
             )
             .unwrap();
             let tranche = tranche_instrument;

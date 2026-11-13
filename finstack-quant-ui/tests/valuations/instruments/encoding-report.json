@@ -7100,6 +7100,7 @@
           { "pointer": "#/$defs/RepoType", "keyword": "oneOf" },
           { "pointer": "#/$defs/CdsConvention", "keyword": "oneOf" },
           { "pointer": "#/$defs/CdsDocClause", "keyword": "oneOf" },
+          { "pointer": "#/$defs/CdsDateRegime", "keyword": "oneOf" },
           { "pointer": "#/$defs/CdsValuationConvention", "keyword": "oneOf" },
           { "pointer": "#/$defs/IndexPricing", "keyword": "oneOf" },
           {
@@ -10521,9 +10522,9 @@
           { "pointer": "#/$defs/d_f80f2b90e7af690c5898", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_b556bbeb1ecf96c44c5a", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_01cd6b2e4ad257352fdb", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_8078aa9a0733228e6e46", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_c0401254ec268b317b65", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_69148dfad1155676d8a6", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_265d9a24c72cc01c3986", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_ae08d495fff86ea9db9a", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_86136b061c9def2cf9ef", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_4ef216f41776daf2c898", "keyword": "oneOf" }
@@ -11291,6 +11292,7 @@
         ],
         "unit-union": [
           { "pointer": "#/$defs/d_01cd6b2e4ad257352fdb", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_059dd6944ea1ab49bdde", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_c0401254ec268b317b65", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_69148dfad1155676d8a6", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_02a11b30ee627630f221", "keyword": "oneOf" },
@@ -11304,7 +11306,6 @@
           { "pointer": "#/$defs/d_f80f2b90e7af690c5898", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_b556bbeb1ecf96c44c5a", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_9bbbe0cc70b45831cb71", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_0fb63ab4f431d629f4d9", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_28b6523781fb1d76052d", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_824f38e62e355eadf8d3", "keyword": "oneOf" }
         ]
@@ -18804,6 +18805,7 @@
           { "pointer": "#/$defs/RepoType", "keyword": "oneOf" },
           { "pointer": "#/$defs/CdsConvention", "keyword": "oneOf" },
           { "pointer": "#/$defs/CdsDocClause", "keyword": "oneOf" },
+          { "pointer": "#/$defs/CdsDateRegime", "keyword": "oneOf" },
           { "pointer": "#/$defs/CdsValuationConvention", "keyword": "oneOf" },
           { "pointer": "#/$defs/IndexPricing", "keyword": "oneOf" },
           {
@@ -19993,9 +19995,9 @@
           { "pointer": "#/$defs/d_f80f2b90e7af690c5898", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_b556bbeb1ecf96c44c5a", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_01cd6b2e4ad257352fdb", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_c1d0ca0f757ac92424ce", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_c0401254ec268b317b65", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_69148dfad1155676d8a6", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_c4f0f60f0c3e41bff146", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_6284e2184ff1857156bd", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_29d331bec2302fab708a", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_340600459464be36bb01", "keyword": "oneOf" }

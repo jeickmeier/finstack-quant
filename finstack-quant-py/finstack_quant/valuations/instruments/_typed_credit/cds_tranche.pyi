@@ -5,7 +5,6 @@ from __future__ import annotations
 import datetime
 from typing import Any, Literal
 import pandas as pd
-from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.dates import BusinessDayConvention, DayCount, StubKind, Tenor
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
@@ -645,15 +644,15 @@ class CdsTranche:
         """
         ...
     @property
-    def roll_rule(self) -> RollRule:
+    def date_regime(self) -> str:
         """
-        Coupon roll-date grid.
+        Contractual date regime of the coupon schedule.
 
         Returns
         -------
-        RollRule
-            ``RollRule.CDS_IMM`` for the CDS roll dates (20th of Mar/Jun/Sep/Dec);
-            ``RollRule.NONE`` for a bespoke ``frequency``/``stub`` schedule.
+        str
+            ``"standard"`` for the CDS roll dates (20th of Mar/Jun/Sep/Dec);
+            ``"bespoke"`` for a ``frequency``/``stub`` schedule.
 
         Notes
         -----
@@ -663,7 +662,7 @@ class CdsTranche:
     @property
     def stub(self) -> StubKind:
         """
-        Stub convention for a bespoke (``RollRule.NONE``) coupon schedule.
+        Stub convention for a bespoke coupon schedule.
 
         Returns
         -------
@@ -740,8 +739,8 @@ class CdsTrancheBuilder:
     Fluent builder for :class:`CdsTranche`; wraps the Rust
     ``FinancialBuilder`` output one setter for one setter.
 
-    The builder pre-seeds ``realized_loss(0.0)``; ``roll_rule`` defaults to
-    ``RollRule.NONE``, ``stub`` to ``"short_front"`` and
+    The builder pre-seeds ``realized_loss(0.0)``; ``date_regime`` is
+    required, ``stub`` defaults to ``"short_front"`` and
     ``business_day_convention`` to
     ``"modified_following"``. Builders are consumed by ``build()``; create a
     new builder per instrument. Required fields: ``id``, ``index_name``,
@@ -1086,7 +1085,7 @@ class CdsTrancheBuilder:
         Parameters
         ----------
         value : datetime.date | datetime.datetime | pd.Timestamp | str
-            Effective date; if never set, uses the as-of date (or the prior CDS roll date when ``roll_rule`` is ``RollRule.CDS_IMM``).
+            Effective date. Required for the bespoke regime; under the standard regime it defaults to the CDS roll date on or before the valuation date and must be a roll date.
 
         Returns
         -------
@@ -1119,16 +1118,16 @@ class CdsTrancheBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def roll_rule(self, value: RollRule) -> CdsTrancheBuilder:
+    def date_regime(self, value: Literal["standard", "bespoke"]) -> CdsTrancheBuilder:
         """
-        Set the coupon roll-date grid.
+        Set the contractual date regime of the coupon schedule.
 
         Parameters
         ----------
-        value : RollRule
-            ``RollRule.CDS_IMM`` for the CDS roll dates (20th of Mar, Jun, Sep,
-            Dec) or ``RollRule.NONE`` (the default) for a schedule from
-            ``frequency`` and ``stub``; ``RollRule.IMM`` is rejected by ``build()``.
+        value : str
+            ``"standard"`` for the CDS roll dates (20th of Mar, Jun, Sep, Dec),
+            which pay quarterly, or ``"bespoke"`` for a schedule from
+            ``frequency`` and ``stub``. Required.
 
         Returns
         -------
@@ -1138,7 +1137,7 @@ class CdsTrancheBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed by ``build()``.
+            If the builder was already consumed by ``build()`` or the regime is unknown.
         """
         ...
     def stub(
@@ -1150,7 +1149,7 @@ class CdsTrancheBuilder:
         Parameters
         ----------
         value : StubKind | str
-            Stub rule used when ``roll_rule`` is ``RollRule.NONE``; ``"short_front"`` when never set.
+            Stub rule of a bespoke schedule; ``"short_front"`` when never set.
 
         Returns
         -------

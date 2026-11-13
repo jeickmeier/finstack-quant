@@ -15,7 +15,6 @@
 //!   anchored on a month-end regular endpoint (an off-grid anchor is an error)
 //! - **IMM mode**: a quarterly IMM grid (third Wednesday of Mar/Jun/Sep/Dec),
 //!   anchored on an IMM regular endpoint (an off-grid anchor is an error)
-//! - **CDS IMM mode**: Credit default swap quarterly schedules (20th of Mar/Jun/Sep/Dec)
 //! - **Payment / fixing lag**: optional business-day offsets from each period end
 //!   (payments) or period start (fixings)
 //! - **Deterministic**: Same inputs always produce identical outputs

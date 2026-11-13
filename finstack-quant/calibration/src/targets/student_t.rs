@@ -215,7 +215,9 @@ impl StudentTTarget {
         let tranche = build_cds_tranche_instrument(
             &tranche_quote,
             &build_context,
-            &CdsTrancheBuildOverrides::default(),
+            &CdsTrancheBuildOverrides::for_regime(
+                finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+            ),
         )?;
 
         let calibrator = Self::new(params.clone(), pricing_context, global_config.clone())?;
@@ -455,7 +457,9 @@ mod tests {
                 1.0 / (quote.detachment - quote.attachment),
                 curve_ids,
             ),
-            &CdsTrancheBuildOverrides::default(),
+            &CdsTrancheBuildOverrides::for_regime(
+                finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
+            ),
         )
         .expect("quote-built unit-notional tranche")
     }

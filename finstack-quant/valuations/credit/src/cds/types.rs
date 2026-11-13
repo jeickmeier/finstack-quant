@@ -343,7 +343,7 @@ impl CreditDefaultSwap {
             .side(PayReceive::Pay)
             .convention(convention)
             .premium_leg(PremiumLegSpec {
-                roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
+                date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
                 start: date!(2024 - 03 - 20),
                 end: date!(2029 - 03 - 20),
                 frequency,
@@ -412,7 +412,7 @@ impl CreditDefaultSwap {
             side,
             convention,
             premium_leg: PremiumLegSpec {
-                roll_rule: finstack_quant_cashflows::builder::RollRule::CdsImm,
+                date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime::Standard,
                 start,
                 end,
                 frequency,
@@ -462,11 +462,10 @@ impl CreditDefaultSwap {
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::types::CurveId;
-    /// use finstack_quant_cashflows::builder::RollRule;
     /// use finstack_quant_valuations_core::constants::isda::STANDARD_RECOVERY_SENIOR;
     /// use finstack_quant_valuations_core::market::conventions::CdsConvention;
     /// use finstack_quant_valuations_credit::cds::CreditDefaultSwap;
-    /// use finstack_quant_valuations_core::instruments::{PayReceive, PremiumLegSpec, ProtectionLegSpec};
+    /// use finstack_quant_valuations_core::instruments::{CdsDateRegime, PayReceive, PremiumLegSpec, ProtectionLegSpec};
     /// use finstack_quant_core::types::Attributes;
     /// use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
     /// use rust_decimal::Decimal;
@@ -479,7 +478,7 @@ impl CreditDefaultSwap {
     ///     .side(PayReceive::Pay)
     ///     .convention(CdsConvention::IsdaNa)
     ///     .premium_leg(PremiumLegSpec {
-    ///         roll_rule: RollRule::CdsImm,
+    ///         date_regime: CdsDateRegime::Standard,
     ///         start: date!(2024 - 03 - 20),
     ///         end: date!(2029 - 03 - 20),
     ///         frequency: CdsConvention::IsdaNa.get_spec().expect("CDS registry").frequency,
@@ -644,8 +643,8 @@ impl CreditDefaultSwap {
     /// This is **not** a pricing entry point; it is a schedule helper that
     /// exposes the convention-driven coupon dates used by the CDS pricer.
     ///
-    /// - With `premium.roll_rule = cds_imm`, dates use the prescribed quarterly
-    ///   CDS 20th grid. Bespoke legs use `premium.frequency` and `premium.stub`.
+    /// - With `premium.date_regime = standard`, dates use the quarterly CDS
+    ///   20th grid. Bespoke legs use `premium.frequency` and `premium.stub`.
     /// - Payments use the instrument calendar and business-day convention;
     ///   absent calendars leave payment dates unadjusted.
     /// - The returned schedule includes the start date and the (possibly adjusted)

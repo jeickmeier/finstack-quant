@@ -18,7 +18,6 @@ import pickle
 
 import pytest
 
-from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, StubKind, Tenor
 from finstack_quant.core.market_data import (
@@ -268,7 +267,7 @@ def test_leg_specs_pickle_round_trip() -> None:
         day_count=DayCount.ACT_360,
         coupon_bp="100",
         discount_curve_id="USD-OIS",
-        roll_rule=RollRule.CDS_IMM,
+        date_regime="standard",
     )
     protection = ProtectionLegSpec("ACME-HZD", 0.4, 3)
     for leg in (fixed, floating, premium, protection):
@@ -293,7 +292,7 @@ def test_leg_spec_decimal_fields_take_exact_decimal_strings() -> None:
         day_count=DayCount.ACT_360,
         coupon_bp="100",
         discount_curve_id="USD-OIS",
-        roll_rule=RollRule.CDS_IMM,
+        date_regime="standard",
     )
     assert premium.coupon_bp == pytest.approx(100.0)
     # One spelling per value: a float, a ``Rate`` or a percent label is not the

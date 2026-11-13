@@ -14,7 +14,6 @@ use crate::api::market_datum::MarketDatum;
 use crate::api::prior_market::PriorMarketObject;
 use crate::config::{CalibrationConfig, CalibrationMethod, RatesStepConventions};
 use crate::quotes::QuoteId;
-use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_core::config::ResultsMeta;
 use finstack_quant_core::contract::{
     ContractDescriptor, ContractError, Diagnostic, LoadLimits, LoadPhase, Severity,
@@ -1090,12 +1089,11 @@ pub struct BaseCorrelationParams {
     /// every quote must match one point and every point must be quoted.
     #[serde(default)]
     pub detachment_points: Vec<f64>,
-    /// Coupon roll-date grid for the synthetic tranches: `cds_imm` for the
-    /// standard CDS roll dates (20th of Mar/Jun/Sep/Dec) or `none` (the
-    /// default) for a schedule generated from the convention frequency and
-    /// stub. `imm` is rejected.
-    #[serde(default)]
-    pub roll_rule: RollRule,
+    /// Contractual date regime of the synthetic tranches (record
+    /// CALIBRATION-FRAMEWORK-007, O7): `standard` CDS roll dates (20th of
+    /// Mar/Jun/Sep/Dec) or `bespoke` for a schedule from the convention
+    /// frequency and stub. Required; there is no default regime.
+    pub date_regime: finstack_quant_valuations_core::instruments::CdsDateRegime,
 }
 
 /// Parameters for Student-t copula degrees of freedom calibration.

@@ -19,7 +19,6 @@ import pickle
 import pytest
 
 from finstack_quant.calibration import calibrate
-from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import (
@@ -126,7 +125,7 @@ def _cds_legs() -> tuple[PremiumLegSpec, ProtectionLegSpec]:
         day_count=DayCount.ACT_360,
         coupon_bp="100",
         discount_curve_id="USD-OIS",
-        roll_rule=RollRule.CDS_IMM,
+        date_regime="standard",
     )
     return premium, ProtectionLegSpec("CORP-HAZARD", 0.4, 3)
 
@@ -344,6 +343,7 @@ class TestCdsTranche:
             .side("pay")
             .upfront(("2024-06-25", Money(100_000.0, USD)))
             .attributes(Attributes())
+            .date_regime("bespoke")
             .build()
         )
         assert tranche.coupon_bp == 100.0

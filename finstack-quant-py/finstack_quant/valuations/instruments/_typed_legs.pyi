@@ -5,7 +5,6 @@ from __future__ import annotations
 import datetime
 from decimal import Decimal
 from typing import Any, Literal
-from finstack_quant.cashflows.builder import RollRule
 from finstack_quant.core.dates import DayCount, StubKind, Tenor
 
 class FixedLegSpec:
@@ -836,7 +835,6 @@ class PremiumLegSpec:
 
     Examples
     --------
-    >>> from finstack_quant.cashflows.builder import RollRule
     >>> from finstack_quant.core.dates import DayCount, Tenor
     >>> from finstack_quant.valuations.instruments import PremiumLegSpec
     >>> leg = PremiumLegSpec(
@@ -846,7 +844,7 @@ class PremiumLegSpec:
     ...     day_count=DayCount.ACT_360,
     ...     coupon_bp="100",
     ...     discount_curve_id="USD-OIS",
-    ...     roll_rule=RollRule.CDS_IMM,
+    ...     date_regime="standard",
     ... )
     >>> leg.coupon_bp
     100.0
@@ -861,7 +859,7 @@ class PremiumLegSpec:
         day_count: DayCount | str,
         coupon_bp: Decimal | str,
         discount_curve_id: str,
-        roll_rule: RollRule | str,
+        date_regime: Literal["standard", "bespoke"],
         stub: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"] = "short_front",
         business_day_convention: str = "modified_following",
         calendar_id: str | None = None,
@@ -889,11 +887,11 @@ class PremiumLegSpec:
             (``"100"`` = 100bp = 1%); a ``float`` or ``Bps`` is rejected.
         discount_curve_id : str
             Discount curve identifier for pricing this leg.
-        roll_rule : RollRule | str
-            ``RollRule.CDS_IMM`` for the prescribed quarterly CDS 20th dates
-            (requires quarterly frequency and a short-front stub at pricing).
-            ``RollRule.NONE`` generates a bespoke schedule from ``frequency``
-            and ``stub``. ``RollRule.IMM`` is rejected at pricing.
+        date_regime : str
+            ``"standard"`` for the quarterly CDS 20th dates from the roll on
+            or before ``start`` (requires quarterly frequency; the regime owns
+            the stub), or ``"bespoke"`` for a schedule from ``frequency`` and
+            ``stub``. Required; there is no default regime.
         stub : StubKind | str, default "short_front"
             Stub period handling rule.
         business_day_convention : str, default "modified_following"
@@ -913,8 +911,7 @@ class PremiumLegSpec:
 
         Examples
         --------
-        >>> from finstack_quant.cashflows.builder import RollRule
-        >>> from finstack_quant.core.dates import DayCount, Tenor
+            >>> from finstack_quant.core.dates import DayCount, Tenor
         >>> from finstack_quant.valuations.instruments import PremiumLegSpec
         >>> leg = PremiumLegSpec(
         ...     start="2024-03-20",
@@ -923,7 +920,7 @@ class PremiumLegSpec:
         ...     day_count=DayCount.ACT_360,
         ...     coupon_bp="100",
         ...     discount_curve_id="USD-OIS",
-        ...     roll_rule=RollRule.CDS_IMM,
+        ...     date_regime="standard",
         ... )
         >>> leg.discount_curve_id
         'USD-OIS'
@@ -953,8 +950,7 @@ class PremiumLegSpec:
 
         Examples
         --------
-        >>> from finstack_quant.cashflows.builder import RollRule
-        >>> from finstack_quant.core.dates import DayCount, Tenor
+            >>> from finstack_quant.core.dates import DayCount, Tenor
         >>> from finstack_quant.valuations.instruments import PremiumLegSpec
         >>> leg = PremiumLegSpec(
         ...     start="2024-03-20",
@@ -963,7 +959,7 @@ class PremiumLegSpec:
         ...     day_count=DayCount.ACT_360,
         ...     coupon_bp="100",
         ...     discount_curve_id="USD-OIS",
-        ...     roll_rule=RollRule.CDS_IMM,
+        ...     date_regime="standard",
         ... )
         >>> PremiumLegSpec.from_json(leg.to_json()).coupon_bp
         100.0
@@ -1015,18 +1011,19 @@ class PremiumLegSpec:
         """
         ...
     @property
-    def roll_rule(self) -> RollRule:
-        """Premium roll-date grid.
+    def date_regime(self) -> str:
+        """Contractual date regime of the premium schedule.
 
         Returns
         -------
-        RollRule
-            ``RollRule.CDS_IMM`` for the standard CDS roll grid;
-            ``RollRule.NONE`` for bespoke frequency/stub dates.
+        str
+            ``"standard"`` for the quarterly CDS roll dates (20th of
+            Mar/Jun/Sep/Dec) or ``"bespoke"`` for a schedule from
+            ``frequency`` and ``stub``.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored rule.
+        This accessor does not raise; it returns the stored regime.
         """
         ...
 

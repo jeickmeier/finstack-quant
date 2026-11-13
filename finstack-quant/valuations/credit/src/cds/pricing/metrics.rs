@@ -3,13 +3,13 @@
 
 use super::engine::{AodInputs, CdsPricer, CouponPeriod};
 use crate::cds::CreditDefaultSwap;
-use finstack_quant_cashflows::builder::RollRule;
 use finstack_quant_core::dates::{Date, DayCountContext, Schedule, StubKind, Tenor};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::units::{BASIS_POINTS_PER_UNIT, ONE_BASIS_POINT};
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations_core::constants::{credit, numerical};
+use finstack_quant_valuations_core::instruments::CdsDateRegime;
 use rust_decimal::prelude::ToPrimitive;
 
 /// Day-count policy applied when measuring premium accrual from the most
@@ -35,23 +35,19 @@ pub(crate) enum AccrualDayCountPolicy {
 impl CdsPricer {
     /// Generate contractual accrual and payment dates from the premium terms.
     fn premium_schedule(&self, cds: &CreditDefaultSwap) -> Result<Schedule> {
-        let builder = match cds.premium_leg.roll_rule {
-            RollRule::CdsImm => {
-                if cds.premium_leg.frequency != Tenor::quarterly()
-                    || cds.premium_leg.stub != StubKind::ShortFront
-                {
+        let builder = match cds.premium_leg.date_regime {
+            CdsDateRegime::Standard => {
+                if cds.premium_leg.frequency != Tenor::quarterly() {
                     return Err(Error::Validation(
-                        "premium.roll_rule = cds_imm requires quarterly frequency and \
-                         short-front stub; set premium.roll_rule = none for bespoke \
-                         premium terms"
+                        "premium.date_regime = standard requires quarterly frequency; set \
+                         premium.date_regime = bespoke for bespoke premium terms"
                             .into(),
                     ));
                 }
-                // The standard grid runs quarterly on CDS roll dates from the
-                // roll on or before the premium start; the schedule generator
-                // substitutes no start, so the product states that anchor
-                // (record CORE-CONVENTIONS-008). Its short-back generation is
-                // the existing behaviour; the complete CDS date regime is E4b.
+                // The standard regime runs quarterly on CDS roll dates from the
+                // roll on or before the premium start, with a short final period
+                // for an off-grid maturity; it owns that stub (record
+                // CALIBRATION-FRAMEWORK-007, O7).
                 let anchor = if finstack_quant_core::dates::is_cds_date(cds.premium_leg.start) {
                     cds.premium_leg.start
                 } else {
@@ -61,13 +57,10 @@ impl CdsPricer {
                     .frequency(Tenor::quarterly())
                     .stub_rule(StubKind::ShortBack)
             }
-            RollRule::None => Schedule::builder(cds.premium_leg.start, cds.premium_leg.end)?
-                .frequency(cds.premium_leg.frequency)
-                .stub_rule(cds.premium_leg.stub),
-            other => {
-                return Err(Error::Validation(format!(
-                    "premium.roll_rule must be cds_imm or none for CDS premium legs, got {other:?}"
-                )));
+            CdsDateRegime::Bespoke => {
+                Schedule::builder(cds.premium_leg.start, cds.premium_leg.end)?
+                    .frequency(cds.premium_leg.frequency)
+                    .stub_rule(cds.premium_leg.stub)
             }
         };
         let mut builder = builder.grid(finstack_quant_core::dates::GridMode::Natural);

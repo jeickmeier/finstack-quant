@@ -70,12 +70,13 @@ fn create_tranche(attach_pct: f64, detach_pct: f64, tenor_years: i32) -> CdsTran
         format!("CDX_IG42_{}_{}_{}", attach_pct, detach_pct, tenor_years),
         &tranche_params,
         &schedule_params,
+        finstack_quant_valuations_core::instruments::CdsDateRegime::Bespoke,
         "USD-OIS",
         "CDX.NA.IG.42",
         PayReceive::Receive,
     )
     .expect("Valid tranche parameters");
-    tranche.roll_rule = finstack_quant_cashflows::builder::RollRule::CdsImm;
+    tranche.date_regime = finstack_quant_valuations_core::instruments::CdsDateRegime::Standard;
     tranche.stub = finstack_quant_core::dates::StubKind::ShortBack;
     tranche
 }

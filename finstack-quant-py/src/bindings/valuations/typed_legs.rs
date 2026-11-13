@@ -9,7 +9,6 @@
 use pyo3::prelude::*;
 use rust_decimal::prelude::ToPrimitive;
 
-use crate::bindings::cashflows::builder::specs::PyRollRule;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
@@ -321,7 +320,7 @@ impl PyPremiumLegSpec {
     #[new]
     #[pyo3(
         signature = (**fields),
-        text_signature = "(*, start, end, frequency, day_count, coupon_bp, discount_curve_id, roll_rule, stub='short_front', business_day_convention='modified_following', calendar_id=None)"
+        text_signature = "(*, start, end, frequency, day_count, coupon_bp, discount_curve_id, date_regime, stub='short_front', business_day_convention='modified_following', calendar_id=None)"
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
         let inner: finstack_quant_valuations::instruments::PremiumLegSpec =
@@ -387,8 +386,8 @@ discount_curve_id={:?}, stub={:?}, business_day_convention={:?}, calendar_id={})
 }
 
 crate::bindings::macros::py_getters!(PyPremiumLegSpec |s| {
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.roll_rule")]
-    roll_rule -> PyRollRule = PyRollRule { inner: s.inner.roll_rule };
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.date_regime")]
+    date_regime -> String = s.inner.date_regime.to_string();
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "PremiumLegSpec.frequency")]
     frequency -> PyTenor = PyTenor::from_inner(s.inner.frequency);

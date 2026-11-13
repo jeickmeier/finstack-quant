@@ -176,7 +176,7 @@ class TestBuilderSpecs:
         assert CouponType.CASH is not None
         assert CouponType.PIK is not None
         assert CouponType.split(Decimal("0.5"), Decimal("0.5")) is not None
-        assert RollRule.NONE != RollRule.CDS_IMM
+        assert RollRule.NONE != RollRule.IMM
         assert PrincipalExchange.NONE != PrincipalExchange.INITIAL_AND_FINAL
 
     def test_amortization_and_notional(self) -> None:

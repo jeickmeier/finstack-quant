@@ -261,7 +261,7 @@ pub fn calibration_step_swaption_vol(
 ///   - `day_count` (string | null, optional, default `null`): Premium accrual day count (convention default).
 ///   - `business_day_convention` (string | null, optional, default `null`): Schedule business-day convention.
 ///   - `calendar_id` (string | null, optional, default `null`): Holiday calendar for schedule generation.
-///   - `roll_rule` (string, optional, default `"none"`): Coupon roll grid: `"cds_imm"` (20 Mar/Jun/Sep/Dec) or `"none"`; `"imm"` is rejected.
+///   - `date_regime` (string, required): Contractual date regime of the synthetic tranches: `"standard"` CDS roll dates (20 Mar/Jun/Sep/Dec) or `"bespoke"`.
 /// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
 /// @returns A `CalibrationStep` object with `kind: "base_correlation"`.
 ///

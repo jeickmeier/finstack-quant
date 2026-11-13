@@ -18,10 +18,9 @@ use wasm_bindgen::prelude::*;
 
 /// Build a cashflow schedule from a JSON spec and return canonical schedule JSON.
 ///
-/// IMM/CDS IMM roll rules use quarterly accrual and short-back stubs, regardless
-/// of the supplied frequency/stub. IMM retains contractual maturity through a
-/// terminal stub. Both modes reject end-of-month rolling; ACT/ACT ICMA rejects
-/// third-Wednesday IMM but supports CDS IMM. Plain ACT/ACT ICMA end-of-month
+/// The IMM roll rule rolls on third Wednesdays at the supplied frequency and
+/// stub, keeps the contractual maturity through a terminal stub and rejects
+/// end-of-month rolling; ACT/ACT ICMA rejects it. Plain ACT/ACT ICMA end-of-month
 /// schedules require a month-end regular anchor (maturity for front stubs,
 /// start otherwise); the opposite endpoint may be irregular. Negative payment
 /// and reset lags are rejected.

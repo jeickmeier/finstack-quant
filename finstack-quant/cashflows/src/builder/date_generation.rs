@@ -14,7 +14,7 @@ use super::specs::RollRule;
 use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DateExt, DayCount, GridMode, HolidayCalendar, Schedule, StubKind,
-    Tenor, TenorUnit, adjust, is_cds_date, is_imm_date, next_cds_date, prev_cds_date,
+    Tenor, TenorUnit, adjust, is_imm_date,
 };
 
 /// Reject convention combinations that cannot supply an unambiguous ICMA grid.
@@ -26,7 +26,7 @@ use finstack_quant_core::dates::{
 /// * `stub` - Effective stub convention after resolving an explicit roll grid.
 /// * `end_of_month` - Whether intermediate nominal dates roll to month-end.
 /// * `day_count` - Coupon accrual convention whose reference-grid requirements are checked.
-/// * `roll_rule` - Plain month grid, CDS twentieth grid, or third-Wednesday IMM grid.
+/// * `roll_rule` - Plain month grid or third-Wednesday IMM grid.
 pub(crate) fn validate_accrual_grid(
     start: Date,
     end: Date,
@@ -37,7 +37,7 @@ pub(crate) fn validate_accrual_grid(
 ) -> finstack_quant_core::Result<()> {
     if end_of_month && !matches!(roll_rule, RollRule::None) {
         return Err(finstack_quant_core::Error::Validation(
-            "end_of_month cannot be combined with an IMM or CDS IMM roll grid".into(),
+            "end_of_month cannot be combined with an IMM roll grid".into(),
         ));
     }
     if day_count == DayCount::ActActIsma {
@@ -115,10 +115,9 @@ pub(crate) fn is_regular_period(accrual_start: Date, accrual_end: Date, frequenc
 ///
 /// * `accrual_start` - Unadjusted coupon start, including any interior program cut.
 /// * `accrual_end` - Unadjusted coupon end before payment-date adjustment.
-/// * `frequency` - Effective nominal coupon tenor, quarterly for CDS IMM.
+/// * `frequency` - Nominal coupon tenor.
 /// * `stub` - Selects the adjacent reference coupon for a plain-grid stub.
 /// * `end_of_month` - Whether a plain-grid reference date must retain month-end rolling.
-/// * `roll_rule` - CDS IMM uses the twentieth grid even for a clipped front coupon.
 ///
 /// # Errors
 ///
@@ -129,16 +128,7 @@ pub(crate) fn icma_coupon_period(
     frequency: Tenor,
     stub: StubKind,
     end_of_month: bool,
-    roll_rule: RollRule,
 ) -> finstack_quant_core::Result<(Date, Date)> {
-    if matches!(roll_rule, RollRule::CdsImm) {
-        let reference_start = if is_cds_date(accrual_start) {
-            accrual_start
-        } else {
-            prev_cds_date(accrual_start)?
-        };
-        return Ok((reference_start, next_cds_date(reference_start)?));
-    }
     if is_regular_period(accrual_start, accrual_end, frequency) {
         return Ok((accrual_start, accrual_end));
     }
@@ -271,7 +261,6 @@ pub(crate) fn compile_periods(
             let end = period.unadjusted_end;
             let is_stub = match roll_rule {
                 RollRule::Imm => !is_regular_imm_period(start, end, frequency),
-                RollRule::CdsImm => !is_cds_date(start) || next_cds_date(start).ok() != Some(end),
                 RollRule::None => !is_regular_period(start, end, frequency),
             };
             CompiledPeriod { period, is_stub }
@@ -366,11 +355,6 @@ pub(crate) fn generate_periods(
 /// `stub` (`GridMode::QuarterlyImm`; the regular anchor must be an IMM date),
 /// and `end_of_month` selects `GridMode::EndOfMonth` (a month-end anchor);
 /// the two together are an error.
-/// `RollRule::CdsImm` rolls on CDS dates (the 20th of March, June,
-/// September and December) at the leg's own `frequency` and `stub`; the
-/// regular anchor (`start` for back or no stub, `end` for front stubs) must
-/// itself be a CDS roll date, since none is substituted (record
-/// CORE-CONVENTIONS-008).
 pub(crate) fn generate_periods_with_adjustment(
     params: &BuildPeriodsParams<'_>,
 ) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
@@ -410,23 +394,6 @@ pub(crate) fn generate_periods_with_adjustment(
         .stub_rule(stub)
         .grid(grid)
         .unadjusted();
-    // A CDS grid is the natural grid from a regular anchor on a CDS roll
-    // date (the start for back stubs, the end for front stubs); no anchor is
-    // substituted (record CORE-CONVENTIONS-008).
-    if matches!(roll_rule, RollRule::CdsImm) {
-        let anchor = if matches!(stub, StubKind::ShortFront | StubKind::LongFront) {
-            end
-        } else {
-            start
-        };
-        if !is_cds_date(anchor) {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "a cds_imm roll rule needs its regular anchor ({anchor}, the {} with a {stub} \
-                 stub) on a CDS roll date (20 Mar/Jun/Sep/Dec)",
-                if anchor == end { "end" } else { "start" }
-            )));
-        }
-    }
     let cal = calendar_by_id_strict(calendar_id)?;
     // A built schedule always has at least two grid dates (record
     // CORE-CONVENTIONS-008 #13), so there is no empty-period fallback.
