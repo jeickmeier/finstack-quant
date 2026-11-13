@@ -7,8 +7,11 @@
 
 ## Summary
 
-**Run complete (2026-11-13).** Final gate: see the closing line of this
-section. Nothing pushed or merged; everything is on
+**Run complete (2026-11-13). Final gate: `mise run all` pass** at
+`99d7b96b0c` (nextest 16,406 passed / 196 skipped; Python 14,072 passed /
+112 skipped; WASM Node 1,086 passed; UI 1,535 passed; audit clean after the
+soupsieve bump). Rust doctests, the slow tier and the Linux container run are
+outside this gate (see the last paragraph). Nothing pushed or merged; everything is on
 `refactor/core-conventions-reconciliation` (rebased onto local `master`
 during the run; see Baseline).
 
