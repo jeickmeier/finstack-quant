@@ -116,7 +116,7 @@ impl<'a> ModelTimeSeries for StatementsAdapter<'a> {
 /// builder.periods("2025Q1..Q2", None)?;
 /// let model = builder.build()?;
 /// let results = StatementResult {
-///     periods: model.periods.clone(),
+///     periods: Some(model.periods.clone()),
 ///     nodes: IndexMap::from([(
 ///         "leverage".to_string(),
 ///         IndexMap::from([
