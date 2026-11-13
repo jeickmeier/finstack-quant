@@ -104,7 +104,7 @@ or `dict` rather than re-parsing a `ValuationResult`.
 - **Units come from Rust.** A metric's unit family is read from the result
   (`ValuationResult.metric_units()`), never from a Python table; only display labels
   live here. Shares and rolling windows are likewise read from Rust
-  (`PnlAttribution.pct_of_total`, `PeriodKind.periods_per_year`).
+  (`PnlAttribution.pct_of_total`, `PeriodKind.annualization_factor`).
 - **Provenance is read, never asserted.** A numeric-mode header line comes from the
   result's own stamp (`StatementResult` `meta.numeric_mode`, `ValuationResult`
   meta); a sheet whose input carries no stamp prints none.

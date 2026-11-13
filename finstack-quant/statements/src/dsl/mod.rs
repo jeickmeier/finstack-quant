@@ -35,7 +35,7 @@
 //! | `coalesce(expr, default, ...)` | 2+ | First finite argument, or NaN when every argument is non-finite. |
 //! | `lag(expr, n)`, `shift(expr, n)` | 2 | Historical expression lookup by calendar-period offset, preserving missing slots. `lag` requires a non-negative offset; negative `shift` returns NaN to prohibit forward-looking reads. Fiscal daily and weekly model timelines are supported, including leap days and shortened fiscal weeks. |
 //! | `diff(expr[, n])`, `pct_change(expr[, n])` | 1-2 | Difference or percentage change versus `n` periods ago, defaulting to 1. Missing or near-zero denominators return NaN. |
-//! | `growth_rate(expr[, periods])` | 1-2 | Compound annual growth rate in decimal units, `(current / prior)^(1 / years) - 1`, over a positive integer calendar-period offset. Missing observations or a non-positive prior value return NaN. The default lookback is the frequency's periods per year (252 daily, 52 weekly, 12 monthly, 4 quarterly, 2 semiannual, 1 annual). Monthly/quarterly/semiannual/annual years equal offset divided by frequency; daily/weekly years use Actual/Actual ISDA between the final included dates of the two periods. |
+//! | `growth_rate(expr, periods)` | 2 | Compound annual growth rate in decimal units, `(current / prior)^(1 / years) - 1`, over a required positive integer calendar-period offset (no default lookback). Missing observations or a non-positive prior value return NaN. Monthly/quarterly/semiannual/annual years equal the offset divided by the periods in a year (12, 4, 2, 1); daily/weekly years use Actual/Actual ISDA between the final included dates of the two periods. |
 //! | `cumsum(expr)`, `cumprod(expr)`, `cummin(expr)`, `cummax(expr)` | 1 | Cumulative aggregate through the current period, skipping non-finite values. |
 //! | `rolling_mean(expr, window[, min_periods])`, `rolling_sum(expr, window[, min_periods])`, `rolling_std(expr, window[, min_periods])`, `rolling_var(expr, window[, min_periods])`, `rolling_median(expr, window[, min_periods])`, `rolling_min(expr, window[, min_periods])`, `rolling_max(expr, window[, min_periods])`, `rolling_count(expr, window[, min_periods])` | 2-3 | Rolling-window aggregate over finite observations. `min_periods` defaults to `window` (pandas parity): a window with fewer finite observations returns NaN. Pass a smaller `min_periods` for expanding-until-full behavior. |
 //! | `std(expr)`, `var(expr)`, `median(expr)` | 1 | Historical distribution statistic over finite observations available through the current period. |
@@ -47,7 +47,7 @@
 //! | `ytd(expr)` | 1 | Calendar year-to-date finite sum. |
 //! | `qtd(expr)` | 1 | Quarter-to-date finite sum for monthly models. |
 //! | `fiscal_ytd(expr, start_month)` | 2 | Fiscal year-to-date finite sum using a 1-12 fiscal start month. |
-//! | `annualize(expr[, periods])` | 1-2 | Scale a period value to an annual amount. Defaults to the current period frequency. |
+//! | `annualize(expr, annualization_factor)` | 2 | Scale a period value to an annual amount by a required positive annualization factor; none is inferred from the period frequency. |
 //! | `annualize_rate(rate, periods_per_year, compounding)` | 3 | Annualize a periodic decimal rate using the supplied positive periods per year. `compounding = 0` multiplies the rate by periods per year; any non-zero flag computes `(1 + rate)^periods_per_year - 1`. |
 //!
 //! `lead(...)` is intentionally not available because forward-looking formulas

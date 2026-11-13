@@ -519,9 +519,9 @@ fn compile_function_call(func_name: &str, args: &[StmtExpr]) -> Result<Expr> {
                 }
             }
             Function::Annualize => {
-                if compiled_args.is_empty() || compiled_args.len() > 2 {
+                if compiled_args.len() != 2 {
                     return Err(crate::error::Error::eval(
-                        "annualize() requires 1 or 2 arguments (value, [periods_per_year])",
+                        "annualize() requires 2 arguments (value, annualization_factor)",
                     ));
                 }
             }
@@ -540,9 +540,9 @@ fn compile_function_call(func_name: &str, args: &[StmtExpr]) -> Result<Expr> {
                 }
             }
             Function::GrowthRate => {
-                if compiled_args.is_empty() || compiled_args.len() > 2 {
+                if compiled_args.len() != 2 {
                     return Err(crate::error::Error::eval(
-                        "growth_rate() requires 1 or 2 arguments (series, [periods])",
+                        "growth_rate() requires 2 arguments (series, periods)",
                     ));
                 }
             }

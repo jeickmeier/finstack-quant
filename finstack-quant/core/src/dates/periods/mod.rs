@@ -28,13 +28,11 @@ use time::Month;
 /// Period frequency type.
 ///
 /// Defines the frequency of periodic schedules (cashflow rolls, return-series
-/// resampling, statement reporting). Each variant carries an implied
-/// "periods-per-year" used by [`PeriodKind::periods_per_year`] and by
-/// downstream annualization helpers in `finstack-quant-analytics`.
-///
-/// `Daily` follows the trading-day convention (252 per year), not the
-/// calendar-day convention (365 per year). Use `Weekly` if you need
-/// calendar-week granularity.
+/// resampling, statement reporting). Two different yearly counts exist:
+/// [`PeriodKind::annualization_factor`] is the conventional statistical
+/// factor for explicitly selected observations (daily trading 252), and
+/// [`PeriodKind::slots_per_year`] is the calendar partition count, defined
+/// only for the month-block kinds (record CORE-CONVENTIONS-014 #9).
 ///
 /// Parses only the canonical snake_case wire values via [`std::str::FromStr`]:
 /// `daily`, `weekly`, `monthly`, `quarterly`, `semi_annual`, and `annual`.
@@ -108,56 +106,37 @@ impl PeriodKind {
         }
     }
 
-    /// Get the number of periods per year for this frequency.
+    /// Conventional statistical annualization factor for observations
+    /// explicitly selected at this frequency.
     ///
-    /// # Returns
-    /// - Daily: 252 (trading-day convention)
-    /// - Quarterly: 4
-    /// - Monthly: 12
-    /// - Weekly: 52
-    /// - Semi-Annual: 2
-    /// - Annual: 1
-    pub const fn periods_per_year(self) -> u16 {
+    /// Daily trading 252, weekly 52, monthly 12, quarterly 4, semi-annual 2,
+    /// annual 1. It scales return statistics only: it is not an observed
+    /// count, a calendar check, an LTM length, a payment frequency or a
+    /// conversion of dated time (use [`PeriodKind::slots_per_year`] for
+    /// calendar partitions).
+    pub const fn annualization_factor(self) -> u16 {
         match self {
             PeriodKind::Daily => 252,
-            PeriodKind::Quarterly => 4,
-            PeriodKind::Monthly => 12,
             PeriodKind::Weekly => 52,
+            PeriodKind::Monthly => 12,
+            PeriodKind::Quarterly => 4,
             PeriodKind::SemiAnnual => 2,
             PeriodKind::Annual => 1,
         }
     }
 
-    /// Observation date immediately before `first` at this frequency.
+    /// Number of periods of this kind in every year, Gregorian or fiscal.
     ///
-    /// Reconstructs the synthetic prior price date so a return-aligned
-    /// panel has a holding period of one frequency step, independent of
-    /// irregular gaps in the observed date grid.
-    ///
-    /// - Daily: one calendar day before `first`
-    /// - Weekly: seven calendar days before `first`
-    /// - Monthly / quarterly / semi-annual / annual: step back 1 / 3 / 6 /
-    ///   12 months, clamping to the last valid day of the target month
-    ///
-    /// # Arguments
-    ///
-    /// * `first` - First return-aligned observation date in the series.
-    ///
-    /// # Returns
-    ///
-    /// The prior observation date.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error if subtracting the observation period underflows the calendar.
-    pub fn prior_observation_date(self, first: Date) -> crate::Result<Date> {
+    /// Monthly 12, quarterly 4, semi-annual 2, annual 1. `None` for daily
+    /// and weekly periods, whose count depends on the year and calendar
+    /// (365 or 366 days; 52 or 53 weeks).
+    pub const fn slots_per_year(self) -> Option<u16> {
         match self {
-            Self::Daily => first.add_days(-1),
-            Self::Weekly => first.add_days(-7),
-            Self::Monthly => first.add_months(-1),
-            Self::Quarterly => first.add_months(-3),
-            Self::SemiAnnual => first.add_months(-6),
-            Self::Annual => first.add_months(-12),
+            PeriodKind::Daily | PeriodKind::Weekly => None,
+            PeriodKind::Monthly => Some(12),
+            PeriodKind::Quarterly => Some(4),
+            PeriodKind::SemiAnnual => Some(2),
+            PeriodKind::Annual => Some(1),
         }
     }
 
@@ -166,7 +145,10 @@ impl PeriodKind {
         match self {
             PeriodKind::Daily => 366,
             PeriodKind::Weekly => 53,
-            _ => self.periods_per_year(),
+            PeriodKind::Monthly => 12,
+            PeriodKind::Quarterly => 4,
+            PeriodKind::SemiAnnual => 2,
+            PeriodKind::Annual => 1,
         }
     }
 }
@@ -225,9 +207,7 @@ impl PeriodId {
                 }
                 _ => {
                     let mut index = 1;
-                    while index < kind.periods_per_year()
-                        && date >= calendar.bounds(year, kind, index)?.1
-                    {
+                    while index < kind.capacity() && date >= calendar.bounds(year, kind, index)?.1 {
                         index += 1;
                     }
                     index

@@ -1252,8 +1252,8 @@
     "kind": "class",
     "constructor": false,
     "statics": ["annual", "daily", "fromName", "monthly", "quarterly", "semiAnnual", "weekly"],
-    "methods": ["free", "priorObservationDate", "toString"],
-    "getters": ["periodsPerYear"]
+    "methods": ["free", "toString"],
+    "getters": ["annualizationFactor", "slotsPerYear"]
   },
   "core.PeriodId": {
     "kind": "class",

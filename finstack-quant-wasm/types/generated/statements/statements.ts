@@ -2135,13 +2135,11 @@ export type TableColumnRole = "dimension" | "index" | "measure" | "attribute";
  * Period frequency type.
  *
  * Defines the frequency of periodic schedules (cashflow rolls, return-series
- * resampling, statement reporting). Each variant carries an implied
- * "periods-per-year" used by [`PeriodKind::periods_per_year`] and by
- * downstream annualization helpers in `finstack-quant-analytics`.
- *
- * `Daily` follows the trading-day convention (252 per year), not the
- * calendar-day convention (365 per year). Use `Weekly` if you need
- * calendar-week granularity.
+ * resampling, statement reporting). Two different yearly counts exist:
+ * [`PeriodKind::annualization_factor`] is the conventional statistical
+ * factor for explicitly selected observations (daily trading 252), and
+ * [`PeriodKind::slots_per_year`] is the calendar partition count, defined
+ * only for the month-block kinds (record CORE-CONVENTIONS-014 #9).
  *
  * Parses only the canonical snake_case wire values via [`std::str::FromStr`]:
  * `daily`, `weekly`, `monthly`, `quarterly`, `semi_annual`, and `annual`.

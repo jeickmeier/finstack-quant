@@ -196,18 +196,14 @@ pub(crate) fn eval_growth_rate(
     context: &mut EvaluationContext,
     node_id: Option<&str>,
 ) -> Result<f64> {
-    if args.is_empty() || args.len() > 2 {
+    if args.len() != 2 {
         return Err(eval_error(
             node_id,
-            "growth_rate() requires 1 or 2 arguments (series, [periods])",
+            "growth_rate() requires 2 arguments (series, periods)",
         ));
     }
 
-    let periods_raw = if args.len() == 2 {
-        evaluate_formula(&args[1], context, node_id)?
-    } else {
-        context.period_kind.periods_per_year() as f64
-    };
+    let periods_raw = evaluate_formula(&args[1], context, node_id)?;
 
     if !periods_raw.is_finite() || periods_raw <= 0.0 {
         return Err(eval_error(
@@ -284,7 +280,17 @@ pub(crate) fn eval_growth_rate(
             })?;
             DayCount::ActAct.year_fraction(start, end, DayCountContext::default())?
         }
-        _ => periods as f64 / f64::from(context.period_kind.periods_per_year()),
+        kind => {
+            // Month-block kinds partition every year into a fixed number of
+            // periods, so an offset converts to years exactly.
+            let slots = kind.slots_per_year().ok_or_else(|| {
+                eval_error(
+                    node_id,
+                    "growth_rate() month-block periods have a slot count",
+                )
+            })?;
+            periods as f64 / f64::from(slots)
+        }
     };
     if !elapsed_years.is_finite() || elapsed_years <= 0.0 {
         return Err(eval_error(

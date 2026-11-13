@@ -331,23 +331,22 @@ fn bucket_periods(periods: &[Period], target: PeriodKind) -> Result<Vec<Bucket>>
         )));
     }
     // Months, quarters, halves and years nest exactly; days and weeks do not.
-    let nested = [
-        PeriodKind::Monthly,
-        PeriodKind::Quarterly,
-        PeriodKind::SemiAnnual,
-        PeriodKind::Annual,
-    ];
-    if !nested.contains(&source)
-        || !nested.contains(&target)
-        || target.periods_per_year() >= source.periods_per_year()
-    {
+    let (Some(source_slots), Some(target_slots)) =
+        (source.slots_per_year(), target.slots_per_year())
+    else {
+        return Err(Error::invalid_input(format!(
+            "Cannot roll {source} periods up to {target} periods: only months, quarters, halves \
+             and years nest exactly"
+        )));
+    };
+    if target_slots >= source_slots {
         return Err(Error::invalid_input(format!(
             "Cannot roll {source} periods up to {target} periods: the target must be coarser \
              and hold a whole number of source periods (monthly into quarterly, semi-annual or \
              annual; quarterly into semi-annual or annual; semi-annual into annual)"
         )));
     }
-    let per_bucket = source.periods_per_year() / target.periods_per_year();
+    let per_bucket = source_slots / target_slots;
 
     let mut groups: IndexMap<PeriodId, Vec<&Period>> = IndexMap::new();
     for period in periods {

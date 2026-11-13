@@ -1327,34 +1327,34 @@ fn test_period_kind_accessor() {
 }
 
 #[test]
-fn test_periods_per_year() {
+fn test_slots_per_year() {
     assert_eq!(
         PeriodId::quarter(2025, 1)
             .expect("valid period fixture")
             .kind()
-            .periods_per_year(),
-        4
+            .slots_per_year(),
+        Some(4)
     );
     assert_eq!(
         PeriodId::month(2025, 1)
             .expect("valid period fixture")
             .kind()
-            .periods_per_year(),
-        12
+            .slots_per_year(),
+        Some(12)
     );
     assert_eq!(
         PeriodId::half(2025, 1)
             .expect("valid period fixture")
             .kind()
-            .periods_per_year(),
-        2
+            .slots_per_year(),
+        Some(2)
     );
     assert_eq!(
         PeriodId::annual(2025)
             .expect("valid annual period")
             .kind()
-            .periods_per_year(),
-        1
+            .slots_per_year(),
+        Some(1)
     );
 }
 

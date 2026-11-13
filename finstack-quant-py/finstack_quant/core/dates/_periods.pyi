@@ -19,13 +19,13 @@ class PeriodKind:
     Examples
     --------
     >>> from finstack_quant.core.dates import PeriodKind
-    >>> (str(PeriodKind.QUARTERLY), PeriodKind.QUARTERLY.periods_per_year)
+    >>> (str(PeriodKind.QUARTERLY), PeriodKind.QUARTERLY.annualization_factor)
     ('quarterly', 4)
 
     """
 
     DAILY: PeriodKind
-    """Daily periods (252 trading days per year)."""
+    """Daily periods (statistical annualization factor 252)."""
     WEEKLY: PeriodKind
     """Weekly periods."""
     MONTHLY: PeriodKind
@@ -69,50 +69,47 @@ class PeriodKind:
         ...
 
     @property
-    def periods_per_year(self) -> int:
+    def annualization_factor(self) -> int:
         """
-        Number of periods per year for this frequency.
+        Conventional statistical annualization factor for this frequency.
+
+        Daily trading 252, weekly 52, monthly 12, quarterly 4, semi-annual 2,
+        annual 1. It scales return statistics only: it is not an observed
+        count, a calendar check or an LTM length (use :attr:`slots_per_year`
+        for calendar partitions).
 
         Returns
         -------
         int
-            Number of periods per year for this frequency.
+            The statistical factor for observations at this frequency.
 
         Notes
         -----
-        This accessor does not raise; it returns the stored value.
+        This accessor does not raise; it returns a fixed value per kind.
         """
         ...
 
-    def prior_observation_date(self, first: datetime.date | str) -> datetime.date:
+    @property
+    def slots_per_year(self) -> int | None:
         """
-        Observation date one period before *first*.
-
-        Daily and weekly step back 1 and 7 calendar days; monthly, quarterly,
-        semi-annual and annual step back 1, 3, 6 and 12 months with month-end
-        clamping.
-
-        Parameters
-        ----------
-        first : datetime.date | str
-            First observation date of the series.
+        Number of periods of this kind in every year, Gregorian or fiscal.
 
         Returns
         -------
-        datetime.date
-            The prior observation date.
+        int | None
+            ``12``, ``4``, ``2`` or ``1`` for monthly, quarterly, semi-annual
+            and annual periods; ``None`` for daily and weekly periods, whose
+            count depends on the year and calendar.
 
-        Raises
-        ------
-        ValueError
-            If *first* is invalid or the prior observation date underflows the supported calendar.
+        Notes
+        -----
+        This accessor does not raise; it returns a fixed value per kind.
 
         Examples
         --------
         >>> from finstack_quant.core.dates import PeriodKind
-        >>> PeriodKind.QUARTERLY.prior_observation_date("2025-03-31")
-        datetime.date(2024, 12, 31)
-
+        >>> (PeriodKind.MONTHLY.slots_per_year, PeriodKind.DAILY.slots_per_year)
+        (12, None)
         """
         ...
 

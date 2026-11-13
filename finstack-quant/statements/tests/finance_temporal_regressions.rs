@@ -139,7 +139,9 @@ fn growth_rate_annualizes_quarterly_and_monthly_observations() {
                 .periods_explicit(fixture_plan(periods.clone()))
                 .unwrap();
             model_builder.value("x", &values);
-            model_builder.compute("default", "growth_rate(x)").unwrap();
+            model_builder
+                .compute("one_year", format!("growth_rate(x,{frequency})"))
+                .unwrap();
             model_builder
                 .compute("one_period", "growth_rate(x,1)")
                 .unwrap();
@@ -150,7 +152,7 @@ fn growth_rate_annualizes_quarterly_and_monthly_observations() {
         };
         let result = Evaluator::new().evaluate(&model).unwrap();
         let final_period = periods.last().unwrap().id;
-        for node in ["default", "one_period", "expression"] {
+        for node in ["one_year", "one_period", "expression"] {
             close(result.get(node, &final_period).unwrap(), 0.4641);
         }
     }

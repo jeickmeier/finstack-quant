@@ -22,7 +22,7 @@
       "type": "object"
     },
     "LeaseGrowthConvention": {
-      "description": "Convention that determines how `growth_rate` compounds in a lease.\n\n- `AnnualEscalator` (default): `growth_rate` is applied once per\n  **lease-start anniversary**, measured in model periods (every\n  `periods_per_year()` periods from the segment start). Matches Argus /\n  NCREIF annual bumps: rent is flat within a lease year and steps on the\n  anniversary. The bump counter resets at each rent step.\n- `PerPeriod`: `growth_rate` is applied every model period. Must be set\n  explicitly; omitted / defaulted values are never per-period.",
+      "description": "Convention that determines how `growth_rate` compounds in a lease.\n\n- `AnnualEscalator` (default): `growth_rate` is applied once per\n  **lease-start anniversary**, measured in model periods (every\n  `slots_per_year()` periods from the segment start; daily and weekly\n  models are rejected). Matches Argus /\n  NCREIF annual bumps: rent is flat within a lease year and steps on the\n  anniversary. The bump counter resets at each rent step.\n- `PerPeriod`: `growth_rate` is applied every model period. Must be set\n  explicitly; omitted / defaulted values are never per-period.",
       "oneOf": [
         {
           "const": "per_period",

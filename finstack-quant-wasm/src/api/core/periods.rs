@@ -4,11 +4,11 @@
 //! `Period` and `PeriodPlan` are plain data: they cross the boundary as plain
 //! objects typed by the schema-generated `Period` / `PeriodPlan` types.
 
-use crate::utils::input::{js_epoch_days, js_int, js_opt_string, js_string, js_uint};
+use crate::utils::input::{js_int, js_opt_string, js_string, js_uint};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::{
     FiscalConfig, PeriodId, PeriodKind, build_fiscal_periods as rust_build_fiscal_periods,
-    build_periods as rust_build_periods, days_since_epoch,
+    build_periods as rust_build_periods,
 };
 use wasm_bindgen::prelude::*;
 
@@ -22,8 +22,9 @@ use wasm_bindgen::prelude::*;
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
 /// const kind = core.PeriodKind.quarterly();
-/// kind.periodsPerYear; // 4
-/// kind.priorObservationDate(core.createDate(2025, 3, 31)); // 2024-12-31 as epoch days
+/// kind.annualizationFactor; // 4
+/// kind.slotsPerYear; // 4
+/// core.PeriodKind.daily().slotsPerYear; // undefined
 /// ```
 #[wasm_bindgen(js_name = PeriodKind)]
 #[derive(Clone, Copy, Debug)]
@@ -108,36 +109,26 @@ impl JsPeriodKind {
             .map_err(to_js_err)
     }
 
-    /// Number of periods per year (daily uses the 252 trading-day convention).
-    #[wasm_bindgen(getter, js_name = periodsPerYear)]
-    pub fn periods_per_year(&self) -> u16 {
-        self.inner.periods_per_year()
+    /// Conventional statistical annualization factor for observations at
+    /// this frequency (Rust `PeriodKind::annualization_factor`).
+    ///
+    /// @returns Daily trading 252, weekly 52, monthly 12, quarterly 4,
+    /// semi-annual 2, annual 1. It scales return statistics only; use
+    /// `slotsPerYear` for calendar partitions.
+    #[wasm_bindgen(getter, js_name = annualizationFactor)]
+    pub fn annualization_factor(&self) -> u16 {
+        self.inner.annualization_factor()
     }
 
-    /// Observation date one frequency step before `first` (Rust
-    /// `PeriodKind::prior_observation_date`).
+    /// Number of periods of this kind in every year, Gregorian or fiscal
+    /// (Rust `PeriodKind::slots_per_year`).
     ///
-    /// # Arguments
-    ///
-    /// * `first` - First return-aligned observation date, as days since
-    ///   1970-01-01.
-    ///
-    /// @returns The prior observation date as epoch days: one or seven calendar
-    /// days back for daily/weekly, otherwise 1/3/6/12 months back clamped to the
-    /// last valid day of the target month.
-    /// @throws `TypeError` if `first` is not an integer; `FinstackError` (kind
-    /// `validation`) if it is outside the supported date range.
-    /// @param first - First return-aligned observation date, as days since 1970-01-01.
-    #[wasm_bindgen(js_name = priorObservationDate)]
-    pub fn prior_observation_date(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "number")] first: JsValue,
-    ) -> Result<i32, JsValue> {
-        let first = js_epoch_days(&first, "first")?;
-        self.inner
-            .prior_observation_date(first)
-            .map(days_since_epoch)
-            .map_err(to_js_err)
+    /// @returns Monthly 12, quarterly 4, semi-annual 2, annual 1;
+    /// `undefined` for daily and weekly periods, whose count depends on the
+    /// year and calendar.
+    #[wasm_bindgen(getter, js_name = slotsPerYear)]
+    pub fn slots_per_year(&self) -> Option<u16> {
+        self.inner.slots_per_year()
     }
 
     /// Canonical snake_case name of the frequency.

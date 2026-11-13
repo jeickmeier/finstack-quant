@@ -1,6 +1,6 @@
 //! Python bindings for period types from [`finstack_quant_core::dates`].
 
-use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::date_utils::date_to_py;
 use crate::bindings::macros::{label_enum, wire_methods};
 use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
@@ -58,25 +58,16 @@ impl PyPeriodKind {
             .map_err(core_to_py)
     }
 
-    #[doc = pydoc!("finstack_quant.core.dates._periods", "PeriodKind.periods_per_year")]
+    #[doc = pydoc!("finstack_quant.core.dates._periods", "PeriodKind.annualization_factor")]
     #[getter]
-    fn periods_per_year(&self) -> u16 {
-        self.inner.periods_per_year()
+    fn annualization_factor(&self) -> u16 {
+        self.inner.annualization_factor()
     }
 
-    #[doc = pydoc!("finstack_quant.core.dates._periods", "PeriodKind.prior_observation_date")]
-    #[pyo3(text_signature = "(self, first)")]
-    fn prior_observation_date<'py>(
-        &self,
-        py: Python<'py>,
-        first: &Bound<'py, PyAny>,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        date_to_py(
-            py,
-            self.inner
-                .prior_observation_date(py_to_date(first)?)
-                .map_err(core_to_py)?,
-        )
+    #[doc = pydoc!("finstack_quant.core.dates._periods", "PeriodKind.slots_per_year")]
+    #[getter]
+    fn slots_per_year(&self) -> Option<u16> {
+        self.inner.slots_per_year()
     }
 }
 

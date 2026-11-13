@@ -102,7 +102,7 @@ pub fn ltm_window(target: PeriodId, plan: &PeriodPlan) -> crate::Result<LtmWindo
             Ok(LtmWindow { slots, missing })
         }
         kind => {
-            let count = i32::from(kind.periods_per_year());
+            let count = i32::from(kind.capacity());
             let mut window = LtmWindow {
                 slots: Vec::with_capacity(count as usize),
                 missing: 0,

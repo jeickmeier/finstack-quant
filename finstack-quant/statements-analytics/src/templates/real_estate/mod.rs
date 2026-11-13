@@ -318,7 +318,8 @@ impl RenewalSpec {
 ///
 /// - `AnnualEscalator` (default): `growth_rate` is applied once per
 ///   **lease-start anniversary**, measured in model periods (every
-///   `periods_per_year()` periods from the segment start). Matches Argus /
+///   `slots_per_year()` periods from the segment start; daily and weekly
+///   models are rejected). Matches Argus /
 ///   NCREIF annual bumps: rent is flat within a lease year and steps on the
 ///   anniversary. The bump counter resets at each rent step.
 /// - `PerPeriod`: `growth_rate` is applied every model period. Must be set
@@ -581,12 +582,13 @@ pub fn add_rent_roll(
         return Err(Error::build("add_rent_roll: expected at least one lease"));
     }
 
-    // Periods-per-year for annual escalator calculation.
-    let ppy = builder
+    // Periods in a lease year for the annual escalator: only month-block
+    // periods partition a year into a fixed count.
+    let slots_per_year = builder
         .periods_slice()
         .first()
-        .map(|p| p.id.kind().periods_per_year() as usize)
-        .unwrap_or(4);
+        .and_then(|p| p.id.kind().slots_per_year())
+        .map(usize::from);
 
     for lease in leases {
         lease.validate()?;
@@ -650,7 +652,15 @@ pub fn add_rent_roll(
             let periods_elapsed = idx.saturating_sub(base_idx);
             let raw_n = match lease.growth_convention {
                 LeaseGrowthConvention::PerPeriod => periods_elapsed,
-                LeaseGrowthConvention::AnnualEscalator => periods_elapsed / ppy,
+                LeaseGrowthConvention::AnnualEscalator => {
+                    let slots = slots_per_year.ok_or_else(|| {
+                        Error::build(
+                            "add_rent_roll: an annual escalator needs monthly, quarterly, \
+                             semi-annual or annual periods",
+                        )
+                    })?;
+                    periods_elapsed / slots
+                }
             };
             let n = checked_growth_exponent(raw_n as u32).map_err(|e| {
                 Error::build(format!(

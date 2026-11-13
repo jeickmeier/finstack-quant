@@ -382,7 +382,9 @@ for_all_functions! {
     Sum => ("sum", false),
     /// Average of multiple values, skipping NaN values.
     Mean => ("mean", false),
-    /// Annualize a flow value by multiplying by periods per year.
+    /// Annualize a flow value by multiplying by a required annualization
+    /// factor: `annualize(value, annualization_factor)`. No factor is
+    /// inferred from the period frequency.
     ///
     /// Use this for cash flows, income, and expense items.
     /// For periodic rates, use `AnnualizeRate` instead.
@@ -396,10 +398,12 @@ for_all_functions! {
     /// Use this for interest rates, returns, and growth rates.
     /// For cash flows, use `Annualize` instead.
     AnnualizeRate => ("annualize_rate", false),
-    /// Trailing twelve months over a window of `periods_per_year` periods.
+    /// Trailing twelve months: the twelve calendar months ending at the
+    /// period's end, stepped through the model's period plan
+    /// ([`crate::dates::ltm_window`]); weekly models are an error.
     ///
     /// Evaluated in the `statements` layer (not in `core::expr`), where the
-    /// period frequency (monthly, quarterly, etc.) is known.
+    /// period plan is known.
     Ttm => ("ttm", false),
     /// Calendar year-to-date sum.
     ///
@@ -435,7 +439,8 @@ for_all_functions! {
     Abs => ("abs", true),
     /// Sign helper returning -1, 0, or 1 (`sign(expr)`).
     Sign => ("sign", true),
-    /// Compound annual growth rate between current and lagged periods.
+    /// Compound annual growth rate between the current period and one a
+    /// required number of periods back: `growth_rate(series, periods)`.
     ///
     /// Evaluated in the statements layer where period spacing is known.
     GrowthRate => ("growth_rate", false),

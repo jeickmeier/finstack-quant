@@ -83,7 +83,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/performance.schema.json",
-      "bytes": 3739,
+      "bytes": 3722,
       "kind": "input",
       "path": "schemas/analytics/1/performance.schema.json",
       "summary": "Central performance analytics engine.",
@@ -92,7 +92,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/performance_panel.schema.json",
-      "bytes": 3738,
+      "bytes": 3721,
       "kind": "input",
       "path": "schemas/analytics/1/performance_panel.schema.json",
       "summary": "Dated price or return panel, one series per ticker, that a Performance is built from.",

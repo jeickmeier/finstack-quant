@@ -14,9 +14,10 @@ use finstack_quant_statements::types::NodeId;
 ///
 /// The burn node is interpreted as cash burn **per model period**; the
 /// runway is converted to months using the model's period cadence:
-/// `months = (cash / burn_per_period) * (12 / periods_per_year)` — e.g. a
+/// `months = (cash / burn_per_period) * (12 / slots_per_year)` — e.g. a
 /// quarterly model with `cash / burn = 2` periods of runway reports 6
-/// months.
+/// months. Daily and weekly models have no fixed month length, so the check
+/// errors on them.
 ///
 /// Periods with non-positive cash burn are skipped (the company is not
 /// burning cash).
@@ -65,9 +66,15 @@ impl Check for LiquidityRunwayCheck {
             }
 
             // `cash / burn` is the runway in *model periods*; convert to
-            // months using the period cadence (12 / periods_per_year).
-            let periods_per_year = f64::from(pid.kind().periods_per_year());
-            let months = (cash / burn) * (12.0 / periods_per_year);
+            // months with the calendar partition (12 / slots per year). Days
+            // and weeks have no fixed month length.
+            let slots = pid.kind().slots_per_year().ok_or_else(|| {
+                finstack_quant_statements::Error::invalid_input(format!(
+                    "liquidity runway in months needs monthly or coarser periods, not {}",
+                    pid.kind()
+                ))
+            })?;
+            let months = (cash / burn) * (12.0 / f64::from(slots));
 
             let severity = if months < self.min_months_error {
                 Some(Severity::Error)

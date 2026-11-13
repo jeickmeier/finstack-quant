@@ -1179,13 +1179,23 @@ mod tests {
 
         let value = evaluate_function(
             &Function::GrowthRate,
-            &[Expr::column("series")],
+            &[Expr::column("series"), Expr::literal(4.0)],
             &mut context,
             Some("series"),
         )
         .expect("growth_rate evaluation");
 
         assert!((value - 0.4641).abs() < 1e-6, "value={value}");
+        assert!(
+            evaluate_function(
+                &Function::GrowthRate,
+                &[Expr::column("series")],
+                &mut context,
+                Some("series"),
+            )
+            .is_err(),
+            "growth_rate() has no default lookback"
+        );
 
         let explicit = evaluate_function(
             &Function::GrowthRate,
@@ -1201,7 +1211,7 @@ mod tests {
     }
 
     #[test]
-    fn annualize_uses_period_kind_when_periods_missing() {
+    fn annualize_requires_an_explicit_factor() {
         let period = PeriodId::month(2025, 3).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             period,
@@ -1214,15 +1224,16 @@ mod tests {
             std::sync::Arc::new(IndexMap::new()),
         );
 
-        let default_factor = evaluate_function(
-            &Function::Annualize,
-            &[Expr::literal(2.5)],
-            &mut context,
-            Some("annualize"),
-        )
-        .expect("annualize default");
-
-        assert!((default_factor - 30.0).abs() < 1e-9);
+        assert!(
+            evaluate_function(
+                &Function::Annualize,
+                &[Expr::literal(2.5)],
+                &mut context,
+                Some("annualize"),
+            )
+            .is_err(),
+            "annualize() infers no factor from the period kind"
+        );
 
         let override_factor = evaluate_function(
             &Function::Annualize,

@@ -17954,7 +17954,7 @@ export default [
     "path": "#/$defs/Function/oneOf/27",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/27",
     "const": "annualize",
-    "description": "Annualize a flow value by multiplying by periods per year.\n\nUse this for cash flows, income, and expense items.\nFor periodic rates, use `AnnualizeRate` instead."
+    "description": "Annualize a flow value by multiplying by a required annualization\nfactor: `annualize(value, annualization_factor)`. No factor is\ninferred from the period frequency.\n\nUse this for cash flows, income, and expense items.\nFor periodic rates, use `AnnualizeRate` instead."
   },
   {
     "path": "#/$defs/Function/oneOf/28",
@@ -17966,7 +17966,7 @@ export default [
     "path": "#/$defs/Function/oneOf/29",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/29",
     "const": "ttm",
-    "description": "Trailing twelve months over a window of `periods_per_year` periods.\n\nEvaluated in the `statements` layer (not in `core::expr`), where the\nperiod frequency (monthly, quarterly, etc.) is known."
+    "description": "Trailing twelve months: the twelve calendar months ending at the\nperiod's end, stepped through the model's period plan\n([`crate::dates::ltm_window`]); weekly models are an error.\n\nEvaluated in the `statements` layer (not in `core::expr`), where the\nperiod plan is known."
   },
   {
     "path": "#/$defs/Function/oneOf/3",
@@ -18026,7 +18026,7 @@ export default [
     "path": "#/$defs/Function/oneOf/38",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/38",
     "const": "growth_rate",
-    "description": "Compound annual growth rate between current and lagged periods.\n\nEvaluated in the statements layer where period spacing is known."
+    "description": "Compound annual growth rate between the current period and one a\nrequired number of periods back: `growth_rate(series, periods)`.\n\nEvaluated in the statements layer where period spacing is known."
   },
   {
     "path": "#/$defs/Function/oneOf/39",

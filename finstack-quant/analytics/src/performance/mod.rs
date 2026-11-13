@@ -859,7 +859,7 @@ impl Performance {
     }
 
     fn ann(&self) -> finstack_quant_core::Result<f64> {
-        self.frequency.map(|frequency| f64::from(frequency.periods_per_year())).ok_or_else(|| {
+        self.frequency.map(|frequency| f64::from(frequency.annualization_factor())).ok_or_else(|| {
             finstack_quant_core::Error::Validation("explicit observation frequency is required for annualization or cash conversion".into())
         })
     }

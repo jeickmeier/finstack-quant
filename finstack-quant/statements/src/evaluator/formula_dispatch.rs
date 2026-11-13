@@ -356,35 +356,33 @@ fn eval_quantile(
 }
 
 /// Annualise a flow value (cash flows, income, expenses) by multiplying by
-/// periods-per-year. For periodic *rates*, use [`eval_annualize_rate`].
+/// the caller's explicit annualization factor; no factor is inferred from the
+/// period kind (record CORE-CONVENTIONS-014 #9, O8). For periodic *rates*,
+/// use [`eval_annualize_rate`].
 fn eval_annualize(
     args: &[Expr],
     context: &mut EvaluationContext,
     node_id: Option<&str>,
 ) -> Result<f64> {
-    if args.is_empty() || args.len() > 2 {
+    if args.len() != 2 {
         return Err(eval_error(
             node_id,
-            "annualize() requires 1 or 2 arguments (value, [periods_per_year])",
+            "annualize() requires 2 arguments (value, annualization_factor)",
         ));
     }
 
     let value = evaluate_formula(&args[0], context, node_id)?;
-    let periods_per_year = if args.len() == 2 {
-        evaluate_formula(&args[1], context, node_id)?
-    } else {
-        context.period_kind.periods_per_year() as f64
-    };
+    let factor = evaluate_formula(&args[1], context, node_id)?;
 
-    if value.is_nan() || periods_per_year.is_nan() {
+    if value.is_nan() || factor.is_nan() {
         Ok(f64::NAN)
-    } else if periods_per_year <= 0.0 {
+    } else if !(factor.is_finite() && factor > 0.0) {
         Err(eval_error(
             node_id,
-            "annualize() periods_per_year must be positive",
+            "annualize() annualization_factor must be positive and finite",
         ))
     } else {
-        Ok(value * periods_per_year)
+        Ok(value * factor)
     }
 }
 

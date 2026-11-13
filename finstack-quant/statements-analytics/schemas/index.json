@@ -272,7 +272,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lease_spec.schema.json",
-      "bytes": 6604,
+      "bytes": 6643,
       "kind": "input",
       "path": "schemas/statements_analytics/1/lease_spec.schema.json",
       "summary": "Richer lease spec for rent roll generation: - rent steps (explicit bumps) - arbitrary free-rent windows - optional renewal with downtime + probability",

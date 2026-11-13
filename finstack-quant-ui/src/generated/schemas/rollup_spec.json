@@ -52,7 +52,7 @@
       ]
     },
     "d_c3655ecfd9c3fc910677": {
-      "description": "Period frequency type.\n\nDefines the frequency of periodic schedules (cashflow rolls, return-series\nresampling, statement reporting). Each variant carries an implied\n\"periods-per-year\" used by [`PeriodKind::periods_per_year`] and by\ndownstream annualization helpers in `finstack-quant-analytics`.\n\n`Daily` follows the trading-day convention (252 per year), not the\ncalendar-day convention (365 per year). Use `Weekly` if you need\ncalendar-week granularity.\n\nParses only the canonical snake_case wire values via [`std::str::FromStr`]:\n`daily`, `weekly`, `monthly`, `quarterly`, `semi_annual`, and `annual`.\nAliases, whitespace padding and case variants are rejected.\n\nOrdering follows [`PeriodKind::rank`] (daily through annual). It is a\ndeterministic key order, not a chronology.",
+      "description": "Period frequency type.\n\nDefines the frequency of periodic schedules (cashflow rolls, return-series\nresampling, statement reporting). Two different yearly counts exist:\n[`PeriodKind::annualization_factor`] is the conventional statistical\nfactor for explicitly selected observations (daily trading 252), and\n[`PeriodKind::slots_per_year`] is the calendar partition count, defined\nonly for the month-block kinds (record CORE-CONVENTIONS-014 #9).\n\nParses only the canonical snake_case wire values via [`std::str::FromStr`]:\n`daily`, `weekly`, `monthly`, `quarterly`, `semi_annual`, and `annual`.\nAliases, whitespace padding and case variants are rejected.\n\nOrdering follows [`PeriodKind::rank`] (daily through annual). It is a\ndeterministic key order, not a chronology.",
       "oneOf": [
         {
           "const": "daily",

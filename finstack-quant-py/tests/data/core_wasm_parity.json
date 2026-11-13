@@ -660,9 +660,9 @@
     "2026M01",
     "2024Q4",
     "FY2026Q1",
-    52
+    52,
+    null
   ],
-  "period_kind_prior_observation_date": "2024-12-31",
   "prev_cds_date": "2024-12-20",
   "prev_cds_semiannual_roll": "2023-09-20",
   "price_curve": {

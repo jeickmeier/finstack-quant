@@ -77,7 +77,7 @@ impl PeriodCalendar {
         kind: PeriodKind,
         index: u16,
     ) -> crate::Result<(Date, Date)> {
-        let count = kind.periods_per_year();
+        let count = kind.capacity();
         if !(1..=count).contains(&index) {
             return Err(invalid_period(
                 &format!("{kind} {year} index {index}"),

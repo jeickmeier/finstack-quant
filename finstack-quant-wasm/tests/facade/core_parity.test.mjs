@@ -225,10 +225,9 @@ const CASES = {
     core.PeriodId.parse('FY2025Q4')
       .shift(1, { fiscal: { start_month: 10, start_day: 1 } })
       .toString(),
-    core.PeriodId.week(2025, 5).kind.periodsPerYear,
+    core.PeriodId.week(2025, 5).kind.annualizationFactor,
+    core.PeriodId.week(2025, 5).kind.slotsPerYear ?? null,
   ],
-  period_kind_prior_observation_date: () =>
-    iso(core.PeriodKind.quarterly().priorObservationDate(ep('2025-03-31'))),
   build_periods: () => core.buildPeriods('2025Q1..Q4', '2025Q2'),
   build_fiscal_periods: () => core.buildFiscalPeriods('FY2025Q1..Q2', usFederal),
   schedule: () => JSON.parse(schedule().toJson()),

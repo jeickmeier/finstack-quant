@@ -555,7 +555,8 @@ export type NodeType = "value" | "calculated" | "mixed";
  *
  * - `AnnualEscalator` (default): `growth_rate` is applied once per
  *   **lease-start anniversary**, measured in model periods (every
- *   `periods_per_year()` periods from the segment start). Matches Argus /
+ *   `slots_per_year()` periods from the segment start; daily and weekly
+ *   models are rejected). Matches Argus /
  *   NCREIF annual bumps: rent is flat within a lease year and steps on the
  *   anniversary. The bump counter resets at each rent step.
  * - `PerPeriod`: `growth_rate` is applied every model period. Must be set

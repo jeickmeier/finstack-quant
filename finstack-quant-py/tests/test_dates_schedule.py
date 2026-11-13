@@ -297,13 +297,15 @@ def test_period_plan_iteration_dataframe_and_ordering() -> None:
     assert frame["is_actual"].tolist() == [True, True, False, False]
     assert PeriodId.parse("2024Q1") < PeriodId.parse("2024Q2") <= PeriodId.parse("2024Q2")
     assert str(sorted([PeriodId.parse("2025M02"), PeriodId.parse("2024M12")])[0]) == "2024M12"
-    assert PeriodKind.QUARTERLY.prior_observation_date("2025-03-31") == date(2024, 12, 31)
     with pytest.raises(ValueError, match=r"'2024Q1\.\.2024M06'.*2024Q1\.\.Q4"):
         build_periods("2024Q1..2024M06")
     with pytest.raises(ValueError, match="13"):
         PeriodId.month(2025, month=13)
     assert str(PeriodId.half(2025, half=2)) == "2025H2"
     assert str(PeriodId.week(2025, week=2)) == "2025W02"
+    assert PeriodKind.DAILY.annualization_factor == 252
+    assert PeriodKind.QUARTERLY.slots_per_year == 4
+    assert PeriodKind.WEEKLY.slots_per_year is None
 
 
 def test_tenor_constructor_forms_and_context_helpers() -> None:

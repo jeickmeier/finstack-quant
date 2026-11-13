@@ -155,71 +155,6 @@ fn prev_rolls_to_previous_iso_year_last_week() {
 }
 
 #[test]
-fn prior_observation_date_daily_is_one_calendar_day() {
-    let first = d(2024, Month::January, 3);
-    assert_eq!(
-        PeriodKind::Daily
-            .prior_observation_date(first)
-            .expect("valid prior date"),
-        d(2024, Month::January, 2)
-    );
-}
-
-#[test]
-fn prior_observation_date_weekly_is_seven_days() {
-    let first = d(2024, Month::January, 8);
-    assert_eq!(
-        PeriodKind::Weekly
-            .prior_observation_date(first)
-            .expect("valid prior date"),
-        d(2024, Month::January, 1)
-    );
-}
-
-#[test]
-fn prior_observation_date_month_end_clamps() {
-    let jan31 = d(2023, Month::January, 31);
-    assert_eq!(
-        PeriodKind::Monthly
-            .prior_observation_date(jan31)
-            .expect("valid prior date"),
-        d(2022, Month::December, 31)
-    );
-    let feb28 = d(2023, Month::February, 28);
-    assert_eq!(
-        PeriodKind::Monthly
-            .prior_observation_date(feb28)
-            .expect("valid prior date"),
-        d(2023, Month::January, 28)
-    );
-    let mar31 = d(2023, Month::March, 31);
-    assert_eq!(
-        PeriodKind::Monthly
-            .prior_observation_date(mar31)
-            .expect("valid prior date"),
-        d(2023, Month::February, 28)
-    );
-    assert_eq!(
-        PeriodKind::Quarterly
-            .prior_observation_date(jan31)
-            .expect("valid prior date"),
-        d(2022, Month::October, 31)
-    );
-    assert_eq!(
-        PeriodKind::SemiAnnual
-            .prior_observation_date(jan31)
-            .expect("valid prior date"),
-        d(2022, Month::July, 31)
-    );
-    assert_eq!(
-        PeriodKind::Annual
-            .prior_observation_date(jan31)
-            .expect("valid prior date"),
-        d(2022, Month::January, 31)
-    );
-}
-
-#[test]
 fn period_kind_display_parse_and_counts() {
     assert_eq!(PeriodKind::SemiAnnual.to_string(), "semi_annual");
     assert_eq!(
@@ -268,8 +203,11 @@ fn period_kind_display_parse_and_counts() {
     }
     assert!(PeriodKind::from_str("unknown").is_err());
 
-    assert_eq!(PeriodKind::Daily.periods_per_year(), 252);
-    assert_eq!(PeriodKind::Quarterly.periods_per_year(), 4);
+    assert_eq!(PeriodKind::Daily.annualization_factor(), 252);
+    assert_eq!(PeriodKind::Quarterly.annualization_factor(), 4);
+    assert_eq!(PeriodKind::Daily.slots_per_year(), None);
+    assert_eq!(PeriodKind::Weekly.slots_per_year(), None);
+    assert_eq!(PeriodKind::Monthly.slots_per_year(), Some(12));
 }
 
 #[test]
@@ -664,7 +602,7 @@ fn fiscal_config_default_is_calendar_year() {
 
 #[test]
 fn period_kind_annualization_factor_is_const() {
-    const DAILY: f64 = PeriodKind::Daily.periods_per_year() as f64;
+    const DAILY: f64 = PeriodKind::Daily.annualization_factor() as f64;
     assert_eq!(DAILY, 252.0);
 }
 
