@@ -1,6 +1,6 @@
 # Analytic model methodology inventory
 
-**Decision status:** MODELS-ANALYTIC-01 through 26 Accepted. MODELS-ANALYTIC-27 Proposed. Record 28 is Draft.
+**Decision status:** MODELS-ANALYTIC-01 through 28 Accepted.
 
 **Implementation scope:** All **58 assigned Rust source files** in models `closed_form`, `fourier`, `rates` and `volatility`: **47 algorithm-bearing**, **9 support**, **2 test-only**, **0 generated**. Runtime implementations, material domain/default/dispatch decisions and interleaved test-helper boundaries were inspected. The exact one-file-one-entry ledger is [coverage.json](coverage.json).
 
@@ -167,10 +167,15 @@ was accepted on **2026-11-10** for actual dated issuer-call cash and
 exact decision order, checked state-based continuation regression, and
 independent pricing of a frozen admissible policy.
 
-[MODELS-ANALYTIC-27](diebold-li-var.md#proposed-decision-for-checked-nelsonsiegel-factors-and-var-forecasts)
-proposes explicit observation cadence, checked full-rank Nelson–Siegel
-and VAR fits, strict stationarity and marginal fitted-yield prediction
-intervals.
+[MODELS-ANALYTIC-27](diebold-li-var.md#accepted-decision-for-checked-nelsonsiegel-factors-and-var-forecasts)
+was accepted on **2026-11-10** for explicit observation cadence, checked
+full-rank Nelson–Siegel and VAR fits, strict stationarity and marginal
+fitted-yield prediction intervals.
+
+[MODELS-ANALYTIC-28](yield-pca.md#accepted-decision-for-checked-yield-change-pca-and-scenarios)
+was accepted on **2026-11-11** for checked centered-data SVD, full-spectrum
+variance accounting, qualified cadence and maturity identity, and
+fitted-basis reconstruction and scenarios.
 
 | Calculation / supported instruments | Implemented method / material variants | Actual selection | Decision record | Implementation / validation | Scope and evidence limits |
 |---|---|---|---|---|---|
@@ -215,9 +220,9 @@ intervals.
 | HW MC paths/discount | Exact rate marginal, Philox antithetics, event grid, trapezoid bank | 10000 streams/seed42/4 minimum substeps defaults | [MODELS-ANALYTIC-25](hw1f-monte-carlo-discounting.md) | Observed behavior and independent Gaussian checks | Exact joint Gaussian transitions and checked log-bank discounting accepted on 2026-11-10 |
 | HW estimate statistics | Average antithetic pairs then independent-estimator stats | Optional held-out odd streams | [MODELS-ANALYTIC-25](hw1f-monte-carlo-discounting.md) | Observed behavior and independent sampling checks | Explicit Philox controls and complete pair estimates with checked Student-t uncertainty accepted on 2026-11-10 |
 | Issuer exercise regression | Backward continuation, coupon separation, polynomial bases | Optional OOS; issuer minimizes amount vs continuation | [MODELS-ANALYTIC-26](hw1f-issuer-lsmc.md) | Observed behavior and independent cash and policy checks | Dated branch cash, checked full-rank fit and independent frozen-policy pricing accepted on 2026-11-10 |
-| Historical NS/VAR | Fixed-lambda OLS factors, VAR(1), Gaussian marginal bands | lambda=.7308 inverse years default | [MODELS-ANALYTIC-27](diebold-li-var.md) | Observed behavior and independent scalar and VAR checks | Proposed explicit observation cadence, strict stationarity and conditional marginal intervals |
-| Yield-change PCA | Centered sample covariance, clamped eigenvalues, sign normalization | All components retained; explicit truncation | [MODELS-ANALYTIC-28](yield-pca.md) | Observed; source and evidence links in record; not executed | Negative eigenvalue and repeated-space stability |
-| PCA scenarios/reconstruction | SD-scaled loading shocks; score reconstruction+mean | Explicit component shocks/count | [MODELS-ANALYTIC-28](yield-pca.md) | Observed; source and evidence links in record; not executed | No annualization; synthetic tenor metadata |
+| Historical NS/VAR | Fixed-lambda OLS factors, VAR(1), Gaussian marginal bands | lambda=.7308 inverse years default | [MODELS-ANALYTIC-27](diebold-li-var.md) | Observed behavior and independent scalar and VAR checks | Explicit observation cadence, strict stationarity and conditional marginal intervals accepted on 2026-11-10 |
+| Yield-change PCA | Centered sample covariance, clamped eigenvalues, sign normalization | All components retained; explicit truncation | [MODELS-ANALYTIC-28](yield-pca.md) | Observed behavior and independent arithmetic checks | Centered-data SVD, numerical retention and scoped fitted axes accepted on 2026-11-11 |
+| PCA scenarios/reconstruction | SD-scaled loading shocks; score reconstruction+mean | Explicit component shocks/count | [MODELS-ANALYTIC-28](yield-pca.md) | Observed behavior and independent arithmetic checks | Actual tenors and cadence, full-spectrum thresholds and checked scenarios accepted on 2026-11-11 |
 
 ## Evidence boundaries
 

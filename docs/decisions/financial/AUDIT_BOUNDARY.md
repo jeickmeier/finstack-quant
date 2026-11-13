@@ -329,13 +329,354 @@ uncertainty.
 [Analytic-model record 26](models-analytic/hw1f-issuer-lsmc.md#accepted-decision-for-checked-issuer-call-policy-training-and-pricing)
 was accepted on 2026-11-10 for dated issuer-call cash, checked
 continuation regression and independent pricing of a frozen policy.
-[Analytic-model record 27](models-analytic/diebold-li-var.md#proposed-decision-for-checked-nelsonsiegel-factors-and-var-forecasts)
-proposes explicit observation cadence, checked Nelson–Siegel factor
-extraction, stable VAR dynamics and marginal fitted-yield forecasts.
-Record 28 remains Draft.
-Runtime/caller/host/state reconciliation and independent qualification remain pending. Other financial records
-and convention ADRs retain their separately stated statuses; describing an
-observed method does not approve it.
+[Analytic-model record 27](models-analytic/diebold-li-var.md#accepted-decision-for-checked-nelsonsiegel-factors-and-var-forecasts)
+was accepted on 2026-11-10 for explicit observation cadence, checked
+Nelson–Siegel factor extraction, stable VAR dynamics and marginal
+fitted-yield forecasts.
+[Analytic-model record 28](models-analytic/yield-pca.md#accepted-decision-for-checked-yield-change-pca-and-scenarios)
+was accepted on 2026-11-11 for checked yield-change PCA, full-spectrum
+variance accounting and fitted-basis reconstruction and scenarios.
+All 28 analytic-model records are Accepted.
+[Numerical-model record 001](models-numerical/equity-binomial-construction.md#accepted-decision-for-checked-crr-and-leisenreimer-lattices)
+was accepted on 2026-11-11 for checked CRR and Leisen–Reimer
+transitions, explicit lattice counts and exact vanilla payoff limits.
+[Numerical-model record 002](models-numerical/dividends-and-lattice-exercise.md#accepted-decision-for-checked-escrowed-dividends-and-lattice-exercise)
+was accepted on 2026-11-11 for dated ex-claim values, a common escrow
+reserve horizon, exact alignment and product-qualified exercise phases.
+[Numerical-model record 003](models-numerical/tree-discounting-and-induction.md#accepted-decision-for-checked-tree-discounting-and-rollback)
+was accepted on 2026-11-11 for checked interval discounting, explicit
+nodewise OAS, validated rollback and genuine terminal state.
+[Numerical-model record 004](models-numerical/ho-lee-curve-fit.md#accepted-decision-for-checked-holee-curve-fitting)
+was accepted on 2026-11-11 for origin-relative Ho–Lee targets,
+checked additive row fits and one repricing gate.
+[Numerical-model record 005](models-numerical/bdt-lognormal-curve-fit.md#accepted-decision-for-checked-bdt-curve-fitting)
+was accepted on 2026-11-11 for strictly decreasing BDT targets,
+unclamped log-rate fits and one inclusive replay gate.
+[Numerical-model record 006](models-numerical/black-karasinski-trinomial.md#accepted-decision-for-checked-bk-trinomial-fitting)
+was accepted on 2026-11-11 for exact conditional OU moments on a
+capped trinomial, positive rate fitting and one inclusive replay gate.
+[Numerical-model record 007](models-numerical/hull-white-event-grid-and-affine-bonds.md#accepted-decision-for-checked-hullwhite-event-lattices-and-node-bonds)
+was accepted on 2026-11-11 for exact Hull–White event grids,
+conditional OU moments, Continuous base fitting and explicit
+affine exercise valuation.
+[Numerical-model record 008](models-numerical/rates-credit-marginal-calibration.md#accepted-decision-for-checked-rates-credit-marginal-calibration)
+was accepted on 2026-11-11 for centered binary marginals,
+strict variance retention, local integrated-hazard fitting
+and checked replay.
+[Numerical-model record 009](models-numerical/rates-credit-coupling-and-sampling.md#accepted-decision-for-checked-rates-credit-coupling-and-path-sampling)
+was accepted on 2026-11-11 for strict Bernoulli coupling, indexed
+Philox midpoints and bound segment replay.
+[Numerical-model record 010](models-numerical/rates-credit-coupon-folding.md#accepted-decision-for-checked-joint-credit-rollback-and-coupon-folding)
+was accepted on 2026-11-11 for checked joint survival and recovery,
+projection on exact index dates and a full coupon fold with explicit
+exercise eligibility.
+[Numerical-model record 011](models-numerical/pde-grids-interpolation-and-greeks.md#accepted-decision-for-checked-pde-grids-interpolation-and-coordinate-greeks)
+was accepted on 2026-11-11 for validated spatial grids, closed-domain
+value extraction and interpolated quadratic nodal derivative estimates.
+[Numerical-model record 012](models-numerical/pde-spatial-stencils.md#accepted-decision-for-checked-directional-and-mixed-pde-stencils)
+was accepted on 2026-11-11 for checked diffusion admission, an inclusive
+central-to-one-sided drift switch and an explicit tensor mixed stencil.
+[Numerical-model record 013](models-numerical/pde-boundary-elimination.md#accepted-decision-for-checked-pde-boundary-elimination-and-reconstruction)
+was accepted on 2026-11-11 for shared checked edge relations, explicit
+x-edge corner ownership and stage-consistent reconstruction and cache reuse.
+[Numerical-model record 014](models-numerical/theta-time-march-and-thomas.md#accepted-decision-for-checked-theta-marching-and-tridiagonal-solves)
+was accepted on 2026-11-11 for exact event-grid theta steps, full-interval
+damping and one checked Thomas kernel with a componentwise residual gate.
+[Numerical-model record 015](models-numerical/pde-exercise-projection.md#accepted-decision-for-checked-grid-based-pde-exercise)
+was accepted on 2026-11-11 for exact post-step payoff comparison,
+exact exercise knots and actual-spot immediate exercise at eligible
+equity valuations.
+[Numerical-model record 016](models-numerical/mcs-adi-time-march.md#accepted-decision-for-checked-modified-craigsneyd-adi)
+was accepted on 2026-11-11 for fixed full MCS, checked factorized startup
+and atomic stages with application-specific stability and price qualification.
+[Numerical-model record 017](models-numerical/black-scholes-and-heston-pde-bridges.md#accepted-decision-for-checked-pde-coefficient-bridges)
+was accepted on 2026-11-11 for checked bridge parameters and diffusion,
+explicit edge laws, exact deterministic limits and qualified price and
+risk boundaries. All 17 trees and finite differences records are accepted.
+Runtime/caller/host/state reconciliation and independent qualification remain pending.
+
+The first Monte Carlo package was accepted on 2026-11-11. Its evidence includes
+source and primary references, plus independent arithmetic checks for event
+time, correlation, discounting, antithetic counts and optional stopping.
+Production execution, host parity and pricing qualification are pending.
+[Monte Carlo record 01](models-monte-carlo/01-engine-and-estimation.md#accepted-decision-for-checked-monte-carlo-execution-and-estimation).
+
+The second Monte Carlo package was accepted on 2026-11-11. Independent
+checks cover Random123 words, open midpoint and complement arithmetic,
+reflected normals, fill capacity, uniform offsets and FNV seed framing.
+Runtime, host replay and model qualification are pending.
+[Monte Carlo record 02](models-monte-carlo/02-random-streams.md#accepted-decision-for-checked-philox-streams-and-seed-derivation).
+
+The third Monte Carlo package was accepted on 2026-11-11. Independent
+checks cover dyadic budget admission, seed and address arithmetic, bridge
+geometry, equal weighting and finite-grid limits. Runtime, host and price
+qualification are pending.
+[Monte Carlo record 03](models-monte-carlo/03-randomized-qmc.md#accepted-decision-for-whole-path-sobol-pricing-and-replicate-diagnostics).
+
+The fourth Monte Carlo package was accepted on 2026-11-11. Independent
+checks cover transition range, cumulative carry, log covariance,
+dated ATM variance and local-volatility steps. Runtime, host parity
+and production pricing qualification are pending.
+[Monte Carlo record 04](models-monte-carlo/04-lognormal-diffusions.md#accepted-decision-for-checked-gbm-and-local-volatility-paths).
+
+The fifth Monte Carlo package was accepted on 2026-11-11. Independent
+checks cover Euler range, additive Brownian covariance, exact OU limits
+and the effect of unequal reversion speeds on step covariance.
+Runtime, host parity and model qualification are pending.
+[Monte Carlo record 05](models-monte-carlo/05-generic-steppers.md#accepted-decision-for-checked-coordinatewise-euler-and-exact-gaussian-steps).
+
+The sixth Monte Carlo package was accepted on 2026-11-11. Independent
+checks cover delayed cash claim values, mixed jump order, adjacent
+knots, small positive widths and floor-sensitive forward moments.
+Runtime, host parity and financial qualification are pending.
+[Monte Carlo record 06](models-monte-carlo/06-cash-dividend-jumps.md#accepted-decision-for-checked-discrete-dividend-jumps-on-exact-grid-knots).
+
+The seventh Monte Carlo package was accepted on 2026-11-11. Independent
+checks cover scheduled endpoint moments, exact stored times, extreme
+mean and noise arithmetic, and the difference between mean-level fit
+and discount replay. Runtime, host and product qualification are pending.
+[Monte Carlo record 07](models-monte-carlo/07-hull-white.md#accepted-decision-for-checked-hullwhite-endpoints-and-curve-fit-boundaries).
+
+The eighth Monte Carlo package was accepted on 2026-11-11. Independent
+checks cover conditional moments, the switch boundary, the positive
+mixture tail, log-moment range, zero atoms and signed CIR++ projection.
+Runtime, host and product qualification are pending.
+[Monte Carlo record 08](models-monte-carlo/08-cir-qe.md#accepted-decision-for-checked-cir-and-cir-quadratic-exponential-paths).
+
+The ninth Monte Carlo package was accepted on 2026-11-11. Independent Heston checks
+cover the QE mixture atom, both moment poles, centered leverage,
+deterministic variance and exact carry endpoints. Runtime, host and
+product qualification are pending.
+[Monte Carlo record 09](models-monte-carlo/09-heston-qe.md#accepted-decision-for-checked-heston-qe-m-paths).
+
+The tenth Monte Carlo package was accepted on 2026-11-11. Independent LMM
+examples cover displaced support, checked step arithmetic, exact tenor and
+payment-bond identities and finite-step bias in deflated bond moments.
+Runtime, host and product qualification are pending.
+[Monte Carlo record 10](models-monte-carlo/10-lmm.md#accepted-decision-for-checked-terminal-measure-lmm-paths).
+
+The eleventh Monte Carlo package was accepted on 2026-11-11. Independent checks
+cover clipped utilization moments, left-spread coupling, exact limits,
+scaled arithmetic and latent-normal and bank covariances. Runtime,
+host and product qualification are pending.
+[Monte Carlo record 11](models-monte-carlo/11-credit-line.md#accepted-decision-for-checked-revolving-credit-paths).
+
+The twelfth Monte Carlo package was accepted on 2026-11-11. Independent
+Schwartz–Smith checks cover covariance and partition moments, near-singular variance,
+factor initialization and one-expiry log forward pinning. Runtime, host
+and product qualification are pending.
+[Monte Carlo record 12](models-monte-carlo/12-schwartz-smith.md#accepted-decision-for-checked-schwartzsmith-paths-and-expectations).
+
+The thirteenth Monte Carlo package was accepted on 2026-11-11. Independent
+fractional noise checks cover window covariance, newest-cell conditioning, actual
+grid geometry, sampled RL variance and Gaussian compensation. Runtime,
+host and product qualification are pending.
+[Monte Carlo record 13](models-monte-carlo/13-fractional-noise.md#accepted-decision-for-checked-fractional-noise-and-volterra-drivers).
+
+The fourteenth Monte Carlo package was accepted on 2026-11-11.
+Independent rough Bergomi checks cover variance break alignment, numerical scale,
+finite-grid moments, parity and a two-cell option benchmark. Runtime,
+host and product qualification are pending.
+[Monte Carlo record 14](models-monte-carlo/14-rough-bergomi.md#accepted-decision-for-checked-rough-bergomi-spot-and-pricing).
+
+The fifteenth Monte Carlo package was accepted on 2026-11-11.
+Independent rough Heston checks cover actual-knot weights, newest-cell
+covariance, the projected zero atom and two-cell European pricing.
+Runtime, host and product qualification are pending.
+[Monte Carlo record 15](models-monte-carlo/15-rough-heston.md#accepted-decision-for-checked-rough-heston-paths-and-pricing).
+
+The sixteenth Monte Carlo package was accepted on 2026-11-11.
+Independent rough Cheyette checks cover amplitude units, coarse-grid
+positivity, Gaussian endpoint moments, within-cell covariance and the
+discount integration boundary. Runtime, host, grid-convergence and
+financial qualification are pending.
+[Monte Carlo record 16](models-monte-carlo/16-rough-cheyette.md#accepted-decision-for-checked-rough-cheyette-paths).
+
+The seventeenth Monte Carlo package was accepted on 2026-11-11.
+Independent checks cover signed terminal settlements, strict digital
+ties, scaled arithmetic, repeated Asian fixings and a tied-grid geometric
+control. Runtime, host and product qualification are pending.
+[Monte Carlo record 17](models-monte-carlo/17-vanilla-and-asian.md#accepted-decision-for-checked-terminal-and-asian-payoffs).
+
+The eighteenth Monte Carlo package was accepted on 2026-11-11.
+Independent barrier checks cover small crossing probabilities, exact
+carry breaks, first-passage timing and discounting, and continuous GBM parity.
+Runtime, host, Heston refinement and product qualification are pending.
+[Monte Carlo record 18](models-monte-carlo/18-barrier-monitoring.md#accepted-decision-for-checked-monte-carlo-barrier-monitoring-and-rebates).
+
+The nineteenth Monte Carlo package was accepted on 2026-11-11.
+Independent lookback checks cover terminal eligibility, historical-only
+settlement, conditional extrema, small excursions, carry breaks and
+continuous GBM prices.
+Runtime, host and dated product qualification are pending.
+[Monte Carlo record 19](models-monte-carlo/19-lookback-monitoring.md#accepted-decision-for-checked-monte-carlo-lookback-extrema).
+
+The twentieth Monte Carlo package was accepted on 2026-11-11.
+Independent autocallable checks cover coupon and call ordering, memory,
+exact discrete downside touch, all three redemption formulas and distinct
+dated cash. Runtime, host and dated product qualification are pending.
+[Monte Carlo record 20](models-monte-carlo/20-autocallable.md#accepted-decision-for-checked-monte-carlo-autocallable-payoffs).
+
+The twenty-first Monte Carlo package was accepted on 2026-11-11.
+Independent cliquet checks cover strike setting, both accumulation modes,
+fully observed settlement, mixed-scale arithmetic and one- and two-period
+prices. Runtime, host and dated product qualification are pending.
+[Monte Carlo record 21](models-monte-carlo/21-cliquet.md#accepted-decision-for-checked-monte-carlo-cliquet-payoffs).
+
+The twenty-second Monte Carlo package was accepted on 2026-11-11.
+Independent range accrual checks cover tied rows, fixed counts, inclusive
+boundaries, scaled coupon arithmetic, dated carry and marginal price benchmarks.
+Runtime, host and dated product qualification are pending.
+[Monte Carlo record 22](models-monte-carlo/22-range-accrual.md#accepted-decision-for-checked-monte-carlo-range-accrual).
+
+The twenty-third Monte Carlo package was accepted on 2026-11-11.
+Independent examples cover the exact exercise clock, antithetic group
+admission, frozen origin selection, look-ahead, deterministic exercise
+and an optimal two-date GBM put.
+Runtime, host and financial qualification are pending.
+[Monte Carlo record 23](models-monte-carlo/23-lsmc-exercise.md#accepted-decision-for-checked-holder-exercise-policy-training-and-pricing).
+
+The twenty-fourth Monte Carlo package was accepted on 2026-11-11.
+Independent examples cover basis equivalence, shifted standardization,
+singular rank, frozen replay and manufactured multivariate continuation.
+Runtime, host and financial qualification are pending.
+[Monte Carlo record 24](models-monte-carlo/24-regression-policies.md#accepted-decision-for-checked-continuation-regression).
+
+The twenty-fifth Monte Carlo package was accepted on 2026-11-11.
+Independent examples cover rounded spot geometry, stored-PV
+cancellation, antithetic group uncertainty, work counts and
+European GBM finite-stencil targets.
+Runtime, host and broader sensitivity qualification are pending.
+[Monte Carlo record 25](models-monte-carlo/25-finite-difference-greeks.md#accepted-decision-for-checked-paired-monte-carlo-spot-greeks).
+
+The twenty-sixth Monte Carlo package was accepted on 2026-11-11.
+Independent examples cover terminal and joint scores, rounded shock
+loss, scaled Greek products and antithetic weighting. Runtime, host and broader
+sensitivity qualification are pending.
+[Monte Carlo record 26](models-monte-carlo/26-likelihood-ratio-greeks.md#accepted-decision-for-checked-gbm-likelihood-ratio-greeks).
+
+The twenty-seventh Monte Carlo package was accepted on 2026-11-11.
+Independent examples cover same-sample bias, grouped fitting, constant
+and tiny controls, and the ideal seasoned Asian control expectation
+and payment discount.
+Runtime, dated product and host qualification are pending.
+[Monte Carlo record 27](models-monte-carlo/27-control-variate.md#accepted-decision-for-checked-single-control-monte-carlo-pricing).
+
+The twenty-eighth Monte Carlo package was accepted on 2026-11-11.
+Independent examples cover fixed-size membership, storage boundaries,
+actual knots, subset quantiles and timed cash export. Runtime, host and
+financial qualification are pending.
+[Monte Carlo record 28](models-monte-carlo/28-capture-and-simulation-contracts.md#accepted-decision-for-checked-path-capture-and-raw-simulation).
+
+The first credit and liquidity package was accepted on 2026-11-11.
+Independent examples cover selected distress-score coefficients,
+boundary classification, historical SIZE scaling, leverage basis and
+numerical range. Runtime, host and empirical qualification are pending.
+[Credit record 01](models-and-valuations-credit/01-financial-distress-scores.md#accepted-decision-for-checked-financial-distress-scores).
+
+The second credit and liquidity package was accepted on 2026-11-11.
+Independent examples cover the conditional Gaussian mean, endpoint
+and cohort semantics, complete PD bands and exact factor selection.
+Runtime, host, empirical and regulatory qualification are pending.
+[Credit record 02](models-and-valuations-credit/02-pd-scales-and-rating-data.md#accepted-decision-for-checked-pd-transforms-and-explicit-rating-data).
+
+The third credit and liquidity package was accepted on 2026-11-11.
+Independent examples cover two-state incidence, generator correction and
+fit residuals, a valid complex-spectrum chain and competing absorbing states.
+Runtime, host, sampling and empirical qualification are pending.
+[Credit record 03](models-and-valuations-credit/03-rating-migration.md#accepted-decision-for-checked-rating-migration-generator-fitting-and-paths).
+
+The fourth credit and liquidity package was accepted on 2026-11-11.
+Independent examples cover first-passage and jump tails, CreditGrades
+origin conditioning, equity and PD reprice, multiple CDS proxy roots,
+near-par debt loss and asset-path numerical boundaries. Runtime, host,
+market and empirical qualification are pending.
+[Credit record 04](models-and-valuations-credit/04-structural-default.md#accepted-decision-for-checked-structural-default-models-and-calibrated-outputs).
+
+The fifth credit and liquidity package was accepted on 2026-11-11.
+Independent examples cover leverage and range, local hazard and CIR
+anchoring, sigmoid tails, origin touch, paired payoffs and discrete
+monitoring. Runtime, host, market and issuer-policy qualification are pending.
+[Credit record 05](models-and-valuations-credit/05-hazard-and-toggle.md#accepted-decision-for-checked-leverage-hazard-and-pik-election-models).
+
+The sixth credit and liquidity package was accepted on 2026-11-12.
+Independent examples cover dilution and EAD range, workout timing,
+downturn and beta tails, and pledged-pool and priority conservation.
+Runtime, host, empirical and regulatory qualification are pending.
+[Credit record 06](models-and-valuations-credit/06-recovery-and-lgd.md#accepted-decision-for-checked-exposure-loss-and-recovery-allocations),
+[core beta-quantile amendment](core-numerics/distribution-functions.md#accepted-amendment-checked-rust-beta-quantile).
+
+The seventh credit and liquidity package was accepted on 2026-11-12.
+Independent examples cover tiny CDR, Student-t shared scales, lognormal
+intensity and capped-rate expectations, persistence, granularity and
+draw alignment. Runtime, host and product qualification are pending.
+[Credit record 07](models-and-valuations-credit/07-pool-defaults.md#accepted-decision-for-checked-pool-default-rates-and-period-copula-resolution).
+
+The eighth credit and liquidity package was accepted on 2026-11-12.
+Independent examples cover nonlinear SMM expectations, refinancing and
+burnout, regime persistence and transition limits, and matrix shocks.
+Runtime, host, market and product qualification are pending.
+[Credit record 08](models-and-valuations-credit/08-prepayment-and-pool-correlation.md#accepted-decision-for-checked-prepayment-and-pool-correlation).
+
+The ninth credit and liquidity package was accepted on 2026-11-12.
+Independent examples cover probability tails, random-loading calibration,
+fixed quadrature, paired Student-t integration and factor coordinates.
+Runtime, host and product qualification are pending.
+[Credit record 09](models-and-valuations-credit/09-copula-kernels.md#accepted-decision-for-checked-copula-laws-and-latent-factors).
+
+The tenth credit and liquidity package was accepted on 2026-11-12.
+Independent examples cover loading admission, shared scales, recovery on
+default, role addressing, empirical tail mass and tranche boundaries.
+Runtime, host, calibration and sampling qualification are pending.
+[Credit record 10](models-and-valuations-credit/10-portfolio-loss-and-correlated-recovery.md#accepted-decision-for-checked-portfolio-loss-and-correlated-recovery).
+
+The eleventh credit and liquidity package was accepted on 2026-11-12.
+Independent examples cover quote geometry, spread and turnover estimators,
+execution units and bucket scores, spread stress and liquidation capacity.
+Runtime, host and empirical qualification are pending.
+[Credit record 11](models-and-valuations-credit/11-liquidity.md#accepted-decision-for-checked-liquidity-and-execution-estimates).
+
+The twelfth credit and liquidity package was accepted on 2026-11-13.
+Independent examples cover included maturity, rolled coupons, mixed clocks,
+default settlement, stable integration and quote/settlement algebra. Runtime,
+host, calibration and external-reference qualification are pending.
+[Credit record 12](models-and-valuations-credit/12-cds-legs.md#accepted-decision-for-checked-cds-legs-and-quote-basis).
+
+The thirteenth credit and liquidity package was accepted on 2026-11-13.
+Independent examples cover bump normalization, rate and recovery bases,
+covered loss, default settlement and the expired margin proxy. Runtime,
+host, calibration and margin qualification remain pending.
+[Credit record 13](models-and-valuations-credit/13-cds-and-index-risk.md#accepted-decision-for-checked-cds-and-index-risk).
+
+The fourteenth credit and liquidity package was accepted on 2026-11-13.
+Independent examples cover original-weight allocation, clean and dirty
+quotes, retained earned cash, confirmed events and default timing. Runtime,
+host and external-reference qualification remain pending.
+[Credit record 14](models-and-valuations-credit/14-index-valuation.md#accepted-decision-for-checked-cds-index-valuation-and-cashflows).
+
+The fifteenth credit and liquidity package was accepted on 2026-11-13.
+Independent examples cover the two-root case, the replacement fit and
+parity, settlement normalization, front-end protection and strike factors.
+Runtime, host and external-reference qualification remain pending.
+[Credit record 15](models-and-valuations-credit/15-cds-option-quadrature.md#accepted-decision-for-checked-cds-option-valuation).
+
+The sixteenth credit and liquidity package was accepted on 2026-11-13.
+Independent examples cover matched spread stencils, clock decay and
+parity, rate and recovery bases, and inversion near structural or numerical
+flatness. Runtime, market replay, host and external qualification remain pending.
+[Credit record 16](models-and-valuations-credit/16-cds-option-risk-and-inversion.md#accepted-decision-for-checked-cds-option-risk-and-implied-volatility).
+
+The seventeenth credit and liquidity package was accepted on 2026-11-13.
+Independent examples cover seasoned geometry, exact and split-grid
+expectations, factor endpoints and inconsistent tranchelets. Runtime,
+calibration, dated market and host qualification remain pending.
+[Credit record 17](models-and-valuations-credit/17-tranche-loss-distribution.md#accepted-decision-for-checked-finite-pool-tranche-losses).
+
+The eighteenth credit and liquidity package was accepted on 2026-11-13.
+Independent examples cover daily cash and discount dates, heterogeneous
+timing, maturity and partial settlement, and clean versus actual upfront.
+Runtime, dated market, calibration and host qualification remain pending.
+[Credit record 18](models-and-valuations-credit/18-tranche-projection.md#accepted-decision-for-checked-tranche-cashflows-and-settlement).
 
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons

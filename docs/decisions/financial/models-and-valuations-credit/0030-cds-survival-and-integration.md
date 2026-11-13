@@ -1,7 +1,6 @@
 # ADR 0030: CDS survival integration and valuation conventions
 
-**Decision status:** Draft — observed implementation; adoption and rationale
-pending agreement.
+**Decision status:** Accepted — scoped single-name CDS engine selection, 2026-11-13.
 
 **Implementation status:** Observed for single-name CDS pricing and its reuse
 by CDS indices; index composition and valuation have separate owners below.
@@ -13,6 +12,15 @@ reference calculations not rerun for this documentation audit.
 
 **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`
 
+## Accepted selection
+
+The existing [CREDIT-12 decision](12-cds-legs.md#accepted-decision-for-checked-cds-legs-and-quote-basis) owns the accepted
+single-name CDS schedule, coverage, settlement, integration and quote basis.
+Retain the reduced-form `HazardRate` engine, with explicit dated terms
+and one set of legs for economic PV and matching clean or dirty quotes.
+Implementation, host and external-reference reconciliation remain pending.
+The observed source sections below document historical paths and defaults.
+
 ## Observed choice and rationale
 
 `CreditDefaultSwap` selects a reduced-form hazard engine with conditional
@@ -23,16 +31,15 @@ policies; its observed default is `BloombergCdswClean`.
 The source rationale is screen reconciliation for named convention bundles,
 with both curve knot grids retained and discount/hazard clocks kept distinct.
 The [CDS leg record](12-cds-legs.md) owns those conventions, integration details
-and source evidence. These explanations do not establish acceptance of every
-bundle, default or approximation.
+and source evidence. The accepted contract replaces the observed vendor bundles and default.
 
-Proposed adoption rationale, awaiting agreement: a common reduced-form engine
+Rationale for selecting a shared engine: a common reduced-form engine
 keeps CDS calibration, pricing and spread risk on compatible cashflow and
 recovery assumptions; explicit convention bundles make comparisons with named
 reference systems reproducible. This proposed rationale does not establish
 a library-wide default.
 
-## Scope and selection
+## Observed scope and selection
 
 The scope is single-name running/upfront CDS, including supported forward
 protection starts, and the analytic leg engine reused by `CdsIndex`. Discount
@@ -62,8 +69,8 @@ treatment, hazard calibration, and quote-risk replay are separate choices.
 | Quote contracts and fixed-recovery hazard fitting | [CDS materialization](../calibration-framework/07-cds-materialization.md) and [hazard calibration](../calibration-targets/05-hazard-calibration.md) |
 
 The owners retain numerical formulas, settings, source/test/reference evidence
-and material limitations. They remain Draft; this selection record does not
-adopt adjacent calibration, index or risk policies.
+and material limitations. This selection does not adopt adjacent
+calibration, index or risk policies.
 
 ## Alternatives and tradeoffs
 
@@ -79,7 +86,7 @@ model changes calibration assumptions and is not a missing-input substitute.
 
 The fixed grid, whole-date inversion and absent-calendar settlement remain
 observed approximations; the [date-inversion fallback](12-cds-legs.md#limitations-failure-and-fallback)
-is not approved by this draft. Missing curves and inconsistent recovery error;
+is replaced by the accepted forward date grid. Missing curves and inconsistent recovery error;
 no hazard curve is inferred from missing inputs.
 
 The named QuantLib and Bloomberg fixtures retain provenance limitations in the

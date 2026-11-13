@@ -177,7 +177,10 @@ Accepted on **2026-11-10** after review of all 22 decisions.
     inputs. Add owner admission wherever the old constructor supplied
     those checks. Discretization and calibration choices remain with
     their owners. Restore the embedded rough model through validated
-    construction.
+    construction. The classical Monte Carlo owner has selected the two
+    zero-input limits for its checked implementation, with runtime and
+    product qualification pending.
+    [Accepted classical Heston QE-M](../models-monte-carlo/09-heston-qe.md#accepted-decision-for-checked-heston-qe-m-paths).
 
 21. **Update existing hosts without exposing the internal transform.**
     Propagate the admitted fields and validation through the Rust,

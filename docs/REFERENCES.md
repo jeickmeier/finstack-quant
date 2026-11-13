@@ -97,6 +97,28 @@ and implementation and validation evidence.
   (2nd ed.). Springer Finance. Caps, floors, swaptions, Hull-White, and
   quanto-adjustment conventions.
 
+### Displaced LMM and terminal-bond pricing
+
+- Brace, Gatarek and Musiela derive the market model for simple
+  forward rates. Denson and Joshi give the displaced diffusion and
+  its terminal-measure proportional drift in equations 2.1 and 2.2.
+  [Brace, Gatarek and Musiela](https://onlinelibrary.wiley.com/doi/10.1111/1467-9965.00028),
+  [Denson and Joshi](https://fbe.unimelb.edu.au/__data/assets/pdf_file/0011/2591831/201.pdf).
+- Hunter, Jäckel and Joshi average the drift at the start and at the
+  predictor, reusing the same innovations. The proposed variant
+  holds loadings and evolution eligibility fixed within each exact
+  interval. Beveridge, Denson and Joshi discuss displacement and
+  drift approximation.
+  [Original predictor-corrector paper](https://citeseerx.ist.psu.edu/document?doi=3e26dc596f3d649c9bf1e525ade5f52c59db4b1b&repid=rep1&type=pdf),
+  [Displaced-LMM discretization study](https://fbe.unimelb.edu.au/__data/assets/pdf_file/0011/2591885/171.pdf).
+- Glasserman and Zhao study discretization of bond-price ratios to
+  preserve discrete martingale properties. The proposed predictor-
+  corrector acts on forward rates and can bias deflated bond moments
+  at finite step sizes. A simple forward determines a bond ratio
+  between its two tenor maturities.
+  [Glasserman and Zhao](https://business.columbia.edu/faculty/research/arbitrage-free-discretization-lognormal-forward-libor-and-swap-rate-models),
+  [Glasserman and Wang](https://www.dam.brown.edu/people/huiwang/research/box1.pdf).
+
 <a id="hull-white-1990-pricing-ird"></a>
 
 ### Hull White 1990 Pricing Interest-Rate Derivatives
@@ -160,6 +182,110 @@ and implementation and validation evidence.
   the mean of independent pair averages. The record selects
   the core Student-t mean interval on those pricing observations.
   [Monte Carlo Methods in Financial Engineering](https://doi.org/10.1007/978-0-387-21617-1)
+
+### Hull–White endpoint paths and curve-fit boundaries
+
+- Gillespie derives the exact Gaussian OU transition. The accepted
+  endpoint model uses signed piecewise-constant mean levels and the
+  common scheduled state-noise law on the actual interval.
+  [Exact numerical simulation of the Ornstein–Uhlenbeck process and its integral](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.54.2084).
+- Hull and White describe fitting a short-rate model to its initial
+  curve. Ostrovski derives the centered state and deterministic shift
+  with a joint Gaussian rate integral. The accepted dated fit and
+  cash discount law are in analytic records 24 and 25.
+  [Using Hull–White Interest Rate Trees](https://www-2.rotman.utoronto.ca/~hull/downloadablepublications/USETREE.pdf),
+  [Efficient and Exact Simulation of the Hull-White Model](https://www.researchgate.net/publication/262336369_Efficient_and_Exact_Simulation_of_the_Hull-White_Model).
+
+### Fixed-budget Monte Carlo pricing and estimation
+
+- Glasserman's foundations connect derivative pricing to expectations under
+  the appropriate measure. The accepted generic engine contract admits a single
+  deterministic discount factor and relies on the caller to supply the
+  corresponding payoff representation and measure.
+  [Monte Carlo Methods in Financial Engineering, Foundations](https://link.springer.com/chapter/10.1007/978-0-387-21617-1_1).
+- Hammersley and Morton introduce antithetic coupling. In the accepted
+  engine the complete pair average is one independent observation for
+  uncertainty calculations.
+  [A New Monte Carlo Technique](https://www.cambridge.org/core/journals/mathematical-proceedings-of-the-cambridge-philosophical-society/article/abs/new-monte-carlo-technique-antithetic-variates/69A9BBEDC6A4F1B1AF7E0764CD422E15).
+- Student derives the small-sample mean statistic for normal observations.
+  Howard et al. develop time-uniform confidence sequences under separate
+  assumptions. The generic pricing contract selects a fixed-count
+  Student-t interval and removes width-driven sequential stopping.
+  [The Probable Error of a Mean](https://ocw.mit.edu/courses/esd-86-models-data-and-inference-for-socio-technical-systems-spring-2007/resources/gosset_1908/),
+  [Time-uniform confidence sequences](https://arxiv.org/abs/1810.08240).
+
+### Paired Monte Carlo spot sensitivities
+
+- Broadie and Glasserman describe paired finite-difference repricing,
+  its finite-bump error, and European option derivatives in their
+  simulation comparison and Appendices B and C.
+  [Estimating Security Price Derivatives Using Simulation](https://www.columbia.edu/~mnb2/broadie/Assets/bg-ms-1996.pdf)
+- Glasserman and Yao explain how common random numbers couple
+  comparisons and identify conditions for variance reduction.
+  Record 25 fixes the draw assignment across scenarios and estimates
+  uncertainty from the resulting complete groups.
+  [Some Guidelines and Guarantees for Common Random Numbers](https://business.columbia.edu/sites/default/files-efs/pubfiles/4261/glasserman_yao_guidelines.pdf)
+- Fornberg derives derivative weights for arbitrarily spaced grids.
+  The accepted gamma is the three-node quadratic case. The accepted
+  delta is the slope of the two-endpoint linear interpolant.
+  [Generation of Finite Difference Formulas on Arbitrarily Spaced Grids](https://www.colorado.edu/amath/sites/default/files/attached-files/mathcomp_88_fd_formulas.pdf)
+
+### GBM likelihood-ratio delta and vega
+
+- Broadie and Glasserman derive terminal likelihood-ratio delta
+  and vega in Proposition 4, equations (37)–(38), and joint
+  Asian path scores in Proposition 6, equations (48)–(49).
+  Record 26 selects the same Gaussian score law at the
+  actual grid intervals with frozen deterministic carry.
+  [Estimating Security Price Derivatives Using Simulation](https://www.columbia.edu/~mnb2/broadie/Assets/bg-ms-1996.pdf)
+
+### Paired control variates and independent pilots
+
+- Glynn and Szechtman derive the fixed-coefficient adjustment
+  from a known control expectation and the variance-minimizing
+  covariance-to-variance ratio. Their estimated-coefficient
+  limit results concern asymptotic efficiency.
+  [Some New Perspectives on the Method of Control Variates](https://web.stanford.edu/~glynn/papers/2002/GSzechtman02.pdf)
+- Nelson's Section 6 explains how fitting on an independent
+  pilot makes the coefficient independent of the pricing
+  sample. Record 27 selects this split for the dated
+  arithmetic Asian pricer and calculates uncertainty from
+  the held-out adjusted observations.
+  [Control Variate Remedies](https://users.iems.northwestern.edu/~nelsonb/Publications/ControlVariateRemedies.pdf)
+
+### Longstaff-Schwartz holder stopping and independent policy pricing
+
+- Longstaff and Schwartz use regression on decision-time state
+  to estimate the discounted value of continuing on in-the-money
+  paths. Their Section 3 compares the fitted rule on the original
+  simulation and on an independent simulation. The accepted holder
+  contract selects the independent valuation route.
+  [Valuing American Options by Simulation](https://galton.uchicago.edu/~mykland/346W05/Longstaff.pdf)
+- Andersen and Broadie give the population lower bound for an
+  admissible maximizing stopping policy in equation (3).
+  [Primal-Dual Simulation Algorithm](https://business.columbia.edu/sites/default/files-efs/pubfiles/1233/primal_dual_ms_2004.pdf)
+- Woo, Liu and Choi analyze look-ahead from using the same
+  observations to fit continuation and estimate policy value.
+  [Leave-One-Out Least Squares Monte Carlo Algorithm](https://arxiv.org/abs/1810.02071)
+
+### Continuation regression bases and rank
+
+- Golub and Reinsch derive SVD least squares and discuss loss of
+  accuracy from forming the Gram matrix. Record 24 accepts a
+  bounded decomposition and full-rank admission on the scaled
+  design, with a caller-selected threshold.
+  [Singular Value Decomposition and Least Squares Solutions](https://people.duke.edu/~hpgavin/SystemID/References/Golub%2BReinsch-NM-1970.pdf)
+- The finite series for ordinary Laguerre gives one polynomial of
+  each degree, with nonzero leading coefficient. Longstaff and
+  Schwartz use exponentially weighted Laguerre functions in their
+  put example. The unweighted series spans the same polynomial space
+  as powers of the same maximum degree.
+  [NIST DLMF §18.5](https://dlmf.nist.gov/18.5),
+  [Longstaff and Schwartz, sections 1 and 3](https://galton.uchicago.edu/~mykland/346W05/Longstaff.pdf)
+- Glasserman and Yu analyze how basis degree and path count jointly
+  affect worst-case convergence. Algebraic rank alone provides no
+  exercise-value accuracy guarantee.
+  [Number of Paths Versus Number of Basis Functions](https://arxiv.org/abs/math/0503556)
 
 ### Checked issuer-call policy training and pricing
 
@@ -472,24 +598,35 @@ and implementation and validation evidence.
 
 ### Altman 1968
 
-- Altman, E. I. "Financial Ratios, Discriminant Analysis and the Prediction of
-  Corporate Bankruptcy." Original Altman Z-Score reference.
+- Altman's 1968 equation (1) uses a sales coefficient of 0.999.
+  Its first four predictors use percentage units. Section V
+  gives the historical 1.81 and 2.99 screen boundaries.
+  [Financial Ratios, Discriminant Analysis and the Prediction of Corporate Bankruptcy](https://www.calctopia.com/papers/Altman1968.pdf)
+- Altman's later chapter gives the revised Z′, Z″ and EM
+  formulas. Table 1.6 describes the private-firm screening
+  boundaries. Table 1.7 reports historical means by bond
+  rating for the EMS analysis.
+  [Revisiting the Z-Score and ZETA Models](https://www.blackwellpublishing.com/content/BPL_images/Content_Store/Sample_Chapter/9780631225638/altman.pdf)
 
 <a id="ohlson-1980"></a>
 
 ### Ohlson 1980
 
-- Ohlson, J. A. "Financial Ratios and the Probabilistic Prediction of
-  Bankruptcy." *Journal of Accounting Research*, 18(1), 109-131. Logistic
-  O-score used by `ohlson_o_score`.
+- Ohlson's Section 5 and Table 4 define the one-year Model 1
+  and the prior-year GNP index with 1968=100. Section 6 describes
+  the historical classification error tradeoff.
+  [Financial Ratios and the Probabilistic Prediction of Bankruptcy](https://www.jstor.org/stable/2490395)
 
 <a id="zmijewski-1984"></a>
 
 ### Zmijewski 1984
 
-- Zmijewski, M. E. "Methodological Issues Related to the Estimation of
-  Financial Distress Prediction Models." *Journal of Accounting Research*,
-  22, 59-82. Probit distress model used by `zmijewski_score`.
+- Zmijewski defines the debt/assets, return on assets and current
+  ratio inputs on page 66 and studies sample selection in probit
+  distress models. Shumway reports the retained coefficient
+  vector in Table 4 with his replication's own ratio basis.
+  [Methodological Issues Related to the Estimation of Financial Distress Prediction Models](https://www.jstor.org/stable/2490859),
+  [Forecasting Bankruptcy More Accurately](https://www.tylergshumway.org/Shumway-ForecastingBankruptcyAccurately-2001.pdf)
 
 <a id="diebold-li-2006"></a>
 
@@ -497,6 +634,23 @@ and implementation and validation evidence.
 
 - Diebold, F. X., and Li, C. "Forecasting the Term Structure of Government Bond
   Yields." Nelson-Siegel factor dynamics and yield-curve forecasting.
+
+### Checked Nelson–Siegel factors and VAR forecasts
+
+- Diebold and Li, sections 3.2–3.3, use fixed decay for the
+  cross-sectional factor fit and direct horizon-specific
+  regressions in the forecast comparison.
+  [Record 27](decisions/financial/models-analytic/diebold-li-var.md#accepted-decision-for-checked-nelsonsiegel-factors-and-var-forecasts)
+  uses the same factor representation with an iterated one-step VAR.
+  [Forecasting the Term Structure of Government Bond Yields](https://elearning.unito.it/sme/pluginfile.php/473145/course/section/81686/DieboldLi_JoE06.pdf)
+- Lütkepohl gives the finite-horizon innovation covariance and
+  marginal Gaussian intervals in section 3.5. The local interval
+  projects that covariance onto the fitted Nelson–Siegel signal.
+  [Applied Time Series Econometrics](https://new.mmf.lnu.edu.ua/wp-content/uploads/2018/03/lutkepohl_time_series.pdf)
+- Süli, section 3.7.2, gives the Cayley transformation and the
+  Routh–Hurwitz criterion used for the strict cubic stability
+  test. The exact dyadic evaluation is a local numerical choice.
+  [Numerical Solution of Ordinary Differential Equations](https://people.maths.ox.ac.uk/suli/nsodes.pdf)
 
 <a id="nelson-siegel-1987"></a>
 
@@ -519,8 +673,23 @@ and implementation and validation evidence.
 ### Litterman Scheinkman 1991
 
 - Litterman, R., and Scheinkman, J. "Common Factors Affecting Bond Returns."
-  *Journal of Fixed Income*, 1(1), 54-61. Level/slope/curvature PCA of the
-  yield curve.
+  *Journal of Fixed Income*, 1(1), 54-61. Empirical bond-return factors
+  commonly interpreted as level, slope and curvature.
+  [Common Factors Affecting Bond Returns](https://doi.org/10.3905/jfi.1991.692347)
+
+### Checked yield-change PCA and scenarios
+
+- Golub and Reinsch relate the singular values and right singular
+  vectors of a data matrix to its Gram matrix and explain the
+  numerical cost of forming the Gram matrix directly.
+  [Record 28](decisions/financial/models-analytic/yield-pca.md#accepted-decision-for-checked-yield-change-pca-and-scenarios)
+  applies this to centered yield changes with sample-covariance scale.
+  [Singular Value Decomposition and Least Squares Solutions](https://people.duke.edu/~hpgavin/SystemID/References/Golub%2BReinsch-NM-1970.pdf)
+- Yu, Wang and Samworth relate estimated subspace sensitivity to
+  eigenvalue separation and extend their result to singular vectors.
+  The accepted sign anchor and variance-retention rules govern each
+  fitted snapshot.
+  [A useful variant of the Davis–Kahan theorem for statisticians](https://arxiv.org/abs/1405.0680)
 
 <a id="mcneil-frey-embrechts-qrm"></a>
 
@@ -630,17 +799,34 @@ and implementation and validation evidence.
 
 ### Vasicek 2002 Loan Portfolio
 
-- Vasicek, O. A. "The Distribution of Loan Portfolio Value." *Risk*, 15(12),
-  160-162. Asymptotic single-factor portfolio-loss distribution used in IRB
-  PD mapping.
+- Vasicek derives a conditional default probability under a
+  Gaussian systematic factor and independent idiosyncratic
+  normal shocks. Averaging the conditional probability over
+  the factor recovers the unconditional probability.
+  [The Distribution of Loan Portfolio Value](https://www.bancoinvest.pt/docs/default-source/fundamentais-risco-credito/distributionloanportfoliovalue.pdf)
 
 <a id="basel-ii-2006"></a>
 
 ### Basel II 2006
 
 - Basel Committee on Banking Supervision. *International Convergence of
-  Capital Measurement and Capital Standards: A Revised Framework*. IRB PD
-  floors, EAD/CCF, and asset-correlation formulas.
+  Capital Measurement and Capital Standards: A Revised Framework*.
+  The historical paragraph 285 applies its 0.03% PD floor to
+  specified one-year corporate and bank inputs. A later CRE32
+  edition uses different floors and scope. Record 02 leaves
+  application with the regulatory owner.
+  [Basel II comprehensive version](https://www.bis.org/publ/bcbs128.pdf),
+  [Basel CRE32 dated edition](https://www.bis.org/committees/bcbs/basel-framework/standard/cre/32/inforce/2023-01-01/published/2020-03-27)
+
+### Historical CLO rating factors
+
+- The Moody's CLO methodology dated May 15, 2024 uses ten-year
+  idealized default rates scaled by 10,000 for its stated rating
+  inputs. Exhibit 1 includes Ca and C at 10,000. The table
+  comparison supports historical provenance only. A live
+  structured-credit use requires a qualified selected edition and
+  its own treatment of unrated or missing inputs.
+  [Moody's Global Approach to Rating Collateralized Loan Obligations](https://ratings.moodys.com/api/rmc-documents/420962)
 
 <a id="lando-skodeberg-2002"></a>
 
@@ -883,6 +1069,7 @@ and implementation and validation evidence.
 
 - Black, F., and Scholes, M. "The Pricing of Options and Corporate Liabilities."
   Canonical European option pricing model on a non-dividend-paying underlying.
+  [Original paper](https://doi.org/10.1086/260062).
 
 <a id="merton-1973"></a>
 
@@ -890,6 +1077,166 @@ and implementation and validation evidence.
 
 - Merton, R. C. "Theory of Rational Option Pricing." Continuous-dividend-yield
   extension of Black-Scholes used by the spot-style closed-form primitives.
+
+### Checked CRR and Leisen–Reimer lattices
+
+- Cox, Ross and Rubinstein derive strict risk-neutral support,
+  the branch probabilities and discounted exercise recursion.
+  [Option Pricing: A Simplified Approach](https://bpb-us-w2.wpmucdn.com/u.osu.edu/dist/7/36891/files/2017/07/CRR79-1yy8av8.pdf)
+- Leisen and Reimer, section 4, use odd step counts and
+  Peizer–Pratt inversion for strike-centered constructions.
+  [Record 001](decisions/financial/models-numerical/equity-binomial-construction.md#accepted-decision-for-checked-crr-and-leisenreimer-lattices)
+  selects method 2 and checked complementary-weight arithmetic.
+  The paper distinguishes European convergence analysis from
+  its early-exercise results.
+  [Binomial Models for Option Valuation](https://wiwi.uni-bonn.de/sfb303/papers/1995/b/bonnsfb309.pdf)
+
+### Checked escrowed dividends and lattice exercise
+
+- Haug, Haug and Lewis describe the shifted stock volatility of escrow
+  and the effect of changing the reserve with option expiry. Lu gives
+  the stock and strike adjustments under a common reserve horizon.
+  [Back to Basics](https://citeseerx.ist.psu.edu/document?doi=414dac84d6185d1840a20e1f38e1858004f5d4d1&repid=rep1&type=pdf),
+  [Discrete dividends after maturity](https://arxiv.org/abs/2607.24973)
+- QuantLib's escrowed finite-difference adjustment illustrates use
+  of the discount-to-yield factor ratio in reserve carry.
+  [QuantLib escrow adjustment](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/methods/finitedifferences/utilities/escroweddividendadjustment.cpp#L34-L41)
+- Vellekoop and Nieuwenhuis separate pre- and post-dividend value
+  and use interpolation across a piecewise lognormal stock jump.
+  Their model gives an alternative for comparison. The exact-node
+  exercise and delayed-payment claim conventions are specific to
+  [record 002](decisions/financial/models-numerical/dividends-and-lattice-exercise.md#accepted-decision-for-checked-escrowed-dividends-and-lattice-exercise).
+  [Efficient Pricing of Derivatives on Assets with Discrete Dividends](https://ris.utwente.nl/ws/portalfiles/portal/6787112/Vellekoop06efficient.pdf)
+
+### Discrete-dividend jumps and modeled ex-values
+
+- Haug, Haug and Lewis distinguish the requested dividend from its
+  modeled payout when equity is insufficient. Their liquidator policy
+  motivates the capped stock drop and absorbing zero selected in the
+  accepted Monte Carlo contract.
+  [Back to Basics](https://citeseerx.ist.psu.edu/document?doi=414dac84d6185d1840a20e1f38e1858004f5d4d1&repid=rep1&type=pdf).
+- Vellekoop and Nieuwenhuis analyze stock diffusion between discrete
+  dividend dates and the stock transition at the ex boundary.
+  The accepted model selects exact grid placement and a post-ex
+  observation phase for its own Monte Carlo driver.
+  [Efficient Pricing of Derivatives on Assets with Discrete Dividends](https://ris.utwente.nl/ws/portalfiles/portal/6787112/Vellekoop06efficient.pdf).
+- Buryak and Guo distinguish nominal and modeled cash in their
+  analysis of forward and parity effects near depletion.
+  [Put–call parity and discrete dividends](https://arxiv.org/abs/1407.7328).
+
+### Checked tree discounting and rollback
+
+- Ho and Lee use one-period discount bonds and backward
+  substitution for term-structure contingent claims.
+  [Term Structure Movements and Pricing Interest Rate Contingent Claims](https://onlinelibrary.wiley.com/doi/full/10.1111/j.1540-6261.1986.tb02528.x)
+- QuantLib's lattice implementation uses the same departing-node
+  discount and branch weights for forward state prices and
+  backward expectation. [Forward and backward lattice operators](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/methods/lattices/lattice.hpp)
+- QuantLib's callable bond API uses a benchmark maturity zero
+  rate to convert a conventional OAS to one continuous shift.
+  [Record 003](decisions/financial/models-numerical/tree-discounting-and-induction.md#accepted-decision-for-checked-tree-discounting-and-rollback)
+  selects a local nodewise periodic restatement under the accepted
+  scalar conversion. External comparisons must match the quote
+  basis and discount law. [Callable bond OAS conversion](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/experimental/callablebonds/callablebond.cpp#L197-L230)
+
+### Checked Ho–Lee curve fitting
+
+- Ho and Lee take the observed initial term structure as given.
+  Grant and Vora develop an analytical implementation of the
+  short-rate model. The selected finite binomial law, noncontinuous
+  bracket and acceptance controls are specified in
+  [record 004](decisions/financial/models-numerical/ho-lee-curve-fit.md#accepted-decision-for-checked-holee-curve-fitting).
+  [Ho and Lee, 1986](https://onlinelibrary.wiley.com/doi/full/10.1111/j.1540-6261.1986.tb02528.x),
+  [Grant and Vora, 2003](https://www.sciencedirect.com/science/article/pii/S1044028303000036)
+
+### Checked BDT curve fitting
+
+- Black, Derman and Toy construct a short-rate tree from the initial
+  rate and yield-volatility structures and use it for bond options.
+  [A One-Factor Model of Interest Rates and Its Application to Treasury Bond Options](https://rpc.cfainstitute.org/research/financial-analysts-journal/1990/a-one-factor-model-of-interest-rates-and-its-application-to-treasury-bond-options)
+- Boyle, Tan and Tian distinguish the conditional short-rate
+  volatility calibration from the yield-volatility construction
+  and analyze their feasibility. [Record 005](decisions/financial/models-numerical/bdt-lognormal-curve-fit.md#accepted-decision-for-checked-bdt-curve-fitting)
+  selects a supplied constant log-rate volatility and one
+  checked curve fit per outgoing row.
+  [Calibrating the Black–Derman–Toy Model](https://www.tandfonline.com/doi/abs/10.1080/13504860110062049)
+
+### Checked BK trinomial fitting
+
+- Black and Karasinski present a lognormal short-rate model
+  with deterministic time variation of the target, mean reversion
+  and volatility. [Record 006](decisions/financial/models-numerical/black-karasinski-trinomial.md#accepted-decision-for-checked-bk-trinomial-fitting)
+  selects constant mean reversion and volatility and fits the
+  initial curve with log-rate row centers.
+  [Bond and Option Pricing when Short Rates are Lognormal](https://rpc.cfainstitute.org/research/financial-analysts-journal/1991/bond-and-option-pricing-when-short-rates-are-lognormal)
+- Hull and White describe the capped branching alternatives and
+  match the first two conditional moments. The selected BK
+  lattice uses the exact OU moment inputs in those branch formulas.
+  [Numerical Procedures for Implementing Term Structure Models I](https://doi.org/10.3905/jod.1994.407902)
+- Daniluk and Muchorski derive continuous-model approximations
+  for bond and swaption prices. Their results provide a comparator
+  candidate with matching inputs and separately qualified error.
+  [Approximations of Bond and Swaption Prices in a Black–Karasiński Model](https://arxiv.org/abs/1506.00697)
+
+### Checked Hull–White event lattices and node bonds
+
+- Hull and White describe state-price calibration, exact conditional
+  moments as an option in moment matching, and variable-step
+  trinomial construction. [Record 007](decisions/financial/models-numerical/hull-white-event-grid-and-affine-bonds.md#accepted-decision-for-checked-hullwhite-event-lattices-and-node-bonds)
+  selects exact moments, nearest-mean branches and a checked prepared
+  grid for the additive Gaussian model.
+  [Numerical Procedures for Implementing Term Structure Models I](https://doi.org/10.3905/jod.1994.407902),
+  [Using Hull–White Interest Rate Trees](https://www-2.rotman.utoronto.ca/~hull/downloadablepublications/USETREE.pdf)
+- The continuous conditional bond follows the accepted centered
+  affine law. Its use for exercise with finite-lattice discounting
+  requires separate grid and price qualification.
+  [Hull–White analytic kernels](#checked-hullwhite-analytic-kernels-and-payment-measures),
+  [Hull–White rate clock and term projection](#hullwhite-rate-clock-curve-fit-and-term-projection)
+
+### Checked rates-credit marginal calibration
+
+- Nelson and Ramaswamy study recombining binomial diffusion
+  approximations. [Record 008](decisions/financial/models-numerical/rates-credit-marginal-calibration.md#accepted-decision-for-checked-rates-credit-marginal-calibration)
+  specifies a local binary mean-matching law with checked variance
+  retention and a separately fitted rate and hazard level.
+  [Simple Binomial Processes as Diffusion Approximations in Financial Models](https://doi.org/10.1093/rfs/3.3.393)
+- Lando and Duffie–Singleton give intensity-based credit valuation
+  context. Survival derives from integrated intensity. Joint
+  discount and survival payoffs depend on the joint law.
+  The positive-part floor and finite-grid acceptance rules are
+  specific to record 008.
+  [On Cox Processes and Credit Risky Securities](https://researchprofiles.ku.dk/en/publications/on-cox-processes-and-credit-risky-securities/),
+  [Modeling Term Structures of Defaultable Bonds](https://web.stanford.edu/~duffie/jstorlinks/ds2.pdf)
+
+### Checked rates-credit coupling and path sampling
+
+- Erdely gives the Fréchet interval and cell formulas for two
+  Bernoulli variables. [Record 009](decisions/financial/models-numerical/rates-credit-coupling-and-sampling.md#accepted-decision-for-checked-rates-credit-coupling-and-path-sampling)
+  applies the accepted strict law to the prepared innovations
+  and checks the intersection over departing row extrema.
+  [A Subcopula Based Dependence Measure, Example 3.1](https://www.kybernetika.cz/content/2017/2/231/paper.pdf)
+- Salmon, Moraes, Dror and Shaw describe counter-based random
+  numbers and Philox. The project profile selects the seed,
+  path, word-pair and midpoint assignments. Random123 supplies
+  independent block reference vectors.
+  [Parallel Random Numbers](https://www.thesalmons.org/john/random123/papers/random123sc11.pdf),
+  [Random123 known-answer vectors](https://raw.githubusercontent.com/DEShawResearch/random123/main/tests/kat_vectors)
+
+### Checked joint credit rollback and coupon folding
+
+- Lando's Cox-process valuation separates payments conditional on survival
+  from default-time payments. Duffie's continuous recovery treatment covers
+  fractional recovery of par. [Record 010](decisions/financial/models-numerical/rates-credit-coupon-folding.md#accepted-decision-for-checked-joint-credit-rollback-and-coupon-folding)
+  derives its local recovery weight by holding the interval rate and
+  intensity constant in the default-time integral.
+  [Lando, Proposition 3.1](https://globalriskguard.com/resources/fideriv/lando_cox.pdf),
+  [Duffie, §2.4](https://web.stanford.edu/~duffie/par.pdf)
+- Bianchetti distinguishes discounting and index forwarding curves and
+  discusses changes of numeraire. The accepted gross-ratio normalization
+  is a project choice for the prepared one-factor rate tree and matches
+  the first moment under its index-maturity forward measure. The record
+  derives the coupon fold by conditioning on fixing and survival to payment.
+  [Two Curves, One Price](https://arxiv.org/abs/0905.2770)
 
 <a id="garman-kohlhagen-1983"></a>
 
@@ -978,7 +1325,60 @@ and implementation and validation evidence.
 
 - Andersen, L. "Simple and Efficient Simulation of the Heston Stochastic
   Volatility Model." Quadratic-exponential discretization used by the Heston
-  Monte Carlo pricers.
+  Monte Carlo pricers. Sections 3.2 and 4 describe the moment-matched
+  transition and the use of its exponential moments.
+  [Author's paper](https://www.maths.univ-evry.fr/pages_perso/crepey/Finance/andersen%20vol%20sto.pdf).
+
+### Checked Heston QE-M spot paths
+
+- Andersen's sections 3.2 and 4.3 give the QE variance law and
+  exponential-moment spot correction. Section 5 uses trapezoidal
+  weights. The ideal conditional forward property applies on the
+  domain of the selected QE law's moment, including the mass at
+  zero in the mixture. Record 09 selects a run failure at a moment
+  pole and evaluates the correction in centered form.
+  [Andersen's paper](https://www.maths.univ-evry.fr/pages_perso/crepey/Finance/andersen%20vol%20sto.pdf).
+- Broadie and Kaya sample the integrated variance conditional on
+  the variance endpoints in their exact Heston method. It provides
+  an independent reference for grid-bias comparisons with QE-M's
+  endpoint-based integral. The deterministic zero-vol-of-vol limit
+  integrates the mean-reverting variance directly.
+  [Broadie and Kaya's paper](https://www.columbia.edu/~mnb2/broadie/Assets/broadie_kaya_exact_sim_or_2006.pdf).
+
+### Revolving-credit utilization and joint paths
+
+- Gillespie gives the exact Gaussian transition of a scalar
+  Ornstein–Uhlenbeck process and its integral. The utilization
+  model uses a frozen-target endpoint followed by saturation,
+  which changes its moments and creates boundary mass.
+  [Exact OU simulation](https://doi.org/10.1103/PhysRevE.54.2084).
+- Hull and White develop the extended Gaussian rate model.
+  Andersen supplies the QE law used for the credit spread.
+  The proposed composition correlates latent step normals and
+  preserves the Gaussian endpoint/integral covariance for the
+  fitted rate, with a separately specified cross-factor coupling.
+  [Hull and White](https://doi.org/10.1093/rfs/3.4.573),
+  [Andersen](https://www.maths.univ-evry.fr/pages_perso/crepey/Finance/andersen%20vol%20sto.pdf).
+- Jiménez, Lopez and Saurina find that borrower distress and
+  supply conditions affect corporate line utilization. The
+  empirical work motivates testing a link and supplies no
+  coefficient or pricing-measure fit for the selected model.
+  [Empirical Analysis of Corporate Credit Lines](https://www.bis.org/bcbs/events/rtf07lopez.pdf).
+
+### Checked CIR QE and deterministic shifts
+
+- Cox, Ingersoll and Ross derive the square-root process and its
+  conditional moments and transition law. Malham and Wiese develop
+  exact transition sampling. The accepted QE law uses the exact
+  first two conditional moments and has its own distribution and
+  atom at zero.
+  [A Theory of the Term Structure of Interest Rates](https://pages.stern.nyu.edu/~dbackus/BCZ/discrete_time/CIR_Econometrica_85.pdf),
+  [Chi-square simulation of the CIR process and the Heston model](https://arxiv.org/abs/0802.4411).
+- Brigo and Mercurio separate the unshifted factor from the
+  deterministic short-rate shift. A curve fit uses a qualified shift
+  integral. The accepted raw route uses the supplied shift and
+  publishes the checked short-rate endpoint.
+  [On deterministic-shift extensions of short-rate models](https://www.ma.imperial.ac.uk/~dbrigo/detshiftrep.pdf).
 
 <a id="reiner-rubinstein-1991"></a>
 
@@ -994,6 +1394,22 @@ and implementation and validation evidence.
   [MODELS-ANALYTIC-05](decisions/financial/models-analytic/barriers-and-rebates.md#accepted-decision-for-continuous-barrier-premiums-and-cash).
   [QuantLib source](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/pricingengines/barrier/analyticbarrierengine.cpp)
 
+### Sampled log barrier crossing and first passage
+
+- Shevchenko, sections 2.3 and 2.4, derives single-barrier
+  crossing probabilities conditional on simulated endpoints and
+  states the cellwise drift and volatility assumptions.
+  [Brownian-bridge barrier simulation](https://arxiv.org/pdf/0904.1157).
+- Casella and Roberts, appendix A, derive the transformed conditional
+  first-passage law of a Brownian bridge. The barrier package uses
+  the crossing uniform to select the conditional time and qualifies
+  the discount law independently.
+  [Conditional first-passage derivation](https://wrap.warwick.ac.uk/id/eprint/35492/1/WRAP_Casella_08-19w.pdf).
+- Broadie, Glasserman and Kou derive an asymptotic barrier shift for
+  approximating discretely monitored contracts with continuous pricing.
+  The sampled continuous bridge uses the contractual level.
+  [Continuity correction](https://www.columbia.edu/~mnb2/broadie/Assets/bgk_mf.pdf).
+
 <a id="kemna-vorst-1990"></a>
 
 ### Kemna Vorst 1990
@@ -1003,6 +1419,20 @@ and implementation and validation evidence.
   Section 4 and Appendix B derive the geometric average's lognormal law.
   The paper's discrete grid includes time zero. Apply the weights for the
   actual grid. See also [QuantLib's discrete geometric engine](https://raw.githubusercontent.com/lballabio/QuantLib/master/ql/pricingengines/asian/analytic_discr_geom_av_price.cpp).
+
+### Discrete Asian payoff and settlement
+
+- Boyle, Broadie and Glasserman, section 2.6, give the discrete arithmetic
+  Asian payoff with the count-normalized average and illustrate a geometric
+  control variate. Kemna and Vorst derive the geometric lognormal law under
+  positive GBM. The same-path control expectation uses the actual fixing
+  law, including history and tied times.
+  [Monte Carlo methods for security pricing](https://business.columbia.edu/sites/default/files-efs/pubfiles/4336/monte_carlo_methods_security_pricing.pdf),
+  [Kemna–Vorst](https://doi.org/10.1016/0378-4266(90)90039-5).
+- FpML's equity options documentation distinguishes averaging dates
+  from the option's delivery or cash settlement. The payoff record
+  specifies its own exact node mapping, scale and observation count.
+  [Equity derivative options product architecture](https://www.fpml.org/spec/fpml-5-3-6-rec-1/html/confirmation/fpml-5-3-intro-9.html).
 
 <a id="turnbull-wakeman-1991"></a>
 
@@ -1041,6 +1471,26 @@ and implementation and validation evidence.
   Path-Dependent Options*, Section 2, give the lookback payoff definitions and
   the relationship between the fixed-call and floating-put payoffs.
   [Original paper](https://business.columbia.edu/sites/default/files-efs/pubfiles/1851/connecting.pdf)
+
+### Sampled lognormal lookback extrema
+
+- Conze and Viswanathan treat fixed-strike lookback payoffs. Goldman,
+  Sosin and Gatto treat floating exercise levels defined by the
+  path extremum.
+  [Fixed-strike lookbacks](https://doi.org/10.1111/j.1540-6261.1991.tb04648.x),
+  [Floating-strike lookbacks](https://doi.org/10.1111/j.1540-6261.1979.tb00059.x).
+- Shevchenko, section 2.3, gives the conditional one-dimensional
+  Brownian-bridge extremum laws by reflection. Inverting one
+  tail gives the sampled extremum used for one payoff direction.
+  Beaglehole, Dybvig and Zhou discuss the simulation bias caused
+  by observing continuous extrema only at nodes.
+  [Conditional extrema](https://arxiv.org/pdf/0904.1157),
+  [Simulation of path extrema](https://doi.org/10.2469/faj.v53.n1.2057).
+- Broadie, Glasserman and Kou relate continuous and discrete
+  extrema prices by asymptotic corrections. The exact-node
+  payoff and sampled continuous bridge each use their selected
+  monitoring law directly.
+  [Connecting discrete and continuous path-dependent options](https://www.columbia.edu/~sk75/f%26sBGK.pdf).
 
 <a id="broadie-glasserman-kou-1997"></a>
 
@@ -1292,7 +1742,25 @@ and implementation and validation evidence.
 
 - Bayer, C., Friz, P., and Gatheral, J. "Pricing under rough volatility."
   *Quantitative Finance*, 16(6), 887-904. Rough Bergomi and forward-variance
-  curve inputs.
+  curve inputs. [Original paper](https://doi.org/10.1080/14697688.2015.1099717).
+
+### Rough Bergomi adapted steps and moment limits
+
+- Bayer, Friz and Gatheral give the conditional forward-variance
+  model and its shared Brownian driver. McCrickerd and Pakkanen
+  describe a hybrid-grid simulation and condition on the common
+  driver to evaluate options. The proposed left-point step uses
+  sampled-grid variance for Gaussian normalization.
+  [Original model](https://www.realvol.com/RVOL2Paper.pdf),
+  [Simulation and conditioning](https://arxiv.org/pdf/1708.02563).
+- Gassiat distinguishes the continuous model's true and strict
+  local martingale regimes and proves higher-moment divergence
+  under stated conditions. The proposed grid's first-moment
+  identity and direct call variance follow separately by
+  conditioning on the current shock and the previous cell's
+  independent RL residual. The European estimator uses grid
+  put–call parity and bounded put observations.
+  [Continuum martingale and moment results](https://arxiv.org/pdf/1811.10935).
 
 <a id="gatheral-jaisson-rosenbaum-2018"></a>
 
@@ -1308,7 +1776,31 @@ and implementation and validation evidence.
 
 - El Euch, O., and Rosenbaum, M. "The characteristic function of rough Heston
   models." *Mathematical Finance*, 29(1), 3-38. Rough Heston dynamics and
-  characteristic function.
+  characteristic function. [Original paper](https://arxiv.org/pdf/1609.02108).
+
+### Rough Heston hybrid paths and projection
+
+- El Euch and Rosenbaum give the fractional variance equation.
+  Abi Jaber, Larsson and Pulido cover the fractional case in
+  Example 7.2 and prove the continuous stock martingale in
+  Lemma 7.3. The proposed grid uses exact newest-cell Gaussian
+  covariance and an older-cell projection onto Brownian increments.
+  [Fractional Heston law](https://arxiv.org/pdf/1609.02108),
+  [Affine Volterra Processes](https://arxiv.org/pdf/1708.08796).
+- Bennedsen, Lunde and Pakkanen describe exact near-cell integrals
+  and average-kernel projection. Richard, Tan and Yang analyze
+  related rough Heston Euler schemes using positive parts in their
+  coefficients. Convergence of the proposed projected hybrid
+  requires its own evidence.
+  [Hybrid cell projection](https://pure.au.dk/ws/files/135819738/Bennedsen2017_Article_HybridSchemeForBrownianSemista.pdf),
+  [Related discrete-time simulation schemes](https://arxiv.org/pdf/2107.07835).
+- Gerhold, Gerstenecker and Pinter analyze continuum moment
+  explosions. The finite-grid Gaussian power-moment bound in
+  record 15 follows from its square-root history recursion.
+  Bayer and Brêneis provide a separate weak simulation approach
+  for benchmark comparisons.
+  [Continuum moment explosions](https://arxiv.org/pdf/1801.09458),
+  [Weak simulation benchmark](https://arxiv.org/abs/2310.04146).
 
 <a id="rough-heston-lewis-and-tail-comparison"></a>
 
@@ -1348,13 +1840,70 @@ and implementation and validation evidence.
 - McCrickerd, R., and Pakkanen, M. S. "Turbocharging Monte Carlo pricing for
   the rough Bergomi model." *Quantitative Finance*, 18(11), 1877-1886.
 
+### Fractional noise and actual-grid Volterra projection
+
+- Mandelbrot and Van Ness define fractional Brownian motion
+  with stationary increments. The standalone sampler uses the
+  accepted unit-normalized increment covariance with a
+  chronological lower factor.
+  [Original fBM paper](https://epubs.siam.org/doi/10.1137/1010093).
+- Bennedsen, Lunde and Pakkanen use power-kernel integrals near
+  the endpoint and a step approximation elsewhere. Proposition
+  2.8 derives the cell-average constant as an orthogonal
+  projection. The proposal applies that projection to each
+  actual cell and retains the exact newest integral. The
+  projection preserves covariance with its Brownian increment
+  while changing the variance and covariance of the sampled
+  fractional levels.
+  [Hybrid scheme](https://pure.au.dk/ws/files/135819738/Bennedsen2017_Article_HybridSchemeForBrownianSemista.pdf).
+- McCrickerd and Pakkanen use the shared Brownian driver in
+  rough Bergomi leverage. For the proposed grid law, normalizing
+  a Gaussian exponential uses the variance of the sampled
+  level. Product convergence requires separate evidence.
+  [Rough Bergomi simulation](https://arxiv.org/abs/1708.02563).
+
+### Cheyette state and rough volatility extension
+
+- Cheyette derives the separable HJM state reduction in equations 4–7.
+  García-Lorite and Merino give the corresponding short rate and
+  two state equations in section 3.2, along with the bond formula
+  under an initial forward curve.
+  [Cheyette's Interest Rate Models](https://catalogimages.wiley.com/images/db/pdf/E0471220949.01.pdf),
+  [Convexity adjustments à la Malliavin](https://arxiv.org/html/2304.13402#S3.SS2).
+- Gillespie gives the exact Gaussian OU transition. Bennedsen, Lunde
+  and Pakkanen give the hybrid power-kernel construction. The
+  [accepted rough Cheyette record](decisions/financial/models-monte-carlo/16-rough-cheyette.md#accepted-decision-for-checked-rough-cheyette-paths)
+  combines these with left-frozen amplitude and a projection that
+  preserves rate covariance with the actual Brownian increment.
+  Its within-cell rough covariance and financial qualification are
+  separate from those references.
+  [Exact OU simulation](https://doi.org/10.1103/PhysRevE.54.2084),
+  [Hybrid scheme](https://arxiv.org/abs/1507.03004).
+
 <a id="schwartz-smith-2000"></a>
 
 ### Schwartz Smith 2000
 
 - Schwartz, E., and Smith, J. E. "Short-Term Variations and Long-Term Dynamics
   in Commodity Prices." *Management Science*, 46(7), 893-911. Two-factor
-  commodity spot model.
+  commodity spot model. [Authors' paper](https://www.anderson.ucla.edu/documents/areas/fac/finance/72.pdf).
+
+### Schwartz Smith joint transition and spot expectation
+
+- Schwartz and Smith give the OU and arithmetic Brownian factor
+  means and covariance in sections 2 and 3. Their pricing law
+  applies constant drift adjustments and equation 9 gives the
+  risk-neutral expectation of future spot. The proposed step
+  uses the integrated Gaussian covariance, with scaled loadings
+  for its conditional residual and log-spot variance.
+  [Schwartz and Smith](https://www.anderson.ucla.edu/documents/areas/fac/finance/72.pdf).
+- Section 3.1 relates the risk-neutral expectation to futures
+  and states the conditions for forward equality. Cox, Ingersoll
+  and Ross analyze the forward and futures distinction under
+  stochastic rates. Curve calibration and a one-expiry terminal
+  mean constraint serve different purposes.
+  [Schwartz and Smith](https://www.anderson.ucla.edu/documents/areas/fac/finance/72.pdf),
+  [Cox, Ingersoll and Ross](https://spinup-000d1a-wp-offload-media.s3.amazonaws.com/faculty/wp-content/uploads/sites/34/2019/06/1981_ForwardFuturesPrices.pdf).
 
 <a id="kirk-1995"></a>
 
@@ -1509,6 +2058,39 @@ and implementation and validation evidence.
 ### Dupire 1994
 
 - Dupire, B. "Pricing with a Smile." Canonical local-volatility density reference.
+
+### Checked lognormal and local-volatility paths
+
+- Black and Scholes give the lognormal pricing model. Glasserman covers
+  exact lognormal path generation on a simulation grid. The accepted
+  model also allows deterministic integrated carry and piecewise variance.
+  [Black and Scholes](https://www.journals.uchicago.edu/doi/10.1086/260062),
+  [Generating sample paths](https://link.springer.com/chapter/10.1007/978-0-387-21617-1_3).
+- Dupire explains recovering a deterministic volatility term structure
+  from ATM total variance and extending to state-dependent volatility.
+  Gatheral and Jacquier give the calendar condition at every fixed log
+  forward moneyness. The accepted ATM bootstrap samples only zero
+  log forward moneyness at its requested expiries.
+  [Pricing with a Smile](https://www.risk.net/sites/default/files/import_unmanaged/risk.net/data/risk/pdf/technical/2007/risk20_0707_technical_volatility.pdf),
+  [Arbitrage-free SVI volatility surfaces](https://arxiv.org/abs/1204.0646).
+- Glasserman treats discretized diffusion paths. The accepted local-volatility
+  model uses the accepted instantaneous relative coefficient and freezes it
+  at the left knot in log space. Product convergence depends on the grid
+  and payoff. [Discretization methods](https://link.springer.com/chapter/10.1007/978-0-387-21617-1_6).
+
+### Coordinatewise Euler and exact Gaussian transitions
+
+- Higham presents Euler–Maruyama, Milstein and the assumptions behind
+  their convergence and stability analysis. The accepted generic
+  Euler operation selects a checked coordinatewise coefficient domain.
+  [An Algorithmic Introduction to Numerical Simulation of Stochastic Differential Equations](https://epubs.siam.org/doi/10.1137/S0036144500378302).
+- Gillespie derives the exact scalar OU transition. Särkkä and Solin
+  give the conditional mean and covariance for linear SDEs in
+  sections 6.1–6.2. The accepted multi-OU law specializes that
+  covariance integral to diagonal drift with correlated Brownian
+  drivers, then factors the finite-step innovation covariance.
+  [Exact numerical simulation of the Ornstein–Uhlenbeck process and its integral](https://journals.aps.org/pre/abstract/10.1103/PhysRevE.54.2084),
+  [Applied Stochastic Differential Equations](https://users.aalto.fi/~asolin/sde-book/sde-book.pdf).
 
 ### Checked Dupire extraction and local-volatility grids
 
@@ -1917,6 +2499,23 @@ and implementation and validation evidence.
   points, are the units for replicate uncertainty under the relevant assumptions;
   this paper does not qualify the project's prefix-hash family or owner policy.
 
+### Sobol blocks, Brownian paths and replicate diagnostics
+
+- Owen analyzes how thinning, skipping point zero and inappropriate counts
+  can degrade a Sobol net. The accepted pricing mode takes complete,
+  equal base-2 prefixes from point zero. The selected prefix-hash
+  profile has the finite net properties stated in CORE-NUMERICS-18.
+  [On Dropping the First Sobol' Point](https://arxiv.org/abs/2008.08051).
+- Morokoff describes Brownian bridge construction for quasi-random paths.
+  Wang and Sloan show that its benefit depends on the payoff. The accepted
+  pricing mode evaluates standardized increments using the conditional
+  Gaussian split on actual knots. [Generating Quasi-Random Paths for Stochastic Processes](https://epubs.siam.org/doi/10.1137/S0036144597317959),
+  [Brownian bridge performance in finance](https://pubsonline.informs.org/doi/10.1287/opre.1100.0853).
+- L'Ecuyer et al. study Student-t intervals over independently randomized
+  replicate estimates. The accepted deterministic root-to-seed profile
+  supplies descriptive replicate spread and leaves the confidence interval
+  and sampling standard error unavailable. [Confidence Intervals for Randomized Quasi-Monte Carlo Estimators](https://www.informs-sim.org/wsc23papers/037.pdf).
+
 <a id="box-muller-1958"></a>
 
 ### Box Muller 1958
@@ -1956,7 +2555,22 @@ and implementation and validation evidence.
 
 - Salmon, J. K., Moraes, M. A., Dror, R. O., and Shaw, D. E. "Parallel Random
   Numbers: As Easy as 1, 2, 3." *SC '11*. Counter-based Philox generator used
-  for splittable Monte Carlo streams.
+  for splittable Monte Carlo streams. The Random123 vector file supplies
+  independent all-zero, all-ones and mixed key/counter checks. The project
+  selects its own word pairing, midpoint mapping, normal transform and
+  exhaustion policy.
+  [Original paper](https://www.thesalmons.org/john/random123/papers/random123sc11.pdf),
+  [Random123 known-answer vectors](https://github.com/DEShawResearch/random123/blob/main/tests/kat_vectors).
+
+### FNV-1a seed derivation and UTF-8 framing
+
+- Noll et al. specify FNV-1a's XOR-before-multiply recurrence and the
+  64-bit constants. The project's instrument-and-scenario mapping uses
+  its own byte framing. [FNV, RFC 9923 §§2 and 5](https://www.rfc-editor.org/rfc/rfc9923.html#section-2).
+- Yergeau documents the permitted UTF-8 byte sequences, which exclude
+  `0xff`. The delimiter therefore identifies the component boundary
+  before hashing. A 64-bit hash can map distinct encoded pairs to the
+  same seed. [UTF-8, RFC 3629 §1](https://www.rfc-editor.org/rfc/rfc3629.html#section-1).
 
 <a id="o-neill-2014-pcg"></a>
 
@@ -2002,7 +2616,142 @@ and implementation and validation evidence.
 
 - In 't Hout, K. J., and Welfert, B. D. "Unconditional stability of second-order
   ADI schemes applied to multi-dimensional diffusion equations with mixed
-  derivative terms." Modified Craig-Sneyd ADI used by 2D PDE engines.
+  derivative terms." *Applied Numerical Mathematics*, 59(3–4), 677–692.
+  The paper introduces Modified Craig–Sneyd and analyzes diffusion
+  discretizations with mixed derivatives.
+  [Primary paper](https://www.sciencedirect.com/science/article/abs/pii/S016892740800055X)
+
+<a id="craig-sneyd-1988"></a>
+
+### Craig and Sneyd 1988
+
+- Craig and Sneyd introduce the earlier alternating-direction
+  implicit scheme with a mixed-derivative correction.
+  [An Alternating-Direction Implicit Scheme for Parabolic Equations with Mixed Derivatives](https://www.sciencedirect.com/science/article/pii/0898122188901502)
+
+<a id="in-t-hout-mishra-mcs-stability"></a>
+
+### In 't Hout and Mishra MCS stability
+
+- Equation (1.4) gives the full MCS stages. Theorem 2.2 gives the
+  real-symbol \(1/3\) result. Theorem 2.3 establishes \(2/5\)
+  as necessary for its broader symbol class and conjectures
+  sufficiency. Section 3 states the Fourier problem assumptions.
+  [Stability of the Modified Craig–Sneyd Scheme for Two-Dimensional Convection-Diffusion Equations with Mixed Derivative Term](https://arxiv.org/pdf/1011.6528)
+
+### Checked PDE grids, interpolation and coordinate Greeks
+
+- In 't Hout and Foulon use Cartesian sinh meshes in Section 2.2,
+  equations (2.6)–(2.8), and a barrier endpoint in Section 3.3.
+  [Record 011](decisions/financial/models-numerical/pde-grids-interpolation-and-greeks.md#accepted-decision-for-checked-pde-grids-interpolation-and-coordinate-greeks)
+  uses the mapping family in the chosen model coordinate, with
+  checked finite geometry and explicit endpoints.
+  [ADI Finite Difference Schemes for Option Pricing in the Heston Model with Correlation](https://www.math.ualberta.ca/ijnam/Volume-7-2010/No-2-10/2010-02-06.pdf)
+- Fornberg derives polynomial finite-difference weights on arbitrary
+  1D meshes. The accepted nodal first and second derivatives use
+  the three-point quadratic case, including endpoint evaluations.
+  The closed-domain rule and interpolation of derivative estimates
+  are project choices. Product accuracy requires independent refinement
+  and reference comparisons.
+  [Generation of Finite Difference Formulas on Arbitrarily Spaced Grids](https://www.ams.org/mcom/1988-51-184/S0025-5718-1988-0935077-0/S0025-5718-1988-0935077-0.pdf)
+
+### Checked directional and mixed PDE stencils
+
+- Windcliff, Forsyth and Vetzal derive the nonuniform central row
+  and switch to upstream convection when an off-diagonal turns
+  negative, in Section 4, equations (4.2)–(4.7).
+  [Record 012](decisions/financial/models-numerical/pde-spatial-stencils.md#accepted-decision-for-checked-directional-and-mixed-pde-stencils)
+  selects that switch with exact product comparison and checked
+  row arithmetic. Boundary and time-march decisions have separate scope.
+  [Analysis of the Stability of the Linear Boundary Condition for the Black–Scholes Equation](https://cs.uwaterloo.ca/~paforsyt/bc.pdf)
+- In 't Hout and Foulon give the centered directional weights
+  in equations (2.9b) and (2.10) and the tensor mixed stencil
+  in (2.11). Section 2.3 treats the mixed term separately from
+  implicit directional solves. The accepted equal split of
+  the source and the strict represented-coefficient admission
+  are specified in 012. The paper's upwind rule and boundary
+  closure use their own assumptions.
+  [ADI Finite Difference Schemes for Option Pricing in the Heston Model with Correlation](https://www.math.ualberta.ca/ijnam/Volume-7-2010/No-2-10/2010-02-06.pdf)
+
+### Checked PDE boundary elimination and reconstruction
+
+- Windcliff, Forsyth and Vetzal discuss the zero spot-curvature
+  condition and the role of the boundary row in stability in
+  Sections 2.2 and 4.1. [Record 013](decisions/financial/models-numerical/pde-boundary-elimination.md#accepted-decision-for-checked-pde-boundary-elimination-and-reconstruction)
+  uses the affine-in-spot idea for log-spot extrapolation and
+  defines its own checked local substitution.
+  [Analysis of the Stability of the Linear Boundary Condition for the Black–Scholes Equation](https://cs.uwaterloo.ca/~paforsyt/bc.pdf)
+- In 't Hout and Foulon use a limiting PDE treatment at the
+  zero-variance edge under their Feller assumption in Sections
+  2.1 and 2.2. The project's corner ownership and affine
+  boundary relations are choices in 013. Heston closure selection
+  and qualification belong to the bridge record.
+  [ADI Finite Difference Schemes for Option Pricing in the Heston Model with Correlation](https://www.math.ualberta.ca/ijnam/Volume-7-2010/No-2-10/2010-02-06.pdf)
+
+### Checked theta marching and tridiagonal solves
+
+- Giles and Carter analyze the convergence of damped
+  Crank–Nicolson on their selected problems. Section 4.3
+  distinguishes full backward-Euler intervals from
+  Rannacher's paired halfsteps. [Record 014](decisions/financial/models-numerical/theta-time-march-and-thomas.md#accepted-decision-for-checked-theta-marching-and-tridiagonal-solves)
+  selects the full-interval profile and tracks independent
+  qualification of the live product counts and event restarts.
+  [Convergence Analysis of Crank–Nicolson and Rannacher Time-Marching](https://people.maths.ox.ac.uk/~gilesm/files/giles_carter.pdf)
+- Higham gives the tridiagonal elimination recurrences in
+  Section 2 and qualifies error bounds by matrix class.
+  LAPACK's DGTRFS documents the componentwise backward
+  error based on the original row and RHS. Record 014
+  specifies its own scaled ratio and inclusive tolerance.
+  [Bounding the Error in Gaussian Elimination for Tridiagonal Systems](https://nhigham.com/wp-content/uploads/2023/09/high90t-1.pdf),
+  [LAPACK DGTRFS](https://netlib.org/lapack/explore-html/d2/d33/dgtrfs_8f_source.html)
+
+### Checked grid-based PDE exercise
+
+- In 't Hout and Valkov give the explicit payoff split in Section 3,
+  equation (7), and report regime-dependent temporal errors.
+  In 't Hout and Snoeijer give the Bermudan exercise-time maximum
+  in equations (1.3) and (2.13). [Record 015](decisions/financial/models-numerical/pde-exercise-projection.md#accepted-decision-for-checked-grid-based-pde-exercise)
+  selects the nodewise rule for its qualified 1D profile.
+  [Numerical Study of Splitting Methods for American Option Valuation](https://arxiv.org/pdf/1610.09622),
+  [Numerical Valuation of Bermudan Basket Options via Partial Differential Equations](https://arxiv.org/pdf/1909.01164)
+- Forsyth and Vetzal distinguish explicit obstacle enforcement from
+  a coupled penalty iteration and publish independent American put
+  comparators in Tables 11.1 and 12.1. Their coupled solve and binomial
+  estimates provide qualification targets with aligned inputs.
+  [Quadratic Convergence for Valuing American Options Using a Penalty Method](https://cs.uwaterloo.ca/~paforsyt/con7.pdf)
+
+<a id="checked-modified-craig-sneyd-adi"></a>
+
+### Checked Modified Craig–Sneyd ADI
+
+- [Record 016](decisions/financial/models-numerical/mcs-adi-time-march.md#accepted-decision-for-checked-modified-craigsneyd-adi)
+  selects fixed-parameter MCS and the project's factorized startup.
+  In 't Hout and Foulon give the MCS stages in Section 2.3
+  and European Heston input sets and refinement comparisons
+  in Table 1 and Sections 3.1–3.2. Their backward-Euler
+  startup comparisons use a coupled step.
+  [In 't Hout and Foulon](https://www.math.ualberta.ca/ijnam/Volume-7-2010/No-2-10/2010-02-06.pdf)
+- Wyns analyzes MCS with coupled backward-Euler halfsteps
+  under the paper's model and grid assumptions. The
+  factorized startup in 016 has different mixed-term and
+  affine stage effects and requires independent qualification.
+  [Convergence Analysis of the Modified Craig–Sneyd Scheme with Nonsmooth Initial Data](https://arxiv.org/pdf/1508.04296)
+
+### Checked PDE coefficient bridges
+
+- Black and Scholes give the constant-volatility pricing PDE.
+  Heston gives the square-root variance model, mixed PDE term
+  and characteristic-function pricing. [Record 017](decisions/financial/models-numerical/black-scholes-and-heston-pde-bridges.md#accepted-decision-for-checked-pde-coefficient-bridges)
+  selects checked generators in log spot and variance with
+  explicit risk-neutral inputs and represented diffusion rules.
+  [The Pricing of Options and Corporate Liabilities](https://www.journals.uchicago.edu/doi/10.1086/260062),
+  [Heston's stochastic volatility model](https://www.ma.imperial.ac.uk/~ajacquie/IC_Num_Methods/IC_Num_Methods_Docs/Literature/Heston.pdf)
+- In 't Hout and Foulon describe the vanishing diffusion terms
+  at zero variance and their limiting-PDE treatment under strict
+  Feller in Sections 2.1 and 2.2. Record 017 selects linear
+  reconstruction for the existing solver topology and requires
+  separate reachable-zero, zero-start and truncation evidence.
+  [ADI Finite Difference Schemes for Option Pricing in the Heston Model with Correlation](https://www.math.ualberta.ca/ijnam/Volume-7-2010/No-2-10/2010-02-06.pdf)
 
 <a id="broadie-detemple-1996"></a>
 
@@ -2323,6 +3072,57 @@ and implementation and validation evidence.
 
 - Overhaus, M. et al. *Equity Derivatives: Theory and Applications*. Wiley.
   Autocallable and related equity-structured-product mechanics.
+
+### Autocallable observation eligibility and payment terms
+
+- The Royal Bank of Canada Buffered Phoenix pricing supplement
+  specifies separate coupon and call conditions, excludes the final
+  observation from calling and releases memory only when the coupon
+  condition is met. Its buffered downside is specific to that issue.
+  [RBC filed pricing supplement](https://www.sec.gov/Archives/edgar/data/1000275/000095010325000733/dp223672_424b2-jpmeln550.htm).
+- The UBS contingent-income pricing supplement illustrates
+  separate final determination and maturity dates, memory released
+  at the qualifying payment date and inclusive level tests.
+  [UBS filed pricing supplement](https://www.sec.gov/Archives/edgar/data/1114446/000183988225039448/ubs_424b2-21451.htm).
+- The Nasdaq-100 accelerated-redemption filing includes the final
+  observation as an eligible call with maturity-date settlement.
+  Issuer terms govern actual observations, call amounts and
+  redemption. The [accepted autocallable record](decisions/financial/models-monte-carlo/20-autocallable.md#accepted-decision-for-checked-monte-carlo-autocallable-payoffs)
+  selects a single-underlying par-call contract with explicit row
+  eligibility and its own three maturity redemption formulas.
+  [Filed accelerated-redemption terms](https://www.sec.gov/Archives/edgar/data/83246/000110465925103049/tm2527726d407_fwp.pdf).
+
+### Cliquet reset and accumulation contracts
+
+- The historical CBOE FLEX approval order describes a standalone
+  cliquet option using successive monthly fixing levels, capped
+  simple returns, addition and a final zero floor.
+  [CBOE approval order](https://www.sec.gov/rules/sro/cboe/2015/34-75425.pdf).
+- Barclays' filed pricing supplement describes the initial level
+  and subsequent period-end anchors for an additive capped-return
+  note. That issue specifies principal separately.
+  [Barclays filed pricing supplement](https://www.sec.gov/Archives/edgar/data/312070/000119312511020240/d424b2.htm).
+- Carr and Wu, equations 19–20, use a product of locally capped
+  gross factors for a compounding cliquet. Their example pays gross
+  value. The [accepted Monte Carlo cliquet record](decisions/financial/models-monte-carlo/21-cliquet.md#accepted-decision-for-checked-monte-carlo-cliquet-payoffs)
+  uses the recurrence and specifies its own return-only payout.
+  [Static Hedging of Standard Options](https://engineering.nyu.edu/sites/default/files/2019-01/CarrStandardOptionsJuly2002-a.pdf).
+
+### Range accrual observation counts and coupon terms
+
+- Bank of America's RANGE-1 supplement defines a qualifying-day
+  count over the full applicable count. Its term sheets choose the
+  eligible day basis, period boundaries and range.
+  [Filed range accrual supplement](https://www.sec.gov/Archives/edgar/data/70858/000119312510199455/d424b5.htm).
+- JPMorgan's equity-index supplement describes inclusive lower and
+  upper band tests where selected by the issue terms.
+  [Filed equity-index range terms](https://www.sec.gov/Archives/edgar/data/19617/000089109214000661/e57163_424b2.pdf).
+- Morgan Stanley's buffered issue illustrates an annual rate,
+  a qualifying index-business-day fraction, a separate 30/360
+  basis and distinct determination and payment dates. The
+  [accepted range accrual record](decisions/financial/models-monte-carlo/22-range-accrual.md#accepted-decision-for-checked-monte-carlo-range-accrual)
+  accepts a prepared full-period coupon for one fixed schedule.
+  [Filed buffered range accrual terms](https://www.sec.gov/Archives/edgar/data/895421/000095010312001632/dp29638_424b2-ps133.htm).
 
 ## Expected Credit Loss And Accounting Impairment
 

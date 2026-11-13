@@ -515,11 +515,248 @@ uncertainty.
 [Analytic-model record 26](models-analytic/hw1f-issuer-lsmc.md#accepted-decision-for-checked-issuer-call-policy-training-and-pricing)
 was accepted on 2026-11-10 for dated issuer-call cash, checked
 continuation regression and independent pricing of a frozen policy.
-[Analytic-model record 27](models-analytic/diebold-li-var.md#proposed-decision-for-checked-nelsonsiegel-factors-and-var-forecasts)
-proposes explicit observation cadence, checked Nelson–Siegel factor
-extraction, stable VAR dynamics and marginal fitted-yield forecasts.
-Record 28 remains Draft.
+[Analytic-model record 27](models-analytic/diebold-li-var.md#accepted-decision-for-checked-nelsonsiegel-factors-and-var-forecasts)
+was accepted on 2026-11-10 for explicit observation cadence, checked
+Nelson–Siegel factor extraction, stable VAR dynamics and marginal
+fitted-yield forecasts.
+[Analytic-model record 28](models-analytic/yield-pca.md#accepted-decision-for-checked-yield-change-pca-and-scenarios)
+was accepted on 2026-11-11 for checked yield-change PCA, full-spectrum
+variance accounting and fitted-basis reconstruction and scenarios.
+All 28 analytic-model records are Accepted.
+[Numerical-model record 001](models-numerical/equity-binomial-construction.md#accepted-decision-for-checked-crr-and-leisenreimer-lattices)
+was accepted on 2026-11-11 for checked CRR and Leisen–Reimer
+transitions, explicit lattice counts and exact vanilla payoff limits.
+[Numerical-model record 002](models-numerical/dividends-and-lattice-exercise.md#accepted-decision-for-checked-escrowed-dividends-and-lattice-exercise)
+was accepted on 2026-11-11 for dated ex-claim values, a common escrow
+reserve horizon, exact alignment and product-qualified exercise phases.
+[Numerical-model record 003](models-numerical/tree-discounting-and-induction.md#accepted-decision-for-checked-tree-discounting-and-rollback)
+was accepted on 2026-11-11 for checked interval discounting, explicit
+nodewise OAS, validated rollback and genuine terminal state.
+[Numerical-model record 004](models-numerical/ho-lee-curve-fit.md#accepted-decision-for-checked-holee-curve-fitting)
+was accepted on 2026-11-11 for origin-relative Ho–Lee targets,
+checked additive row fits and one repricing gate.
+[Numerical-model record 005](models-numerical/bdt-lognormal-curve-fit.md#accepted-decision-for-checked-bdt-curve-fitting)
+was accepted on 2026-11-11 for strictly decreasing BDT targets,
+unclamped log-rate fits and one inclusive replay gate.
+[Numerical-model record 006](models-numerical/black-karasinski-trinomial.md#accepted-decision-for-checked-bk-trinomial-fitting)
+was accepted on 2026-11-11 for exact conditional OU moments on a
+capped trinomial, positive rate fitting and one inclusive replay gate.
+[Numerical-model record 007](models-numerical/hull-white-event-grid-and-affine-bonds.md#accepted-decision-for-checked-hullwhite-event-lattices-and-node-bonds)
+was accepted on 2026-11-11 for exact Hull–White event grids,
+conditional OU moments, Continuous base fitting and explicit
+affine exercise valuation.
+[Numerical-model record 008](models-numerical/rates-credit-marginal-calibration.md#accepted-decision-for-checked-rates-credit-marginal-calibration)
+was accepted on 2026-11-11 for centered binary marginals,
+strict variance retention, local integrated-hazard fitting
+and checked replay.
+[Numerical-model record 009](models-numerical/rates-credit-coupling-and-sampling.md#accepted-decision-for-checked-rates-credit-coupling-and-path-sampling)
+was accepted on 2026-11-11 for strict Bernoulli coupling, indexed
+Philox midpoints and bound segment replay.
+[Numerical-model record 010](models-numerical/rates-credit-coupon-folding.md#accepted-decision-for-checked-joint-credit-rollback-and-coupon-folding)
+was accepted on 2026-11-11 for checked joint survival and recovery,
+projection on exact index dates and a full coupon fold with explicit
+exercise eligibility.
+[Numerical-model record 011](models-numerical/pde-grids-interpolation-and-greeks.md#accepted-decision-for-checked-pde-grids-interpolation-and-coordinate-greeks)
+was accepted on 2026-11-11 for validated spatial grids, closed-domain
+value extraction and interpolated quadratic nodal derivative estimates.
+[Numerical-model record 012](models-numerical/pde-spatial-stencils.md#accepted-decision-for-checked-directional-and-mixed-pde-stencils)
+was accepted on 2026-11-11 for checked diffusion admission, an inclusive
+central-to-one-sided drift switch and an explicit tensor mixed stencil.
+[Numerical-model record 013](models-numerical/pde-boundary-elimination.md#accepted-decision-for-checked-pde-boundary-elimination-and-reconstruction)
+was accepted on 2026-11-11 for shared checked edge relations, explicit
+x-edge corner ownership and stage-consistent reconstruction and cache reuse.
+[Numerical-model record 014](models-numerical/theta-time-march-and-thomas.md#accepted-decision-for-checked-theta-marching-and-tridiagonal-solves)
+was accepted on 2026-11-11 for exact event-grid theta steps, full-interval
+damping and one checked Thomas kernel with a componentwise residual gate.
+[Numerical-model record 015](models-numerical/pde-exercise-projection.md#accepted-decision-for-checked-grid-based-pde-exercise)
+was accepted on 2026-11-11 for exact post-step payoff comparison,
+exact exercise knots and actual-spot immediate exercise at eligible
+equity valuations.
+[Numerical-model record 016](models-numerical/mcs-adi-time-march.md#accepted-decision-for-checked-modified-craigsneyd-adi)
+was accepted on 2026-11-11 for fixed full MCS, checked factorized startup
+and atomic stages with application-specific stability and price qualification.
+[Numerical-model record 017](models-numerical/black-scholes-and-heston-pde-bridges.md#accepted-decision-for-checked-pde-coefficient-bridges)
+was accepted on 2026-11-11 for checked bridge parameters and diffusion,
+explicit edge laws, exact deterministic limits and qualified price and
+risk boundaries. All 17 trees and finite differences records are accepted.
 Runtime/caller/host/state reconciliation and independent qualification remain pending.
+
+The first Monte Carlo package was accepted on 2026-11-11 for fixed-budget
+pseudorandom execution, scalar discounting, independent estimator units and
+fixed-sample uncertainty. [Monte Carlo record 01](models-monte-carlo/01-engine-and-estimation.md#accepted-decision-for-checked-monte-carlo-execution-and-estimation).
+The second package was accepted on 2026-11-11 for Philox stream addresses,
+fallible uniforms and normals, explicit FNV seed derivation and replay.
+[Monte Carlo record 02](models-monte-carlo/02-random-streams.md#accepted-decision-for-checked-philox-streams-and-seed-derivation).
+The third package was accepted on 2026-11-11 for equal dyadic Sobol
+blocks, checked whole-path construction and descriptive replicate spread.
+[Monte Carlo record 03](models-monte-carlo/03-randomized-qmc.md#accepted-decision-for-whole-path-sobol-pricing-and-replicate-diagnostics).
+The fourth package was accepted on 2026-11-11 for checked exact GBM,
+bounded carry, dated ATM variance bootstrapping and log-Euler local
+volatility. [Monte Carlo record 04](models-monte-carlo/04-lognormal-diffusions.md#accepted-decision-for-checked-gbm-and-local-volatility-paths).
+The fifth package was accepted on 2026-11-11 for checked coordinatewise
+Euler, removal of obsolete generic steppers and exact Gaussian transitions.
+[Monte Carlo record 05](models-monte-carlo/05-generic-steppers.md#accepted-decision-for-checked-coordinatewise-euler-and-exact-gaussian-steps).
+The sixth package was accepted on 2026-11-11 for exact-knot discrete
+dividend jumps, explicit carry and ex phases, and the capped cash model.
+[Monte Carlo record 06](models-monte-carlo/06-cash-dividend-jumps.md#accepted-decision-for-checked-discrete-dividend-jumps-on-exact-grid-knots).
+The seventh package was accepted on 2026-11-11 for checked Hull–White
+endpoints and reconciliation of dated callers to the accepted curve fit.
+[Monte Carlo record 07](models-monte-carlo/07-hull-white.md#accepted-decision-for-checked-hullwhite-endpoints-and-curve-fit-boundaries).
+The eighth package was accepted on 2026-11-11 for checked CIR and CIR++
+QE, the shared log moment and signed shift projection.
+[Monte Carlo record 08](models-monte-carlo/08-cir-qe.md#accepted-decision-for-checked-cir-and-cir-quadratic-exponential-paths).
+The ninth package was accepted on 2026-11-11 for checked Heston QE-M, an
+exact deterministic variance limit and strict moment errors on the
+declared grid.
+[Monte Carlo record 09](models-monte-carlo/09-heston-qe.md#accepted-decision-for-checked-heston-qe-m-paths).
+The tenth package was accepted on 2026-11-11 for checked displaced LMM
+predictor-corrector, exact grid boundaries and explicit tenor-bond ratios.
+[Monte Carlo record 10](models-monte-carlo/10-lmm.md#accepted-decision-for-checked-terminal-measure-lmm-paths).
+The eleventh package was accepted on 2026-11-11 for checked revolving-credit
+paths with clamped utilization, explicit spread and rate laws, and joint
+Hull–White discounting for the dated fitted mode.
+[Monte Carlo record 11](models-monte-carlo/11-credit-line.md#accepted-decision-for-checked-revolving-credit-paths).
+The twelfth package was accepted on 2026-11-11 for checked exact
+Schwartz–Smith paths with explicit factor initialization, scaled
+covariance and spot expectation.
+[Monte Carlo record 12](models-monte-carlo/12-schwartz-smith.md#accepted-decision-for-checked-schwartzsmith-paths-and-expectations).
+The thirteenth package was accepted on 2026-11-11 for checked standalone
+fBM and actual-grid RL with Brownian leverage and sampled-variance compensation.
+[Monte Carlo record 13](models-monte-carlo/13-fractional-noise.md#accepted-decision-for-checked-fractional-noise-and-volterra-drivers).
+The fourteenth package was accepted on 2026-11-11 for checked adapted
+rough Bergomi paths, sampled-variance normalization and bounded
+European call estimation.
+[Monte Carlo record 14](models-monte-carlo/14-rough-bergomi.md#accepted-decision-for-checked-rough-bergomi-spot-and-pricing).
+The fifteenth package was accepted on 2026-11-11 for checked rough Heston
+hybrid paths with full Volterra history, explicit variance projection
+and fixed-grid European estimation.
+[Monte Carlo record 15](models-monte-carlo/15-rough-heston.md#accepted-decision-for-checked-rough-heston-paths-and-pricing).
+The sixteenth package was accepted on 2026-11-11 for checked rough
+Cheyette raw paths with model-owned amplitude, a signed shift, exact
+frozen-amplitude state marginals and Brownian increment covariance.
+[Monte Carlo record 16](models-monte-carlo/16-rough-cheyette.md#accepted-decision-for-checked-rough-cheyette-paths).
+The seventeenth package was accepted on 2026-11-11 for checked terminal
+and Asian payoffs with strict digital ties, exact observation coverage,
+count-normalized fixings and separate settlement and diagnostic values.
+[Monte Carlo record 17](models-monte-carlo/17-vanilla-and-asian.md#accepted-decision-for-checked-terminal-and-asian-payoffs).
+The eighteenth package was accepted on 2026-11-11 for checked barrier
+monitoring and rebates with exact observation binding, sampled continuous
+first passage, an explicit Heston approximation and same-source discounting.
+[Monte Carlo record 18](models-monte-carlo/18-barrier-monitoring.md#accepted-decision-for-checked-monte-carlo-barrier-monitoring-and-rebates).
+The nineteenth package was accepted on 2026-11-11 for checked lookback
+extrema with explicit monitoring, qualified history and terminal fixings,
+and range-safe conditional GBM extremum sampling.
+[Monte Carlo record 19](models-monte-carlo/19-lookback-monitoring.md#accepted-decision-for-checked-monte-carlo-lookback-extrema).
+The twentieth package was accepted on 2026-11-11 for checked autocallable
+payoffs with exact observation rows, explicit call and coupon eligibility,
+shared history replay and actual dated coupon and principal cash.
+[Monte Carlo record 20](models-monte-carlo/20-autocallable.md#accepted-decision-for-checked-monte-carlo-autocallable-payoffs).
+The twenty-first package was accepted on 2026-11-11 for checked cliquet
+payoffs with exact period ends, shared historical and live accumulation,
+and one payoff on the actual payment date.
+[Monte Carlo record 21](models-monte-carlo/21-cliquet.md#accepted-decision-for-checked-monte-carlo-cliquet-payoffs).
+The twenty-second package was accepted on 2026-11-11 for checked range
+accrual with a fixed contractual denominator, exact tied observation
+rows, qualified history and one cash amount on the actual payment date.
+[Monte Carlo record 22](models-monte-carlo/22-range-accrual.md#accepted-decision-for-checked-monte-carlo-range-accrual).
+The twenty-third package was accepted on 2026-11-11 for exact GBM
+exercise nodes, explicit sparse-date and origin rules, immutable policy
+replay and conditional uncertainty on held-out price paths.
+[Monte Carlo record 23](models-monte-carlo/23-lsmc-exercise.md#accepted-decision-for-checked-holder-exercise-policy-training-and-pricing).
+The twenty-fourth package was accepted on 2026-11-11 for strike-centered
+holder powers, explicit standardized multivariate bases, bounded
+full-rank SVD and immutable prediction.
+[Monte Carlo record 24](models-monte-carlo/24-regression-policies.md#accepted-decision-for-checked-continuation-regression).
+The twenty-fifth package was accepted on 2026-11-11 for actual spot nodes,
+complete common-draw groups, signed finite sensitivities and fixed-sample
+uncertainty.
+[Monte Carlo record 25](models-monte-carlo/25-finite-difference-greeks.md#accepted-decision-for-checked-paired-monte-carlo-spot-greeks).
+The twenty-sixth package was accepted on 2026-11-11 for density-only
+payoff eligibility, consumed-shock scoring and joint execution
+with marginal uncertainty in native Greek units.
+[Monte Carlo record 26](models-monte-carlo/26-likelihood-ratio-greeks.md#accepted-decision-for-checked-gbm-likelihood-ratio-greeks).
+The twenty-seventh package was accepted on 2026-11-11 for a qualified
+expected control PV, a fixed or independently fitted coefficient,
+complete paired groups and held-out fixed-sample uncertainty.
+[Monte Carlo record 27](models-monte-carlo/27-control-variate.md#accepted-decision-for-checked-single-control-monte-carlo-pricing).
+The twenty-eighth package was accepted on 2026-11-11 for exact retained
+subsets, timed cash diagnostics, explicit model-owned schemes and
+checked replay on stored knots. All 28 Monte Carlo packages are accepted.
+[Monte Carlo record 28](models-monte-carlo/28-capture-and-simulation-contracts.md#accepted-decision-for-checked-path-capture-and-raw-simulation).
+
+The first credit and liquidity package was accepted on 2026-11-11
+for explicit distress score profiles, qualified ratio inputs,
+checked affine evaluation and removal of automatic grading.
+[Credit record 01](models-and-valuations-credit/01-financial-distress-scores.md#accepted-decision-for-checked-financial-distress-scores).
+The second credit and liquidity package was accepted on 2026-11-11
+for checked Gaussian conditioning, equal-year default rates,
+complete PD scales and explicitly selected rating-factor tables.
+[Credit record 02](models-and-valuations-credit/02-pd-scales-and-rating-data.md#accepted-decision-for-checked-pd-transforms-and-explicit-rating-data).
+The third credit and liquidity package was accepted on 2026-11-11
+for explicit migration state and default roles, checked generator fitting
+and projection, and bounded jump-path execution and results.
+[Credit record 03](models-and-valuations-credit/03-rating-migration.md#accepted-decision-for-checked-rating-migration-generator-fitting-and-paths).
+The fourth credit and liquidity package was accepted on 2026-11-11
+for explicit structural laws and measures, checked probability tails,
+calibration repricing, survival and spreads, and bounded asset-only paths.
+[Credit record 04](models-and-valuations-credit/04-structural-default.md#accepted-decision-for-checked-structural-default-models-and-calibrated-outputs).
+The fifth credit and liquidity package was accepted on 2026-11-11 for
+checked leverage hazard maps and local market anchoring, explicit PIK
+action inputs and bounded paired equity comparison.
+[Credit record 05](models-and-valuations-credit/05-hazard-and-toggle.md#accepted-decision-for-checked-leverage-hazard-and-pik-election-models).
+The sixth credit and liquidity package was accepted on 2026-11-12
+for explicit exposure and recovery assumptions, bounded workout and
+downturn scenarios, checked beta recovery and priority allocation.
+[Credit record 06](models-and-valuations-credit/06-recovery-and-lgd.md#accepted-decision-for-checked-exposure-loss-and-recovery-allocations),
+[core beta-quantile amendment](core-numerics/distribution-functions.md#accepted-amendment-checked-rust-beta-quantile).
+The seventh credit and liquidity package was accepted on 2026-11-12
+for explicit monthly default rates, one-period copula conditioning and
+name selection, aligned replay, and checked expected MDR.
+[Credit record 07](models-and-valuations-credit/07-pool-defaults.md#accepted-decision-for-checked-pool-default-rates-and-period-copula-resolution).
+The eighth credit and liquidity package was accepted on 2026-11-12
+for explicit monthly prepayment models, checked expectations and state,
+authored correlation structures, and validated shocks.
+[Credit record 08](models-and-valuations-credit/08-prepayment-and-pool-correlation.md#accepted-decision-for-checked-prepayment-and-pool-correlation).
+The ninth credit and liquidity package was accepted on 2026-11-12
+for explicit checked copula laws and conditional factors, shared mixing,
+calibrated random loading, bounded integration and whole-vector factor application.
+[Credit record 09](models-and-valuations-credit/09-copula-kernels.md#accepted-decision-for-checked-copula-laws-and-latent-factors).
+The tenth credit and liquidity package was accepted on 2026-11-12
+for explicit signed factors and recovery, stable path replay, checked empirical
+loss and tranche measures, and validated sample state.
+[Credit record 10](models-and-valuations-credit/10-portfolio-loss-and-correlated-recovery.md#accepted-decision-for-checked-portfolio-loss-and-correlated-recovery).
+The eleventh credit and liquidity package was accepted on 2026-11-12
+for explicit liquidity data, distinct estimators and impact proxies, checked
+execution schedules, supplied spread stress and capacity outcomes.
+[Credit record 11](models-and-valuations-credit/11-liquidity.md#accepted-decision-for-checked-liquidity-and-execution-estimates).
+The twelfth credit and liquidity package was accepted on 2026-11-13
+for explicit single-name CDS terms, inclusive maturity, local hazard,
+separate default settlement and matching dirty, clean and par valuations.
+[Credit record 12](models-and-valuations-credit/12-cds-legs.md#accepted-decision-for-checked-cds-legs-and-quote-basis).
+The thirteenth credit and liquidity package was accepted on 2026-11-13
+for qualified quote replay, explicit rate and recovery risk, covered
+expected loss, named default scenarios and margin factor deltas.
+[Credit record 13](models-and-valuations-credit/13-cds-and-index-risk.md#accepted-decision-for-checked-cds-and-index-risk).
+The fourteenth credit and liquidity package was accepted on 2026-11-13
+for explicit index allocation, confirmed event and earned coupon cash,
+aggregate quotes and expected cash from the CDS pricing geometry.
+[Credit record 14](models-and-valuations-credit/14-index-valuation.md#accepted-decision-for-checked-cds-index-valuation-and-cashflows).
+The fifteenth credit and liquidity package was accepted on 2026-11-13
+for the dated CDS forward, a bounded continuous-premium state, explicit
+exercise cash and loss, checked fit and integration, and resolved settlement.
+[Credit record 15](models-and-valuations-credit/15-cds-option-quadrature.md#accepted-decision-for-checked-cds-option-valuation).
+The sixteenth credit and liquidity package was accepted on 2026-11-13
+for matched quote risk and hedge basis, explicit model Vega and diffusion
+Theta, rate and recovery bases, and checked standalone premium inversion.
+[Credit record 16](models-and-valuations-credit/16-cds-option-risk-and-inversion.md#accepted-decision-for-checked-cds-option-risk-and-implied-volatility).
+The seventeenth credit and liquidity package was accepted on 2026-11-13
+for explicit pool and copula selection, original-pool seasoning and loss,
+bounded grid and factor methods, and consistency checks across dates.
+[Credit record 17](models-and-valuations-credit/17-tranche-loss-distribution.md#accepted-decision-for-checked-finite-pool-tranche-losses).
+The eighteenth credit and liquidity package was accepted on 2026-11-13
+for explicit tranche schedules and settlement, daily protection and premium,
+confirmed cash through maturity, residual quotes and one valuation trace.
+[Credit record 18](models-and-valuations-credit/18-tranche-projection.md#accepted-decision-for-checked-tranche-cashflows-and-settlement).
 
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the
@@ -542,7 +779,7 @@ algorithms and broader policies retain their status in the owning catalogues.
 | [0027: Vanilla equity and FX options](valuations-equity-and-composition/0027-vanilla-option-model-selection.md) | Draft | Entry points and registered alternatives observed | Source/test evidence inspected; numerical checks not rerun |
 | [0028: Callable bond model selection](valuations-bonds/0028-callable-bond-model-selection.md) | Draft | Model resolution and option-bearing paths observed | Source/test evidence inspected; numerical checks not rerun |
 | [0029: Rate-option exercise and volatility](valuations-rates/0029-rate-option-exercise-and-volatility.md) | Draft | Vanilla rate-option and Bermudan selection observed | Source/test evidence inspected; numerical checks not rerun |
-| [0030: CDS survival and integration](models-and-valuations-credit/0030-cds-survival-and-integration.md) | Draft | CDS convention and integration paths observed | Source/test evidence inspected; numerical checks not rerun |
+| [0030: CDS survival and integration](models-and-valuations-credit/0030-cds-survival-and-integration.md) | Accepted | Single-name CDS engine selection; detailed contract in CREDIT-12 | Independent date, integral and quote checks; runtime reconciliation pending |
 | [0031: Tranche loss model selection](models-and-valuations-credit/0031-tranche-loss-model-selection.md) | Draft | Gaussian default and explicit copula paths observed | Source/test evidence inspected; numerical checks not rerun |
 | [0032: Curve interpolation and calibration](calibration-targets/0032-curve-interpolation-and-calibration.md) | Draft | Raw curve and calibration defaults observed | Source/test evidence inspected; numerical checks not rerun |
 | [0033: Return-series VaR and ES](analytics/0033-value-at-risk-method-selection.md) | Accepted fixed historical selection | Historical scalar/summary dispatch; explicit inputs and invalid-CF errors reconciled | [Scoped implementation evidence](analytics/README.md#implementation-evidence) |

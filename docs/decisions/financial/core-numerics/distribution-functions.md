@@ -19,8 +19,10 @@ qualification remain pending; source-observed behavior is retained below.
    ln_gamma, norm_cdf, norm_pdf, log_norm_cdf, standard_normal_inv_cdf,
    norm_cdf_with_params, norm_pdf_with_params, student_t_cdf and student_t_inv_cdf
    as canonical `Result<f64>` functions. No Option availability, parallel unchecked/
-   NaN family, distribution-object hierarchy, new public beta API, controls class
-   or host-only computation. Use existing statrs algorithms where they meet the
+   NaN family, distribution-object hierarchy, controls class or host-only
+   computation. The later scoped Rust beta-quantile entry is specified in the
+   [accepted amendment](#accepted-amendment-checked-rust-beta-quantile).
+   Use existing statrs algorithms where they meet the
    selected contract; the narrowly checked Student-t adaptation below addresses
    verified missing failure/work semantics rather than adding another method.
 
@@ -192,6 +194,20 @@ qualification remain pending; source-observed behavior is retained below.
     dependency roundtrips from independence, and probability accuracy from
     financial price/risk/inference fitness. This review changes no runtime code,
     test fixture, generator or dependency.
+
+## Accepted amendment: checked Rust beta quantile
+
+Accepted on **2026-11-12** with [MODELS-AND-VALUATIONS-CREDIT-06](../models-and-valuations-credit/06-recovery-and-lgd.md#accepted-decision-for-checked-exposure-loss-and-recovery-allocations).
+Expose one checked Rust beta quantile entry for `BetaRecovery`, using the
+same bounded incomplete-beta and inverse-beta machinery specified above.
+Require finite positive shapes and finite `p` in `[0,1]` with exact endpoint
+results. For interior `p` require `0<x<1` and verify the actual returned
+`x` against the smaller supplied tail, using `log(p)` on the lower side and
+`log1p(−p)` on the upper side. Require an absolute log residual at most
+`1e−8`. Unresolved values, exhausted work and failed residuals error. This
+adds no host beta API or public incomplete-beta routines. The Student-t
+contract is governed by its own gates above. Reconcile and qualify the
+shared implementation with CREDIT-06.
 
 ## Boundary examples for the accepted package
 

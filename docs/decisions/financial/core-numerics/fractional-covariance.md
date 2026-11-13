@@ -143,6 +143,11 @@ qualification remain pending; observed behavior is retained below.
     07 factor/solve admission. This does not select the window, omitted long-range
     dependence, sampler/default, empirical H or financial approximation budget.
 
+    The model owner subsequently selected checked standalone Cholesky and
+    retired the windowed sampler. The windowed caller reconciliation is
+    satisfied by removing that path.
+    [Accepted fractional-noise package](../models-monte-carlo/13-fractional-noise.md#accepted-decision-for-checked-fractional-noise-and-volterra-drivers).
+
 14. **Retain intentional host scope and faithful model wire state.** No direct
     generic core Python/WASM covariance helper or Hurst class is added. Hurst is
     already embedded as `{h}` in model wire types: preserve that representation,

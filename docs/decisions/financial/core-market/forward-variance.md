@@ -15,12 +15,11 @@ and [record 14's distinct sigma-grid domain](volatility-grids-and-shocks.md#acce
 A variance rate is different from volatility amplitude, implied sigma and total
 integrated variance. A variance source need not have been calibrated.
 
-[Rough Bergomi dynamics/discretization](../models-monte-carlo/14-rough-bergomi.md),
-[rough Cheyette amplitudes/state](../models-monte-carlo/16-rough-cheyette.md)
-and the [equity ATM-strip producer/pricer](../valuations-equity-and-composition/11-rough-volatility-adapters.md)
-retain their remaining Draft choices. This source contract does not adopt their
-full Gaussian driver, compensation, measure, fit, simulation, grid, error budget
-or financial pricing methodology.
+The [accepted rough Bergomi model package](../models-monte-carlo/14-rough-bergomi.md#accepted-decision-for-checked-rough-bergomi-spot-and-pricing)
+owns the adapted variance law, exact grid breaks and pricing estimator.
+[Rough Cheyette amplitudes and state](../models-monte-carlo/16-rough-cheyette.md)
+and the [equity ATM-strip producer and pricer](../valuations-equity-and-composition/11-rough-volatility-adapters.md)
+retain their remaining Draft choices.
 
 ## Foundational findings
 
@@ -140,7 +139,8 @@ financial qualification remain pending.
    Existing numeric curve utilities may support implementation where their
    actual semantics fit; their availability does not justify replacing a linear
    amplitude with a constant one. No new generic core curve family is required.
-   Cheyette's full amplitude/model/state policy remains with its Draft owner.
+   Cheyette's full amplitude, model and state policy remains with its
+   [Monte Carlo owner](../models-monte-carlo/16-rough-cheyette.md).
 
 8. **Keep ATM strips and simulation sampling separately qualified.** The equity
    producer's ATM-forward strip is an explicitly chosen proxy for expected

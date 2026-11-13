@@ -252,8 +252,8 @@ test("core.Currency creation", () => {
 
 test("analytics.Performance.sharpe returns a typed array", () => {
   const perf = new analytics.Performance({
-    dates: ["2024-01-01", "2024-01-02"],
-    series: [[0.01]],
+    dates: ["2024-01-01", "2024-01-02", "2024-01-03"],
+    series: [[0.01, 0.02]],
     kind: "returns",
     ticker_names: ["asset"],
     frequency: "daily",

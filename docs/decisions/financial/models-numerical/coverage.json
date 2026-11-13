@@ -75,7 +75,7 @@
     },
     {
       "id": "MODELS-NUMERICAL-015",
-      "title": "Post-step penalty projection for early exercise",
+      "title": "Grid-based PDE early-exercise projection",
       "path": "pde-exercise-projection.md"
     },
     {

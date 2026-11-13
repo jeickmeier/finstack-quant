@@ -18,7 +18,7 @@ Validate a nonempty ordered fixing schedule and require observations on/before v
 
 Geometric pricing forms `μ=[historical_log_sum+Σ(log S+carry(t_i)-σ²t_i/2)]/n` and `v=σ²Σmin(t_i,t_j)/n²`; use the exact lognormal average-price formula with expiry DF. `carry(t_i)=-ln DF_i-q t_i`, so every fixing uses its own curve date. Arithmetic TW uses `K*=(nK-H)/m`, scale `m/n`, and the shared two-moment kernel at actual future fixing times. For nonpositive effective strike the call reduces to expected full-average intrinsic using datewise forwards; otherwise the shared TW kernel derives a constant effective rate from expiry DF.
 
-GBM MC merges all future fixing times into the time grid; times must map within `1e-10`. A cumulative drift schedule preserves datewise curve forwards. Arithmetic payoff `X` and geometric control payoff `Y` are simulated using the same seed/grid; capture paired final values, compute online means/variances/covariance, and apply `mean(X)-β[mean(Y)-E(Y)]` with the shared control-variate coefficient. The control expectation is the seasoned geometric formula above, scaled identically. Geometric MC directly averages payoffs.
+GBM MC merges all future fixing times into the time grid; times must map within `1e-10`. A cumulative drift schedule preserves datewise curve forwards. Arithmetic payoff `X` and geometric control payoff `Y` observe one simulated path per leg. The engine accumulates discounted paired moments and applies `mean(X)-β[mean(Y)-E(Y)]` with the shared control-variate coefficient. The control expectation is the seasoned geometric formula above, scaled identically. Geometric MC directly averages payoffs.
 
 Heston MC resolves a strict preconfigured Heston parameter set, starts `[spot,v0]`, uses QE steps and Philox, and includes exact fixing times. It multiplies fixing spots by `exp[-ln DF_i-r_eff t_i]` to restore datewise forwards. Defaults are 100,000 paths, 252 steps/year and minimum ten steps; positive path overrides and instrument seeds apply. Its returned stderr is attached as a measure.
 
@@ -32,7 +32,7 @@ Shared GBM defaults: 100,000 estimator paths, 252 steps/year, minimum eight step
 
 ## Limitations, failure and fallback
 
-The positive-effective-strike TW branch uses flat terminal-implied drift while geometric, GBM and the linear seasoned branch preserve datewise curve forwards. The control-variate coefficient is estimated on the pricing sample and uses two separate seeded runs; this construction alone does not establish estimator bias or accuracy. Asset Asian residual settlement semantics are observed behavior, not an adopted lifecycle contract.
+The positive-effective-strike TW branch uses flat terminal-implied drift while geometric, GBM and the linear seasoned branch preserve datewise curve forwards. The control-variate coefficient is estimated on the pricing sample. The [shared control-variate record](../models-monte-carlo/27-control-variate.md) owns coefficient fitting and adjusted uncertainty. Asset Asian residual settlement remains an observed lifecycle choice.
 
 ## Alternatives and tradeoffs
 
