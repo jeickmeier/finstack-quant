@@ -41,7 +41,7 @@ export default [
   {
     "path": "#/$defs/d_c3655ecfd9c3fc910677",
     "source": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json#/$defs/PeriodKind",
-    "description": "Period frequency type.\n\nDefines the frequency of periodic schedules (cashflow rolls, return-series\nresampling, statement reporting). Each variant carries an implied\n\"periods-per-year\" used by [`PeriodKind::periods_per_year`] and by\ndownstream annualization helpers in `finstack-quant-analytics`.\n\n`Daily` follows the trading-day convention (252 per year), not the\ncalendar-day convention (365 per year). Use `Weekly` if you need\ncalendar-week granularity.\n\nParses only the canonical snake_case wire values via [`std::str::FromStr`]:\n`daily`, `weekly`, `monthly`, `quarterly`, `semi_annual`, and `annual`.\nAliases, whitespace padding and case variants are rejected."
+    "description": "Period frequency type.\n\nDefines the frequency of periodic schedules (cashflow rolls, return-series\nresampling, statement reporting). Each variant carries an implied\n\"periods-per-year\" used by [`PeriodKind::periods_per_year`] and by\ndownstream annualization helpers in `finstack-quant-analytics`.\n\n`Daily` follows the trading-day convention (252 per year), not the\ncalendar-day convention (365 per year). Use `Weekly` if you need\ncalendar-week granularity.\n\nParses only the canonical snake_case wire values via [`std::str::FromStr`]:\n`daily`, `weekly`, `monthly`, `quarterly`, `semi_annual`, and `annual`.\nAliases, whitespace padding and case variants are rejected.\n\nOrdering follows [`PeriodKind::rank`] (daily through annual). It is a\ndeterministic key order, not a chronology."
   },
   {
     "path": "#/$defs/d_c3655ecfd9c3fc910677/oneOf/0",

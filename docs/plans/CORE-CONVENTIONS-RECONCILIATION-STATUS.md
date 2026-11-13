@@ -114,7 +114,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 26 | G2 | committed (`G2:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16358; core doctests 285; python-test 13988; python-lint; wasm-test 1085; wasm-lint; ui-check | 019 entry: CreditRating part recorded; record 019 partly reconciled | `D` = 21 and `NR` off the ladder; no `Ord`, hand-written `PartialOrd` (`NR` incomparable with rated values, equal to itself); `ladder_position()`; `notches_to`/`to_moodys_string -> Result` (`NR` arithmetic and Moody's `D` error); finite canonical/Moody's/status alias tables replace suffix stripping; the models rating-factor table and the structured-credit `rating_haircuts` move from `BTreeMap` to `IndexMap` (ladder order / wire order); Python ordering of `NR` against a rated value raises `TypeError` |
 | 27 | G3 | **committed** (`G3:` in git log) | workspace check; rust-test (statements-analytics, core); gen-write; slice-gate (lint, rust-test, gen-check, python-test, wasm-test, ui-check); notebooks 101/101 | 019 entry: registry and scorecard part reconciled; remaining is qualification and owner policies | Per D3: embedded scales, `embedded_registry`, default score/scale and `UnknownScalePolicy` removed; `RatingScaleRegistry`/`RatingScaleEntry`/`ScorecardScale`/`RatingLevel` privately validated (nonblank source, strict ids, reserved unrated labels, `[0, 100]` coverage, representative self-membership); `ScorecardScale::classify`; `CreditScorecardExtension::new(config, &registry)` snapshots the entry; hosts, schema (`rating_scale_entry`), parity ledger, tests and notebooks supply explicit registries |
 | 28 | G4 | committed (`G4:` in git log) | workspace rust-lint; gen-write (nothing moved); workspace rust-test 16,371; python-test 14,008 / 112 skip; wasm-test 1,087; ui-check 1,527; doctests and the Linux run skipped by owner request | 016 part of the 015/016 entry: runtime reconciliation recorded (qualification and product review remain); record 016 status updated | `npv`/`npv_amounts(as_of, flows, include_today)`; validate-before-select, no unused source query, `df_between_dates`, exact Money and checked scalar paths; shared `NeumaierAccumulator::checked_add`/`checked_total`; `flat_discount_factor` underflow error; schedule helpers take `include_today`; private trade-NPV copy removed; see Needs review |
-| 29 | F1 | not attempted (run budget; plan sized M) | | | About 200 sites in about 50 files (fiscal presets 48+ in 19 files, `PeriodId::annual` 72 in 20, `next_fiscal`/`prev_fiscal` 39, plus host presets) |
+| 29 | F1 | **in progress** (`F1a:` structural ordering) | F1a: rust-test, python-test, wasm-test and notebooks under a temporary trap on cross-kind/context comparisons; slice-gate | | F1a: `PeriodKind::rank` and hand-written `Ord` (`(year, rank, index, fiscal)`) replace the declaration-order derive and the date-based mixed-kind comparator; the trap found a core test (re-expressed) and the statements model, which now rejects mixed-kind/context period lists (record #8; see Needs review) |
 | 30 | F2 | not attempted (run budget; dep F1) | | | |
 | 31 | F3 | not attempted (run budget; dep F2) | | | |
 | 32 | F4 | not attempted (run budget; dep F3) | | | |
@@ -674,6 +674,18 @@ logged under Needs review.
   the `f64` ratio directly; and setting `Periodic(n)` from each fixture's
   payment frequency to pin existing goldens would be an implementer's choice,
   not the record's.
+- **F1a mixed-kind statement models are rejected.** `FinancialModelSpec`
+  checked chronology with `next.id <= prev.id` and keyed its history by
+  `PeriodId` in ordered maps, which only worked for mixed-frequency timelines
+  through the old date-based mixed-kind comparator. Record 014 #8 says to
+  reject mixed-kind/context plans rather than read chronology from the
+  structural order, and no statements record accepts mixed-frequency models,
+  so model validation now requires one period kind and one calendar context
+  (and starts that strictly increase). The YTD workaround for frequency
+  changes mid-year was removed; its regression test now pins the rejection.
+  This removes a working statements capability (months then quarters in one
+  model); an owner wanting it back needs a chronology keyed on resolved
+  intervals throughout the evaluator.
 - **E2c-4 bond quote compounding.** `Bond.quote_compounding` is required
   (builder, serde, schema). `BondConvention::quote_compounding()` is its own
   explicit per-market table (semi-annual: UST, agency, gilt, US corporate,
@@ -685,7 +697,10 @@ logged under Needs review.
   argument in Rust, Python and WASM. Before deleting the derivation, the spread
   kernel errored whenever the stated field differed from it; rust-test,
   python-test, wasm-test and all 101 notebooks passed under that check, so no
-  z-spread, DM or CS01 value moved (D4: no market golden needed re-pinning).
+  z-spread, DM or CS01 value moved. This shows the fixtures restate the old
+  derivation; it does not show that each market golden's (Bloomberg, QuantLib)
+  actual quote convention equals it, which D4 asks for and was not checked
+  against the external sources.
   Sites the check could not verify because they compute no spread: custom
   cashflow fixtures passed to `from_cashflows`/`bond_from_cashflows_json`
   (stated from the schedule's coupon tenor, or `semi_annual` where the

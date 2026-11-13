@@ -83,7 +83,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
-      "bytes": 3858,
+      "bytes": 3975,
       "kind": "input",
       "path": "schemas/statements/1/rollup_spec.schema.json",
       "summary": "Target frequency and per-node methods for rolling statement results up to coarser periods.",

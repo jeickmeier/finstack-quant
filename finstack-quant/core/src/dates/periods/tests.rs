@@ -282,10 +282,28 @@ fn period_id_display_parse_and_serde_roundtrip() {
 }
 
 #[test]
-fn period_id_ordering_mixed_frequencies_same_year() {
+fn period_id_ordering_is_structural_and_total() {
+    // (year, kind rank, index, fiscal): daily < weekly < monthly < quarterly
+    // < semi-annual < annual within a year; not a chronology across kinds.
     let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let m1 = PeriodId::month(2025, 1).expect("valid period fixture");
-    assert!(q1 > m1);
+    let m12 = PeriodId::month(2025, 12).expect("valid period fixture");
+    let w53 = PeriodId::week(2026, 53).expect("valid period fixture");
+    let fy = "FY2025M01".parse::<PeriodId>().expect("fiscal period");
+    assert!(
+        m1 < q1 && m12 < q1,
+        "every month of a year ranks below its quarters"
+    );
+    assert!(m1 < fy, "the Gregorian flag precedes the fiscal flag");
+    assert!(q1 < w53, "a later year ranks above an earlier one");
+    let mut ids = vec![q1, fy, w53, m12, m1];
+    ids.sort();
+    assert_eq!(ids, vec![m1, fy, m12, q1, w53]);
+    assert!(PeriodKind::Daily < PeriodKind::Weekly && PeriodKind::Weekly < PeriodKind::Monthly);
+    assert!(
+        PeriodKind::Quarterly < PeriodKind::SemiAnnual
+            && PeriodKind::SemiAnnual < PeriodKind::Annual
+    );
 }
 
 #[test]

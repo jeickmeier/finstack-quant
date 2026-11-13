@@ -223,6 +223,9 @@ export type PanelSeriesKind = "prices" | "returns";
  * Parses only the canonical snake_case wire values via [`std::str::FromStr`]:
  * `daily`, `weekly`, `monthly`, `quarterly`, `semi_annual`, and `annual`.
  * Aliases, whitespace padding and case variants are rejected.
+ *
+ * Ordering follows [`PeriodKind::rank`] (daily through annual). It is a
+ * deterministic key order, not a chronology.
  */
 export type PeriodKind = "daily" | "quarterly" | "monthly" | "weekly" | "semi_annual" | "annual";
 /**

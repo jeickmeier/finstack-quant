@@ -371,6 +371,35 @@ impl FinancialModelSpec {
     /// intervals are empty, reversed or overlapping, or an actual period
     /// appears after any forecast period. Gaps between intervals are allowed.
     fn validate_period_timeline(periods: &[finstack_quant_core::dates::Period]) -> Result<()> {
+        // `PeriodId` order is structural, not chronological across kinds or
+        // calendars, so a model holds one kind in one calendar context
+        // (record CORE-CONVENTIONS-014 #8).
+        if let Some(first) = periods.first() {
+            for period in periods {
+                if period.id.kind() != first.id.kind()
+                    || period.id.is_fiscal() != first.id.is_fiscal()
+                {
+                    return Err(Error::build(format!(
+                        "Model periods must share one period kind and calendar context, but {} \
+                         ({}, {}) follows {} ({}, {})",
+                        period.id,
+                        period.id.kind(),
+                        if period.id.is_fiscal() {
+                            "fiscal"
+                        } else {
+                            "Gregorian"
+                        },
+                        first.id,
+                        first.id.kind(),
+                        if first.id.is_fiscal() {
+                            "fiscal"
+                        } else {
+                            "Gregorian"
+                        },
+                    )));
+                }
+            }
+        }
         for period in periods {
             if period.end <= period.start {
                 return Err(Error::build(format!(
@@ -381,7 +410,7 @@ impl FinancialModelSpec {
         }
         for window in periods.windows(2) {
             let [prev, next] = window else { continue };
-            if next.id <= prev.id {
+            if next.id <= prev.id || next.start <= prev.start {
                 return Err(Error::build(format!(
                     "Model periods must be in strictly increasing chronological order, but \
                      {} appears after {}. Forecasts anchor on the last actual period, so an \

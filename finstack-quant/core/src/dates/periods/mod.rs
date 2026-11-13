@@ -39,9 +39,10 @@ use time::Month;
 /// Parses only the canonical snake_case wire values via [`std::str::FromStr`]:
 /// `daily`, `weekly`, `monthly`, `quarterly`, `semi_annual`, and `annual`.
 /// Aliases, whitespace padding and case variants are rejected.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
-)]
+///
+/// Ordering follows [`PeriodKind::rank`] (daily through annual). It is a
+/// deterministic key order, not a chronology.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum PeriodKind {
@@ -79,7 +80,34 @@ impl FromStr for PeriodKind {
     }
 }
 
+impl PartialOrd for PeriodKind {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PeriodKind {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.rank().cmp(&other.rank())
+    }
+}
+
 impl PeriodKind {
+    /// Structural rank used to order kinds and period identifiers:
+    /// daily `0`, weekly `1`, monthly `2`, quarterly `3`, semi-annual `4`,
+    /// annual `5` (record CORE-CONVENTIONS-014 #8).
+    #[must_use]
+    pub const fn rank(self) -> u8 {
+        match self {
+            PeriodKind::Daily => 0,
+            PeriodKind::Weekly => 1,
+            PeriodKind::Monthly => 2,
+            PeriodKind::Quarterly => 3,
+            PeriodKind::SemiAnnual => 4,
+            PeriodKind::Annual => 5,
+        }
+    }
+
     /// Get the number of periods per year for this frequency.
     ///
     /// # Returns
@@ -836,52 +864,19 @@ impl PartialOrd for PeriodId {
     }
 }
 impl Ord for PeriodId {
+    /// Structural total order on `(year, kind rank, index, fiscal)`.
+    ///
+    /// This is a deterministic key order consistent with equality, not a
+    /// chronology across kinds or calendar contexts (record
+    /// CORE-CONVENTIONS-014 #8): chronological work sorts resolved periods by
+    /// their bounds under a known calendar.
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // First compare by year for a fast path across different calendar years.
-        if self.year != other.year {
-            return self.year.cmp(&other.year);
-        }
-
-        let self_kind = self.kind;
-        let other_kind = other.kind;
-
-        // Within the same frequency kind and year, order by index.
-        if self_kind == other_kind {
-            return self
-                .index
-                .cmp(&other.index)
-                .then(self.fiscal.cmp(&other.fiscal));
-        }
-
-        // Mixed frequencies in the same year: order by actual calendar span
-        // (start date, then end date) using Gregorian bounds.
-        let self_bounds = PeriodCalendar::Gregorian.bounds(self.year, self.kind, self.index);
-        let other_bounds = PeriodCalendar::Gregorian.bounds(other.year, other.kind, other.index);
-
-        // Years outside the supported date range still need a total ordering.
-        let (Ok((self_start, self_end)), Ok((other_start, other_end))) =
-            (self_bounds, other_bounds)
-        else {
-            return self_kind
-                .cmp(&other_kind)
-                .then(self.index.cmp(&other.index));
-        };
-
-        let by_start = self_start.cmp(&other_start);
-        if by_start != std::cmp::Ordering::Equal {
-            return by_start;
-        }
-        let by_end = self_end.cmp(&other_end);
-        if by_end != std::cmp::Ordering::Equal {
-            return by_end;
-        }
-
-        // Deterministic tie-breaker (should be extremely rare): stable kind then index.
-        let by_kind = self_kind.cmp(&other_kind);
-        if by_kind != std::cmp::Ordering::Equal {
-            return by_kind;
-        }
-        self.index.cmp(&other.index)
+        (self.year, self.kind.rank(), self.index, self.fiscal).cmp(&(
+            other.year,
+            other.kind.rank(),
+            other.index,
+            other.fiscal,
+        ))
     }
 }
 
