@@ -448,17 +448,6 @@ impl Tenor {
         }
     }
 
-    /// Integer compounding periods per year for a contractual coupon tenor.
-    ///
-    /// The reciprocal of [`Self::to_years_approx`] rounded to the nearest integer and
-    /// floored at one, so a 90-day or 91-day coupon both compound four times a
-    /// year. [`Self::payments_per_year`] is the unrounded ratio.
-    #[inline]
-    #[must_use]
-    pub fn compounding_frequency(&self) -> f64 {
-        (1.0 / self.to_years_approx()).round().max(1.0)
-    }
-
     /// Nominal payments per year of a monthly or yearly payment tenor.
     ///
     /// `nM` gives `12/n` and `nY` gives `1/n`, including fractional ratios

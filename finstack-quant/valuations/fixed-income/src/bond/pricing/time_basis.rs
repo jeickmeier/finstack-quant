@@ -348,6 +348,7 @@ mod tests {
             .issue_date(date!(2023 - 10 - 15))
             .maturity(date!(2025 - 04 - 15))
             .cashflow_spec(spec)
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .attributes(finstack_quant_core::types::Attributes::new())
             .build()
@@ -479,6 +480,7 @@ mod tests {
                 )
                 .expect("spec"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .attributes(finstack_quant_core::types::Attributes::new())
             .build()
@@ -500,6 +502,7 @@ mod tests {
                 )
                 .expect("spec"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .attributes(finstack_quant_core::types::Attributes::new())
             .build()

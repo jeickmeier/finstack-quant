@@ -703,6 +703,7 @@ mod tests {
                 CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F)
                     .expect("finite coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .instrument_pricing_overrides(
                 finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()

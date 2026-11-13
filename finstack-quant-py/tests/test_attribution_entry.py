@@ -53,6 +53,7 @@ def _bond_json() -> str:
                         "payment_lag_days": 0,
                     }
                 },
+                "quote_compounding": {"periodic": 2},
                 "discount_curve_id": "USD-OIS",
                 "call_put": None,
                 "attributes": {"tags": [], "meta": {}},

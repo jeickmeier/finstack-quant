@@ -305,6 +305,7 @@ fn b12_dm_inversion_applies_settlement_once() {
             issue_date: date!(2025 - 01 - 03),
             maturity: date!(2028 - 01 - 03),
             frequency: Tenor::quarterly(),
+            quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
             day_count: DayCount::Act360,
             discount_curve_id: "USD-OIS".into(),
         },
@@ -537,6 +538,7 @@ fn b1_bond_builder_requires_contractual_issue_date() {
         .notional(bond.notional)
         .maturity(bond.maturity)
         .cashflow_spec(bond.cashflow_spec)
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id(bond.discount_curve_id)
         .build()
         .expect_err("a missing issue date must not shorten the bond");
@@ -1066,6 +1068,8 @@ fn b13_unpaid_principal_remains_exposed_to_credit_recovery() {
         spec.schedule.business_day_convention = BusinessDayConvention::Following;
         spec.schedule.calendar_id = "weekends_only".into();
     }
+    bond.quote_compounding =
+        finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN);
     let market = MarketContext::new()
         .insert(
             DiscountCurve::builder("D")

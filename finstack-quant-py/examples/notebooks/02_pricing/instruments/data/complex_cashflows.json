@@ -35,6 +35,7 @@
           }
         }
       },
+      "quote_compounding": {"periodic": 2},
       "credit_curve_id": null,
       "discount_curve_id": "USD-OIS",
       "ex_coupon_days": 0,

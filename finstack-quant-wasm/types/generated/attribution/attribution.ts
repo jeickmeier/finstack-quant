@@ -7349,6 +7349,12 @@ export interface Bond {
    */
   notional: Money;
   /**
+   * Quote compounding of the z-spread (spread pricing, quote inversion
+   * and CS01), stated independently of the coupon frequency (record
+   * CORE-CONVENTIONS-007 #9, O6). Required: there is no default.
+   */
+  quote_compounding: Compounding;
+  /**
    * Optional repo (financing) discount curve for carry cost computation.
    */
   repo_curve_id?: Id | null;

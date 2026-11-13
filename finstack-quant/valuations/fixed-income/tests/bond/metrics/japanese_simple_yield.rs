@@ -34,6 +34,7 @@ fn two_year_jgb_style_bond() -> Bond {
             CashflowSpec::fixed(0.02, Tenor::semi_annual(), DayCount::Act365F)
                 .expect("finite coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("JPY-JGB".into())
         .build()
         .expect("JGB-style bullet")
@@ -241,6 +242,7 @@ fn quote_engine_japanese_simple_yield_rejects_frn() {
             issue_date: as_of,
             maturity: date!(2027 - 01 - 01),
             frequency: Tenor::quarterly(),
+            quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
             day_count: DayCount::Act360,
             discount_curve_id: "USD-OIS".into(),
         },

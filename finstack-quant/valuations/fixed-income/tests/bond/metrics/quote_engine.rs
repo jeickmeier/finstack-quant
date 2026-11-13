@@ -139,6 +139,7 @@ fn test_quote_engine_roundtrip_dm_for_frn() {
             issue_date: as_of,
             maturity,
             frequency: Tenor::quarterly(),
+            quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
             day_count: DayCount::Act360,
             discount_curve_id: "USD-OIS".into(),
         },

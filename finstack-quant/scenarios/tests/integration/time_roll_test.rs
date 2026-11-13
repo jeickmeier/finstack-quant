@@ -213,6 +213,9 @@ fn test_time_roll_with_bond_carry() {
                 )
                 .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                std::num::NonZeroU32::MIN,
+            ))
             .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .instrument_pricing_overrides(InstrumentPricingOverrides::default())

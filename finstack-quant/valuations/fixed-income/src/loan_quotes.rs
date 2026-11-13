@@ -445,18 +445,6 @@ pub fn oid_eir_schedule_from_flows(
     })
 }
 
-/// TEMPORARY (E2c): the quote compounding the unmigrated callers used to
-/// derive from the payment frequency. Removed when each instrument states its
-/// own convention (record CORE-CONVENTIONS-007 #9, O6).
-pub(crate) fn legacy_frequency_compounding(
-    frequency: finstack_quant_core::dates::Tenor,
-) -> finstack_quant_core::math::Compounding {
-    finstack_quant_core::math::Compounding::Periodic(
-        std::num::NonZeroU32::new(frequency.compounding_frequency() as u32)
-            .unwrap_or(std::num::NonZeroU32::MIN),
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

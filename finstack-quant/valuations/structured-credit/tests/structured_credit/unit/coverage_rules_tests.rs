@@ -429,6 +429,7 @@ fn bond_deal(rules: Option<CoverageRules>) -> StructuredCredit {
     bond.id = InstrumentId::new("B-8");
     bond.cashflow_spec =
         CashflowSpec::fixed(0.08, Tenor::semi_annual(), DayCount::Thirty360).expect("coupon");
+    bond.quote_compounding = finstack_quant_core::math::Compounding::SEMI_ANNUAL;
     let mut deal = StructuredCredit {
         coverage_triggers: vec![CoverageTestSpec::oc("A", 1.05)],
         ..deal_with(DealSpec {

@@ -4,6 +4,7 @@ use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, StubKind};
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{Bps, CurveId, InstrumentId, Rate};
 use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
@@ -48,6 +49,9 @@ pub struct FloatingBondParams {
     pub frequency: finstack_quant_core::dates::Tenor,
     /// Accrual day count of the floating coupons, e.g. `act360`.
     pub day_count: DayCount,
+    /// Quote compounding of the z-spread, stated independently of
+    /// `frequency` (O6); the regional convention does not supply it.
+    pub quote_compounding: Compounding,
     /// Discount curve identifier for pricing.
     pub discount_curve_id: CurveId,
 }
@@ -277,6 +281,7 @@ impl Bond {
             .issue_date(issue_date)
             .maturity(maturity)
             .cashflow_spec(cashflow_spec)
+            .quote_compounding(convention.quote_compounding())
             .discount_curve_id(discount_curve_id.into())
             .settlement_convention(convention_settlement(convention))
             .build()
@@ -345,6 +350,7 @@ impl Bond {
     ///     issue_date: date!(2025-01-15),
     ///     maturity: date!(2030-01-15),
     ///     frequency: Tenor::quarterly(),
+    ///     quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
     ///     day_count: DayCount::Act360,
     ///     discount_curve_id: CurveId::new("USD-OIS"),
     /// });
@@ -406,6 +412,7 @@ impl Bond {
     ///         issue_date: date!(2025-01-15),
     ///         maturity: date!(2030-01-15),
     ///         frequency: Tenor::quarterly(),
+    ///         quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
     ///         day_count: DayCount::Act360,
     ///         discount_curve_id: CurveId::new("USD-OIS"),
     ///     },
@@ -426,6 +433,7 @@ impl Bond {
             maturity,
             frequency,
             day_count,
+            quote_compounding,
             discount_curve_id,
         } = params;
         let mut cashflow_spec = CashflowSpec::floating(
@@ -448,6 +456,7 @@ impl Bond {
             .issue_date(issue_date)
             .maturity(maturity)
             .cashflow_spec(cashflow_spec)
+            .quote_compounding(quote_compounding)
             .discount_curve_id(discount_curve_id)
             .settlement_convention(convention_settlement(convention))
             .build()
@@ -461,6 +470,8 @@ impl Bond {
     /// * `notional` - Face value of the bond (paid at maturity)
     /// * `issue_date` - Issue date of the bond
     /// * `maturity` - Maturity date of the bond
+    /// * `quote_compounding` - Compounding of the bond's z-spread quotes
+    ///   (O6); required, never derived from the nominal annual coupon grid.
     /// * `discount_curve_id` - Discount curve identifier for pricing
     ///
     /// # Returns
@@ -480,6 +491,7 @@ impl Bond {
     ///     Money::from((1_000_000_i64, Currency::USD)),
     ///     date!(2025-01-15),
     ///     date!(2027-01-15),
+    ///     finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN),
     ///     "USD-OIS",
     /// ).unwrap();
     /// ```
@@ -492,6 +504,7 @@ impl Bond {
         notional: Money,
         issue_date: Date,
         maturity: Date,
+        quote_compounding: Compounding,
         discount_curve_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
         Self::builder()
@@ -504,6 +517,7 @@ impl Bond {
                 finstack_quant_core::dates::Tenor::annual(),
                 DayCount::Act365F,
             )?)
+            .quote_compounding(quote_compounding)
             .discount_curve_id(discount_curve_id.into())
             .build()
     }
@@ -519,6 +533,8 @@ impl Bond {
     ///
     /// * `id` - Unique identifier for the bond
     /// * `schedule` - Pre-built cashflow schedule
+    /// * `quote_compounding` - Compounding of the bond's z-spread quotes
+    ///   (O6); required, never derived from the inferred coupon frequency.
     /// * `discount_curve_id` - Discount curve identifier for pricing
     /// * `quoted_clean_price_pct` - Optional quoted clean price in percent of par
     ///   (99.5 = 99.5%), stored as
@@ -568,7 +584,7 @@ impl Bond {
     ///     .fixed_cf(fixed_spec)
     ///     .build(None)?;
     ///
-    /// let bond = Bond::from_cashflows("PIK-001", schedule, "USD-HY", Some(95.0))?;
+    /// let bond = Bond::from_cashflows("PIK-001", schedule, finstack_quant_core::math::Compounding::SEMI_ANNUAL, "USD-HY", Some(95.0))?;
     /// # let _ = bond;
     /// # Ok(())
     /// # }
@@ -576,6 +592,7 @@ impl Bond {
     pub fn from_cashflows(
         id: impl Into<InstrumentId>,
         schedule: CashFlowSchedule,
+        quote_compounding: Compounding,
         discount_curve_id: impl Into<CurveId>,
         quoted_clean_price_pct: Option<f64>,
     ) -> finstack_quant_core::Result<Self> {
@@ -690,6 +707,7 @@ impl Bond {
             .issue_date(issue_date)
             .maturity(maturity)
             .cashflow_spec(cashflow_spec)
+            .quote_compounding(quote_compounding)
             .discount_curve_id(discount_curve_id.into())
             .instrument_pricing_overrides(pricing_overrides)
             .custom_cashflows_opt(Some(schedule))
@@ -877,6 +895,7 @@ impl Bond {
             .issue_date(date!(2024 - 01 - 15))
             .maturity(date!(2029 - 01 - 15))
             .cashflow_spec(cashflow_spec)
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .settlement_convention(BondSettlementConvention {
                 settlement_days: 2,
@@ -927,6 +946,7 @@ impl Bond {
             .issue_date(date!(2024 - 01 - 15))
             .maturity(date!(2034 - 01 - 15))
             .cashflow_spec(cashflow_spec)
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .call_put_opt(Some(call_put))
             .settlement_convention(BondSettlementConvention {
@@ -976,6 +996,7 @@ impl Bond {
             .issue_date(date!(2024 - 01 - 15))
             .maturity(date!(2029 - 01 - 15))
             .cashflow_spec(cashflow_spec)
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .settlement_convention(BondSettlementConvention {
                 settlement_days: 2,

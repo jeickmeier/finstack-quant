@@ -250,6 +250,7 @@ test('floating horizons preserve opening-day and crossed fixings for every metho
       maturity: '2026-01-03',
       frequency: { count: 3, unit: 'months' },
       day_count: 'act_360',
+      quote_compounding: { periodic: 4 },
       discount_curve_id: 'USD-OIS',
     });
     const original = bond.toJson();

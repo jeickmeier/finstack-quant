@@ -93,6 +93,7 @@ function bondInstrumentJson(returnFloor = null) {
         calendar_id: 'weekends_only',
       },
     },
+    quote_compounding: { periodic: 1 },
     discount_curve_id: 'USD-OIS',
     settlement_days: 0,
     ex_coupon_days: 0,

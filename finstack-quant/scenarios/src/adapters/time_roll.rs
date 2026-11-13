@@ -608,6 +608,9 @@ mod tests {
                     CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Thirty360)
                         .expect("finite test coupon"),
                 )
+                .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                    std::num::NonZeroU32::MIN,
+                ))
                 .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -702,6 +705,9 @@ mod tests {
                     CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Thirty360)
                         .expect("finite test coupon"),
                 )
+                .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                    std::num::NonZeroU32::MIN,
+                ))
                 .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .instrument_pricing_overrides(InstrumentPricingOverrides::default())

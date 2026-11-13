@@ -98,6 +98,9 @@ fn test_zero_coupon_bond_ytm() {
             CashflowSpec::fixed(0.0, Tenor::annual(), DayCount::Thirty360)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .issue_date(issue)
         .maturity(maturity)
         .discount_curve_id("USD-OIS".into())
@@ -162,6 +165,7 @@ fn test_odd_first_coupon_ytm() {
                 roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }))
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .issue_date(issue)
         .maturity(maturity)
         .discount_curve_id("USD-OIS".into())
@@ -282,6 +286,7 @@ fn test_long_first_coupon_ytm() {
                 roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }))
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .issue_date(issue)
         .maturity(maturity)
         .discount_curve_id("USD-OIS".into())

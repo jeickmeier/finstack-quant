@@ -49,6 +49,7 @@ test('time roll preserves the raw crossed fixing and supports repeated rolls', (
     maturity: '2026-01-03',
     frequency: { count: 3, unit: 'months' },
     day_count: 'act_360',
+    quote_compounding: { periodic: 4 },
     discount_curve_id: 'USD-OIS',
   });
   const instrument = JSON.parse(bond.toJson());

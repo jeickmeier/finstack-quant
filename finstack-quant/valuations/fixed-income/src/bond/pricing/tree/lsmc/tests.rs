@@ -124,6 +124,7 @@ fn stochastic_test_bond(as_of: Date, maturity: Date) -> Bond {
             CashflowSpec::fixed(0.08, Tenor::quarterly(), DayCount::Act365F)
                 .expect("finite coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .credit_curve_id_opt(Some(CurveId::new("USD-CREDIT")))
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -143,6 +144,7 @@ fn term_pik_test_bond(as_of: Date, maturity: Date) -> Bond {
         Some(2),
     )
     .expect("term floating specification");
+    bond.quote_compounding = finstack_quant_core::math::Compounding::SEMI_ANNUAL;
     let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec else {
         unreachable!("floating constructor returned a non-floating specification");
     };
@@ -164,6 +166,7 @@ fn overnight_pik_test_bond(as_of: Date, maturity: Date) -> Bond {
         Some(0),
     )
     .expect("overnight floating specification");
+    bond.quote_compounding = finstack_quant_core::math::Compounding::QUARTERLY;
     let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec else {
         unreachable!("floating constructor returned a non-floating specification");
     };
@@ -471,6 +474,7 @@ fn term_act365l_balance_segments_replay_the_full_coupon_leap_denominator() {
         Some(0),
     )
     .expect("term floating specification");
+    bond.quote_compounding = finstack_quant_core::math::Compounding::QUARTERLY;
     bond.cashflow_spec = CashflowSpec::amortizing(
         bond.cashflow_spec,
         AmortizationSpec::StepRemaining {

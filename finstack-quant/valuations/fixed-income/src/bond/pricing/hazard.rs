@@ -271,6 +271,7 @@ mod tests {
                 CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
                     .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(Some(CurveId::new("USD-CREDIT")))
             .instrument_pricing_overrides(
@@ -311,6 +312,7 @@ mod tests {
             .issue_date(issue)
             .maturity(maturity)
             .cashflow_spec(spec)
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(Some(CurveId::new("USD-CREDIT")))
             .instrument_pricing_overrides(
@@ -367,6 +369,7 @@ mod tests {
                 CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F)
                     .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(Some(CurveId::new("USD-CREDIT")))
             .instrument_pricing_overrides(

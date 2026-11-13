@@ -8155,6 +8155,7 @@ export interface ValuationsInstrumentsNamespace {
    * Construct a canonical bond instrument envelope from a cashflow schedule.
    * @param instrumentId - Stable instrument identifier used for pricing and metric keys.
    * @param scheduleJson - Canonical cashflow-schedule JSON used to construct the fixed-income instrument.
+   * @param quoteCompounding - Compounding of the bond's z-spread quotes, in `Compounding` wire form (`"continuous"`, `"simple"` or `{ periodic: n }`); required, never derived from the schedule's coupon frequency.
    * @param discountCurveId - Market-context discount-curve identifier for the instrument currency.
    * @param quotedCleanPricePct - Optional observed clean bond price in percent of par (99.5 = 99.5%), stored as `instrument_pricing_overrides.market_quotes.quoted_clean_price_pct`.
    *

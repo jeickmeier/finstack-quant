@@ -231,6 +231,7 @@ fn cashflows_json_bridge_builds_accrues_and_prices_custom_bond() {
     let instrument_json = bond_from_cashflows_json(
         JsValue::from("CUSTOM-CF"),
         JsValue::from(&schedule_json),
+        JsValue::from("{\"periodic\":4}"),
         JsValue::from("USD-OIS"),
         Some(JsValue::from(99.0)),
     )
@@ -399,6 +400,7 @@ fn cashflows_json_bridge_accepts_config_and_missing_quoted_clean_price_pct() {
     let instrument_json = bond_from_cashflows_json(
         JsValue::from("CUSTOM-CF-NO-QUOTE"),
         JsValue::from(&schedule_json),
+        JsValue::from("{\"periodic\":1}"),
         JsValue::from("USD-OIS"),
         None,
     )

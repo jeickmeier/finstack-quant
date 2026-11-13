@@ -41,6 +41,9 @@ fn bund_style_bond(
         .cashflow_spec(
             CashflowSpec::fixed(0.03, Tenor::annual(), DayCount::Act365F).expect("finite coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .discount_curve_id("EUR-BUND".into())
         .build()
         .expect("Bund-style bullet")

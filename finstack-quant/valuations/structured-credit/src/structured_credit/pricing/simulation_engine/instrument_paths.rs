@@ -626,6 +626,7 @@ mod tests {
         let mut bond = Bond::example().expect("fixed bond");
         bond.cashflow_spec =
             CashflowSpec::fixed(0.08, Tenor::semi_annual(), DayCount::Thirty360).expect("coupon");
+        bond.quote_compounding = finstack_quant_core::math::Compounding::SEMI_ANNUAL;
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
                 start: date!(2026 - 01 - 15),
@@ -665,6 +666,7 @@ mod tests {
         let mut bond = Bond::example().expect("fixed bond");
         bond.cashflow_spec =
             CashflowSpec::fixed(0.04, Tenor::semi_annual(), DayCount::Thirty360).expect("coupon");
+        bond.quote_compounding = finstack_quant_core::math::Compounding::SEMI_ANNUAL;
         bond.call_put = Some(CallPutSchedule {
             calls: Vec::new(),
             puts: vec![CallPut {

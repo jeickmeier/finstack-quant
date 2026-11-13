@@ -47,6 +47,7 @@ def _frn(spread_bp: float | Bps) -> Bond:
         "maturity": "2029-01-01",
         "frequency": Tenor.quarterly(),
         "day_count": DayCount.ACT_360,
+        "quote_compounding": {"periodic": 4},
         "discount_curve_id": "USD-OIS",
     })
 

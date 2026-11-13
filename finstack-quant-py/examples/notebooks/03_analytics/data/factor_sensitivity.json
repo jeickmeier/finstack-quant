@@ -18,6 +18,7 @@
           "stub": "none"
         }
       },
+      "quote_compounding": {"periodic": 2},
       "discount_curve_id": "USD-OIS",
       "id": "BOND-5Y",
       "issue_date": "2025-01-15",

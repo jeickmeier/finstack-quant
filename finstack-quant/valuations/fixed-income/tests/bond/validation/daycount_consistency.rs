@@ -69,6 +69,7 @@ fn create_bond_with_daycount(
                 roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }))
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .build()
         .unwrap()

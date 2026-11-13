@@ -319,6 +319,9 @@ fn test_accrued_interest_amortizing_schedule_driven() {
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(cashflow_spec)
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .discount_curve_id("USD-OIS".into())
         .build()
         .unwrap();

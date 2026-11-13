@@ -231,6 +231,7 @@ fn production_time_roll_materializes_raw_index_fixings_before_curve_roll() {
             issue_date: reset,
             maturity: date!(2026 - 01 - 03),
             frequency: Tenor::quarterly(),
+            quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
             day_count: DayCount::Act360,
             discount_curve_id: "USD-OIS".into(),
         },

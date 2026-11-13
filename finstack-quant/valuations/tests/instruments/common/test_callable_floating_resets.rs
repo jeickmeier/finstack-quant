@@ -105,6 +105,7 @@ fn floating_credit_bond() -> Bond {
         Some(0),
     )
     .unwrap();
+    bond.quote_compounding = finstack_quant_core::math::Compounding::QUARTERLY;
     bond.credit_curve_id = Some(CurveId::from("USD-HAZ"));
     bond
 }

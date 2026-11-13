@@ -249,7 +249,7 @@ schedule = (CashFlowSchedule.builder().principal(Money(2_000_000.0, 'USD'), date
     .amortization(AmortizationSpec.linear_to(Money(0.0, 'USD')))
     .fixed_cf(FixedCouponSpec(Decimal('0.055'), ScheduleParams.semiannual_30360()))
     .build())
-amortizer = bond_from_cashflows_json('LESSON-AMORTIZER', schedule.to_json(), 'USD-OIS')
+amortizer = bond_from_cashflows_json('LESSON-AMORTIZER', schedule.to_json(), 'semi_annual', 'USD-OIS')
 amortized = price_instrument(amortizer, market, AS_OF, metrics=['duration_mod', 'ytm'])
 bullet = price_instrument(json.dumps(instruments('foundations')['USD-CORP']), market, AS_OF, metrics=['duration_mod'])
 print({'amortizer_duration': amortized.get_metric('duration_mod'), 'bullet_duration': bullet.get_metric('duration_mod')})

@@ -234,7 +234,7 @@ def test_money_inputs_take_only_money() -> None:
     with pytest.raises(TypeError, match=r"notional: expected finstack_quant\.core\.money\.Money, got float"):
         InterestRateSwap.builder().notional(1_000_000.0)
     with pytest.raises(TypeError, match=r"notional: expected finstack_quant\.core\.money\.Money"):
-        Bond.zero_coupon("ZC", 1_000_000.0, "2024-01-01", "2029-01-01", "USD-OIS")
+        Bond.zero_coupon("ZC", 1_000_000.0, "2024-01-01", "2029-01-01", "periodic(1)", "USD-OIS")
 
 
 def test_builder_repr_renders_fields_set_so_far() -> None:
@@ -356,7 +356,9 @@ def test_bond_fixed_accepts_floats_strings_and_with_convention_takes_a_stub() ->
 
 def test_bond_constructors_and_examples() -> None:
     assert (
-        Bond.zero_coupon("ZC", Money(1_000_000.0, "USD"), "2024-01-01", "2029-01-01", "USD-OIS").has_floating_coupons
+        Bond.zero_coupon(
+            "ZC", Money(1_000_000.0, "USD"), "2024-01-01", "2029-01-01", "periodic(1)", "USD-OIS"
+        ).has_floating_coupons
         is False
     )
     gilt = Bond.with_convention(
@@ -372,6 +374,7 @@ def test_bond_constructors_and_examples() -> None:
         "maturity": "2029-01-01",
         "frequency": Tenor.quarterly(),
         "day_count": DayCount.ACT_360,
+        "quote_compounding": {"periodic": 4},
         "discount_curve_id": "USD-OIS",
     })
     assert frn.has_floating_coupons
@@ -386,6 +389,7 @@ def test_bond_constructors_and_examples() -> None:
             "maturity": "2029-01-01",
             "frequency": Tenor.quarterly(),
             "day_count": DayCount.ACT_360,
+            "quote_compounding": {"periodic": 4},
             "discount_curve_id": "EUR-OIS",
         },
         "eur_corporate",
@@ -411,6 +415,8 @@ def test_bond_builder_credit_models_preserve_explicit_model_contract() -> None:
             .issue_date("2024-01-15")
             .maturity("2034-01-15")
             .cashflow_spec(base["cashflow_spec"])
+            .quote_compounding("semi_annual")
+            .quote_compounding("semi_annual")
             .discount_curve_id("USD-OIS")
             .credit_curve_id("ACME-HZD")
             .attributes({"meta": {"issuer": "ACME"}})
@@ -533,6 +539,7 @@ def test_bond_builder_requires_contractual_issue_date() -> None:
         .notional(Money(1_000_000.0, "USD"))
         .maturity("2034-01-15")
         .cashflow_spec(base["cashflow_spec"])
+        .quote_compounding("semi_annual")
         .discount_curve_id("USD-OIS")
     )
     with pytest.raises(ValueError, match=r"BondBuilder.*missing required field 'issue_date'"):
@@ -782,6 +789,7 @@ def test_bond_builder_quoted_price_drives_ytm_like_the_wire_field() -> None:
             .issue_date(spec["issue_date"])
             .maturity(spec["maturity"])
             .cashflow_spec(spec["cashflow_spec"])
+            .quote_compounding("semi_annual")
             .discount_curve_id(spec["discount_curve_id"])
         )
 

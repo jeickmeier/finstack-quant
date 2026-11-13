@@ -1284,6 +1284,17 @@ export interface D_0C72F5Cb09B10476Ecb7 {
   metric_pricing_overrides?: D_3883C45B3701884Ad50B;
   notional: DD5Bd42D8B6Ec6C31D7864;
   /**
+   * Quote compounding of the z-spread (spread pricing, quote inversion
+   * and CS01), stated independently of the coupon frequency (record
+   * CORE-CONVENTIONS-007 #9, O6). Required: there is no default.
+   */
+  quote_compounding:
+    | "continuous"
+    | {
+        periodic: number;
+      }
+    | "simple";
+  /**
    * Optional repo (financing) discount curve for carry cost computation.
    */
   repo_curve_id?: D_557De6D70142Abc041E8 | null;

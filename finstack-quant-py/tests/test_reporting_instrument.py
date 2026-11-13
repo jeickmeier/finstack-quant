@@ -184,6 +184,7 @@ def test_definition_terms_bond() -> None:
             "cashflow_spec": {
                 "fixed": {"rate": "0.0425", "frequency": {"count": 6, "unit": "months"}, "day_count": "30_360"}
             },
+            "quote_compounding": {"periodic": 2},
             "discount_curve_id": "USD-OIS",
         },
     }
@@ -236,6 +237,7 @@ def test_instrument_tearsheet_bond_with_definition_and_cashflows() -> None:
             "cashflow_spec": {
                 "fixed": {"rate": "0.0425", "frequency": {"count": 6, "unit": "months"}, "day_count": "30_360"}
             },
+            "quote_compounding": {"periodic": 2},
             "discount_curve_id": "USD-OIS",
         },
     }
@@ -447,6 +449,7 @@ def _bond_definition() -> dict:
             "cashflow_spec": {
                 "fixed": {"rate": "0.0425", "frequency": {"count": 6, "unit": "months"}, "day_count": "30_360"}
             },
+            "quote_compounding": {"periodic": 2},
             "discount_curve_id": "USD-OIS",
         },
     }

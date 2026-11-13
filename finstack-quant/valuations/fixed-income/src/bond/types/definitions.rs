@@ -68,6 +68,10 @@ pub struct Bond {
     pub maturity: Date,
     /// Cashflow specification (fixed, floating, or amortizing).
     pub cashflow_spec: CashflowSpec,
+    /// Quote compounding of the z-spread (spread pricing, quote inversion
+    /// and CS01), stated independently of the coupon frequency (record
+    /// CORE-CONVENTIONS-007 #9, O6). Required: there is no default.
+    pub quote_compounding: finstack_quant_core::math::Compounding,
     /// Discount curve identifier for pricing.
     pub discount_curve_id: CurveId,
     /// Optional credit curve identifier (default intensity). When present,
@@ -149,6 +153,7 @@ impl<'de> serde::Deserialize<'de> for Bond {
             issue_date: Option<Date>,
             maturity: Date,
             cashflow_spec: CashflowSpec,
+            quote_compounding: finstack_quant_core::math::Compounding,
             discount_curve_id: CurveId,
             credit_curve_id: Option<CurveId>,
             #[serde(default)]
@@ -212,6 +217,7 @@ impl<'de> serde::Deserialize<'de> for Bond {
             issue_date,
             maturity: helper.maturity,
             cashflow_spec: helper.cashflow_spec,
+            quote_compounding: helper.quote_compounding,
             discount_curve_id: helper.discount_curve_id,
             credit_curve_id: helper.credit_curve_id,
             repo_curve_id: helper.repo_curve_id,

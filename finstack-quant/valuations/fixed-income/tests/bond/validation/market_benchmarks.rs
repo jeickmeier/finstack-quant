@@ -60,6 +60,7 @@ fn test_bond_ytm_benchmark_1() {
             CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())
@@ -143,6 +144,9 @@ fn test_bond_ytm_benchmark_2_par_bond() {
             CashflowSpec::fixed(0.06, Tenor::annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())
@@ -197,6 +201,9 @@ fn test_bond_macaulay_duration_benchmark() {
             CashflowSpec::fixed(0.08, Tenor::annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())
@@ -251,6 +258,9 @@ fn test_bond_modified_duration_benchmark() {
             CashflowSpec::fixed(0.08, Tenor::annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())
@@ -309,6 +319,9 @@ fn test_bond_yield_dv01_market_standard() {
             CashflowSpec::fixed(0.08, Tenor::annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())
@@ -374,6 +387,7 @@ fn test_bond_price_yield_relationship() {
                 CashflowSpec::fixed(0.06, Tenor::semi_annual(), DayCount::Act365F)
                     .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .issue_date(as_of)
             .maturity(maturity)
             .discount_curve_id("USD_DISC".into())
@@ -427,6 +441,9 @@ fn test_bond_zero_coupon_duration() {
             CashflowSpec::fixed(0.0, Tenor::annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())
@@ -477,6 +494,9 @@ fn test_bond_convexity_positive() {
             CashflowSpec::fixed(0.08, Tenor::annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())

@@ -184,6 +184,7 @@
               "business_day_convention": "modified_following"
             }
           },
+          "quote_compounding": {"periodic": 2},
           "discount_curve_id": "USD-TREASURY",
           "credit_curve_id": null,
           "instrument_pricing_overrides": {

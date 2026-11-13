@@ -21,6 +21,7 @@
             "payment_lag_days": 0
           }
         },
+        "quote_compounding": {"periodic": 2},
         "discount_curve_id": "FLAT",
         "attributes": {},
         "settlement_days": 0,

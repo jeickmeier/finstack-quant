@@ -163,6 +163,7 @@ fn test_accrued_frn_uses_forward_rate() {
             )
             .expect("finite test rate"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .credit_curve_id_opt(None)
         .attributes(Attributes::new())

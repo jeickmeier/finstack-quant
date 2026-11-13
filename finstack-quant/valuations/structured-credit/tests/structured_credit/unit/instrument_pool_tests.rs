@@ -364,6 +364,7 @@ fn callable_eight_percent_bond(calls: Vec<CallPut>, puts: Vec<CallPut>) -> Bond 
     bond.id = InstrumentId::new("B-8");
     bond.cashflow_spec =
         CashflowSpec::fixed(0.08, Tenor::semi_annual(), DayCount::Thirty360).expect("coupon");
+    bond.quote_compounding = finstack_quant_core::math::Compounding::SEMI_ANNUAL;
     bond.call_put = Some(CallPutSchedule { calls, puts });
     bond
 }

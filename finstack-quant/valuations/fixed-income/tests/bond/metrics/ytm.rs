@@ -99,6 +99,7 @@ fn test_ytm_floating_bond_is_finite_from_price() {
             issue_date: as_of,
             maturity,
             frequency: Tenor::quarterly(),
+            quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
             day_count: DayCount::Act360,
             discount_curve_id: "USD-OIS".into(),
         },
@@ -183,6 +184,7 @@ fn test_ytm_amortizing_bond_is_finite_from_price() {
         .issue_date(as_of)
         .maturity(maturity)
         .cashflow_spec(cashflow_spec)
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(Attributes::new())
         .build()

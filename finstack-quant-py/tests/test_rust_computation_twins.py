@@ -107,7 +107,7 @@ def test_fx_forward_from_trade_date_defaults_spot_lag_in_rust() -> None:
 
 def _book() -> dict:
     def zero(instrument_id: str, notional: float, maturity: str) -> dict:
-        bond = Bond.zero_coupon(instrument_id, Money(notional, "USD"), "2024-01-15", maturity, "USD-OIS")
+        bond = Bond.zero_coupon(instrument_id, Money(notional, "USD"), "2024-01-15", maturity, "periodic(1)", "USD-OIS")
         return json.loads(bond.to_json())["instrument"]
 
     return {

@@ -200,7 +200,7 @@ request boundaries, not executed production tests or pricing qualification.
 
 `Tenor::add_to_date` adds calendar days/weeks or clamped months/years, then applies the requested business-day convention only if a calendar is supplied. An absent calendar leaves the raw date even with a non-Unadjusted convention.
 
-`to_years`: D/365, 7W/365, M/12, Y. `payments_per_year`: 365/D, 52/W, 12/M, 1/Y. `compounding_frequency`: round(1/to_years), floored at 1; this differs deliberately from fractional payments/year, especially for weekly and multi-year tenors. `to_days_approx`: round(D,7W,365M/12,365Y), using `CALENDAR_DAYS_PER_YEAR=365`.
+`to_years`: D/365, 7W/365, M/12, Y. `payments_per_year`: 365/D, 52/W, 12/M, 1/Y. `compounding_frequency` is removed (2026-11-12): Bond, TermLoan, RevolvingCredit and ABF each carry a required quote `Compounding` (O6). `to_days_approx`: round(D,7W,365M/12,365Y), using `CALENDAR_DAYS_PER_YEAR=365`.
 
 `from_years` requires finite positive input. If `12*years` lies within `1e-4` of an integer, use months and choose years when divisible by 12. Otherwise round to days using 360 for the 30/360 family/ACT360, 365 for ACT365F/NL365/ACT365L, 252 for Bus252 and 365.25 for the remaining conventions. The resulting D tenor remains **calendar** days when added, even if inferred using a business-day basis. `from_payments_per_year` accepts only positive integer divisors of 12. Parsing accepts positive ASCII-digit counts followed by a single unit, ignores outer whitespace/case, and rejects money-market aliases.
 

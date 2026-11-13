@@ -45,6 +45,7 @@ fn test_pv_anchored_at_as_of() {
             CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .settlement_convention_opt(Some(
             finstack_quant_valuations_fixed_income::bond::BondSettlementConvention {
@@ -101,6 +102,7 @@ fn test_callable_exercise_coupon_always_paid() {
             CashflowSpec::fixed(0.06, Tenor::semi_annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(
             finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
@@ -122,6 +124,7 @@ fn test_callable_exercise_coupon_always_paid() {
             CashflowSpec::fixed(0.06, Tenor::semi_annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .call_put_opt(None)
         .attributes(Default::default())
@@ -173,6 +176,7 @@ fn test_putable_bond_worth_more() {
             CashflowSpec::fixed(0.03, Tenor::semi_annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(
             finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default()
@@ -194,6 +198,7 @@ fn test_putable_bond_worth_more() {
             CashflowSpec::fixed(0.03, Tenor::semi_annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .call_put_opt(None)
         .attributes(Default::default())
@@ -235,6 +240,7 @@ fn test_bond_pricing_basic() {
             CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .attributes(Default::default())
         .build()

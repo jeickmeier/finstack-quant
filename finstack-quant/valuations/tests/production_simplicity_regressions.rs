@@ -52,6 +52,7 @@ fn tied_custom_coupon_intervals_choose_shorter_frequency() {
     let wire = finstack_quant_valuations::instruments::fixed_income::bond_from_cashflows_json(
         "TIED",
         &schedule_json,
+        finstack_quant_core::math::Compounding::SEMI_ANNUAL,
         "USD-OIS",
         None,
     )

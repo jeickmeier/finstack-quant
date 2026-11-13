@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "426a5f0e828bb35d7079abaf3ae6cfaa50b067ada0da432ca710c94d1edb7779"
+      "sha256": "05c3b99fc01d3ea8f435d53ba3d7d489edb627e922579774c1aadeb717815cdc"
     }
   ],
   "base": {

@@ -120,6 +120,7 @@ fn test_quarterly_coupon_frequency() {
             CashflowSpec::fixed(0.04, Tenor::quarterly(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .discount_curve_id("USD-OIS".into())
         .build()
         .unwrap();
@@ -151,6 +152,7 @@ fn test_floating_rate_cashflows() {
             )
             .expect("finite test rate"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .build()
         .unwrap();
@@ -183,6 +185,7 @@ fn test_amortizing_bond_linear() {
                 final_notional: Money::new(400.0, Currency::USD).expect("valid money fixture"),
             },
         ))
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .build()
         .unwrap();
@@ -239,7 +242,14 @@ fn test_custom_cashflows_from_schedule() {
         .build(None)
         .unwrap();
 
-    let bond = Bond::from_cashflows("CUSTOM", custom_schedule, "USD-OIS", Some(98.0)).unwrap();
+    let bond = Bond::from_cashflows(
+        "CUSTOM",
+        custom_schedule,
+        finstack_quant_core::math::Compounding::SEMI_ANNUAL,
+        "USD-OIS",
+        Some(98.0),
+    )
+    .unwrap();
 
     let curves = create_test_curves(issue);
     let flows = bond.dated_cashflows(&curves, issue).unwrap();
@@ -285,7 +295,14 @@ fn test_pik_cashflows() {
         .build(None)
         .unwrap();
 
-    let bond = Bond::from_cashflows("PIK", custom_schedule, "USD-OIS", None).unwrap();
+    let bond = Bond::from_cashflows(
+        "PIK",
+        custom_schedule,
+        finstack_quant_core::math::Compounding::SEMI_ANNUAL,
+        "USD-OIS",
+        None,
+    )
+    .unwrap();
 
     let curves = create_test_curves(issue);
     let schedule = bond.cashflow_schedule(&curves, issue).unwrap();
@@ -376,6 +393,7 @@ fn test_cashflows_with_short_front_stub() {
                 roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }))
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .build()
         .unwrap();
@@ -499,6 +517,7 @@ fn test_cashflow_schedule_floating() {
             )
             .expect("finite test rate"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .build()
         .unwrap();
@@ -531,6 +550,7 @@ fn test_cashflows_day_count_conventions() {
                 CashflowSpec::fixed(0.05, Tenor::semi_annual(), day_count)
                     .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .build()
             .unwrap();
@@ -560,6 +580,7 @@ fn test_amortizing_full_redemption() {
                 final_notional: Money::new(0.0, Currency::USD).expect("valid money fixture"),
             },
         ))
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .build()
         .unwrap();
@@ -602,6 +623,7 @@ fn test_actact_isma_daycount_context() {
                 roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }))
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .build()
         .unwrap();
@@ -691,6 +713,7 @@ fn test_bus252_daycount_with_calendar() {
                 roll_rule: finstack_quant_cashflows::builder::RollRule::None,
             },
         }))
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .discount_curve_id("USD-OIS".into())
         .build()
         .unwrap();

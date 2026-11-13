@@ -112,7 +112,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1266814
+            "bytes": 1267147
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
@@ -2000,7 +2000,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1159997
+            "bytes": 1160330
           },
           {
             "path": "schemas/scenarios/1/horizon_result.schema.json",
@@ -2136,7 +2136,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 390351
+            "bytes": 390684
           },
           {
             "path": "schemas/statements/1/forecast_parameters.schema.json",
@@ -2737,7 +2737,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/floating_bond_params.schema.json",
             "type_name": "FloatingBondParams",
             "kind": "input",
-            "bytes": 2581
+            "bytes": 5246
           },
           {
             "path": "schemas/common/1/fx_forward_trade_date_params.schema.json",
@@ -2779,7 +2779,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
             "type_name": "InstrumentJson",
             "kind": "component",
-            "bytes": 1014195
+            "bytes": 1014594
           },
           {
             "path": "schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -2870,7 +2870,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
             "type_name": "StandardDealParams",
             "kind": "component",
-            "bytes": 240512
+            "bytes": 240845
           },
           {
             "path": "schemas/common/1/swaption_conventions.schema.json",
@@ -2961,7 +2961,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1022108
+            "bytes": 1022441
           },
           {
             "path": "schemas/instruments/1/credit_derivatives/cds_index.schema.json",
@@ -3052,7 +3052,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 197117
+            "bytes": 197450
           },
           {
             "path": "schemas/instruments/1/equity/private_markets_fund.schema.json",
@@ -3115,7 +3115,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1021085
+            "bytes": 1021418
           },
           {
             "path": "schemas/instruments/1/exotics/callable_range_accrual.schema.json",
@@ -3178,21 +3178,21 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 287562
+            "bytes": 287895
           },
           {
             "path": "schemas/instruments/1/fixed_income/bond.schema.json",
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 97881
+            "bytes": 100633
           },
           {
             "path": "schemas/instruments/1/fixed_income/bond_future.schema.json",
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 111501
+            "bytes": 114181
           },
           {
             "path": "schemas/instruments/1/fixed_income/convertible_bond.schema.json",
@@ -3227,7 +3227,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 403816
+            "bytes": 404149
           },
           {
             "path": "schemas/instruments/1/fixed_income/term_loan.schema.json",
@@ -3332,7 +3332,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
             "type_name": "InstrumentEnvelope",
             "kind": "input",
-            "bytes": 1112461
+            "bytes": 1112866
           },
           {
             "path": "schemas/instruments/1/rates/basis_swap.schema.json",
@@ -3486,7 +3486,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
             "type_name": "CompositeRebalanceResult",
             "kind": "output",
-            "bytes": 1023716
+            "bytes": 1024049
           },
           {
             "path": "schemas/results/1/convertible_greeks.schema.json",
@@ -3714,6 +3714,7 @@
           "CashFlowSchedule",
           "CashflowRepresentation",
           "CashflowSpec",
+          "Compounding",
           "CouponType",
           "DayCountContextState",
           "FloatingCouponSpec",
@@ -3765,6 +3766,7 @@
           "CashFlowSchedule",
           "CashflowRepresentation",
           "CashflowSpec",
+          "Compounding",
           "CouponSpecs",
           "CouponType",
           "Currency",
@@ -3825,7 +3827,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1266814
+            "bytes": 1267147
           },
           {
             "domain": "attribution",
@@ -4721,7 +4723,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1159997
+            "bytes": 1160330
           },
           {
             "domain": "scenarios",
@@ -4785,7 +4787,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 390351
+            "bytes": 390684
           },
           {
             "domain": "statements",
@@ -5001,7 +5003,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/floating_bond_params.schema.json",
             "type_name": "FloatingBondParams",
             "kind": "input",
-            "bytes": 2581
+            "bytes": 5246
           },
           {
             "domain": "valuations",
@@ -5049,7 +5051,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
             "type_name": "InstrumentJson",
             "kind": "component",
-            "bytes": 1014195
+            "bytes": 1014594
           },
           {
             "domain": "valuations",
@@ -5153,7 +5155,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/standard_deal_params.schema.json",
             "type_name": "StandardDealParams",
             "kind": "component",
-            "bytes": 240512
+            "bytes": 240845
           },
           {
             "domain": "valuations",
@@ -5257,7 +5259,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1022108
+            "bytes": 1022441
           },
           {
             "domain": "valuations",
@@ -5361,7 +5363,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 197117
+            "bytes": 197450
           },
           {
             "domain": "valuations",
@@ -5433,7 +5435,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1021085
+            "bytes": 1021418
           },
           {
             "domain": "valuations",
@@ -5505,7 +5507,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 287562
+            "bytes": 287895
           },
           {
             "domain": "valuations",
@@ -5513,7 +5515,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 97881
+            "bytes": 100633
           },
           {
             "domain": "valuations",
@@ -5521,7 +5523,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond_future.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 111501
+            "bytes": 114181
           },
           {
             "domain": "valuations",
@@ -5561,7 +5563,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 403816
+            "bytes": 404149
           },
           {
             "domain": "valuations",
@@ -5681,7 +5683,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
             "type_name": "InstrumentEnvelope",
             "kind": "input",
-            "bytes": 1112461
+            "bytes": 1112866
           },
           {
             "domain": "valuations",
@@ -5857,7 +5859,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
             "type_name": "CompositeRebalanceResult",
             "kind": "output",
-            "bytes": 1023716
+            "bytes": 1024049
           },
           {
             "domain": "valuations",
@@ -6113,6 +6115,7 @@
           "CashFlowSchedule",
           "CashflowRepresentation",
           "CashflowSpec",
+          "Compounding",
           "CouponType",
           "DayCountContextState",
           "FloatingCouponSpec",
@@ -6164,6 +6167,7 @@
           "CashFlowSchedule",
           "CashflowRepresentation",
           "CashflowSpec",
+          "Compounding",
           "CouponSpecs",
           "CouponType",
           "Currency",
@@ -6459,8 +6463,8 @@
     }
   },
   "instrument": {
-    "json": "{\"instrument\":{\"spec\":{\"attributes\":{},\"call_put\":null,\"cashflow_spec\":{\"fixed\":{\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"coupon_type\":\"cash\",\"day_count\":\"act_act_isma\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.0425\",\"stub\":\"short_front\"}},\"credit_curve_id\":null,\"discount_curve_id\":\"USD-TREASURY\",\"ex_coupon_calendar_id\":\"sifma\",\"ex_coupon_days\":0,\"id\":\"US912828XG33\",\"issue_date\":\"2024-01-15\",\"maturity\":\"2034-01-15\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"settlement_days\":1},\"type\":\"bond\"},\"schema\":\"finstack_quant.instrument/1\"}",
-    "envelope": "{\"instrument\":{\"spec\":{\"attributes\":{},\"call_put\":null,\"cashflow_spec\":{\"fixed\":{\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"coupon_type\":\"cash\",\"day_count\":\"act_act_isma\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.0425\",\"stub\":\"short_front\"}},\"credit_curve_id\":null,\"discount_curve_id\":\"USD-TREASURY\",\"ex_coupon_calendar_id\":\"sifma\",\"ex_coupon_days\":0,\"id\":\"US912828XG33\",\"issue_date\":\"2024-01-15\",\"maturity\":\"2034-01-15\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"settlement_days\":1},\"type\":\"bond\"},\"schema\":\"finstack_quant.instrument/1\"}",
-    "typed": "{\"instrument\":{\"spec\":{\"attributes\":{},\"call_put\":null,\"cashflow_spec\":{\"fixed\":{\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"coupon_type\":\"cash\",\"day_count\":\"act_act_isma\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.0425\",\"stub\":\"short_front\"}},\"credit_curve_id\":null,\"discount_curve_id\":\"USD-TREASURY\",\"ex_coupon_calendar_id\":\"sifma\",\"ex_coupon_days\":0,\"id\":\"US912828XG33\",\"issue_date\":\"2024-01-15\",\"maturity\":\"2034-01-15\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"settlement_days\":1},\"type\":\"bond\"},\"schema\":\"finstack_quant.instrument/1\"}"
+    "json": "{\"instrument\":{\"spec\":{\"attributes\":{},\"call_put\":null,\"cashflow_spec\":{\"fixed\":{\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"coupon_type\":\"cash\",\"day_count\":\"act_act_isma\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.0425\",\"stub\":\"short_front\"}},\"credit_curve_id\":null,\"discount_curve_id\":\"USD-TREASURY\",\"ex_coupon_calendar_id\":\"sifma\",\"ex_coupon_days\":0,\"id\":\"US912828XG33\",\"issue_date\":\"2024-01-15\",\"maturity\":\"2034-01-15\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"quote_compounding\":{\"periodic\":2},\"settlement_days\":1},\"type\":\"bond\"},\"schema\":\"finstack_quant.instrument/1\"}",
+    "envelope": "{\"instrument\":{\"spec\":{\"attributes\":{},\"call_put\":null,\"cashflow_spec\":{\"fixed\":{\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"coupon_type\":\"cash\",\"day_count\":\"act_act_isma\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.0425\",\"stub\":\"short_front\"}},\"credit_curve_id\":null,\"discount_curve_id\":\"USD-TREASURY\",\"ex_coupon_calendar_id\":\"sifma\",\"ex_coupon_days\":0,\"id\":\"US912828XG33\",\"issue_date\":\"2024-01-15\",\"maturity\":\"2034-01-15\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"quote_compounding\":{\"periodic\":2},\"settlement_days\":1},\"type\":\"bond\"},\"schema\":\"finstack_quant.instrument/1\"}",
+    "typed": "{\"instrument\":{\"spec\":{\"attributes\":{},\"call_put\":null,\"cashflow_spec\":{\"fixed\":{\"business_day_convention\":\"following\",\"calendar_id\":\"sifma\",\"coupon_type\":\"cash\",\"day_count\":\"act_act_isma\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.0425\",\"stub\":\"short_front\"}},\"credit_curve_id\":null,\"discount_curve_id\":\"USD-TREASURY\",\"ex_coupon_calendar_id\":\"sifma\",\"ex_coupon_days\":0,\"id\":\"US912828XG33\",\"issue_date\":\"2024-01-15\",\"maturity\":\"2034-01-15\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"quote_compounding\":{\"periodic\":2},\"settlement_days\":1},\"type\":\"bond\"},\"schema\":\"finstack_quant.instrument/1\"}"
   }
 }

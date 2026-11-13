@@ -4,6 +4,7 @@
 //! eliminating the need for multiple instrument-specific constructors.
 
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
+use finstack_quant_core::math::Compounding;
 
 use serde::{Deserialize, Serialize};
 
@@ -92,6 +93,27 @@ impl BondConvention {
             BondConvention::GermanBund
             | BondConvention::FrenchOat
             | BondConvention::EurCorporate => Tenor::annual(),
+        }
+    }
+
+    /// Quote compounding of the z-spread for this market.
+    ///
+    /// Stated per preset, independently of [`Self::frequency`] (record
+    /// CORE-CONVENTIONS-007 #9, O6): the bond's spread quotes compound at
+    /// the market's street-yield frequency.
+    ///
+    /// - **Semi-annual**: US Treasury, US Agency, UK Gilt, US Corporate, JGB
+    /// - **Annual**: German Bund, French OAT, EUR Corporate
+    pub fn quote_compounding(&self) -> Compounding {
+        match self {
+            BondConvention::UsTreasury
+            | BondConvention::UsAgency
+            | BondConvention::UkGilt
+            | BondConvention::UsCorporate
+            | BondConvention::Jgb => Compounding::SEMI_ANNUAL,
+            BondConvention::GermanBund
+            | BondConvention::FrenchOat
+            | BondConvention::EurCorporate => Compounding::Periodic(std::num::NonZeroU32::MIN),
         }
     }
 

@@ -746,6 +746,7 @@ mod tests {
             None,
         )
         .expect("finite test rate");
+        bond.quote_compounding = finstack_quant_core::math::Compounding::QUARTERLY;
 
         let result = BondFuturePricer::calculate_conversion_factor(
             &bond,

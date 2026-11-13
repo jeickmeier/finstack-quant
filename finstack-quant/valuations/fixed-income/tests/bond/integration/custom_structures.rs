@@ -58,7 +58,14 @@ fn test_pik_bond() {
         .build(None)
         .unwrap();
 
-    let bond = Bond::from_cashflows("PIK", schedule, "USD-OIS", None).unwrap();
+    let bond = Bond::from_cashflows(
+        "PIK",
+        schedule,
+        finstack_quant_core::math::Compounding::SEMI_ANNUAL,
+        "USD-OIS",
+        None,
+    )
+    .unwrap();
     let market = create_curve();
     let pv = bond.value(&market, issue).unwrap();
 
@@ -99,7 +106,14 @@ fn test_step_up_bond() {
         .build(None)
         .unwrap();
 
-    let bond = Bond::from_cashflows("STEPUP", schedule, "USD-OIS", None).unwrap();
+    let bond = Bond::from_cashflows(
+        "STEPUP",
+        schedule,
+        finstack_quant_core::math::Compounding::SEMI_ANNUAL,
+        "USD-OIS",
+        None,
+    )
+    .unwrap();
     let market = create_curve();
     let pv = bond.value(&market, issue).unwrap();
 

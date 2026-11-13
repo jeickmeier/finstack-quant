@@ -85,6 +85,7 @@ fn floating_ctd_future() -> BondFuture {
             issue_date: date!(2024 - 01 - 15),
             maturity: date!(2034 - 01 - 15),
             frequency: Tenor::quarterly(),
+            quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
             day_count: DayCount::Act360,
             discount_curve_id: "USD-TREASURY".into(),
         })

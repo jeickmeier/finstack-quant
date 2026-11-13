@@ -109,6 +109,7 @@ fn frn() -> Bond {
             issue_date: AS_OF,
             maturity: date!(2030 - 03 - 15),
             frequency: Tenor::quarterly(),
+            quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
             day_count: DayCount::Act360,
             discount_curve_id: "USD-OIS".into(),
         },

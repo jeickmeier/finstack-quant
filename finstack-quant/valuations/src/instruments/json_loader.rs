@@ -835,6 +835,7 @@ mod tests {
                             "payment_lag_days": 0
                         }
                     },
+                    "quote_compounding": {"periodic": 2},
                     "discount_curve_id": "USD-OIS",
                     "credit_curve_id": null,
                     "call_put": null,
@@ -946,6 +947,7 @@ mod tests {
                             "payment_lag_days": 0
                         }
                     },
+                    "quote_compounding": {"periodic": 2},
                     "discount_curve_id": "USD-OIS",
                     "credit_curve_id": null,
                     "call_put": null,
@@ -985,6 +987,7 @@ mod tests {
                             "payment_lag_days": 0
                         }
                     },
+                    "quote_compounding": {"periodic": 2},
                     "discount_curve_id": "USD-OIS",
                     "credit_curve_id": null,
                     "call_put": null,
@@ -1620,6 +1623,7 @@ mod tests {
                             "payment_lag_days": 0
                         }
                     },
+                    "quote_compounding": {"periodic": 2},
                     "discount_curve_id": "USD-OIS",
                     "credit_curve_id": null,
                     "call_put": null,

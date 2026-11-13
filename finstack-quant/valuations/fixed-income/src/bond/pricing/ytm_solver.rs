@@ -261,6 +261,7 @@ mod tests {
                     .issue_date(issue)
                     .maturity(maturity)
                     .cashflow_spec(cashflow_spec)
+                    .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
                     .discount_curve_id("ACT365L-DISC".into())
                     .attributes(Attributes::new())
                     .build()

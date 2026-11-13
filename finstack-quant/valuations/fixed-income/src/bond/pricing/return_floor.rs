@@ -534,8 +534,14 @@ mod tests {
                 ..CashFlowMeta::default()
             },
         );
-        let bond = Bond::from_cashflows("SEASONED-PIK-AMORT", schedule, "USD-OIS", None)
-            .expect("custom bond");
+        let bond = Bond::from_cashflows(
+            "SEASONED-PIK-AMORT",
+            schedule,
+            finstack_quant_core::math::Compounding::SEMI_ANNUAL,
+            "USD-OIS",
+            None,
+        )
+        .expect("custom bond");
 
         let dist = realized_distributions(&bond, &MarketContext::new(), issue)
             .expect("realized distributions");

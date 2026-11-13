@@ -52,6 +52,7 @@ def fixed_bond(idx: int) -> tuple[str, dict]:
                     "stub": "none",
                 }
             },
+            "quote_compounding": {"periodic": 2},
             "call_put": None,
             "credit_curve_id": None,
             "attributes": {"tags": ["fixed-income"], "meta": {"sector": "IG"}},
@@ -99,6 +100,7 @@ def floating_bond(idx: int) -> tuple[str, dict]:
                     },
                 }
             },
+            "quote_compounding": {"periodic": 4},
             "call_put": None,
             "credit_curve_id": None,
             "attributes": {"tags": ["fixed-income", "frn"], "meta": {}},
@@ -718,6 +720,7 @@ def acme_bond() -> dict:
                     "payment_lag_days": 0,
                 }
             },
+            "quote_compounding": {"periodic": 2},
             "discount_curve_id": "USD-OIS",
             "call_put": None,
             "attributes": {"tags": [], "meta": {}},

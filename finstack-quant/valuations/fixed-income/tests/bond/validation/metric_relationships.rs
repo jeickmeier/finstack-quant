@@ -106,6 +106,9 @@ fn test_yield_dv01_duration_price_relationship() {
             CashflowSpec::fixed(0.08, Tenor::annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .issue_date(as_of)
         .maturity(maturity)
         .discount_curve_id("USD_DISC".into())

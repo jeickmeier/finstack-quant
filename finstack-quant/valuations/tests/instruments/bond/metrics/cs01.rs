@@ -99,6 +99,8 @@ fn test_cs01_zspread_fallback_uses_settlement_anchored_basis() {
     .unwrap();
     bond.cashflow_spec =
         CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
+    bond.quote_compounding =
+        finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN);
     // No credit curve => CS01 takes the z-spread fallback.
     bond.credit_curve_id = None;
     // Quote off-par so the Z-spread (and hence CS01) is non-trivial.

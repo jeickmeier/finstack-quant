@@ -139,6 +139,7 @@ mod tests {
             issue_date: as_of,
             maturity: date!(2030 - 01 - 01),
             frequency: finstack_quant_core::dates::Tenor::quarterly(),
+            quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
             day_count: finstack_quant_core::dates::DayCount::Act360,
             discount_curve_id: "USD-OIS".into(),
         })

@@ -215,6 +215,7 @@ fn amortizing_bond(index: usize) -> Bond {
         .issue_date(date!(2025 - 01 - 01))
         .maturity(maturity)
         .cashflow_spec(cashflows)
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .build()
         .expect("benchmark amortizing bond")

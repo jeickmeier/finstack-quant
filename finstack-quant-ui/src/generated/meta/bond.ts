@@ -37,6 +37,9 @@ export default [
               "amount": "1000000",
               "currency": "USD"
             },
+            "quote_compounding": {
+              "periodic": 2
+            },
             "settlement_days": 1
           },
           "type": "bond"
@@ -1252,6 +1255,34 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_4653fca73cedbf09a5e0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json#/$defs/Compounding",
+    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Periodic(1)]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor a common discount factor below one, annual and simple rates both exceed\nthe continuous rate. Their ordering depends on the maturity `t` in years:\n`r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and\n`r_simple > r_annual` for `t > 1`."
+  },
+  {
+    "path": "#/$defs/d_4653fca73cedbf09a5e0/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json#/$defs/Compounding/oneOf/0",
+    "const": "continuous",
+    "description": "Continuous compounding: r = -ln(DF) / t\n\nMost common for internal calculations, curve construction, and\nquantitative finance models. Provides the simplest mathematical\nproperties (additive over time)."
+  },
+  {
+    "path": "#/$defs/d_4653fca73cedbf09a5e0/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json#/$defs/Compounding/oneOf/1",
+    "description": "Periodic compounding with n periods per year: r = n × (DF^(-1/(n×t)) - 1)\n\nCommon values:\n- n=1: Annual (UK gilts, European government bonds and annual zero rates)\n- n=2: Semi-annual (US Treasury, corporate bonds)\n- n=4: Quarterly (some FRNs)\n- n=12: Monthly (rare, some retail products)\n\nNote: Uses [`NonZeroU32`] to prevent division by zero at compile time."
+  },
+  {
+    "path": "#/$defs/d_4653fca73cedbf09a5e0/oneOf/1/properties/periodic",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json#/$defs/Compounding/oneOf/1/properties/periodic",
+    "format": "uint32",
+    "minimum": 1
+  },
+  {
+    "path": "#/$defs/d_4653fca73cedbf09a5e0/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json#/$defs/Compounding/oneOf/2",
+    "const": "simple",
+    "description": "Simple interest (no compounding): r = (1/DF - 1) / t\n\nUsed for money market instruments with maturity < 1 year, including:\n- Interbank deposits\n- T-bills and commercial paper\n- SOFR, SONIA, €STR fixings\n\nTypically paired with ACT/360 (USD, EUR) or ACT/365F (GBP) day counts."
+  },
+  {
     "path": "#/$defs/d_47e5e74524615b78a19f",
     "source": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json#",
     "description": "Parsed financial tenor.",
@@ -2010,6 +2041,13 @@ export default [
     "description": "Principal amount of the bond.",
     "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_67c3f0fee95f47938ab4/properties/quote_compounding",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json#/$defs/Bond/properties/quote_compounding",
+    "description": "Quote compounding of the z-spread (spread pricing, quote inversion\nand CS01), stated independently of the coupon frequency (record\nCORE-CONVENTIONS-007 #9, O6). Required: there is no default.",
+    "ref": "#/$defs/Compounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json#/$defs/Compounding"
   },
   {
     "path": "#/$defs/d_67c3f0fee95f47938ab4/properties/repo_curve_id",

@@ -1117,6 +1117,7 @@
             "business_day_convention": "modified_following"
           }
         },
+        "quote_compounding": {"periodic": 1},
         "discount_curve_id": "EUR-SWAP-514",
         "instrument_pricing_overrides": {
           "market_quotes": {

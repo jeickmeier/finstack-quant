@@ -85,6 +85,7 @@ def test_frn_time_roll_preserves_raw_index_excluding_coupon_spread() -> None:
         "maturity": "2026-01-03",
         "frequency": Tenor.quarterly(),
         "day_count": DayCount.ACT_360,
+        "quote_compounding": {"periodic": 4},
         "discount_curve_id": "USD-OIS",
     })
     instrument = json.loads(bond.to_json())

@@ -28,6 +28,7 @@
             "stub": "short_front"
           }
         },
+        "quote_compounding": {"periodic": 2},
         "credit_curve_id": "USD-CREDIT",
         "discount_curve_id": "USD-OIS",
         "ex_coupon_days": 0,

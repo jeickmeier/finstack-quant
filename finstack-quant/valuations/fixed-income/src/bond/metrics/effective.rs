@@ -178,6 +178,7 @@ mod tests {
                 CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
                     .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Default::default())
@@ -197,6 +198,7 @@ mod tests {
                 CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
                     .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Default::default())
@@ -321,6 +323,7 @@ mod tests {
                 CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
                     .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id(CurveId::new("USD-OIS"))
             .instrument_pricing_overrides(
                 InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.0),
@@ -415,6 +418,7 @@ mod tests {
                 CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365F)
                     .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id(CurveId::new("USD-OIS"))
             // Quote via OAS directly (decimal: 0.005 = 50 bp).
             .instrument_pricing_overrides(
@@ -496,6 +500,9 @@ mod tests {
                 CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F)
                     .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                std::num::NonZeroU32::MIN,
+            ))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(Some(CurveId::new("ACME-HZD")))
             .instrument_pricing_overrides(overrides)

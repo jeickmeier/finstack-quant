@@ -16,6 +16,8 @@
 /// * `schedule_json` - JSON representation of a canonical
 ///   `CashFlowSchedule`; it must contain a valid, internally consistent
 ///   principal and coupon schedule.
+/// * `quote_compounding` - Compounding of the bond's z-spread quotes (O6);
+///   required, never derived from the schedule's coupon frequency.
 /// * `discount_curve_id` - Market-context key of the discount curve used to
 ///   value the bond's cashflows.
 /// * `quoted_clean_price_pct` - Optional clean market price in percent of par
@@ -28,6 +30,7 @@
 pub fn bond_from_cashflows_json(
     instrument_id: &str,
     schedule_json: &str,
+    quote_compounding: finstack_quant_core::math::Compounding,
     discount_curve_id: &str,
     quoted_clean_price_pct: Option<f64>,
 ) -> finstack_quant_core::Result<String> {
@@ -39,6 +42,7 @@ pub fn bond_from_cashflows_json(
     let bond = crate::instruments::fixed_income::bond::Bond::from_cashflows(
         instrument_id,
         schedule,
+        quote_compounding,
         discount_curve_id,
         quoted_clean_price_pct,
     )?;
@@ -83,8 +87,14 @@ mod tests {
         let schedule = finstack_quant_cashflows::build_cashflow_schedule_json(&spec, None)
             .expect("raw schedule should build");
 
-        let instrument = bond_from_cashflows_json("CUSTOM-CF", &schedule, "USD-OIS", Some(99.0))
-            .expect("bond JSON should build from a raw schedule");
+        let instrument = bond_from_cashflows_json(
+            "CUSTOM-CF",
+            &schedule,
+            finstack_quant_core::math::Compounding::MONTHLY,
+            "USD-OIS",
+            Some(99.0),
+        )
+        .expect("bond JSON should build from a raw schedule");
         let instrument: serde_json::Value =
             serde_json::from_str(&instrument).expect("instrument JSON should parse");
 

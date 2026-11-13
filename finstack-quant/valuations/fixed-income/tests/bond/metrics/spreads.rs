@@ -82,6 +82,8 @@ fn test_z_spread_reports_bond_compounding_spread() {
         DayCount::Act365F,
     )
     .expect("finite test coupon");
+    bond.quote_compounding =
+        finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN);
     bond.settlement_convention = None;
     let base_df = (1.0 + base_zero_rate).powf(-years);
 
@@ -1055,6 +1057,8 @@ fn test_z_spread_roundtrip_coupon_exactly_on_settlement_date() {
     // Explicit annual day-count to make the on-date coupon unambiguous.
     bond.cashflow_spec = CashflowSpec::fixed(coupon_rate, Tenor::annual(), DayCount::Act365F)
         .expect("finite test coupon");
+    bond.quote_compounding =
+        finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN);
     // No settlement lag: quote_date == as_of.
     bond.settlement_convention = None;
 
@@ -1150,6 +1154,8 @@ fn test_ytm_roundtrip_settlement_lag_two_days() {
     .expect("bond should build");
     bond.cashflow_spec = CashflowSpec::fixed(coupon_rate, Tenor::annual(), DayCount::Act365F)
         .expect("finite test coupon");
+    bond.quote_compounding =
+        finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN);
     // 2 settlement days so that quote_date = as_of + 2 weekdays = 2025-01-01.
     bond.settlement_convention = Some(BondSettlementConvention {
         settlement_days: 2,
@@ -1370,6 +1376,8 @@ fn test_z_spread_roundtrip_with_settlement_lag() {
     .expect("bond should build");
     bond.cashflow_spec =
         CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F).expect("finite test coupon");
+    bond.quote_compounding =
+        finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN);
     // 3-business-day settlement lag => quote_date strictly after as_of.
     bond.settlement_convention = Some(BondSettlementConvention {
         settlement_days: 3,

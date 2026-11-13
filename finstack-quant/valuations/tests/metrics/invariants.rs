@@ -54,6 +54,7 @@ fn bucketed_dv01_uses_configured_bucket_grid() {
             CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .build()
         .expect("bond");
@@ -116,6 +117,7 @@ proptest! {
                 Tenor::semi_annual(),
                 DayCount::Thirty360,
             ).expect("finite test coupon"))
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .build()
             .expect("Bond construction should succeed");
@@ -192,6 +194,7 @@ proptest! {
                 Tenor::semi_annual(),
                 DayCount::Thirty360,
             ).expect("finite test coupon"))
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .build()
             .expect("Bond construction should succeed");
@@ -944,6 +947,7 @@ mod additional_invariants {
                     CashflowSpec::fixed(0.04, Tenor::semi_annual(), DayCount::Thirty360)
                         .expect("finite test coupon"),
                 )
+                .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
                 .discount_curve_id("USD-OIS".into())
                 .build()
                 .expect("Bond construction should succeed");

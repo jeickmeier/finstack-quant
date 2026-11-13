@@ -253,6 +253,7 @@ impl JsBond {
     /// @param notional - Principal repaid at maturity.
     /// @param issueDate - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
     /// @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
+    /// @param quoteCompounding - Compounding of the bond's z-spread quotes, in `Compounding` wire form (`"continuous"`, `"simple"` or `{ periodic: n }`); required.
     /// @param discountCurveId - Discount curve identifier used for pricing.
     /// @returns The validated zero-coupon bond.
     /// @throws Error - Throws with kind `validation` if a date is malformed or
@@ -263,6 +264,11 @@ impl JsBond {
         notional: &JsMoney,
         #[wasm_bindgen(js_name = "issueDate", unchecked_param_type = "string")] issue_date: JsValue,
         #[wasm_bindgen(unchecked_param_type = "string")] maturity: JsValue,
+        #[wasm_bindgen(
+            js_name = "quoteCompounding",
+            unchecked_param_type = "generated.valuations.Bond['quote_compounding']"
+        )]
+        quote_compounding: JsValue,
         #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
         discount_curve_id: JsValue,
     ) -> Result<JsBond, JsValue> {
@@ -271,6 +277,7 @@ impl JsBond {
             notional.inner,
             js_date(&issue_date, "issueDate")?,
             js_date(&maturity, "maturity")?,
+            crate::utils::input::from_js_json(&quote_compounding, "quoteCompounding")?,
             js_string(&discount_curve_id, "discountCurveId")?,
         )
         .map_err(to_js_err)?;
@@ -573,6 +580,9 @@ getters!(JsBond, "Bond", |i| {
         /// Coupon/cashflow specification in serde form.
         /// @returns One-key plain object: `{"fixed": {...}}`, `{"floating": {...}}`, `{"step_up": {...}}` or `{"amortizing": {...}}`.
         cashflow_spec as cashflowSpec: "generated.valuations.Bond['cashflow_spec']" => json(i.cashflow_spec),
+        /// Quote compounding of the z-spread (spread pricing, quote inversion and CS01), stated independently of the coupon frequency.
+        /// @returns The `Compounding` wire value.
+        quote_compounding as quoteCompounding: "generated.valuations.Bond['quote_compounding']" => json(i.quote_compounding),
         /// Discount curve identifier.
         /// @returns Curve id used for discounting.
         discount_curve_id as discountCurveId: "string" => text(i.discount_curve_id),
@@ -638,6 +648,11 @@ builder_class!(
 );
 
 setters!(JsBondBuilder, "BondBuilder", {
+        /// Set the quote compounding of the z-spread (required; never derived from the coupon frequency).
+        /// @param value - `Compounding` wire value: `"continuous"`, `"simple"` or `{ periodic: n }`.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        quote_compounding as quoteCompounding: "generated.valuations.Bond['quote_compounding']" => from_js_json,
         /// Set the instrument identifier.
         /// @param value - Instrument identifier.
         /// @returns The builder, for chaining.

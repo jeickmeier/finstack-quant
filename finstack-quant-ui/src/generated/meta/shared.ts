@@ -3062,6 +3062,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
   },
   {
+    "path": "#/$defs/Bond/properties/quote_compounding",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Bond/properties/quote_compounding",
+    "description": "Quote compounding of the z-spread (spread pricing, quote inversion\nand CS01), stated independently of the coupon frequency (record\nCORE-CONVENTIONS-007 #9, O6). Required: there is no default.",
+    "ref": "#/$defs/Compounding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Compounding"
+  },
+  {
     "path": "#/$defs/Bond/properties/repo_curve_id",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Bond/properties/repo_curve_id",
     "description": "Optional repo (financing) discount curve for carry cost computation."

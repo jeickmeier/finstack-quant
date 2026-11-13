@@ -42,6 +42,7 @@ fn step_up_bond() -> Bond {
         DayCount::Thirty360,
     )
     .expect("step-up spec");
+    b.quote_compounding = finstack_quant_core::math::Compounding::SEMI_ANNUAL;
     b
 }
 

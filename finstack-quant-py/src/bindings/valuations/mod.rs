@@ -334,20 +334,25 @@ fn pretty_instrument_json(json: &Bound<'_, PyAny>) -> PyResult<String> {
 #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments", "bond_from_cashflows_json")]
 #[pyfunction]
 #[pyo3(
-    signature = (instrument_id, schedule_json, discount_curve_id, quoted_clean_price_pct = None),
-    text_signature = "(instrument_id, schedule_json, discount_curve_id, quoted_clean_price_pct=None)"
+    signature = (instrument_id, schedule_json, quote_compounding, discount_curve_id, quoted_clean_price_pct = None),
+    text_signature = "(instrument_id, schedule_json, quote_compounding, discount_curve_id, quoted_clean_price_pct=None)"
 )]
 fn bond_from_cashflows_json(
     py: Python<'_>,
     instrument_id: &str,
     schedule_json: &str,
+    quote_compounding: &str,
     discount_curve_id: &str,
     quoted_clean_price_pct: Option<f64>,
 ) -> PyResult<String> {
+    let quote_compounding: finstack_quant_core::math::Compounding = quote_compounding
+        .parse()
+        .map_err(crate::errors::core_to_py)?;
     py.detach(|| {
         finstack_quant_valuations::instruments::fixed_income::bond_from_cashflows_json(
             instrument_id,
             schedule_json,
+            quote_compounding,
             discount_curve_id,
             quoted_clean_price_pct,
         )

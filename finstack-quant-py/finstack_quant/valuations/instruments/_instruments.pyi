@@ -290,6 +290,7 @@ class Bond:
         ...     "maturity": "2029-01-01",
         ...     "frequency": Tenor.quarterly(),
         ...     "day_count": DayCount.ACT_360,
+        ...     "quote_compounding": {"periodic": 4},
         ...     "discount_curve_id": "USD-OIS",
         ... })
         >>> frn.has_floating_coupons
@@ -361,6 +362,7 @@ class Bond:
         ...         "maturity": "2029-01-01",
         ...         "frequency": Tenor.quarterly(),
         ...         "day_count": DayCount.ACT_360,
+        ...         "quote_compounding": {"periodic": 4},
         ...         "discount_curve_id": "EUR-OIS",
         ...     },
         ...     "eur_corporate",
@@ -375,6 +377,7 @@ class Bond:
         notional: Money,
         issue_date: datetime.date | datetime.datetime | pd.Timestamp | str,
         maturity: datetime.date | datetime.datetime | pd.Timestamp | str,
+        quote_compounding: str,
         discount_curve_id: str,
     ) -> Bond:
         """
@@ -392,6 +395,10 @@ class Bond:
             Issue date.
         maturity : datetime.date | datetime.datetime | pd.Timestamp | str
             Maturity (redemption) date.
+        quote_compounding : str
+            Compounding of the bond's z-spread quotes: ``"continuous"``,
+            ``"simple"``, ``"semi_annual"``, ``"quarterly"``, ``"monthly"`` or
+            ``"periodic(n)"``. Required; never derived from the coupon grid.
         discount_curve_id : str
             Discount curve identifier used for pricing.
 
@@ -403,7 +410,8 @@ class Bond:
         Raises
         ------
         ValueError
-            If ``maturity`` is not after ``issue_date``.
+            If ``maturity`` is not after ``issue_date`` or ``quote_compounding``
+            is not a known label.
         TypeError
             If ``notional`` is not a ``Money`` or a date cannot be interpreted.
 
@@ -411,7 +419,7 @@ class Bond:
         --------
         >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.valuations.instruments import Bond
-        >>> zc = Bond.zero_coupon("ZC", Money(1_000_000.0, "USD"), "2024-01-01", "2029-01-01", "USD-OIS")
+        >>> zc = Bond.zero_coupon("ZC", Money(1_000_000.0, "USD"), "2024-01-01", "2029-01-01", "periodic(1)", "USD-OIS")
         >>> zc.has_floating_coupons
         False
         """
@@ -795,6 +803,25 @@ class Bond:
         -------
         dict[str, object]
             One-key dict: ``{"fixed": {...}}``, ``{"floating": {...}}``, ``{"step_up": {...}}`` or ``{"amortizing": {...}}``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def quote_compounding(self) -> str:
+        """
+        Quote compounding of the z-spread.
+
+        Shared by spread pricing, quote inversion and CS01; stated
+        independently of the coupon frequency, never derived from it.
+
+        Returns
+        -------
+        str
+            ``"continuous"``, ``"simple"``, ``"semi_annual"``, ``"quarterly"``,
+            ``"monthly"`` or ``"periodic(n)"``.
 
         Notes
         -----
@@ -1275,6 +1302,28 @@ class BondBuilder:
         ------
         ValueError
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``CashflowSpec``.
+        """
+        ...
+    def quote_compounding(self, value: str) -> BondBuilder:
+        """
+        Set the quote compounding of the z-spread (required).
+
+        Parameters
+        ----------
+        value : str
+            ``"continuous"``, ``"simple"``, ``"semi_annual"``, ``"quarterly"``,
+            ``"monthly"`` or ``"periodic(n)"``; stated independently of the
+            coupon frequency.
+
+        Returns
+        -------
+        BondBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the label is unknown or the builder was already consumed by ``build()``.
         """
         ...
     def discount_curve_id(self, value: str) -> BondBuilder:

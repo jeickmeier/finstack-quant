@@ -301,6 +301,7 @@ fn test_bond_settlement_date_impact() {
             )
             .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .settlement_convention_opt(None)
         .build()
@@ -320,6 +321,7 @@ fn test_bond_settlement_date_impact() {
             )
             .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .settlement_convention_opt(Some(
             finstack_quant_valuations_fixed_income::bond::BondSettlementConvention {
@@ -536,6 +538,7 @@ fn test_bond_different_day_counts() {
                 )
                 .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .build()
             .unwrap();

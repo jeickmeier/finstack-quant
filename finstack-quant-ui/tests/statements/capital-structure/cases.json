@@ -85,6 +85,9 @@
                   "payment_lag_days": 0
                 }
               },
+              "quote_compounding": {
+                "periodic": 2
+              },
               "discount_curve_id": "USD-OIS",
               "credit_curve_id": null,
               "call_put": null,
@@ -123,6 +126,9 @@
                   "payment_lag_days": 0
                 }
               },
+              "quote_compounding": {
+                "periodic": 2
+              },
               "discount_curve_id": "USD-OIS",
               "credit_curve_id": null,
               "call_put": null,
@@ -160,6 +166,9 @@
                   "end_of_month": false,
                   "payment_lag_days": 0
                 }
+              },
+              "quote_compounding": {
+                "periodic": 2
               },
               "discount_curve_id": "USD-OIS",
               "credit_curve_id": null,

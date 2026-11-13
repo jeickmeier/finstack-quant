@@ -1536,6 +1536,7 @@
             "calendar_id": "weekends_only"
           }
         },
+        "quote_compounding": {"periodic": 2},
         "discount_curve_id": "USD-SWAP-490",
         "instrument_pricing_overrides": {
           "market_quotes": {

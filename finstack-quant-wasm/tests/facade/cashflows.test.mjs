@@ -211,7 +211,13 @@ test('cashflows end-to-end build/validate/flows/accrual from JSON spec', () => {
   assert.ok(accrued > 0);
 
   const instrument = JSON.parse(
-    valuations.instruments.bondFromCashflowsJson('CUSTOM-CF', scheduleJson, 'USD-OIS', 99.0)
+    valuations.instruments.bondFromCashflowsJson(
+      'CUSTOM-CF',
+      scheduleJson,
+      { periodic: 2 },
+      'USD-OIS',
+      99.0
+    )
   );
   assert.equal(instrument.schema, 'finstack_quant.instrument/1');
   assert.equal(instrument.instrument.type, 'bond');

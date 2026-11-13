@@ -82,6 +82,7 @@ fn zero_coupon() -> Bond {
         usd(NOTIONAL),
         AS_OF,
         date!(2030 - 01 - 01),
+        finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN),
         "USD-OIS",
     )
     .expect("zero");

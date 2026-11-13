@@ -160,7 +160,7 @@ def test_cashflows_namespace_build_validate_accrual_and_price_bond() -> None:
     assert len(flows) == len(schedule["flows"])
     assert accrued_interest(schedule_json, "2025-02-28") > 0.0
 
-    instrument_json = bond_from_cashflows_json("CUSTOM-CF", schedule_json, "USD-OIS", 99.0)
+    instrument_json = bond_from_cashflows_json("CUSTOM-CF", schedule_json, "quarterly", "USD-OIS", 99.0)
     instrument = json.loads(instrument_json)
     assert instrument["instrument"]["type"] == "bond"
 
@@ -317,7 +317,7 @@ def test_cashflows_accrued_interest_rejects_unknown_config_json_fields() -> None
 
 def test_cashflows_bond_from_cashflows_allows_missing_quoted_clean_price_pct() -> None:
     schedule_json = build_cashflow_schedule_json(_cashflow_spec())
-    instrument_json = bond_from_cashflows_json("CUSTOM-CF-NO-QUOTE", schedule_json, "USD-OIS")
+    instrument_json = bond_from_cashflows_json("CUSTOM-CF-NO-QUOTE", schedule_json, "periodic(1)", "USD-OIS")
     instrument = json.loads(instrument_json)
 
     assert instrument["instrument"]["type"] == "bond"

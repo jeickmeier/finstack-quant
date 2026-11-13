@@ -39,6 +39,9 @@ fn test_instrument_type_price_shock_matching() {
                     )
                     .expect("finite test coupon"),
                 )
+                .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                    std::num::NonZeroU32::MIN,
+                ))
                 .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -63,6 +66,9 @@ fn test_instrument_type_price_shock_matching() {
                     )
                     .expect("finite test coupon"),
                 )
+                .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                    std::num::NonZeroU32::MIN,
+                ))
                 .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -147,6 +153,9 @@ fn test_instrument_type_spread_shock_matching() {
                 )
                 .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                std::num::NonZeroU32::MIN,
+            ))
             .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -241,6 +250,9 @@ fn test_instrument_spread_shock_moves_bond_pv() {
             )
             .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
         .credit_curve_id_opt(None)
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -318,6 +330,9 @@ fn test_instrument_attr_price_shock_matching() {
                     )
                     .expect("finite test coupon"),
                 )
+                .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                    std::num::NonZeroU32::MIN,
+                ))
                 .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -346,6 +361,9 @@ fn test_instrument_attr_price_shock_matching() {
                     )
                     .expect("finite test coupon"),
                 )
+                .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                    std::num::NonZeroU32::MIN,
+                ))
                 .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -421,6 +439,9 @@ fn test_instrument_attr_price_shock_no_matches() {
                 )
                 .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                std::num::NonZeroU32::MIN,
+            ))
             .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -521,6 +542,9 @@ fn test_instrument_shock_no_matching_types() {
                 )
                 .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                std::num::NonZeroU32::MIN,
+            ))
             .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -620,6 +644,9 @@ fn test_instrument_shock_multiple_types() {
                     )
                     .expect("finite test coupon"),
                 )
+                .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                    std::num::NonZeroU32::MIN,
+                ))
                 .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -644,6 +671,9 @@ fn test_instrument_shock_multiple_types() {
                     )
                     .expect("finite test coupon"),
                 )
+                .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                    std::num::NonZeroU32::MIN,
+                ))
                 .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
                 .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -743,6 +773,9 @@ fn test_attr_filter_ignores_tags_uses_meta_only() {
                 )
                 .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                std::num::NonZeroU32::MIN,
+            ))
             .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .instrument_pricing_overrides(InstrumentPricingOverrides::default())

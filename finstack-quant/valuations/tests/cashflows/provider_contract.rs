@@ -240,6 +240,7 @@ mod bond_contract {
                 issue_date: issue,
                 maturity,
                 frequency: Tenor::quarterly(),
+                quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
                 day_count: DayCount::Act360,
                 discount_curve_id: "USD-OIS".into(),
             },

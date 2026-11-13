@@ -196,6 +196,7 @@ fn bond_floating_constructor_builds_frn() {
         "maturity": "2030-01-01",
         "frequency": {"count": 3, "unit": "months"},
         "day_count": "act_360",
+        "quote_compounding": {"periodic": 4},
         "discount_curve_id": "USD-OIS",
     });
     let frn = JsBond::floating(JsValue::from(params.to_string())).expect("floating bond");

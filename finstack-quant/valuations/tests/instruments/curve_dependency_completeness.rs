@@ -84,6 +84,7 @@ fn test_bond_curve_dependencies_complete() {
             CashflowSpec::fixed(0.04, Tenor::semi_annual(), DayCount::Thirty360)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .build()
         .expect("Bond construction should succeed");
@@ -199,6 +200,7 @@ fn test_dependency_count_reasonable() {
             CashflowSpec::fixed(0.04, Tenor::semi_annual(), DayCount::Thirty360)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .build()
         .expect("Bond construction should succeed");

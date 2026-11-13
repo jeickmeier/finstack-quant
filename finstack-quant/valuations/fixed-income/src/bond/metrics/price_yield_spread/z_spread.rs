@@ -25,10 +25,11 @@ const Z_SPREAD_MAX_BRACKET_BP: f64 = 3000.0;
 /// Calculates the zero-volatility spread (Z-spread) as the constant additive spread
 /// to the base discount curve that makes the discounted value of future cashflows
 /// equal to the bond's dirty market price. The spread is applied on the
-/// **periodically-compounded zero rate**: the base discount factor is converted
-/// to its zero rate at the quote frequency `m`, the spread `z` is added, and the
-/// flow is re-discounted at frequency `m` (see `z_spread_discount_factor`). It is
-/// not a continuous `exp(-z·t)` shift.
+/// zero rate in the bond's stated `quote_compounding` (O6): the base discount
+/// factor is converted to its zero rate in that compounding, the spread `z` is
+/// added, and the flow is re-discounted in the same compounding (see
+/// `z_spread_discount_factor`). The convention is never derived from the
+/// coupon frequency.
 ///
 /// Uses Brent's method with tolerance `1e-10` and a maturity-aware initial
 /// bracket: ±1000 bp for short-dated bonds, widened up to ±3000 bp for

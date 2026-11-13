@@ -29,6 +29,7 @@ fn test_bond_dated_cashflows_include_floating_cfkind() {
         issue_date: issue,
         maturity,
         frequency: Tenor::quarterly(),
+        quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
         day_count: DayCount::Act365F,
         discount_curve_id: "USD-OIS".into(),
     })
@@ -119,8 +120,14 @@ fn test_bond_serde_allows_missing_issue_date_with_custom_cashflows() {
         .build(None)
         .expect("schedule build");
 
-    let bond = Bond::from_cashflows("SERDE-NO-ISSUE", schedule, "USD-OIS", Some(99.0))
-        .expect("bond from cashflows");
+    let bond = Bond::from_cashflows(
+        "SERDE-NO-ISSUE",
+        schedule,
+        finstack_quant_core::math::Compounding::SEMI_ANNUAL,
+        "USD-OIS",
+        Some(99.0),
+    )
+    .expect("bond from cashflows");
 
     let mut value = serde_json::to_value(&bond).expect("serialize");
     let obj = value
@@ -208,8 +215,14 @@ fn test_bond_custom_cashflows_serde_roundtrip() {
         .expect("schedule build");
 
     let flow_count = schedule.get_flows().len();
-    let bond = Bond::from_cashflows("SERDE-RT", schedule, "USD-OIS", Some(98.0))
-        .expect("bond from cashflows");
+    let bond = Bond::from_cashflows(
+        "SERDE-RT",
+        schedule,
+        finstack_quant_core::math::Compounding::SEMI_ANNUAL,
+        "USD-OIS",
+        Some(98.0),
+    )
+    .expect("bond from cashflows");
 
     let json = serde_json::to_string(&bond).expect("serialize");
     let restored: Bond = serde_json::from_str(&json).expect("deserialize");
@@ -316,6 +329,7 @@ fn bond_price_merton_mc_rejects_amortizing() {
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::amortizing(base, amort))
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .instrument_pricing_overrides(
             finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
@@ -358,6 +372,7 @@ fn build_step_up_bond_schedule(
             )
             .expect("finite test rate"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(
             finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
@@ -402,6 +417,7 @@ fn step_up_no_steps_equals_fixed_rate() {
             CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Thirty360)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(
             finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default(),
@@ -579,6 +595,7 @@ fn step_up_serde_roundtrip() {
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(spec)
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .instrument_pricing_overrides(
             finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides::default(),

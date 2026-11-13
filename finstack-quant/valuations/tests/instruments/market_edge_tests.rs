@@ -327,6 +327,7 @@ mod bond_market_edge {
                 CashflowSpec::fixed(0.06, Tenor::semi_annual(), DayCount::Thirty360)
                     .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .settlement_convention_opt(Some(
                 finstack_quant_valuations::instruments::fixed_income::bond::BondSettlementConvention {
@@ -347,6 +348,7 @@ mod bond_market_edge {
                 CashflowSpec::fixed(0.06, Tenor::semi_annual(), DayCount::Thirty360)
                     .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .settlement_convention_opt(Some(
                 finstack_quant_valuations::instruments::fixed_income::bond::BondSettlementConvention {
@@ -541,6 +543,7 @@ mod bond_market_edge {
                 CashflowSpec::fixed(0.06, Tenor::semi_annual(), DayCount::Thirty360)
                     .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .build()
             .unwrap();
@@ -555,6 +558,7 @@ mod bond_market_edge {
                 CashflowSpec::fixed(0.06, Tenor::semi_annual(), DayCount::Act365F)
                     .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .build()
             .unwrap();

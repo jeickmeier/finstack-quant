@@ -609,6 +609,7 @@ pub(super) fn floating_bond_params() -> Result<Vec<Value>> {
             issue_date: date(2025, time::Month::January, 15)?,
             maturity: date(2030, time::Month::January, 15)?,
             frequency: Tenor::quarterly(),
+            quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
             day_count: DayCount::Act360,
             discount_curve_id: CurveId::new("USD-OIS"),
         },

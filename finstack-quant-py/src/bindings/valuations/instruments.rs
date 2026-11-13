@@ -163,12 +163,15 @@ impl PyBond {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "Bond.zero_coupon")]
     #[staticmethod]
-    #[pyo3(text_signature = "(id, notional, issue_date, maturity, discount_curve_id)")]
+    #[pyo3(
+        text_signature = "(id, notional, issue_date, maturity, quote_compounding, discount_curve_id)"
+    )]
     fn zero_coupon(
         id: &str,
         notional: &Bound<'_, PyAny>,
         issue_date: &Bound<'_, PyAny>,
         maturity: &Bound<'_, PyAny>,
+        quote_compounding: &str,
         discount_curve_id: &str,
     ) -> PyResult<Self> {
         let inner = finstack_quant_valuations::instruments::fixed_income::bond::Bond::zero_coupon(
@@ -176,6 +179,9 @@ impl PyBond {
             money_from_py(notional, "notional")?,
             py_to_date(issue_date)?,
             py_to_date(maturity)?,
+            quote_compounding
+                .parse::<finstack_quant_core::math::Compounding>()
+                .map_err(core_to_py)?,
             discount_curve_id,
         )
         .map_err(core_to_py)?;
@@ -324,6 +330,9 @@ crate::bindings::macros::py_getters!(PyBond |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "Bond.notional")]
     notional -> PyMoney = money_to_py(s.inner.notional);
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "Bond.quote_compounding")]
+    quote_compounding -> String = s.inner.quote_compounding.to_string();
+
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "Bond.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
 
@@ -414,6 +423,22 @@ impl PyBondBuilder {
             spec_from_py(py, value, "cashflow_spec")?;
         builder_set!(slf, cashflow_spec, "{...}".to_string(), |b: BondBuilder| b
             .cashflow_spec(spec))
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "BondBuilder.quote_compounding")]
+    #[pyo3(text_signature = "($self, value)")]
+    fn quote_compounding<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: &str,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let compounding: finstack_quant_core::math::Compounding =
+            value.parse().map_err(crate::errors::core_to_py)?;
+        builder_set!(
+            slf,
+            quote_compounding,
+            compounding.to_string(),
+            |b: BondBuilder| b.quote_compounding(compounding)
+        )
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._instruments", "BondBuilder.discount_curve_id")]

@@ -55,6 +55,7 @@ fn test_bond_with_custom_cashflows() {
     let bond = Bond::from_cashflows(
         "CUSTOM_STEPUP_BOND",
         custom_schedule.clone(),
+        finstack_quant_core::math::Compounding::SEMI_ANNUAL,
         "USD-OIS",
         Some(98.5),
     )
@@ -140,6 +141,7 @@ fn test_bond_builder_with_custom_cashflows() {
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::default())
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .custom_cashflows_opt(Some(custom_schedule))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .instrument_pricing_overrides(
@@ -176,6 +178,7 @@ fn test_bond_with_cashflows_method() {
             CashflowSpec::fixed(0.04, Tenor::semi_annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .credit_curve_id_opt(None)
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -230,6 +233,9 @@ fn test_custom_cashflows_override_regular_generation() {
             CashflowSpec::fixed(0.03, Tenor::annual(), DayCount::Act365F)
                 .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .credit_curve_id_opt(None)
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -317,6 +323,7 @@ fn test_bond_floating_value() {
         issue_date: issue,
         maturity,
         frequency: Tenor::quarterly(),
+        quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
         day_count: DayCount::Act360,
         discount_curve_id: "USD-OIS".into(),
     })
@@ -361,6 +368,7 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
         issue_date: issue,
         maturity,
         frequency: Tenor::quarterly(),
+        quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
         day_count: DayCount::Act360,
         discount_curve_id: "USD-OIS".into(),
     })
@@ -474,6 +482,9 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(cashflow_spec)
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
@@ -571,6 +582,7 @@ fn test_bond_frn_dated_cashflows_uses_builder() {
         issue_date: issue,
         maturity,
         frequency: Tenor::quarterly(),
+        quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
         day_count: DayCount::Act360,
         discount_curve_id: "USD-OIS".into(),
     })
@@ -647,6 +659,7 @@ fn test_bond_amortization_signed_schedule_preserves_all_flows() {
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(cashflow_spec)
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
@@ -752,6 +765,9 @@ fn test_amortizing_bond_pv_greater_than_bullet_for_same_yield() {
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(bullet_cashflow_spec)
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
@@ -785,6 +801,9 @@ fn test_amortizing_bond_pv_greater_than_bullet_for_same_yield() {
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(amort_spec)
+        .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+            std::num::NonZeroU32::MIN,
+        ))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
@@ -828,6 +847,7 @@ fn bond_maturing_before_issue_is_rejected_by_validation() {
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::default())
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(Attributes::new())
         .build()
@@ -856,6 +876,7 @@ fn bond_maturing_after_issue_validates() {
         .issue_date(issue)
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::default())
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id(CurveId::new("USD-OIS"))
         .attributes(Attributes::new())
         .build()
@@ -882,6 +903,7 @@ fn bond_floating_usd_uses_us_corporate_settlement() {
         issue_date: issue,
         maturity,
         frequency: Tenor::quarterly(),
+        quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
         day_count: DayCount::Act360,
         discount_curve_id: "USD-OIS".into(),
     })
@@ -908,6 +930,7 @@ fn bond_floating_eur_uses_eur_corporate_settlement() {
         issue_date: issue,
         maturity,
         frequency: Tenor::quarterly(),
+        quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
         day_count: DayCount::Act360,
         discount_curve_id: "EUR-OIS".into(),
     })
@@ -934,6 +957,7 @@ fn bond_floating_gbp_uses_uk_gilt_t1_not_t2() {
         issue_date: issue,
         maturity,
         frequency: Tenor::quarterly(),
+        quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
         day_count: DayCount::Act365F,
         discount_curve_id: "GBP-SONIA".into(),
     })
@@ -959,6 +983,7 @@ fn bond_floating_unmapped_currency_requires_convention() {
         issue_date: issue,
         maturity,
         frequency: Tenor::quarterly(),
+        quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
         day_count: DayCount::Act360,
         discount_curve_id: "CHF-SARON".into(),
     })

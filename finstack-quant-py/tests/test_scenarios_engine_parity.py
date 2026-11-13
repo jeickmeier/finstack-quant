@@ -359,6 +359,7 @@ def test_floating_horizons_preserve_opening_and_crossed_fixings(method: str, iss
         "maturity": "2026-01-03",
         "frequency": Tenor.quarterly(),
         "day_count": DayCount.ACT_360,
+        "quote_compounding": {"periodic": 4},
         "discount_curve_id": "USD-OIS",
     })
     original = bond.to_json()

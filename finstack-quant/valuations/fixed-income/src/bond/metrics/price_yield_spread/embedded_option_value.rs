@@ -188,6 +188,7 @@ mod tests {
                 )
                 .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .credit_curve_id_opt(None)
             .instrument_pricing_overrides(InstrumentPricingOverrides {
@@ -239,6 +240,7 @@ mod tests {
                 )
                 .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .credit_curve_id_opt(None)
             .instrument_pricing_overrides(InstrumentPricingOverrides {
@@ -281,6 +283,7 @@ mod tests {
                 )
                 .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .credit_curve_id_opt(None)
             .instrument_pricing_overrides(InstrumentPricingOverrides {

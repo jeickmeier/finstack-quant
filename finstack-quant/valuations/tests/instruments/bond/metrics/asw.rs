@@ -637,6 +637,8 @@ fn seasoned_asw_keeps_full_next_coupon_and_inverts_on_same_basis() {
     spec.schedule.frequency = Tenor::annual();
     spec.schedule.day_count = DayCount::Thirty360;
     spec.schedule.business_day_convention = BusinessDayConvention::Unadjusted;
+    bond.quote_compounding =
+        finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN);
     let market = MarketContext::new().insert(
         DiscountCurve::builder("D")
             .base_date(as_of)

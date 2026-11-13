@@ -51,6 +51,7 @@ fn zero_coupon_maturity_and_amortization_preserve_principal_without_income() {
                 payment
             })
             .cashflow_spec(spec)
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .build()
             .expect("bond");

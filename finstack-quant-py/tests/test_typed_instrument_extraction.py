@@ -110,6 +110,7 @@ def _frn() -> Bond:
         "maturity": datetime.date(2029, 1, 15),
         "frequency": Tenor.quarterly(),
         "day_count": DayCount.ACT_360,
+        "quote_compounding": {"periodic": 4},
         "discount_curve_id": "USD-OIS",
     })
 

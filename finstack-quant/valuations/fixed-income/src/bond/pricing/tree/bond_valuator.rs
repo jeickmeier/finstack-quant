@@ -1539,8 +1539,14 @@ mod tests {
                 ..CashFlowMeta::default()
             },
         );
-        let mut bond =
-            Bond::from_cashflows("SEASONED-PIK", schedule, "USD-OIS", None).expect("custom bond");
+        let mut bond = Bond::from_cashflows(
+            "SEASONED-PIK",
+            schedule,
+            finstack_quant_core::math::Compounding::SEMI_ANNUAL,
+            "USD-OIS",
+            None,
+        )
+        .expect("custom bond");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
                 start: as_of,
@@ -1614,8 +1620,14 @@ mod tests {
                 ..CashFlowMeta::default()
             },
         );
-        let mut bond =
-            Bond::from_cashflows("SAME-DAY-EXERCISE", schedule, "USD-OIS", None).expect("bond");
+        let mut bond = Bond::from_cashflows(
+            "SAME-DAY-EXERCISE",
+            schedule,
+            finstack_quant_core::math::Compounding::SEMI_ANNUAL,
+            "USD-OIS",
+            None,
+        )
+        .expect("bond");
         bond.call_put = Some(CallPutSchedule {
             calls: vec![CallPut {
                 start: as_of,
@@ -1789,6 +1801,8 @@ mod tests {
         .expect("bond");
         bond.cashflow_spec = CashflowSpec::fixed(0.06, Tenor::annual(), DayCount::Act365F)
             .expect("finite test coupon");
+        bond.quote_compounding =
+            finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN);
         bond.instrument_pricing_overrides
             .market_quotes
             .implied_volatility = Some(0.01);
@@ -1887,6 +1901,8 @@ mod tests {
         .expect("bond");
         bond.cashflow_spec = CashflowSpec::fixed(0.06, Tenor::annual(), DayCount::Act365F)
             .expect("finite test coupon");
+        bond.quote_compounding =
+            finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN);
         bond.instrument_pricing_overrides
             .market_quotes
             .implied_volatility = Some(0.01);
@@ -1986,6 +2002,8 @@ mod tests {
         .expect("bond");
         bond.cashflow_spec = CashflowSpec::fixed(0.06, Tenor::annual(), DayCount::Act365F)
             .expect("finite test coupon");
+        bond.quote_compounding =
+            finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN);
         bond.instrument_pricing_overrides
             .market_quotes
             .implied_volatility = Some(0.01);

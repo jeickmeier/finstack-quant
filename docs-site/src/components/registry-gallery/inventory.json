@@ -1692,7 +1692,7 @@
   "provenance": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "426a5f0e828bb35d7079abaf3ae6cfaa50b067ada0da432ca710c94d1edb7779"
+      "sha256": "05c3b99fc01d3ea8f435d53ba3d7d489edb627e922579774c1aadeb717815cdc"
     },
     {
       "path": "finstack-quant-ui/tests/core/market-browser/cases.json",
@@ -1736,7 +1736,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "0b551edb2bc62ada77d9a9c5efde6e49b6f24894a8bfb3f2e6713bdee5e0b9ce"
+      "sha256": "856eb95b7b430cf662dfda523eebcb163904cdc0559eb5ad39f61bf06416d7fe"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/loan-yield/cases.json",
@@ -1744,7 +1744,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/bond-credit/cases.json",
-      "sha256": "4c3303b499438cf283c9c08e2ccd40b643010a5a3eebf421a90254fd13806fd1"
+      "sha256": "0b7cb1475bb4055f1c15d2ad7c9ed718e2d96cce28f90082a3489ca27710548e"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/convertible/cases.json",
@@ -1752,27 +1752,27 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/workout-ladder/cases.json",
-      "sha256": "c2721fb082c7b1b3b0257bdab5b984035911789d9d51d7f1cc0ed7366fc7d781"
+      "sha256": "9c9cba38b74ad5a4582449e03047150be4f3c03c55dc86d4602a969206b4523b"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/quote-converter/cases.json",
-      "sha256": "40ea4ed766dd5ac84a19748c9c434120f830ade28a44b6f31bdd88d2417b01a1"
+      "sha256": "aee4c60dc9a93f0599d18f9eb80af80ecf6f283737335df9c5c2075570be4f6f"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/application/cases.json",
-      "sha256": "d7c0397926e9c18a32574fc64ad586098949339327cc77a2e625032c750f9671"
+      "sha256": "d5bb73969490977f4c442e74347f43354ee84d00914e0da80521991d20f85002"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/horizon/cases.json",
-      "sha256": "992df9d7286918a9d597afad2ee9e509340b1f60b66df77e7d5309a74ce7bfa1"
+      "sha256": "e2294bf6189e54a73af22ac8707e0a100eef7c4e6a3a24400c5f9505a902d086"
     },
     {
       "path": "finstack-quant-ui/tests/scenarios/templates/cases.json",
-      "sha256": "b14b62d4af6fe8a04312f47e6722b61633de6f4243ed5a440405a0752432d57f"
+      "sha256": "1645c2745838bca98ff2c3d0ec2d52a2cf520f27f16d97f7342a2f6d6a0d7dfa"
     },
     {
       "path": "finstack-quant-ui/tests/attribution/cases.json",
-      "sha256": "d5c5f5de634cd38bdcd95f67840830235f961c898d69ae82780910e22e14bda5"
+      "sha256": "3cec5ab95a782bc21592661749050042859185c3ba06d58499c149a07037e6c9"
     },
     {
       "path": "finstack-quant-ui/tests/analytics/explicit.json",
@@ -1824,7 +1824,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/gallery.json",
-      "sha256": "99cb136d5de0421f0a4e1b839f3d6275ed6ad107571b352dda1864c359990461"
+      "sha256": "8702ab084aedfe644c5b2fa6b6d17fd46066821ef78a90c8c31638adfd2e7c14"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/scenario-pnl.json",
@@ -1832,19 +1832,19 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
-      "sha256": "c4dc40ed18feb6339b176293acae26e688ce478bed76df2608b9aa142d56871b"
+      "sha256": "a5e7fa8eeb9f2543279551b54e41fe3a919a77191cf2c17a27d3f96804e39ad1"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-      "sha256": "b273f75680b7f05a6f5e7d6ece3348205db8265865ceeb13638864dcfe858d30"
+      "sha256": "78cca148d0c2fca65ca101fb15fcbea2cb11517ddfb438959d9c2eb4a380a753"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/exposures/cases.json",
-      "sha256": "99a734dc3c83d5f3fb0bf852b45ea466b076351224b362bc6fd89dcc53e4b078"
+      "sha256": "7097778861183bc4875d420cee8fb6f2c5310f03b85691b82d68faf3b71a2a35"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/attribution/cases.json",
-      "sha256": "d784f2f6185f0ea46e7a337f22f5577b8616c9154d6a59b32a0c9e0e025a4308"
+      "sha256": "9e59f296ba718c4825588ad44cdb8241c3eb3930a4fd4263efc0ab28aba5b5fa"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/returns/cases.json",
@@ -1856,7 +1856,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "e16509fe75fb6bcaab5735b3fa533b45a033eba9c8556769e7d2552674b1d6ff"
+      "sha256": "a0dc6a382cc68bfb6d879af2b40deab1eacfbdea27a27b9ae0fcc52f68990b20"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
@@ -1976,7 +1976,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/capital-structure/cases.json",
-      "sha256": "60839d606b807508f7e12fe77498c6d45ba0880deb519f608fb5249b3366d44f"
+      "sha256": "440c6ebf009da16571c41aeff22d0b79f7e85c2b63d95c206928fecb8fc13196"
     },
     {
       "path": "finstack-quant-ui/tests/statements/relative-value/cases.json",

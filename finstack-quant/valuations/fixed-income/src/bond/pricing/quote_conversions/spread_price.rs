@@ -38,7 +38,7 @@ use finstack_quant_valuations_core::pricer::ModelKey;
 /// # Arguments
 ///
 /// * `bond` - Bond whose future pricing cashflows, settlement convention, and
-///   z-spread compounding frequency are used.
+///   stated `quote_compounding` are used.
 /// * `market` - Market context supplying the bond discount curve and schedule
 ///   dependencies.
 /// * `as_of` - Valuation/trade date; the helper derives settlement internally.
@@ -362,9 +362,7 @@ impl BondZSpreadPricingKernel {
         Ok(Self {
             quote_date,
             cached_flows,
-            compounding: crate::loan_quotes::legacy_frequency_compounding(
-                bond.cashflow_spec.frequency(),
-            ),
+            compounding: bond.quote_compounding,
         })
     }
 

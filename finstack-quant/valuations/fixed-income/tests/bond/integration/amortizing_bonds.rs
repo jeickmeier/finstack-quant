@@ -36,6 +36,7 @@ fn test_linear_amortization() {
                 final_notional: Money::new(400.0, Currency::USD).expect("valid money fixture"),
             },
         ))
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .build()
         .unwrap();
@@ -69,6 +70,7 @@ fn test_full_amortization() {
                 final_notional: Money::new(0.0, Currency::USD).expect("valid money fixture"),
             },
         ))
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .build()
         .unwrap();

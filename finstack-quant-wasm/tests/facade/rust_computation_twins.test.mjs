@@ -193,6 +193,7 @@ test('Bond presets, zeroCoupon and return floors construct validated bonds', () 
     new core.Money(1_000_000, usd()),
     '2024-01-15',
     '2029-01-15',
+    { periodic: 1 },
     'USD-OIS'
   );
   assert.equal(JSON.parse(zc.toJson()).instrument.spec.cashflow_spec.fixed.rate, '0');
@@ -208,6 +209,7 @@ test('Bond presets, zeroCoupon and return floors construct validated bonds', () 
     maturity: '2029-01-15',
     frequency: { count: 3, unit: 'months' },
     day_count: 'act_360',
+    quote_compounding: { periodic: 4 },
     discount_curve_id: 'USD-OIS',
   };
   const frn = Bond.floatingWithConvention(frnParams, 'us_corporate');
@@ -229,6 +231,7 @@ test('instrumentCashflows accepts JSON and market handles', () => {
     new core.Money(1_000_000, usd()),
     '2024-01-15',
     '2029-01-15',
+    { periodic: 1 },
     'USD-OIS'
   );
   const args = [zc.toJson(), FLAT_USD_MARKET, '2024-01-15', 'discounting'];
@@ -267,6 +270,7 @@ test('valuationResultMetricSeries decodes composite metric keys', () => {
     new core.Money(1_000_000, usd()),
     '2024-01-15',
     '2029-01-15',
+    { periodic: 1 },
     'USD-OIS'
   );
   const result = valuations.instruments.priceInstrument(
@@ -404,6 +408,7 @@ const zeroCouponSpec = (id, notional, maturity) =>
       new core.Money(notional, usd()),
       '2024-01-15',
       maturity,
+      { periodic: 1 },
       'USD-OIS'
     ).toJson()
   ).instrument;

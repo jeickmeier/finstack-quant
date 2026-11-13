@@ -138,7 +138,7 @@ AS_OF = date(2025, 1, 15)
 raw=instruments('foundations')['USD-CORP']['instrument']['spec']
 built=(Bond.builder().id('TYPED-BOND').notional(Money(2_000_000,'USD'))
        .issue_date(raw['issue_date']).maturity(raw['maturity'])
-       .cashflow_spec(raw['cashflow_spec']).discount_curve_id('USD-OIS').build())
+       .cashflow_spec(raw['cashflow_spec']).quote_compounding('semi_annual').discount_curve_id('USD-OIS').build())
 market=build_market('foundations')
 callable_spec=instruments('foundations')['USD-CORP']
 callable_spec['instrument']['spec']['call_put']={'calls':[{'start':'2027-01-15','end':'2029-01-15','price_pct_of_par':101.0}],'puts':[]}
@@ -171,7 +171,7 @@ schedule = (CashFlowSchedule.builder().principal(Money(2_000_000.0, 'USD'), date
     .amortization(AmortizationSpec.linear_to(Money(0.0, 'USD')))
     .fixed_cf(FixedCouponSpec(Decimal('0.055'), ScheduleParams.semiannual_30360()))
     .build())
-amortizer = bond_from_cashflows_json('LESSON-AMORTIZER', schedule.to_json(), 'USD-OIS')
+amortizer = bond_from_cashflows_json('LESSON-AMORTIZER', schedule.to_json(), 'semi_annual', 'USD-OIS')
 amortized = price_instrument(amortizer, market, AS_OF, metrics=['duration_mod', 'ytm'])
 bullet = price_instrument(json.dumps(instruments('foundations')['USD-CORP']), market, AS_OF, metrics=['duration_mod'])
 print({'amortizer_duration': amortized.get_metric('duration_mod'), 'bullet_duration': bullet.get_metric('duration_mod')})
@@ -197,7 +197,7 @@ from _shared.analyst_book import build_market
 AS_OF = date(2025, 1, 15)
 step_schedule=(CashFlowSchedule.builder().principal(Money(2_000_000,'USD'),date(2024,1,15),date(2030,1,15))
  .step_up_cf(StepUpCouponSpec(0.055,[(date(2027,1,15),0.065)],ScheduleParams(frequency=Tenor.parse('6M'), day_count=DayCount.THIRTY_360, calendar_id='weekends_only'))).build())
-step_bond=bond_from_cashflows_json('STEP-UP',step_schedule.to_json(),'USD-OIS')
+step_bond=bond_from_cashflows_json('STEP-UP',step_schedule.to_json(),'semi_annual','USD-OIS')
 step_price=price_instrument(step_bond,build_market('foundations'),AS_OF,metrics=['ytm'])
 print({'stepup_price_USD':step_price.price,'curve_implied_street_ytm':step_price.get_metric('ytm')})
 print(json.loads(instrument_cashflows(step_bond,build_market('foundations'),AS_OF,'discounting').to_json())['flows'][:3])

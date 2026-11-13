@@ -555,6 +555,9 @@ mod tests {
                 )
                 .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::Periodic(
+                std::num::NonZeroU32::MIN,
+            ))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
             .instrument_pricing_overrides(InstrumentPricingOverrides::default())
@@ -1086,6 +1089,7 @@ mod tests {
                     issue_date,
                     maturity: date!(2026 - 01 - 03),
                     frequency: Tenor::quarterly(),
+                    quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
                     day_count: DayCount::Act360,
                     discount_curve_id: "USD-OIS".into(),
                 },

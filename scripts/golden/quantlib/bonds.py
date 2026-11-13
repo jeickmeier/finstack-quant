@@ -93,6 +93,7 @@ def build_fixed_risk_free_bond() -> dict[str, Any]:
                             "adjust_accrual_dates": True,
                         }
                     },
+                    "quote_compounding": {"periodic": 2},
                     "discount_curve_id": "USD-OIS",
                     "credit_curve_id": None,
                     "attributes": {"tags": ["golden", "quantlib"], "meta": {}},
@@ -227,6 +228,7 @@ def _floating_bond_spec(*, credit_curve_id: str | None) -> dict[str, Any]:
                         "adjust_accrual_dates": True,
                     }
                 },
+                "quote_compounding": {"periodic": 4},
                 "discount_curve_id": "USD-OIS",
                 "credit_curve_id": credit_curve_id,
                 "attributes": {"tags": ["golden", "quantlib"], "meta": {}},

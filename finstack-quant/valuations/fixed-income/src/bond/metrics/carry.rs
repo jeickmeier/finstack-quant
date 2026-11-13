@@ -122,6 +122,7 @@ mod tests {
                 CashflowSpec::fixed(coupon_rate, Tenor::semi_annual(), DayCount::Act365F)
                     .expect("finite test coupon"),
             )
+            .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
             .discount_curve_id("USD-OIS".into())
             .build()
             .expect("bond")
@@ -193,6 +194,7 @@ mod tests {
         );
         bond.cashflow_spec = CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365L)
             .expect("finite coupon");
+        bond.quote_compounding = finstack_quant_core::math::Compounding::SEMI_ANNUAL;
         if let CashflowSpec::Fixed(spec) = &mut bond.cashflow_spec {
             spec.schedule.business_day_convention =
                 finstack_quant_core::dates::BusinessDayConvention::Unadjusted;

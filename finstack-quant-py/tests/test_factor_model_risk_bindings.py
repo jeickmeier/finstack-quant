@@ -57,6 +57,7 @@ def _market_and_portfolio() -> tuple[MarketContext, Portfolio]:
                     "payment_lag_days": 0,
                 }
             },
+            "quote_compounding": {"periodic": 2},
             "attributes": {},
         },
     }

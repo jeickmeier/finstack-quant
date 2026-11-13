@@ -3918,6 +3918,10 @@
           "$ref": "#/$defs/d_4ba43030fede59fe5993",
           "description": "Principal amount of the bond."
         },
+        "quote_compounding": {
+          "$ref": "#/$defs/Compounding",
+          "description": "Quote compounding of the z-spread (spread pricing, quote inversion\nand CS01), stated independently of the coupon frequency (record\nCORE-CONVENTIONS-007 #9, O6). Required: there is no default."
+        },
         "repo_curve_id": {
           "anyOf": [
             {
@@ -3958,6 +3962,7 @@
         "issue_date",
         "maturity",
         "cashflow_spec",
+        "quote_compounding",
         "discount_curve_id",
         "attributes"
       ],

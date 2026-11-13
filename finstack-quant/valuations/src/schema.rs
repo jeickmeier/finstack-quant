@@ -251,7 +251,7 @@ pub fn valuation_result_schema() -> finstack_quant_core::Result<&'static Value> 
 ///                     "calendar_id": "sifma",
 ///                     "rate": "0.0425"
 ///                 }
-///             },
+///             }, "quote_compounding": {"periodic": 2},
 ///             "discount_curve_id": "USD-TREASURY",
 ///             "attributes": {}
 ///         }

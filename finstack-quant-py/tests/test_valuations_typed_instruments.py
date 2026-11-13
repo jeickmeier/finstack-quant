@@ -135,6 +135,7 @@ class TestBondTyped:
             "maturity": datetime.date(2030, 1, 1),
             "frequency": Tenor.quarterly(),
             "day_count": DayCount.ACT_360,
+            "quote_compounding": {"periodic": 4},
             "discount_curve_id": "USD-OIS",
         })
         payload = json.loads(frn.to_json())

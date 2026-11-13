@@ -36,6 +36,8 @@ fn bullet_5y(credit: bool) -> (Bond, MarketContext) {
     .expect("bond builds");
     bond.cashflow_spec =
         CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F).expect("finite coupon");
+    bond.quote_compounding =
+        finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN);
     bond.instrument_pricing_overrides =
         InstrumentPricingOverrides::default().with_quoted_clean_price_pct(96.5);
 
@@ -198,6 +200,8 @@ fn callable_bond_spread_duration_uses_quote_reproducing_workout_path() {
     .expect("bond builds");
     bond.cashflow_spec =
         CashflowSpec::fixed(0.05, Tenor::annual(), DayCount::Act365F).expect("finite coupon");
+    bond.quote_compounding =
+        finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN);
     bond.settlement_convention = Some(BondSettlementConvention {
         settlement_days: 3,
         ..Default::default()

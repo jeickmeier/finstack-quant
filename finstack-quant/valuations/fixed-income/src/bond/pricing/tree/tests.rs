@@ -35,6 +35,7 @@ fn create_test_bond() -> Bond {
             )
             .expect("finite test coupon"),
         )
+        .quote_compounding(finstack_quant_core::math::Compounding::SEMI_ANNUAL)
         .discount_curve_id("USD-OIS".into())
         .credit_curve_id_opt(None)
         .instrument_pricing_overrides(
@@ -680,6 +681,7 @@ fn risk_free_callable_frn(maturity: Date) -> Bond {
         issue_date: issue,
         maturity,
         frequency: finstack_quant_core::dates::Tenor::quarterly(),
+        quote_compounding: finstack_quant_core::math::Compounding::QUARTERLY,
         day_count: finstack_quant_core::dates::DayCount::Act360,
         discount_curve_id: "USD-OIS".into(),
     })
