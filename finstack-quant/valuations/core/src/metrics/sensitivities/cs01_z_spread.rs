@@ -78,8 +78,9 @@ pub struct ZSpreadCs01Inputs {
     pub settlement: Date,
     /// Discount curve the spread is layered on top of.
     pub discount_curve_id: CurveId,
-    /// Compounding frequency for the z-spread shift (payments per year).
-    pub compounds_per_year: f64,
+    /// The instrument's quote compounding of the z-spread shift (record
+    /// CORE-CONVENTIONS-007 #9; never derived from the payment frequency).
+    pub compounding: finstack_quant_core::math::Compounding,
     /// Holder-view cashflows `(date, amount)` the pricer discounts.
     pub flows: Vec<(Date, Money)>,
 }
@@ -138,11 +139,11 @@ fn cache_flows(
 fn price_at_spread(
     cached: &[CachedFlow],
     z: f64,
-    compounds_per_year: f64,
+    compounding: finstack_quant_core::math::Compounding,
 ) -> finstack_quant_core::Result<f64> {
     let mut pv = NeumaierAccumulator::new();
     for (t, df_base, amt) in cached {
-        let df_z = z_spread_discount_factor(*df_base, *t, z, compounds_per_year)?;
+        let df_z = z_spread_discount_factor(*df_base, *t, z, compounding)?;
         pv.add(amt * df_z);
     }
     Ok(pv.total())
@@ -154,13 +155,13 @@ fn bucket_pv_difference(
     base_z: f64,
     bumped: &[usize],
     dz: f64,
-    compounds_per_year: f64,
+    compounding: finstack_quant_core::math::Compounding,
 ) -> finstack_quant_core::Result<f64> {
     let mut pv = NeumaierAccumulator::new();
     for &i in bumped {
         let (t, df_base, amt) = cached[i];
-        let up = z_spread_discount_factor(df_base, t, base_z + dz, compounds_per_year)?;
-        let down = z_spread_discount_factor(df_base, t, base_z - dz, compounds_per_year)?;
+        let up = z_spread_discount_factor(df_base, t, base_z + dz, compounding)?;
+        let down = z_spread_discount_factor(df_base, t, base_z - dz, compounding)?;
         pv.add(amt * (up - down));
     }
     Ok(pv.total())
@@ -170,7 +171,7 @@ fn bucket_pv_difference(
 /// dirty price). Invalid quotes and failed solves are returned to the caller.
 fn solve_anchor_spread(
     cached: &[CachedFlow],
-    compounds_per_year: f64,
+    compounding: finstack_quant_core::math::Compounding,
     target: f64,
 ) -> finstack_quant_core::Result<f64> {
     if !target.is_finite() {
@@ -179,7 +180,7 @@ fn solve_anchor_spread(
         ));
     }
     let objective = |z: f64| -> f64 {
-        match price_at_spread(cached, z, compounds_per_year) {
+        match price_at_spread(cached, z, compounding) {
             Ok(pv) => pv - target,
             // Diverge positively for spreads below the compounding floor so
             // Brent does not manufacture a spurious bracket.
@@ -190,7 +191,7 @@ fn solve_anchor_spread(
         .with_tolerance(1e-10)
         .with_initial_bracket_size(Some(0.05)); // ±500 bp
     let spread = solver.solve(objective, 0.0)?;
-    let pv = price_at_spread(cached, spread, compounds_per_year)?;
+    let pv = price_at_spread(cached, spread, compounding)?;
     if !pv.is_finite() || (pv - target).abs() > target.abs().max(1.0) * 1e-8 {
         return Err(finstack_quant_core::Error::Validation(
             "z-spread anchor solve did not reproduce the quoted dirty price".into(),
@@ -206,13 +207,13 @@ fn anchor_spread<I: ZSpreadCs01>(
     curves: &MarketContext,
     as_of: Date,
     cached: &[CachedFlow],
-    compounds_per_year: f64,
+    compounding: finstack_quant_core::math::Compounding,
 ) -> finstack_quant_core::Result<f64> {
     if let Some(spread) = instrument.z_spread_cs01_quoted_spread() {
         return Ok(spread);
     }
     match instrument.z_spread_cs01_quoted_dirty(curves, as_of)? {
-        Some(target) => solve_anchor_spread(cached, compounds_per_year, target),
+        Some(target) => solve_anchor_spread(cached, compounding, target),
         None => Ok(0.0),
     }
 }
@@ -234,7 +235,7 @@ where
     let cached = cache_flows(&inputs, disc.as_ref())?;
     Ok(Some(solve_anchor_spread(
         &cached,
-        inputs.compounds_per_year,
+        inputs.compounding,
         target,
     )?))
 }
@@ -352,11 +353,11 @@ where
                 curves.as_ref(),
                 context.as_of,
                 &cached,
-                inputs.compounds_per_year,
+                inputs.compounding,
             )?;
             let dz = bump_bp * 1e-4;
-            let pv_up = price_at_spread(&cached, base_z + dz, inputs.compounds_per_year)?;
-            let pv_down = price_at_spread(&cached, base_z - dz, inputs.compounds_per_year)?;
+            let pv_up = price_at_spread(&cached, base_z + dz, inputs.compounding)?;
+            let pv_down = price_at_spread(&cached, base_z - dz, inputs.compounding)?;
             sensitivity_central_diff(pv_up, pv_down, bump_bp)
         };
 
@@ -446,7 +447,7 @@ where
             curves.as_ref(),
             context.as_of,
             &cached,
-            inputs.compounds_per_year,
+            inputs.compounding,
         )?;
         let dz = bump_bp * 1e-4;
         let groups = assign_buckets(&cached, &buckets);
@@ -460,7 +461,7 @@ where
                 0.0
             } else {
                 let difference =
-                    bucket_pv_difference(&cached, base_z, group, dz, inputs.compounds_per_year)?;
+                    bucket_pv_difference(&cached, base_z, group, dz, inputs.compounding)?;
                 sensitivity_central_diff(difference, 0.0, bump_bp)
             };
             series.push((label, cs01));
@@ -481,7 +482,12 @@ mod tests {
     fn price_at_spread_zero_matches_base_pv() {
         let cached = vec![(0.5, 0.98, 100.0), (2.0, 0.92, 100.0), (5.0, 0.80, 1000.0)];
         let base: f64 = cached.iter().map(|(_, df, amt)| df * amt).sum();
-        let pv = price_at_spread(&cached, 0.0, 4.0).unwrap();
+        let pv = price_at_spread(
+            &cached,
+            0.0,
+            finstack_quant_core::math::Compounding::QUARTERLY,
+        )
+        .unwrap();
         assert!((pv - base).abs() < 1e-9, "pv={pv} base={base}");
     }
 
@@ -489,8 +495,18 @@ mod tests {
     #[test]
     fn price_at_spread_decreases_with_spread() {
         let cached = vec![(1.0, 0.97, 50.0), (3.0, 0.90, 1050.0)];
-        let lo = price_at_spread(&cached, 0.0, 1.0).unwrap();
-        let hi = price_at_spread(&cached, 0.01, 1.0).unwrap();
+        let lo = price_at_spread(
+            &cached,
+            0.0,
+            finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN),
+        )
+        .unwrap();
+        let hi = price_at_spread(
+            &cached,
+            0.01,
+            finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN),
+        )
+        .unwrap();
         assert!(hi < lo, "widening spread must reduce PV: lo={lo} hi={hi}");
     }
 
@@ -498,7 +514,7 @@ mod tests {
     #[test]
     fn solve_anchor_spread_roundtrips() {
         let cached = vec![(1.0, 0.97, 50.0), (2.0, 0.94, 50.0), (3.0, 0.90, 1050.0)];
-        let m = 1.0;
+        let m = finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN);
         let z_true = 0.0123;
         let target = price_at_spread(&cached, z_true, m).unwrap();
         let z = solve_anchor_spread(&cached, m, target).unwrap();
@@ -509,7 +525,14 @@ mod tests {
     fn solve_anchor_spread_rejects_impossible_and_nonfinite_quotes() {
         let cached = [(1.0, 0.97, 50.0), (3.0, 0.90, 1050.0)];
         for target in [-100.0, f64::NAN, f64::INFINITY] {
-            assert!(solve_anchor_spread(&cached, 1.0, target).is_err());
+            assert!(
+                solve_anchor_spread(
+                    &cached,
+                    finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN),
+                    target
+                )
+                .is_err()
+            );
         }
     }
 
@@ -545,7 +568,7 @@ mod tests {
             .collect();
         let buckets = vec![0.01, 1.0, 3.0, 10.0, 30.0];
         let groups = assign_buckets(&cached, &buckets);
-        let m = 4.0;
+        let m = finstack_quant_core::math::Compounding::QUARTERLY;
         let dz = 1e-4;
 
         let base_z = 0.05;

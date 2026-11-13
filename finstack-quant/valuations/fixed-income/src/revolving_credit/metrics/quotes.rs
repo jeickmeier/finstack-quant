@@ -164,7 +164,7 @@ impl MetricCalculator for DiscountMarginCalculator {
         let disc = context
             .curves
             .get_discount(facility.discount_curve_id.as_str())?;
-        let compounds = facility.frequency.compounding_frequency();
+        let compounds = crate::loan_quotes::legacy_frequency_compounding(facility.frequency);
         solve_discount_margin(
             |dm| pv_with_discount_margin(&flows, settlement, disc.as_ref(), compounds, dm),
             target,
@@ -213,7 +213,7 @@ impl MetricCalculator for PriceFromDmCalculator {
             &flows,
             settlement,
             disc.as_ref(),
-            facility.frequency.compounding_frequency(),
+            crate::loan_quotes::legacy_frequency_compounding(facility.frequency),
             dm,
         )?;
         let accrued = accrued_interest(facility, &schedule, settlement)?;

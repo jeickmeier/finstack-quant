@@ -14115,6 +14115,41 @@ export type CommodityFutureFixing =
       type: "arithmetic_average";
     };
 /**
+ * Compounding convention for interest rates.
+ *
+ * Used to specify how interest rates should be quoted or converted.
+ * All variants produce mathematically equivalent discount factors when
+ * applied consistently.
+ *
+ * # Relationship Between Conventions
+ *
+ * For a given discount factor DF at time t, the rates under different
+ * conventions are related by:
+ *
+ * ```text
+ * DF = e^(-r_cc × t)                    [Continuous]
+ *    = (1 + r_ann)^(-t)                 [Periodic(1)]
+ *    = (1 + r_per/n)^(-n×t)             [Periodic(n)]
+ *    = 1 / (1 + r_simple × t)           [Simple]
+ * ```
+ *
+ * # Ordering of Rates
+ *
+ * For a common discount factor below one, annual and simple rates both exceed
+ * the continuous rate. Their ordering depends on the maturity `t` in years:
+ * `r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and
+ * `r_simple > r_annual` for `t > 1`.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "Compounding".
+ */
+export type Compounding =
+  | "continuous"
+  | {
+      periodic: number;
+    }
+  | "simple";
+/**
  * Dimension a concentration limit is measured on.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -16701,6 +16736,7 @@ export interface SharedDefs {
   CompositeLegSpec?: CompositeLegSpec;
   CompositeSpec?: CompositeSpec1;
   CompositeState?: CompositeState1;
+  Compounding?: Compounding;
   ConcentrationLimit?: ConcentrationLimit;
   ConcentrationScope?: ConcentrationScope;
   ConstituentReference?: ConstituentReference;
@@ -20087,6 +20123,16 @@ export interface AssetBackedFacility {
   maturity: Date40;
   metric_pricing_overrides?: MetricPricingOverrides7;
   prepayment_spec?: PrepaymentModelSpec2;
+  /**
+   * Quote compounding of the facility's spread (z-spread CS01), stated
+   * independently of `frequency` (record CORE-CONVENTIONS-007 #9, O6).
+   */
+  quote_compounding:
+    | "continuous"
+    | {
+        periodic: number;
+      }
+    | "simple";
   /**
    * Facility coupon: a fixed all-in rate (decimal) or a floating index
    * plus spread.

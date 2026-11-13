@@ -222,6 +222,7 @@ def test_typed_facility_terms_are_accepted_by_the_facility_builder() -> None:
         .revolving_end(datetime.date(2026, 1, 15))
         .maturity(MATURITY)
         .frequency("3M")
+        .quote_compounding("quarterly")
         .calendar_id("nyse")
         .term_out(TermOutSpec(24).months)
         .amortization_events([AmortizationEvent.cumulative_loss(0.04), AmortizationEvent.excess_spread(0.01)])

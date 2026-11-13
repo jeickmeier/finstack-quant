@@ -293,7 +293,7 @@ fn maturity_scaled_bracket(
 pub(crate) struct BondZSpreadPricingKernel {
     pub(crate) quote_date: Date,
     cached_flows: Vec<(f64, f64, f64)>,
-    compounds_per_year: f64,
+    compounding: finstack_quant_core::math::Compounding,
 }
 
 impl BondZSpreadPricingKernel {
@@ -362,14 +362,16 @@ impl BondZSpreadPricingKernel {
         Ok(Self {
             quote_date,
             cached_flows,
-            compounds_per_year: bond.cashflow_spec.frequency().compounding_frequency(),
+            compounding: crate::loan_quotes::legacy_frequency_compounding(
+                bond.cashflow_spec.frequency(),
+            ),
         })
     }
 
     pub(crate) fn price(&self, z: f64) -> finstack_quant_core::Result<f64> {
         let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
         for (t, df_base, amount) in &self.cached_flows {
-            let df_z = z_spread_discount_factor(*df_base, *t, z, self.compounds_per_year)?;
+            let df_z = z_spread_discount_factor(*df_base, *t, z, self.compounding)?;
             pv.add(*amount * df_z);
         }
         Ok(pv.total())

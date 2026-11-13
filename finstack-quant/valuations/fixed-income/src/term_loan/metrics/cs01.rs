@@ -36,12 +36,12 @@ impl ZSpreadCs01 for TermLoan {
 
         // Compounding frequency for the z-spread shift = coupon payments/year,
         // mirroring the bond z-spread convention.
-        let compounds_per_year = self.frequency.compounding_frequency();
+        let compounding = crate::loan_quotes::legacy_frequency_compounding(self.frequency);
 
         Ok(ZSpreadCs01Inputs {
             settlement,
             discount_curve_id: self.discount_curve_id.clone(),
-            compounds_per_year,
+            compounding,
             flows,
         })
     }

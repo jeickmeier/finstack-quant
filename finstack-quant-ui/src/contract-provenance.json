@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "47e73b6080253b15fddd94a86de19684ec868125e485421abfb3ae06528b3efa",
+          "sha256": "ba002b70e390b991a79339fc70884f0dd418a2e9d65ecb6a9a0168e99bacdeb6",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "8fbba54475878d1b48390485ab7c4c2fbbbe3167ad1fd84e2e60057feaf6976c",
+          "sha256": "0e211418bfcb58482dbe8763d85b2d8059b47ce0c8ba954d1c5112752a310798",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -285,7 +285,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
-          "sha256": "830adae1f5fe8ba41cda7b9c2e10893d61a25f93defb83840a68d92c98a5ef29",
+          "sha256": "87fe02d172cb6a14f87902b1f0be8f347898c32cfa95cc6a7fb498c4a3391718",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {

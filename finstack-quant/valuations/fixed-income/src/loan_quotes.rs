@@ -18,9 +18,10 @@
 //!
 //! # Quick Example
 //! ```rust
-//! use finstack_quant_core::dates::Tenor;
+//! use finstack_quant_core::math::Compounding;
 //!
-//! assert_eq!(Tenor::quarterly().compounding_frequency(), 4.0);
+//! // The discount margin is quoted in the loan's own stated compounding.
+//! assert_eq!(Compounding::QUARTERLY.periods_per_year(), Some(4));
 //! ```
 
 use finstack_quant_core::Result;
@@ -107,8 +108,8 @@ pub(crate) fn floating_margin(
 /// guards against solver divergence.
 pub const DISCOUNT_MARGIN_BOUND: f64 = 0.50;
 
-/// Present value of `flows` at `settlement` with `dm` added to the
-/// periodically compounded zero rate of each discount factor.
+/// Present value of `flows` at `settlement` with `dm` added to the zero rate
+/// of each discount factor in the instrument's quote compounding.
 ///
 /// Flows dated on or before `settlement` are skipped. With `dm = 0` the
 /// result reproduces plain curve discounting of the same flows.
@@ -119,8 +120,8 @@ pub const DISCOUNT_MARGIN_BOUND: f64 = 0.50;
 ///   view: receipts positive, funding legs negative).
 /// * `settlement` - Anchor date the flows are discounted to.
 /// * `disc` - Discount curve of the instrument.
-/// * `compounds_per_year` - Compounding frequency of the zero-rate shift, from
-///   [`Tenor::compounding_frequency`](finstack_quant_core::dates::Tenor::compounding_frequency).
+/// * `compounding` - The instrument's quote compounding of the zero-rate
+///   shift (record CORE-CONVENTIONS-007 #9).
 /// * `dm` - Discount margin, decimal (`0.025` = 250 bp).
 ///
 /// # Errors
@@ -131,7 +132,7 @@ pub fn pv_with_discount_margin(
     flows: &[(Date, f64)],
     settlement: Date,
     disc: &dyn Discounting,
-    compounds_per_year: f64,
+    compounding: finstack_quant_core::math::Compounding,
     dm: f64,
 ) -> Result<f64> {
     let mut pv = NeumaierAccumulator::new();
@@ -143,7 +144,7 @@ pub fn pv_with_discount_margin(
             .day_count()
             .year_fraction(settlement, *date, DayCountContext::default())?;
         let df = disc.df_between_dates(settlement, *date)?;
-        let df_dm = z_spread_discount_factor(df, t, dm, compounds_per_year)?;
+        let df_dm = z_spread_discount_factor(df, t, dm, compounding)?;
         pv.add(amount * df_dm);
     }
     Ok(pv.total())
@@ -444,6 +445,18 @@ pub fn oid_eir_schedule_from_flows(
     })
 }
 
+/// TEMPORARY (E2c): the quote compounding the unmigrated callers used to
+/// derive from the payment frequency. Removed when each instrument states its
+/// own convention (record CORE-CONVENTIONS-007 #9, O6).
+pub(crate) fn legacy_frequency_compounding(
+    frequency: finstack_quant_core::dates::Tenor,
+) -> finstack_quant_core::math::Compounding {
+    finstack_quant_core::math::Compounding::Periodic(
+        std::num::NonZeroU32::new(frequency.compounding_frequency() as u32)
+            .unwrap_or(std::num::NonZeroU32::MIN),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -491,11 +504,33 @@ mod tests {
             .iter()
             .map(|(d, a)| a * disc.df_between_dates(settlement, *d).expect("df"))
             .sum();
-        let pv0 = pv_with_discount_margin(&flows, settlement, &disc, 2.0, 0.0).expect("pv");
+        let pv0 = pv_with_discount_margin(
+            &flows,
+            settlement,
+            &disc,
+            finstack_quant_core::math::Compounding::SEMI_ANNUAL,
+            0.0,
+        )
+        .expect("pv");
         assert!((pv0 - plain).abs() < 1e-9);
-        let target = pv_with_discount_margin(&flows, settlement, &disc, 2.0, 0.0125).expect("pv");
+        let target = pv_with_discount_margin(
+            &flows,
+            settlement,
+            &disc,
+            finstack_quant_core::math::Compounding::SEMI_ANNUAL,
+            0.0125,
+        )
+        .expect("pv");
         let dm = solve_discount_margin(
-            |dm| pv_with_discount_margin(&flows, settlement, &disc, 2.0, dm),
+            |dm| {
+                pv_with_discount_margin(
+                    &flows,
+                    settlement,
+                    &disc,
+                    finstack_quant_core::math::Compounding::SEMI_ANNUAL,
+                    dm,
+                )
+            },
             target,
             0.0,
         )

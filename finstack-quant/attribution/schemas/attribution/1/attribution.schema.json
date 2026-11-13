@@ -1102,6 +1102,10 @@
           },
           "description": "Prepayment model specification."
         },
+        "quote_compounding": {
+          "$ref": "#/$defs/Compounding",
+          "description": "Quote compounding of the facility's spread (z-spread CS01), stated\nindependently of `frequency` (record CORE-CONVENTIONS-007 #9, O6)."
+        },
         "rate": {
           "$ref": "#/$defs/RateSpec",
           "description": "Facility coupon: a fixed all-in rate (decimal) or a floating index\nplus spread."
@@ -1183,6 +1187,7 @@
         "revolving_end",
         "maturity",
         "frequency",
+        "quote_compounding",
         "discount_curve_id"
       ],
       "type": "object"

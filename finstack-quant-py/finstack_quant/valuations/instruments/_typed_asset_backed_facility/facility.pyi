@@ -585,6 +585,24 @@ class AssetBackedFacility:
         """
         ...
     @property
+    def quote_compounding(self) -> str:
+        """
+        Quote compounding of the facility's spread (z-spread CS01).
+
+        Stated independently of the payment frequency, never derived from it.
+
+        Returns
+        -------
+        str
+            ``"continuous"``, ``"simple"``, ``"semi_annual"``, ``"quarterly"``,
+            ``"monthly"`` or ``"periodic(n)"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def day_count(self) -> DayCount:
         """
         Accrual day count of the facility interest and the commitment fee.
@@ -1128,6 +1146,28 @@ class AssetBackedFacilityBuilder:
         ------
         ValueError
             If the date is invalid or the builder was already consumed.
+        """
+        ...
+    def quote_compounding(self, value: str) -> AssetBackedFacilityBuilder:
+        """
+        Set the quote compounding of the facility's spread (required).
+
+        Parameters
+        ----------
+        value : str
+            ``"continuous"``, ``"simple"``, ``"semi_annual"``, ``"quarterly"``,
+            ``"monthly"`` or ``"periodic(n)"``; stated independently of the
+            payment frequency.
+
+        Returns
+        -------
+        AssetBackedFacilityBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the label is unknown or the builder was already consumed by ``build()``.
         """
         ...
     def frequency(self, value: Tenor | str) -> AssetBackedFacilityBuilder:

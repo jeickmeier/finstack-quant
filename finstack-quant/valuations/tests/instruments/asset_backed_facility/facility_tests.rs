@@ -101,6 +101,7 @@ fn facility(drawn: f64, commitment: f64) -> AssetBackedFacility {
         .revolving_end(d(2026, 1, 1))
         .maturity(d(2032, 1, 1))
         .frequency(Tenor::quarterly())
+        .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
         .calendar_id("nyse".into())
         .term_out(TermOutSpec { months: 24 })
         .discount_curve_id(CurveId::new("USD-OIS".to_string()))

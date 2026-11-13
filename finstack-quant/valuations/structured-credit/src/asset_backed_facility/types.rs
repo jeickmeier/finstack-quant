@@ -181,6 +181,9 @@ pub struct AssetBackedFacility {
     pub maturity: Date,
     /// Payment frequency of interest, fees and the borrowing-base test.
     pub frequency: Tenor,
+    /// Quote compounding of the facility's spread (z-spread CS01), stated
+    /// independently of `frequency` (record CORE-CONVENTIONS-007 #9, O6).
+    pub quote_compounding: finstack_quant_core::math::Compounding,
     /// Accrual convention of the facility interest and commitment fee.
     #[builder(default = DayCount::Act360)]
     #[serde(default = "default_day_count")]
@@ -356,6 +359,7 @@ impl AssetBackedFacility {
             .revolving_end(closing.add_months(24)?)
             .maturity(closing.add_months(72)?)
             .frequency(Tenor::quarterly())
+            .quote_compounding(finstack_quant_core::math::Compounding::QUARTERLY)
             .calendar_id("nyse".into())
             .term_out(TermOutSpec { months: 24 })
             .discount_curve_id(CurveId::new("USD-OIS".to_string()))

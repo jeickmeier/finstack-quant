@@ -53,6 +53,7 @@ def _facility(drawn: float = 60_000_000.0) -> AssetBackedFacility:
         .revolving_end(datetime.date(2026, 1, 15))
         .maturity(datetime.date(2030, 1, 15))
         .frequency("3M")
+        .quote_compounding("quarterly")
         .day_count("act_360")
         .calendar_id("nyse")
         .term_out(24)
@@ -122,6 +123,7 @@ def test_amortization_events_pull_the_revolving_end_forward() -> None:
         .revolving_end(datetime.date(2026, 1, 15))
         .maturity(datetime.date(2030, 1, 15))
         .frequency("3M")
+        .quote_compounding("quarterly")
         .calendar_id("nyse")
         .amortization_events([
             {"kind": "date", "date": "2025-01-15"},
@@ -258,6 +260,7 @@ def test_every_amortization_event_kind_projects_with_documented_units() -> None:
             .revolving_end(datetime.date(2026, 1, 15))
             .maturity(datetime.date(2030, 1, 15))
             .frequency("3M")
+            .quote_compounding("quarterly")
             .calendar_id("nyse")
             .term_out(24)
             .amortization_events(events)
@@ -287,6 +290,7 @@ def test_draws_fees_and_readvance_round_trip_and_project() -> None:
         .revolving_end(datetime.date(2026, 1, 15))
         .maturity(datetime.date(2030, 1, 15))
         .frequency("3M")
+        .quote_compounding("quarterly")
         .calendar_id("nyse")
         .term_out(24)
         .draws([{"date": "2025-01-15", "amount": {"amount": "5000000", "currency": "USD"}}])

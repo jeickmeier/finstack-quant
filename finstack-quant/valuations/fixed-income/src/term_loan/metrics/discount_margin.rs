@@ -91,7 +91,7 @@ impl MetricCalculator for DiscountMarginCalculator {
         let disc = context
             .curves
             .get_discount(loan.discount_curve_id.as_str())?;
-        let compounding = loan.frequency.compounding_frequency();
+        let compounding = crate::loan_quotes::legacy_frequency_compounding(loan.frequency);
         let pv_given_dm = |dm: f64| {
             pv_with_discount_margin(&flows, settlement_date, disc.as_ref(), compounding, dm)
         };

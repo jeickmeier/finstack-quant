@@ -120,6 +120,9 @@ export default [
               "cpr": 0.2,
               "curve": "constant"
             },
+            "quote_compounding": {
+              "periodic": 4
+            },
             "rate": {
               "fixed": {
                 "rate": 0.06

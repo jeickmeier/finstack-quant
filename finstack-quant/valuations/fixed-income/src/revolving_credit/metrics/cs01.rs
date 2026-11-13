@@ -42,7 +42,7 @@ impl ZSpreadCs01 for RevolvingCredit {
     ) -> finstack_quant_core::Result<ZSpreadCs01Inputs> {
         // Compounding frequency for the z-spread shift = coupon/fee payments per
         // year, mirroring the term-loan and bond z-spread convention.
-        let compounds_per_year = self.frequency.compounding_frequency();
+        let compounding = crate::loan_quotes::legacy_frequency_compounding(self.frequency);
 
         let flows = match &self.draw_repay_spec {
             DrawRepaySpec::Deterministic(_) => {
@@ -86,7 +86,7 @@ impl ZSpreadCs01 for RevolvingCredit {
         Ok(ZSpreadCs01Inputs {
             settlement: as_of,
             discount_curve_id: self.discount_curve_id.clone(),
-            compounds_per_year,
+            compounding,
             flows,
         })
     }

@@ -6737,6 +6737,11 @@ export interface AssetBackedFacility {
    */
   prepayment_spec?: PrepaymentModelSpec;
   /**
+   * Quote compounding of the facility's spread (z-spread CS01), stated
+   * independently of `frequency` (record CORE-CONVENTIONS-007 #9, O6).
+   */
+  quote_compounding: Compounding;
+  /**
    * Facility coupon: a fixed all-in rate (decimal) or a floating index
    * plus spread.
    */

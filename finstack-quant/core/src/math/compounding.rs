@@ -405,33 +405,35 @@ impl std::fmt::Display for Compounding {
     }
 }
 
-/// Discount factor of one cashflow under a periodically compounded zero rate
-/// shifted by an additive z-spread.
+/// Discount factor of one cashflow under a zero rate shifted by an additive
+/// z-spread in an explicitly selected quote compounding.
 ///
-/// The base curve's discount factor is inverted to a zero rate compounded
-/// `compounds_per_year` times a year, the spread is added, and the cashflow is
-/// re-discounted at the shifted rate.
+/// The base curve's discount factor is inverted to a zero rate in
+/// `compounding`, the spread is added, and the cashflow is re-discounted at
+/// the shifted rate in the same compounding. The compounding is the
+/// instrument's quote convention, never derived from its payment frequency
+/// (record CORE-CONVENTIONS-007 #9).
 ///
 /// # Arguments
 ///
 /// * `df_base` - Positive, finite base-curve discount factor for the cashflow.
 /// * `t` - Cashflow time in years on the discount curve clock; non-positive
 ///   times return `df_base` unchanged.
-/// * `z` - Additive decimal spread on the periodically compounded zero rate.
-/// * `compounds_per_year` - Whole compounding periods per year (a fractional
-///   part is truncated), floored at one.
+/// * `z` - Additive decimal spread on the zero rate in `compounding`.
+/// * `compounding` - Quote compounding of the zero rate and its spread.
 ///
 /// # Errors
 ///
 /// Returns `Error::Validation` when `df_base` is non-finite or non-positive
-/// (a curve-data error), or when the spread-adjusted compounding base
-/// `1 + (base_rate + z) / m` is non-positive or non-finite, which only happens
-/// for spreads too negative to be meaningful.
+/// (a curve-data error), when `t` or `z` is non-finite, or when the shifted
+/// rate has no valid discount factor in `compounding` (a periodic base
+/// `1 + (rate + z) / m` or simple base `1 + (rate + z) t` that is not
+/// positive), which only happens for spreads too negative to be meaningful.
 pub fn z_spread_discount_factor(
     df_base: f64,
     t: f64,
     z: f64,
-    compounds_per_year: f64,
+    compounding: Compounding,
 ) -> crate::Result<f64> {
     if !df_base.is_finite() || df_base <= 0.0 {
         return Err(crate::Error::Validation(format!(
@@ -439,27 +441,36 @@ pub fn z_spread_discount_factor(
              this is a curve-data error"
         )));
     }
-    if !t.is_finite() || !z.is_finite() || !compounds_per_year.is_finite() {
+    if !t.is_finite() || !z.is_finite() {
         return Err(crate::Error::Validation(format!(
-            "z_spread_discount_factor: non-finite input (t={t}, z={z}, compounds_per_year={compounds_per_year})"
+            "z_spread_discount_factor: non-finite input (t={t}, z={z})"
         )));
     }
     if t <= 0.0 {
         return Ok(df_base);
     }
-    let periods = NonZeroU32::new(compounds_per_year.max(1.0) as u32).unwrap_or(NonZeroU32::MIN);
-    let compounding = Compounding::Periodic(periods);
-    let m = f64::from(periods.get());
     let base_rate = compounding.rate_from_df(df_base, t);
-    let denom = 1.0 + (base_rate + z) / m;
-    if denom <= 0.0 || !denom.is_finite() {
+    let shifted = base_rate + z;
+    let base = match compounding {
+        Compounding::Continuous => 1.0,
+        Compounding::Periodic(m) => 1.0 + shifted / f64::from(m.get()),
+        Compounding::Simple => 1.0 + shifted * t,
+    };
+    if base <= 0.0 || !base.is_finite() {
         return Err(crate::Error::Validation(format!(
-            "z_spread_discount_factor: non-positive compounding denominator ({denom}) \
-             for z={z:.6e}, base_rate={base_rate:.6e}, m={m}; \
+            "z_spread_discount_factor: non-positive compounding base ({base}) \
+             for z={z:.6e}, base_rate={base_rate:.6e} in {compounding:?}; \
              spread is too negative for this cashflow"
         )));
     }
-    Ok(compounding.df_from_rate(base_rate + z, t))
+    let df = compounding.df_from_rate(shifted, t);
+    if !df.is_finite() || df <= 0.0 {
+        return Err(crate::Error::Validation(format!(
+            "z_spread_discount_factor: spread {z:.6e} gives no finite positive discount factor \
+             in {compounding:?}"
+        )));
+    }
+    Ok(df)
 }
 
 #[cfg(test)]

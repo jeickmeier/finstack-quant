@@ -1229,6 +1229,9 @@ getters!(JsAssetBackedFacility, "AssetBackedFacility", |i| {
         /// Payment frequency of interest, fees and the borrowing-base test.
         /// @returns The payment frequency.
         frequency as frequency: "Tenor" => tenor(i.frequency),
+        /// Quote compounding of the facility's spread (z-spread CS01), stated independently of the payment frequency.
+        /// @returns The `Compounding` wire value.
+        quote_compounding as quoteCompounding: "generated.valuations.AssetBackedFacility['quote_compounding']" => json(i.quote_compounding),
         /// Accrual day count of the facility interest and the commitment fee.
         /// @returns The accrual convention.
         day_count as dayCount: "DayCount" => day_count(i.day_count),
@@ -1365,6 +1368,11 @@ setters!(JsAssetBackedFacilityBuilder, "AssetBackedFacilityBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         draws as draws: "NonNullable<generated.valuations.AssetBackedFacility['draws']>" => from_js_json,
+        /// Set the quote compounding of the facility's spread (required; never derived from the payment frequency).
+        /// @param value - `Compounding` wire value: `"continuous"`, `"simple"` or `{ periodic: n }`.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        quote_compounding as quoteCompounding: "generated.valuations.AssetBackedFacility['quote_compounding']" => from_js_json,
         /// Set whether the line is re-advanced up to the borrowing base each revolving period.
         /// @param value - `true` draws `min(commitment, borrowing base) − balance` every revolving period.
         /// @returns The builder, for chaining.

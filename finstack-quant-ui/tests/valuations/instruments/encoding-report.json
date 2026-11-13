@@ -2146,7 +2146,8 @@
           { "pointer": "#/$defs/d_5c13df5a55f1da604df2", "keyword": "oneOf" },
           { "pointer": "#/$defs/IssuePrice", "keyword": "oneOf" },
           { "pointer": "#/$defs/ProtectionWindow", "keyword": "oneOf" },
-          { "pointer": "#/$defs/LoanCallType", "keyword": "oneOf" }
+          { "pointer": "#/$defs/LoanCallType", "keyword": "oneOf" },
+          { "pointer": "#/$defs/Compounding", "keyword": "oneOf" }
         ],
         "money": [
           "#/$defs/d_4ba43030fede59fe5993",
@@ -2859,6 +2860,7 @@
           "#/$defs/RepLine/properties/seasoning_months",
           "#/$defs/ModificationSpec/properties/term_extension_months",
           "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months",
+          "#/$defs/Compounding/oneOf/1/properties/periodic",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/recovery_lag",
           "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/lockout_months",
           "#/$defs/TermOutSpec/properties/months"
@@ -5235,7 +5237,8 @@
           { "pointer": "#/$defs/DefaultedValuation", "keyword": "oneOf" },
           { "pointer": "#/$defs/SwapNotional", "keyword": "oneOf" },
           { "pointer": "#/$defs/PaymentCalculation", "keyword": "oneOf" },
-          { "pointer": "#/$defs/RecipientType", "keyword": "oneOf" }
+          { "pointer": "#/$defs/RecipientType", "keyword": "oneOf" },
+          { "pointer": "#/$defs/Compounding", "keyword": "oneOf" }
         ],
         "money": [
           "#/$defs/d_4ba43030fede59fe5993",
@@ -7019,6 +7022,7 @@
           "#/$defs/d_6f4088f89d6bfc98e242/properties/recovery_lag",
           "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/lockout_months",
           "#/$defs/ShiftingInterestStep/properties/months_from_closing",
+          "#/$defs/Compounding/oneOf/1/properties/periodic",
           "#/$defs/TermOutSpec/properties/months"
         ],
         "uint8": [
@@ -16940,7 +16944,8 @@
           { "pointer": "#/$defs/DefaultedValuation", "keyword": "oneOf" },
           { "pointer": "#/$defs/SwapNotional", "keyword": "oneOf" },
           { "pointer": "#/$defs/PaymentCalculation", "keyword": "oneOf" },
-          { "pointer": "#/$defs/RecipientType", "keyword": "oneOf" }
+          { "pointer": "#/$defs/RecipientType", "keyword": "oneOf" },
+          { "pointer": "#/$defs/Compounding", "keyword": "oneOf" }
         ],
         "money": [
           "#/$defs/d_4ba43030fede59fe5993",
@@ -18724,6 +18729,7 @@
           "#/$defs/d_6f4088f89d6bfc98e242/properties/recovery_lag",
           "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/lockout_months",
           "#/$defs/ShiftingInterestStep/properties/months_from_closing",
+          "#/$defs/Compounding/oneOf/1/properties/periodic",
           "#/$defs/TermOutSpec/properties/months"
         ],
         "uint8": [

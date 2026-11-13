@@ -15,13 +15,12 @@ use finstack_quant_valuations_core::pricer::InstrumentType;
 
 impl ZSpreadCs01 for AssetBackedFacility {
     /// The lender's projected receipts (interest, principal, commitment fees)
-    /// on or after `as_of`, z-bumped at the payment frequency.
+    /// on or after `as_of`, z-bumped in the facility's quote compounding.
     fn z_spread_cs01_inputs(
         &self,
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<ZSpreadCs01Inputs> {
-        let compounds_per_year = self.frequency.compounding_frequency();
         let flows = self
             .project(curves, as_of)?
             .lender_cashflows()?
@@ -31,7 +30,7 @@ impl ZSpreadCs01 for AssetBackedFacility {
         Ok(ZSpreadCs01Inputs {
             settlement: as_of,
             discount_curve_id: self.discount_curve_id.clone(),
-            compounds_per_year,
+            compounding: self.quote_compounding,
             flows,
         })
     }

@@ -200,7 +200,7 @@ impl TermLoanDiscountingPricer {
                 &flows,
                 settlement_date,
                 disc.as_ref(),
-                loan.frequency.compounding_frequency(),
+                crate::loan_quotes::legacy_frequency_compounding(loan.frequency),
                 spread,
             )?;
             Money::from_model_value(pv, loan.currency)
