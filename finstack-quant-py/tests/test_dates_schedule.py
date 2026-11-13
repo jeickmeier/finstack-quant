@@ -157,7 +157,7 @@ def test_schedule_builder_fluent_setter_preserves_exceptions() -> None:
 
 
 def test_fiscal_week_stepping_includes_week_53() -> None:
-    fiscal = FiscalConfig.us_federal()
+    fiscal = FiscalConfig(10, 1)
     week_52 = PeriodId.parse("FY2025W52")
 
     week_53 = week_52.next_fiscal(fiscal)
@@ -274,7 +274,7 @@ def test_dates_pickle_round_trips() -> None:
         StubKind.LONG_BACK,
         BusinessDayConvention.MODIFIED_PRECEDING,
         DayCount.THIRTY_360_ISDA,
-        FiscalConfig.uk(),
+        FiscalConfig(4, 6),
         build_periods("2024Q1..Q4", "2024Q2"),
         Schedule
         .builder("2025-01-15", "2026-01-15")
@@ -369,7 +369,7 @@ def test_thirty360_and_date_extension_free_functions() -> None:
     assert end_of_month("2024-02-15") == date(2024, 2, 29)
     assert is_weekend("2025-01-04")
     assert quarter("2025-08-15") == 3
-    assert fiscal_year("2024-10-15", FiscalConfig.us_federal()) == 2025
+    assert fiscal_year("2024-10-15", FiscalConfig(10, 1)) == 2025
     assert months_until("2020-01-15", "2022-03-10") == 25
 
 

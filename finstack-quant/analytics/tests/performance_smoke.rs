@@ -256,7 +256,10 @@ fn performance_facade_exercises_broad_api_surface() {
 
     let ref_date = *perf.get_active_dates().last().expect("last active date");
     let lookbacks = perf
-        .lookback_returns(Some(ref_date), Some(FiscalConfig::us_federal()))
+        .lookback_returns(
+            Some(ref_date),
+            Some(FiscalConfig::new(10, 1).expect("valid fiscal start")),
+        )
         .expect("lookback");
     assert_finite_metric("month-to-date lookback", &lookbacks.mtd, ticker_count);
     assert_finite_metric("quarter-to-date lookback", &lookbacks.qtd, ticker_count);
@@ -352,7 +355,10 @@ fn performance_lookback_returns_retains_empty_pre_start_reference_date() {
 
     let ref_date = Date::from_calendar_date(2025, Month::May, 15).expect("ref date");
     let lookbacks = perf
-        .lookback_returns(Some(ref_date), Some(FiscalConfig::us_federal()))
+        .lookback_returns(
+            Some(ref_date),
+            Some(FiscalConfig::new(10, 1).expect("valid fiscal start")),
+        )
         .expect("lookback");
     assert!(lookbacks.mtd[0].is_nan());
     assert_eq!(lookbacks.mtd_samples[0].n_obs, 0);
@@ -482,7 +488,10 @@ fn lookback_returns_includes_maximum_reference_date_without_overflow() {
         PeriodKind::Daily,
     ))
     .expect("maximum-date panel");
-    for fiscal_config in [FiscalConfig::calendar_year(), FiscalConfig::us_federal()] {
+    for fiscal_config in [
+        FiscalConfig::calendar_year(),
+        FiscalConfig::new(10, 1).expect("valid fiscal start"),
+    ] {
         let lookbacks = perf
             .lookback_returns(Some(Date::MAX), Some(fiscal_config))
             .expect("lookback");

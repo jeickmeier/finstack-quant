@@ -612,13 +612,6 @@ impl From<FiscalConfig> for FiscalConfigFields {
     }
 }
 
-/// The calendar year (January 1), the fiscal year used when none is given.
-impl Default for FiscalConfig {
-    fn default() -> Self {
-        Self::calendar_year()
-    }
-}
-
 impl FiscalConfig {
     /// Create a new fiscal configuration.
     ///
@@ -690,42 +683,14 @@ impl FiscalConfig {
         )
     }
 
-    /// Standard calendar year (January 1).
+    /// Fiscal year opening on January 1, labelled by its own calendar year.
+    ///
+    /// There is no implicit default or jurisdiction preset (record
+    /// CORE-CONVENTIONS-014 #2): callers state their actual opening month
+    /// and day with [`Self::new`], or select this January 1 rule explicitly.
     pub fn calendar_year() -> Self {
         Self {
             start_month: Month::January,
-            start_day: 1,
-        }
-    }
-
-    /// US Federal fiscal year (October 1).
-    pub fn us_federal() -> Self {
-        Self {
-            start_month: Month::October,
-            start_day: 1,
-        }
-    }
-
-    /// UK fiscal year (April 6).
-    pub fn uk() -> Self {
-        Self {
-            start_month: Month::April,
-            start_day: 6,
-        }
-    }
-
-    /// Japanese fiscal year (April 1).
-    pub fn japan() -> Self {
-        Self {
-            start_month: Month::April,
-            start_day: 1,
-        }
-    }
-
-    /// Australian fiscal year (July 1).
-    pub fn australia() -> Self {
-        Self {
-            start_month: Month::July,
             start_day: 1,
         }
     }

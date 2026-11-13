@@ -74,7 +74,7 @@ def test_fiscal_period_stats_preserves_ragged_active_alignment() -> None:
     perf.reset_date_range(dates[1], dates[-2])
     assert perf.get_active_dates_for_ticker("FUND") == dates[1:-1]
     expected = math.prod(1.0 + value for value in returns[1:-1]) - 1.0
-    stats = perf.period_stats("FUND", "monthly", FiscalConfig.us_federal())
+    stats = perf.period_stats("FUND", "monthly", FiscalConfig(10, 1))
     assert stats.avg_return == pytest.approx(expected, abs=1e-12)
 
 

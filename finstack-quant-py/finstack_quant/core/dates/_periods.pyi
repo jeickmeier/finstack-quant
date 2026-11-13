@@ -781,7 +781,7 @@ class FiscalConfig:
     Examples
     --------
     >>> from finstack_quant.core.dates import FiscalConfig
-    >>> (FiscalConfig.us_federal().start_month, FiscalConfig.uk().start_day)
+    >>> (FiscalConfig(10, 1).start_month, FiscalConfig(4, 6).start_day)
     (10, 6)
 
     """
@@ -826,98 +826,6 @@ class FiscalConfig:
         >>> config = FiscalConfig.calendar_year()
         >>> (config.start_month, config.start_day)
         (1, 1)
-        """
-        ...
-
-    @classmethod
-    def us_federal(cls) -> FiscalConfig:
-        """
-        US Federal fiscal year (October 1).
-
-        Returns
-        -------
-        FiscalConfig
-            US federal fiscal configuration beginning October 1.
-
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.dates import FiscalConfig
-        >>> config = FiscalConfig.us_federal()
-        >>> (config.start_month, config.start_day)
-        (10, 1)
-        """
-        ...
-
-    @classmethod
-    def uk(cls) -> FiscalConfig:
-        """
-        UK fiscal year (April 6).
-
-        Returns
-        -------
-        FiscalConfig
-            UK fiscal configuration beginning April 6.
-
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.dates import FiscalConfig
-        >>> config = FiscalConfig.uk()
-        >>> (config.start_month, config.start_day)
-        (4, 6)
-        """
-        ...
-
-    @classmethod
-    def japan(cls) -> FiscalConfig:
-        """
-        Japanese fiscal year (April 1).
-
-        Returns
-        -------
-        FiscalConfig
-            Japanese fiscal configuration beginning April 1.
-
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.dates import FiscalConfig
-        >>> config = FiscalConfig.japan()
-        >>> (config.start_month, config.start_day)
-        (4, 1)
-        """
-        ...
-
-    @classmethod
-    def australia(cls) -> FiscalConfig:
-        """
-        Australian fiscal year (July 1).
-
-        Returns
-        -------
-        FiscalConfig
-            Australian fiscal configuration beginning July 1.
-
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.dates import FiscalConfig
-        >>> config = FiscalConfig.australia()
-        >>> (config.start_month, config.start_day)
-        (7, 1)
         """
         ...
 
@@ -1028,7 +936,7 @@ def build_fiscal_periods(
     Examples
     --------
     >>> from finstack_quant.core.dates import FiscalConfig, build_fiscal_periods
-    >>> build_fiscal_periods("2024Q1..Q1", FiscalConfig.us_federal()).periods[0].start
+    >>> build_fiscal_periods("2024Q1..Q1", FiscalConfig(10, 1)).periods[0].start
     datetime.date(2023, 10, 1)
 
     """

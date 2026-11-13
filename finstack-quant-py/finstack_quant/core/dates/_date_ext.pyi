@@ -219,7 +219,7 @@ def fiscal_year(date: datetime.date | str, config: FiscalConfig) -> int:
     date : datetime.date | str
         Date to classify.
     config : FiscalConfig
-        Fiscal-year start (``FiscalConfig.us_federal()`` starts October 1, so
+        Fiscal-year start (``FiscalConfig(10, 1)`` starts October 1, so
         2024-10-15 belongs to fiscal year 2025).
 
     Returns
@@ -235,7 +235,7 @@ def fiscal_year(date: datetime.date | str, config: FiscalConfig) -> int:
     Examples
     --------
     >>> from finstack_quant.core.dates import FiscalConfig, fiscal_year
-    >>> fiscal_year("2024-10-15", FiscalConfig.us_federal())
+    >>> fiscal_year("2024-10-15", FiscalConfig(10, 1))
     2025
 
     """

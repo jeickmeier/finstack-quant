@@ -67,7 +67,7 @@ fn actuals_cutoff_requires_matching_period_kind_and_calendar() {
         error.to_string().contains("need a fiscal builder"),
         "{error}"
     );
-    let fiscal = FiscalConfig::us_federal();
+    let fiscal = FiscalConfig::new(10, 1).expect("valid fiscal start");
     assert!(build_fiscal_periods("FY2025M01..M04", fiscal, Some("2025Q1")).is_err());
     for plan in [
         build_periods("2025M01..M04", Some("2025M02")).unwrap(),
@@ -350,7 +350,7 @@ fn fiscal_config_constructors_and_validation() {
     assert!(FiscalConfig::new(1, 32).is_err());
     assert!(FiscalConfig::new(0, 1).is_err());
     assert!(FiscalConfig::new(1, 0).is_err());
-    let uk = FiscalConfig::uk();
+    let uk = FiscalConfig::new(4, 6).expect("valid fiscal start");
     assert_eq!(uk.start_month(), 4);
     let feb_edge = FiscalConfig::new(2, 30).expect("feb clamp path");
     let plan = build_fiscal_periods("2025Q1..Q1", feb_edge, None).expect("fiscal quarter");
@@ -361,7 +361,7 @@ fn fiscal_config_constructors_and_validation() {
 fn fiscal_config_deserialization_validates_and_year_start_clamps() {
     let uk: FiscalConfig =
         serde_json::from_str(r#"{"start_month":4,"start_day":6}"#).expect("valid config");
-    assert_eq!(uk, FiscalConfig::uk());
+    assert_eq!(uk, FiscalConfig::new(4, 6).expect("valid fiscal start"));
     assert_eq!(
         serde_json::to_string(&uk).expect("serialize"),
         r#"{"start_month":4,"start_day":6}"#
@@ -383,7 +383,9 @@ fn fiscal_config_deserialization_validates_and_year_start_clamps() {
         Ok(d(2025, Month::January, 1))
     );
     assert_eq!(
-        FiscalConfig::us_federal().year_start(2025),
+        FiscalConfig::new(10, 1)
+            .expect("valid fiscal start")
+            .year_start(2025),
         Ok(d(2024, Month::October, 1))
     );
     let feb_30 = FiscalConfig::new(2, 30).expect("clamped start");
@@ -393,18 +395,18 @@ fn fiscal_config_deserialization_validates_and_year_start_clamps() {
 
 #[test]
 fn build_fiscal_periods_us_federal_and_monthly() {
-    let cfg = FiscalConfig::us_federal();
+    let cfg = FiscalConfig::new(10, 1).expect("valid fiscal start");
     let qs = build_fiscal_periods("2025Q1..Q2", cfg, None).expect("FY quarters");
     assert_eq!(qs.periods.len(), 2);
 
-    let jp = FiscalConfig::japan();
+    let jp = FiscalConfig::new(4, 1).expect("valid fiscal start");
     let ms = build_fiscal_periods("2025M01..M02", jp, None).expect("FY months");
     assert_eq!(ms.periods.len(), 2);
 }
 
 #[test]
 fn fiscal_daily_and_weekly_bounds_stay_inside_fiscal_year() {
-    let cfg = FiscalConfig::us_federal();
+    let cfg = FiscalConfig::new(10, 1).expect("valid fiscal start");
     let day = build_fiscal_periods("2025D001..D001", cfg, None).expect("fiscal day");
     assert_eq!(day.periods[0].start, d(2024, Month::October, 1));
     assert_eq!(day.periods[0].end, d(2024, Month::October, 2));
@@ -416,7 +418,7 @@ fn fiscal_daily_and_weekly_bounds_stay_inside_fiscal_year() {
 
 #[test]
 fn fiscal_ranges_include_partial_week_53_and_leap_day_366() {
-    let federal = FiscalConfig::us_federal();
+    let federal = FiscalConfig::new(10, 1).expect("valid fiscal start");
     let week = build_fiscal_periods("FY2025W53..W53", federal, None)
         .expect("FY2025 has a partial week 53");
     assert_eq!(week.periods[0].start, d(2025, Month::September, 30));
@@ -437,7 +439,7 @@ fn fiscal_ranges_include_partial_week_53_and_leap_day_366() {
 
 #[test]
 fn fiscal_week_stepping_uses_fiscal_year_capacity() {
-    let federal = FiscalConfig::us_federal();
+    let federal = FiscalConfig::new(10, 1).expect("valid fiscal start");
     let week_52 = PeriodId {
         year: 2025,
         index: 52,
@@ -485,7 +487,7 @@ fn fiscal_week_stepping_uses_fiscal_year_capacity() {
 
 #[test]
 fn fiscal_week_53_display_parse_and_serde_roundtrip() {
-    let federal = FiscalConfig::us_federal();
+    let federal = FiscalConfig::new(10, 1).expect("valid fiscal start");
     let plan = build_fiscal_periods("FY2025W52..W52", federal, None).expect("fiscal weekly period");
     let week_53 = plan.periods[0]
         .id
@@ -508,7 +510,7 @@ fn fiscal_week_53_display_parse_and_serde_roundtrip() {
 
 #[test]
 fn fiscal_stepping_needs_a_calendar_only_across_fiscal_day_365() {
-    let federal = FiscalConfig::us_federal();
+    let federal = FiscalConfig::new(10, 1).expect("valid fiscal start");
     let week = PeriodId::from_str("FY2025W52").expect("fiscal week");
     for id in [week, week.next_fiscal(federal).expect("FY2025W53")] {
         assert_eq!(id.shift(1), id.next_fiscal(federal));
@@ -649,7 +651,7 @@ fn parse_id_rejects_bad_ranges() {
 
 #[test]
 fn fiscal_config_default_is_calendar_year() {
-    assert_eq!(FiscalConfig::default(), FiscalConfig::calendar_year());
+    assert_eq!(FiscalConfig::calendar_year(), FiscalConfig::calendar_year());
 }
 
 #[test]
@@ -672,7 +674,7 @@ fn period_builders_reject_unsupported_dates_and_excessive_work() {
     }
     let err = build_periods("1D1..9998D365", None).expect_err("bounded period count");
     assert!(err.to_string().contains("100000-period limit"));
-    let config = FiscalConfig::us_federal();
+    let config = FiscalConfig::new(10, 1).expect("valid fiscal start");
     assert!(build_fiscal_periods("FY2147483647..FY2147483647", config, None).is_err());
     assert!(build_fiscal_periods("FY1D1..FY9999D365", config, None).is_err());
 }
@@ -695,7 +697,10 @@ fn period_year_stepping_rejects_integer_overflow() {
     let first: PeriodId = "FY-2147483648".parse().expect("symbolic fiscal year");
     assert!(last.shift(1).is_err());
     assert!(first.shift(-1).is_err());
-    assert!(last.next_fiscal(FiscalConfig::us_federal()).is_err());
+    assert!(
+        last.next_fiscal(FiscalConfig::new(10, 1).expect("valid fiscal start"))
+            .is_err()
+    );
 }
 
 #[test]
@@ -711,8 +716,8 @@ fn from_date_matches_calendar_and_fiscal_plan_boundaries() {
     let configs = [
         None,
         Some(FiscalConfig::calendar_year()),
-        Some(FiscalConfig::us_federal()),
-        Some(FiscalConfig::uk()),
+        Some(FiscalConfig::new(10, 1).expect("valid fiscal start")),
+        Some(FiscalConfig::new(4, 6).expect("valid fiscal start")),
         Some(FiscalConfig::new(1, 15).unwrap()),
         Some(FiscalConfig::new(1, 31).unwrap()),
         Some(FiscalConfig::new(2, 29).unwrap()),
@@ -745,7 +750,7 @@ fn from_date_matches_calendar_and_fiscal_plan_boundaries() {
 
 #[test]
 fn from_date_observes_midmonth_clamping_leap_days_and_partial_weeks() {
-    let federal = Some(FiscalConfig::us_federal());
+    let federal = Some(FiscalConfig::new(10, 1).expect("valid fiscal start"));
     assert_eq!(
         PeriodId::from_date(d(2025, Month::September, 30), PeriodKind::Weekly, federal)
             .unwrap()
@@ -758,7 +763,7 @@ fn from_date_observes_midmonth_clamping_leap_days_and_partial_weeks() {
             .to_string(),
         "FY2026W01"
     );
-    let uk = Some(FiscalConfig::uk());
+    let uk = Some(FiscalConfig::new(4, 6).expect("valid fiscal start"));
     assert_eq!(
         PeriodId::from_date(d(2024, Month::April, 5), PeriodKind::Annual, uk)
             .unwrap()
@@ -837,7 +842,7 @@ fn from_date_rejects_unrepresentable_period_boundaries() {
         for config in [
             None,
             Some(FiscalConfig::calendar_year()),
-            Some(FiscalConfig::us_federal()),
+            Some(FiscalConfig::new(10, 1).expect("valid fiscal start")),
         ] {
             assert!(
                 PeriodId::from_date(Date::MAX, kind, config).is_err(),

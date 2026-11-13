@@ -510,9 +510,13 @@ fn monthly_results_roll_up_to_quarters() {
 fn fiscal_quarters_roll_up_to_fiscal_years_and_halves() {
     use finstack_quant_core::dates::{FiscalConfig, build_fiscal_periods};
 
-    let periods = build_fiscal_periods("FY2025Q1..FY2025Q4", FiscalConfig::us_federal(), None)
-        .expect("fiscal quarters")
-        .periods;
+    let periods = build_fiscal_periods(
+        "FY2025Q1..FY2025Q4",
+        FiscalConfig::new(10, 1).expect("valid fiscal start"),
+        None,
+    )
+    .expect("fiscal quarters")
+    .periods;
     let values: Vec<_> = periods
         .iter()
         .zip([1.0, 2.0, 4.0, 8.0])

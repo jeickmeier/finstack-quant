@@ -170,7 +170,7 @@ def _ledoit_wolf() -> dict[str, Any]:
     return {"covariance": [x for row in covariance for x in row], "shrinkage": shrinkage}
 
 
-US_FEDERAL = dates.FiscalConfig.us_federal()
+US_FEDERAL = dates.FiscalConfig(10, 1)
 NYSE = dates.HolidayCalendar("nyse")
 REGISTRY = rating_scales.RatingScaleRegistry.from_json(
     (Path(__file__).parent / "data" / "agency_style_rating_scales.json").read_text()

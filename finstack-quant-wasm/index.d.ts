@@ -270,7 +270,7 @@ declare module './pkg/finstack_quant_wasm.js' {
      * fiscal calendar start of `fiscalConfig` through `refDate`. Holidays are not
      * skipped. The first included simple return still spans the prior close.
      * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end. Omitted or `null` is the last active date; the result's `ref_date` states the date used.
-     * @param fiscalConfig - Optional `FiscalConfig` handle for FYTD. Omitted or `null` is the calendar year (`FiscalConfig::default`).
+     * @param fiscalConfig - Optional `FiscalConfig` handle for FYTD. Omitted or `null` selects the explicit January 1 rule (`FiscalConfig.calendarYear()`, ANALYTICS-003).
      * @returns LookbackReturns with return estimates, fiscal context and per-ticker counts and actual holding bounds for each selected window; unavailable numeric results remain NaN.
      * @throws Error - Rejects an invalid ISO `ref_date`, an omitted one while no dates are active, or a result that cannot be serialized to JavaScript.
      */
@@ -853,13 +853,13 @@ export interface CoreNamespace {
    *
    * * `date` - Date as days since 1970-01-01.
    * * `config` - Fiscal-year start month and day that decide which fiscal
-   *   year the date belongs to (for example `FiscalConfig.usFederal()`).
+   *   year the date belongs to (for example `new FiscalConfig(10, 1)` for a 1 October opening).
    *
    * @returns The fiscal year the date falls in.
    * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
    * `validation`) if it is outside the supported range.
    * @param date - Date as days since 1970-01-01.
-   * @param config - Fiscal-year start month and day that decide which fiscal year the date belongs to (for example `FiscalConfig.usFederal()`).
+   * @param config - Fiscal-year start month and day that decide which fiscal year the date belongs to (for example `new FiscalConfig(10, 1)` for a 1 October opening).
    */
   readonly fiscalYear: typeof wasm.fiscalYear;
   /**

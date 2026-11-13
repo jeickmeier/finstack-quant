@@ -74,7 +74,7 @@ test('fiscal aggregation preserves ragged active-window alignment', () => {
   assert.deepEqual(perf.getActiveDatesForTicker(1), example.dates.slice(1, -1));
   const expected =
     example.returns.slice(1, -1).reduce((wealth, value) => wealth * (1 + value), 1) - 1;
-  const usFederal = core.FiscalConfig.usFederal();
+  const usFederal = new core.FiscalConfig(10, 1);
   close(perf.periodStats(1, 'monthly', usFederal).avg_return, expected);
   usFederal.free();
   perf.free();

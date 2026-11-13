@@ -439,8 +439,8 @@ wire_methods!(PyPeriodPlan, PeriodPlan, "PeriodPlan");
 /// Examples
 /// --------
 /// >>> from finstack_quant.core.dates import FiscalConfig
-/// >>> FiscalConfig.us_federal() == FiscalConfig(10, 1)
-/// True
+/// >>> FiscalConfig(10, 1).start_month
+/// 10
 #[pyclass(
     name = "FiscalConfig",
     module = "finstack_quant.core.dates",
@@ -477,30 +477,6 @@ impl PyFiscalConfig {
     #[classmethod]
     fn calendar_year(_cls: &Bound<'_, PyType>) -> Self {
         Self::from_inner(FiscalConfig::calendar_year())
-    }
-
-    /// US Federal fiscal year (October 1).
-    #[classmethod]
-    fn us_federal(_cls: &Bound<'_, PyType>) -> Self {
-        Self::from_inner(FiscalConfig::us_federal())
-    }
-
-    /// UK fiscal year (April 6).
-    #[classmethod]
-    fn uk(_cls: &Bound<'_, PyType>) -> Self {
-        Self::from_inner(FiscalConfig::uk())
-    }
-
-    /// Japanese fiscal year (April 1).
-    #[classmethod]
-    fn japan(_cls: &Bound<'_, PyType>) -> Self {
-        Self::from_inner(FiscalConfig::japan())
-    }
-
-    /// Australian fiscal year (July 1).
-    #[classmethod]
-    fn australia(_cls: &Bound<'_, PyType>) -> Self {
-        Self::from_inner(FiscalConfig::australia())
     }
 
     /// Month when the fiscal year starts (1-12).

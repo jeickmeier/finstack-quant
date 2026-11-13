@@ -1265,7 +1265,7 @@
   "core.FiscalConfig": {
     "kind": "class",
     "constructor": true,
-    "statics": ["australia", "calendarYear", "japan", "uk", "usFederal"],
+    "statics": ["calendarYear"],
     "methods": ["free"],
     "getters": ["startDay", "startMonth"]
   },

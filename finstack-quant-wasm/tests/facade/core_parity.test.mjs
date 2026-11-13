@@ -142,7 +142,7 @@ const attributes = () => {
   return value;
 };
 
-const usFederal = core.FiscalConfig.usFederal();
+const usFederal = new core.FiscalConfig(10, 1);
 const nyse = new core.HolidayCalendar('nyse');
 const registry = core.RatingScaleRegistry.fromJson(
   readFileSync(

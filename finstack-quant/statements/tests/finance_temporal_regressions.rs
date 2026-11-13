@@ -43,9 +43,13 @@ fn offset_model(periods: Vec<Period>, observations: &[f64]) -> FinancialModelSpe
 
 #[test]
 fn fiscal_weekly_offsets_include_the_short_final_week() {
-    let periods = build_fiscal_periods("FY2024W52..FY2025W2", FiscalConfig::us_federal(), None)
-        .unwrap()
-        .periods;
+    let periods = build_fiscal_periods(
+        "FY2024W52..FY2025W2",
+        FiscalConfig::new(10, 1).expect("valid fiscal start"),
+        None,
+    )
+    .unwrap()
+    .periods;
     assert_eq!(periods[1].id.index(), 53);
     assert_eq!((periods[1].end - periods[1].start).whole_days(), 2);
     let model = offset_model(periods.clone(), &[100.0, 110.0, 121.0, 133.1]);
@@ -72,9 +76,13 @@ fn fiscal_daily_offsets_cross_leap_and_nonleap_fiscal_years() {
     for (range, expected_final_ordinal) in
         [("FY2024D365..FY2025D2", 366), ("FY2025D364..FY2026D2", 365)]
     {
-        let periods = build_fiscal_periods(range, FiscalConfig::us_federal(), None)
-            .unwrap()
-            .periods;
+        let periods = build_fiscal_periods(
+            range,
+            FiscalConfig::new(10, 1).expect("valid fiscal start"),
+            None,
+        )
+        .unwrap()
+        .periods;
         assert_eq!(periods[1].id.index(), expected_final_ordinal);
         assert_eq!(periods[2].id.index(), 1);
         let model = offset_model(periods.clone(), &[100.0, 110.0, 121.0, 133.1]);
@@ -133,14 +141,20 @@ fn growth_rate_annualizes_quarterly_and_monthly_observations() {
 
 #[test]
 fn daily_and_weekly_growth_use_elapsed_period_end_dates() {
-    let fiscal_weekly =
-        build_fiscal_periods("FY2024W52..FY2025W1", FiscalConfig::us_federal(), None)
-            .unwrap()
-            .periods;
-    let fiscal_daily =
-        build_fiscal_periods("FY2024D366..FY2025D1", FiscalConfig::us_federal(), None)
-            .unwrap()
-            .periods;
+    let fiscal_weekly = build_fiscal_periods(
+        "FY2024W52..FY2025W1",
+        FiscalConfig::new(10, 1).expect("valid fiscal start"),
+        None,
+    )
+    .unwrap()
+    .periods;
+    let fiscal_daily = build_fiscal_periods(
+        "FY2024D366..FY2025D1",
+        FiscalConfig::new(10, 1).expect("valid fiscal start"),
+        None,
+    )
+    .unwrap()
+    .periods;
     let calendar_daily = build_periods("2023D365..2024D2", None).unwrap().periods;
     for periods in [fiscal_weekly, fiscal_daily, calendar_daily] {
         let origin = periods[0].end.previous_day().unwrap();
@@ -287,9 +301,13 @@ fn cashflow_period_aggregates_resolve_only_the_requested_window() {
 
 #[test]
 fn ytd_starts_at_the_first_fiscal_period_of_the_fiscal_year() {
-    let periods = build_fiscal_periods("FY2024Q3..FY2025Q2", FiscalConfig::us_federal(), None)
-        .unwrap()
-        .periods;
+    let periods = build_fiscal_periods(
+        "FY2024Q3..FY2025Q2",
+        FiscalConfig::new(10, 1).expect("valid fiscal start"),
+        None,
+    )
+    .unwrap()
+    .periods;
     let values: Vec<_> = periods
         .iter()
         .zip([1.0, 2.0, 4.0, 8.0])
@@ -376,9 +394,13 @@ fn model_rejects_periods_of_mixed_kinds() {
 /// whole week, so every window crossing the year end summed 359 days.
 #[test]
 fn fiscal_weekly_ttm_covers_a_full_year_of_days() {
-    let periods = build_fiscal_periods("FY2024W1..FY2025W10", FiscalConfig::us_federal(), None)
-        .unwrap()
-        .periods;
+    let periods = build_fiscal_periods(
+        "FY2024W1..FY2025W10",
+        FiscalConfig::new(10, 1).expect("valid fiscal start"),
+        None,
+    )
+    .unwrap()
+    .periods;
     let values: Vec<_> = periods
         .iter()
         .map(|period| {

@@ -193,9 +193,13 @@ mod tests {
     #[test]
     fn fiscal_weekly_window_covers_a_full_year_of_days() {
         use crate::dates::{FiscalConfig, build_fiscal_periods};
-        let periods = build_fiscal_periods("FY2024W1..FY2026W53", FiscalConfig::us_federal(), None)
-            .expect("plan")
-            .periods;
+        let periods = build_fiscal_periods(
+            "FY2024W1..FY2026W53",
+            FiscalConfig::new(10, 1).expect("valid fiscal start"),
+            None,
+        )
+        .expect("plan")
+        .periods;
         let days = |id: &PeriodId| {
             let period = periods.iter().find(|p| p.id == *id).expect("model period");
             (period.end - period.start).whole_days()

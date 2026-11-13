@@ -875,8 +875,13 @@ mod fiscal_reconciliation {
             PeriodKind::SemiAnnual,
             PeriodKind::Annual,
         ] {
-            let grouped =
-                group_period_buckets(&dates, &returns, kind, Some(FiscalConfig::uk())).unwrap();
+            let grouped = group_period_buckets(
+                &dates,
+                &returns,
+                kind,
+                Some(FiscalConfig::new(4, 6).expect("valid fiscal start")),
+            )
+            .unwrap();
             let linked: Vec<_> = grouped.iter().map(|point| point.value).collect();
             assert!(
                 (comp_total(&linked).unwrap() - comp_total(&returns).unwrap()).abs() < 1e-12,

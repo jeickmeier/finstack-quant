@@ -247,7 +247,7 @@ fn py_quarter(date: &Bound<'_, PyAny>) -> PyResult<u8> {
 /// date : datetime.date | str
 ///     Date to classify.
 /// config : FiscalConfig
-///     Fiscal-year start (e.g. ``FiscalConfig.us_federal()`` starts October 1,
+///     Fiscal-year start (e.g. ``FiscalConfig(10, 1)`` opens on October 1,
 ///     so 2024-10-15 belongs to fiscal year 2025).
 ///
 /// Returns
@@ -263,7 +263,7 @@ fn py_quarter(date: &Bound<'_, PyAny>) -> PyResult<u8> {
 /// Examples
 /// --------
 /// >>> from finstack_quant.core.dates import FiscalConfig, fiscal_year
-/// >>> fiscal_year("2024-10-15", FiscalConfig.us_federal())
+/// >>> fiscal_year("2024-10-15", FiscalConfig(10, 1))
 /// 2025
 #[pyfunction(name = "fiscal_year")]
 #[pyo3(text_signature = "(date, config)")]

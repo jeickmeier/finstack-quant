@@ -448,7 +448,7 @@ impl JsPeriodId {
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
-/// const fiscal = core.FiscalConfig.usFederal(); // 1 October
+/// const fiscal = new core.FiscalConfig(10, 1); // opens 1 October
 /// core.fiscalYear(core.createDate(2024, 11, 15), fiscal); // 2025
 /// new core.FiscalConfig(4, 6).startDay; // 6
 /// ```
@@ -502,38 +502,6 @@ impl JsFiscalConfig {
     #[wasm_bindgen(js_name = calendarYear)]
     pub fn calendar_year() -> Self {
         Self::from_inner(FiscalConfig::calendar_year())
-    }
-
-    /// US federal government fiscal year (1 October).
-    ///
-    /// @returns The US federal `FiscalConfig`.
-    #[wasm_bindgen(js_name = usFederal)]
-    pub fn us_federal() -> Self {
-        Self::from_inner(FiscalConfig::us_federal())
-    }
-
-    /// UK government fiscal year (6 April).
-    ///
-    /// @returns The UK `FiscalConfig`.
-    #[wasm_bindgen(js_name = uk)]
-    pub fn uk() -> Self {
-        Self::from_inner(FiscalConfig::uk())
-    }
-
-    /// Japanese government fiscal year (1 April).
-    ///
-    /// @returns The Japanese `FiscalConfig`.
-    #[wasm_bindgen(js_name = japan)]
-    pub fn japan() -> Self {
-        Self::from_inner(FiscalConfig::japan())
-    }
-
-    /// Australian government fiscal year (1 July).
-    ///
-    /// @returns The Australian `FiscalConfig`.
-    #[wasm_bindgen(js_name = australia)]
-    pub fn australia() -> Self {
-        Self::from_inner(FiscalConfig::australia())
     }
 
     /// Month the fiscal year starts in (1 = January).

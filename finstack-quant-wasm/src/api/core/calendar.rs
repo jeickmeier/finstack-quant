@@ -320,13 +320,13 @@ pub fn quarter(
 ///
 /// * `date` - Date as days since 1970-01-01.
 /// * `config` - Fiscal-year start month and day that decide which fiscal
-///   year the date belongs to (for example `FiscalConfig.usFederal()`).
+///   year the date belongs to (for example `new FiscalConfig(10, 1)` for a 1 October opening).
 ///
 /// @returns The fiscal year the date falls in.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported range.
 /// @param date - Date as days since 1970-01-01.
-/// @param config - Fiscal-year start month and day that decide which fiscal year the date belongs to (for example `FiscalConfig.usFederal()`).
+/// @param config - Fiscal-year start month and day that decide which fiscal year the date belongs to (for example `new FiscalConfig(10, 1)` for a 1 October opening).
 #[wasm_bindgen(js_name = fiscalYear)]
 pub fn fiscal_year(
     #[wasm_bindgen(unchecked_param_type = "number")] date: JsValue,

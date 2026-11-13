@@ -13,7 +13,7 @@ import * as wasm from '../pkg/finstack_quant_wasm.js';
  * fiscal calendar start of `fiscalConfig` through `refDate`. Holidays are not
  * skipped. The first included simple return still spans the prior close.
  * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end. Omitted or `null` is the last active date; the result's `ref_date` states the date used.
- * @param fiscalConfig - Optional `FiscalConfig` handle for FYTD. Omitted or `null` is the calendar year (`FiscalConfig::default`).
+ * @param fiscalConfig - Optional `FiscalConfig` handle for FYTD. Omitted or `null` selects the explicit January 1 rule (`FiscalConfig.calendarYear()`, ANALYTICS-003).
  * @returns LookbackReturns with return estimates, fiscal context and per-ticker counts and actual holding bounds for each selected window; unavailable numeric results remain NaN.
  * @throws Error - Rejects an invalid ISO `ref_date`, an omitted one while no dates are active, or a result that cannot be serialized to JavaScript.
  *

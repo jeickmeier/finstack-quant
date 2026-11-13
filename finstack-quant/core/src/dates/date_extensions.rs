@@ -358,7 +358,7 @@ mod tests {
 
     #[test]
     fn test_fiscal_year_us_federal() {
-        let config = FiscalConfig::us_federal(); // October 1 start
+        let config = FiscalConfig::new(10, 1).expect("valid fiscal start"); // October 1 start
 
         // Date before fiscal year start (e.g., September) belongs to previous FY
         let sept_date = make_date(2024, 9, 15);
@@ -374,7 +374,7 @@ mod tests {
 
     #[test]
     fn test_fiscal_year_uk() {
-        let config = FiscalConfig::uk(); // April 6 start
+        let config = FiscalConfig::new(4, 6).expect("valid fiscal start"); // April 6 start
 
         // Date before fiscal year start belongs to previous FY
         let march_date = make_date(2025, 3, 15);

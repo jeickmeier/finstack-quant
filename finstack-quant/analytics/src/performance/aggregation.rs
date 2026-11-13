@@ -474,7 +474,10 @@ mod tests {
         let ref_date = on(2025, Month::May, 15);
 
         let us_federal = perf
-            .lookback_returns(Some(ref_date), Some(FiscalConfig::us_federal()))
+            .lookback_returns(
+                Some(ref_date),
+                Some(FiscalConfig::new(10, 1).expect("valid fiscal start")),
+            )
             .expect("lookback");
         assert_eq!(us_federal.mtd, vec![comp_total(&r[7..9]).unwrap()]);
         assert_eq!(us_federal.qtd, vec![comp_total(&r[5..9]).unwrap()]);

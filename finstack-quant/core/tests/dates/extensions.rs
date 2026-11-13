@@ -68,7 +68,7 @@ fn date_ext_fiscal_year_calendar() {
 
 #[test]
 fn date_ext_fiscal_year_us_federal() {
-    let config = FiscalConfig::us_federal(); // Oct 1 start
+    let config = FiscalConfig::new(10, 1).expect("valid fiscal start"); // Oct 1 start
 
     // Sept 30, 2024 is before FY start, belongs to FY 2024
     let sept = make_date(2024, 9, 30);

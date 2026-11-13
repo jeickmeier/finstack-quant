@@ -27,7 +27,7 @@ def test_calendar_period_boundaries_raise_value_error(spec: str) -> None:
 @pytest.mark.parametrize("spec", ["FY2147483647..FY2147483647", "FY1D1..FY9999D365"])
 def test_fiscal_period_boundaries_raise_value_error(spec: str) -> None:
     with pytest.raises(ValueError, match=r"(?i)period|date|year|range"):
-        build_fiscal_periods(spec, FiscalConfig.us_federal())
+        build_fiscal_periods(spec, FiscalConfig(10, 1))
 
 
 def test_terminal_representable_daily_period_succeeds() -> None:

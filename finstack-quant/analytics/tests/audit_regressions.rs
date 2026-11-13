@@ -668,7 +668,10 @@ fn aggregation_propagates_unrepresentable_boundaries() {
             perf.period_stats(
                 0,
                 kind,
-                Some(finstack_quant_core::dates::FiscalConfig::us_federal())
+                Some(
+                    finstack_quant_core::dates::FiscalConfig::new(10, 1)
+                        .expect("valid fiscal start")
+                )
             )
             .is_err()
         );
