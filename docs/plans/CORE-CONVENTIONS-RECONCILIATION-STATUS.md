@@ -7,6 +7,78 @@
 
 ## Summary
 
+**Run complete (2026-11-13).** Final gate: see the closing line of this
+section. Nothing pushed or merged; everything is on
+`refactor/core-conventions-reconciliation` (rebased onto local `master`
+during the run; see Baseline).
+
+**Outcome by slice** (rows below have the detail; commits are named by
+their `<slice>:` prefix in git log):
+
+| Phase | Committed | Partial or not done |
+| --- | --- | --- |
+| A | A1, A2, A3, A3b | |
+| B | B1, B1b, B2a, B2b, B3, B4, B5 | |
+| C | C1a, C1b, C4 | C2 and C3 partial (resolver fallbacks, 100-day cap, composite coverage, product-level defaults remain) |
+| D | D1, D2, D3 | |
+| E | E1, E2a, E2b, E2c-1…4, E3a, E3b-1…3, E4, E4b-1/2/4, E5 | E2 `from_years` removal (owner-blocked, logged); E4b's single five-date CDS resolver; E6 skipped (CASHFLOWS-001 ICMA long-stub composition) |
+| F | F1a/b/c, F2a, F2b, F2c/F3, F4, F5, F6, F7, F8 | F2 private validated `Period`/`PeriodPlan` fields |
+| G | G1, G2, G3, G4, G5-1…5g | |
+| H | H1, H2, H6 | H3, H4, H5 not attempted (multi-year notice transcription) |
+
+Plus `nightly:` (stub/README examples), `deps:` (rustix, soupsieve) and
+`NB:`/docs repair commits.
+
+**What changed for users, in brief:**
+- Money and rates are exact decimal end to end, with explicit rounding,
+  alphabetic currency identity and the XCG/ZWG additions.
+- Calendars, business-day conventions, schedules, day counts and tenors have
+  no defaults or silent repairs; every financial choice is stated.
+- CDS dates are product-owned (standard/bespoke regime); bonds, loans,
+  revolvers and ABF state their quote compounding.
+- Periods: one exact grammar, structural ordering, plans and models carry
+  their calendar, context-aware `shift`, plan-based LTM with weekly rejected
+  and daily needing every calendar day; statistical `annualization_factor`
+  is separate from calendar `slots_per_year`.
+- FX: explicit pivot and policy, explicit pair metadata, no inferred spot
+  lags; products count a stated lag on stated calendars.
+- Cash flows carry explicit principal effects and validated private state;
+  NPV/IRR use explicit clocks and inclusion rules.
+
+**Capabilities removed (owner attention):**
+- **Mixed-frequency statement models (F1a).** A statements model now holds
+  one period kind and one calendar context; months-then-quarters models are
+  rejected. Bringing them back needs a chronology keyed on resolved
+  intervals through the evaluator.
+- **Business-day daily LTM (F3).** A business-day grid is not a complete
+  daily year, so its `ttm()` is NaN and credit leverage/coverage are `None`;
+  weekly LTM is an error.
+- **CLS-style FX spot exception (F5).** A US holiday at T+1 now delays spot
+  for USD pairs; products needing the exception must select it.
+- **Statements DSL defaults (F4).** `annualize(x)` and `growth_rate(x)`
+  without their second argument no longer compile.
+- **FxSpot business-day convention (F5).** An explicit settlement date is
+  used as given.
+
+**Open items an owner should look at first** (all under Needs review):
+- Two slow-tier CDS goldens fail and were not re-pinned (`usd_5y_cds_self_test`
+  after E4b-2's literal pillars; `cdx_ig_5y_3_7_mezz` moved ~1.7e-4,
+  commit not bisected).
+- Docs-site lesson content and `docs-site/contracts/core.json` show pre-run
+  APIs and are outside the gate.
+- H3–H5 data slices, F2 private period state, E4b's five-date resolver,
+  C2/C3 remainders and E6.
+
+**Register:** FOLLOW_UPS entries for 001–020 updated in place as slices
+landed (removed, narrowed or moved to Evidence); current totals are in the
+register's header counts.
+
+**Tiers not run per slice (owner request):** Rust doctests, the Linux
+container run, and the slow suites except one full sweep after F4
+(`nightly:` commit; see Needs review).
+
+### First run summary (2026-11-09, superseded)
+
 **Run complete (2026-11-09). Final gate: `mise run all` pass** at HEAD
 (nextest 16358 passed, Python 13988 passed / 112 skipped). Nothing pushed or
 merged; everything is on `refactor/core-conventions-reconciliation`, cut from
