@@ -13,10 +13,10 @@
 //!
 //! # Convention Notes
 //!
-//! FX spot settlement follows T+N **joint business days**:
+//! The products' explicit spot rule counts T+N **joint business days**:
 //! - A day is business only if it's business on BOTH currency calendars
-//! - Standard spot lag is T+2 for most pairs (T+1 for some like USD/CAD)
-//! - Settlement calendars depend on currency pair (not exchange)
+//! - The lag and both calendars are stated by the trade; none is inferred
+//!   from the currencies (record CORE-CONVENTIONS-011)
 //!
 //! # Golden File Updates
 //!
@@ -32,7 +32,6 @@
 //! - ECB TARGET2 calendar: https://www.ecb.europa.eu/paym/target/target2/profuse/calendar/html/index.en.html
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::fx::fx_spot_date;
 use finstack_quant_core::dates::{DateExt, create_date, resolve_calendar, resolve_joint_calendar};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
@@ -72,15 +71,9 @@ fn test_usd_eur_spot_new_year_2024() {
     // CLS-consistent rule: USD calendar gates only the final value date
     // . Same result here since
     // Jan 1 is a joint closure.
-    let spot = fx_spot_date(
-        trade_date,
-        2,
-        Currency::USD,
-        Currency::EUR,
-        Some("nyse"),
-        Some("target2"),
-    )
-    .expect("Valid calendars");
+    let spot = resolve_joint_calendar(Some("nyse"), Some("target2"))
+        .and_then(|cal| trade_date.add_business_days(2, cal))
+        .expect("Valid calendars");
 
     // Expected: Wednesday, January 3, 2024
     // (skips weekend + Jan 1 joint holiday, then counts 2 business days)
@@ -120,15 +113,9 @@ fn test_usd_eur_spot_christmas_2024() {
 
     // CLS-consistent rule : same result here
     // since the skipped days are TARGET2 (non-USD) closures.
-    let spot = fx_spot_date(
-        trade_date,
-        2,
-        Currency::USD,
-        Currency::EUR,
-        Some("nyse"),
-        Some("target2"),
-    )
-    .expect("Valid calendars");
+    let spot = resolve_joint_calendar(Some("nyse"), Some("target2"))
+        .and_then(|cal| trade_date.add_business_days(2, cal))
+        .expect("Valid calendars");
 
     // Expected: Friday, December 27, 2024
     let expected = create_date(2024, Month::December, 27).expect("Valid expected date");
@@ -242,15 +229,9 @@ fn test_usd_gbp_spot_july_4th_2025() {
     let trade_date = create_date(2025, Month::July, 2).expect("Valid date");
 
     // CLS-consistent rule .
-    let spot = fx_spot_date(
-        trade_date,
-        2,
-        Currency::USD,
-        Currency::GBP,
-        Some("nyse"),
-        Some("gblo"),
-    )
-    .expect("Valid calendars");
+    let spot = resolve_joint_calendar(Some("nyse"), Some("gblo"))
+        .and_then(|cal| trade_date.add_business_days(2, cal))
+        .expect("Valid calendars");
 
     // Expected: Monday, July 7, 2025
     let expected = create_date(2025, Month::July, 7).expect("Valid expected date");
@@ -299,43 +280,28 @@ fn test_joint_business_days_christmas_week_2024() {
     );
 }
 
-/// Test edge case: Friday trade requiring spot to roll past weekend + holiday
+/// Friday trade with MLK Day at T+1 under the explicit joint-calendar rule.
 ///
-/// # Scenario
-/// - Trade Date: Friday, January 17, 2025 (before MLK Day)
-/// - Currency Pair: USD/GBP
-/// - Spot Lag: T+2
-///
-/// # Expected Settlement (CLS-consistent rule)
-/// From Friday Jan 17, 2025:
-/// - Skip: Sat Jan 18, Sun Jan 19 (weekend)
-/// - Count: Mon Jan 20 (MLK Day - NYSE closed, but USD does **not** gate
-///   intermediate days; GBLO open → business day 1)
-/// - Count: Tue Jan 21 (business day 2, good in all calendars) ← **Spot Date**
-///
-/// Expectation updated from Jan 22 to Jan 21 per the CLS-consistent FX spot
-/// rule :
-/// a US holiday on an intermediate day must not delay a USD pair's spot date.
+/// The spot lag is counted in joint NYSE/GBLO business days, so the US
+/// holiday on Mon Jan 20 is not a counting day: Tue Jan 21 is day 1 and Wed
+/// Jan 22 is spot. The removed CLS-style exception (a US holiday on an
+/// intermediate day does not delay a USD pair) would give Jan 21; a product
+/// that needs it must select that convention explicitly (record
+/// CORE-CONVENTIONS-011 #5, #6).
 #[test]
 fn test_usd_gbp_spot_mlk_day_2025() {
     let trade_date = create_date(2025, Month::January, 17).expect("Valid date");
 
-    let spot = fx_spot_date(
-        trade_date,
-        2,
-        Currency::USD,
-        Currency::GBP,
-        Some("nyse"),
-        Some("gblo"),
-    )
-    .expect("Valid calendars");
+    let spot = resolve_joint_calendar(Some("nyse"), Some("gblo"))
+        .and_then(|cal| trade_date.add_business_days(2, cal))
+        .expect("Valid calendars");
 
-    // Expected: Tuesday, January 21, 2025
-    let expected = create_date(2025, Month::January, 21).expect("Valid expected date");
+    // Expected: Wednesday, January 22, 2025
+    let expected = create_date(2025, Month::January, 22).expect("Valid expected date");
 
     assert_eq!(
         spot, expected,
-        "USD/GBP T+2 from Jan 17, 2025 should be Jan 21 (MLK Day at T+1 does not delay spot)"
+        "USD/GBP T+2 joint business days from Jan 17, 2025 is Jan 22 (MLK Day is not a counting day)"
     );
 }
 
@@ -475,15 +441,13 @@ fn test_joint_business_days_iteration_limit() {
     );
 }
 
-/// Instrument-level regression: EUR/USD traded the business day before a US
-/// holiday must NOT settle one day late.
+/// Instrument-level check of the explicit joint-calendar rule with a US
+/// holiday at T+1.
 ///
-/// EUR/USD traded Thu 2025-07-03; Fri 2025-07-04 (US Independence Day) is a
-/// good EUR (TARGET2) day, so under the CLS-consistent rule it counts as the
-/// first intermediate day and spot is Mon 2025-07-07 — not Tue 2025-07-08 as
-/// the old symmetric joint-calendar roll produced.
-///
-/// /// "Major — schedules" FX spot finding.
+/// EUR/USD traded Thu 2025-07-03 with target2/usny calendars: Fri 2025-07-04
+/// (US Independence Day) is not a joint business day, so Mon 2025-07-07 is
+/// day 1 and Tue 2025-07-08 is spot. The removed CLS-style exception would
+/// have counted July 4 and settled on July 7.
 #[test]
 fn test_fx_spot_instrument_eur_usd_us_holiday_intermediate_2025() {
     let trade_date = create_date(2025, Month::July, 3).expect("Valid date");
@@ -503,11 +467,10 @@ fn test_fx_spot_instrument_eur_usd_us_holiday_intermediate_2025() {
         .effective_settlement_date(trade_date)
         .expect("settlement date");
 
-    let expected = create_date(2025, Month::July, 7).expect("Valid expected date");
+    let expected = create_date(2025, Month::July, 8).expect("Valid expected date");
     assert_eq!(
         settlement, expected,
-        "EUR/USD traded 2025-07-03 must settle Mon 2025-07-07; a US holiday at \
-         T+1 must not delay spot"
+        "EUR/USD traded 2025-07-03 settles Tue 2025-07-08 on joint target2/usny business days"
     );
 }
 

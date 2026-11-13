@@ -186,12 +186,14 @@ def test_fx_forward_trade_date_convention_defaults_in_rust() -> None:
         "notional": Money(1_000_000.0, "EUR"),
         "domestic_discount_curve_id": "USD-OIS",
         "foreign_discount_curve_id": "EUR-OIS",
-        "end_of_month": False,
+        "base_calendar_id": "weekends_only",
+        "quote_calendar_id": "weekends_only",
+        "settlement_days": 2,
+        "business_day_convention": "modified_following",
+        "preserve_business_eom": False,
     }
-    default = FxForward.from_trade_date(params)
-    assert default.maturity == dt.date(2024, 4, 17)
-    explicit = FxForward.from_trade_date({**params, "business_day_convention": "modified_following"})
-    assert explicit.maturity == default.maturity
+    explicit = FxForward.from_trade_date(params)
+    assert explicit.maturity == dt.date(2024, 4, 17)
     with pytest.raises(ValueError, match="FxForwardTradeDateParams"):
         FxForward.from_trade_date({**params, "business_day_convention": "bogus"})
 

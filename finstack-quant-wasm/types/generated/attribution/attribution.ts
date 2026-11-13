@@ -14467,12 +14467,11 @@ export interface VolatilityIndexFutureOption {
  *
  * # Settlement
  *
- * When `settlement_days` is `None`, the pair-aware default is T+1 for
- * USD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB and T+2 otherwise (including
- * EUR/USD). An explicit `settlement_days` is the contractual lag and overrides
- * that default in either direction (for example tom-next T+1 on EUR/USD);
- * `settlement_date` overrides both. Without calendars the USD leg uses the
- * `usny` calendar and other currencies count weekdays only.
+ * An explicit `settlement_date` is the actual value date, used as given.
+ * Otherwise the settlement date is `as_of` plus `settlement_days` business
+ * days on the joint base/quote calendar, and both the lag and both
+ * calendars are required: there is no pair lag table, implicit `usny` or
+ * weekends-only fallback (record CORE-CONVENTIONS-011 #5, #6).
  *
  * See module-level documentation for comprehensive FX quoting conventions.
  */
@@ -14492,13 +14491,6 @@ export interface FxSpot {
    * Base currency (the currency being priced)
    */
   base_currency: Currency;
-  /**
-   * Business day convention to apply when adjusting settlement (default: ModifiedFollowing)
-   *
-   * Note: Default changed from `Following` to `ModifiedFollowing` in v0.8.0 to align
-   * with ISDA standard FX settlement conventions.
-   */
-  business_day_convention?: BusinessDayConvention;
   /**
    * Optional quote-currency discount curve for PV-ing the settlement
    * cashflow. When absent the settlement amount is reported undiscounted
@@ -14541,18 +14533,13 @@ export interface FxSpot {
    */
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
-   * Optional explicit settlement (value) date. When set it is only
-   * business-day adjusted and `settlement_days` is ignored.
+   * Actual settlement (value) date, used as given; when set,
+   * `settlement_days` is ignored.
    */
   settlement_date?: DateWire | null;
   /**
-   * Optional contractual T+N settlement lag in business days when
-   * `settlement_date` is not provided.
-   *
-   * `None` uses the pair-aware default from
-   * [`finstack_quant_core::dates::fx::fx_standard_settlement_days`]: T+1 for
-   * USD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB, T+2 otherwise. An explicit value
-   * overrides that default.
+   * Contractual spot lag in business days on the joint calendar, required
+   * when `settlement_date` is not provided.
    */
   settlement_days?: number | null;
 }

@@ -1464,34 +1464,6 @@ mod tests {
     }
 
     #[test]
-    fn test_fx_spot_default_business_day_convention_when_omitted() {
-        use finstack_quant_core::dates::BusinessDayConvention;
-
-        let spot = FxSpot::builder()
-            .id(InstrumentId::new("EURUSD-DEFAULTS"))
-            .base_currency(Currency::EUR)
-            .quote_currency(Currency::USD)
-            .notional(Money::from((1_i64, Currency::EUR)))
-            .build()
-            .expect("valid FX spot");
-        let mut json = serde_json::to_value(InstrumentJson::FxSpot(spot))
-            .expect("FxSpot JSON serialization should succeed");
-        remove_spec_key(&mut json, "business_day_convention");
-
-        let deserialized: InstrumentJson =
-            serde_json::from_value(json).expect("FxSpot JSON deserialization should succeed");
-        match deserialized {
-            InstrumentJson::FxSpot(i) => {
-                assert_eq!(
-                    i.business_day_convention,
-                    BusinessDayConvention::ModifiedFollowing
-                );
-            }
-            _ => panic!("Expected FxSpot variant"),
-        }
-    }
-
-    #[test]
     fn test_cds_option_defaults_when_optional_fields_omitted() {
         let option = CdsOption::example().expect("CdsOption example is valid");
         let mut json = serde_json::to_value(InstrumentJson::CdsOption(option))

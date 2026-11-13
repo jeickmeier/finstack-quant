@@ -5887,11 +5887,6 @@ export type Currency11 =
   | "ZMW"
   | "ZWL";
 /**
- * Business-day adjustment convention.
- */
-export type BusinessDayConvention18 =
-  "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
-/**
  * Opaque string identifier.
  */
 export type Id125 = string;
@@ -8963,7 +8958,7 @@ export type Date105 = string;
 /**
  * Business-day adjustment convention.
  */
-export type BusinessDayConvention19 =
+export type BusinessDayConvention18 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
  * Opaque string identifier.
@@ -10131,7 +10126,7 @@ export type Date112 = string;
 /**
  * Business-day adjustment convention.
  */
-export type BusinessDayConvention20 =
+export type BusinessDayConvention19 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
  * Base currency for pricing
@@ -10319,7 +10314,7 @@ export type Date114 = string;
 /**
  * Business-day adjustment convention.
  */
-export type BusinessDayConvention21 =
+export type BusinessDayConvention20 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
  * Base currency for pricing
@@ -11569,7 +11564,7 @@ export type Date126 = string;
 /**
  * Business-day adjustment convention.
  */
-export type BusinessDayConvention22 =
+export type BusinessDayConvention21 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
  * Opaque string identifier.
@@ -13254,7 +13249,7 @@ export type Id245 = string;
 /**
  * Business-day adjustment convention.
  */
-export type BusinessDayConvention23 =
+export type BusinessDayConvention22 =
   "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
  * ISO 8601 calendar date string.
@@ -15166,7 +15161,7 @@ export type RebalanceRule =
       kind: "dates";
     }
   | {
-      business_day_convention: BusinessDayConvention23;
+      business_day_convention: BusinessDayConvention22;
       /**
        * Registered holiday-calendar identifier.
        */
@@ -41752,12 +41747,11 @@ export interface FutureOptionTerms1 {
  *
  * # Settlement
  *
- * When `settlement_days` is `None`, the pair-aware default is T+1 for
- * USD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB and T+2 otherwise (including
- * EUR/USD). An explicit `settlement_days` is the contractual lag and overrides
- * that default in either direction (for example tom-next T+1 on EUR/USD);
- * `settlement_date` overrides both. Without calendars the USD leg uses the
- * `usny` calendar and other currencies count weekdays only.
+ * An explicit `settlement_date` is the actual value date, used as given.
+ * Otherwise the settlement date is `as_of` plus `settlement_days` business
+ * days on the joint base/quote calendar, and both the lag and both
+ * calendars are required: there is no pair lag table, implicit `usny` or
+ * weekends-only fallback (record CORE-CONVENTIONS-011 #5, #6).
  *
  * See module-level documentation for comprehensive FX quoting conventions.
  *
@@ -41774,7 +41768,6 @@ export interface FxSpot {
    */
   base_calendar_id?: Id9 | null;
   base_currency: Currency11;
-  business_day_convention?: BusinessDayConvention18;
   /**
    * Optional quote-currency discount curve for PV-ing the settlement
    * cashflow. When absent the settlement amount is reported undiscounted
@@ -41799,18 +41792,13 @@ export interface FxSpot {
   quoted_spot?: number | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides39;
   /**
-   * Optional explicit settlement (value) date. When set it is only
-   * business-day adjusted and `settlement_days` is ignored.
+   * Actual settlement (value) date, used as given; when set,
+   * `settlement_days` is ignored.
    */
   settlement_date?: Date | null;
   /**
-   * Optional contractual T+N settlement lag in business days when
-   * `settlement_date` is not provided.
-   *
-   * `None` uses the pair-aware default from
-   * [`finstack_quant_core::dates::fx::fx_standard_settlement_days`]: T+1 for
-   * USD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB, T+2 otherwise. An explicit value
-   * overrides that default.
+   * Contractual spot lag in business days on the joint calendar, required
+   * when `settlement_date` is not provided.
    */
   settlement_days?: number | null;
 }
@@ -44615,7 +44603,7 @@ export interface FxVarianceSwap {
   maturity: Date105;
   metric_pricing_overrides?: MetricPricingOverrides47;
   notional: Money74;
-  observation_business_day_convention?: BusinessDayConvention19;
+  observation_business_day_convention?: BusinessDayConvention18;
   /**
    * Preserve month-end rolls for month/year observation frequencies.
    */
@@ -45975,7 +45963,7 @@ export interface ScenarioPricingOverrides51 {
  */
 export interface CommoditySwap {
   attributes?: Attributes53;
-  business_day_convention?: BusinessDayConvention20;
+  business_day_convention?: BusinessDayConvention19;
   /**
    * Optional calendar ID for date adjustments.
    */
@@ -46180,7 +46168,7 @@ export interface ScenarioPricingOverrides52 {
  */
 export interface CommoditySwaption {
   attributes?: Attributes54;
-  business_day_convention?: BusinessDayConvention21;
+  business_day_convention?: BusinessDayConvention20;
   /**
    * Optional calendar ID for date adjustments.
    */
@@ -49984,7 +49972,7 @@ export interface ScheduleParams {
    * Serialized only when `true`, so existing wire payloads are unchanged.
    */
   adjust_accrual_dates?: boolean;
-  business_day_convention: BusinessDayConvention22;
+  business_day_convention: BusinessDayConvention21;
   calendar_id: Id226;
   day_count: DayCount53;
   /**
@@ -55368,7 +55356,7 @@ export interface CompositeSpec {
         kind: "dates";
       }
     | {
-        business_day_convention: BusinessDayConvention23;
+        business_day_convention: BusinessDayConvention22;
         /**
          * Registered holiday-calendar identifier.
          */
@@ -57080,7 +57068,7 @@ export interface CompositeSpec1 {
         kind: "dates";
       }
     | {
-        business_day_convention: BusinessDayConvention23;
+        business_day_convention: BusinessDayConvention22;
         /**
          * Registered holiday-calendar identifier.
          */
@@ -58600,7 +58588,7 @@ export interface ScheduleParams1 {
    * Serialized only when `true`, so existing wire payloads are unchanged.
    */
   adjust_accrual_dates?: boolean;
-  business_day_convention: BusinessDayConvention22;
+  business_day_convention: BusinessDayConvention21;
   calendar_id: Id226;
   day_count: DayCount53;
   /**

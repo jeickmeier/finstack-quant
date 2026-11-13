@@ -90,11 +90,16 @@ impl PyFxForward {
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_fx", "FxForward.with_forward_pips")]
-    #[pyo3(text_signature = "($self, spot_rate, pips)")]
-    fn with_forward_pips(&self, spot_rate: f64, pips: f64) -> PyResult<Self> {
+    #[pyo3(text_signature = "($self, spot_rate, pips, convention)")]
+    fn with_forward_pips(
+        &self,
+        spot_rate: f64,
+        pips: f64,
+        convention: PyRef<'_, crate::bindings::core::market_data::fx::PyFxPairConvention>,
+    ) -> PyResult<Self> {
         self.inner
             .clone()
-            .with_forward_pips(spot_rate, pips)
+            .with_forward_pips(spot_rate, pips, &convention.inner)
             .map(|inner| Self { inner })
             .map_err(core_to_py)
     }

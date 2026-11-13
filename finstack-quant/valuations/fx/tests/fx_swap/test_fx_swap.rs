@@ -33,11 +33,11 @@ fn standard_swap_tenor_preserves_explicit_end_of_month_policy() {
             notional: Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
             domestic_discount_curve_id: "USD-OIS".into(),
             foreign_discount_curve_id: "EUR-OIS".into(),
-            base_calendar_id: None,
-            quote_calendar_id: None,
+            base_calendar_id: "weekends_only".to_string(),
+            quote_calendar_id: "weekends_only".to_string(),
             settlement_days: 2,
             business_day_convention: BusinessDayConvention::Unadjusted,
-            end_of_month: true,
+            preserve_business_eom: true,
         },
     )
     .expect("swap should build");

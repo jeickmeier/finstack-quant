@@ -26393,15 +26393,6 @@
           "#/$defs/d_cdb8fddc0106047270c4/properties/times",
           "#/$defs/d_cdb8fddc0106047270c4/properties/values"
         ],
-        "business_day_convention": [
-          "#/$defs/d_01cd6b2e4ad257352fdb",
-          "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/0",
-          "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/1",
-          "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/2",
-          "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/3",
-          "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/4",
-          "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/5"
-        ],
         "calendar-id": [
           "#/$defs/d_81828a2fc42ad3c4ad70/properties/base_calendar_id",
           "#/$defs/d_81828a2fc42ad3c4ad70/properties/quote_calendar_id"
@@ -26910,7 +26901,6 @@
         ],
         "unit-union": [
           { "pointer": "#/$defs/d_be98333e68c25ab5ae57", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_01cd6b2e4ad257352fdb", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_02a11b30ee627630f221", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_948cdc4db846a21357a4", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_4ac4dad3ab3a5d25d3f9", "keyword": "oneOf" },

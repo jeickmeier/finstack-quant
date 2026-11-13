@@ -9,15 +9,14 @@ export default [
         "instrument": {
           "spec": {
             "attributes": {},
-            "base_calendar_id": null,
+            "base_calendar_id": "target2",
             "base_currency": "EUR",
-            "business_day_convention": "modified_following",
             "id": "EURUSD",
             "notional": {
               "amount": "1000000",
               "currency": "EUR"
             },
-            "quote_calendar_id": null,
+            "quote_calendar_id": "usny",
             "quote_currency": "USD",
             "quoted_spot": 1.1,
             "settlement_date": null,
@@ -121,52 +120,6 @@ export default [
   {
     "path": "#/$defs/d_00292b2cd9779815232f/properties/var_config/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/properties/var_config/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_01cd6b2e4ad257352fdb",
-    "source": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#",
-    "description": "Business-day adjustment convention.",
-    "examples": [
-      "modified_following",
-      "following"
-    ],
-    "title": "Business Day Convention"
-  },
-  {
-    "path": "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#/oneOf/0",
-    "const": "unadjusted",
-    "description": "No adjustment - date remains as specified.\n\n**ISDA**: Section 4.12(a) - \"Unadjusted\"\n**FpML**: \"NONE\""
-  },
-  {
-    "path": "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#/oneOf/1",
-    "const": "following",
-    "description": "Adjust to next business day (may cross month boundary).\n\n**ISDA**: Section 4.12(b) - \"Following Business Day Convention\"\n**FpML**: \"FOLLOWING\"\n**ISO 20022**: \"FWNG\""
-  },
-  {
-    "path": "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#/oneOf/2",
-    "const": "modified_following",
-    "description": "Following, unless that crosses into next month, then preceding.\n\nEnsures month-end dates don't shift to next month, important for\nconsistent period calculations in swaps and bonds.\n\n**ISDA**: Section 4.12(c) - \"Modified Following Business Day Convention\"\n**FpML**: \"MODFOLLOWING\"\n**ISO 20022**: \"MODF\""
-  },
-  {
-    "path": "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#/oneOf/3",
-    "const": "preceding",
-    "description": "Adjust to previous business day (may cross month boundary).\n\n**ISDA**: Section 4.12(d) - \"Preceding Business Day Convention\"\n**FpML**: \"PRECEDING\"\n**ISO 20022**: \"PREC\""
-  },
-  {
-    "path": "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#/oneOf/4",
-    "const": "modified_preceding",
-    "description": "Preceding, unless that crosses into previous month, then following.\n\n**ISDA**: Section 4.12(e) - \"Modified Preceding Business Day Convention\"\n**FpML**: \"MODPRECEDING\""
-  },
-  {
-    "path": "#/$defs/d_01cd6b2e4ad257352fdb/oneOf/5",
-    "source": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#/oneOf/5",
-    "const": "nearest",
-    "description": "Adjust to the closer business day. A tie (equal calendar-day distance)\nrolls Following, matching FpML `NEAREST` and QuantLib `Nearest`.\n\n**FpML**: \"NEAREST\""
   },
   {
     "path": "#/$defs/d_02a11b30ee627630f221",
@@ -1133,7 +1086,7 @@ export default [
   {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot",
-    "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `quoted_spot = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB and T+2 otherwise (including\nEUR/USD). An explicit `settlement_days` is the contractual lag and overrides\nthat default in either direction (for example tom-next T+1 on EUR/USD);\n`settlement_date` overrides both. Without calendars the USD leg uses the\n`usny` calendar and other currencies count weekdays only.\n\nSee module-level documentation for comprehensive FX quoting conventions."
+    "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `quoted_spot = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nAn explicit `settlement_date` is the actual value date, used as given.\nOtherwise the settlement date is `as_of` plus `settlement_days` business\ndays on the joint base/quote calendar, and both the lag and both\ncalendars are required: there is no pair lag table, implicit `usny` or\nweekends-only fallback (record CORE-CONVENTIONS-011 #5, #6).\n\nSee module-level documentation for comprehensive FX quoting conventions."
   },
   {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/attributes",
@@ -1163,14 +1116,6 @@ export default [
     "description": "Base currency (the currency being priced)",
     "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/business_day_convention",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/business_day_convention",
-    "default": "modified_following",
-    "description": "Business day convention to apply when adjusting settlement (default: ModifiedFollowing)\n\nNote: Default changed from `Following` to `ModifiedFollowing` in v0.8.0 to align\nwith ISDA standard FX settlement conventions.",
-    "ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json#"
   },
   {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/domestic_discount_curve_id",
@@ -1254,7 +1199,7 @@ export default [
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/settlement_date",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/settlement_date",
     "default": null,
-    "description": "Optional explicit settlement (value) date. When set it is only\nbusiness-day adjusted and `settlement_days` is ignored."
+    "description": "Actual settlement (value) date, used as given; when set,\n`settlement_days` is ignored."
   },
   {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/settlement_date/anyOf/0",
@@ -1269,7 +1214,7 @@ export default [
   {
     "path": "#/$defs/d_81828a2fc42ad3c4ad70/properties/settlement_days",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json#/$defs/FxSpot/properties/settlement_days",
-    "description": "Optional contractual T+N settlement lag in business days when\n`settlement_date` is not provided.\n\n`None` uses the pair-aware default from\n[`finstack_quant_core::dates::fx::fx_standard_settlement_days`]: T+1 for\nUSD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB, T+2 otherwise. An explicit value\noverrides that default.",
+    "description": "Contractual spot lag in business days on the joint calendar, required\nwhen `settlement_date` is not provided.",
     "format": "uint32",
     "minimum": 0
   },

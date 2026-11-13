@@ -687,7 +687,6 @@
       "FxDeltaVolSurface",
       "FxMatrix",
       "FxPairConvention",
-      "FxQuoteConvention",
       "FxRateResult",
       "HazardCurve",
       "HolidayCalendar",
@@ -739,8 +738,6 @@
       "finiteMaxOrNan",
       "finiteMinOrNan",
       "fiscalYear",
-      "fxPairConvention",
-      "fxStandardSettlementDays",
       "invertFxRate",
       "isCdsDate",
       "isImmDate",
@@ -1199,9 +1196,6 @@
     "methods": ["free", "toString"],
     "getters": []
   },
-  "core.fxStandardSettlementDays": {
-    "kind": "function"
-  },
   "core.createDate": {
     "kind": "function"
   },
@@ -1600,22 +1594,12 @@
     "methods": ["free", "rate", "setQuoteOn", "setQuotes"],
     "getters": []
   },
-  "core.FxQuoteConvention": {
-    "kind": "class",
-    "constructor": false,
-    "statics": ["direct", "fromName", "indirect"],
-    "methods": ["free", "toString"],
-    "getters": []
-  },
   "core.FxPairConvention": {
     "kind": "class",
-    "constructor": false,
+    "constructor": true,
     "statics": [],
-    "methods": ["free"],
-    "getters": ["base", "pipSize", "quote", "settlementDays", "usdQuotation"]
-  },
-  "core.fxPairConvention": {
-    "kind": "function"
+    "methods": ["free", "ratePoints"],
+    "getters": ["base", "pipSize", "quote"]
   },
   "core.invertFxRate": {
     "kind": "function"

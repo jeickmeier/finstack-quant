@@ -81,7 +81,6 @@ from finstack_quant.core.dates._date_ext import (
 
 __all__ = [
     # FX settlement
-    "fx_standard_settlement_days",
     # day-count
     "DayCount",
     "DayCountContext",
@@ -138,44 +137,6 @@ __all__ = [
 ]
 
 # Free functions
-
-def fx_standard_settlement_days(base: Currency | str, quote: Currency | str) -> int:
-    """Return the market-standard FX spot lag in business days for a currency pair.
-
-    Parameters
-    ----------
-    base : Currency | str
-        Base (foreign) currency as a Currency or ISO-4217 alphabetic code.
-        Codes are case-insensitive and must not contain surrounding whitespace.
-    quote : Currency | str
-        Quote (domestic) currency, accepted in the same forms as base.
-        Reversing the pair preserves its settlement lag.
-
-    Returns
-    -------
-    int
-        One business day for USD/CAD, USD/TRY, USD/PHP and USD/RUB in either
-        order; two business days otherwise, including USD/MXN and EUR/CAD.
-        This reports the standard lag without applying holiday calendars or
-        an instrument's explicit settlement-lag override.
-
-    Raises
-    ------
-    TypeError
-        If either currency is neither a Currency nor a string.
-    ValueError
-        If a string is not a recognized ISO-4217 alphabetic currency code.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.currency import Currency
-    >>> from finstack_quant.core.dates import fx_standard_settlement_days
-    >>> fx_standard_settlement_days("USD", "CAD")
-    1
-    >>> fx_standard_settlement_days(Currency("EUR"), "USD")
-    2
-    """
-    ...
 
 def create_date(year: int, month: int, day: int) -> datetime.date:
     """

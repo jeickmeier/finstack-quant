@@ -24,6 +24,7 @@ from finstack_quant.core.dates import DayCount, Tenor
 from finstack_quant.core.market_data import (
     DiscountCurve,
     FxMatrix,
+    FxPairConvention,
     MarketContext,
     VolSurface,
 )
@@ -621,13 +622,17 @@ class TestFxForward:
             "notional": Money(1_000_000.0, "EUR"),
             "domestic_discount_curve_id": "USD-OIS",
             "foreign_discount_curve_id": "EUR-OIS",
-            "end_of_month": False,
+            "base_calendar_id": "weekends_only",
+            "quote_calendar_id": "weekends_only",
+            "settlement_days": 2,
+            "business_day_convention": "modified_following",
+            "preserve_business_eom": False,
         })
         assert fwd.contract_rate is None
         assert fwd.maturity > datetime.date(2025, 4, 10)
         with_points = fwd.with_forward_points(1.10, 0.0025)
         assert with_points.contract_rate == pytest.approx(1.1025)
-        with_pips = fwd.with_forward_pips(1.10, 25.0)
+        with_pips = fwd.with_forward_pips(1.10, 25.0, FxPairConvention("EUR", "USD", 0.0001))
         assert with_pips.contract_rate == pytest.approx(1.1025)
         with pytest.raises(ValueError, match=r"spot_rate must be positive"):
             fwd.with_forward_points(-1.0, 0.0)

@@ -176,85 +176,62 @@ class FxRateResult:
     def __repr__(self) -> str: ...
     def _repr_html_(self) -> Optional[str]: ...
 
-class FxQuoteConvention:
+class FxPairConvention:
     """
-    USD quotation style for a market FX pair.
+    Validated quote metadata for one ordered FX pair.
 
-    **Direct** means USD is the quote currency (EURUSD, GBPUSD). **Indirect**
-    means USD is the base (USDJPY, USDCAD). Non-USD crosses inherit the USD
-    quotation of market CCY1 versus USD.
+    The supplied order is kept: an outright rate is quote-currency units per
+    one base unit. The pip size is explicit; nothing is inferred from the
+    currencies, and the reversed pair needs its own convention.
 
     Examples
     --------
-    >>> from finstack_quant.core.market_data import FxQuoteConvention
-    >>> str(FxQuoteConvention.from_name("direct"))
-    'direct'
-
+    >>> from finstack_quant.core.market_data import FxPairConvention
+    >>> conv = FxPairConvention("USD", "JPY", 0.01)
+    >>> (str(conv.base), str(conv.quote), conv.pip_size)
+    ('USD', 'JPY', 0.01)
     """
 
-    DIRECT: FxQuoteConvention
-    """USD is the quote currency (units of USD per one unit of CCY1)."""
-    INDIRECT: FxQuoteConvention
-    """USD is the base currency (units of CCY2 per one USD)."""
-
-    @classmethod
-    def from_name(cls, name: str) -> FxQuoteConvention:
+    def __init__(self, base: Union[Currency, str], quote: Union[Currency, str], pip_size: float) -> None:
         """
-        Parse from a string label.
+        Quote metadata for the ordered pair ``base``/``quote``.
 
         Parameters
         ----------
-        name : str
-            Convention label (``"direct"`` or ``"indirect"``).
-
-        Returns
-        -------
-        FxQuoteConvention
-            Parsed USD quotation style.
+        base : Currency or str
+            Base currency: one unit of it is quoted.
+        quote : Currency or str
+            Quote currency; must differ from ``base``.
+        pip_size : float
+            Outright-rate increment per pip in this pair's quote units (for
+            example ``0.0001`` for EUR/USD, ``0.01`` for USD/JPY). Not an ISO
+            minor unit, display precision or venue tick; finite and positive.
 
         Raises
         ------
+        TypeError
+            If ``base`` or ``quote`` is not a :class:`Currency` or ISO code.
         ValueError
-            If *name* is not ``"direct"`` or ``"indirect"``.
+            If a code is unrecognized, the currencies are equal, or
+            ``pip_size`` is not finite and positive.
 
         Examples
         --------
-        >>> from finstack_quant.core.market_data import FxQuoteConvention
-        >>> str(FxQuoteConvention.from_name("indirect"))
-        'indirect'
-
+        >>> from finstack_quant.core.market_data import FxPairConvention
+        >>> FxPairConvention("EUR", "USD", 0.0001).pip_size
+        0.0001
         """
         ...
-
-    def __eq__(self, other: object) -> bool: ...
-    def __repr__(self) -> str: ...
-    def __str__(self) -> str: ...
-
-class FxPairConvention:
-    """
-    Market convention for one FX pair after Bloomberg/Reuters CCY1 ordering.
-
-    Instances come from :func:`fx_pair_convention`. ``base`` / ``quote`` are
-    always market CCY1/CCY2, even when the lookup arguments were inverted.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import fx_pair_convention
-    >>> conv = fx_pair_convention("USD", "EUR")
-    >>> (str(conv.base), str(conv.quote), str(conv.usd_quotation), conv.pip_size, conv.settlement_days)
-    ('EUR', 'USD', 'direct', 0.0001, 2)
-
-    """
 
     @property
     def base(self) -> Currency:
         """
-        Base currency of the market-convention pair.
+        Base currency of the ordered pair.
 
         Returns
         -------
         Currency
-            ISO-4217 code of CCY1: the currency whose single unit the quoted rate prices.
+            The base currency.
 
         Notes
         -----
@@ -265,28 +242,12 @@ class FxPairConvention:
     @property
     def quote(self) -> Currency:
         """
-        Quote currency of the market-convention pair.
+        Quote currency of the ordered pair.
 
         Returns
         -------
         Currency
-            ISO-4217 code of CCY2: the currency the rate is expressed in, per one unit of CCY1.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def usd_quotation(self) -> FxQuoteConvention:
-        """
-        How USD sits in the market convention for this pair.
-
-        Returns
-        -------
-        FxQuoteConvention
-            Quotation label: direct when USD is the quote currency (as in EURUSD), indirect when USD is the base (as in USDJPY).
+            The quote currency.
 
         Notes
         -----
@@ -297,12 +258,12 @@ class FxPairConvention:
     @property
     def pip_size(self) -> float:
         """
-        Smallest conventional price increment for the pair.
+        Outright-rate increment per pip.
 
         Returns
         -------
         float
-            Pip size in outright-rate units: ``0.01`` for JPY, KRW and HUF pairs and ``0.0001`` for the rest.
+            The pip size in quote units per base unit.
 
         Notes
         -----
@@ -310,62 +271,34 @@ class FxPairConvention:
         """
         ...
 
-    @property
-    def settlement_days(self) -> int:
+    def rate_points(self, pips: float) -> float:
         """
-        Conventional settlement lag from trade date to spot.
+        Rate points for a signed number of forward pips: ``pips * pip_size``.
+
+        Parameters
+        ----------
+        pips : float
+            Signed forward points in pips; must be finite.
 
         Returns
         -------
-        int
-            Business days to spot: ``1`` for USDCAD and similar pairs, ``2`` for the market standard.
+        float
+            The rate points to add to an outright rate.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
+        Raises
+        ------
+        ValueError
+            If ``pips`` or the product is not finite.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import FxPairConvention
+        >>> round(FxPairConvention("EUR", "USD", 0.0001).rate_points(50.0), 6)
+        0.005
         """
         ...
 
     def __repr__(self) -> str: ...
-
-def fx_pair_convention(
-    base: Union[Currency, str],
-    quote: Union[Currency, str],
-) -> FxPairConvention:
-    """
-    Market convention for an unordered currency pair.
-
-    Returned ``base`` / ``quote`` are always the market CCY1/CCY2, even when
-    the arguments are inverted.
-
-    Parameters
-    ----------
-    base : Currency or str
-        One currency of the pair. Orientation is ignored.
-    quote : Currency or str
-        The other currency of the pair. Orientation is ignored.
-
-    Returns
-    -------
-    FxPairConvention
-        Market CCY1/CCY2, USD quotation, pip size, and standard spot lag.
-
-    Raises
-    ------
-    TypeError
-        If *base* or *quote* is not a :class:`Currency` or ISO code string.
-    ValueError
-        If either value is an unrecognized currency code.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import fx_pair_convention
-    >>> conv = fx_pair_convention("USD", "JPY")
-    >>> (str(conv.base), str(conv.quote), str(conv.usd_quotation), conv.pip_size, conv.settlement_days)
-    ('USD', 'JPY', 'indirect', 0.01, 2)
-
-    """
-    ...
 
 def invert_fx_rate(rate: float) -> float:
     """

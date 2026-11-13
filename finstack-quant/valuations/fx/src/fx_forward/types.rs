@@ -132,8 +132,9 @@ finstack_quant_valuations_core::validate_on_deserialize!(FxForward);
 
 /// Inputs of [`FxForward::from_trade_date`].
 ///
-/// Omitted optional fields take the market defaults: the pair's standard spot
-/// lag, Modified Following and weekends-only calendars.
+/// Every date convention is explicit (record CORE-CONVENTIONS-011 #6, #7):
+/// the spot lag, both calendars, the business-day convention and
+/// business-EOM preservation.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -158,25 +159,21 @@ pub struct FxForwardTradeDateParams {
     pub domestic_discount_curve_id: CurveId,
     /// Base-currency (foreign) discount curve identifier.
     pub foreign_discount_curve_id: CurveId,
-    /// Base-currency holiday calendar id; `None` uses weekends only.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub base_calendar_id: Option<String>,
-    /// Quote-currency holiday calendar id; `None` uses weekends only.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub quote_calendar_id: Option<String>,
-    /// T+N spot lag in business days (typically 2, or 1 for USD/CAD). `None`
-    /// selects the pair's market-standard lag from
-    /// [`finstack_quant_core::dates::fx::fx_standard_settlement_days`].
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub settlement_days: Option<u32>,
-    /// Business-day convention rolling the maturity on the joint calendar.
-    /// `None` selects Modified Following, the ISDA FX settlement convention.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub business_day_convention: Option<finstack_quant_core::dates::BusinessDayConvention>,
-    /// Preserve month-end: a month-end spot date gives a month-end maturity.
-    /// Defaults to `false`.
-    #[serde(default)]
-    pub end_of_month: bool,
+    /// Base-currency holiday calendar id (may itself be a composite such as
+    /// `"target2+usny"` when the convention needs a USD gate).
+    pub base_calendar_id: String,
+    /// Quote-currency holiday calendar id.
+    pub quote_calendar_id: String,
+    /// Spot lag: business days from trade date to spot on the joint
+    /// base/quote calendar. Stated by the trade's convention; no pair table
+    /// supplies it.
+    pub settlement_days: u32,
+    /// Business-day convention rolling the maturity once on the joint
+    /// calendar.
+    pub business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
+    /// Keep a business month-end spot on the business month-end of the
+    /// maturity month; month and year tenors only.
+    pub preserve_business_eom: bool,
 }
 
 impl FxForward {
@@ -279,34 +276,19 @@ impl FxForward {
             quote_calendar_id,
             settlement_days,
             business_day_convention,
-            end_of_month,
+            preserve_business_eom,
         } = params;
-        use finstack_quant_core::dates::fx::{
-            add_fx_standard_tenor, fx_spot_date, fx_standard_settlement_days,
-        };
-        let settlement_days = settlement_days
-            .unwrap_or_else(|| fx_standard_settlement_days(base_currency, quote_currency));
-        let business_day_convention = business_day_convention
-            .unwrap_or_else(finstack_quant_valuations_core::serde_defaults::bdc_modified_following);
-
-        // CLS-consistent spot roll: a US holiday on an intermediate day does not
-        // delay a USD pair's spot date (FX spot convention
-        // finding).
-        let spot_date = fx_spot_date(
-            trade_date,
-            settlement_days,
-            base_currency,
-            quote_currency,
-            base_calendar_id.as_deref(),
-            quote_calendar_id.as_deref(),
+        let calendar = finstack_quant_core::dates::resolve_joint_calendar(
+            Some(&base_calendar_id),
+            Some(&quote_calendar_id),
         )?;
-        let maturity = add_fx_standard_tenor(
+        let spot_date = crate::shared::spot_date_from_lag(trade_date, settlement_days, calendar)?;
+        let maturity = finstack_quant_core::dates::fx::fx_forward_date(
             spot_date,
             tenor,
             business_day_convention,
-            end_of_month,
-            base_calendar_id.as_deref(),
-            quote_calendar_id.as_deref(),
+            preserve_business_eom,
+            calendar,
         )?;
 
         Self::builder()
@@ -317,8 +299,8 @@ impl FxForward {
             .notional(notional)
             .domestic_discount_curve_id(domestic_discount_curve_id)
             .foreign_discount_curve_id(foreign_discount_curve_id)
-            .base_calendar_id_opt(base_calendar_id.map(Into::into))
-            .quote_calendar_id_opt(quote_calendar_id.map(Into::into))
+            .base_calendar_id_opt(Some(base_calendar_id.into()))
+            .quote_calendar_id_opt(Some(quote_calendar_id.into()))
             .attributes(Attributes::new())
             .build()
     }
@@ -406,11 +388,11 @@ impl FxForward {
 
     /// Create an FX forward from spot plus forward points quoted in pips.
     ///
-    /// Converts pips to decimal points with
-    /// the `pip_size` of [`fx_pair_convention`](finstack_quant_core::money::fx::fx_pair_convention) for this
-    /// instrument's stored `base_currency` / `quote_currency`, then delegates
-    /// to [`with_forward_points`](Self::with_forward_points). Pip size is
-    /// `0.01` when either side is JPY, KRW, or HUF, otherwise `0.0001`.
+    /// Converts pips to rate points with the caller's explicit quote
+    /// convention, which must name this instrument's stored
+    /// `base_currency`/`quote_currency` order, then delegates to
+    /// [`with_forward_points`](Self::with_forward_points). No pip size is
+    /// inferred (record CORE-CONVENTIONS-011 #3).
     ///
     /// # Arguments
     ///
@@ -418,12 +400,15 @@ impl FxForward {
     ///   finite and strictly positive.
     /// * `pips` - Forward points in pip units (for example `50.0` for "+50"
     ///   on EURUSD). May be negative for a discount; must be finite.
+    /// * `convention` - Quote metadata of this instrument's ordered pair,
+    ///   carrying the pip size.
     ///
     /// # Errors
     ///
-    /// Returns an error when `spot_rate` is non-finite or not strictly
-    /// positive, `pips` is non-finite, or `spot_rate + pips * pip_size` is
-    /// not a finite strictly positive contract rate.
+    /// Returns an error when `convention` names another pair or order,
+    /// `spot_rate` is non-finite or not strictly positive, `pips` is
+    /// non-finite, or `spot_rate + pips * pip_size` is not a finite strictly
+    /// positive contract rate.
     ///
     /// # Example
     ///
@@ -432,8 +417,10 @@ impl FxForward {
     /// # use finstack_quant_core::currency::Currency;
     /// # use finstack_quant_core::dates::Date;
     /// # use finstack_quant_core::money::Money;
+    /// # use finstack_quant_core::money::fx::FxPairConvention;
     /// # use finstack_quant_core::types::{CurveId, InstrumentId};
     /// # use time::Month;
+    /// let eurusd = FxPairConvention::new(Currency::EUR, Currency::USD, 0.0001).unwrap();
     /// let forward = FxForward::builder()
     ///     .id(InstrumentId::new("EURUSD-FWD"))
     ///     .base_currency(Currency::EUR)
@@ -444,25 +431,31 @@ impl FxForward {
     ///     .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
     ///     .build()
     ///     .unwrap()
-    ///     .with_forward_pips(1.1000, 50.0)
+    ///     .with_forward_pips(1.1000, 50.0, &eurusd)
     ///     .unwrap();
     ///
     /// // Contract rate = 1.1000 + 50 × 0.0001 = 1.1050
     /// assert!((forward.contract_rate.unwrap() - 1.1050).abs() < 1e-10);
     /// ```
-    pub fn with_forward_pips(self, spot_rate: f64, pips: f64) -> finstack_quant_core::Result<Self> {
-        if !pips.is_finite() {
+    pub fn with_forward_pips(
+        self,
+        spot_rate: f64,
+        pips: f64,
+        convention: &finstack_quant_core::money::fx::FxPairConvention,
+    ) -> finstack_quant_core::Result<Self> {
+        if (convention.get_base(), convention.get_quote())
+            != (self.base_currency, self.quote_currency)
+        {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "FX forward pips must be finite, got {}",
-                pips
+                "FX pip convention {}/{} does not match the forward's {}/{}",
+                convention.get_base(),
+                convention.get_quote(),
+                self.base_currency,
+                self.quote_currency
             )));
         }
-        let pip_size = finstack_quant_core::money::fx::fx_pair_convention(
-            self.base_currency,
-            self.quote_currency,
-        )
-        .pip_size;
-        self.with_forward_points(spot_rate, pips * pip_size)
+        let points = convention.rate_points(pips)?;
+        self.with_forward_points(spot_rate, points)
     }
 
     /// Compute the market forward rate via covered interest rate parity.

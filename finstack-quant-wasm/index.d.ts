@@ -656,31 +656,6 @@ export interface CoreNamespace {
   readonly Tenor: typeof wasm.Tenor;
   readonly TenorUnit: typeof wasm.TenorUnit;
   /**
-   * Return the market-standard FX spot lag in business days for a currency pair.
-   *
-   * USD/CAD, USD/TRY, USD/PHP and USD/RUB settle T+1 in either order; all
-   * other pairs settle T+2. No holiday calendars or instrument overrides apply.
-   *
-   * # Arguments
-   *
-   * * `base` - Base (foreign) currency ISO-4217 code; case-insensitive, with no surrounding whitespace.
-   * * `quote` - Quote (domestic) currency ISO-4217 code; reversing the pair preserves the lag.
-   *
-   * @returns One business day for USD/CAD, USD/TRY, USD/PHP and USD/RUB in either order; two otherwise, including USD/MXN and EUR/CAD.
-   * @throws TypeError - With kind `invalid_type` if either currency is not a string.
-   * @throws Error - With kind `validation` if either code is not a recognized ISO-4217 currency.
-   * @param base - Base (foreign) currency ISO-4217 code; case-insensitive, with no surrounding whitespace.
-   * @param quote - Quote (domestic) currency ISO-4217 code; reversing the pair preserves the lag.
-   * @example
-   * ```typescript
-   * import init, { core } from "finstack-quant-wasm";
-   * await init();
-   * console.log(core.fxStandardSettlementDays("USD", "CAD")); // 1
-   * console.log(core.fxStandardSettlementDays("EUR", "USD")); // 2
-   * ```
-   */
-  readonly fxStandardSettlementDays: typeof wasm.fxStandardSettlementDays;
-  /**
    * Create a date and return it as epoch days (days since 1970-01-01).
    * # Arguments
    *
@@ -1132,23 +1107,7 @@ export interface CoreNamespace {
   readonly FxConversionPolicy: typeof wasm.FxConversionPolicy;
   readonly FxRateResult: typeof wasm.FxRateResult;
   readonly FxMatrix: typeof wasm.FxMatrix;
-  readonly FxQuoteConvention: typeof wasm.FxQuoteConvention;
   readonly FxPairConvention: typeof wasm.FxPairConvention;
-  /**
-   * Market convention for an unordered currency pair.
-   *
-   * Returned `base` / `quote` are always the market CCY1/CCY2, even when the
-   * arguments are inverted.
-   * @param base - One currency ISO code of the pair. Orientation is ignored.
-   * @param quote - The other currency ISO code of the pair. Orientation is ignored.
-   * @returns Market CCY1/CCY2, USD quotation, pip size, and standard spot lag.
-   *
-   * # Errors
-   *
-   * Throws a JavaScript exception if either code is not a recognized ISO-4217
-   * alphabetic currency.
-   */
-  readonly fxPairConvention: typeof wasm.fxPairConvention;
   /**
    * Reciprocal of a strictly positive finite FX rate.
    * @param rate - Outright FX rate to invert, in quote-per-base units. Must be

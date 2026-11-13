@@ -74,13 +74,17 @@ reached through the standard metric registry.
   buys 1.10 USD. Base is the foreign ("asset") currency, quote is the domestic
   ("numéraire") currency. Option payoffs are quoted in domestic; notionals are
   in base unless a type says otherwise.
-- **Spot dates and standard tenors.** Leaves that derive settlement dates roll
-  through `finstack_quant_core::dates::fx::fx_spot_date`, which derives each currency's
-  lag from its currency code and applies explicit pair minimums and holiday
-  calendars. Signed business-day arithmetic uses `DateExt::add_business_days`;
-  negative lags are not spot-settlement conventions. Forward, swap and NDF standard-maturity constructors then add a
-  calendar `Tenor` with explicit business-day and EOM policy; broken-date
-  constructors take explicit contractual dates.
+- **Spot dates and forward tenors.** Products prefer actual value dates. A
+  product that derives one owns an explicit rule: `FxSpot`, and the forward,
+  swap and NDF trade-date constructors, add their stated `settlement_days` in
+  business days on the joint calendar of their two stated calendar ids (a
+  composite id such as `target2+usny` adds a USD gate). Nothing is inferred
+  from the currencies: there is no pair lag table, implicit `usny` or
+  weekends-only fallback (record CORE-CONVENTIONS-011). The maturity is
+  `finstack_quant_core::dates::fx::fx_forward_date` from that spot, with an
+  explicit business-day convention and business-EOM choice; broken-date
+  constructors take explicit contractual dates. Forward pips convert with an
+  explicit `FxPairConvention` for the instrument's ordered pair.
 - **Two clocks.** Option pricers combine a vol-surface clock with a
   discount-curve clock; the model rate must satisfy `exp(-r·t_vol) = df`.
   `common_impl::helpers::zero_rate_from_df` derives that rate and

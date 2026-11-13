@@ -12810,12 +12810,11 @@ export interface VolatilityIndexFutureOption {
  *
  * # Settlement
  *
- * When `settlement_days` is `None`, the pair-aware default is T+1 for
- * USD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB and T+2 otherwise (including
- * EUR/USD). An explicit `settlement_days` is the contractual lag and overrides
- * that default in either direction (for example tom-next T+1 on EUR/USD);
- * `settlement_date` overrides both. Without calendars the USD leg uses the
- * `usny` calendar and other currencies count weekdays only.
+ * An explicit `settlement_date` is the actual value date, used as given.
+ * Otherwise the settlement date is `as_of` plus `settlement_days` business
+ * days on the joint base/quote calendar, and both the lag and both
+ * calendars are required: there is no pair lag table, implicit `usny` or
+ * weekends-only fallback (record CORE-CONVENTIONS-011 #5, #6).
  *
  * See module-level documentation for comprehensive FX quoting conventions.
  */
@@ -12835,13 +12834,6 @@ export interface FxSpot {
    * Base currency (the currency being priced)
    */
   base_currency: Currency;
-  /**
-   * Business day convention to apply when adjusting settlement (default: ModifiedFollowing)
-   *
-   * Note: Default changed from `Following` to `ModifiedFollowing` in v0.8.0 to align
-   * with ISDA standard FX settlement conventions.
-   */
-  business_day_convention?: BusinessDayConvention;
   /**
    * Optional quote-currency discount curve for PV-ing the settlement
    * cashflow. When absent the settlement amount is reported undiscounted
@@ -12884,18 +12876,13 @@ export interface FxSpot {
    */
   scenario_pricing_overrides?: ScenarioPricingOverrides;
   /**
-   * Optional explicit settlement (value) date. When set it is only
-   * business-day adjusted and `settlement_days` is ignored.
+   * Actual settlement (value) date, used as given; when set,
+   * `settlement_days` is ignored.
    */
   settlement_date?: DateWire | null;
   /**
-   * Optional contractual T+N settlement lag in business days when
-   * `settlement_date` is not provided.
-   *
-   * `None` uses the pair-aware default from
-   * [`finstack_quant_core::dates::fx::fx_standard_settlement_days`]: T+1 for
-   * USD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB, T+2 otherwise. An explicit value
-   * overrides that default.
+   * Contractual spot lag in business days on the joint calendar, required
+   * when `settlement_date` is not provided.
    */
   settlement_days?: number | null;
 }
@@ -20575,27 +20562,23 @@ export interface FloatingBondParams {
  */
 export interface FxForwardTradeDateParams {
   /**
-   * Base-currency holiday calendar id; `None` uses weekends only.
+   * Base-currency holiday calendar id (may itself be a composite such as
+   * `"target2+usny"` when the convention needs a USD gate).
    */
-  base_calendar_id?: string | null;
+  base_calendar_id: string;
   /**
    * Base (foreign) currency: the numerator of the quote and the notional currency.
    */
   base_currency: Currency;
   /**
-   * Business-day convention rolling the maturity on the joint calendar.
-   * `None` selects Modified Following, the ISDA FX settlement convention.
+   * Business-day convention rolling the maturity once on the joint
+   * calendar.
    */
-  business_day_convention?: BusinessDayConvention | null;
+  business_day_convention: BusinessDayConvention;
   /**
    * Quote-currency (domestic) discount curve identifier.
    */
   domestic_discount_curve_id: Id;
-  /**
-   * Preserve month-end: a month-end spot date gives a month-end maturity.
-   * Defaults to `false`.
-   */
-  end_of_month?: boolean;
   /**
    * Base-currency (foreign) discount curve identifier.
    */
@@ -20609,19 +20592,24 @@ export interface FxForwardTradeDateParams {
    */
   notional: Money;
   /**
-   * Quote-currency holiday calendar id; `None` uses weekends only.
+   * Keep a business month-end spot on the business month-end of the
+   * maturity month; month and year tenors only.
    */
-  quote_calendar_id?: string | null;
+  preserve_business_eom: boolean;
+  /**
+   * Quote-currency holiday calendar id.
+   */
+  quote_calendar_id: string;
   /**
    * Quote (domestic) currency: the denominator of the quote and the PV currency.
    */
   quote_currency: Currency;
   /**
-   * T+N spot lag in business days (typically 2, or 1 for USD/CAD). `None`
-   * selects the pair's market-standard lag from
-   * [`finstack_quant_core::dates::fx::fx_standard_settlement_days`].
+   * Spot lag: business days from trade date to spot on the joint
+   * base/quote calendar. Stated by the trade's convention; no pair table
+   * supplies it.
    */
-  settlement_days?: number | null;
+  settlement_days: number;
   /**
    * Calendar tenor from spot to maturity, e.g. `3M`.
    */
@@ -20677,25 +20665,21 @@ export interface FxOptionParams {
  */
 export interface FxSwapTradeDateParams {
   /**
-   * Base-currency holiday calendar id; `None` uses weekends only.
+   * Base-currency holiday calendar id (may itself be a composite).
    */
-  base_calendar_id?: string | null;
+  base_calendar_id: string;
   /**
    * Base (foreign) currency: the numerator of the quote and the notional currency.
    */
   base_currency: Currency;
   /**
-   * Business-day convention rolling the far date on the joint calendar.
+   * Business-day convention rolling the far date once on the joint calendar.
    */
   business_day_convention: BusinessDayConvention;
   /**
    * Quote-currency (domestic) discount curve identifier.
    */
   domestic_discount_curve_id: Id;
-  /**
-   * Preserve month-end: a month-end near date gives a month-end far date.
-   */
-  end_of_month: boolean;
   /**
    * Calendar tenor from the near date to the far date, e.g. `6M`.
    */
@@ -20713,15 +20697,21 @@ export interface FxSwapTradeDateParams {
    */
   notional: Money;
   /**
-   * Quote-currency holiday calendar id; `None` uses weekends only.
+   * Keep a business month-end near date on the business month-end of the
+   * far month; month and year tenors only.
    */
-  quote_calendar_id?: string | null;
+  preserve_business_eom: boolean;
+  /**
+   * Quote-currency holiday calendar id.
+   */
+  quote_calendar_id: string;
   /**
    * Quote (domestic) currency: the denominator of the quote.
    */
   quote_currency: Currency;
   /**
-   * T+N spot lag in business days from trade date to near date (2 in most markets).
+   * Spot lag: business days from trade date to the near date on the joint
+   * base/quote calendar, stated by the trade's convention.
    */
   settlement_days: number;
   /**
@@ -21094,15 +21084,16 @@ export interface MetricMetadata {
  */
 export interface NdfTradeDateParams {
   /**
-   * Base-currency holiday calendar id; `None` uses weekends only.
+   * Base-currency holiday calendar id (may itself be a composite).
    */
-  base_calendar_id?: string | null;
+  base_calendar_id: string;
   /**
    * Restricted (non-deliverable) currency: the numerator and notional currency.
    */
   base_currency: Currency;
   /**
-   * Business-day convention rolling the maturity on the joint calendar.
+   * Business-day convention rolling the maturity once on the joint
+   * calendar.
    */
   business_day_convention: BusinessDayConvention;
   /**
@@ -21113,10 +21104,6 @@ export interface NdfTradeDateParams {
    * Settlement-currency discount curve identifier.
    */
   domestic_discount_curve_id: Id;
-  /**
-   * Preserve month-end: a month-end spot date gives a month-end maturity.
-   */
-  end_of_month: boolean;
   /**
    * Joint business days from fixing to maturity (typically 2); a negative
    * value places the fixing after maturity's unadjusted date.
@@ -21131,15 +21118,21 @@ export interface NdfTradeDateParams {
    */
   notional: Money;
   /**
-   * Settlement-currency holiday calendar id; `None` uses weekends only.
+   * Keep a business month-end spot on the business month-end of the
+   * maturity month; month and year tenors only.
    */
-  settlement_calendar_id?: string | null;
+  preserve_business_eom: boolean;
+  /**
+   * Settlement-currency holiday calendar id.
+   */
+  settlement_calendar_id: string;
   /**
    * Convertible settlement currency (typically USD): the denominator.
    */
   settlement_currency: Currency;
   /**
-   * T+N spot lag in business days (typically 2).
+   * Spot lag: business days from trade date to spot on the joint
+   * base/settlement calendar, stated by the trade's convention.
    */
   settlement_days: number;
   /**

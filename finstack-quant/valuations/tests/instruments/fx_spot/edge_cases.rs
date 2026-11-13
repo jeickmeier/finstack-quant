@@ -3,8 +3,7 @@
 use super::common::*;
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::{
-    currency::Currency, dates::BusinessDayConvention, market_data::context::MarketContext,
-    money::Money, types::InstrumentId,
+    currency::Currency, market_data::context::MarketContext, money::Money, types::InstrumentId,
 };
 use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
 use finstack_quant_valuations::{instruments::Instrument, pricer::InstrumentType};
@@ -77,6 +76,9 @@ fn test_negative_notional() {
         .quote_currency(Currency::USD)
         .notional(Money::new(-1_000_000.0, Currency::EUR).expect("valid money fixture"))
         .quoted_spot(1.20)
+        .settlement_days(2)
+        .base_calendar_id("weekends_only".into())
+        .quote_calendar_id("weekends_only".into())
         .build()
         .expect("valid FX spot");
 
@@ -240,29 +242,6 @@ fn test_rate_precision_limits() {
 
     // Decimal precision limit - expect 2 decimal places by default
     approx_eq(pv.amount(), 1.23, 1e-2, "Rate precision");
-}
-
-#[test]
-fn test_weekend_settlement_adjustment() {
-    // Settlement on Saturday should adjust to Monday (with Following convention)
-    let fx = FxSpot {
-        settlement_date: Some(d(2025, 1, 18)), // Saturday
-        business_day_convention: BusinessDayConvention::Following,
-        base_calendar_id: Some("target2".into()),
-        quote_calendar_id: Some("usny".into()),
-        ..eurusd_with_notional(1_000_000.0, 1.20)
-    };
-
-    let market = MarketContext::new();
-    let cashflows = fx.dated_cashflows(&market, test_date()).unwrap();
-
-    assert_eq!(cashflows.len(), 1);
-    // BDC adjustment only applies when calendar is loaded - may return unadjusted date
-    // Saturday (18th) with Following should adjust to Monday (20th) if calendar is active
-    assert!(
-        cashflows[0].0 >= d(2025, 1, 18),
-        "Settlement on or after Saturday"
-    );
 }
 
 #[test]

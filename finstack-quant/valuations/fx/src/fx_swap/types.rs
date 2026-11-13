@@ -121,18 +121,18 @@ pub struct FxSwapTradeDateParams {
     pub domestic_discount_curve_id: CurveId,
     /// Base-currency (foreign) discount curve identifier.
     pub foreign_discount_curve_id: CurveId,
-    /// Base-currency holiday calendar id; `None` uses weekends only.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub base_calendar_id: Option<String>,
-    /// Quote-currency holiday calendar id; `None` uses weekends only.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub quote_calendar_id: Option<String>,
-    /// T+N spot lag in business days from trade date to near date (2 in most markets).
+    /// Base-currency holiday calendar id (may itself be a composite).
+    pub base_calendar_id: String,
+    /// Quote-currency holiday calendar id.
+    pub quote_calendar_id: String,
+    /// Spot lag: business days from trade date to the near date on the joint
+    /// base/quote calendar, stated by the trade's convention.
     pub settlement_days: u32,
-    /// Business-day convention rolling the far date on the joint calendar.
+    /// Business-day convention rolling the far date once on the joint calendar.
     pub business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
-    /// Preserve month-end: a month-end near date gives a month-end far date.
-    pub end_of_month: bool,
+    /// Keep a business month-end near date on the business month-end of the
+    /// far month; month and year tenors only.
+    pub preserve_business_eom: bool,
 }
 
 impl FxSwap {
@@ -217,27 +217,19 @@ impl FxSwap {
             quote_calendar_id,
             settlement_days,
             business_day_convention,
-            end_of_month,
+            preserve_business_eom,
         } = params;
-        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date};
-        // CLS-consistent spot roll: a US holiday on an intermediate day does not
-        // delay a USD pair's spot date (FX spot convention
-        // finding).
-        let near_date = fx_spot_date(
-            trade_date,
-            settlement_days,
-            base_currency,
-            quote_currency,
-            base_calendar_id.as_deref(),
-            quote_calendar_id.as_deref(),
+        let calendar = finstack_quant_core::dates::resolve_joint_calendar(
+            Some(&base_calendar_id),
+            Some(&quote_calendar_id),
         )?;
-        let far_date = add_fx_standard_tenor(
+        let near_date = crate::shared::spot_date_from_lag(trade_date, settlement_days, calendar)?;
+        let far_date = finstack_quant_core::dates::fx::fx_forward_date(
             near_date,
             far_tenor,
             business_day_convention,
-            end_of_month,
-            base_calendar_id.as_deref(),
-            quote_calendar_id.as_deref(),
+            preserve_business_eom,
+            calendar,
         )?;
 
         Self::builder()
@@ -249,8 +241,8 @@ impl FxSwap {
             .notional(notional)
             .domestic_discount_curve_id(domestic_discount_curve_id)
             .foreign_discount_curve_id(foreign_discount_curve_id)
-            .base_calendar_id_opt(base_calendar_id.map(Into::into))
-            .quote_calendar_id_opt(quote_calendar_id.map(Into::into))
+            .base_calendar_id_opt(Some(base_calendar_id.into()))
+            .quote_calendar_id_opt(Some(quote_calendar_id.into()))
             .attributes(Attributes::new())
             .build()
     }

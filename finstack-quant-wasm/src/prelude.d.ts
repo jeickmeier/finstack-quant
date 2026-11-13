@@ -1363,32 +1363,6 @@ export interface FxHandle extends WasmOwned {
 }
 
 /**
- * Optional arguments of `FxForward.fromTradeDate`; omitted fields take the Rust defaults.
- */
-export interface FxForwardFromTradeDateOptions {
-  /**
-   * Base-currency holiday calendar; omitted counts weekdays only, except that a USD leg uses `"usny"`.
-   */
-  base_calendar_id?: string | null;
-  /**
-   * Quote-currency holiday calendar; omitted counts weekdays only, except that a USD leg uses `"usny"`.
-   */
-  quote_calendar_id?: string | null;
-  /**
-   * Contractual T+N spot lag in business days, honored as given (e.g. `1` for tom-next); omitted uses the pair's market standard.
-   */
-  settlement_days?: number | null;
-  /**
-   * Maturity roll rule (serde name, e.g. `"modified_following"`); omitted uses Modified Following.
-   */
-  business_day_convention?: string | null;
-  /**
-   * Apply the FX end-of-month rule when spot falls on month end (default `false`).
-   */
-  end_of_month?: boolean;
-}
-
-/**
  * FX vanilla option handle with first-order greeks.
  */
 export interface FxOptionGreeks extends FxHandle {

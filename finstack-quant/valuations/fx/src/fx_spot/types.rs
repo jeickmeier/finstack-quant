@@ -50,7 +50,7 @@
 //!     .notional(Money::from((1_000_000_i64, Currency::EUR)))
 //!     // How many units of `quote` per 1 unit of `base`
 //!     .quoted_spot(1.10)
-//!     .build()?;
+//!     .settlement_days(2).base_calendar_id("weekends_only".into()).quote_calendar_id("weekends_only".into()).build()?;
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 //!
@@ -59,7 +59,7 @@
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, Date};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
@@ -82,12 +82,11 @@ use finstack_quant_valuations_core::impl_instrument_base;
 ///
 /// # Settlement
 ///
-/// When `settlement_days` is `None`, the pair-aware default is T+1 for
-/// USD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB and T+2 otherwise (including
-/// EUR/USD). An explicit `settlement_days` is the contractual lag and overrides
-/// that default in either direction (for example tom-next T+1 on EUR/USD);
-/// `settlement_date` overrides both. Without calendars the USD leg uses the
-/// `usny` calendar and other currencies count weekdays only.
+/// An explicit `settlement_date` is the actual value date, used as given.
+/// Otherwise the settlement date is `as_of` plus `settlement_days` business
+/// days on the joint base/quote calendar, and both the lag and both
+/// calendars are required: there is no pair lag table, implicit `usny` or
+/// weekends-only fallback (record CORE-CONVENTIONS-011 #5, #6).
 ///
 /// See module-level documentation for comprehensive FX quoting conventions.
 #[derive(
@@ -107,21 +106,16 @@ pub struct FxSpot {
     pub base_currency: Currency,
     /// Quote currency (the currency used for pricing)
     pub quote_currency: Currency,
-    /// Optional explicit settlement (value) date. When set it is only
-    /// business-day adjusted and `settlement_days` is ignored.
+    /// Actual settlement (value) date, used as given; when set,
+    /// `settlement_days` is ignored.
     #[serde(default)]
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub settlement_date: Option<Date>,
-    /// Optional contractual T+N settlement lag in business days when
-    /// `settlement_date` is not provided.
-    ///
-    /// `None` uses the pair-aware default from
-    /// [`finstack_quant_core::dates::fx::fx_standard_settlement_days`]: T+1 for
-    /// USD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB, T+2 otherwise. An explicit value
-    /// overrides that default.
+    /// Contractual spot lag in business days on the joint calendar, required
+    /// when `settlement_date` is not provided.
     pub settlement_days: Option<u32>,
     /// Optional quoted FX spot rate (quote per base); `None` reads the FxMatrix.
     pub quoted_spot: Option<f64>,
@@ -156,13 +150,6 @@ pub struct FxSpot {
     )]
     pub scenario_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
-    /// Business day convention to apply when adjusting settlement (default: ModifiedFollowing)
-    ///
-    /// Note: Default changed from `Following` to `ModifiedFollowing` in v0.8.0 to align
-    /// with ISDA standard FX settlement conventions.
-    #[builder(default = BusinessDayConvention::ModifiedFollowing)]
-    #[serde(default = "finstack_quant_valuations_core::serde_defaults::bdc_modified_following")]
-    pub business_day_convention: BusinessDayConvention,
     /// Optional base currency calendar for joint calendar settlement adjustment.
     ///
     /// Per market convention, FX settlement uses the joint calendar of both currencies.
@@ -194,45 +181,27 @@ impl FxSpot {
     /// # Arguments
     ///
     /// * `as_of` - Trade/valuation date used as the T+0 origin when
-    ///   `settlement_date` is unset. The spot lag and joint-calendar roll are
-    ///   applied from this date; an explicit `settlement_date` is only
-    ///   business-day-adjusted and ignores `as_of`.
+    ///   `settlement_date` is unset: the spot lag is counted from it on the
+    ///   joint calendar. An explicit `settlement_date` ignores `as_of`.
     pub fn effective_settlement_date(&self, as_of: Date) -> Result<Date> {
-        use finstack_quant_core::dates::fx::fx_spot_date;
-        use finstack_quant_core::dates::{adjust, resolve_joint_calendar};
-
-        // Check if we should use joint calendar logic
-        let use_joint_calendar =
-            self.base_calendar_id.is_some() || self.quote_calendar_id.is_some();
+        use finstack_quant_core::dates::resolve_joint_calendar;
 
         if let Some(date) = self.settlement_date {
-            // Explicit settlement date provided - adjust for business days
-            if use_joint_calendar {
-                let calendar = resolve_joint_calendar(
-                    self.base_calendar_id.as_deref(),
-                    self.quote_calendar_id.as_deref(),
-                )?;
-                adjust(date, self.business_day_convention, calendar)
-            } else {
-                Ok(date)
-            }
+            Ok(date)
         } else {
-            // Compute T+N from as_of date
-            let settlement_days = self.settlement_days.unwrap_or_else(|| {
-                finstack_quant_core::dates::fx::fx_standard_settlement_days(
-                    self.base_currency,
-                    self.quote_currency,
-                )
-            });
-
-            fx_spot_date(
-                as_of,
-                settlement_days,
-                self.base_currency,
-                self.quote_currency,
+            let (Some(settlement_days), Some(base), Some(quote)) = (
+                self.settlement_days,
                 self.base_calendar_id.as_deref(),
                 self.quote_calendar_id.as_deref(),
-            )
+            ) else {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "FxSpot {} needs a settlement_date, or settlement_days with both \
+                     base_calendar_id and quote_calendar_id",
+                    self.id
+                )));
+            };
+            let calendar = resolve_joint_calendar(Some(base), Some(quote))?;
+            crate::shared::spot_date_from_lag(as_of, settlement_days, calendar)
         }
     }
 
@@ -277,6 +246,8 @@ impl FxSpot {
             .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .quoted_spot(1.10)
             .settlement_days(2)
+            .base_calendar_id("target2".into())
+            .quote_calendar_id("usny".into())
             .build()
     }
 }
@@ -430,17 +401,26 @@ mod tests {
     }
 
     /// EUR/USD builder with a one-euro notional and no quoted spot.
+    /// EUR/USD with an explicit T+2 lag on stated weekends-only calendars.
     fn eurusd() -> FxSpotBuilder {
         FxSpot::builder()
             .id(InstrumentId::new("EURUSD"))
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .notional(Money::from((1_i64, Currency::EUR)))
+            .settlement_days(2)
+            .base_calendar_id("weekends_only".into())
+            .quote_calendar_id("weekends_only".into())
     }
 
     #[test]
     fn test_fx_spot_creation() {
-        let spot = eurusd().build().expect("valid FX spot");
+        let spot = eurusd()
+            .settlement_days(2)
+            .base_calendar_id("weekends_only".into())
+            .quote_calendar_id("weekends_only".into())
+            .build()
+            .expect("valid FX spot");
         assert_eq!(spot.base_currency, Currency::EUR);
         assert_eq!(spot.quote_currency, Currency::USD);
     }
@@ -461,10 +441,10 @@ mod tests {
     }
 
     #[test]
-    fn test_fx_spot_effective_settlement_date_default() {
+    fn test_fx_spot_effective_settlement_date_t_plus_two() {
         let spot = eurusd().build().expect("valid FX spot");
 
-        // Wednesday -> should settle Friday (T+2 weekdays)
+        // Wednesday -> Friday (T+2 on weekends-only calendars)
         let as_of = date(2025, Month::January, 15); // Wednesday
         let settle = spot
             .effective_settlement_date(as_of)
@@ -593,6 +573,9 @@ mod tests {
             .quote_currency(Currency::USD)
             .notional(Money::from((1_000_000_i64, Currency::USD)))
             .attributes(Attributes::new())
+            .settlement_days(2)
+            .base_calendar_id("weekends_only".into())
+            .quote_calendar_id("weekends_only".into())
             .build();
 
         assert!(
@@ -602,12 +585,15 @@ mod tests {
     }
 
     #[test]
-    fn test_fx_spot_new_defaults_t1_pairs_to_one_day() {
+    fn an_explicit_one_day_lag_is_counted_on_the_joint_calendar() {
         let spot = FxSpot::builder()
             .id(InstrumentId::new("USDCAD"))
             .base_currency(Currency::USD)
             .quote_currency(Currency::CAD)
             .notional(Money::from((1_i64, Currency::USD)))
+            .settlement_days(1)
+            .base_calendar_id("weekends_only".into())
+            .quote_calendar_id("weekends_only".into())
             .build()
             .expect("valid FX spot");
         let as_of = date(2025, Month::January, 15); // Wednesday
@@ -664,6 +650,9 @@ mod tests {
             .quoted_spot_opt(Some(-1.10))
             .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .attributes(Attributes::new())
+            .settlement_days(2)
+            .base_calendar_id("weekends_only".into())
+            .quote_calendar_id("weekends_only".into())
             .build();
         assert!(result.is_err(), "builder must reject a negative spot rate");
 
@@ -674,6 +663,9 @@ mod tests {
             .quoted_spot_opt(Some(0.0))
             .notional(Money::from((1_000_000_i64, Currency::EUR)))
             .attributes(Attributes::new())
+            .settlement_days(2)
+            .base_calendar_id("weekends_only".into())
+            .quote_calendar_id("weekends_only".into())
             .build();
         assert!(result.is_err(), "builder must reject a zero spot rate");
 

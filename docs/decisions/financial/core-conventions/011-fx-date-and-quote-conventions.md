@@ -1,7 +1,7 @@
 # CORE-CONVENTIONS-011: Explicit FX quote metadata and value-date conventions
 
 - Decision status: **Accepted — complete FX quote/date package, 2026-11-07**.
-- Implementation status: **Observed; reconciliation pending**, scoped to `dates/fx.rs` and `money/fx/conventions.rs`.
+- Implementation status: **Runtime reconciled 2026-11-13** (status F5): explicit validated `FxPairConvention(base, quote, pip_size)`; `FxQuoteConvention`, `fx_pair_convention`, `fx_spot_date`, `fx_standard_settlement_days` and `add_fx_standard_tenor` removed in Rust, Python and WASM; `fx_forward_date(spot, tenor, bdc, preserve_business_eom, calendar)` implements #7–#10; FX spot/forward/swap/NDF and XCCY calibration own an explicit joint-calendar spot rule (stated lag and calendars, no inference); `with_forward_pips` takes the matching convention. Independent qualification pending.
 - Validation status: **Evidence inspected/located; independent qualification pending**. Documentation and independent quote/unit/reciprocal/calendar examples passed; production Rust/host tests, pricing and current pair/venue qualification were not executed for this review.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
 

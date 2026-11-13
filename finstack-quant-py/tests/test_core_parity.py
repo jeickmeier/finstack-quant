@@ -32,12 +32,11 @@ from finstack_quant.core.market_data import (
     ForwardCurve,
     FxConversionPolicy,
     FxMatrix,
-    FxQuoteConvention,
+    FxPairConvention,
     HazardCurve,
     InflationIndex,
     MarketContext,
     ScalarTimeSeries,
-    fx_pair_convention,
     invert_fx_rate,
 )
 from finstack_quant.core.money import Money
@@ -361,22 +360,20 @@ class TestDayCountParity:
 
 
 class TestFxConventionParity:
-    """FX pair-convention helpers match Rust market order, pips, and invert."""
+    """Explicit FX quote metadata keeps the supplied order; invert is checked."""
 
-    def test_fx_market_order_and_convention(self) -> None:
-        eur = fx_pair_convention("USD", "EUR")
-        assert [str(eur.base), str(eur.quote)] == ["EUR", "USD"]
-        conv = fx_pair_convention("USD", "JPY")
-        assert str(conv.base) == "USD"
-        assert str(conv.quote) == "JPY"
-        assert str(conv.usd_quotation) == "indirect"
-        assert conv.usd_quotation == FxQuoteConvention.INDIRECT
+    def test_fx_convention_keeps_the_supplied_order(self) -> None:
+        usdeur = FxPairConvention("USD", "EUR", 0.0001)
+        assert [str(usdeur.base), str(usdeur.quote)] == ["USD", "EUR"]
+        conv = FxPairConvention("USD", "JPY", 0.01)
         assert conv.pip_size == 0.01
-        assert conv.settlement_days == 2
+        assert conv.rate_points(50.0) == pytest.approx(0.5)
 
-    def test_fx_convention_pip_size_and_invert(self) -> None:
-        assert fx_pair_convention("USD", "JPY").pip_size == 0.01
-        assert fx_pair_convention("EUR", "USD").pip_size == 0.0001
+    def test_fx_convention_rejects_bad_inputs_and_inverts(self) -> None:
+        with pytest.raises(ValueError, match="distinct"):
+            FxPairConvention("USD", "USD", 0.0001)
+        with pytest.raises(ValueError, match="pip size"):
+            FxPairConvention("EUR", "USD", 0.0)
         assert invert_fx_rate(1.10) == pytest.approx(1.0 / 1.10)
 
 

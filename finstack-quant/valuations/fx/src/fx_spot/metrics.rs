@@ -153,6 +153,9 @@ mod tests {
             .quote_currency(Currency::USD)
             .notional(Money::from((5_000_000_i64, Currency::EUR)))
             .quoted_spot(1.24)
+            .settlement_days(2)
+            .base_calendar_id("weekends_only".into())
+            .quote_calendar_id("weekends_only".into())
             .build()
             .expect("valid FX spot")
     }
@@ -229,6 +232,9 @@ mod base_amount_tests {
             .quote_currency(Currency::USD)
             .notional(Money::from((1_250_000_i64, Currency::EUR)))
             .quoted_spot(1.18)
+            .settlement_days(2)
+            .base_calendar_id("weekends_only".into())
+            .quote_calendar_id("weekends_only".into())
             .build()
             .expect("valid FX spot")
     }

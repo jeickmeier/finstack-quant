@@ -2,15 +2,14 @@
   "instrument": {
     "spec": {
       "attributes": {},
-      "base_calendar_id": null,
+      "base_calendar_id": "target2",
       "base_currency": "EUR",
-      "business_day_convention": "modified_following",
       "id": "EURUSD",
       "notional": {
         "amount": "1000000",
         "currency": "EUR"
       },
-      "quote_calendar_id": null,
+      "quote_calendar_id": "usny",
       "quote_currency": "USD",
       "quoted_spot": 1.1,
       "settlement_date": null,

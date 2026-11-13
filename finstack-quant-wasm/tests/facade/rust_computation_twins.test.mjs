@@ -317,24 +317,6 @@ test('RevolvingCredit exposes isStochastic and the expected cashflow schedule', 
 
 // --------------------------------------------------------------------- FX
 
-test('core FX spot lags preserve pair symmetry and currency validation', () => {
-  for (const other of ['CAD', 'TRY', 'PHP', 'RUB']) {
-    assert.equal(core.fxStandardSettlementDays('usd', other), 1);
-    assert.equal(core.fxStandardSettlementDays(other, 'USD'), 1);
-  }
-  for (const [base, quote] of [
-    ['EUR', 'USD'],
-    ['USD', 'MXN'],
-    ['EUR', 'CAD'],
-  ]) {
-    assert.equal(core.fxStandardSettlementDays(base, quote), 2);
-  }
-  assert.throws(() => core.fxStandardSettlementDays('INVALID', 'USD'), { kind: 'validation' });
-  assert.throws(() => core.fxStandardSettlementDays('USD', ' CAD '), { kind: 'validation' });
-  assert.throws(() => core.fxStandardSettlementDays(1, 'USD'), { kind: 'invalid_type' });
-  assert.throws(() => core.fxStandardSettlementDays('USD', null), { kind: 'invalid_type' });
-});
-
 test('FxForward presets and the CIP market forward match Python', () => {
   const { FxForward } = valuations.instruments;
   const forward = FxForward.example();
@@ -349,20 +331,23 @@ test('FxForward presets and the CIP market forward match Python', () => {
     notional: { amount: '1000000', currency: 'EUR' },
     domestic_discount_curve_id: 'USD-OIS',
     foreign_discount_curve_id: 'EUR-OIS',
-    end_of_month: false,
+    base_calendar_id: 'weekends_only',
+    quote_calendar_id: 'weekends_only',
+    settlement_days: 2,
+    business_day_convention: 'modified_following',
+    preserve_business_eom: false,
   };
   const traded = FxForward.fromTradeDate(forwardParams);
   assert.equal(JSON.parse(traded.toJson()).instrument.spec.maturity, '2025-04-17');
-  const explicit = FxForward.fromTradeDate({
-    ...forwardParams,
-    settlement_days: 2,
-    business_day_convention: 'modified_following',
-  });
-  assert.equal(explicit.toJson(), traded.toJson());
+  for (const key of ['settlement_days', 'base_calendar_id', 'business_day_convention']) {
+    const missing = { ...forwardParams };
+    delete missing[key];
+    assert.throws(() => FxForward.fromTradeDate(missing), new RegExp(key));
+  }
   assert.throws(() => FxForward.fromTradeDate({ ...forwardParams, settlement_lag: 2 }));
   const withPoints = traded.withForwardPoints(1.1, 0.0025);
   assert.equal(JSON.parse(withPoints.toJson()).instrument.spec.contract_rate, 1.1025);
-  const withPips = traded.withForwardPips(1.1, 25);
+  const withPips = traded.withForwardPips(1.1, 25, new core.FxPairConvention('EUR', 'USD', 0.0001));
   close(JSON.parse(withPips.toJson()).instrument.spec.contract_rate, 1.1025, 1e-12, 'pips');
   assert.throws(
     () => traded.withForwardPoints(-1, 0),

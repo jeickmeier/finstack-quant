@@ -3,6 +3,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, Tenor};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::money::fx::FxPairConvention;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations_core::instruments::Instrument;
@@ -81,11 +82,11 @@ fn test_fx_forward_from_trade_date() {
             notional: Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
             domestic_discount_curve_id: "USD-OIS".into(),
             foreign_discount_curve_id: "EUR-OIS".into(),
-            base_calendar_id: None,
-            quote_calendar_id: None,
-            settlement_days: Some(2),
-            business_day_convention: Some(BusinessDayConvention::ModifiedFollowing),
-            end_of_month: false,
+            base_calendar_id: "weekends_only".to_string(),
+            quote_calendar_id: "weekends_only".to_string(),
+            settlement_days: 2,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            preserve_business_eom: false,
         },
     )
     .expect("should build");
@@ -94,28 +95,6 @@ fn test_fx_forward_from_trade_date() {
         forward.maturity,
         Date::from_calendar_date(2024, Month::April, 17).expect("valid date")
     );
-
-    // `None` selects the Rust-owned Modified Following default and the
-    // pair's standard spot lag (T+2 for EUR/USD).
-    let defaulted = FxForward::from_trade_date(
-        finstack_quant_valuations_fx::fx_forward::FxForwardTradeDateParams {
-            id: "EURUSD-3M".into(),
-            base_currency: Currency::EUR,
-            quote_currency: Currency::USD,
-            trade_date,
-            tenor: Tenor::parse("3M").expect("valid tenor"),
-            notional: Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
-            domestic_discount_curve_id: "USD-OIS".into(),
-            foreign_discount_curve_id: "EUR-OIS".into(),
-            base_calendar_id: None,
-            quote_calendar_id: None,
-            settlement_days: None,
-            business_day_convention: None,
-            end_of_month: false,
-        },
-    )
-    .expect("should build");
-    assert_eq!(defaulted.maturity, forward.maturity);
 }
 
 #[test]
@@ -130,11 +109,11 @@ fn standard_forward_tenor_preserves_explicit_end_of_month_policy() {
             notional: Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"),
             domestic_discount_curve_id: "USD-OIS".into(),
             foreign_discount_curve_id: "EUR-OIS".into(),
-            base_calendar_id: None,
-            quote_calendar_id: None,
-            settlement_days: Some(2),
-            business_day_convention: Some(BusinessDayConvention::Unadjusted),
-            end_of_month: true,
+            base_calendar_id: "weekends_only".to_string(),
+            quote_calendar_id: "weekends_only".to_string(),
+            settlement_days: 2,
+            business_day_convention: BusinessDayConvention::Unadjusted,
+            preserve_business_eom: true,
         },
     )
     .expect("should build");
@@ -212,7 +191,11 @@ fn test_fx_forward_with_forward_pips() {
         .attributes(Attributes::new())
         .build()
         .expect("should build")
-        .with_forward_pips(1.10, 50.0)
+        .with_forward_pips(
+            1.10,
+            50.0,
+            &FxPairConvention::new(Currency::EUR, Currency::USD, 0.0001).expect("valid convention"),
+        )
         .expect("valid forward pips");
 
     assert_eq!(forward.quoted_spot, None);
@@ -232,7 +215,11 @@ fn test_fx_forward_with_forward_pips_jpy_pair() {
         .attributes(Attributes::new())
         .build()
         .expect("should build")
-        .with_forward_pips(150.00, 50.0)
+        .with_forward_pips(
+            150.00,
+            50.0,
+            &FxPairConvention::new(Currency::USD, Currency::JPY, 0.01).expect("valid convention"),
+        )
         .expect("valid JPY pips");
 
     assert_eq!(forward.quoted_spot, None);

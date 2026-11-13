@@ -86,6 +86,9 @@ fn bench_fx_spot_pv(c: &mut Criterion) {
             .base_currency(Currency::EUR)
             .quote_currency(Currency::USD)
             .notional(Money::from((1_i64, Currency::EUR)))
+            .settlement_days(2)
+            .base_calendar_id("weekends_only".into())
+            .quote_calendar_id("weekends_only".into())
             .build()
             .expect("valid FX spot");
         assert_eq!(spot.default_model(), ModelKey::Discounting);

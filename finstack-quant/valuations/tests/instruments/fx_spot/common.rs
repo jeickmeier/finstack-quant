@@ -74,6 +74,9 @@ pub fn sample_eurusd() -> FxSpot {
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
         .notional(Money::from((1_i64, Currency::EUR)))
+        .settlement_days(2)
+        .base_calendar_id("weekends_only".into())
+        .quote_calendar_id("weekends_only".into())
         .build()
         .expect("valid FX spot")
 }
@@ -94,6 +97,9 @@ pub fn sample_gbpusd() -> FxSpot {
         .base_currency(Currency::GBP)
         .quote_currency(Currency::USD)
         .notional(Money::from((1_i64, Currency::GBP)))
+        .settlement_days(2)
+        .base_calendar_id("weekends_only".into())
+        .quote_calendar_id("weekends_only".into())
         .build()
         .expect("valid FX spot")
 }
@@ -105,6 +111,9 @@ pub fn sample_usdjpy() -> FxSpot {
         .base_currency(Currency::USD)
         .quote_currency(Currency::JPY)
         .notional(Money::from((1_i64, Currency::USD)))
+        .settlement_days(2)
+        .base_calendar_id("weekends_only".into())
+        .quote_calendar_id("weekends_only".into())
         .build()
         .expect("valid FX spot")
 }

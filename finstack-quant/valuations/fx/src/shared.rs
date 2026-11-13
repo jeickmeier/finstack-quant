@@ -555,6 +555,33 @@ where
     Ok((bump_abs, up, down))
 }
 
+/// Spot date of an FX trade under the product's explicit rule:
+/// `trade_date` plus `settlement_days` business days on `calendar`, which
+/// must be open on the result (record CORE-CONVENTIONS-011 #6).
+///
+/// The caller selects the lag and the calendar (the strict composite of
+/// every member the trade's convention needs, including any USD gate);
+/// nothing is inferred from the currencies.
+pub(crate) fn spot_date_from_lag(
+    trade_date: finstack_quant_core::dates::Date,
+    settlement_days: u32,
+    calendar: &dyn finstack_quant_core::dates::HolidayCalendar,
+) -> finstack_quant_core::Result<finstack_quant_core::dates::Date> {
+    use finstack_quant_core::dates::DateExt;
+    let lag = i32::try_from(settlement_days).map_err(|_| {
+        finstack_quant_core::Error::Validation(format!(
+            "FX spot lag {settlement_days} is out of range"
+        ))
+    })?;
+    let spot = trade_date.add_business_days(lag, calendar)?;
+    if !calendar.is_business_day(spot)? {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "FX spot date {spot} is not a business day of the settlement calendar"
+        )));
+    }
+    Ok(spot)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

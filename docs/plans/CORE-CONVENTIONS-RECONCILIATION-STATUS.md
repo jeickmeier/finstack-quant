@@ -118,7 +118,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 30 | F2 | **committed except private state** (`F2a:` plan calendar; `F2b:` statements model holds its plan; `F2c/F3:` results hold their plan); private validated `Period`/`PeriodPlan` fields not done (see Needs review) | F2a: slice-gate; core parity golden regenerated. F2b: slice-gate; temporary bounds inventory over all Rust suites; statements and canonical goldens regenerated; notebooks 101/101 | | F2a: `PeriodCalendar` is public (serde `"gregorian"` / `{"fiscal": {...}}`, JSON schema) and `PeriodPlan` carries a required `calendar` set by both builders; Python `PeriodPlan.calendar` returns the serde form, WASM plans carry it as a plain field. F2b: `FinancialModelSpec.periods` is a `PeriodPlan` (wire `{"calendar", "periods"}`), so the model retains its calendar (record #4); `PeriodPlan::try_new` and plan restore reject a period whose fiscal flag does not match the calendar; `ModelBuilder::periods_explicit` takes a plan in Rust, Python and WASM; `PeriodPlan` derefs to its period slice so read access is unchanged; fixtures, tests, the UI and six notebooks follow the new wire |
 | 31 | F3 | committed (`F2c/F3:` in git log) | slice-gate: every stage passes except all-audit (a newly published soupsieve 2.9.1 advisory in `uv.lock`, unrelated to the diff; see Needs review); notebooks 101/101; workspace rust-test; python-test (non-doctest tier incl. slow: 14,081 pass, 2 CDS golden failures traced to E4b-4, see Needs review); wasm-test; ui tsc; slice-gate after gen-write; core and statements parity goldens and the tornado fixture regenerated | 014 entry: shift/LTM items recorded as reconciled | `PeriodId::shift(periods, calendar)` validates the id in its calendar and steps daily by calendar days, Gregorian weeks by 7 days and other kinds by ordinal slot with the calendar's capacity; `next_fiscal`/`prev_fiscal` removed in Rust, Python and WASM (record #7). `ltm_window(target, plan)` requires the target in the plan, rejects weekly plans, requires every calendar day for daily plans (a business-day grid is incomplete) and counts slots the plan lacks as missing (#11, #12). Statements `PeriodHistory`, `EvaluationContext` and YTD use the model plan; `ttm()` propagates window errors instead of NaN; `StatementResult.periods` is the evaluated `Option<PeriodPlan>`; statements-analytics trailing sums, leverage, coverage and the leverage check return `Result`, and `CreditAssessmentReport::new` is fallible so `Display` cannot fail; changelog LTM entry rewritten; see Needs review |
 | 32 | F4 | committed (`F4:` in git log) | workspace rust-test 16,421; slice-gate after gen-write; core parity golden regenerated; notebooks 101/101 | 014 entry: annualization items recorded as reconciled | `PeriodKind::periods_per_year` renamed `annualization_factor` (252/52/12/4/2/1, statistical only) in Rust, Python and WASM; new calendar `slots_per_year() -> Option<u16>` (12/4/2/1, `None` for days and weeks) serves core bounds, LTM, rollup, `growth_rate` year conversion, the rent-roll escalator and liquidity runway; `prior_observation_date` removed in every host (no production caller); statements `annualize(value, annualization_factor)` and `growth_rate(series, periods)` require their second argument (O8); rollup methods already distinguish flow sums, closing balances and recomputed ratios; see Needs review |
-| 33 | F5 | not attempted (run budget; plan sized L) | | | |
+| 33 | F5 | committed (`F5:` in git log) | workspace rust-test 16,405; slice-gate after gen-write (core and valuations parity goldens regenerated); notebooks 101/101 | 011 entry: runtime reconciliation recorded (qualification remains); record 011 status updated | Validated explicit `FxPairConvention(base, quote, pip_size)` with `rate_points`; `FxQuoteConvention`, `fx_pair_convention`, `fx_spot_date`, `fx_standard_settlement_days`, `add_fx_standard_tenor` removed in every host; `fx_forward_date` per record #7–#10; FX spot/forward/swap/NDF and XCCY calibration count a stated lag in joint business days on two stated calendars; `with_forward_pips(spot, pips, &convention)`; trade-date params take required calendars, lag, convention and `preserve_business_eom`; see Needs review |
 | 34 | F6 | committed (`F6:` in git log) | lint, rust-test, python-test, wasm-test, all-audit (slice-gate; after gen-write) | 013 entry: config/policy items recorded as reconciled; record 013 status updated; STATEMENTS-CAPITAL-09 observed text updated | Required `pivot_currency: Option<Currency>`; no FX config/matrix/policy defaults; explicit pivots at ~165 Rust and ~60 host sites (`None` unless a deliberate hub); `PeriodAverage` removed; required host `rate` policy; calibration `fx: Option<FxConfig>`; statements `PeriodEnd` fallback removed; see Needs review |
 | 35 | F7 | committed (`F7:` in git log) | lint, gen-check, rust-test, python-test, wasm-test, ui-check (slice-gate; after gen-write) | 013 entry: resolution items recorded as reconciled, state/shock items remain for F8; record 013 status updated | Pin > global > provider; identity quotes rejected; literal ordered cache; NotFound-only routing with preserved leg causes; checked revisions; one-call limit for revisionless providers; single fallible `FxProvider::snapshot` hook with validated capture; see Needs review |
 | 36 | F8 | committed (`F8:` in git log) | lint, gen-check, rust-test, python-test, wasm-test, ui-check (slice-gate; after gen-write) | 013 entry and the non-atomic-merge entry removed (598 items; Observed 156, Reconciliation 92; Core conventions 17); record 013 status and core-conventions inventory updated | `load_from_state` removed; fresh `try_from_state` with repeated-key rejection; frozen quote-only `with_bumped_rate(reference, b)`; `MarketBump::FxPct.policy`; validated `FxRateResult` deserialization; see Needs review |
@@ -751,6 +751,32 @@ logged under Needs review.
     allowlisted known gaps. Fourteen slow tests hit the 60 s runner cap under
     full-tier parallel load (Monte Carlo, LSMC and copula panels); none is a
     value failure.
+- **F5 spot dates now count joint business days.** Each product's explicit
+  rule adds its stated `settlement_days` on the joint calendar of its two
+  stated calendars. The removed helper's CLS-style exception (a US holiday on
+  an intermediate day does not delay a USD pair) and its per-currency lags
+  are gone, so a USD holiday at T+1 settles a day later: two settlement
+  tests were re-expressed (MLK Day 2025 USD/GBP now Jan 22; EUR/USD traded
+  2025-07-03 now Jul 8). A product that needs the CLS exception, venue lags
+  or a USD gate must select it explicitly (a composite calendar covers the
+  gate). Value-date results moved for no other Rust, Python or WASM test.
+- **F5 FxSpot settlement.** An explicit `settlement_date` is the actual value
+  date and is used as given; the business-day convention that adjusted it is
+  removed (field, builder setter and serde key). Without one, `settlement_days`
+  and both calendar ids are required. Test helpers state T+2 on
+  `weekends_only` calendars; `FxSpot::example` states target2/usny.
+- **F5 trade-date params.** Forward, swap and NDF trade-date params require
+  both calendar ids (`None` used to mean weekends only), the lag, the
+  business-day convention and `preserve_business_eom` (renamed from
+  `end_of_month`, whose old trigger was calendar month-end, not business
+  month-end). Schema examples that used `None` now state `weekends_only`.
+- **F5 XCCY calibration spot.** The XCCY convention's `settlement_days` is
+  counted on the joint base/quote calendar; no XCCY fixture moved.
+- **Docs-site lesson content is stale.** `docs-site/content/learn/1/1.1-*.mdx`
+  and `docs-site/contracts/core.json` still show pre-run APIs
+  (`FxMatrix()` without a pivot, `fx_pair_convention`); they are not
+  regenerated by `gen-write` or checked by the gate, and were left for their
+  generator's owner.
 - **F1a mixed-kind statement models are rejected.** `FinancialModelSpec`
   checked chronology with `next.id <= prev.id` and keyed its history by
   `PeriodId` in ordered maps, which only worked for mixed-frequency timelines

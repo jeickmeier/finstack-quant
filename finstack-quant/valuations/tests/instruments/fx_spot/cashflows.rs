@@ -4,10 +4,7 @@ use super::common::*;
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::types::InstrumentId;
-use finstack_quant_core::{
-    currency::Currency, dates::BusinessDayConvention, market_data::context::MarketContext,
-    money::Money,
-};
+use finstack_quant_core::{currency::Currency, market_data::context::MarketContext, money::Money};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
 
@@ -169,31 +166,6 @@ fn test_settlement_lag_over_weekend() {
     assert_eq!(cashflows.len(), 1);
     // T+2 business days from Fri Jan 17 = Tue Jan 21 (skips weekend)
     assert_eq!(cashflows[0].0, d(2025, 1, 21));
-}
-
-#[test]
-fn test_settlement_with_business_day_convention() {
-    // Test that BDC is applied when calendar is present
-    let settlement = d(2025, 1, 18); // Saturday
-    let fx = FxSpot {
-        settlement_date: Some(settlement),
-        business_day_convention: BusinessDayConvention::Following,
-        base_calendar_id: Some("target2".into()),
-        quote_calendar_id: Some("usny".into()),
-        ..eurusd_with_notional(1_000_000.0, 1.20)
-    };
-
-    let market = MarketContext::new();
-
-    let cashflows = fx.dated_cashflows(&market, test_date()).unwrap();
-
-    assert_eq!(cashflows.len(), 1);
-    // BDC adjustment only applies when calendar is loaded - may return unadjusted date
-    // Following convention should move Saturday to Monday if calendar is active
-    assert!(
-        cashflows[0].0 >= settlement,
-        "Settlement on or after original date"
-    );
 }
 
 #[test]

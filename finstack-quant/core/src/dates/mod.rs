@@ -142,8 +142,6 @@ mod schedule;
 
 pub use schedule::{GridMode, NominalReference, Schedule, ScheduleBuilder, ScheduleSpec, StubKind};
 
-pub(crate) use calendar::composite::CompositeCalendar;
-
 mod imm;
 mod tenor;
 

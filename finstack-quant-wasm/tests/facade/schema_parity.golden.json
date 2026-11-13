@@ -123,7 +123,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1267403
+            "bytes": 1266690
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
@@ -2011,7 +2011,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1160586
+            "bytes": 1159873
           },
           {
             "path": "schemas/scenarios/1/horizon_result.schema.json",
@@ -2761,7 +2761,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/fx_forward_trade_date_params.schema.json",
             "type_name": "FxForwardTradeDateParams",
             "kind": "input",
-            "bytes": 3818
+            "bytes": 3785
           },
           {
             "path": "schemas/common/1/fx_option_params.schema.json",
@@ -2775,7 +2775,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/fx_swap_trade_date_params.schema.json",
             "type_name": "FxSwapTradeDateParams",
             "kind": "input",
-            "bytes": 3660
+            "bytes": 3732
           },
           {
             "path": "schemas/common/1/id.schema.json",
@@ -2796,7 +2796,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
             "type_name": "InstrumentJson",
             "kind": "component",
-            "bytes": 1014850
+            "bytes": 1014087
           },
           {
             "path": "schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -2838,7 +2838,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/ndf_trade_date_params.schema.json",
             "type_name": "NdfTradeDateParams",
             "kind": "input",
-            "bytes": 3805
+            "bytes": 3957
           },
           {
             "path": "schemas/common/1/oas_config.schema.json",
@@ -2978,7 +2978,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1022697
+            "bytes": 1021934
           },
           {
             "path": "schemas/instruments/1/credit_derivatives/cds_index.schema.json",
@@ -3132,7 +3132,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1021674
+            "bytes": 1020911
           },
           {
             "path": "schemas/instruments/1/exotics/callable_range_accrual.schema.json",
@@ -3307,7 +3307,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 7516
+            "bytes": 6701
           },
           {
             "path": "schemas/instruments/1/fx/fx_swap.schema.json",
@@ -3349,7 +3349,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
             "type_name": "InstrumentEnvelope",
             "kind": "input",
-            "bytes": 1113122
+            "bytes": 1112307
           },
           {
             "path": "schemas/instruments/1/rates/basis_swap.schema.json",
@@ -3503,7 +3503,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
             "type_name": "CompositeRebalanceResult",
             "kind": "output",
-            "bytes": 1024305
+            "bytes": 1023542
           },
           {
             "path": "schemas/results/1/convertible_greeks.schema.json",
@@ -3844,7 +3844,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1267403
+            "bytes": 1266690
           },
           {
             "domain": "attribution",
@@ -4748,7 +4748,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1160586
+            "bytes": 1159873
           },
           {
             "domain": "scenarios",
@@ -5036,7 +5036,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/fx_forward_trade_date_params.schema.json",
             "type_name": "FxForwardTradeDateParams",
             "kind": "input",
-            "bytes": 3818
+            "bytes": 3785
           },
           {
             "domain": "valuations",
@@ -5052,7 +5052,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/fx_swap_trade_date_params.schema.json",
             "type_name": "FxSwapTradeDateParams",
             "kind": "input",
-            "bytes": 3660
+            "bytes": 3732
           },
           {
             "domain": "valuations",
@@ -5076,7 +5076,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
             "type_name": "InstrumentJson",
             "kind": "component",
-            "bytes": 1014850
+            "bytes": 1014087
           },
           {
             "domain": "valuations",
@@ -5124,7 +5124,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/ndf_trade_date_params.schema.json",
             "type_name": "NdfTradeDateParams",
             "kind": "input",
-            "bytes": 3805
+            "bytes": 3957
           },
           {
             "domain": "valuations",
@@ -5284,7 +5284,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1022697
+            "bytes": 1021934
           },
           {
             "domain": "valuations",
@@ -5460,7 +5460,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 1021674
+            "bytes": 1020911
           },
           {
             "domain": "valuations",
@@ -5660,7 +5660,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json",
             "type_name": "SingleInstrumentEnvelope",
             "kind": "input",
-            "bytes": 7516
+            "bytes": 6701
           },
           {
             "domain": "valuations",
@@ -5708,7 +5708,7 @@
             "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
             "type_name": "InstrumentEnvelope",
             "kind": "input",
-            "bytes": 1113122
+            "bytes": 1112307
           },
           {
             "domain": "valuations",
@@ -5884,7 +5884,7 @@
             "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
             "type_name": "CompositeRebalanceResult",
             "kind": "output",
-            "bytes": 1024305
+            "bytes": 1023542
           },
           {
             "domain": "valuations",

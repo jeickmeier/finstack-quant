@@ -2,7 +2,7 @@
   "$defs": {
     "FxSpot": {
       "additionalProperties": false,
-      "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `quoted_spot = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nWhen `settlement_days` is `None`, the pair-aware default is T+1 for\nUSD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB and T+2 otherwise (including\nEUR/USD). An explicit `settlement_days` is the contractual lag and overrides\nthat default in either direction (for example tom-next T+1 on EUR/USD);\n`settlement_date` overrides both. Without calendars the USD leg uses the\n`usny` calendar and other currencies count weekdays only.\n\nSee module-level documentation for comprehensive FX quoting conventions.",
+      "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `quoted_spot = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nAn explicit `settlement_date` is the actual value date, used as given.\nOtherwise the settlement date is `as_of` plus `settlement_days` business\ndays on the joint base/quote calendar, and both the lag and both\ncalendars are required: there is no pair lag table, implicit `usny` or\nweekends-only fallback (record CORE-CONVENTIONS-011 #5, #6).\n\nSee module-level documentation for comprehensive FX quoting conventions.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -22,11 +22,6 @@
         "base_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Base currency (the currency being priced)"
-        },
-        "business_day_convention": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
-          "default": "modified_following",
-          "description": "Business day convention to apply when adjusting settlement (default: ModifiedFollowing)\n\nNote: Default changed from `Following` to `ModifiedFollowing` in v0.8.0 to align\nwith ISDA standard FX settlement conventions."
         },
         "domestic_discount_curve_id": {
           "anyOf": [
@@ -92,10 +87,10 @@
             }
           ],
           "default": null,
-          "description": "Optional explicit settlement (value) date. When set it is only\nbusiness-day adjusted and `settlement_days` is ignored."
+          "description": "Actual settlement (value) date, used as given; when set,\n`settlement_days` is ignored."
         },
         "settlement_days": {
-          "description": "Optional contractual T+N settlement lag in business days when\n`settlement_date` is not provided.\n\n`None` uses the pair-aware default from\n[`finstack_quant_core::dates::fx::fx_standard_settlement_days`]: T+1 for\nUSD↔CAD, USD↔TRY, USD↔PHP and USD↔RUB, T+2 otherwise. An explicit value\noverrides that default.",
+          "description": "Contractual spot lag in business days on the joint calendar, required\nwhen `settlement_date` is not provided.",
           "format": "uint32",
           "minimum": 0,
           "type": [
@@ -145,15 +140,14 @@
       "instrument": {
         "spec": {
           "attributes": {},
-          "base_calendar_id": null,
+          "base_calendar_id": "target2",
           "base_currency": "EUR",
-          "business_day_convention": "modified_following",
           "id": "EURUSD",
           "notional": {
             "amount": "1000000",
             "currency": "EUR"
           },
-          "quote_calendar_id": null,
+          "quote_calendar_id": "usny",
           "quote_currency": "USD",
           "quoted_spot": 1.1,
           "settlement_date": null,

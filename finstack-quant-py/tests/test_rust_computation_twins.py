@@ -90,7 +90,7 @@ def test_breach_probability_survives_from_json_with_path_data() -> None:
     assert MonteCarloResults.from_json(without_paths.to_json()).breach_probability("revenue", 410.0) is None
 
 
-def test_fx_forward_from_trade_date_defaults_spot_lag_in_rust() -> None:
+def test_fx_forward_from_trade_date_requires_its_conventions() -> None:
     params = {
         "id": "EURUSD-3M",
         "base_currency": "EUR",
@@ -100,12 +100,18 @@ def test_fx_forward_from_trade_date_defaults_spot_lag_in_rust() -> None:
         "notional": Money(1_000_000.0, "EUR"),
         "domestic_discount_curve_id": "USD-OIS",
         "foreign_discount_curve_id": "EUR-OIS",
-        "end_of_month": False,
+        "base_calendar_id": "weekends_only",
+        "quote_calendar_id": "weekends_only",
+        "settlement_days": 2,
+        "business_day_convention": "modified_following",
+        "preserve_business_eom": False,
     }
-    defaulted = FxForward.from_trade_date(params)
-    explicit = FxForward.from_trade_date({**params, "settlement_days": 2})
-    assert defaulted.maturity == datetime.date(2025, 4, 17)
-    assert defaulted.to_json() == explicit.to_json()
+    forward = FxForward.from_trade_date(params)
+    assert forward.maturity == datetime.date(2025, 4, 17)
+    for key in ("settlement_days", "base_calendar_id", "business_day_convention", "preserve_business_eom"):
+        missing = {name: value for name, value in params.items() if name != key}
+        with pytest.raises(ValueError, match=key):
+            FxForward.from_trade_date(missing)
 
 
 def _book() -> dict:

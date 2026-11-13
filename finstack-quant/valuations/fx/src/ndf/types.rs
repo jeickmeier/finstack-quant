@@ -349,21 +349,22 @@ pub struct NdfTradeDateParams {
     pub contract_rate: f64,
     /// Settlement-currency discount curve identifier.
     pub domestic_discount_curve_id: CurveId,
-    /// Base-currency holiday calendar id; `None` uses weekends only.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub base_calendar_id: Option<String>,
-    /// Settlement-currency holiday calendar id; `None` uses weekends only.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub settlement_calendar_id: Option<String>,
-    /// T+N spot lag in business days (typically 2).
+    /// Base-currency holiday calendar id (may itself be a composite).
+    pub base_calendar_id: String,
+    /// Settlement-currency holiday calendar id.
+    pub settlement_calendar_id: String,
+    /// Spot lag: business days from trade date to spot on the joint
+    /// base/settlement calendar, stated by the trade's convention.
     pub settlement_days: u32,
     /// Joint business days from fixing to maturity (typically 2); a negative
     /// value places the fixing after maturity's unadjusted date.
     pub fixing_offset_days: i64,
-    /// Business-day convention rolling the maturity on the joint calendar.
+    /// Business-day convention rolling the maturity once on the joint
+    /// calendar.
     pub business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
-    /// Preserve month-end: a month-end spot date gives a month-end maturity.
-    pub end_of_month: bool,
+    /// Keep a business month-end spot on the business month-end of the
+    /// maturity month; month and year tenors only.
+    pub preserve_business_eom: bool,
 }
 
 impl Ndf {
@@ -510,36 +511,21 @@ impl Ndf {
             settlement_days,
             fixing_offset_days,
             business_day_convention,
-            end_of_month,
+            preserve_business_eom,
         } = params;
-        use finstack_quant_core::dates::fx::{add_fx_standard_tenor, fx_spot_date};
         use finstack_quant_core::dates::{DateExt, adjust, resolve_joint_calendar};
 
-        // CLS-consistent spot roll: a US holiday on an intermediate day does not
-        // delay a USD pair's spot date (FX spot convention
-        // finding). For NDFs the settlement currency (typically USD) takes the
-        // second-currency slot of the pair.
-        let spot_date = fx_spot_date(
-            trade_date,
-            settlement_days,
-            base_currency,
-            settlement_currency,
-            base_calendar_id.as_deref(),
-            settlement_calendar_id.as_deref(),
-        )?;
-        let maturity = add_fx_standard_tenor(
+        // Settlement and fixing are separate dates: the maturity is the
+        // settlement date from spot; the fixing steps back from it.
+        let joint_cal =
+            resolve_joint_calendar(Some(&base_calendar_id), Some(&settlement_calendar_id))?;
+        let spot_date = crate::shared::spot_date_from_lag(trade_date, settlement_days, joint_cal)?;
+        let maturity = finstack_quant_core::dates::fx::fx_forward_date(
             spot_date,
             tenor,
             business_day_convention,
-            end_of_month,
-            base_calendar_id.as_deref(),
-            settlement_calendar_id.as_deref(),
-        )?;
-
-        // Fixing date is typically T-2 before maturity using joint-business-day stepping.
-        let joint_cal = resolve_joint_calendar(
-            base_calendar_id.as_deref(),
-            settlement_calendar_id.as_deref(),
+            preserve_business_eom,
+            joint_cal,
         )?;
         let mut fixing_unadjusted = maturity;
         if fixing_offset_days >= 0 {
@@ -575,8 +561,8 @@ impl Ndf {
             .contract_rate(contract_rate)
             .domestic_discount_curve_id(domestic_discount_curve_id)
             .quote_convention(NdfQuoteConvention::BasePerSettlement)
-            .base_calendar_id_opt(base_calendar_id.map(Into::into))
-            .settlement_calendar_id_opt(settlement_calendar_id.map(Into::into))
+            .base_calendar_id_opt(Some(base_calendar_id.into()))
+            .settlement_calendar_id_opt(Some(settlement_calendar_id.into()))
             .attributes(Attributes::new())
             .build()
     }

@@ -202,7 +202,6 @@
     "core.DayCountContext": "data-constructor",
     "core.FxConversionPolicy": "data-constructor",
     "core.FxPairConvention": "getter",
-    "core.FxQuoteConvention": "data-constructor",
     "core.FxRateResult": "getter",
     "core.RoundingMode": "data-constructor",
     "core.TenorUnit": "data-constructor",

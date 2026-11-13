@@ -365,10 +365,11 @@ fx_option_with_all_greeks!(
 impl JsFxForward {
     /// Build an at-market forward from a trade date and a standard FX tenor.
     ///
-    /// Mirrors Rust `FxForward::from_trade_date`: spot is rolled from
-    /// `trade_date` by the spot lag (CLS-consistent pair roll), then `tenor` is
-    /// added with the FX end-of-month rule.
-    /// @param params - `FxForwardTradeDateParams` (plain object or JSON text): `id`; `base_currency` - base (foreign) ISO code, the notional currency; `quote_currency` - quote (domestic) ISO code; `trade_date` - ISO-8601 date; `tenor` - FX tenor object from spot (e.g. `{ count: 3, unit: "months" }`); `notional` - Money wire object `{ amount: "1000000", currency: "EUR" }` (decimal string amount) in `base_currency`; `domestic_discount_curve_id` / `foreign_discount_curve_id` - quote- and base-currency curves; Optional, omitted for the market default: `end_of_month` (boolean, preserve month-end; default `false`), `base_calendar_id` / `quote_calendar_id` (weekends only), `settlement_days` (the pair's standard T+N lag), `business_day_convention` (serde name, default `"modified_following"`).
+    /// Mirrors Rust `FxForward::from_trade_date`: spot is `trade_date` plus
+    /// `settlement_days` business days on the joint calendar, then the
+    /// maturity is `tenor` after spot with the stated business-day convention
+    /// and business-EOM choice.
+    /// @param params - `FxForwardTradeDateParams` (plain object or JSON text), every key required: `id`; `base_currency` - base (foreign) ISO code, the notional currency; `quote_currency` - quote (domestic) ISO code; `trade_date` - ISO-8601 date; `tenor` - tenor object from spot (e.g. `{ count: 3, unit: "months" }`); `notional` - Money wire object `{ amount: "1000000", currency: "EUR" }` (decimal string amount) in `base_currency`; `domestic_discount_curve_id` / `foreign_discount_curve_id` - quote- and base-currency curves; `base_calendar_id` / `quote_calendar_id` - calendar ids whose joint calendar counts the spot lag and rolls the maturity (a composite such as `"target2+usny"` adds a USD gate); `settlement_days` - spot lag in business days; `business_day_convention` - serde name of the maturity roll; `preserve_business_eom` - keep a business month-end spot on the business month-end of the maturity month (month and year tenors only).
     /// @returns The validated forward without a contract rate; chain `withForwardPoints` / `withForwardPips` to fix it.
     /// @throws Error - Throws with kind `validation` if `params` is malformed, the currencies coincide, or the notional currency differs from `base_currency`; kind `not_found` if a calendar identifier is unknown; kind `invalid_type` if `params` is not an object or JSON text.
     #[wasm_bindgen(js_name = fromTradeDate)]
@@ -411,21 +412,27 @@ impl JsFxForward {
 
     /// Return a copy whose contract rate is `spotRate + pips * pipSize`.
     ///
-    /// Mirrors Rust `FxForward::with_forward_pips`; the pip size follows
-    /// market convention (`0.01` for JPY/KRW/HUF pairs, `0.0001` otherwise).
+    /// Mirrors Rust `FxForward::with_forward_pips`; the pip size comes from
+    /// the explicit `convention`, which must name this forward's ordered pair.
     /// @param spotRate - Spot rate, quote currency per unit of base currency; must be positive.
     /// @param pips - Forward points quoted in pips.
+    /// @param convention - Quote metadata of this forward's base/quote order, carrying the pip size.
     /// @returns A new forward with the contract rate set.
-    /// @throws Error - Throws with kind `validation` if `pips` or `spotRate` is not finite or the resulting rate is not positive.
+    /// @throws Error - Throws with kind `validation` if `convention` names another pair or order, `pips` or `spotRate` is not finite, or the resulting rate is not positive.
     #[wasm_bindgen(js_name = withForwardPips)]
     pub fn with_forward_pips(
         &self,
         #[wasm_bindgen(js_name = "spotRate", unchecked_param_type = "number")] spot_rate: JsValue,
         #[wasm_bindgen(unchecked_param_type = "number")] pips: JsValue,
+        convention: &crate::api::core::market_fx::JsFxPairConvention,
     ) -> Result<JsFxForward, JsValue> {
         self.inner
             .clone()
-            .with_forward_pips(js_f64(&spot_rate, "spotRate")?, js_f64(&pips, "pips")?)
+            .with_forward_pips(
+                js_f64(&spot_rate, "spotRate")?,
+                js_f64(&pips, "pips")?,
+                &convention.inner,
+            )
             .map(|inner| JsFxForward { inner })
             .map_err(to_js_err)
     }

@@ -155,7 +155,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/fx_forward_trade_date_params.schema.json",
-      "bytes": 3818,
+      "bytes": 3785,
       "kind": "input",
       "path": "schemas/common/1/fx_forward_trade_date_params.schema.json",
       "summary": "Trade-date, tenor and spot-roll inputs of an FX forward built from its trade date.",
@@ -173,7 +173,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/fx_swap_trade_date_params.schema.json",
-      "bytes": 3660,
+      "bytes": 3732,
       "kind": "input",
       "path": "schemas/common/1/fx_swap_trade_date_params.schema.json",
       "summary": "Trade-date, far tenor and spot-roll inputs of an FX swap built from its trade date.",
@@ -200,7 +200,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 1014850,
+      "bytes": 1014087,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -254,7 +254,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/ndf_trade_date_params.schema.json",
-      "bytes": 3805,
+      "bytes": 3957,
       "kind": "input",
       "path": "schemas/common/1/ndf_trade_date_params.schema.json",
       "summary": "Trade-date, tenor, contract rate and fixing inputs of an NDF built from its trade date.",
@@ -434,7 +434,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1022697,
+      "bytes": 1021934,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -632,7 +632,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1021674,
+      "bytes": 1020911,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -857,7 +857,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_spot.schema.json",
-      "bytes": 7516,
+      "bytes": 6701,
       "kind": "input",
       "path": "schemas/instruments/1/fx/fx_spot.schema.json",
       "summary": "Spot foreign-exchange trade.",
@@ -911,7 +911,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1113122,
+      "bytes": 1112307,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -1109,7 +1109,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 1024305,
+      "bytes": 1023542,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",

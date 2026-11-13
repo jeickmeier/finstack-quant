@@ -272,7 +272,7 @@ def _label_enum_classes() -> list[type]:
         StubKind,
         TenorUnit,
     )
-    from finstack_quant.core.market_data import FxConversionPolicy, FxQuoteConvention
+    from finstack_quant.core.market_data import FxConversionPolicy
 
     return [
         RoundingMode,
@@ -282,7 +282,6 @@ def _label_enum_classes() -> list[type]:
         StubKind,
         PeriodKind,
         FxConversionPolicy,
-        FxQuoteConvention,
         SifmaSettlementClass,
         CreditRating,
     ]

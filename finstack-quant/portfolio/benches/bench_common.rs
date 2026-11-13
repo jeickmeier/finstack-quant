@@ -725,6 +725,9 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .base_currency(base_currency)
             .quote_currency(quote_currency)
             .notional(Money::from((1_i64, base_currency)))
+            .settlement_days(2)
+            .base_calendar_id("weekends_only".into())
+            .quote_calendar_id("weekends_only".into())
             .build()
             .expect("valid FX spot");
         let entity_id = format!("FUND_{}", (i % 5) + 1);

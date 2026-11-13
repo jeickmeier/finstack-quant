@@ -87,12 +87,12 @@ fn test_ndf_from_trade_date() {
         notional: Money::new(10_000_000.0, Currency::CNY).expect("valid money fixture"),
         contract_rate: 7.25,
         domestic_discount_curve_id: "USD-OIS".into(),
-        base_calendar_id: None,
-        settlement_calendar_id: None,
+        base_calendar_id: "weekends_only".to_string(),
+        settlement_calendar_id: "weekends_only".to_string(),
         settlement_days: 2,
         fixing_offset_days: 2,
         business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        end_of_month: false,
+        preserve_business_eom: false,
     })
     .expect("should build");
 

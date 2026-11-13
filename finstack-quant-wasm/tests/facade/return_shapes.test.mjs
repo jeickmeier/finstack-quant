@@ -138,7 +138,6 @@ test('bare string returns are named or allowlisted', () => {
     'DayCount#toString',
     'Tenor#toString',
     'FxConversionPolicy#toString',
-    'FxQuoteConvention#toString',
     // Canonical labels of the core enum, identifier and calendar handles.
     'HolidayCalendar#toString',
     'PeriodKind#toString',

@@ -338,19 +338,16 @@ test('core FX delta surface absent wings use omitted arguments, not empty arrays
   assert.throws(() => new core.FxDeltaVolSurface('EURUSD', [1], [0.1], [0], [0], [0], undefined));
 });
 
-test('core FX pair convention helpers', () => {
-  const eur = core.fxPairConvention('USD', 'EUR');
-  assert.equal(eur.base.toString(), 'EUR');
-  assert.equal(eur.quote.toString(), 'USD');
-  const conv = core.fxPairConvention('USD', 'JPY');
-  assert.equal(conv.base.toString(), 'USD');
-  assert.equal(conv.quote.toString(), 'JPY');
-  assert.equal(conv.usdQuotation.toString(), 'indirect');
+test('core FX pair convention keeps the supplied order and explicit pip size', () => {
+  const usdeur = new core.FxPairConvention('USD', 'EUR', 0.0001);
+  assert.equal(usdeur.base.toString(), 'USD');
+  assert.equal(usdeur.quote.toString(), 'EUR');
+  const conv = new core.FxPairConvention('USD', 'JPY', 0.01);
   assert.equal(conv.pipSize, 0.01);
-  assert.equal(conv.settlementDays, 2);
-  assert.equal(core.fxPairConvention('EUR', 'USD').pipSize, 0.0001);
+  assert.ok(Math.abs(conv.ratePoints(50) - 0.5) < 1e-12);
+  assert.throws(() => new core.FxPairConvention('USD', 'USD', 0.0001), { kind: 'validation' });
+  assert.throws(() => new core.FxPairConvention('EUR', 'USD', 0), { kind: 'validation' });
   assert.ok(Math.abs(core.invertFxRate(1.1) - 1 / 1.1) < 1e-12);
-  assert.equal(core.FxQuoteConvention.direct().toString(), 'direct');
 });
 
 test('core.FxMatrix quote updates invalidate cached crosses', () => {

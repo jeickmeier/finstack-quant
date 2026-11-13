@@ -1,5 +1,5 @@
 //! WASM bindings for `finstack_quant_core::money::fx`: conversion policy,
-//! rate results, market pair conventions and the `FxMatrix` handle.
+//! rate results, explicit pair quote metadata and the `FxMatrix` handle.
 
 use std::sync::Arc;
 
@@ -10,8 +10,7 @@ use crate::utils::wire::js_date;
 use finstack_quant_core::currency::Currency as RustCurrency;
 use finstack_quant_core::money::fx::{
     CurrencyPair, FxConversionPolicy as RustFxConversionPolicy, FxMatrix as RustFxMatrix,
-    FxPairConvention as RustFxPairConvention, FxQuery, FxQuoteConvention as RustFxQuoteConvention,
-    FxRateResult as RustFxRateResult, fx_pair_convention as rust_fx_pair_convention,
+    FxPairConvention as RustFxPairConvention, FxQuery, FxRateResult as RustFxRateResult,
     invert_fx_rate as rust_invert_fx_rate,
 };
 use wasm_bindgen::prelude::*;
@@ -139,151 +138,99 @@ impl JsFxRateResult {
     }
 }
 
-/// USD quotation style for a market FX pair (Direct or Indirect versus USD).
+/// Validated quote metadata for one ordered FX pair.
 ///
-/// **Direct** means USD is the quote currency (EURUSD, GBPUSD). **Indirect**
-/// means USD is the base (USDJPY, USDCAD). Non-USD crosses inherit the USD
-/// quotation of market CCY1 versus USD.
-///
-/// @example
-/// ```javascript
-/// import init, { core } from "finstack-quant-wasm";
-/// await init();
-/// const direct = core.FxQuoteConvention.direct();
-/// direct.toString(); // "direct"
-/// ```
-#[wasm_bindgen(js_name = FxQuoteConvention)]
-#[derive(Clone, Copy, Debug)]
-pub struct JsFxQuoteConvention {
-    inner: RustFxQuoteConvention,
-}
-
-#[wasm_bindgen(js_class = FxQuoteConvention)]
-impl JsFxQuoteConvention {
-    /// USD is the quote currency (units of USD per one unit of CCY1).
-    /// @returns An `FxQuoteConvention` handle.
-    pub fn direct() -> Self {
-        Self {
-            inner: RustFxQuoteConvention::Direct,
-        }
-    }
-
-    /// USD is the base currency (units of CCY2 per one USD).
-    /// @returns An `FxQuoteConvention` handle.
-    pub fn indirect() -> Self {
-        Self {
-            inner: RustFxQuoteConvention::Indirect,
-        }
-    }
-
-    /// Parse from a string label such as `"direct"` or `"indirect"`.
-    /// @param name - Convention label: `direct` or `indirect`.
-    ///
-    /// # Errors
-    ///
-    /// Throws a JavaScript exception unless `name` is `direct` or `indirect`.
-    /// @returns An `FxQuoteConvention` handle.
-    #[wasm_bindgen(js_name = fromName)]
-    pub fn from_name(
-        #[wasm_bindgen(unchecked_param_type = "string")] name: JsValue,
-    ) -> Result<Self, JsValue> {
-        let name: &str = &js_string(&name, "name")?;
-        Ok(Self {
-            inner: name.parse().map_err(to_js_err)?,
-        })
-    }
-
-    /// String form of the USD quotation style (`"direct"` or `"indirect"`).
-    /// @returns Human-readable string form of this value.
-    #[wasm_bindgen(js_name = toString)]
-    #[allow(clippy::inherent_to_string)]
-    pub fn to_string(&self) -> String {
-        self.inner.to_string()
-    }
-}
-
-/// Market convention for one FX pair after Bloomberg/Reuters CCY1 ordering.
-///
-/// Instances come from `fxPairConvention`. `base` / `quote` are always market
-/// CCY1/CCY2, even when the lookup arguments were inverted.
+/// The supplied order is kept (an outright rate is quote units per one base
+/// unit) and the pip size is explicit; nothing is inferred from the
+/// currencies (record CORE-CONVENTIONS-011 #2).
 ///
 /// @example
 /// ```javascript
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
-/// const conv = core.fxPairConvention("USD", "EUR");
-/// conv.base.toString();          // "EUR"
-/// conv.usdQuotation.toString(); // "direct"
-/// conv.pipSize;            // 0.0001
-/// conv.settlementDays;     // 2
+/// const conv = new core.FxPairConvention("EUR", "USD", 0.0001);
+/// conv.base.toString(); // "EUR"
+/// conv.pipSize;         // 0.0001
+/// conv.ratePoints(50);  // 0.005
 /// ```
 #[wasm_bindgen(js_name = FxPairConvention)]
 #[derive(Clone, Copy, Debug)]
 pub struct JsFxPairConvention {
-    inner: RustFxPairConvention,
+    pub(crate) inner: RustFxPairConvention,
 }
 
 #[wasm_bindgen(js_class = FxPairConvention)]
 impl JsFxPairConvention {
-    /// Market CCY1 (one unit of this currency in the screen pair).
+    /// Quote metadata for the ordered pair `base`/`quote`.
+    ///
+    /// # Arguments
+    ///
+    /// * `base` - Base currency ISO-4217 code.
+    /// * `quote` - Quote currency ISO-4217 code; must differ from `base`.
+    /// * `pip_size` - Outright-rate increment per pip, finite and positive.
+    ///
+    /// @param base - Base currency ISO-4217 code: one unit of it is quoted.
+    /// @param quote - Quote currency ISO-4217 code; must differ from `base`.
+    /// @param pipSize - Outright-rate increment per pip in this pair's quote units; finite and positive.
+    /// @returns A validated `FxPairConvention`.
+    /// @throws `TypeError` (kind `invalid_type`) for a non-string code or non-number size; `FinstackError` (kind `validation`) for equal currencies or a non-positive or non-finite pip size.
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        #[wasm_bindgen(unchecked_param_type = "string")] base: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] quote: JsValue,
+        #[wasm_bindgen(js_name = "pipSize", unchecked_param_type = "number")] pip_size: JsValue,
+    ) -> Result<JsFxPairConvention, JsValue> {
+        let base = js_currency(&base, "base")?;
+        let quote = js_currency(&quote, "quote")?;
+        let pip_size = js_f64(&pip_size, "pipSize")?;
+        RustFxPairConvention::new(base, quote, pip_size)
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Base currency of the ordered pair.
+    /// @returns The base `Currency`.
     #[wasm_bindgen(getter, js_name = base)]
     pub fn base(&self) -> JsCurrency {
         JsCurrency {
-            inner: self.inner.base,
+            inner: self.inner.get_base(),
         }
     }
 
-    /// Market CCY2 (units of this currency per one unit of CCY1).
+    /// Quote currency of the ordered pair.
+    /// @returns The quote `Currency`.
     #[wasm_bindgen(getter, js_name = quote)]
     pub fn quote(&self) -> JsCurrency {
         JsCurrency {
-            inner: self.inner.quote,
+            inner: self.inner.get_quote(),
         }
     }
 
-    /// Direct if the USD leg quotes USD as CCY2; Indirect if USD is CCY1.
-    #[wasm_bindgen(getter, js_name = usdQuotation)]
-    pub fn usd_quotation(&self) -> JsFxQuoteConvention {
-        JsFxQuoteConvention {
-            inner: self.inner.usd_quotation,
-        }
-    }
-
-    /// Pip size in outright-rate units (`0.01` or `0.0001`).
+    /// Outright-rate increment per pip.
+    /// @returns The pip size in quote units per base unit.
     #[wasm_bindgen(getter, js_name = pipSize)]
     pub fn pip_size(&self) -> f64 {
-        self.inner.pip_size
+        self.inner.get_pip_size()
     }
 
-    /// Standard spot lag in business days (T+1 or T+2).
-    #[wasm_bindgen(getter, js_name = settlementDays)]
-    pub fn settlement_days(&self) -> u32 {
-        self.inner.settlement_days
+    /// Rate points for a signed number of forward pips (`pips * pipSize`).
+    ///
+    /// # Arguments
+    ///
+    /// * `pips` - Signed forward points in pips; must be finite.
+    ///
+    /// @param pips - Signed forward points in pips; must be finite.
+    /// @returns The rate points.
+    /// @throws `TypeError` (kind `invalid_type`) if `pips` is not a number; `FinstackError` (kind `validation`) if it or the product is not finite.
+    #[wasm_bindgen(js_name = ratePoints)]
+    pub fn rate_points(
+        &self,
+        #[wasm_bindgen(unchecked_param_type = "number")] pips: JsValue,
+    ) -> Result<f64, JsValue> {
+        self.inner
+            .rate_points(js_f64(&pips, "pips")?)
+            .map_err(to_js_err)
     }
-}
-
-/// Market convention for an unordered currency pair.
-///
-/// Returned `base` / `quote` are always the market CCY1/CCY2, even when the
-/// arguments are inverted.
-/// @param base - One currency ISO code of the pair. Orientation is ignored.
-/// @param quote - The other currency ISO code of the pair. Orientation is ignored.
-/// @returns Market CCY1/CCY2, USD quotation, pip size, and standard spot lag.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if either code is not a recognized ISO-4217
-/// alphabetic currency.
-#[wasm_bindgen(js_name = fxPairConvention)]
-pub fn fx_pair_convention(
-    #[wasm_bindgen(unchecked_param_type = "string")] base: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "string")] quote: JsValue,
-) -> Result<JsFxPairConvention, JsValue> {
-    let base = js_currency(&base, "base")?;
-    let quote = js_currency(&quote, "quote")?;
-    Ok(JsFxPairConvention {
-        inner: rust_fx_pair_convention(base, quote),
-    })
 }
 
 /// Reciprocal of a strictly positive finite FX rate.

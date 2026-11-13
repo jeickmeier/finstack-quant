@@ -1,9 +1,7 @@
 //! FX Spot construction and builder pattern tests.
 
 use super::common::*;
-use finstack_quant_core::{
-    currency::Currency, dates::BusinessDayConvention, money::Money, types::InstrumentId,
-};
+use finstack_quant_core::{currency::Currency, money::Money, types::InstrumentId};
 use finstack_quant_valuations::instruments::fx::fx_spot::FxSpot;
 
 #[test]
@@ -13,6 +11,9 @@ fn test_basic_construction() {
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
         .notional(Money::from((1_i64, Currency::EUR)))
+        .settlement_days(2)
+        .base_calendar_id("weekends_only".into())
+        .quote_calendar_id("weekends_only".into())
         .build()
         .expect("valid FX spot");
 
@@ -24,11 +25,6 @@ fn test_basic_construction() {
     assert_eq!(
         fx.notional,
         Money::new(1.0, Currency::EUR).expect("valid money fixture")
-    );
-    // Default BDC is ModifiedFollowing per ISDA FX settlement standard
-    assert_eq!(
-        fx.business_day_convention,
-        BusinessDayConvention::ModifiedFollowing
     );
 }
 
@@ -60,6 +56,9 @@ fn test_construction_with_mismatched_currency_fails() {
         .base_currency(Currency::EUR)
         .quote_currency(Currency::USD)
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
+        .settlement_days(2)
+        .base_calendar_id("weekends_only".into())
+        .quote_calendar_id("weekends_only".into())
         .build();
 
     assert!(result.is_err());
@@ -101,7 +100,6 @@ fn test_construction_full_builder() {
         .notional(Money::new(5_000_000.0, Currency::GBP).expect("valid money fixture"))
         .quoted_spot(1.32)
         .settlement_date(d(2025, 1, 17))
-        .business_day_convention(BusinessDayConvention::ModifiedFollowing)
         .base_calendar_id("London".into())
         .quote_calendar_id("USNY".into())
         .build()
@@ -113,10 +111,6 @@ fn test_construction_full_builder() {
     assert_eq!(fx.notional.amount(), 5_000_000.0);
     assert_eq!(fx.quoted_spot, Some(1.32));
     assert_eq!(fx.settlement_date, Some(d(2025, 1, 17)));
-    assert_eq!(
-        fx.business_day_convention,
-        BusinessDayConvention::ModifiedFollowing
-    );
     assert_eq!(fx.base_calendar_id.as_deref(), Some("London"));
     assert_eq!(fx.quote_calendar_id.as_deref(), Some("USNY"));
 }
@@ -158,6 +152,9 @@ fn test_construction_with_various_currencies() {
             .base_currency(base)
             .quote_currency(quote)
             .notional(Money::from((1_i64, base)))
+            .settlement_days(2)
+            .base_calendar_id("weekends_only".into())
+            .quote_calendar_id("weekends_only".into())
             .build()
             .expect("valid FX spot");
         assert_eq!(fx.base_currency, base);

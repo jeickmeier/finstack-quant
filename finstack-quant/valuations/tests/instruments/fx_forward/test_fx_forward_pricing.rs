@@ -6,7 +6,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider, invert_fx_rate};
+use finstack_quant_core::money::fx::{
+    FxMatrix, FxPairConvention, SimpleFxProvider, invert_fx_rate,
+};
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::Instrument;
@@ -333,7 +335,11 @@ fn test_fx_forward_with_forward_pips() {
         .attributes(Attributes::new())
         .build()
         .expect("should build")
-        .with_forward_pips(1.10, 50.0)
+        .with_forward_pips(
+            1.10,
+            50.0,
+            &FxPairConvention::new(Currency::EUR, Currency::USD, 0.0001).expect("valid convention"),
+        )
         .expect("valid forward pips");
 
     assert_eq!(forward.quoted_spot, None);
@@ -361,7 +367,11 @@ fn test_fx_forward_with_forward_pips_inverted_pair_still_prices() {
         .attributes(Attributes::new())
         .build()
         .expect("inverted pair must construct")
-        .with_forward_pips(inverted, 10.0)
+        .with_forward_pips(
+            inverted,
+            10.0,
+            &FxPairConvention::new(Currency::USD, Currency::EUR, 0.0001).expect("valid convention"),
+        )
         .expect("pips on inverted pair");
 
     let npv = forward

@@ -7,16 +7,18 @@
     {
       "base_calendar_id": "target2",
       "base_currency": "EUR",
+      "business_day_convention": "modified_following",
       "domestic_discount_curve_id": "USD-OIS",
-      "end_of_month": false,
       "foreign_discount_curve_id": "EUR-OIS",
       "id": "EURUSD-FWD-3M",
       "notional": {
         "amount": "1000000",
         "currency": "EUR"
       },
+      "preserve_business_eom": false,
       "quote_calendar_id": "usny",
       "quote_currency": "USD",
+      "settlement_days": 2,
       "tenor": {
         "count": 3,
         "unit": "months"
@@ -26,35 +28,20 @@
   ],
   "properties": {
     "base_calendar_id": {
-      "description": "Base-currency holiday calendar id; `None` uses weekends only.",
-      "type": [
-        "string",
-        "null"
-      ]
+      "description": "Base-currency holiday calendar id (may itself be a composite such as\n`\"target2+usny\"` when the convention needs a USD gate).",
+      "type": "string"
     },
     "base_currency": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
       "description": "Base (foreign) currency: the numerator of the quote and the notional currency."
     },
     "business_day_convention": {
-      "anyOf": [
-        {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Business-day convention rolling the maturity on the joint calendar.\n`None` selects Modified Following, the ISDA FX settlement convention."
+      "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+      "description": "Business-day convention rolling the maturity once on the joint\ncalendar."
     },
     "domestic_discount_curve_id": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
       "description": "Quote-currency (domestic) discount curve identifier."
-    },
-    "end_of_month": {
-      "default": false,
-      "description": "Preserve month-end: a month-end spot date gives a month-end maturity.\nDefaults to `false`.",
-      "type": "boolean"
     },
     "foreign_discount_curve_id": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -68,25 +55,23 @@
       "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
       "description": "Notional in `base_currency`."
     },
+    "preserve_business_eom": {
+      "description": "Keep a business month-end spot on the business month-end of the\nmaturity month; month and year tenors only.",
+      "type": "boolean"
+    },
     "quote_calendar_id": {
-      "description": "Quote-currency holiday calendar id; `None` uses weekends only.",
-      "type": [
-        "string",
-        "null"
-      ]
+      "description": "Quote-currency holiday calendar id.",
+      "type": "string"
     },
     "quote_currency": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
       "description": "Quote (domestic) currency: the denominator of the quote and the PV currency."
     },
     "settlement_days": {
-      "description": "T+N spot lag in business days (typically 2, or 1 for USD/CAD). `None`\nselects the pair's market-standard lag from\n[`finstack_quant_core::dates::fx::fx_standard_settlement_days`].",
+      "description": "Spot lag: business days from trade date to spot on the joint\nbase/quote calendar. Stated by the trade's convention; no pair table\nsupplies it.",
       "format": "uint32",
       "minimum": 0,
-      "type": [
-        "integer",
-        "null"
-      ]
+      "type": "integer"
     },
     "tenor": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
@@ -105,7 +90,12 @@
     "tenor",
     "notional",
     "domestic_discount_curve_id",
-    "foreign_discount_curve_id"
+    "foreign_discount_curve_id",
+    "base_calendar_id",
+    "quote_calendar_id",
+    "settlement_days",
+    "business_day_convention",
+    "preserve_business_eom"
   ],
   "title": "FxForwardTradeDateParams",
   "type": "object"

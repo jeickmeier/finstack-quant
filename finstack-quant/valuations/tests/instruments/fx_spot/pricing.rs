@@ -203,6 +203,9 @@ fn test_triangulated_rate() {
         .base_currency(Currency::EUR)
         .quote_currency(Currency::GBP)
         .notional(Money::new(1_000_000.0, Currency::EUR).expect("valid money fixture"))
+        .settlement_days(2)
+        .base_calendar_id("weekends_only".into())
+        .quote_calendar_id("weekends_only".into())
         .build()
         .expect("valid FX spot");
 
@@ -222,6 +225,9 @@ fn test_inverse_pair() {
         .base_currency(Currency::USD)
         .quote_currency(Currency::EUR)
         .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
+        .settlement_days(2)
+        .base_calendar_id("weekends_only".into())
+        .quote_calendar_id("weekends_only".into())
         .build()
         .expect("valid FX spot");
 

@@ -3,8 +3,7 @@
 use std::sync::Arc;
 
 use finstack_quant_core::money::fx::{
-    CurrencyPair, FxConversionPolicy, FxMatrix, FxPairConvention, FxQuery, FxQuoteConvention,
-    FxRateResult, fx_pair_convention as rust_fx_pair_convention,
+    CurrencyPair, FxConversionPolicy, FxMatrix, FxPairConvention, FxQuery, FxRateResult,
     invert_fx_rate as rust_invert_fx_rate,
 };
 use pyo3::prelude::*;
@@ -319,40 +318,9 @@ impl PyFxMatrix {
     }
 }
 
-/// USD quotation style for a market FX pair (Direct or Indirect versus USD).
+/// Validated quote metadata for one ordered FX pair.
 ///
-/// Wraps [`FxQuoteConvention`] from `finstack-quant-core`.
-#[pyclass(
-    name = "FxQuoteConvention",
-    module = "finstack_quant.core.market_data",
-    frozen,
-    eq,
-    hash,
-    skip_from_py_object
-)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct PyFxQuoteConvention {
-    /// Inner Rust convention.
-    pub(crate) inner: FxQuoteConvention,
-}
-
-impl PyFxQuoteConvention {
-    pub(crate) fn from_inner(inner: FxQuoteConvention) -> Self {
-        Self { inner }
-    }
-}
-
-label_enum!(PyFxQuoteConvention, FxQuoteConvention, "FxQuoteConvention", from_name, {
-    /// USD is the quote currency (EURUSD, GBPUSD).
-    DIRECT => Direct,
-    /// USD is the base currency (USDJPY, USDCAD).
-    INDIRECT => Indirect,
-});
-
-/// Market convention for one FX pair after Bloomberg/Reuters CCY1 ordering.
-///
-/// Wraps [`FxPairConvention`] from `finstack-quant-core`. Instances come from
-/// [`fx_pair_convention`].
+/// Wraps [`FxPairConvention`] from `finstack-quant-core`.
 #[pyclass(
     name = "FxPairConvention",
     module = "finstack_quant.core.market_data",
@@ -362,79 +330,64 @@ label_enum!(PyFxQuoteConvention, FxQuoteConvention, "FxQuoteConvention", from_na
 #[derive(Clone, Copy, Debug)]
 pub struct PyFxPairConvention {
     /// Inner Rust convention.
-    inner: FxPairConvention,
-}
-
-impl PyFxPairConvention {
-    fn from_inner(inner: FxPairConvention) -> Self {
-        Self { inner }
-    }
+    pub(crate) inner: FxPairConvention,
 }
 
 #[pymethods]
 impl PyFxPairConvention {
-    /// Market CCY1 (one unit of this currency).
+    /// Quote metadata for the ordered pair `base`/`quote` with an explicit
+    /// pip size.
+    ///
+    /// # Arguments
+    ///
+    /// * `base` - Base currency (`Currency` or ISO code).
+    /// * `quote` - Quote currency (`Currency` or ISO code); must differ from
+    ///   `base`.
+    /// * `pip_size` - Outright-rate increment per pip; finite and positive.
+    #[new]
+    #[pyo3(text_signature = "(base, quote, pip_size)")]
+    fn new(base: &Bound<'_, PyAny>, quote: &Bound<'_, PyAny>, pip_size: f64) -> PyResult<Self> {
+        FxPairConvention::new(extract_currency(base)?, extract_currency(quote)?, pip_size)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
+    /// Base currency of the ordered pair.
     #[getter]
     fn base(&self) -> PyCurrency {
-        PyCurrency::from_inner(self.inner.base)
+        PyCurrency::from_inner(self.inner.get_base())
     }
 
-    /// Market CCY2 (units of this currency per one unit of CCY1).
+    /// Quote currency of the ordered pair.
     #[getter]
     fn quote(&self) -> PyCurrency {
-        PyCurrency::from_inner(self.inner.quote)
+        PyCurrency::from_inner(self.inner.get_quote())
     }
 
-    /// Direct if the USD leg quotes USD as CCY2; Indirect if USD is CCY1.
-    #[getter]
-    fn usd_quotation(&self) -> PyFxQuoteConvention {
-        PyFxQuoteConvention::from_inner(self.inner.usd_quotation)
-    }
-
-    /// Pip size in outright-rate units (`0.01` or `0.0001`).
+    /// Outright-rate increment per pip.
     #[getter]
     fn pip_size(&self) -> f64 {
-        self.inner.pip_size
+        self.inner.get_pip_size()
     }
 
-    /// Standard spot lag in business days (T+1 or T+2).
-    #[getter]
-    fn settlement_days(&self) -> u32 {
-        self.inner.settlement_days
+    /// Rate points for a signed number of forward pips.
+    ///
+    /// # Arguments
+    ///
+    /// * `pips` - Signed forward points in pips; must be finite.
+    #[pyo3(text_signature = "($self, pips)")]
+    fn rate_points(&self, pips: f64) -> PyResult<f64> {
+        self.inner.rate_points(pips).map_err(core_to_py)
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "FxPairConvention(base={}, quote={}, usd_quotation={}, pip_size={}, settlement_days={})",
-            self.inner.base,
-            self.inner.quote,
-            self.inner.usd_quotation,
-            self.inner.pip_size,
-            self.inner.settlement_days,
+            "FxPairConvention(base={}, quote={}, pip_size={})",
+            self.inner.get_base(),
+            self.inner.get_quote(),
+            self.inner.get_pip_size(),
         )
     }
-}
-
-/// Market convention for an unordered currency pair.
-///
-/// Returned ``base`` / ``quote`` are always market CCY1/CCY2.
-///
-/// # Arguments
-///
-/// * `base` - One currency of the pair (`Currency` or ISO code). Orientation
-///   is ignored.
-/// * `quote` - The other currency of the pair (`Currency` or ISO code).
-///   Orientation is ignored.
-#[pyfunction]
-#[pyo3(text_signature = "(base, quote)")]
-fn fx_pair_convention(
-    base: &Bound<'_, PyAny>,
-    quote: &Bound<'_, PyAny>,
-) -> PyResult<PyFxPairConvention> {
-    Ok(PyFxPairConvention::from_inner(rust_fx_pair_convention(
-        extract_currency(base)?,
-        extract_currency(quote)?,
-    )))
 }
 
 /// Reciprocal of a strictly positive finite FX rate.
@@ -453,9 +406,7 @@ pub(super) const EXPORTS: &[&str] = &[
     "FxConversionPolicy",
     "FxMatrix",
     "FxPairConvention",
-    "FxQuoteConvention",
     "FxRateResult",
-    "fx_pair_convention",
     "invert_fx_rate",
 ];
 
@@ -464,9 +415,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFxConversionPolicy>()?;
     m.add_class::<PyFxRateResult>()?;
     m.add_class::<PyFxMatrix>()?;
-    m.add_class::<PyFxQuoteConvention>()?;
     m.add_class::<PyFxPairConvention>()?;
-    m.add_function(wrap_pyfunction!(fx_pair_convention, m)?)?;
     m.add_function(wrap_pyfunction!(invert_fx_rate, m)?)?;
     Ok(())
 }

@@ -5,8 +5,7 @@ use crate::quotes::Pillar;
 use crate::quotes::XccyQuote;
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::BusinessDayConvention;
-use finstack_quant_core::dates::fx::fx_spot_date;
-use finstack_quant_core::dates::{adjust, resolve_joint_calendar};
+use finstack_quant_core::dates::{DateExt, adjust, resolve_joint_calendar};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::FloatLegSpec;
@@ -47,17 +46,27 @@ pub(crate) fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result
         )
     })?;
 
-    // CLS-consistent spot roll: a US holiday on an intermediate day does
-    // not delay a USD pair's spot date (2026-06-09 core quant review,
-    // FX spot finding).
-    let spot = fx_spot_date(
-        ctx.as_of(),
-        conv.settlement_days,
-        conv.base_currency,
-        conv.quote_currency,
-        Some(&conv.base_calendar_id),
-        Some(&conv.quote_calendar_id),
-    )?;
+    // The XCCY convention owns its spot rule (record CORE-CONVENTIONS-011
+    // #6, O9): its stated lag in business days on the joint calendar of its
+    // two stated calendars. No pair table or implicit USD gate applies; a
+    // convention that needs one names a composite calendar.
+    let spot = {
+        let calendar =
+            resolve_joint_calendar(Some(&conv.base_calendar_id), Some(&conv.quote_calendar_id))?;
+        let lag = i32::try_from(conv.settlement_days).map_err(|_| {
+            finstack_quant_core::Error::Validation(format!(
+                "XCCY spot lag {} is out of range",
+                conv.settlement_days
+            ))
+        })?;
+        let spot = ctx.as_of().add_business_days(lag, calendar)?;
+        if !calendar.is_business_day(spot)? {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "XCCY spot date {spot} is not a business day of the joint calendar"
+            )));
+        }
+        spot
+    };
     let far = resolve_far_date(
         spot,
         far_pillar,

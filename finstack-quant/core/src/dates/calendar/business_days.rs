@@ -631,8 +631,8 @@ pub fn resolve_calendar(cal_id: Option<&str>) -> crate::Result<&'static dyn Holi
 /// calendar alone (every built-in calendar already closes on weekends); none
 /// resolves to weekends only.
 /// Step and adjust on the result with [`crate::dates::DateExt::add_business_days`]
-/// and [`adjust`]; the USD-aware market spot rule lives in
-/// [`crate::dates::fx::fx_spot_date`].
+/// and [`adjust`]; FX products own their spot-date rule, and
+/// [`crate::dates::fx::fx_forward_date`] adds a forward tenor to an actual spot.
 ///
 /// # Arguments
 ///

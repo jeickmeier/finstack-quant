@@ -630,11 +630,12 @@ pub(super) fn fx_forward_trade_date_params() -> Result<Vec<Value>> {
             notional: Money::from((1_000_000_i64, Currency::EUR)),
             domestic_discount_curve_id: CurveId::new("USD-OIS"),
             foreign_discount_curve_id: CurveId::new("EUR-OIS"),
-            base_calendar_id: Some("target2".to_string()),
-            quote_calendar_id: Some("usny".to_string()),
-            settlement_days: None,
-            business_day_convention: None,
-            end_of_month: false,
+            base_calendar_id: "target2".to_string(),
+            quote_calendar_id: "usny".to_string(),
+            settlement_days: 2,
+            business_day_convention:
+                finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
+            preserve_business_eom: false,
         },
     )
 }
@@ -652,11 +653,11 @@ pub(super) fn fx_swap_trade_date_params() -> Result<Vec<Value>> {
         notional: Money::from((1_000_000_i64, Currency::EUR)),
         domestic_discount_curve_id: CurveId::new("USD-OIS"),
         foreign_discount_curve_id: CurveId::new("EUR-OIS"),
-        base_calendar_id: Some("target2".to_string()),
-        quote_calendar_id: Some("usny".to_string()),
+        base_calendar_id: "target2".to_string(),
+        quote_calendar_id: "usny".to_string(),
         settlement_days: 2,
         business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        end_of_month: false,
+        preserve_business_eom: false,
     })
 }
 
@@ -673,12 +674,12 @@ pub(super) fn ndf_trade_date_params() -> Result<Vec<Value>> {
         notional: Money::from((10_000_000_i64, Currency::CNY)),
         contract_rate: 7.25,
         domestic_discount_curve_id: CurveId::new("USD-OIS"),
-        base_calendar_id: None,
-        settlement_calendar_id: Some("usny".to_string()),
+        base_calendar_id: "weekends_only".to_string(),
+        settlement_calendar_id: "usny".to_string(),
         settlement_days: 2,
         fixing_offset_days: 2,
         business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        end_of_month: false,
+        preserve_business_eom: false,
     })
 }
 

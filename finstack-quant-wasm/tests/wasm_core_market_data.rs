@@ -431,23 +431,24 @@ fn fx_matrix_quote_and_rate() {
 }
 
 #[wasm_bindgen_test]
-fn fx_pair_convention_helpers() {
-    let conv =
-        fx_pair_convention(JsValue::from("USD"), JsValue::from("JPY")).expect("USDJPY convention");
+fn fx_pair_convention_keeps_order_and_explicit_pip_size() {
+    let conv = JsFxPairConvention::new(
+        JsValue::from("USD"),
+        JsValue::from("JPY"),
+        JsValue::from(0.01),
+    )
+    .expect("USDJPY convention");
     assert_eq!(conv.base().to_string(), "USD");
     assert_eq!(conv.quote().to_string(), "JPY");
-    assert_eq!(conv.usd_quotation().to_string(), "indirect");
     assert!((conv.pip_size() - 0.01).abs() < 1e-12);
-    assert_eq!(conv.settlement_days(), 2);
-    let eurusd =
-        fx_pair_convention(JsValue::from("EUR"), JsValue::from("USD")).expect("EURUSD convention");
-    assert!((eurusd.pip_size() - 0.0001).abs() < 1e-12);
+    assert!(
+        JsFxPairConvention::new(
+            JsValue::from("EUR"),
+            JsValue::from("EUR"),
+            JsValue::from(0.0001)
+        )
+        .is_err()
+    );
     let inverted = invert_fx_rate(JsValue::from(1.10)).expect("positive rate");
     assert!((inverted - 1.0 / 1.10).abs() < 1e-12);
-    assert_eq!(
-        JsFxQuoteConvention::from_name(JsValue::from("direct"))
-            .expect("direct")
-            .to_string(),
-        "direct"
-    );
 }

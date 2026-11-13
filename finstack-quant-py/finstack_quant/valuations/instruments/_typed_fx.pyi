@@ -7,7 +7,7 @@ from typing import Any, Literal
 import pandas as pd
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import BusinessDayConvention, DayCount, Tenor
-from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.market_data import FxPairConvention, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.core.types import Attributes
 from finstack_quant.valuations import ValuationResult
@@ -351,11 +351,12 @@ class FxForward:
     @staticmethod
     def from_trade_date(params: dict[str, Any] | str) -> FxForward:
         """
-        Build a forward from a trade date and a standard FX tenor (mirrors Rust
-        ``FxForward::from_trade_date``): the spot date is rolled from
-        ``trade_date`` by ``settlement_days`` business days (CLS-consistent pair
-        roll), then ``tenor`` is added with the FX end-of-month rule and
-        ``business_day_convention``.
+        Build a forward from a trade date and an FX tenor (mirrors Rust
+        ``FxForward::from_trade_date``): spot is ``trade_date`` plus
+        ``settlement_days`` business days on the joint base/quote calendar,
+        then the maturity is ``tenor`` after spot on that calendar with
+        ``business_day_convention`` and optional business-EOM preservation.
+        Every convention is explicit; nothing is inferred from the currencies.
 
         Parameters
         ----------
@@ -365,29 +366,24 @@ class FxForward:
             - ``id`` (str): unique instrument identifier.
             - ``base_currency`` / ``quote_currency`` (Currency | str): base
               (foreign, notional) and quote (domestic, PV) ISO-4217 codes.
-            - ``trade_date`` (datetime.date | str): ISO 8601 date from which spot is rolled.
+            - ``trade_date`` (datetime.date | str): ISO 8601 trade date.
             - ``tenor`` (Tenor | dict): a ``Tenor`` (``Tenor.parse("3M")``) or its wire dict
-              ``{"count": 3, "unit": "months"}``: standard FX tenor from spot.
+              ``{"count": 3, "unit": "months"}``: tenor from spot.
             - ``notional`` (Money | dict): notional in ``base_currency``, a
               ``Money`` or its wire dict ``{"amount": "1000000", "currency": "USD"}``.
             - ``domestic_discount_curve_id`` / ``foreign_discount_curve_id``
               (str): quote- and base-currency discount curves.
-
-            Optional keys (omit for the default):
-
-            - ``end_of_month`` (bool, default ``False``): apply the FX
-              end-of-month rule when spot falls on month end.
             - ``base_calendar_id`` / ``quote_calendar_id`` (str): holiday
-              calendars; omitted counts weekdays only, except that a USD leg
-              uses ``"usny"``.
-            - ``settlement_days`` (int): contractual T+N spot lag in business
-              days (non-negative), honored as given (for example ``1`` for
-              tom-next); omitted uses
-              :func:`finstack_quant.core.dates.fx_standard_settlement_days` for
-              the pair.
+              calendars; their joint calendar counts the spot lag and rolls the
+              maturity. A composite id such as ``"target2+usny"`` adds a
+              required USD gate.
+            - ``settlement_days`` (int): spot lag in business days, as the
+              trade's convention states it.
             - ``business_day_convention`` (str): serde name of the maturity roll
-              rule (``"modified_following"``, ``"following"``, ...); omitted
-              selects Modified Following.
+              (``"modified_following"``, ``"following"``, ...).
+            - ``preserve_business_eom`` (bool): keep a business month-end spot
+              on the business month-end of the maturity month (month and year
+              tenors only).
 
         Returns
         -------
@@ -398,8 +394,10 @@ class FxForward:
         ------
         ValueError
             If ``params`` has a missing, unknown or malformed key, the
-            currencies coincide, the tenor/date is invalid, or the notional
-            currency differs from ``base_currency``.
+            currencies coincide, the tenor/date is invalid, a computed spot or
+            maturity is not a business day after spot, business-EOM
+            preservation is requested with a day or week tenor, or the
+            notional currency differs from ``base_currency``.
         KeyError
             If a calendar identifier is unknown.
 
@@ -417,7 +415,11 @@ class FxForward:
         ...     "notional": Money(1_000_000.0, "EUR"),
         ...     "domestic_discount_curve_id": "USD-OIS",
         ...     "foreign_discount_curve_id": "EUR-OIS",
-        ...     "end_of_month": False,
+        ...     "base_calendar_id": "target2",
+        ...     "quote_calendar_id": "usny",
+        ...     "settlement_days": 2,
+        ...     "business_day_convention": "modified_following",
+        ...     "preserve_business_eom": False,
         ... })
         >>> fwd.contract_rate is None
         True
@@ -448,11 +450,11 @@ class FxForward:
             rate is not positive.
         """
         ...
-    def with_forward_pips(self, spot_rate: float, pips: float) -> FxForward:
+    def with_forward_pips(self, spot_rate: float, pips: float, convention: FxPairConvention) -> FxForward:
         """
         Return a copy whose contract rate is ``spot_rate + pips * pip_size``
-        (mirrors Rust ``FxForward::with_forward_pips``); the pip size follows
-        market convention (``0.01`` for JPY/KRW/HUF pairs, ``0.0001`` otherwise).
+        (mirrors Rust ``FxForward::with_forward_pips``); the pip size comes from
+        the explicit ``convention``, which must name this forward's ordered pair.
 
         Parameters
         ----------
@@ -460,6 +462,9 @@ class FxForward:
             Spot rate, quote currency per unit of base currency; must be positive.
         pips : float
             Forward points quoted in pips.
+        convention : FxPairConvention
+            Quote metadata of this forward's base/quote order, carrying the
+            pip size.
 
         Returns
         -------
@@ -469,8 +474,9 @@ class FxForward:
         Raises
         ------
         ValueError
-            If ``pips`` or ``spot_rate`` is not finite, or the resulting
-            contract rate is not positive.
+            If ``convention`` names another pair or order, ``pips`` or
+            ``spot_rate`` is not finite, or the resulting contract rate is not
+            positive.
         """
         ...
     def market_forward_rate(
