@@ -1,6 +1,6 @@
 # VALUATIONS-BONDS-12: Z-spread, discount margin, I/G spreads and OAS inversions
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Draft — observed implementation; adoption pending; quote compounding accepted (O6, 2026-11-12).
 **Implementation status:** Observed in the linked bond production scope; discrepancies are identified explicitly.
 **Validation status:** Evidence inspected or located, not executed; no accuracy certification.
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
@@ -18,6 +18,20 @@ Z-spread/DM discount contractual or selected workout cashflows; OAS reprices the
 **I/G spread:** `selected_yield−benchmark_par_rate`; use workout yield/horizon when an explicit clean optional quote supplies it, otherwise YTM/maturity. I-spread uses the bond discount curve; G-spread requires an explicit government curve. If curve calibration contains at least two swap quotes, restate each quote from its index fixed-leg compounding to bond yield frequency, linearly interpolate by remaining tenor, and clamp outside end tenors. Otherwise construct a ShortFront fixed-leg schedule and use `(D_start−D_end)/ΣαD`. Fixed specs use bond day count/frequency; other specs use ACT/ACT annual. Even G-spread calls this same par-rate/swap-quote helper; it does not interpolate a sovereign cash-bond yield directly.
 
 **OAS:** an explicit OAS is returned as-is; otherwise a price-driving quote is required. Convert quote to settlement dirty, remove price drivers, prepare the selected model at settlement and solve price minus target in bp. Default tolerance `1e−6`, max 50 iterations, initial bracket 1000 bp. Standard tree/joint dispatch reuses calibrated preparation; custom registries preserve their dispatch. Trial pricing errors are captured while the numeric objective returns `1e12`; if solve fails the first underlying error is reported. An optional MC CI gate is suppressed during trial solves and checked on the final candidate, without a separate price-residual acceptance check. Hazard and stochastic joint OAS require continuous quotes.
+
+## Accepted decision: required quote compounding
+
+Accepted on **2026-11-12** as owner resolution O6 of the core-conventions
+reconciliation, within the accepted
+[CORE-CONVENTIONS-007 #9](../core-conventions/007-tenor-date-arithmetic.md#accepted-decision-tenor-and-date-arithmetic-conventions)
+separation of payment cadence from quote compounding. Runtime
+implementation is tracked in the register.
+
+The bond carries a required, independent `Compounding` quote
+convention. Spread pricing, quote inversion and spread sensitivities (CS01)
+all read that one field. It is never derived from the payment frequency or
+any other tenor, and it has no default: a convention preset may state it
+explicitly, but no value is computed from the preset's frequency.
 
 ## Evidence and limitations
 

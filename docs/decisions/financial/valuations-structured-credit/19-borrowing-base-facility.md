@@ -1,6 +1,6 @@
 # VALUATIONS-STRUCTURED-CREDIT-19: Borrowing base and asset-backed facility synthesis
 
-- **Decision status:** Draft — observed implementation; adoption pending agreement.
+- **Decision status:** Draft — observed implementation; adoption pending agreement; quote compounding accepted (O6, 2026-11-12).
 - **Implementation status:** Observed in the owning paths below; scope: eligible collateral, concentration limits, facility advances and lender cashflows.
 - **Validation status:** Evidence inspected/located, not executed. Source and selected assertions establish implemented behavior, not general numerical accuracy or market approval.
 - **Audit date:** 2026-11-05.
@@ -37,6 +37,20 @@ A direct standalone loan model would be a different methodology. Supported contr
 Existing evidence: [asset_backed_facility/event_unit_tests.rs](../../../../finstack-quant/valuations/structured-credit/tests/asset_backed_facility/event_unit_tests.rs); [structured_credit/unit/funding_tests.rs](../../../../finstack-quant/valuations/structured-credit/tests/structured_credit/unit/funding_tests.rs). These are behavior/formula/invariant tests; no test was rerun for this audit. Where only a test location was inspected, no independent reference validation is claimed.
 
 The inspected event tests verify units and rejected retired keys, not an independent borrowing-base/legal facility reference.
+
+## Accepted decision: required quote compounding
+
+Accepted on **2026-11-12** as owner resolution O6 of the core-conventions
+reconciliation, within the accepted
+[CORE-CONVENTIONS-007 #9](../core-conventions/007-tenor-date-arithmetic.md#accepted-decision-tenor-and-date-arithmetic-conventions)
+separation of payment cadence from quote compounding. Runtime
+implementation is tracked in the register.
+
+The asset-backed (borrowing-base) facility carries a required, independent `Compounding` quote
+convention. Spread pricing, quote inversion and spread sensitivities (CS01)
+all read that one field. It is never derived from the payment frequency or
+any other tenor, and it has no default: a convention preset may state it
+explicitly, but no value is computed from the preset's frequency.
 
 ## Follow-up tracking
 

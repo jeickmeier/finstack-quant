@@ -1,6 +1,6 @@
 # VALUATIONS-OTHER-FIXED-INCOME-12: Revolver quote schedules, exposure and draw-option attribution
 
-- **Decision status:** Draft — observed implementation; adoption and rationale require agreement.
+- **Decision status:** Draft — observed implementation; adoption and rationale require agreement; quote compounding accepted (O6, 2026-11-12).
 - **Audit date/source:** 2026-11-05; `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - **Implementation status:** Observed in the entry points and kernels linked below.
 - **Validation status:** Source and named evidence inspected or located; tests and numerical experiments were not executed. Evidence limits are stated below.
@@ -29,6 +29,20 @@
 ## Conventions, alternatives and limitations
 
 Rates/yields/DM are annual decimals; prices are points per 100 drawn; PV/exposure/cost attribution are lender-side money. Quote metrics can mix credit-adjusted model targets with unweighted expected contractual cashflows. Recovery metrics intentionally exclude stochastic credit. A state-conditioned draw-option model, realized-default simulation, historical EIR ledger and elapsed-balance accrued are unimplemented alternatives; each changes the economic contract, not merely a numerical tolerance.
+
+## Accepted decision: required quote compounding
+
+Accepted on **2026-11-12** as owner resolution O6 of the core-conventions
+reconciliation, within the accepted
+[CORE-CONVENTIONS-007 #9](../core-conventions/007-tenor-date-arithmetic.md#accepted-decision-tenor-and-date-arithmetic-conventions)
+separation of payment cadence from quote compounding. Runtime
+implementation is tracked in the register.
+
+The revolving credit facility carries a required, independent `Compounding` quote
+convention. Spread pricing, quote inversion and spread sensitivities (CS01)
+all read that one field. It is never derived from the payment frequency or
+any other tenor, and it has no default: a convention preset may state it
+explicitly, but no value is computed from the preset's frequency.
 
 ## Evidence
 
