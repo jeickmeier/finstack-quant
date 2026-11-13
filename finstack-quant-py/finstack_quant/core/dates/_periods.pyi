@@ -128,7 +128,7 @@ class PeriodId:
     Examples
     --------
     >>> from finstack_quant.core.dates import PeriodId
-    >>> (str(PeriodId.parse("2025Q2")), str(PeriodId.parse("2025Q2").shift(1)))
+    >>> (str(PeriodId.parse("2025Q2")), str(PeriodId.parse("2025Q2").shift(1, "gregorian")))
     ('2025Q2', '2025Q3')
 
     """

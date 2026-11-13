@@ -139,7 +139,10 @@ class ScheduleParams:
         >>> from finstack_quant.cashflows.builder import ScheduleParams
         >>> from finstack_quant.core.dates import DayCount, Tenor
         >>> params = ScheduleParams(
-        ...     frequency=Tenor.parse("3M"), day_count=DayCount.ACT_360, calendar_id="weekends_only"
+        ...     frequency=Tenor.parse("3M"),
+        ...     day_count=DayCount.ACT_360,
+        ...     calendar_id="weekends_only",
+        ...     business_day_convention="modified_following",
         ... )
         >>> (str(params.stub), params.payment_lag_days)
         ('short_front', 0)

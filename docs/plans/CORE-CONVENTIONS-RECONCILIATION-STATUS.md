@@ -722,23 +722,35 @@ logged under Needs review.
   GHSA-4j63-6c4x-wfg4 and GHSA-mmhr-3c5m-f64f against `soupsieve 2.9.1` in
   `uv.lock`, a transitive Python dependency. Nothing in this run touched it;
   the fix is a lockfile upgrade, handled before the final gate.
-- **Nightly tier not run per slice; failures found.** A full Python run
-  (doctest and slow tiers included) at F3 found stub doctests and two slow
-  CDS goldens failing from earlier slices of this run (for example the
-  `CdsTrancheBuilder` example lacked the E4b-4 `date_regime`). These are
-  addressed in their own commit after F3.
-- **F4 consumers that used the statistical factor as a calendar count.**
-  Three non-risk sites read `periods_per_year` as a partition count and now
-  use `slots_per_year`: the rent-roll annual escalator (it fell back to 4 for
-  an empty model and used 252 for a daily one; daily and weekly models now
-  error for that convention), the liquidity runway check (a daily model
-  converted runway with 252 trading periods a year; daily and weekly models
-  now error), and statements rollup and `growth_rate` year conversion
-  (unchanged values). Core bounds and LTM use the kind's capacity.
-- **F4 removed DSL defaults.** `annualize(x)` and `growth_rate(x)` without
-  their second argument are compile errors. No fixture, notebook or UI
-  formula used the one-argument forms; one statements test computed the
-  default and now states `growth_rate(x, frequency)`.
+- **Nightly tier not run per slice; sweep after F4.** Doctests and slow
+  suites are nightly-only by owner request, so earlier slices left breakage
+  there. The sweep (`nightly:` in git log) ran both tiers:
+  - **Python doctest tier: fixed, 281 pass.** Ten stubs and the README
+    still used pre-run APIs: PIK rows without their principal pair (G5),
+    `FeeSpec.periodic_bp`/`ScheduleParams`/`Schedule.builder` without a
+    business-day convention or grid (C3, E3b), bond/term-loan/revolver/ABF
+    builders without `quote_compounding` (E2c), the CDS tranche and
+    base-correlation step without `date_regime` (E4b-4), `ScorecardConfig`
+    without its scale (G3), `PeriodId.shift` without a calendar (F3),
+    `FxMatrix.rate` without a policy and the old FX quote order and repr
+    (F6–F8, B5). Rust doctests were not run (owner request).
+  - **Rust and Python slow tier: two CDS goldens still fail; not re-pinned.**
+    `regression_goldens/cds/usd_5y_cds_self_test.json` errors in DV01/CS01:
+    "no exact spread-risk replay pillar for contractual date 2031-04-30".
+    Its standard-regime CDS matures off-roll on 2031-04-30 while the 5Y quote
+    pillar is now the post-2015 roll date 2031-06-20; this matches the E4b-2
+    case where three deal-quote tests had to mature on the pillar date, so
+    E4b-2 is the likely cause. `regression_goldens/cds_tranche/cdx_ig_5y_3_7_mezz.json`
+    moved by about 1.7e-4 relative (NPV 2,453,526.36 → 2,453,935.88; DV01
+    −700.38 → −699.80; CS01 26,207.04 → 26,205.18; par spread 705.016 →
+    705.092 bp). The commit that moved it was not bisected; E4/E4b-4 (tranche
+    schedule regime) are the candidates, and E4b-4's "no value moves" claim
+    held only for the non-slow suites. Both need an owner to choose: fix the
+    fixture inputs (mature on the pillar) or accept the moves and re-bless.
+    The Bloomberg BHCCN and CDX IG 46 option mismatches in the same run are
+    allowlisted known gaps. Fourteen slow tests hit the 60 s runner cap under
+    full-tier parallel load (Monte Carlo, LSMC and copula panels); none is a
+    value failure.
 - **F1a mixed-kind statement models are rejected.** `FinancialModelSpec`
   checked chronology with `next.id <= prev.id` and keyed its history by
   `PeriodId` in ordered maps, which only worked for mixed-frequency timelines

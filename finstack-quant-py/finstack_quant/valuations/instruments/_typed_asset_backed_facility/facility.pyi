@@ -927,6 +927,7 @@ class AssetBackedFacilityBuilder:
     ...     .calendar_id("nyse")
     ...     .term_out(24)
     ...     .discount_curve_id("USD-OIS")
+    ...     .quote_compounding("quarterly")
     ...     .build()
     ... )
     >>> (facility.id, facility.undrawn.amount, facility.repayment_date)

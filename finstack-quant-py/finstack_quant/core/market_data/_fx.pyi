@@ -419,7 +419,7 @@ class FxMatrix:
     >>> round(matrix.rate("EUR", "GBP", datetime.date(2025, 1, 1), "cashflow_date").rate, 4)
     0.88
     >>> list(matrix.quotes()["base"])
-    ['GBP', 'EUR']
+    ['EUR', 'GBP']
 
     """
 
@@ -445,7 +445,7 @@ class FxMatrix:
         --------
         >>> from finstack_quant.core.market_data import FxMatrix
         >>> FxMatrix(None)
-        FxMatrix(quotes=0, pinned_quotes=0, None)
+        FxMatrix(quotes=0, pinned_quotes=0)
 
         """
         ...
@@ -480,7 +480,9 @@ class FxMatrix:
         --------
         >>> import datetime
         >>> from finstack_quant.core.market_data import FxMatrix
-        >>> FxMatrix.from_dict({"EURUSD": 1.1}, None).rate("EUR", "USD", datetime.date(2025, 1, 1)).rate
+        >>> FxMatrix.from_dict({"EURUSD": 1.1}, None).rate(
+        ...     "EUR", "USD", datetime.date(2025, 1, 1), "cashflow_date"
+        ... ).rate
         1.1
 
         """

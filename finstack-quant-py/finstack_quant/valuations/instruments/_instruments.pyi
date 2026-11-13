@@ -1196,6 +1196,7 @@ class BondBuilder:
     ...         "calls": [{"start": "2029-01-15", "end": "2034-01-15", "price_pct_of_par": 100.0}],
     ...         "puts": [],
     ...     })
+    ...     .quote_compounding("semi_annual")
     ...     .build()
     ... )
     >>> callable_bond.credit_curve_id
@@ -2389,6 +2390,7 @@ class TermLoanBuilder:
     ...     .yield_basis("act_360")
     ...     .discount_curve_id("USD-OIS")
     ...     .amortization({"percent_of_remaining_per_period": {"pct": 0.025}})
+    ...     .quote_compounding("quarterly")
     ...     .build()
     ... )
     >>> loan.rate

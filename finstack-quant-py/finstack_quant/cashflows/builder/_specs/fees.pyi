@@ -496,6 +496,7 @@ class FeeSpec:
         ...         frequency=Tenor.parse("3M"),
         ...         day_count=DayCount.ACT_360,
         ...         calendar_id="weekends_only",
+        ...         business_day_convention="modified_following",
         ...     ).to_json(),
         ...     str,
         ... )
@@ -534,6 +535,7 @@ class FeeSpec:
         ...     frequency=Tenor.parse("3M"),
         ...     day_count=DayCount.ACT_360,
         ...     calendar_id="weekends_only",
+        ...     business_day_convention="modified_following",
         ... )
         >>> FeeSpec.from_json(value.to_json()).to_json() == value.to_json()
         True

@@ -883,6 +883,7 @@ class RevolvingCreditBuilder:
     ...     .draw_repay_spec({"deterministic": []})
     ...     .discount_curve_id("USD-OIS")
     ...     .recovery_rate(0.4)
+    ...     .quote_compounding("quarterly")
     ...     .build()
     ... )
     >>> facility.is_stochastic

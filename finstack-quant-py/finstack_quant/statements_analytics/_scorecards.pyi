@@ -388,7 +388,7 @@ class ScorecardConfig:
         Examples
         --------
         >>> from finstack_quant.statements_analytics import ScorecardConfig
-        >>> config = ScorecardConfig(period="2025Q1")
+        >>> config = ScorecardConfig("agency_style", period="2025Q1")
         >>> ScorecardConfig.from_json(config.to_json()).period
         '2025Q1'
 

@@ -288,7 +288,13 @@ def schedule_from_classified_flows(
     >>> from finstack_quant.core.cashflow import CashFlow, CFKind
     >>> from finstack_quant.core.dates import DayCount
     >>> from finstack_quant.core.money import Money
-    >>> flow = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.PIK, 0.0)
+    >>> flow = CashFlow(
+    ...     datetime.date(2025, 6, 15),
+    ...     Money(0.0, "USD"),
+    ...     CFKind.PIK,
+    ...     0.0,
+    ...     principal=(Money(100.0, "USD"), "2025-06-15"),
+    ... )
     >>> schedule_from_classified_flows([flow], DayCount.ACT_360).get_flows()[0].kind.name
     'pik'
     """

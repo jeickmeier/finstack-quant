@@ -479,6 +479,7 @@ class CalibrationStep:
         ...     "base_date": "2024-06-28",
         ...     "discount_curve_id": "usd_ois",
         ...     "currency": "USD",
+        ...     "date_regime": "standard",
         ... }
         >>> step = CalibrationStep.base_correlation("cdx_bc", params)
         >>> step.kind

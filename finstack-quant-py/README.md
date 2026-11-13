@@ -236,12 +236,14 @@ named `with_*`.
 
 ```python
 from datetime import date
-from finstack_quant.core.dates import Schedule, StubKind
+from finstack_quant.core.dates import GridMode, Schedule, StubKind
 
 schedule = (
     Schedule.builder(date(2025, 1, 15), date(2030, 1, 15))
     .frequency("3M")
     .stub_rule(StubKind.SHORT_FRONT)
+    .grid(GridMode.NATURAL)
+    .unadjusted()
     .build()
 )
 ```
