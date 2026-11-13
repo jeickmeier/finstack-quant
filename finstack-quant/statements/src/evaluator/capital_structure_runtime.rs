@@ -638,7 +638,14 @@ mod fx_policy_tests {
             end,
             is_actual: false,
         };
-        let mut model = FinancialModelSpec::new("fx-default", vec![period.clone()]);
+        let mut model = FinancialModelSpec::new(
+            "fx-default",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![period.clone()],
+            )
+            .expect("valid period plan"),
+        );
         model.capital_structure = Some(CapitalStructureSpec {
             debt_instruments: vec![],
             meta: indexmap::IndexMap::new(),

@@ -10,7 +10,7 @@ use super::handles::JsRegistry;
 use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, json_text};
 use crate::utils::wire::{js_date, js_wire};
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_core::dates::{Date, Period, PeriodId};
+use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder};
 use finstack_quant_statements::capital_structure::{
@@ -149,22 +149,21 @@ impl JsModelBuilder {
         Ok(())
     }
 
-    /// Define the model periods from an explicit list.
+    /// Define the model timeline from an explicit period plan.
     ///
     /// Twin of Python `ModelBuilder.periods_explicit` (Rust
-    /// `ModelBuilder::periods_explicit`).
+    /// `ModelBuilder::periods_explicit`); the model retains the plan's calendar.
     ///
-    /// @param periods - Array of `Period` objects (`id`, ISO `start`, exclusive ISO `end`, `is_actual`) in timeline order (array or JSON).
-    /// @throws Error with kind `validation` if `periods` is malformed or empty, periods were already set, or the builder was consumed.
+    /// @param plan - `PeriodPlan` (`calendar` plus `periods` in timeline order), for example from `core.buildPeriods` or `core.buildFiscalPeriods` (object or JSON).
+    /// @throws Error with kind `validation` if `plan` is malformed or has no periods, a period does not belong to its calendar, periods were already set, or the builder was consumed.
     #[wasm_bindgen(js_name = periodsExplicit)]
     pub fn periods_explicit(
         &mut self,
-        #[wasm_bindgen(unchecked_param_type = "generated.statements.Period[] | string")]
-        periods: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "PeriodPlan | string")] plan: JsValue,
     ) -> Result<(), JsValue> {
-        let periods: Vec<Period> = from_js_json(&periods, "periods")?;
+        let plan: finstack_quant_core::dates::PeriodPlan = from_js_json(&plan, "plan")?;
         self.builder_mut()?
-            .periods_explicit(periods)
+            .periods_explicit(plan)
             .map_err(to_js_err)?;
         Ok(())
     }

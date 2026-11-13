@@ -822,7 +822,14 @@ mod tests {
         debts: Vec<(&str, FinancialStatementInstrument)>,
         classes: Vec<PaymentClassSpec>,
     ) -> FinancialModelSpec {
-        let mut model = FinancialModelSpec::new("borrower", periods(range));
+        let mut model = FinancialModelSpec::new(
+            "borrower",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                periods(range),
+            )
+            .expect("valid period plan"),
+        );
         model.capital_structure = Some(CapitalStructureSpec {
             debt_instruments: debts
                 .into_iter()
@@ -993,12 +1000,12 @@ mod tests {
             vec![("TLA", term_loan(date!(2029 - 06 - 30)))],
             vec![class("1L", 0, &["TLA"])],
         );
-        model.periods.clear();
+        model.periods.periods.clear();
         let mut day = date!(2024 - 01 - 01);
         while day <= date!(2025 - 12 - 31) {
             if day.weekday().number_days_from_monday() < 5 {
                 let id = PeriodId::from_date(day, PeriodKind::Daily, None).expect("day");
-                model.periods.push(Period {
+                model.periods.periods.push(Period {
                     id,
                     start: day,
                     end: day.next_day().expect("next day"),
@@ -1157,8 +1164,8 @@ mod tests {
         let (results, mut model) = fixture();
         // Four periods before 2026Q1 exist, but 2025Q4 is missing from the model:
         // the last four model periods span five quarters, which `ttm` also refuses.
-        model.periods.retain(|period| period.id != q(4));
-        model.periods.extend(periods("2026Q1..2026Q1"));
+        model.periods.periods.retain(|period| period.id != q(4));
+        model.periods.periods.extend(periods("2026Q1..2026Q1"));
         let period = PeriodId::quarter(2026, 1).expect("valid quarter");
         let mut results = results;
         for instrument_rows in results

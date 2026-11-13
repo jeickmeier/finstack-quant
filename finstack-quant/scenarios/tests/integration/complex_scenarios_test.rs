@@ -45,7 +45,14 @@ fn test_fx_equity_curve_combo() {
             MarketScalar::Price(Money::new(400.0, Currency::USD).expect("valid money fixture")),
         );
 
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "combo".into(),
@@ -132,7 +139,14 @@ fn test_statements_rate_bindings_curve() {
 
     let period_plan = build_periods("2025Q1..Q2", None).unwrap();
     let periods = period_plan.periods;
-    let mut model = FinancialModelSpec::new("test", periods.clone());
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods.clone(),
+        )
+        .expect("valid period plan"),
+    );
 
     // Add revenue and rate nodes
     let mut revenue_values = IndexMap::new();
@@ -224,7 +238,14 @@ fn test_time_roll_with_market_shocks() {
         "SPY",
         MarketScalar::Price(Money::new(450.0, Currency::USD).expect("valid money fixture")),
     );
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "roll_and_shock".into(),
@@ -284,7 +305,14 @@ fn test_conflicting_operations_last_wins() {
         .unwrap();
 
     let mut market = MarketContext::new().insert(curve);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "conflicting".into(),
@@ -407,7 +435,14 @@ fn test_multiple_statement_operations() {
 
     let period_plan = build_periods("2025Q1..Q2", None).unwrap();
     let periods = period_plan.periods;
-    let mut model = FinancialModelSpec::new("test", periods.clone());
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods.clone(),
+        )
+        .expect("valid period plan"),
+    );
 
     let mut revenue_values = IndexMap::new();
     let mut cost_values = IndexMap::new();

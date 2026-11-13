@@ -590,7 +590,7 @@ fn plain_evaluate_generates_fixed_rate_capital_structure_cashflows() {
 
     // No as-of cutoff: an actual is used as given, where evaluating with a
     // market as of the first period's start would hide it until period end.
-    model.periods[0].is_actual = true;
+    model.periods.periods[0].is_actual = true;
     let plain = Evaluator::new().evaluate(&model).expect("plain evaluation");
     assert_eq!(
         plain.node_sources["cash"][&q1],

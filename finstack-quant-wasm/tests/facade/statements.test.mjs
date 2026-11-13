@@ -32,7 +32,10 @@ await init({ module_or_path: readFileSync(WASM_BG) });
 
 const MODEL_JSON = JSON.stringify({
   id: 'facade-model',
-  periods: [{ id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: false }],
+  periods: {
+    calendar: 'gregorian',
+    periods: [{ id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: false }],
+  },
   nodes: {
     revenue: {
       node_id: 'revenue',
@@ -246,12 +249,15 @@ test('statements correlated paths retain sampled shocks when peer values round f
   function run(method, rho, tiny) {
     const model = JSON.parse(MODEL_JSON);
     model.id = 'direct-shocks';
-    model.periods = [1, 2, 3, 4].map((quarter) => ({
-      id: `2025Q${quarter}`,
-      start: `2025-${String(quarter * 3 - 2).padStart(2, '0')}-01`,
-      end: quarter === 4 ? '2026-01-01' : `2025-${String(quarter * 3 + 1).padStart(2, '0')}-01`,
-      is_actual: quarter === 1,
-    }));
+    model.periods = {
+      calendar: 'gregorian',
+      periods: [1, 2, 3, 4].map((quarter) => ({
+        id: `2025Q${quarter}`,
+        start: `2025-${String(quarter * 3 - 2).padStart(2, '0')}-01`,
+        end: quarter === 4 ? '2026-01-01' : `2025-${String(quarter * 3 + 1).padStart(2, '0')}-01`,
+        is_actual: quarter === 1,
+      })),
+    };
     const params = {
       std_dev: tiny ? 1e-20 : 0.1,
       seed: 42,

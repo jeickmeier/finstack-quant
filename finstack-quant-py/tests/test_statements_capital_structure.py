@@ -302,7 +302,9 @@ class TestModelBuilderForecasts:
 
     def test_financial_model_from_json_runs_semantic_validation(self) -> None:
         with pytest.raises(ValueError, match="Model must have at least one period"):
-            statements.FinancialModelSpec.from_json('{"schema_version":1,"id":"bad","periods":[],"nodes":{}}')
+            statements.FinancialModelSpec.from_json(
+                '{"schema_version":1,"id":"bad","periods":{"calendar": "gregorian", "periods": []},"nodes":{}}'
+            )
 
 
 def test_pik_targets_are_required_and_nonempty() -> None:

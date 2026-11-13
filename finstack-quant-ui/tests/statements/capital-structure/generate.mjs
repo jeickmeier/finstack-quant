@@ -60,12 +60,15 @@ const values = (amounts) =>
  */
 const modelWithCash = (cash) => ({
   id: "capital-structure",
-  periods: quarters.map((id, i) => ({
-    id,
-    start: starts[i],
-    end: ends[i],
-    is_actual: false,
-  })),
+  periods: {
+    calendar: "gregorian",
+    periods: quarters.map((id, i) => ({
+      id,
+      start: starts[i],
+      end: ends[i],
+      is_actual: false,
+    })),
+  },
   nodes: {
     ebitda: {
       node_id: "ebitda",

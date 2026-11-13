@@ -116,7 +116,17 @@ fn failed_model_setters_preserve_state_and_allow_retry() {
         builder.value_scalar("revenue", &[(q1, 100.0)]);
         builder.with_meta("marker", serde_json::json!({"retained": true}));
     }
-    assert!(retry.periods_explicit(Vec::new()).is_err());
+    assert!(
+        retry
+            .periods_explicit(
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    Vec::new()
+                )
+                .expect("valid period plan")
+            )
+            .is_err()
+    );
     assert!(retry.periods("not a period range", None).is_err());
     retry
         .periods("2025Q1..Q2", Some("2025Q1"))

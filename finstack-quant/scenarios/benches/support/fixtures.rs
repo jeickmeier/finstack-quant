@@ -253,7 +253,14 @@ pub fn hierarchy_market(n_curves: usize) -> MarketContext {
 pub fn financial_model() -> FinancialModelSpec {
     let period_plan = build_periods("2025Q1..2026Q4", None).unwrap();
     let periods = period_plan.periods;
-    let mut model = FinancialModelSpec::new("test_model", periods.clone());
+    let mut model = FinancialModelSpec::new(
+        "test_model",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods.clone(),
+        )
+        .expect("valid period plan"),
+    );
 
     let mut revenue_values = IndexMap::new();
     for (i, period) in periods.iter().enumerate() {

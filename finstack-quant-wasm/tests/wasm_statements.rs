@@ -40,7 +40,14 @@ fn model_node_ids_empty_model() {
     let periods = finstack_quant_core::dates::build_periods("2025Q1..Q1", None)
         .unwrap()
         .periods;
-    let model = finstack_quant_statements::types::FinancialModelSpec::new("empty", periods);
+    let model = finstack_quant_statements::types::FinancialModelSpec::new(
+        "empty",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods,
+        )
+        .expect("valid period plan"),
+    );
     let json = serde_json::to_string(&model).unwrap();
     let result = model_node_ids(JsValue::from(&json)).unwrap();
     let ids: Vec<String> = serde_wasm_bindgen::from_value(result).unwrap();
@@ -51,7 +58,14 @@ fn model_node_ids_empty_model() {
 fn model_node_ids_validates_the_model() {
     // `modelNodeIds` goes through Rust `FinancialModelSpec::from_json`, so a
     // model `validateFinancialModelJson` rejects is rejected here too.
-    let model = finstack_quant_statements::types::FinancialModelSpec::new("empty", vec![]);
+    let model = finstack_quant_statements::types::FinancialModelSpec::new(
+        "empty",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let json = serde_json::to_string(&model).unwrap();
     assert!(model_node_ids(JsValue::from(&json)).is_err());
     assert!(validate_financial_model_json(JsValue::from(&json)).is_err());
@@ -173,7 +187,14 @@ fn validate_financial_model_json_accepts_valid_model() {
     let periods = finstack_quant_core::dates::build_periods("2025Q1..Q1", None)
         .expect("valid periods")
         .periods;
-    let model = finstack_quant_statements::types::FinancialModelSpec::new("test", periods);
+    let model = finstack_quant_statements::types::FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods,
+        )
+        .expect("valid period plan"),
+    );
     let json = serde_json::to_string(&model).expect("model should serialize to JSON");
     let out = validate_financial_model_json(JsValue::from(&json))
         .expect("validate_financial_model_json should accept valid model");

@@ -85,15 +85,18 @@ def test_explicit_forecast_keeps_growth_anchor_and_seasonal_phase(forecast_json:
     model = {
         "id": "forecast-continuity",
         "schema_version": 1,
-        "periods": [
-            {
-                "id": f"2025Q{q}",
-                "start": f"2025-{q * 3 - 2:02d}-01",
-                "end": "2026-01-01" if q == 4 else f"2025-{q * 3 + 1:02d}-01",
-                "is_actual": q == 1,
-            }
-            for q in range(1, 5)
-        ],
+        "periods": {
+            "calendar": "gregorian",
+            "periods": [
+                {
+                    "id": f"2025Q{q}",
+                    "start": f"2025-{q * 3 - 2:02d}-01",
+                    "end": "2026-01-01" if q == 4 else f"2025-{q * 3 + 1:02d}-01",
+                    "is_actual": q == 1,
+                }
+                for q in range(1, 5)
+            ],
+        },
         "nodes": {
             "revenue": {
                 "node_id": "revenue",

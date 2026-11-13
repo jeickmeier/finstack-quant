@@ -1876,7 +1876,7 @@ mod tests {
                 model_builder_1.with_meta("currency", serde_json::json!("USD"));
                 model_builder_1.build().unwrap()
             };
-            for (p, w) in model.periods.iter_mut().zip(boundaries.windows(2)) {
+            for (p, w) in model.periods.periods.iter_mut().zip(boundaries.windows(2)) {
                 p.start = w[0];
                 p.end = w[1];
             }
@@ -1895,7 +1895,7 @@ mod tests {
                 unreachable!()
             };
             assert_eq!(terminal_metric, 100.);
-            model.periods.remove(0);
+            model.periods.periods.remove(0);
             assert!(
                 resolve_exit_multiple_metric(&model, &results, terminal.clone(), Some("ebitda"))
                     .is_err()

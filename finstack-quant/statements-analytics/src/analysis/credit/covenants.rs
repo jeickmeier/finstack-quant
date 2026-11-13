@@ -208,7 +208,7 @@ mod tests {
     fn calendar() -> Vec<finstack_quant_core::dates::Period> {
         let mut model_builder = finstack_quant_statements::builder::ModelBuilder::new("calendar");
         model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.build().unwrap().periods
+        model_builder.build().unwrap().periods.periods
     }
 
     #[test]

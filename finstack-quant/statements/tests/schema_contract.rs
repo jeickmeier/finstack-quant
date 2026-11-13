@@ -275,7 +275,9 @@ fn root_types_generate_typed_schemas() {
 
     assert_eq!(model["title"], "FinancialModelSpec");
     assert_eq!(result["title"], "StatementResult");
-    assert!(model["properties"]["periods"]["items"].is_object());
+    assert_eq!(model["properties"]["periods"]["$ref"], "#/$defs/PeriodPlan");
+    assert!(model["$defs"]["PeriodPlan"]["properties"]["calendar"].is_object());
+    assert!(model["$defs"]["PeriodPlan"]["properties"]["periods"]["items"].is_object());
     assert!(result["properties"]["meta"].is_object());
     assert_eq!(
         model["$defs"]["DebtInstrumentSpec"]["properties"]["spec"]["$ref"],

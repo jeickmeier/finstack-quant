@@ -55,7 +55,14 @@ fn test_discount_curve_df_monotonic_after_parallel_shock() {
         hazard_bump_mode: Default::default(),
     };
 
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
@@ -124,7 +131,14 @@ fn test_discount_curve_df_monotonic_after_node_shock() {
         hazard_bump_mode: Default::default(),
     };
 
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
@@ -190,7 +204,14 @@ fn test_forward_curve_rates_finite_after_parallel_shock() {
         hazard_bump_mode: Default::default(),
     };
 
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
@@ -260,7 +281,14 @@ fn test_forward_curve_rates_finite_after_node_shock() {
         hazard_bump_mode: Default::default(),
     };
 
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market,
@@ -325,7 +353,14 @@ fn test_base_correlation_bounds_after_parallel_shock() {
         hazard_bump_mode: Default::default(),
     };
 
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let engine = ScenarioEngine::new();
     let as_of = date!(2025 - 01 - 01);
     let mut ctx = ExecutionContext {
@@ -432,7 +467,14 @@ fn test_base_correlation_bounds_after_bucket_shock() {
         hazard_bump_mode: Default::default(),
     };
 
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let engine = ScenarioEngine::new();
     let as_of = date!(2025 - 01 - 01);
     let mut ctx = ExecutionContext {
@@ -491,7 +533,14 @@ fn test_vol_surface_non_negative_after_parallel_shock() {
         hazard_bump_mode: Default::default(),
     };
 
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let engine = ScenarioEngine::new();
     let as_of = date!(2025 - 01 - 01);
     let mut ctx = ExecutionContext {
@@ -558,7 +607,14 @@ fn test_vol_surface_non_negative_after_bucket_shock() {
         hazard_bump_mode: Default::default(),
     };
 
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let engine = ScenarioEngine::new();
     let as_of = date!(2025 - 01 - 01);
     let mut ctx = ExecutionContext {

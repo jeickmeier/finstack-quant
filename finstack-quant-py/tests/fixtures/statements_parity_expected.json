@@ -59,7 +59,7 @@
         }
       }
     ],
-    "builder.content_hash": "sha256:1217c6da517d96135c677b56d9c86bf76768e5dac114550a7309be08d123213b",
+    "builder.content_hash": "sha256:e8557dea2948eab4d1416b15e56bc7d44ab8b80be17a4356b6086f9ccc346dca",
     "builder.node_ids": [
       "revenue",
       "profit",

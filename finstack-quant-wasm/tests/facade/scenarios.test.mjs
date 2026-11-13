@@ -424,7 +424,10 @@ test('applyScenario stamps the caller configuration into meta', () => {
   const model = {
     schema_version: 1,
     id: 'm',
-    periods: [{ id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: false }],
+    periods: {
+      calendar: 'gregorian',
+      periods: [{ id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: false }],
+    },
     nodes: {},
   };
   const withModel = scenarios.applyScenario(
@@ -462,7 +465,12 @@ test('scenario errors surface before market errors and match Python text', () =>
 
 test('applyScenario rejects a statement model that fails semantic validation', () => {
   const spec = scenarios.parseScenarioSpec({ id: 'up25', operations: [UP_25] });
-  const model = { schema_version: 1, id: 'm', periods: [], nodes: {} };
+  const model = {
+    schema_version: 1,
+    id: 'm',
+    periods: { calendar: 'gregorian', periods: [] },
+    nodes: {},
+  };
   assert.throws(
     () => scenarios.applyScenario(spec, OIS_MARKET, AS_OF, model),
     /at least one period/

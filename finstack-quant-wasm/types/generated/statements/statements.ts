@@ -1992,6 +1992,19 @@ export type NodeValueType =
       [k: string]: unknown;
     };
 /**
+ * Calendar context that bounds and steps period identifiers.
+ *
+ * An unprefixed identifier belongs to `Gregorian`, an `FY` identifier to
+ * `Fiscal(config)`. A [`PeriodPlan`] retains its calendar once; operations
+ * that resolve or step an identifier take this context explicitly (record
+ * CORE-CONVENTIONS-014 #4).
+ */
+export type PeriodCalendar =
+  | "gregorian"
+  | {
+      fiscal: FiscalConfig;
+    };
+/**
  * Identifier for a Gregorian period like `2025Q1` or a fiscal period like
  * `FY2025W53`.
  */
@@ -7165,12 +7178,14 @@ export interface FinancialModelSpec {
     [k: string]: NodeSpec;
   };
   /**
-   * Ordered list of periods (quarters, months, etc.).
+   * Period plan: the ordered periods (quarters, months, etc.) with the
+   * calendar context they belong to, retained once (record
+   * CORE-CONVENTIONS-014 #4).
    *
    * Evaluation follows this order end-to-end (dependency resolution and time-series
    * helpers assume a single coherent timeline).
    */
-  periods: Period[];
+  periods: PeriodPlan;
   /**
    * Required schema version. Only version `1` is accepted.
    */
@@ -7264,6 +7279,34 @@ export interface ForecastSpec {
   params?: {
     [k: string]: unknown;
   };
+}
+/**
+ * Builder/plan for a contiguous sequence of periods and their actual/forecast split.
+ *
+ * Periods are returned in ascending order and are intended to form a contiguous
+ * run of model periods. Each [`Period`] uses the crate-wide `[start, end)`
+ * interval convention, so the `end` of one period naturally aligns with the
+ * `start` of the next.
+ */
+export interface PeriodPlan {
+  /**
+   * Calendar context of every period in the plan, retained once.
+   */
+  calendar: PeriodCalendar;
+  /**
+   * Ordered periods produced by the parser.
+   */
+  periods: Period[];
+}
+/**
+ * Configuration for fiscal year periods.
+ *
+ * Always holds a start month in `1..=12` and a start day in `1..=31`;
+ * deserialization applies the same validation as [`FiscalConfig::new`].
+ */
+export interface FiscalConfig {
+  start_day: number;
+  start_month: number;
 }
 /**
  * A concrete period with start/end dates and actual/forecast flag.

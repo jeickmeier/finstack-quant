@@ -21,7 +21,14 @@ fn test_zero_percent_shock() {
         "SPY",
         MarketScalar::Price(Money::new(400.0, Currency::USD).expect("valid money fixture")),
     );
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "zero_shock".into(),
@@ -65,7 +72,14 @@ fn test_negative_shock() {
         "SPY",
         MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
     );
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "negative_shock".into(),
@@ -109,7 +123,14 @@ fn test_very_large_shock() {
         "SPY",
         MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
     );
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "large_shock".into(),
@@ -155,7 +176,14 @@ fn test_negative_100_percent_shock_on_equity_is_accepted() {
         "SPY",
         MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
     );
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "full_loss_shock".into(),
@@ -193,7 +221,14 @@ fn test_shock_beyond_negative_100_percent_on_equity_is_rejected() {
         "SPY",
         MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
     );
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "beyond_full_loss".into(),
@@ -240,7 +275,14 @@ fn test_negative_100_percent_fx_shock_is_rejected() {
 
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "fx_full_loss".into(),
@@ -276,7 +318,14 @@ fn test_negative_100_percent_fx_shock_is_rejected() {
 fn test_shock_nonexistent_market_data() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "missing_data".into(),
@@ -310,7 +359,14 @@ fn test_shock_nonexistent_market_data() {
 fn test_shock_nonexistent_statement_node() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "missing_node".into(),
@@ -358,7 +414,14 @@ fn test_curve_parallel_shock_zero_bp() {
         .unwrap();
 
     let mut market = MarketContext::new().insert(curve);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "zero_bp".into(),
@@ -396,7 +459,14 @@ fn test_statement_shock_negative_percent() {
 
     let period_plan = build_periods("2025Q1..Q2", None).unwrap();
     let periods = period_plan.periods;
-    let mut model = FinancialModelSpec::new("test", periods.clone());
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods.clone(),
+        )
+        .expect("valid period plan"),
+    );
 
     let mut values = IndexMap::new();
     for period in &periods {
@@ -445,7 +515,14 @@ fn test_statement_shock_negative_percent() {
 fn test_curve_shock_nonexistent_curve() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "missing_curve".into(),
@@ -483,7 +560,14 @@ fn test_statement_assign_extreme_value() {
 
     let period_plan = build_periods("2025Q1..Q2", None).unwrap();
     let periods = period_plan.periods;
-    let mut model = FinancialModelSpec::new("test", periods.clone());
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods.clone(),
+        )
+        .expect("valid period plan"),
+    );
 
     let mut values = IndexMap::new();
     for period in &periods {

@@ -290,7 +290,10 @@ test('Rust types reject unknown keys and non-finite numbers in object inputs', (
 test('producer results feed consumers directly as objects', () => {
   const model = {
     id: 'm',
-    periods: [{ id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: false }],
+    periods: {
+      calendar: 'gregorian',
+      periods: [{ id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: false }],
+    },
     nodes: {
       revenue: { node_id: 'revenue', node_type: 'value', values: { '2025Q1': 100 } },
     },

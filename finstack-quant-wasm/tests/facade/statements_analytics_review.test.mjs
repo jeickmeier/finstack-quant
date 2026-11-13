@@ -30,7 +30,10 @@ test('backtesting rejects non-finite observations and arithmetic overflow', () =
 test('exit-multiple DCF sensitivity has no terminal growth shock', () => {
   const model = {
     id: 'dcf-review',
-    periods: [{ id: '2025', start: '2025-01-01', end: '2026-01-01', is_actual: false }],
+    periods: {
+      calendar: 'gregorian',
+      periods: [{ id: '2025', start: '2025-01-01', end: '2026-01-01', is_actual: false }],
+    },
     nodes: {
       ufcf: {
         node_id: 'ufcf',
@@ -56,7 +59,10 @@ test('exit-multiple DCF sensitivity has no terminal growth shock', () => {
 test('growth terminals require a full year even for annual period identifiers', () => {
   const model = {
     id: 'annual-stub-review',
-    periods: [{ id: '2025', start: '2025-07-01', end: '2026-01-01', is_actual: false }],
+    periods: {
+      calendar: 'gregorian',
+      periods: [{ id: '2025', start: '2025-07-01', end: '2026-01-01', is_actual: false }],
+    },
     nodes: {
       ufcf: {
         node_id: 'ufcf',
@@ -83,7 +89,10 @@ test('growth terminals require a full year even for annual period identifiers', 
 test('tornado rejects joint scenarios mislabeled as diagonal JSON', () => {
   const model = {
     id: 'joint-shocks',
-    periods: [{ id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: false }],
+    periods: {
+      calendar: 'gregorian',
+      periods: [{ id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: false }],
+    },
     nodes: {
       revenue: { node_id: 'revenue', node_type: 'value', values: { '2025Q1': 100 } },
       cost: { node_id: 'cost', node_type: 'value', values: { '2025Q1': 20 } },

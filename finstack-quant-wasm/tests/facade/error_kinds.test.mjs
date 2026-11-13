@@ -39,10 +39,13 @@ function model(formulas) {
   }
   return {
     id: 'kinds',
-    periods: [
-      { id: '2024Q1', start: '2024-01-01', end: '2024-04-01', is_actual: false },
-      { id: '2024Q2', start: '2024-04-01', end: '2024-07-01', is_actual: false },
-    ],
+    periods: {
+      calendar: 'gregorian',
+      periods: [
+        { id: '2024Q1', start: '2024-01-01', end: '2024-04-01', is_actual: false },
+        { id: '2024Q2', start: '2024-04-01', end: '2024-07-01', is_actual: false },
+      ],
+    },
     nodes,
     schema_version: 1,
   };

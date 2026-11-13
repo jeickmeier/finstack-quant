@@ -24,7 +24,14 @@ fn test_curve_parallel_shock() {
             .build()
             .unwrap();
         let mut market = MarketContext::new().insert(curve);
-        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "test",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
         let scenario = ScenarioSpec {
             id: format!("rate_shock_{case_id}"),
             name: Some(format!("Rate Shock {case_id}")),
@@ -81,7 +88,14 @@ fn test_equity_price_shock() {
     );
 
     // Setup empty model
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     // Create scenario with equity shock
     let scenario = ScenarioSpec {
@@ -179,7 +193,14 @@ fn test_vol_surface_parallel_shock() {
         .unwrap();
 
     let mut market = MarketContext::new().insert_surface(surface);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "vol_parallel".into(),
@@ -226,7 +247,14 @@ fn test_base_correlation_parallel_shock() {
         .unwrap();
 
     let mut market = MarketContext::new().insert(basecorr);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "basecorr_parallel".into(),

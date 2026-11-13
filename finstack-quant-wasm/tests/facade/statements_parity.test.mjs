@@ -245,7 +245,7 @@ test('statements matches the cross-host golden', () => {
   assertMatches(plain(actual), EXPECTED.statements, 'statements');
 });
 
-test('ModelBuilder.fromSpec resumes a model and periodsExplicit takes Period objects', () => {
+test('ModelBuilder.fromSpec resumes a model and periodsExplicit takes a PeriodPlan', () => {
   const resumed = statements.ModelBuilder.fromSpec(MODEL);
   resumed.compute('double', 'revenue * 2');
   resumed.whereClause('revenue > 0');
@@ -262,7 +262,8 @@ test('ModelBuilder.fromSpec resumes a model and periodsExplicit takes Period obj
   explicit.periodsExplicit(MODEL.periods);
   explicit.availabilityDates('seed', { [Q1]: '2025-04-15' });
   const model = explicit.build();
-  assert.equal(model.periods.length, 2);
+  assert.equal(model.periods.periods.length, 2);
+  assert.equal(model.periods.calendar, 'gregorian');
   assert.equal(model.nodes.seed.availability_dates[Q1], '2025-04-15');
 });
 

@@ -536,7 +536,10 @@ test('rebalanceFromSpec applies the optimizer solution to the spec portfolio', (
 
 const MODEL = JSON.stringify({
   id: 'facade-model',
-  periods: [{ id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: false }],
+  periods: {
+    calendar: 'gregorian',
+    periods: [{ id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: false }],
+  },
   nodes: {
     revenue: { node_id: 'revenue', node_type: 'value', values: { '2025Q1': 100000.0 } },
   },
@@ -564,19 +567,22 @@ test('nodeToDatedSchedule applies the Rust period-date convention', () => {
 test('financialModelContentHash matches the Python/Rust hash', () => {
   assert.equal(
     statements.financialModelContentHash(MODEL),
-    'sha256:43c8428179a2f9bb332af91d87fc7c91ea922286ec7a42b3e5ace45b85a0f17e'
+    'sha256:ed75ab489d251a906928f22f537f7d163ad91518482c650c6cfd27dd243e95d7'
   );
 });
 
 test('monteCarloBreachProbability reads the serialized path table', () => {
   const model = JSON.stringify({
     id: 'mc',
-    periods: [
-      { id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: true },
-      { id: '2025Q2', start: '2025-04-01', end: '2025-07-01', is_actual: false },
-      { id: '2025Q3', start: '2025-07-01', end: '2025-10-01', is_actual: false },
-      { id: '2025Q4', start: '2025-10-01', end: '2026-01-01', is_actual: false },
-    ],
+    periods: {
+      calendar: 'gregorian',
+      periods: [
+        { id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: true },
+        { id: '2025Q2', start: '2025-04-01', end: '2025-07-01', is_actual: false },
+        { id: '2025Q3', start: '2025-07-01', end: '2025-10-01', is_actual: false },
+        { id: '2025Q4', start: '2025-10-01', end: '2026-01-01', is_actual: false },
+      ],
+    },
     nodes: {
       revenue: {
         node_id: 'revenue',

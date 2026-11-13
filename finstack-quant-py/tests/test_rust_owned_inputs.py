@@ -106,7 +106,7 @@ def test_arbitrage_grid_checks_default_to_the_rust_tolerance() -> None:
 
 
 def test_goal_seek_result_from_json_validates_the_embedded_model() -> None:
-    empty_model = {"id": "m", "periods": [], "nodes": {}, "schema_version": 1}
+    empty_model = {"id": "m", "periods": {"calendar": "gregorian", "periods": []}, "nodes": {}, "schema_version": 1}
     with pytest.raises(ValueError, match="at least one period"):
         GoalSeekResult.from_json(json.dumps({"solved_value": 1.0, "model": empty_model}))
     assert GoalSeekResult.from_json('{"solved_value": 2.5, "model": null}').solved_value == 2.5

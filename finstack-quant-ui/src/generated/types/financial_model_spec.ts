@@ -977,13 +977,7 @@ export interface FinancialModelSpecWire {
   nodes: {
     [k: string]: D_7B4Cd44901322286925A;
   };
-  /**
-   * Ordered list of periods (quarters, months, etc.).
-   *
-   * Evaluation follows this order end-to-end (dependency resolution and time-series
-   * helpers assume a single coherent timeline).
-   */
-  periods: D_4672B5Faf94Cbb3De83D[];
+  periods: D_867Bd30E1E9B7Fc46878;
   /**
    * Required schema version. Only version `1` is accepted.
    */
@@ -16252,6 +16246,38 @@ export interface DD5Bd42D8B6Ec6C31D78629 {
     | "ZAR"
     | "ZMW"
     | "ZWL";
+}
+/**
+ * Period plan: the ordered periods (quarters, months, etc.) with the
+ * calendar context they belong to, retained once (record
+ * CORE-CONVENTIONS-014 #4).
+ *
+ * Evaluation follows this order end-to-end (dependency resolution and time-series
+ * helpers assume a single coherent timeline).
+ */
+export interface D_867Bd30E1E9B7Fc46878 {
+  /**
+   * Calendar context of every period in the plan, retained once.
+   */
+  calendar:
+    | "gregorian"
+    | {
+        fiscal: DD9478A234Ddbf6C327A0;
+      };
+  /**
+   * Ordered periods produced by the parser.
+   */
+  periods: D_4672B5Faf94Cbb3De83D[];
+}
+/**
+ * Configuration for fiscal year periods.
+ *
+ * Always holds a start month in `1..=12` and a start day in `1..=31`;
+ * deserialization applies the same validation as [`FiscalConfig::new`].
+ */
+export interface DD9478A234Ddbf6C327A0 {
+  start_day: number;
+  start_month: number;
 }
 /**
  * A concrete period with start/end dates and actual/forecast flag.

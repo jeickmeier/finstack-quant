@@ -235,7 +235,7 @@ fn named_capital_structure_formulas_keep_native_instrument_currency() {
 #[test]
 fn model_period_intervals_must_be_positive_and_disjoint() {
     let mut empty = forecast_model();
-    empty.periods[0].end = empty.periods[0].start;
+    empty.periods.periods[0].end = empty.periods.periods[0].start;
     assert!(
         empty
             .validate_semantics()
@@ -245,7 +245,7 @@ fn model_period_intervals_must_be_positive_and_disjoint() {
     );
 
     let mut overlapping = forecast_model();
-    overlapping.periods[1].start = date!(2025 - 03 - 31);
+    overlapping.periods.periods[1].start = date!(2025 - 03 - 31);
     assert!(
         overlapping
             .validate_semantics()
@@ -255,6 +255,6 @@ fn model_period_intervals_must_be_positive_and_disjoint() {
     );
 
     let mut sparse = forecast_model();
-    sparse.periods[1].start = date!(2025 - 05 - 01);
+    sparse.periods.periods[1].start = date!(2025 - 05 - 01);
     assert!(sparse.validate_semantics().is_ok(), "gaps remain supported");
 }

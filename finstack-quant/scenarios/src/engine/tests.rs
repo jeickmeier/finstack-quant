@@ -145,7 +145,14 @@ fn compose_falls_back_to_solve_to_par_when_modes_disagree() {
 #[test]
 fn apply_rejects_hierarchy_op_without_hierarchy() {
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let scenario = ScenarioSpec {
         id: "h_no_attach".into(),
         name: None,
@@ -183,7 +190,14 @@ fn apply_emits_warning_when_hierarchy_target_matches_no_curves() {
     let hierarchy = MarketDataHierarchy::default();
     let mut market = MarketContext::new();
     market.set_hierarchy(hierarchy);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let scenario = ScenarioSpec {
         id: "h_empty".into(),
         name: None,

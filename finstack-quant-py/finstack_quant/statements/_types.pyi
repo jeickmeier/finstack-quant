@@ -1121,8 +1121,8 @@ class FinancialModelSpec:
         --------
         >>> from finstack_quant.statements import FinancialModelSpec
         >>> payload = (
-        ...     '{"id":"demo","periods":[{"id":"2025Q1","start":"2025-01-01",'
-        ...     '"end":"2025-04-01","is_actual":false}],"nodes":{},"schema_version":1}'
+        ...     '{"id":"demo","periods":{"calendar": "gregorian", "periods": [{"id":"2025Q1","start":"2025-01-01",'
+        ...     '"end":"2025-04-01","is_actual":false}]},"nodes":{},"schema_version":1}'
         ... )
         >>> (FinancialModelSpec.from_json(payload).id, FinancialModelSpec.from_json(payload).node_count)
         ('demo', 0)

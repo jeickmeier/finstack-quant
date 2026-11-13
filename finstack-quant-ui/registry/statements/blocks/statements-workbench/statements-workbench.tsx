@@ -326,7 +326,13 @@ export function StatementsWorkbench({
     () =>
       model && rollup.data
         ? {
-            model: { ...model, periods: rollup.data.periods },
+            model: {
+              ...model,
+              periods: {
+                calendar: model.periods.calendar,
+                periods: rollup.data.periods,
+              },
+            },
             result: rollup.data,
           }
         : null,
@@ -355,7 +361,7 @@ export function StatementsWorkbench({
     [model, nodeIds],
   );
   const periodIds = useMemo(
-    () => model?.periods.map((period) => period.id) ?? [],
+    () => model?.periods.periods.map((period) => period.id) ?? [],
     [model],
   );
   const sections = useMemo((): StatementSections => {
@@ -385,7 +391,7 @@ export function StatementsWorkbench({
   const selected = useMemo(() => {
     if (!model || !link.selectedKey) return null;
     for (const nodeId of Object.keys(model.nodes))
-      for (const period of model.periods)
+      for (const period of model.periods.periods)
         if (statementCellKey(nodeId, period.id) === link.selectedKey)
           return { nodeId, periodId: period.id };
     return null;
@@ -395,8 +401,8 @@ export function StatementsWorkbench({
   const activePeriod =
     selected?.periodId ??
     editPeriod ??
-    model?.periods.findLast((period) => period.is_actual)?.id ??
-    model?.periods[0]?.id ??
+    model?.periods.periods.findLast((period) => period.is_actual)?.id ??
+    model?.periods.periods[0]?.id ??
     null;
   const headline = rows.filter((row) =>
     model?.nodes[row.nodeId]?.tags?.some(
@@ -409,7 +415,9 @@ export function StatementsWorkbench({
       : (model?.id ?? "Financial statements");
   const currency =
     typeof model?.meta?.currency === "string" ? model.meta.currency : null;
-  const nextForecast = model?.periods.find((period) => !period.is_actual);
+  const nextForecast = model?.periods.periods.find(
+    (period) => !period.is_actual,
+  );
   const rollForward = async () => {
     if (!onRollForward || !request || !nextForecast) return;
     const before =
@@ -423,7 +431,7 @@ export function StatementsWorkbench({
         updated,
       ) as FinancialModelSpecWire;
       if (
-        !rolled.periods.some(
+        !rolled.periods.periods.some(
           (period) => period.id === nextForecast.id && period.is_actual,
         )
       )
@@ -488,8 +496,8 @@ export function StatementsWorkbench({
               <p className="text-sm text-muted-foreground">
                 {model?.id}
                 {currency ? ` · ${currency}` : ""}
-                {model?.periods.length
-                  ? ` · ${model.periods.length} reporting periods`
+                {model?.periods.periods.length
+                  ? ` · ${model.periods.periods.length} reporting periods`
                   : ""}
               </p>
             </div>
@@ -514,7 +522,7 @@ export function StatementsWorkbench({
               aria-label="Reporting periods"
               className="flex flex-wrap gap-2"
             >
-              {model.periods.map((period) => (
+              {model.periods.periods.map((period) => (
                 <Button
                   key={period.id}
                   type="button"

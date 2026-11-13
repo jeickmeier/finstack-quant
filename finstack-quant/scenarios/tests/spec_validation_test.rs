@@ -406,7 +406,14 @@ fn engine_apply_rejects_invalid_spec() {
     };
 
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let mut ctx = ExecutionContext {
         market: &mut market,
         model: Some(&mut model),

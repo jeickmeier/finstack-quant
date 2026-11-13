@@ -41,7 +41,14 @@ fn test_par_cds_bump_integration() {
         .unwrap();
 
     let mut market = MarketContext::new().insert(discount).insert(hazard);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     // Apply 10bp Par CDS bump at 5Y
     let scenario = ScenarioSpec {
@@ -141,7 +148,14 @@ fn test_par_cds_bump_reprices_credit_bond() {
     };
 
     let mut market_after = market;
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market: &mut market_after,
@@ -220,7 +234,14 @@ fn roll_with_discount_and_par_cds_bump_survives_knot_on_roll_tenor() {
             .unwrap();
 
         let mut market = MarketContext::new().insert(discount).insert(hazard);
-        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "test",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
 
         let scenario = ScenarioSpec {
             id: "roll_and_bump".into(),
@@ -305,7 +326,14 @@ fn apply_par_cds(
     as_of: Date,
     spec: &ScenarioSpec,
 ) -> finstack_quant_scenarios::ApplicationReport {
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {
         market,
@@ -438,7 +466,14 @@ fn sequential_same_curve_first_order_ops_compound() {
 
     let mut once_market = market.clone();
     let mut twice_market = market;
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let mut ctx = ExecutionContext {
         market: &mut once_market,
         model: Some(&mut model),
@@ -449,7 +484,14 @@ fn sequential_same_curve_first_order_ops_compound() {
     };
     engine.apply(&once, &mut ctx).expect("once");
     drop(ctx);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let mut ctx = ExecutionContext {
         market: &mut twice_market,
         model: Some(&mut model),
@@ -1000,7 +1042,14 @@ fn several_failing_par_cds_ops_report_the_first_op_in_order() {
     let engine = ScenarioEngine::new();
     for _ in 0..20 {
         let mut market = MarketContext::new();
-        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "test",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
         let mut ctx = ExecutionContext {
             market: &mut market,
             model: Some(&mut model),

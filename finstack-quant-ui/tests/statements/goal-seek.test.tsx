@@ -36,7 +36,7 @@ const modelJson: string = native.validateFinancialModelJson(
   JSON.stringify(model),
 );
 const nodeIds = Object.keys(model.nodes);
-const periods = model.periods.map((period) => period.id);
+const periods = model.periods.periods.map((period) => period.id);
 const solved = captured as unknown as GoalSeekResult;
 const bounds = run.bounds as [number, number];
 const request: GoalSeekRequest = {

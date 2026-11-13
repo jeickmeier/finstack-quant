@@ -1040,7 +1040,14 @@ mod tests {
             .build()
             .expect("vol index curve should build");
         let mut market = MarketContext::new().insert(vol_curve);
-        let mut model = FinancialModelSpec::new("demo", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "demo",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
 
         let scenario = ScenarioSpec {
             id: "vol".into(),
@@ -1084,7 +1091,14 @@ mod tests {
             .build()
             .expect("vol index curve should build");
         let mut market = MarketContext::new().insert(vol_curve);
-        let mut model = FinancialModelSpec::new("demo", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "demo",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
         let ctx = ExecutionContext {
             market: &mut market,
             model: Some(&mut model),
@@ -1146,7 +1160,14 @@ mod tests {
             .build()
             .expect("vol-index curve should build");
         let mut market = MarketContext::new().insert(forward).insert(vol);
-        let mut model = FinancialModelSpec::new("demo", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "demo",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
         let scenario = ScenarioSpec {
             id: "metadata".into(),
             name: None,
@@ -1211,7 +1232,14 @@ mod tests {
             .build()
             .expect("vol index curve should build");
         let mut market = MarketContext::new().insert(vol_curve);
-        let mut model = FinancialModelSpec::new("demo", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "demo",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
         let ctx = ExecutionContext {
             market: &mut market,
             model: Some(&mut model),
@@ -1241,7 +1269,14 @@ mod tests {
             .expect("discount curve should build");
         let base_zero = curve.zero_rate(3.0, finstack_quant_core::math::Compounding::Continuous);
         let mut market = MarketContext::new().insert(curve);
-        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "test",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
         let ctx = ExecutionContext {
             market: &mut market,
             model: Some(&mut model),
@@ -1316,7 +1351,14 @@ mod tests {
             .build()
             .expect("hazard curve should build");
         let mut market = MarketContext::new().insert(discount).insert(hazard);
-        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "test",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
         let ctx = ExecutionContext {
             market: &mut market,
             model: Some(&mut model),
@@ -1360,7 +1402,14 @@ mod tests {
             .build()
             .expect("forward curve should build");
         let mut market = MarketContext::new().insert(discount).insert(forward);
-        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "test",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
         let ctx = ExecutionContext {
             market: &mut market,
             model: Some(&mut model),
@@ -1423,7 +1472,14 @@ mod tests {
     fn commodity_parallel_percent_moves_every_knot_and_spot() {
         let as_of = date!(2025 - 01 - 01);
         let mut market = MarketContext::new().insert(wti_price_curve(as_of));
-        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "test",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
         let engine = ScenarioEngine::new();
         let mut ctx = ExecutionContext {
             market: &mut market,
@@ -1468,7 +1524,14 @@ mod tests {
     fn commodity_exact_node_percent_moves_only_that_pillar() {
         let as_of = date!(2025 - 01 - 01);
         let mut market = MarketContext::new().insert(wti_price_curve(as_of));
-        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "test",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
         let ctx = ExecutionContext {
             market: &mut market,
             model: Some(&mut model),
@@ -1506,7 +1569,14 @@ mod tests {
         let curve = wti_price_curve(as_of);
         let base_px = curve.price(3.0);
         let mut market = MarketContext::new().insert(curve);
-        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "test",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
         let ctx = ExecutionContext {
             market: &mut market,
             model: Some(&mut model),
@@ -1545,7 +1615,14 @@ mod tests {
     fn commodity_parallel_large_shock_emits_warning() {
         let as_of = date!(2025 - 01 - 01);
         let mut market = MarketContext::new().insert(wti_price_curve(as_of));
-        let mut model = FinancialModelSpec::new("demo", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "demo",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
         let ctx = ExecutionContext {
             market: &mut market,
             model: Some(&mut model),

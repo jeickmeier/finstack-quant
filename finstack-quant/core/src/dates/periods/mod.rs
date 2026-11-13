@@ -721,12 +721,86 @@ pub struct Period {
 /// `start` of the next.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "PeriodPlanWire")]
+#[cfg_attr(feature = "json-schema", schemars(!try_from, deny_unknown_fields))]
 pub struct PeriodPlan {
     /// Calendar context of every period in the plan, retained once.
     pub calendar: PeriodCalendar,
     /// Ordered periods produced by the parser.
     pub periods: Vec<Period>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PeriodPlanWire {
+    calendar: PeriodCalendar,
+    periods: Vec<Period>,
+}
+
+impl TryFrom<PeriodPlanWire> for PeriodPlan {
+    type Error = crate::Error;
+
+    fn try_from(wire: PeriodPlanWire) -> crate::Result<Self> {
+        Self::try_new(wire.calendar, wire.periods)
+    }
+}
+
+impl PeriodPlan {
+    /// Build a plan from periods of one calendar context.
+    ///
+    /// # Arguments
+    ///
+    /// * `calendar` - Calendar context the periods belong to, retained once.
+    /// * `periods` - Periods in order; every identifier must belong to
+    ///   `calendar` (fiscal identifiers to a fiscal calendar, unprefixed ones
+    ///   to the Gregorian calendar).
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when a period's identifier does not belong
+    /// to `calendar`.
+    pub fn try_new(calendar: PeriodCalendar, periods: Vec<Period>) -> crate::Result<Self> {
+        if let Some(period) = periods
+            .iter()
+            .find(|period| period.id.is_fiscal() != calendar.is_fiscal())
+        {
+            return Err(invalid_period(
+                &period.id.to_string(),
+                &format!(
+                    "a {} period cannot belong to a {} plan",
+                    if period.id.is_fiscal() {
+                        "fiscal"
+                    } else {
+                        "Gregorian"
+                    },
+                    if calendar.is_fiscal() {
+                        "fiscal"
+                    } else {
+                        "Gregorian"
+                    }
+                ),
+            ));
+        }
+        Ok(Self { calendar, periods })
+    }
+}
+
+impl std::ops::Deref for PeriodPlan {
+    type Target = [Period];
+
+    /// The plan's periods in order; the calendar stays with the plan.
+    fn deref(&self) -> &[Period] {
+        &self.periods
+    }
+}
+
+impl<'a> IntoIterator for &'a PeriodPlan {
+    type Item = &'a Period;
+    type IntoIter = std::slice::Iter<'a, Period>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.periods.iter()
+    }
 }
 
 /// Build periods from a range expression (e.g., "2025Q1..Q4" or "2024Q4..2025Q2").

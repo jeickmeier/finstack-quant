@@ -9,13 +9,13 @@ use super::registry::PyRegistry;
 use super::types::{PyFinancialModelSpec, PyForecastSpec, PyNodeSpec};
 use super::{PERIOD_GRAMMAR, extract_money_series, extract_scalar_series, extract_value_series};
 use crate::bindings::core::currency::PyCurrency;
-use crate::bindings::core::dates::periods::PyPeriod;
+use crate::bindings::core::dates::periods::PyPeriodPlan;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::module_utils::spec_from_py;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, statements_to_py, value_error};
-use finstack_quant_core::dates::{Period, PeriodId};
+use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::money::fx::FxConversionPolicy;
 use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder};
 use finstack_quant_statements::capital_structure::{
@@ -164,14 +164,13 @@ impl PyModelBuilder {
     }
 
     #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.periods_explicit")]
-    #[pyo3(text_signature = "($self, periods)")]
+    #[pyo3(text_signature = "($self, plan)")]
     fn periods_explicit<'py>(
         mut slf: PyRefMut<'py, Self>,
-        periods: Vec<PyRef<'_, PyPeriod>>,
+        plan: PyRef<'_, PyPeriodPlan>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let periods: Vec<Period> = periods.iter().map(|p| p.inner.clone()).collect();
         slf.builder_mut()?
-            .periods_explicit(periods)
+            .periods_explicit(plan.inner.clone())
             .map_err(statements_to_py)?;
         Ok(slf)
     }
@@ -262,9 +261,12 @@ impl PyModelBuilder {
 
         let builder = slf.builder_mut()?;
         if builder.periods_slice().is_empty() {
-            builder
-                .periods_explicit(periods)
-                .map_err(statements_to_py)?;
+            let plan = finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                periods,
+            )
+            .map_err(crate::errors::core_to_py)?;
+            builder.periods_explicit(plan).map_err(statements_to_py)?;
         }
         for (node_id, pairs) in rows {
             builder.value(node_id, &pairs);

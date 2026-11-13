@@ -2147,7 +2147,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 390684
+            "bytes": 393291
           },
           {
             "path": "schemas/statements/1/forecast_parameters.schema.json",
@@ -2305,6 +2305,7 @@
           "FeeStep",
           "FeeTier",
           "FinancialStatementInstrument",
+          "FiscalConfig",
           "FixedCouponSpec",
           "FixedLegSpec",
           "FloatLegSpec",
@@ -2361,7 +2362,9 @@
           "PaymentClassSpec",
           "PaymentPriority",
           "Period",
+          "PeriodCalendar",
           "PeriodId",
+          "PeriodPlan",
           "PiecewiseConstantCurve",
           "PikMode",
           "PikSchedule",
@@ -2496,6 +2499,7 @@
           "FeeStep",
           "FeeTier",
           "FinancialStatementInstrument",
+          "FiscalConfig",
           "FixedCouponSpec",
           "FixedLegSpec",
           "FloatLegSpec",
@@ -2552,7 +2556,9 @@
           "PaymentClassSpec",
           "PaymentPriority",
           "Period",
+          "PeriodCalendar",
           "PeriodId",
+          "PeriodPlan",
           "PiecewiseConstantCurve",
           "PikMode",
           "PikSchedule",
@@ -4806,7 +4812,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 390684
+            "bytes": 393291
           },
           {
             "domain": "statements",

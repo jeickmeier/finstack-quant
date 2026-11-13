@@ -114,8 +114,8 @@ it("projects the native cell source of every evaluated cell, including a where m
   expect(source("revenue", "2025Q2")).toBe("forecast");
   expect(source("ebitda", "2024Q1")).toBe("formula");
   expect(
-    model.periods.map((period) => source("masked_capex", period.id)),
-  ).toEqual(model.periods.map(() => "where_masked"));
+    model.periods.periods.map((period) => source("masked_capex", period.id)),
+  ).toEqual(model.periods.periods.map(() => "where_masked"));
   // Every returned cell carries the source Rust recorded for it.
   for (const row of rows)
     for (const [periodId, cell] of Object.entries(row.cells))
@@ -254,7 +254,7 @@ it("evaluates the complete analyst example, returned ratios, checks and supplied
     );
     const model = JSON.parse(updated) as FinancialModelSpecWire;
     expect(
-      model.periods.find((period) => period.id === periodId)?.is_actual,
+      model.periods.periods.find((period) => period.id === periodId)?.is_actual,
     ).toBe(true);
     const evaluated = unwrap(
       await harness.proxy.evaluateStatement({ modelJson: updated }),

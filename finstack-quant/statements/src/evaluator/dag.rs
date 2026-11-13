@@ -445,7 +445,14 @@ mod tests {
         let periods = finstack_quant_core::dates::build_periods("2025Q1..Q1", None)
             .expect("periods")
             .periods;
-        let mut model = FinancialModelSpec::new("deep", periods);
+        let mut model = FinancialModelSpec::new(
+            "deep",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                periods,
+            )
+            .expect("valid period plan"),
+        );
         for i in (1..n).rev() {
             model.add_node(
                 NodeSpec::new(format!("a{i}"), NodeType::Mixed)

@@ -28,7 +28,14 @@ fn test_fx_shock() {
     let mut market = MarketContext::new().insert_fx(fx_matrix);
 
     // Setup empty model
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     // Create FX shock scenario
     let scenario = ScenarioSpec {
@@ -91,7 +98,14 @@ fn test_fx_shock_preserves_other_quotes() {
 
     let fx_matrix = FxMatrix::new(fx_provider, None);
     let mut market = MarketContext::new().insert_fx(fx_matrix);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "fx_shock".into(),
@@ -153,7 +167,14 @@ fn test_rate_binding() {
     // Setup model with interest rate node
     let period_plan = build_periods("2025Q1..Q4", None).unwrap();
     let periods = period_plan.periods;
-    let mut model = FinancialModelSpec::new("test", periods.clone());
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods.clone(),
+        )
+        .expect("valid period plan"),
+    );
 
     // Add interest rate node with initial values
     let mut rate_values = IndexMap::new();

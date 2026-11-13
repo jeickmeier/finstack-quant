@@ -39,7 +39,7 @@ export function StatementChart({
     try {
       const checked = adaptStatementResult(result);
       const values = checked.nodes[nodeId];
-      const points: Point[] = model.periods.flatMap((period) => {
+      const points: Point[] = model.periods.periods.flatMap((period) => {
         const value = values?.[period.id];
         return typeof value === "number" && Number.isFinite(value)
           ? [{ nodeId, periodId: period.id, value }]

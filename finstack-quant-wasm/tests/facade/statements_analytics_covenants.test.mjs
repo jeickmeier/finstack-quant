@@ -24,12 +24,15 @@ const node = (nodeId, extra) => ({ node_id: nodeId, ...extra });
 // LTM leverage is NaN until four quarters of EBITDA exist (2024Q4).
 const MODEL = JSON.stringify({
   id: 'borrower',
-  periods: QUARTERS.map((id, index) => ({
-    id,
-    start: PERIOD_STARTS[index],
-    end: PERIOD_STARTS[index + 1],
-    is_actual: false,
-  })),
+  periods: {
+    calendar: 'gregorian',
+    periods: QUARTERS.map((id, index) => ({
+      id,
+      start: PERIOD_STARTS[index],
+      end: PERIOD_STARTS[index + 1],
+      is_actual: false,
+    })),
+  },
   nodes: {
     ebitda: node('ebitda', { node_type: 'value', values: values([25, 25, 25, 25]) }),
     interest_expense: node('interest_expense', {

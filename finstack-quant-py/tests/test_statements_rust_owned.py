@@ -61,7 +61,7 @@ def goal_seek_model() -> str:
     return json.dumps({
         "id": "goal-seek",
         "schema_version": 1,
-        "periods": [quarter(1)],
+        "periods": {"calendar": "gregorian", "periods": [quarter(1)]},
         "nodes": {
             "revenue": {"node_id": "revenue", "node_type": "value", "values": {"2025Q1": 100}},
             "profit": {"node_id": "profit", "node_type": "calculated", "formula_text": "revenue * 0.5"},
@@ -79,7 +79,10 @@ def lbo_model() -> str:
         "id": "lbo",
         "schema_version": 1,
         "meta": {"currency": "USD"},
-        "periods": [quarter(1), quarter(2), quarter(3), quarter(4), quarter(1, 2026)],
+        "periods": {
+            "calendar": "gregorian",
+            "periods": [quarter(1), quarter(2), quarter(3), quarter(4), quarter(1, 2026)],
+        },
         "nodes": {
             "ebitda": {"node_id": "ebitda", "node_type": "value", "values": series([100, 100, 100, 100, 120])},
             "net_debt": {"node_id": "net_debt", "node_type": "value", "values": series([300, 300, 300, 300, 200])},
@@ -119,7 +122,7 @@ def dcf_model() -> str:
         "id": "dcf",
         "schema_version": 1,
         "meta": {"currency": "USD"},
-        "periods": [annual(2025), annual(2026)],
+        "periods": {"calendar": "gregorian", "periods": [annual(2025), annual(2026)]},
         "nodes": {
             "ufcf": {"node_id": "ufcf", "node_type": "value", "values": {"2025": usd(100), "2026": usd(110)}},
             "ebitda": {"node_id": "ebitda", "node_type": "value", "values": {"2025": usd(50), "2026": usd(60)}},
@@ -286,7 +289,7 @@ def test_explain_formula_reports_the_cell_source() -> None:
     model = json.dumps({
         "id": "explain",
         "schema_version": 1,
-        "periods": [{**quarter(1), "is_actual": True}, quarter(2)],
+        "periods": {"calendar": "gregorian", "periods": [{**quarter(1), "is_actual": True}, quarter(2)]},
         "nodes": {
             "revenue": {
                 "node_id": "revenue",
@@ -321,7 +324,12 @@ def test_explain_formula_reports_the_cell_source() -> None:
 
 
 def test_model_ingest_is_rust_from_json() -> None:
-    empty = json.dumps({"id": "empty", "schema_version": 1, "periods": [], "nodes": {}})
+    empty = json.dumps({
+        "id": "empty",
+        "schema_version": 1,
+        "periods": {"calendar": "gregorian", "periods": []},
+        "nodes": {},
+    })
     with pytest.raises(ValueError, match="at least one period"):
         FinancialModelSpec.from_json(empty)
     with pytest.raises(ValueError, match="at least one period"):
@@ -357,7 +365,7 @@ def test_non_finite_values_use_the_nan_sentinel() -> None:
     model = json.dumps({
         "id": "lag",
         "schema_version": 1,
-        "periods": [quarter(1), quarter(2)],
+        "periods": {"calendar": "gregorian", "periods": [quarter(1), quarter(2)]},
         "nodes": {
             "revenue": {"node_id": "revenue", "node_type": "value", "values": {"2025Q1": 100, "2025Q2": 110}},
             "lagged": {"node_id": "lagged", "node_type": "calculated", "formula_text": "lag(revenue, 1)"},

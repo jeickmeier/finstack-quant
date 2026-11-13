@@ -548,7 +548,7 @@ mod tests {
 
     #[test]
     fn goal_seek_result_from_json_validates_the_embedded_model() {
-        let empty = r#"{"solved_value": 1.0, "model": {"id": "m", "periods": [], "nodes": {}, "schema_version": 1}}"#;
+        let empty = r#"{"solved_value": 1.0, "model": {"id": "m", "periods": {"calendar": "gregorian", "periods": []}, "nodes": {}, "schema_version": 1}}"#;
         let err = GoalSeekResult::from_json(empty).expect_err("a model needs at least one period");
         assert!(err.to_string().contains("at least one period"), "{err}");
 

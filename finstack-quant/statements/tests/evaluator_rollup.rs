@@ -11,6 +11,19 @@ use finstack_quant_statements::types::{
 use indexmap::IndexMap;
 use time::Month;
 
+/// The plan of these fixtures: fiscal ids use the October 1 opening every
+/// fiscal fixture in this file is built with; unprefixed ids are Gregorian.
+fn fixture_plan(periods: Vec<Period>) -> finstack_quant_core::dates::PeriodPlan {
+    let calendar = if periods.first().is_some_and(|period| period.id.is_fiscal()) {
+        finstack_quant_core::dates::PeriodCalendar::Fiscal(
+            finstack_quant_core::dates::FiscalConfig::new(10, 1).expect("valid fiscal start"),
+        )
+    } else {
+        finstack_quant_core::dates::PeriodCalendar::Gregorian
+    };
+    finstack_quant_core::dates::PeriodPlan::try_new(calendar, periods).expect("valid period plan")
+}
+
 fn date(year: i32, month: Month, day: u8) -> Date {
     Date::from_calendar_date(year, month, day).expect("valid date")
 }
@@ -161,8 +174,7 @@ fn empty_annual_spec() -> RollupSpec {
 fn a_target_period_with_any_forecast_source_is_not_actual() {
     let mut model = quarterly_model();
     model.periods = finstack_quant_core::dates::build_periods("2024Q1..2025Q4", Some("2025Q1"))
-        .expect("valid periods")
-        .periods;
+        .expect("valid periods");
     let annual = Evaluator::new()
         .evaluate(&model)
         .expect("evaluation")
@@ -182,7 +194,7 @@ fn a_target_period_with_any_forecast_source_is_not_actual() {
 fn an_evaluated_result_carries_the_model_periods() {
     let model = quarterly_model();
     let quarterly = Evaluator::new().evaluate(&model).expect("evaluation");
-    assert_eq!(quarterly.periods, model.periods);
+    assert_eq!(quarterly.periods, model.periods.periods);
 }
 
 #[test]
@@ -525,7 +537,7 @@ fn fiscal_quarters_roll_up_to_fiscal_years_and_halves() {
     let model = {
         let mut model_builder = ModelBuilder::new("fiscal-rollup");
         model_builder
-            .periods_explicit(periods)
+            .periods_explicit(fixture_plan(periods))
             .expect("valid periods");
         model_builder.value("x", &values);
         model_builder.build().expect("valid model")
@@ -564,7 +576,7 @@ fn rollup_rejects_incomplete_years_and_invalid_targets() {
     let results = Evaluator::new().evaluate(&model).expect("evaluation");
 
     let mut trimmed = model.clone();
-    trimmed.periods.remove(0);
+    trimmed.periods.periods.remove(0);
     let err = results
         .rollup(&trimmed, &annual_spec())
         .expect_err("2024 has three quarters");

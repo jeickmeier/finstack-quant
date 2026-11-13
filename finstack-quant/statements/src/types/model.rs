@@ -5,7 +5,7 @@ use crate::types::{NodeId, NodeSpec, NodeType};
 use finstack_quant_core::contract::{
     ContractDescriptor, ContractError, LoadLimits, ValidationReport,
 };
-use finstack_quant_core::dates::Period;
+use finstack_quant_core::dates::PeriodPlan;
 use finstack_quant_core::wire::SchemaVersion;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
@@ -54,11 +54,13 @@ pub struct FinancialModelSpec {
     /// Unique model identifier
     pub id: String,
 
-    /// Ordered list of periods (quarters, months, etc.).
+    /// Period plan: the ordered periods (quarters, months, etc.) with the
+    /// calendar context they belong to, retained once (record
+    /// CORE-CONVENTIONS-014 #4).
     ///
     /// Evaluation follows this order end-to-end (dependency resolution and time-series
     /// helpers assume a single coherent timeline).
-    pub periods: Vec<Period>,
+    pub periods: PeriodPlan,
 
     /// Map of node_id → NodeSpec
     pub nodes: IndexMap<NodeId, NodeSpec>,
@@ -194,13 +196,13 @@ impl FinancialModelSpec {
     /// the builder validates period ranges and catches stale references to
     /// undefined nodes. This direct constructor is retained for programmatic
     /// use (scenarios, template generators, tests) where callers already have
-    /// a validated `Vec<Period>` and intend to add nodes by hand.
+    /// a validated [`PeriodPlan`] and intend to add nodes by hand.
     ///
     /// # Arguments
     /// * `id` - Identifier used to reference the model
-    /// * `periods` - Ordered list of [`Period`](finstack_quant_core::dates::Period) instances
+    /// * `periods` - Period plan whose calendar context the model retains
     #[must_use]
-    pub fn new(id: impl Into<String>, periods: Vec<Period>) -> Self {
+    pub fn new(id: impl Into<String>, periods: PeriodPlan) -> Self {
         Self {
             id: id.into(),
             periods,
@@ -239,7 +241,7 @@ impl FinancialModelSpec {
     /// use finstack_quant_statements::types::FinancialModelSpec;
     ///
     /// let err = FinancialModelSpec::from_json(
-    ///     r#"{"id": "m", "periods": [], "nodes": {}, "schema_version": 1}"#,
+    ///     r#"{"id": "m", "periods": {"calendar": "gregorian", "periods": []}, "nodes": {}, "schema_version": 1}"#,
     /// )
     /// .expect_err("a model needs at least one period");
     /// assert!(err.to_string().contains("at least one period"));
@@ -272,7 +274,7 @@ impl FinancialModelSpec {
     /// ```rust
     /// use finstack_quant_statements::types::FinancialModelSpec;
     ///
-    /// let value = serde_json::json!({"id": "m", "periods": [], "nodes": {}, "schema_version": 1});
+    /// let value = serde_json::json!({"id": "m", "periods": {"calendar": "gregorian", "periods": []}, "nodes": {}, "schema_version": 1});
     /// assert!(FinancialModelSpec::from_value(value).is_err());
     /// ```
     pub fn from_value(value: serde_json::Value) -> Result<Self> {
@@ -898,7 +900,7 @@ pub struct DebtInstrumentSpec {
 mod period_timeline_tests {
     use super::*;
     use crate::types::AmountOrScalar;
-    use finstack_quant_core::dates::{Date, PeriodId};
+    use finstack_quant_core::dates::{Date, Period, PeriodId};
     use time::Month;
 
     fn period(id: PeriodId, is_actual: bool) -> Period {
@@ -910,7 +912,14 @@ mod period_timeline_tests {
     }
 
     fn model_with_periods(periods: Vec<Period>) -> FinancialModelSpec {
-        let mut model = FinancialModelSpec::new("timeline", periods);
+        let mut model = FinancialModelSpec::new(
+            "timeline",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                periods,
+            )
+            .expect("valid period plan"),
+        );
         // A trivial node so the model is otherwise valid.
         let first = model.periods.first().expect("period").id;
         model.add_node(
@@ -1139,7 +1148,7 @@ mod period_timeline_tests {
     #[test]
     fn from_json_runs_semantic_validation() {
         let err = FinancialModelSpec::from_json(
-            r#"{"id": "m", "periods": [], "nodes": {}, "schema_version": 1}"#,
+            r#"{"id": "m", "periods": {"calendar": "gregorian", "periods": []}, "nodes": {}, "schema_version": 1}"#,
         )
         .expect_err("empty timeline is rejected");
         assert!(matches!(err, Error::Build(_)), "{err:?}");

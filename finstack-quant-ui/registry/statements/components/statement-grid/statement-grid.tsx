@@ -118,7 +118,7 @@ export function StatementGrid({
     ),
   );
   const groups: { label: string; count: number }[] = [];
-  for (const period of model.periods) {
+  for (const period of model.periods.periods) {
     const label = period.is_actual ? "Historical" : "Forecast";
     const last = groups.at(-1);
     // finstack-arith: column span of the period group header
@@ -193,7 +193,7 @@ export function StatementGrid({
             ))}
           </TableRow>
           <TableRow className="border-b border-foreground/50 text-xs hover:bg-transparent">
-            {model.periods.map((period) => (
+            {model.periods.periods.map((period) => (
               <TableHead
                 key={period.id}
                 scope="col"
@@ -231,7 +231,7 @@ export function StatementGrid({
                     {row.valueType}
                   </TableCell>
                 )}
-                {model.periods.map((period) => {
+                {model.periods.periods.map((period) => {
                   const cell = row.cells[period.id];
                   const key = statementCellKey(row.nodeId, period.id);
                   const selected = link?.selectedKey === key;

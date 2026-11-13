@@ -24,7 +24,14 @@ fn test_forecast_curve_parallel_shock() {
         .unwrap();
 
     let mut market = MarketContext::new().insert(curve);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "forward_shock".into(),
@@ -80,7 +87,14 @@ fn test_par_cds_parallel_shock() {
         .unwrap();
 
     let mut market = MarketContext::new().insert(discount).insert(curve);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "hazard_shock".into(),
@@ -139,7 +153,14 @@ fn test_inflation_curve_parallel_shock() {
         .unwrap();
 
     let mut market = MarketContext::new().insert(curve).insert(ois);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "inflation_shock".into(),
@@ -186,7 +207,14 @@ fn test_forecast_curve_node_shock() {
         .unwrap();
 
     let mut market = MarketContext::new().insert(curve);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "forward_node".into(),
@@ -238,7 +266,14 @@ fn test_par_cds_node_shock() {
         .unwrap();
 
     let mut market = MarketContext::new().insert(discount).insert(curve);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "par_cds_node".into(),
@@ -304,7 +339,14 @@ fn test_inflation_curve_node_shock() {
         .unwrap();
 
     let mut market = MarketContext::new().insert(curve).insert(ois);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "inflation_node".into(),
@@ -347,7 +389,14 @@ fn test_discount_curve_id_preservation() {
         .unwrap();
 
     let mut market = MarketContext::new().insert(curve);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "test".into(),
@@ -427,7 +476,14 @@ fn test_all_curve_types_in_one_scenario() {
         .insert(hazard)
         .insert(inflation);
 
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "all_curves".into(),

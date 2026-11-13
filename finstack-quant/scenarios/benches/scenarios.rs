@@ -165,7 +165,14 @@ fn create_base_market() -> MarketContext {
 fn create_financial_model() -> FinancialModelSpec {
     let period_plan = build_periods("2025Q1..2026Q4", None).unwrap();
     let periods = period_plan.periods;
-    let mut model = FinancialModelSpec::new("test_model", periods.clone());
+    let mut model = FinancialModelSpec::new(
+        "test_model",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods.clone(),
+        )
+        .expect("valid period plan"),
+    );
 
     // Revenue node
     let mut revenue_values = IndexMap::new();
@@ -276,7 +283,14 @@ fn bench_curve_parallel_shock(c: &mut Criterion) {
         let engine = ScenarioEngine::new();
         b.iter(|| {
             let mut market = create_base_market();
-            let mut model = FinancialModelSpec::new("test", vec![]);
+            let mut model = FinancialModelSpec::new(
+                "test",
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    vec![],
+                )
+                .expect("valid period plan"),
+            );
             let mut ctx = ExecutionContext {
                 market: &mut market,
                 model: Some(&mut model),
@@ -333,7 +347,14 @@ fn bench_curve_node_shock(c: &mut Criterion) {
                 let engine = ScenarioEngine::new();
                 b.iter(|| {
                     let mut market = create_base_market();
-                    let mut model = FinancialModelSpec::new("test", vec![]);
+                    let mut model = FinancialModelSpec::new(
+                        "test",
+                        finstack_quant_core::dates::PeriodPlan::try_new(
+                            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                            vec![],
+                        )
+                        .expect("valid period plan"),
+                    );
                     let mut ctx = ExecutionContext {
                         market: &mut market,
                         model: Some(&mut model),
@@ -377,7 +398,14 @@ fn bench_fx_shock(c: &mut Criterion) {
         let engine = ScenarioEngine::new();
         b.iter(|| {
             let mut market = create_base_market();
-            let mut model = FinancialModelSpec::new("test", vec![]);
+            let mut model = FinancialModelSpec::new(
+                "test",
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    vec![],
+                )
+                .expect("valid period plan"),
+            );
             let mut ctx = ExecutionContext {
                 market: &mut market,
                 model: Some(&mut model),
@@ -423,7 +451,14 @@ fn bench_equity_shock(c: &mut Criterion) {
                 let engine = ScenarioEngine::new();
                 b.iter(|| {
                     let mut market = create_base_market();
-                    let mut model = FinancialModelSpec::new("test", vec![]);
+                    let mut model = FinancialModelSpec::new(
+                        "test",
+                        finstack_quant_core::dates::PeriodPlan::try_new(
+                            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                            vec![],
+                        )
+                        .expect("valid period plan"),
+                    );
                     let mut ctx = ExecutionContext {
                         market: &mut market,
                         model: Some(&mut model),
@@ -468,7 +503,14 @@ fn bench_vol_surface_shock(c: &mut Criterion) {
         let engine = ScenarioEngine::new();
         b.iter(|| {
             let mut market = create_base_market();
-            let mut model = FinancialModelSpec::new("test", vec![]);
+            let mut model = FinancialModelSpec::new(
+                "test",
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    vec![],
+                )
+                .expect("valid period plan"),
+            );
             let mut ctx = ExecutionContext {
                 market: &mut market,
                 model: Some(&mut model),
@@ -505,7 +547,14 @@ fn bench_vol_surface_shock(c: &mut Criterion) {
         let engine = ScenarioEngine::new();
         b.iter(|| {
             let mut market = create_base_market();
-            let mut model = FinancialModelSpec::new("test", vec![]);
+            let mut model = FinancialModelSpec::new(
+                "test",
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    vec![],
+                )
+                .expect("valid period plan"),
+            );
             let mut ctx = ExecutionContext {
                 market: &mut market,
                 model: Some(&mut model),
@@ -548,7 +597,14 @@ fn bench_base_correlation_shock(c: &mut Criterion) {
         let engine = ScenarioEngine::new();
         b.iter(|| {
             let mut market = create_base_market();
-            let mut model = FinancialModelSpec::new("test", vec![]);
+            let mut model = FinancialModelSpec::new(
+                "test",
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    vec![],
+                )
+                .expect("valid period plan"),
+            );
             let mut ctx = ExecutionContext {
                 market: &mut market,
                 model: Some(&mut model),
@@ -584,7 +640,14 @@ fn bench_base_correlation_shock(c: &mut Criterion) {
         let engine = ScenarioEngine::new();
         b.iter(|| {
             let mut market = create_base_market();
-            let mut model = FinancialModelSpec::new("test", vec![]);
+            let mut model = FinancialModelSpec::new(
+                "test",
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    vec![],
+                )
+                .expect("valid period plan"),
+            );
             let mut ctx = ExecutionContext {
                 market: &mut market,
                 model: Some(&mut model),
@@ -937,7 +1000,14 @@ fn bench_hazard_curve_shock(c: &mut Criterion) {
         let engine = ScenarioEngine::new();
         b.iter(|| {
             let mut market = create_base_market();
-            let mut model = FinancialModelSpec::new("test", vec![]);
+            let mut model = FinancialModelSpec::new(
+                "test",
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    vec![],
+                )
+                .expect("valid period plan"),
+            );
             let mut ctx = ExecutionContext {
                 market: &mut market,
                 model: Some(&mut model),
@@ -975,7 +1045,14 @@ fn bench_hazard_curve_shock(c: &mut Criterion) {
         let engine = ScenarioEngine::new();
         b.iter(|| {
             let mut market = create_base_market();
-            let mut model = FinancialModelSpec::new("test", vec![]);
+            let mut model = FinancialModelSpec::new(
+                "test",
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    vec![],
+                )
+                .expect("valid period plan"),
+            );
             let mut ctx = ExecutionContext {
                 market: &mut market,
                 model: Some(&mut model),
@@ -1018,7 +1095,14 @@ fn bench_credit_vol_shock(c: &mut Criterion) {
         let engine = ScenarioEngine::new();
         b.iter(|| {
             let mut market = create_base_market();
-            let mut model = FinancialModelSpec::new("test", vec![]);
+            let mut model = FinancialModelSpec::new(
+                "test",
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    vec![],
+                )
+                .expect("valid period plan"),
+            );
             let mut ctx = ExecutionContext {
                 market: &mut market,
                 model: Some(&mut model),
@@ -1055,7 +1139,14 @@ fn bench_credit_vol_shock(c: &mut Criterion) {
         let engine = ScenarioEngine::new();
         b.iter(|| {
             let mut market = create_base_market();
-            let mut model = FinancialModelSpec::new("test", vec![]);
+            let mut model = FinancialModelSpec::new(
+                "test",
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    vec![],
+                )
+                .expect("valid period plan"),
+            );
             let mut ctx = ExecutionContext {
                 market: &mut market,
                 model: Some(&mut model),
@@ -1104,7 +1195,14 @@ fn bench_instrument_spread_shock(c: &mut Criterion) {
         let engine = ScenarioEngine::new();
         b.iter(|| {
             let mut market = create_base_market();
-            let mut model = FinancialModelSpec::new("test", vec![]);
+            let mut model = FinancialModelSpec::new(
+                "test",
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    vec![],
+                )
+                .expect("valid period plan"),
+            );
             let mut inventory = Vec::new();
             let mut ctx = ExecutionContext {
                 market: &mut market,
@@ -1174,7 +1272,14 @@ fn bench_comprehensive_credit_scenario(c: &mut Criterion) {
         let engine = ScenarioEngine::new();
         b.iter(|| {
             let mut market = create_base_market();
-            let mut model = FinancialModelSpec::new("test", vec![]);
+            let mut model = FinancialModelSpec::new(
+                "test",
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    vec![],
+                )
+                .expect("valid period plan"),
+            );
             let mut inventory = Vec::new();
             let mut ctx = ExecutionContext {
                 market: &mut market,

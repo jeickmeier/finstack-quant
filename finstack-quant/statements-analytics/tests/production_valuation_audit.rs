@@ -271,7 +271,10 @@ fn growth_terminal_flow_rejects_missing_calendar_quarters() {
         Some(100.0)
     );
     let missing_period = PeriodId::quarter(2026, 1).unwrap();
-    model.periods.retain(|period| period.id != missing_period);
+    model
+        .periods
+        .periods
+        .retain(|period| period.id != missing_period);
     model
         .nodes
         .get_mut("ufcf")
@@ -344,12 +347,18 @@ fn growth_terminal_flow_rejects_annual_identifier_on_partial_year() {
     let model = {
         let mut model_builder = ModelBuilder::new("annual stub");
         model_builder
-            .periods_explicit(vec![Period {
-                id: period,
-                start: time::macros::date!(2025 - 07 - 01),
-                end: time::macros::date!(2026 - 01 - 01),
-                is_actual: false,
-            }])
+            .periods_explicit(
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    vec![Period {
+                        id: period,
+                        start: time::macros::date!(2025 - 07 - 01),
+                        end: time::macros::date!(2026 - 01 - 01),
+                        is_actual: false,
+                    }],
+                )
+                .expect("valid period plan"),
+            )
             .unwrap();
         model_builder.value_money("ufcf", &[(period, Money::from((100_i64, Currency::USD)))]);
         model_builder.with_meta("currency", serde_json::json!("USD"));
@@ -383,20 +392,26 @@ fn growth_terminal_flow_uses_complete_year_across_annual_stub_identifiers() {
     let model = {
         let mut model_builder = ModelBuilder::new("complete year across annual stubs");
         model_builder
-            .periods_explicit(vec![
-                Period {
-                    id: actual,
-                    start: time::macros::date!(2024 - 07 - 01),
-                    end: time::macros::date!(2025 - 01 - 01),
-                    is_actual: true,
-                },
-                Period {
-                    id: forecast,
-                    start: time::macros::date!(2025 - 01 - 01),
-                    end: time::macros::date!(2025 - 07 - 01),
-                    is_actual: false,
-                },
-            ])
+            .periods_explicit(
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    vec![
+                        Period {
+                            id: actual,
+                            start: time::macros::date!(2024 - 07 - 01),
+                            end: time::macros::date!(2025 - 01 - 01),
+                            is_actual: true,
+                        },
+                        Period {
+                            id: forecast,
+                            start: time::macros::date!(2025 - 01 - 01),
+                            end: time::macros::date!(2025 - 07 - 01),
+                            is_actual: false,
+                        },
+                    ],
+                )
+                .expect("valid period plan"),
+            )
             .unwrap();
         model_builder.value_money(
             "ufcf",

@@ -131,7 +131,7 @@ def borrower_vintage(vintage: str = "2024Q4") -> FinancialModelSpec:
     spec = json.loads(borrower_model().to_json())
     spec["id"] = f"analyst-borrower-{vintage}"
     spec["meta"]["forecast_vintage"] = vintage
-    for period in spec["periods"]:
+    for period in spec["periods"]["periods"]:
         period["is_actual"] = period["id"] <= vintage
     for node in spec["nodes"].values():
         if "values" in node:

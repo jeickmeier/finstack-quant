@@ -319,7 +319,14 @@ mod tests {
         let periods = build_periods("2025Q1..Q2", Some("2025Q1"))
             .expect("periods")
             .periods;
-        let mut model = FinancialModelSpec::new("test", periods.clone());
+        let mut model = FinancialModelSpec::new(
+            "test",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                periods.clone(),
+            )
+            .expect("valid period plan"),
+        );
         model.add_node(
             NodeSpec::new("rate", NodeType::Value).with_values(IndexMap::from([
                 (periods[0].id, AmountOrScalar::Scalar(100.0)),

@@ -6,7 +6,7 @@ from datetime import date
 from typing import Any
 import pandas as pd
 from finstack_quant.core.currency import Currency
-from finstack_quant.core.dates import Period
+from finstack_quant.core.dates import PeriodPlan
 from finstack_quant.core.money import Money
 from finstack_quant.statements._capital_structure import WaterfallSpec
 from finstack_quant.statements._registry import Registry
@@ -802,13 +802,13 @@ class ModelBuilder:
         """
         ...
 
-    def periods_explicit(self, periods: list[Period]) -> ModelBuilder:
-        """Set the model timeline from explicit calendar periods.
+    def periods_explicit(self, plan: PeriodPlan) -> ModelBuilder:
+        """Set the model timeline from an explicit period plan.
 
         Parameters
         ----------
-        periods:
-            Non-empty ordered Period objects with positive, nonoverlapping intervals; gaps are allowed. Build rejects a non-increasing timeline or actuals that do not form a prefix.
+        plan:
+            Non-empty PeriodPlan (for example from ``build_periods`` or ``build_fiscal_periods``) whose calendar context the model retains. Its periods must be one kind with positive, nonoverlapping intervals; gaps are allowed. Build rejects a non-increasing timeline or actuals that do not form a prefix.
 
         Returns
         -------
@@ -818,7 +818,7 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If periods is empty, the timeline was already set, or this builder was consumed.
+            If the plan has no periods, the timeline was already set, or this builder was consumed.
         """
         ...
 

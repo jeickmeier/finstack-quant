@@ -8,20 +8,23 @@ export default [
       {
         "id": "example_model",
         "nodes": {},
-        "periods": [
-          {
-            "end": "2024-04-01",
-            "id": "2024Q1",
-            "is_actual": false,
-            "start": "2024-01-01"
-          },
-          {
-            "end": "2024-07-01",
-            "id": "2024Q2",
-            "is_actual": false,
-            "start": "2024-04-01"
-          }
-        ],
+        "periods": {
+          "calendar": "gregorian",
+          "periods": [
+            {
+              "end": "2024-04-01",
+              "id": "2024Q1",
+              "is_actual": false,
+              "start": "2024-01-01"
+            },
+            {
+              "end": "2024-07-01",
+              "id": "2024Q2",
+              "is_actual": false,
+              "start": "2024-04-01"
+            }
+          ]
+        },
         "schema_version": 1
       }
     ],
@@ -5264,6 +5267,28 @@ export default [
     "description": "Where clause for conditional evaluation (optional)"
   },
   {
+    "path": "#/$defs/d_7ca827e3ffe3b5fa83ee",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PeriodCalendar",
+    "description": "Calendar context that bounds and steps period identifiers.\n\nAn unprefixed identifier belongs to `Gregorian`, an `FY` identifier to\n`Fiscal(config)`. A [`PeriodPlan`] retains its calendar once; operations\nthat resolve or step an identifier take this context explicitly (record\nCORE-CONVENTIONS-014 #4)."
+  },
+  {
+    "path": "#/$defs/d_7ca827e3ffe3b5fa83ee/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PeriodCalendar/oneOf/0",
+    "const": "gregorian",
+    "description": "Gregorian years with ISO 8601 weeks."
+  },
+  {
+    "path": "#/$defs/d_7ca827e3ffe3b5fa83ee/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PeriodCalendar/oneOf/1",
+    "description": "Fiscal years opening on the configured month and day."
+  },
+  {
+    "path": "#/$defs/d_7ca827e3ffe3b5fa83ee/oneOf/1/properties/fiscal",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PeriodCalendar/oneOf/1/properties/fiscal",
+    "ref": "#/$defs/FiscalConfig",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FiscalConfig"
+  },
+  {
     "path": "#/$defs/d_7d1a98f209076e58ed77",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OvernightCouponConvention",
     "description": "Contractual terms for an option on a compounded overnight RFR coupon.\n\nThe shared [`FloatingLegCompounding`] type is reused so lookback,\nobservation-shift, and rate-cutoff semantics cannot drift from IRS pricing.\nPayment and fixing calendars are separate because operational payment\ndelays need not use the index publication calendar."
@@ -5433,6 +5458,29 @@ export default [
     "path": "#/$defs/d_85f5d5bd79f75fc47ce3/oneOf/1/properties/cleared/properties/ccp",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ClearingStatus/oneOf/1/properties/cleared/properties/ccp",
     "description": "CCP identifier (e.g., \"LCH\", \"CME\", \"ICE\", \"JSCC\")"
+  },
+  {
+    "path": "#/$defs/d_867bd30e1e9b7fc46878",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PeriodPlan",
+    "description": "Builder/plan for a contiguous sequence of periods and their actual/forecast split.\n\nPeriods are returned in ascending order and are intended to form a contiguous\nrun of model periods. Each [`Period`] uses the crate-wide `[start, end)`\ninterval convention, so the `end` of one period naturally aligns with the\n`start` of the next."
+  },
+  {
+    "path": "#/$defs/d_867bd30e1e9b7fc46878/properties/calendar",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PeriodPlan/properties/calendar",
+    "description": "Calendar context of every period in the plan, retained once.",
+    "ref": "#/$defs/PeriodCalendar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PeriodCalendar"
+  },
+  {
+    "path": "#/$defs/d_867bd30e1e9b7fc46878/properties/periods",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PeriodPlan/properties/periods",
+    "description": "Ordered periods produced by the parser."
+  },
+  {
+    "path": "#/$defs/d_867bd30e1e9b7fc46878/properties/periods/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PeriodPlan/properties/periods/items",
+    "ref": "#/$defs/Period",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Period"
   },
   {
     "path": "#/$defs/d_872965bd151a7e141244",
@@ -8027,6 +8075,25 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Money"
   },
   {
+    "path": "#/$defs/d_d9478a234ddbf6c327a0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FiscalConfig",
+    "description": "Configuration for fiscal year periods.\n\nAlways holds a start month in `1..=12` and a start day in `1..=31`;\ndeserialization applies the same validation as [`FiscalConfig::new`]."
+  },
+  {
+    "path": "#/$defs/d_d9478a234ddbf6c327a0/properties/start_day",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FiscalConfig/properties/start_day",
+    "format": "uint8",
+    "maximum": 31,
+    "minimum": 1
+  },
+  {
+    "path": "#/$defs/d_d9478a234ddbf6c327a0/properties/start_month",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FiscalConfig/properties/start_month",
+    "format": "uint8",
+    "maximum": 12,
+    "minimum": 1
+  },
+  {
     "path": "#/$defs/d_d9b87615ca391901799a",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OvernightSpreadCompounding",
     "description": "Whether a contractual spread is included in overnight daily compounding.\n\nISDA-standard RFR coupons normally compound only the overnight index and add\nany spread as simple interest after compounding. `Include` represents the\nless common contract where the spread enters every daily compound factor."
@@ -9026,13 +9093,9 @@ export default [
   {
     "path": "#/properties/periods",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/properties/periods",
-    "description": "Ordered list of periods (quarters, months, etc.).\n\nEvaluation follows this order end-to-end (dependency resolution and time-series\nhelpers assume a single coherent timeline)."
-  },
-  {
-    "path": "#/properties/periods/items",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/properties/periods/items",
-    "ref": "#/$defs/Period",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Period"
+    "description": "Period plan: the ordered periods (quarters, months, etc.) with the\ncalendar context they belong to, retained once (record\nCORE-CONVENTIONS-014 #4).\n\nEvaluation follows this order end-to-end (dependency resolution and time-series\nhelpers assume a single coherent timeline).",
+    "ref": "#/$defs/PeriodPlan",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PeriodPlan"
   },
   {
     "path": "#/properties/schema_version",

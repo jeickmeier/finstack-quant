@@ -60,7 +60,15 @@ fn test_periods_explicit() {
     let periods = build_periods("2025Q1..Q2", None).unwrap().periods;
     let model = {
         let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods_explicit(periods).unwrap();
+        model_builder
+            .periods_explicit(
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    periods,
+                )
+                .expect("valid period plan"),
+            )
+            .unwrap();
         model_builder.build().unwrap()
     };
 
@@ -71,7 +79,13 @@ fn test_periods_explicit() {
 fn test_empty_periods_error() {
     let result = {
         let mut model_builder = ModelBuilder::new("test");
-        match model_builder.periods_explicit(vec![]) {
+        match model_builder.periods_explicit(
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        ) {
             Ok(_) => Ok(model_builder),
             Err(error) => Err(error),
         }
@@ -738,7 +752,14 @@ fn from_spec_roundtrip_preserves_complete_model_state() {
 
 #[test]
 fn from_spec_rejects_empty_period_plan() {
-    let spec = FinancialModelSpec::new("empty", Vec::new());
+    let spec = FinancialModelSpec::new(
+        "empty",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            Vec::new(),
+        )
+        .expect("valid period plan"),
+    );
 
     assert!(ModelBuilder::from_spec(spec).is_err());
 }

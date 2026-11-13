@@ -458,7 +458,7 @@ it("assesses the active period's credit and summarises the income lines natively
     expect(lastCall("plSummaryReport")).toEqual({
       resultsJson,
       lineItems: income,
-      periods: model.periods.map((period) => period.id),
+      periods: model.periods.periods.map((period) => period.id),
     }),
   );
   expect(
@@ -474,7 +474,7 @@ it("assesses the active period's credit and summarises the income lines natively
     name: "P&L summary by line item and period",
   });
   expect(within(pl).getAllByRole("row")).toHaveLength(
-    income.length * model.periods.length + 1,
+    income.length * model.periods.periods.length + 1,
   );
   fireEvent.click(
     within(screen.getByRole("group", { name: "Reporting periods" })).getByRole(

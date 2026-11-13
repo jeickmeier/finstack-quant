@@ -55,7 +55,7 @@
 //!         .knots([(0.0, 1.0), (5.0, 0.80)])
 //!         .build()?,
 //! );
-//! let mut model = FinancialModelSpec::new("test", vec![]);
+//! let mut model = FinancialModelSpec::new("test", finstack_quant_core::dates::build_periods("2025Q1..Q1", None)?);
 //!
 //! let scenario = ScenarioSpec {
 //!     id: "stress_test".into(),

@@ -50,7 +50,7 @@ function goalSeekModel() {
   return {
     id: 'goal-seek',
     schema_version: 1,
-    periods: [quarter(1)],
+    periods: { calendar: 'gregorian', periods: [quarter(1)] },
     nodes: {
       revenue: { node_id: 'revenue', node_type: 'value', values: { '2025Q1': 100 } },
       profit: { node_id: 'profit', node_type: 'calculated', formula_text: 'revenue * 0.5' },
@@ -66,7 +66,10 @@ function lboModel() {
     id: 'lbo',
     schema_version: 1,
     meta: { currency: 'USD' },
-    periods: [quarter(1), quarter(2), quarter(3), quarter(4), quarter(1, 2026)],
+    periods: {
+      calendar: 'gregorian',
+      periods: [quarter(1), quarter(2), quarter(3), quarter(4), quarter(1, 2026)],
+    },
     nodes: {
       ebitda: { node_id: 'ebitda', node_type: 'value', values: series([100, 100, 100, 100, 120]) },
       net_debt: {
@@ -113,7 +116,7 @@ function dcfModel() {
     id: 'dcf',
     schema_version: 1,
     meta: { currency: 'USD' },
-    periods: [annual(2025), annual(2026)],
+    periods: { calendar: 'gregorian', periods: [annual(2025), annual(2026)] },
     nodes: {
       ufcf: { node_id: 'ufcf', node_type: 'value', values: { 2025: usd(100), 2026: usd(110) } },
       ebitda: { node_id: 'ebitda', node_type: 'value', values: { 2025: usd(50), 2026: usd(60) } },
@@ -233,7 +236,12 @@ const EMPTY_MARKET = {
 };
 
 test('every model entry point applies the Rust semantic validation', () => {
-  const empty = { id: 'empty', schema_version: 1, periods: [], nodes: {} };
+  const empty = {
+    id: 'empty',
+    schema_version: 1,
+    periods: { calendar: 'gregorian', periods: [] },
+    nodes: {},
+  };
   const spec = scenarios.parseScenarioSpec({ id: 'noop', operations: [] });
   for (const call of [
     () => statements.validateFinancialModelJson(empty),
@@ -294,7 +302,7 @@ test('non-finite forecast and explanation values are JavaScript numbers', () => 
   const model = {
     id: 'lag',
     schema_version: 1,
-    periods: [quarter(1), quarter(2)],
+    periods: { calendar: 'gregorian', periods: [quarter(1), quarter(2)] },
     nodes: {
       revenue: { node_id: 'revenue', node_type: 'value', values: { '2025Q1': 100, '2025Q2': 110 } },
       lagged: { node_id: 'lagged', node_type: 'calculated', formula_text: 'lag(revenue, 1)' },

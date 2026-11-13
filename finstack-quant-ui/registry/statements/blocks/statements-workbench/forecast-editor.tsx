@@ -158,7 +158,7 @@ export function ForecastEditor({
   onApply: (forecast: ForecastSpecWire) => Promise<string | null>;
   applyLabel?: string;
 }) {
-  const periods = model.periods
+  const periods = model.periods.periods
     .filter((period) => !period.is_actual)
     .map((period) => period.id);
   const [method, setMethod] = useState<Method>(
@@ -167,7 +167,7 @@ export function ForecastEditor({
   const [error, setError] = useState<string | null>(null);
   const selected = methods.find((item) => item.id === method)!;
   const module = useMemo(() => forecastParamsModule(method), [method]);
-  const history = model.periods
+  const history = model.periods.periods
     .filter((period) => period.is_actual)
     .flatMap((period) => {
       const value = node.values?.[period.id];

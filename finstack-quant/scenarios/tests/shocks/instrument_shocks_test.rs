@@ -17,7 +17,14 @@ use time::Month;
 fn test_instrument_type_price_shock_matching() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
     // Create test instruments
@@ -134,7 +141,14 @@ fn test_instrument_type_spread_shock_matching() {
     use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
         Bond::builder()
@@ -232,7 +246,14 @@ fn test_instrument_spread_shock_moves_bond_pv() {
         .build()
         .unwrap();
     let mut market = MarketContext::new().insert(curve);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let bond = Bond::builder()
         .id("BOND1".into())
@@ -310,7 +331,14 @@ fn test_instrument_attr_price_shock_matching() {
     use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let mut instruments: Vec<Box<dyn Instrument>> = vec![
         Box::new(
@@ -420,7 +448,14 @@ fn test_instrument_attr_price_shock_no_matches() {
     use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
         Bond::builder()
@@ -487,7 +522,14 @@ fn test_instrument_attr_price_shock_no_matches() {
 fn test_instrument_shock_empty_list() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let mut instruments: Vec<Box<dyn Instrument>> = vec![];
 
@@ -523,7 +565,14 @@ fn test_instrument_shock_no_matching_types() {
     use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
         Bond::builder()
@@ -584,7 +633,14 @@ fn test_instrument_shock_no_matching_types() {
 fn test_instrument_shock_without_instruments_provided() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "no_instruments".into(),
@@ -624,7 +680,14 @@ fn test_instrument_shock_multiple_types() {
     use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let mut instruments: Vec<Box<dyn Instrument>> = vec![
         Box::new(
@@ -717,7 +780,14 @@ fn test_empty_attr_filter_is_rejected() {
     // `InstrumentPricePctByType` when they mean "all instruments of type T".
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let mut instruments: Vec<Box<dyn Instrument>> = vec![];
 
     let scenario = ScenarioSpec {
@@ -754,7 +824,14 @@ fn test_attr_filter_ignores_tags_uses_meta_only() {
     use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
         Bond::builder()

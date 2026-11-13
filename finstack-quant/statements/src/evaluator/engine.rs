@@ -891,7 +891,7 @@ impl Evaluator {
         meta: EvalStats,
     ) -> Result<()> {
         results.meta = meta;
-        results.periods = model.periods.clone();
+        results.periods = model.periods.periods.clone();
         results.populate_value_types(&prepared.node_value_types);
         if let Some(suite) = &self.check_suite {
             results.check_report = Some(suite.run(model, results)?);
@@ -1152,7 +1152,14 @@ mod tests {
         let periods = finstack_quant_core::dates::build_periods("2025Q1..Q3", Some("2025Q2"))
             .expect("periods")
             .periods;
-        let mut model = FinancialModelSpec::new("cell-sources", periods);
+        let mut model = FinancialModelSpec::new(
+            "cell-sources",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                periods,
+            )
+            .expect("valid period plan"),
+        );
         model.add_node(
             NodeSpec::new("revenue", NodeType::Mixed)
                 .with_values(IndexMap::from([(q(1), AmountOrScalar::scalar(100.0))]))
@@ -1263,7 +1270,14 @@ mod tests {
             .expect("periods")
             .periods;
         let evaluate = |q2_available_on: Option<Date>| {
-            let mut model = FinancialModelSpec::new("as-of-policy", periods.clone());
+            let mut model = FinancialModelSpec::new(
+                "as-of-policy",
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    periods.clone(),
+                )
+                .expect("valid period plan"),
+            );
             let mut availability = IndexMap::from([(q1, as_of)]);
             if let Some(date) = q2_available_on {
                 availability.insert(q2, date);
@@ -1293,7 +1307,14 @@ mod tests {
         let periods = finstack_quant_core::dates::build_periods("2025Q1..Q2", Some("2025Q2"))
             .expect("periods")
             .periods;
-        let mut model = FinancialModelSpec::new("as-of-policy", periods);
+        let mut model = FinancialModelSpec::new(
+            "as-of-policy",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                periods,
+            )
+            .expect("valid period plan"),
+        );
         let mut values = IndexMap::new();
         values.insert(
             PeriodId::quarter(2025, 1).expect("valid period fixture"),

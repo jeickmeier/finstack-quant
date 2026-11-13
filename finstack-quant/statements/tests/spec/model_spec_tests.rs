@@ -12,7 +12,14 @@ fn test_model_spec_add_node() {
     use finstack_quant_statements::types::{FinancialModelSpec, NodeSpec};
 
     let periods = build_periods("2025Q1..2025Q2", None).unwrap().periods;
-    let mut model = FinancialModelSpec::new("test", periods);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods,
+        )
+        .expect("valid period plan"),
+    );
 
     let node = NodeSpec::new("revenue", NodeType::Value);
     model.add_node(node);
@@ -27,7 +34,14 @@ fn test_model_spec_get_node_mut() {
     use finstack_quant_statements::types::{FinancialModelSpec, NodeSpec};
 
     let periods = build_periods("2025Q1..2025Q2", None).unwrap().periods;
-    let mut model = FinancialModelSpec::new("test", periods);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods,
+        )
+        .expect("valid period plan"),
+    );
 
     let node = NodeSpec::new("revenue", NodeType::Value);
     model.add_node(node);
@@ -49,7 +63,14 @@ fn test_model_spec_get_node_immutable() {
     use finstack_quant_statements::types::{FinancialModelSpec, NodeSpec};
 
     let periods = build_periods("2025Q1..2025Q2", None).unwrap().periods;
-    let mut model = FinancialModelSpec::new("test", periods);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods,
+        )
+        .expect("valid period plan"),
+    );
 
     let node = NodeSpec::new("revenue", NodeType::Value).with_name("Revenue");
     model.add_node(node);
@@ -65,7 +86,14 @@ fn test_model_spec_has_node() {
     use finstack_quant_statements::types::{FinancialModelSpec, NodeSpec};
 
     let periods = build_periods("2025Q1..2025Q2", None).unwrap().periods;
-    let mut model = FinancialModelSpec::new("test", periods);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods,
+        )
+        .expect("valid period plan"),
+    );
 
     assert!(!model.has_node("revenue"));
 
@@ -82,7 +110,14 @@ fn test_model_spec_get_node_none() {
     use finstack_quant_statements::types::FinancialModelSpec;
 
     let periods = build_periods("2025Q1..2025Q2", None).unwrap().periods;
-    let mut model = FinancialModelSpec::new("test", periods);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods,
+        )
+        .expect("valid period plan"),
+    );
 
     assert!(model.get_node("nonexistent").is_none());
     assert!(model.get_node_mut("nonexistent").is_none());
@@ -506,7 +541,14 @@ fn test_financial_model_nodes_keyed_by_node_id() {
     use finstack_quant_statements::types::{FinancialModelSpec, NodeId, NodeSpec, NodeType};
 
     let periods = build_periods("2025Q1..2025Q1", None).unwrap().periods;
-    let mut model = FinancialModelSpec::new("test", periods);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods,
+        )
+        .expect("valid period plan"),
+    );
     model.add_node(NodeSpec::new("revenue", NodeType::Value));
 
     // nodes map is keyed by NodeId

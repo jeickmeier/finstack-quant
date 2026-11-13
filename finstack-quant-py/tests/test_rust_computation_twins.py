@@ -39,7 +39,10 @@ from finstack_quant.valuations.instruments import Bond, FxForward
 
 MODEL = {
     "id": "facade-model",
-    "periods": [{"id": "2025Q1", "start": "2025-01-01", "end": "2025-04-01", "is_actual": False}],
+    "periods": {
+        "calendar": "gregorian",
+        "periods": [{"id": "2025Q1", "start": "2025-01-01", "end": "2025-04-01", "is_actual": False}],
+    },
     "nodes": {"revenue": {"node_id": "revenue", "node_type": "value", "values": {"2025Q1": 100000.0}}},
     "schema_version": 1,
 }
@@ -65,7 +68,7 @@ def test_dated_schedule_convention_and_missing_node_come_from_rust() -> None:
 
 def test_financial_model_content_hash_matches_wasm() -> None:
     model = FinancialModelSpec.from_json(json.dumps(MODEL))
-    assert model.content_hash() == "sha256:43c8428179a2f9bb332af91d87fc7c91ea922286ec7a42b3e5ace45b85a0f17e"
+    assert model.content_hash() == "sha256:ed75ab489d251a906928f22f537f7d163ad91518482c650c6cfd27dd243e95d7"
 
 
 def test_breach_probability_survives_from_json_with_path_data() -> None:

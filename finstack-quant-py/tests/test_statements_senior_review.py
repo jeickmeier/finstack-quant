@@ -7,6 +7,7 @@ import pytest
 
 from finstack_quant import statements as s
 from finstack_quant.core.currency import Currency
+from finstack_quant.core.dates import PeriodPlan
 from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.statements_analytics import run_checks
@@ -245,7 +246,7 @@ def test_empty_explicit_periods_preserve_model_builder_for_retry() -> None:
     builder.value_scalar("revenue", {"2025Q1": 100.0})
     builder.with_meta("marker", {"retained": True})
     with pytest.raises(ValueError, match="at least one period"):
-        builder.periods_explicit([])
+        builder.periods_explicit(PeriodPlan.from_json('{"calendar": "gregorian", "periods": []}'))
     builder.periods("2025Q1..Q2", "2025Q1")
     builder.forecast("revenue", s.ForecastSpec.forward_fill())
     model = json.loads(builder.build().to_json())

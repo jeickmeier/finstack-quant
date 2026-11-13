@@ -16,6 +16,19 @@ use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec};
 use indexmap::IndexMap;
 use std::sync::Arc;
 
+/// The plan of these fixtures: fiscal ids use the October 1 opening every
+/// fiscal fixture in this file is built with; unprefixed ids are Gregorian.
+fn fixture_plan(periods: Vec<Period>) -> finstack_quant_core::dates::PeriodPlan {
+    let calendar = if periods.first().is_some_and(|period| period.id.is_fiscal()) {
+        finstack_quant_core::dates::PeriodCalendar::Fiscal(
+            FiscalConfig::new(10, 1).expect("valid fiscal start"),
+        )
+    } else {
+        finstack_quant_core::dates::PeriodCalendar::Gregorian
+    };
+    finstack_quant_core::dates::PeriodPlan::try_new(calendar, periods).expect("valid period plan")
+}
+
 fn close(actual: f64, expected: f64) {
     assert!((actual - expected).abs() < 1e-10, "{actual} != {expected}");
 }
@@ -28,7 +41,9 @@ fn offset_model(periods: Vec<Period>, observations: &[f64]) -> FinancialModelSpe
         .collect();
     {
         let mut model_builder = ModelBuilder::new("fiscal-offsets");
-        model_builder.periods_explicit(periods).unwrap();
+        model_builder
+            .periods_explicit(fixture_plan(periods))
+            .unwrap();
         model_builder.value("x", &values);
         model_builder.compute("prior", "lag(x,1)").unwrap();
         model_builder.compute("shifted", "shift(x,1)").unwrap();
@@ -120,7 +135,9 @@ fn growth_rate_annualizes_quarterly_and_monthly_observations() {
             .collect();
         let model = {
             let mut model_builder = ModelBuilder::new("annual-growth");
-            model_builder.periods_explicit(periods.clone()).unwrap();
+            model_builder
+                .periods_explicit(fixture_plan(periods.clone()))
+                .unwrap();
             model_builder.value("x", &values);
             model_builder.compute("default", "growth_rate(x)").unwrap();
             model_builder
@@ -176,7 +193,9 @@ fn daily_and_weekly_growth_use_elapsed_period_end_dates() {
             .collect();
         let model = {
             let mut model_builder = ModelBuilder::new("dated-growth");
-            model_builder.periods_explicit(periods.clone()).unwrap();
+            model_builder
+                .periods_explicit(fixture_plan(periods.clone()))
+                .unwrap();
             model_builder.value("x", &values);
             model_builder.compute("growth", "growth_rate(x,1)").unwrap();
             model_builder.build().unwrap()
@@ -315,7 +334,9 @@ fn ytd_starts_at_the_first_fiscal_period_of_the_fiscal_year() {
         .collect();
     let model = {
         let mut model_builder = ModelBuilder::new("fiscal-ytd");
-        model_builder.periods_explicit(periods.clone()).unwrap();
+        model_builder
+            .periods_explicit(fixture_plan(periods.clone()))
+            .unwrap();
         model_builder.value("x", &values);
         model_builder.compute("to_date", "ytd(x)").unwrap();
         model_builder.build().unwrap()
@@ -340,7 +361,9 @@ fn daily_ttm_sums_twelve_calendar_months_of_calendar_and_business_days() {
             .map(|period| (period.id, AmountOrScalar::scalar(1.0)))
             .collect();
         let mut model_builder = ModelBuilder::new("daily-ttm");
-        model_builder.periods_explicit(periods).unwrap();
+        model_builder
+            .periods_explicit(fixture_plan(periods))
+            .unwrap();
         model_builder.value("x", &values);
         model_builder.compute("ltm", "ttm(x)").unwrap();
         let result = Evaluator::new()
@@ -375,7 +398,10 @@ fn model_rejects_periods_of_mixed_kinds() {
         let mut periods = build_periods(fine, None).unwrap().periods;
         periods.extend(build_periods(coarse, None).unwrap().periods);
         let mut model_builder = ModelBuilder::new("mixed-frequency");
-        let err = match model_builder.periods_explicit(periods).map(|_| ()) {
+        let err = match model_builder
+            .periods_explicit(fixture_plan(periods))
+            .map(|_| ())
+        {
             Err(err) => err,
             Ok(()) => model_builder
                 .build()
@@ -410,7 +436,9 @@ fn fiscal_weekly_ttm_covers_a_full_year_of_days() {
         .collect();
     let model = {
         let mut model_builder = ModelBuilder::new("fiscal-weekly-ttm");
-        model_builder.periods_explicit(periods.clone()).unwrap();
+        model_builder
+            .periods_explicit(fixture_plan(periods.clone()))
+            .unwrap();
         model_builder.value("x", &values);
         model_builder.compute("trailing", "ttm(x)").unwrap();
         model_builder.build().unwrap()

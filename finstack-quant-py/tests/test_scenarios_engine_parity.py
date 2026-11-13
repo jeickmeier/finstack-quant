@@ -558,7 +558,10 @@ def test_shocked_instrument_copies_survive_result_round_trips(with_model: bool) 
             json.dumps({
                 "schema_version": 1,
                 "id": "m",
-                "periods": [{"id": "2025Q1", "start": "2025-01-01", "end": "2025-04-01", "is_actual": False}],
+                "periods": {
+                    "calendar": "gregorian",
+                    "periods": [{"id": "2025Q1", "start": "2025-01-01", "end": "2025-04-01", "is_actual": False}],
+                },
                 "nodes": {},
             }),
             instruments=[original],

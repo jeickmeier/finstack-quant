@@ -248,7 +248,7 @@ def test_borrower_vintages_exclude_future_actuals_and_preserve_loan_units(fixtur
     current = fixtures.borrower.borrower_vintage("2024Q4")
     prior_wire = json.loads(prior.to_json())
     assert "2024Q4" not in prior_wire["nodes"]["revenue"]["values"]
-    assert not prior_wire["periods"][3]["is_actual"]
+    assert not prior_wire["periods"]["periods"][3]["is_actual"]
     evaluator = Evaluator()
     prior_result, current_result = evaluator.evaluate(prior), evaluator.evaluate(current)
     assert prior_result.get("revenue", "2024Q4") == pytest.approx(23_000_000 * 1.01)

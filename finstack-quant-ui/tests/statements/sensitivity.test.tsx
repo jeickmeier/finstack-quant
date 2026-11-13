@@ -55,7 +55,7 @@ const modelJson: string = native.validateFinancialModelJson(
 const result = evaluated as unknown as StatementResult;
 const data = captured as unknown as Sensitivity;
 const nodeIds = Object.keys(model.nodes);
-const periods = model.periods.map((period) => period.id);
+const periods = model.periods.periods.map((period) => period.id);
 let harness: Awaited<ReturnType<typeof startWorker>>;
 beforeAll(async () => {
   harness = await startWorker();

@@ -266,10 +266,13 @@ const DEPOSIT = {
 const LAG_MODEL = {
   id: 'lag',
   schema_version: 1,
-  periods: [
-    { id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: false },
-    { id: '2025Q2', start: '2025-04-01', end: '2025-07-01', is_actual: false },
-  ],
+  periods: {
+    calendar: 'gregorian',
+    periods: [
+      { id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: false },
+      { id: '2025Q2', start: '2025-04-01', end: '2025-07-01', is_actual: false },
+    ],
+  },
   nodes: {
     revenue: { node_id: 'revenue', node_type: 'value', values: { '2025Q1': 100, '2025Q2': 110 } },
     lagged: { node_id: 'lagged', node_type: 'calculated', formula_text: 'lag(revenue, 1)' },

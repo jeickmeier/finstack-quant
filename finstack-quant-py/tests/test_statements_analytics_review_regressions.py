@@ -138,7 +138,10 @@ def test_disabled_relative_staging_uses_absolute_trigger_from_zero_origination()
 def test_growth_terminal_rejects_annual_identifier_with_stub_dates() -> None:
     model = {
         "id": "annual-stub-review",
-        "periods": [{"id": "2025", "start": "2025-07-01", "end": "2026-01-01", "is_actual": False}],
+        "periods": {
+            "calendar": "gregorian",
+            "periods": [{"id": "2025", "start": "2025-07-01", "end": "2026-01-01", "is_actual": False}],
+        },
         "nodes": {
             "ufcf": {
                 "node_id": "ufcf",
@@ -164,10 +167,13 @@ def test_growth_terminal_uses_full_year_across_annual_stub_identifiers() -> None
     def terminal_pv(actual_id: str, forecast_id: str) -> float:
         model = {
             "id": "complete-year-review",
-            "periods": [
-                {"id": actual_id, "start": "2024-07-01", "end": "2025-01-01", "is_actual": True},
-                {"id": forecast_id, "start": "2025-01-01", "end": "2025-07-01", "is_actual": False},
-            ],
+            "periods": {
+                "calendar": "gregorian",
+                "periods": [
+                    {"id": actual_id, "start": "2024-07-01", "end": "2025-01-01", "is_actual": True},
+                    {"id": forecast_id, "start": "2025-01-01", "end": "2025-07-01", "is_actual": False},
+                ],
+            },
             "nodes": {
                 "ufcf": {
                     "node_id": "ufcf",

@@ -3,7 +3,7 @@
 use crate::error::{Error, Result};
 use crate::registry::dynamic::StoredMetric;
 use crate::types::{AmountOrScalar, FinancialModelSpec, NodeId, NodeSpec, NodeType};
-use finstack_quant_core::dates::{Period, PeriodId, build_periods};
+use finstack_quant_core::dates::{Period, PeriodId, PeriodPlan, build_periods};
 use indexmap::{IndexMap, IndexSet};
 
 /// DSL keywords that must not be used as node IDs.
@@ -103,7 +103,7 @@ pub fn validate_node_id(node_id: &str) -> Result<()> {
 #[derive(Debug)]
 pub struct ModelBuilder {
     id: String,
-    pub(crate) periods: Vec<Period>,
+    pub(crate) periods: Option<PeriodPlan>,
     pub(crate) nodes: IndexMap<NodeId, NodeSpec>,
     meta: IndexMap<String, serde_json::Value>,
     pub(crate) capital_structure: Option<crate::types::CapitalStructureSpec>,
@@ -159,7 +159,7 @@ impl ModelBuilder {
     /// This is an advanced API primarily for template builders in external crates
     /// that need to iterate over periods to generate per-period value nodes.
     pub fn periods_slice(&self) -> &[Period] {
-        &self.periods
+        self.periods.as_deref().unwrap_or(&[])
     }
 
     /// Resolve and validate the timeline for importing period-labelled values.
@@ -192,10 +192,9 @@ impl ModelBuilder {
                 "Value import requires at least one period column",
             ));
         };
-        let periods = if self.periods.is_empty() {
-            build_periods(&format!("{first}..{last}"), actuals_until)?.periods
-        } else {
-            self.periods.clone()
+        let periods = match &self.periods {
+            None => build_periods(&format!("{first}..{last}"), actuals_until)?.periods,
+            Some(plan) => plan.periods.clone(),
         };
         let period_ids: IndexSet<_> = periods.iter().map(|period| period.id).collect();
         for column in columns {
@@ -233,7 +232,7 @@ impl ModelBuilder {
     pub fn new(id: impl Into<String>) -> Self {
         Self {
             id: id.into(),
-            periods: Vec::new(),
+            periods: None,
             nodes: IndexMap::new(),
             meta: IndexMap::new(),
             capital_structure: None,
@@ -266,42 +265,40 @@ impl ModelBuilder {
                 "Period range must contain at least one period",
             ));
         }
-        self.periods = period_plan.periods;
+        self.periods = Some(period_plan);
         Ok(self)
     }
 
     /// Reject a second timeline: node values are keyed to the first one.
     fn ensure_periods_unset(&self) -> Result<()> {
-        if self.periods.is_empty() {
+        if self.periods.is_none() {
             Ok(())
         } else {
             Err(Error::build("Periods already set"))
         }
     }
 
-    /// Define periods explicitly (for advanced use cases).
+    /// Define the timeline from an explicit period plan (for advanced use
+    /// cases such as fiscal plans or plans whose actual/forecast split cannot
+    /// be written with the range DSL).
     ///
     /// # Arguments
-    /// * `periods` - Vector of [`Period`](finstack_quant_core::dates::Period) instances, typically
-    ///   produced by `finstack_quant_core::dates::build_periods`
-    ///
-    /// The supplied sequence is retained in the given order. It is therefore
-    /// appropriate for models whose actual and forecast periods cannot be
-    /// expressed with the range DSL, but callers remain responsible for
-    /// providing a coherent non-empty period plan.
+    /// * `plan` - [`PeriodPlan`] with its calendar context, typically from
+    ///   `finstack_quant_core::dates::build_periods` or `build_fiscal_periods`;
+    ///   the model retains the plan's calendar (record CORE-CONVENTIONS-014 #4).
     ///
     /// # Errors
     ///
-    /// Returns a period error when `periods` is empty. No additional period
-    /// ordering or continuity validation is performed at this boundary.
-    pub fn periods_explicit(&mut self, periods: Vec<Period>) -> Result<&mut Self> {
+    /// Returns a period error when the plan has no periods. The timeline is
+    /// validated as a whole by [`Self::build`].
+    pub fn periods_explicit(&mut self, plan: PeriodPlan) -> Result<&mut Self> {
         self.ensure_periods_unset()?;
-        if periods.is_empty() {
+        if plan.periods.is_empty() {
             return Err(Error::period(
                 "Period list must contain at least one period",
             ));
         }
-        self.periods = periods;
+        self.periods = Some(plan);
         Ok(self)
     }
 }
@@ -336,7 +333,7 @@ impl ModelBuilder {
         let last_node = spec.nodes.last().map(|(id, _)| id.clone());
         Ok(Self {
             id: spec.id,
-            periods: spec.periods,
+            periods: Some(spec.periods),
             nodes: spec.nodes,
             meta: spec.meta,
             capital_structure: spec.capital_structure,
@@ -1017,12 +1014,15 @@ impl ModelBuilder {
         let _span = tracing::info_span!(
             "statements.build",
             model_id = self.id.as_str(),
-            periods = self.periods.len(),
+            periods = self.periods_slice().len(),
             nodes = self.nodes.len(),
         )
         .entered();
 
-        let mut spec = FinancialModelSpec::new(self.id, self.periods);
+        let plan = self
+            .periods
+            .ok_or_else(|| Error::period("Periods must be set before building the model"))?;
+        let mut spec = FinancialModelSpec::new(self.id, plan);
         spec.nodes = self.nodes;
         spec.meta = self.meta;
         spec.capital_structure = self.capital_structure;

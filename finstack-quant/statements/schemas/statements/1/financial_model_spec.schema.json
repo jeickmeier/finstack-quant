@@ -3988,6 +3988,29 @@
         }
       ]
     },
+    "FiscalConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for fiscal year periods.\n\nAlways holds a start month in `1..=12` and a start day in `1..=31`;\ndeserialization applies the same validation as [`FiscalConfig::new`].",
+      "properties": {
+        "start_day": {
+          "format": "uint8",
+          "maximum": 31,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "start_month": {
+          "format": "uint8",
+          "maximum": 12,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start_month",
+        "start_day"
+      ],
+      "type": "object"
+    },
     "FixedCouponSpec": {
       "additionalProperties": false,
       "description": "Fixed-rate coupon specification.\n\nThis type combines the coupon quote, payment behavior, and schedule\nconventions required to emit a fixed-rate leg.",
@@ -6489,9 +6512,54 @@
       ],
       "type": "object"
     },
+    "PeriodCalendar": {
+      "description": "Calendar context that bounds and steps period identifiers.\n\nAn unprefixed identifier belongs to `Gregorian`, an `FY` identifier to\n`Fiscal(config)`. A [`PeriodPlan`] retains its calendar once; operations\nthat resolve or step an identifier take this context explicitly (record\nCORE-CONVENTIONS-014 #4).",
+      "oneOf": [
+        {
+          "const": "gregorian",
+          "description": "Gregorian years with ISO 8601 weeks.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Fiscal years opening on the configured month and day.",
+          "properties": {
+            "fiscal": {
+              "$ref": "#/$defs/FiscalConfig"
+            }
+          },
+          "required": [
+            "fiscal"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "PeriodId": {
       "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
       "type": "string"
+    },
+    "PeriodPlan": {
+      "additionalProperties": false,
+      "description": "Builder/plan for a contiguous sequence of periods and their actual/forecast split.\n\nPeriods are returned in ascending order and are intended to form a contiguous\nrun of model periods. Each [`Period`] uses the crate-wide `[start, end)`\ninterval convention, so the `end` of one period naturally aligns with the\n`start` of the next.",
+      "properties": {
+        "calendar": {
+          "$ref": "#/$defs/PeriodCalendar",
+          "description": "Calendar context of every period in the plan, retained once."
+        },
+        "periods": {
+          "description": "Ordered periods produced by the parser.",
+          "items": {
+            "$ref": "#/$defs/Period"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "calendar",
+        "periods"
+      ],
+      "type": "object"
     },
     "PiecewiseConstantCurve": {
       "additionalProperties": false,
@@ -8342,20 +8410,23 @@
     {
       "id": "example_model",
       "nodes": {},
-      "periods": [
-        {
-          "end": "2024-04-01",
-          "id": "2024Q1",
-          "is_actual": false,
-          "start": "2024-01-01"
-        },
-        {
-          "end": "2024-07-01",
-          "id": "2024Q2",
-          "is_actual": false,
-          "start": "2024-04-01"
-        }
-      ],
+      "periods": {
+        "calendar": "gregorian",
+        "periods": [
+          {
+            "end": "2024-04-01",
+            "id": "2024Q1",
+            "is_actual": false,
+            "start": "2024-01-01"
+          },
+          {
+            "end": "2024-07-01",
+            "id": "2024Q2",
+            "is_actual": false,
+            "start": "2024-04-01"
+          }
+        ]
+      },
       "schema_version": 1
     }
   ],
@@ -8388,11 +8459,8 @@
       "type": "object"
     },
     "periods": {
-      "description": "Ordered list of periods (quarters, months, etc.).\n\nEvaluation follows this order end-to-end (dependency resolution and time-series\nhelpers assume a single coherent timeline).",
-      "items": {
-        "$ref": "#/$defs/Period"
-      },
-      "type": "array"
+      "$ref": "#/$defs/PeriodPlan",
+      "description": "Period plan: the ordered periods (quarters, months, etc.) with the\ncalendar context they belong to, retained once (record\nCORE-CONVENTIONS-014 #4).\n\nEvaluation follows this order end-to-end (dependency resolution and time-series\nhelpers assume a single coherent timeline)."
     },
     "schema_version": {
       "$ref": "#/$defs/SchemaVersion",

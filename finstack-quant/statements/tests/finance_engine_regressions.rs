@@ -102,7 +102,7 @@ fn prepared_plan_rejects_embedded_identity_and_timeline_mutations() {
     assert!(evaluator.evaluate_prepared(&changed_id, &plan).is_err());
 
     let mut changed_period = model.clone();
-    changed_period.periods[0].end = changed_period.periods[0].start;
+    changed_period.periods.periods[0].end = changed_period.periods.periods[0].start;
     assert!(evaluator.evaluate_prepared(&changed_period, &plan).is_err());
 }
 

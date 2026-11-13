@@ -1,14 +1,17 @@
 {
   "model": {
     "id": "negative-rate-receiver",
-    "periods": [
-      {
-        "id": "2025",
-        "start": "2025-01-01",
-        "end": "2026-01-01",
-        "is_actual": false
-      }
-    ],
+    "periods": {
+      "calendar": "gregorian",
+      "periods": [
+        {
+          "id": "2025",
+          "start": "2025-01-01",
+          "end": "2026-01-01",
+          "is_actual": false
+        }
+      ]
+    },
     "nodes": {
       "cash": {
         "node_id": "cash",

@@ -597,7 +597,14 @@ mod tests {
             .expect("valid discount curve");
 
         let mut market = MarketContext::new().insert(curve);
-        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "test",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
         let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
             Bond::builder()
                 .id("BOND1".into())
@@ -694,7 +701,14 @@ mod tests {
             .expect("valid discount curve");
 
         let mut market = MarketContext::new().insert(curve);
-        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "test",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
         let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(
             Bond::builder()
                 .id("BOND1".into())
@@ -915,7 +929,14 @@ mod tests {
         let old_curve = curve.clone();
 
         let mut market = MarketContext::new().insert(curve);
-        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut model = FinancialModelSpec::new(
+            "test",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                vec![],
+            )
+            .expect("valid period plan"),
+        );
         let mut ctx = ExecutionContext {
             market: &mut market,
             model: Some(&mut model),

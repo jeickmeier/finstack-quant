@@ -18,7 +18,7 @@ const spec = model as never as Parameters<typeof ForecastEditor>[0]["model"];
 const nodeId = Object.keys(spec.nodes).find(
   (id) => spec.nodes[id].forecast !== undefined,
 )!;
-const forecastPeriods = spec.periods
+const forecastPeriods = spec.periods.periods
   .filter((period) => !period.is_actual)
   .map((period) => period.id);
 

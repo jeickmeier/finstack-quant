@@ -611,9 +611,9 @@ def apply_scenario(
     >>> from finstack_quant.core.market_data import MarketContext
     >>> from finstack_quant.scenarios import apply_scenario, compose_scenarios
     >>> model = (
-    ...     '{"schema_version":1,"id":"m","periods":['
+    ...     '{"schema_version":1,"id":"m","periods":{"calendar": "gregorian", "periods": ['
     ...     '{"id":"2025Q1","start":"2025-01-01","end":"2025-04-01",'
-    ...     '"is_actual":false}],"nodes":{}}'
+    ...     '"is_actual":false}]},"nodes":{}}'
     ... )
     >>> applied = apply_scenario(compose_scenarios([]), MarketContext(), "2025-01-15", model)
     >>> applied.report.operations_applied

@@ -6,20 +6,23 @@
     {
       "id": "example_model",
       "nodes": {},
-      "periods": [
-        {
-          "end": "2024-04-01",
-          "id": "2024Q1",
-          "is_actual": false,
-          "start": "2024-01-01"
-        },
-        {
-          "end": "2024-07-01",
-          "id": "2024Q2",
-          "is_actual": false,
-          "start": "2024-04-01"
-        }
-      ],
+      "periods": {
+        "calendar": "gregorian",
+        "periods": [
+          {
+            "end": "2024-04-01",
+            "id": "2024Q1",
+            "is_actual": false,
+            "start": "2024-01-01"
+          },
+          {
+            "end": "2024-07-01",
+            "id": "2024Q2",
+            "is_actual": false,
+            "start": "2024-04-01"
+          }
+        ]
+      },
       "schema_version": 1
     }
   ],
@@ -52,11 +55,8 @@
       "type": "object"
     },
     "periods": {
-      "description": "Ordered list of periods (quarters, months, etc.).\n\nEvaluation follows this order end-to-end (dependency resolution and time-series\nhelpers assume a single coherent timeline).",
-      "items": {
-        "$ref": "#/$defs/d_4672b5faf94cbb3de83d"
-      },
-      "type": "array"
+      "$ref": "#/$defs/d_867bd30e1e9b7fc46878",
+      "description": "Period plan: the ordered periods (quarters, months, etc.) with the\ncalendar context they belong to, retained once (record\nCORE-CONVENTIONS-014 #4).\n\nEvaluation follows this order end-to-end (dependency resolution and time-series\nhelpers assume a single coherent timeline)."
     },
     "schema_version": {
       "$ref": "#/$defs/d_4a4fb947357150db096c",
@@ -4928,6 +4928,29 @@
       ],
       "type": "object"
     },
+    "d_7ca827e3ffe3b5fa83ee": {
+      "description": "Calendar context that bounds and steps period identifiers.\n\nAn unprefixed identifier belongs to `Gregorian`, an `FY` identifier to\n`Fiscal(config)`. A [`PeriodPlan`] retains its calendar once; operations\nthat resolve or step an identifier take this context explicitly (record\nCORE-CONVENTIONS-014 #4).",
+      "oneOf": [
+        {
+          "const": "gregorian",
+          "description": "Gregorian years with ISO 8601 weeks.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Fiscal years opening on the configured month and day.",
+          "properties": {
+            "fiscal": {
+              "$ref": "#/$defs/d_d9478a234ddbf6c327a0"
+            }
+          },
+          "required": [
+            "fiscal"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "d_7d1a98f209076e58ed77": {
       "additionalProperties": false,
       "description": "Contractual terms for an option on a compounded overnight RFR coupon.\n\nThe shared [`FloatingLegCompounding`] type is reused so lookback,\nobservation-shift, and rate-cutoff semantics cannot drift from IRS pricing.\nPayment and fixing calendars are separate because operational payment\ndelays need not use the index publication calendar.",
@@ -5086,6 +5109,28 @@
           "type": "object"
         }
       ]
+    },
+    "d_867bd30e1e9b7fc46878": {
+      "additionalProperties": false,
+      "description": "Builder/plan for a contiguous sequence of periods and their actual/forecast split.\n\nPeriods are returned in ascending order and are intended to form a contiguous\nrun of model periods. Each [`Period`] uses the crate-wide `[start, end)`\ninterval convention, so the `end` of one period naturally aligns with the\n`start` of the next.",
+      "properties": {
+        "calendar": {
+          "$ref": "#/$defs/d_7ca827e3ffe3b5fa83ee",
+          "description": "Calendar context of every period in the plan, retained once."
+        },
+        "periods": {
+          "description": "Ordered periods produced by the parser.",
+          "items": {
+            "$ref": "#/$defs/d_4672b5faf94cbb3de83d"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "calendar",
+        "periods"
+      ],
+      "type": "object"
     },
     "d_872965bd151a7e141244": {
       "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```",
@@ -7510,6 +7555,29 @@
         "threshold",
         "mta",
         "segregated"
+      ],
+      "type": "object"
+    },
+    "d_d9478a234ddbf6c327a0": {
+      "additionalProperties": false,
+      "description": "Configuration for fiscal year periods.\n\nAlways holds a start month in `1..=12` and a start day in `1..=31`;\ndeserialization applies the same validation as [`FiscalConfig::new`].",
+      "properties": {
+        "start_day": {
+          "format": "uint8",
+          "maximum": 31,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "start_month": {
+          "format": "uint8",
+          "maximum": 12,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start_month",
+        "start_day"
       ],
       "type": "object"
     },

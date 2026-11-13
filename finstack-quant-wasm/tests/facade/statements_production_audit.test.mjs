@@ -11,12 +11,15 @@ function model(values, forecast) {
   return {
     id: 'statement-production',
     schema_version: 1,
-    periods: [1, 2, 3, 4].map((q) => ({
-      id: `2025Q${q}`,
-      start: `2025-${String(q * 3 - 2).padStart(2, '0')}-01`,
-      end: q === 4 ? '2026-01-01' : `2025-${String(q * 3 + 1).padStart(2, '0')}-01`,
-      is_actual: q === 1,
-    })),
+    periods: {
+      calendar: 'gregorian',
+      periods: [1, 2, 3, 4].map((q) => ({
+        id: `2025Q${q}`,
+        start: `2025-${String(q * 3 - 2).padStart(2, '0')}-01`,
+        end: q === 4 ? '2026-01-01' : `2025-${String(q * 3 + 1).padStart(2, '0')}-01`,
+        is_actual: q === 1,
+      })),
+    },
     nodes: {
       revenue: {
         node_id: 'revenue',

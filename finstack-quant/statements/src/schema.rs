@@ -49,7 +49,13 @@ fn financial_model_examples() -> finstack_quant_core::Result<Vec<Value>> {
             (2024, time::Month::July, 1),
         )?,
     ];
-    let model = crate::types::FinancialModelSpec::new("example_model", periods);
+    let model = crate::types::FinancialModelSpec::new(
+        "example_model",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods,
+        )?,
+    );
 
     let value = serde_json::to_value(&model).map_err(|error| {
         finstack_quant_core::Error::Internal(format!("serialize financial model example: {error}"))

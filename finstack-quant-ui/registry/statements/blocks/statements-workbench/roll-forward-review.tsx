@@ -95,7 +95,7 @@ export function RollForwardReview({
     const priorModel = JSON.parse(previous.modelJson) as FinancialModelSpecWire;
     const model = JSON.parse(current.modelJson) as FinancialModelSpecWire;
     const forecastBefore = new Set(
-      priorModel.periods
+      priorModel.periods.periods
         .filter((period) => !period.is_actual)
         .map((period) => period.id),
     );
@@ -103,7 +103,7 @@ export function RollForwardReview({
       ids: Object.keys(model.nodes).filter(
         (id) => id in before.nodes && id in after.nodes,
       ),
-      periods: model.periods
+      periods: model.periods.periods
         .filter((period) => period.is_actual && forecastBefore.has(period.id))
         .map((period) => period.id),
     };

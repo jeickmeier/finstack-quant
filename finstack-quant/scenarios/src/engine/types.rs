@@ -26,7 +26,8 @@ use indexmap::IndexMap;
 /// use time::macros::date;
 ///
 /// let mut market = MarketContext::new();
-/// let mut model = FinancialModelSpec::new("demo", vec![]);
+/// let plan = finstack_quant_core::dates::build_periods("2025Q1..Q1", None).expect("valid periods");
+/// let mut model = FinancialModelSpec::new("demo", plan);
 /// let as_of = date!(2025 - 01 - 01);
 /// let ctx = ExecutionContext {
 ///     market: &mut market,

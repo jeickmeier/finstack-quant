@@ -23,7 +23,14 @@ fn test_statement_forecast_percent() {
     let periods = period_plan.periods;
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-    let mut model = FinancialModelSpec::new("test", periods.clone());
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods.clone(),
+        )
+        .expect("valid period plan"),
+    );
 
     // Add a revenue node with explicit values
     let mut revenue_values = IndexMap::new();
@@ -105,7 +112,14 @@ fn test_statement_forecast_assign() {
     let periods = period_plan.periods;
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-    let mut model = FinancialModelSpec::new("test", periods.clone());
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods.clone(),
+        )
+        .expect("valid period plan"),
+    );
 
     // Add a node with explicit values
     let mut values = IndexMap::new();
@@ -170,7 +184,14 @@ fn forecast_assignment_preserves_currency_and_actual_values() {
 
     for currency in [Currency::USD, Currency::EUR] {
         let mut market = MarketContext::new();
-        let mut model = FinancialModelSpec::new("revenue", periods.clone());
+        let mut model = FinancialModelSpec::new(
+            "revenue",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                periods.clone(),
+            )
+            .expect("valid period plan"),
+        );
         model.add_node(
             NodeSpec::new("Revenue", NodeType::Value).with_values(IndexMap::from([
                 (
@@ -253,7 +274,14 @@ fn invalid_rate_conversion_reports_failure_without_mutating_forecasts() {
             (periods[0].id, AmountOrScalar::Scalar(0.02)),
             (periods[1].id, AmountOrScalar::Scalar(0.03)),
         ]);
-        let mut model = FinancialModelSpec::new("rates", periods.clone());
+        let mut model = FinancialModelSpec::new(
+            "rates",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                periods.clone(),
+            )
+            .expect("valid period plan"),
+        );
         model.add_node(NodeSpec::new("Rate", NodeType::Value).with_values(initial_values.clone()));
         model.validate_semantics().expect("valid original model");
 
@@ -324,7 +352,14 @@ fn rate_binding_rejects_monetary_nodes_without_mutating_values() {
             .build()
             .expect("forward curve");
         let mut market = MarketContext::new().insert(forward);
-        let mut model = FinancialModelSpec::new("expenses", periods.clone());
+        let mut model = FinancialModelSpec::new(
+            "expenses",
+            finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                periods.clone(),
+            )
+            .expect("valid period plan"),
+        );
         model.add_node(
             NodeSpec::new("InterestExpense", NodeType::Value).with_values(initial_values.clone()),
         );

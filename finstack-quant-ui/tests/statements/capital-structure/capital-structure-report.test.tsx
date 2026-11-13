@@ -55,7 +55,7 @@ afterEach(() => {
 const resultJson = JSON.stringify(fixture.result);
 const modelJson = JSON.stringify(fixture.model);
 const nodeIds = Object.keys(fixture.model.nodes);
-const periodIds = fixture.model.periods.map((period) => period.id);
+const periodIds = fixture.model.periods.periods.map((period) => period.id);
 const summaryOf = (name: keyof typeof fixture.cases) =>
   fixture.cases[name].summary as unknown as CapitalStructureSummary;
 const full = summaryOf("full");

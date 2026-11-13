@@ -24,7 +24,14 @@ fn test_vol_bucket_filtering_by_tenor() {
         .unwrap();
 
     let mut market = MarketContext::new().insert_surface(surface);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     // Shock only the 1Y tenor (+10% vol)
     let scenario = ScenarioSpec {
@@ -94,7 +101,14 @@ fn test_vol_bucket_filtering_by_strike() {
         .unwrap();
 
     let mut market = MarketContext::new().insert_surface(surface);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     // Shock only 100 strike
     let scenario = ScenarioSpec {
@@ -157,7 +171,14 @@ fn test_vol_bucket_unfiltered_is_multiplicative() {
     let preview = surface.apply_bucket_bump(None, None, 10.0).unwrap();
 
     let mut market = MarketContext::new().insert_surface(surface);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "vol_bucket_all".into(),
@@ -217,7 +238,14 @@ fn test_basecorr_bucket_filtering() {
         .unwrap();
 
     let mut market = MarketContext::new().insert(basecorr);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     // Shock only 7% detachment (+5 correlation points)
     let scenario = ScenarioSpec {
@@ -282,7 +310,14 @@ fn test_basecorr_bucket_filtering_uses_tight_detachment_match() {
         .unwrap();
 
     let mut market = MarketContext::new().insert(basecorr);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let scenario = ScenarioSpec {
         id: "basecorr_tight_bucket".into(),
@@ -328,7 +363,14 @@ fn test_basecorr_bucket_filtering_reports_clamp_and_no_match() {
         .unwrap();
 
     let mut market = MarketContext::new().insert(basecorr);
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let engine = ScenarioEngine::new();
 

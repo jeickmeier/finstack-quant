@@ -21,7 +21,14 @@ fn empty_model_json() -> String {
     let periods = finstack_quant_core::dates::build_periods("2024Q1..Q1", None)
         .unwrap()
         .periods;
-    let model = finstack_quant_statements::types::FinancialModelSpec::new("test", periods);
+    let model = finstack_quant_statements::types::FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            periods,
+        )
+        .expect("valid period plan"),
+    );
     serde_json::to_string(&model).unwrap()
 }
 
@@ -79,7 +86,14 @@ fn apply_scenario_with_model_empty_spec() {
 
 #[wasm_bindgen_test]
 fn apply_scenario_rejects_a_model_without_periods() {
-    let model = finstack_quant_statements::types::FinancialModelSpec::new("test", vec![]);
+    let model = finstack_quant_statements::types::FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
     let err = apply_scenario(
         JsValue::from(&built_scenario_json(None)),
         JsValue::from(&empty_market_json()),

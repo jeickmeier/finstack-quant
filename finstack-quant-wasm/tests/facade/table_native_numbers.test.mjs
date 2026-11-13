@@ -11,10 +11,13 @@ function model() {
   return {
     id: 'native-table-results',
     schema_version: 1,
-    periods: [
-      { id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: false },
-      { id: '2025Q2', start: '2025-04-01', end: '2025-07-01', is_actual: false },
-    ],
+    periods: {
+      calendar: 'gregorian',
+      periods: [
+        { id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: false },
+        { id: '2025Q2', start: '2025-04-01', end: '2025-07-01', is_actual: false },
+      ],
+    },
     nodes: {
       nan: { node_id: 'nan', node_type: 'value', values: { '2025Q1': 100, '2025Q2': 110 } },
       other: { node_id: 'other', node_type: 'value', values: { '2025Q1': 1, '2025Q2': 2 } },

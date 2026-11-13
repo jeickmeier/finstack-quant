@@ -47,12 +47,15 @@ function model(nodes) {
   return {
     id: 'senior-review',
     schema_version: 1,
-    periods: [1, 2, 3].map((q) => ({
-      id: `2025Q${q}`,
-      start: `2025-${String(q * 3 - 2).padStart(2, '0')}-01`,
-      end: `2025-${String(q * 3 + 1).padStart(2, '0')}-01`,
-      is_actual: false,
-    })),
+    periods: {
+      calendar: 'gregorian',
+      periods: [1, 2, 3].map((q) => ({
+        id: `2025Q${q}`,
+        start: `2025-${String(q * 3 - 2).padStart(2, '0')}-01`,
+        end: `2025-${String(q * 3 + 1).padStart(2, '0')}-01`,
+        is_actual: false,
+      })),
+    },
     nodes,
   };
 }
@@ -105,7 +108,7 @@ test('accounting identities reject numerically balanced incompatible currencies'
     liabilities: values('liabilities', [{ amount: '60', currency: 'EUR' }]),
     equity: values('equity', [{ amount: '40', currency: 'EUR' }]),
   });
-  input.periods = input.periods.slice(0, 1);
+  input.periods.periods = input.periods.periods.slice(0, 1);
   const suite = {
     name: 'currency-check',
     builtin_checks: [
@@ -251,7 +254,10 @@ test('empty explicit periods preserve the model builder for retry', () => {
   try {
     builder.valueScalar('revenue', { '2025Q1': 100 });
     builder.withMeta('marker', { retained: true });
-    assert.throws(() => builder.periodsExplicit([]), /at least one period/);
+    assert.throws(
+      () => builder.periodsExplicit({ calendar: 'gregorian', periods: [] }),
+      /at least one period/
+    );
     builder.periods('2025Q1..Q2', '2025Q1');
     builder.forecast('revenue', { method: 'forward_fill', params: {} });
     const model = builder.build();

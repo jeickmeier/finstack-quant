@@ -12,7 +12,8 @@ const resultCodec = createWireCodec(statementSchema);
 export type StatementCellSource = NonNullable<
   StatementResultWire["node_sources"]
 >[string][string];
-export type StatementPeriod = FinancialModelSpecWire["periods"][number];
+export type StatementPeriod =
+  FinancialModelSpecWire["periods"]["periods"][number];
 export interface StatementCell {
   periodId: string;
   present: boolean;
@@ -107,7 +108,7 @@ export function statementRows(
         ? `Monetary · ${kind.currency}`
         : (kind?.type ?? "Unspecified");
     const cells = Object.fromEntries(
-      model.periods.map((period) => {
+      model.periods.periods.map((period) => {
         const monetary = result.monetary_nodes?.[nodeId]?.[period.id];
         const numeric = result.nodes[nodeId]?.[period.id];
         const present = monetary !== undefined || numeric !== undefined;

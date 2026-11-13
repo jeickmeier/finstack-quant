@@ -55,12 +55,15 @@ function quarterlyModel(actualQuarters) {
     Object.fromEntries(QUARTERS.slice(0, series.length).map(([id], i) => [id, series[i]]));
   return {
     id: 'rollup-model',
-    periods: QUARTERS.map(([id, start, end], i) => ({
-      id,
-      start,
-      end,
-      is_actual: i < actualQuarters,
-    })),
+    periods: {
+      calendar: 'gregorian',
+      periods: QUARTERS.map(([id, start, end], i) => ({
+        id,
+        start,
+        end,
+        is_actual: i < actualQuarters,
+      })),
+    },
     nodes: {
       revenue: {
         node_id: 'revenue',

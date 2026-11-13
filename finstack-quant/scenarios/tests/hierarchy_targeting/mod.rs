@@ -170,7 +170,14 @@ fn hierarchy_curve_parallel_bp_resolves_to_individual_bumps() {
     let mut market = MarketContext::new().insert(ois).insert(tsy);
     market.set_hierarchy(h);
 
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     // Use hierarchy-targeted operation targeting the "Rates/USD" subtree,
     // which resolves to both USD-OIS and USD-TSY.
@@ -254,7 +261,14 @@ fn cumulative_mode_stacks_shocks_down_tree() {
     let mut market = MarketContext::new().insert(jpm).insert(oxy);
     market.set_hierarchy(h);
 
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     // Op1: +50bp on all Credit (matches JPM-5Y and OXY-5Y → 2 expansions)
     // Op2: +100bp on Credit/US/HY (matches OXY-5Y only → 1 expansion)
@@ -371,7 +385,14 @@ fn most_specific_wins_keeps_only_deepest_shock() {
     let mut market = MarketContext::new().insert(jpm).insert(oxy);
     market.set_hierarchy(h);
 
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     // Op1 path depth 1 (Credit):     JPM-5Y → depth 1, OXY-5Y → depth 1
     // Op2 path depth 3 (Credit/US/HY): OXY-5Y → depth 3
@@ -465,7 +486,14 @@ fn engine_works_with_resolution_mode_field() {
     let mut market = MarketContext::new().insert(ois).insert(tsy);
     market.set_hierarchy(h);
 
-    let mut model = FinancialModelSpec::new("test", vec![]);
+    let mut model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     // Bump USD-OIS directly with resolution_mode explicitly set
     let scenario = ScenarioSpec {
@@ -756,8 +784,22 @@ fn most_specific_wins_uses_matched_node_depth_not_target_path_depth() {
     };
 
     let engine = ScenarioEngine::new();
-    let mut hierarchy_model = FinancialModelSpec::new("test", vec![]);
-    let mut direct_model = FinancialModelSpec::new("test", vec![]);
+    let mut hierarchy_model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
+    let mut direct_model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let mut hierarchy_ctx = ExecutionContext {
         market: &mut hierarchy_market,
@@ -875,8 +917,22 @@ fn most_specific_wins_deduplicates_per_operation_family_not_raw_identifier() {
 
     let engine = ScenarioEngine::new();
     let base = date!(2025 - 01 - 01);
-    let mut hierarchy_model = FinancialModelSpec::new("test", vec![]);
-    let mut direct_model = FinancialModelSpec::new("test", vec![]);
+    let mut hierarchy_model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
+    let mut direct_model = FinancialModelSpec::new(
+        "test",
+        finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            vec![],
+        )
+        .expect("valid period plan"),
+    );
 
     let mut hierarchy_ctx = ExecutionContext {
         market: &mut hierarchy_market,
