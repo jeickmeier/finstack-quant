@@ -146,7 +146,6 @@ test('bare string returns are named or allowlisted', () => {
     'SifmaSettlementClass#toString',
     'TenorUnit#toString',
     'RoundingMode#toString',
-    'UnknownScalePolicy#toString',
     'CreditRating#toString',
     'CurveId#toString',
     'InstrumentId#toString',
@@ -154,7 +153,6 @@ test('bare string returns are named or allowlisted', () => {
     'CurveId#asStr',
     'InstrumentId#asStr',
     'CreditRating#toMoodysString',
-    'RatingScaleRegistry#defaultScaleId',
     'ratingScalesExtensionKey',
     // Exact decimal text of the amount.
     'Money#amountDecimal',

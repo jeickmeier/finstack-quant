@@ -1955,21 +1955,61 @@ export interface PeriodPlan {
   periods: Period[];
 }
 /**
- * Rating level for credit rating scales.
+ * One band of a scorecard scale: a label, its representative score and the
+ * band's lower bound.
  */
 export interface RatingLevel {
   /**
-   * Minimum score threshold for this rating.
+   * Inclusive lower bound of the band on the 0–100 scale.
    */
   min_score: number;
   /**
-   * Rating name, for example `AAA` or `Aaa`.
+   * Band label, for example `AAA` or `Aaa`; outer whitespace trimmed.
    */
   name: string;
   /**
-   * Numeric score on a 0-100 scale.
+   * Representative score of the band on the inclusive 0–100 scale.
    */
   score: number;
+}
+/**
+ * One registered scorecard scale with its normalized id and the provenance of its numbers.
+ */
+export interface RatingScaleEntry {
+  /**
+   * Scale identifier, outer-trimmed and ASCII-lowercased.
+   */
+  id: string;
+  /**
+   * The scale definition.
+   */
+  scale: ScorecardScale;
+  /**
+   * Provenance of the scale's numbers (policy, owner, vintage).
+   */
+  source: string;
+}
+/**
+ * Scorecard rating-scale definition: a named, best-to-worst list of bands
+ * that covers the whole `[0, 100]` score domain.
+ *
+ * Named `ScorecardScale` (rather than just `RatingScale`) to disambiguate
+ * from `finstack_quant_models::credit::migration::RatingScale`, which models
+ * the ordered state set of a credit-migration / transition matrix.
+ */
+export interface ScorecardScale {
+  /**
+   * Human-readable description.
+   */
+  description?: string | null;
+  /**
+   * Bands ordered best to worst.
+   */
+  ratings: RatingLevel[];
+  /**
+   * Scale name, for example `Internal corporate`; outer whitespace trimmed.
+   */
+  scale_name: string;
 }
 /**
  * Generated accrual, payment and fixing dates with any construction warnings.
@@ -2002,23 +2042,6 @@ export interface ScheduleSpec {
   payment_lag_days?: number;
   start: DateWire;
   stub: StubKind;
-}
-/**
- * Named scorecard rating scale: rating levels ordered best to worst with score thresholds.
- */
-export interface ScorecardScale {
-  /**
-   * Human-readable description.
-   */
-  description?: string | null;
-  /**
-   * Ordered list of rating levels from best to worst.
-   */
-  ratings: RatingLevel[];
-  /**
-   * Scale name, for example `S&P` or `Moody's`.
-   */
-  scale_name: string;
 }
 /**
  * A single named column in a [`TableEnvelope`].

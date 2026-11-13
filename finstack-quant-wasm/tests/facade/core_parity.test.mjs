@@ -144,7 +144,15 @@ const attributes = () => {
 
 const usFederal = core.FiscalConfig.usFederal();
 const nyse = new core.HolidayCalendar('nyse');
-const registry = core.embeddedRegistry();
+const registry = core.RatingScaleRegistry.fromJson(
+  readFileSync(
+    new URL(
+      '../../../finstack-quant-py/tests/data/agency_style_rating_scales.json',
+      import.meta.url
+    ),
+    'utf8'
+  )
+);
 const SERIES = [100.0, 101.5, 99.75, 102.25, 103.0];
 const money = (amount, code) => new core.Money(amount, new core.Currency(code));
 
@@ -154,7 +162,7 @@ const CASES = {
   scorecard_scale_try_new: () =>
     core.scorecardScaleTryNew('custom', 'fixture', [
       core.ratingLevelTryNew('A', 90, 85),
-      core.ratingLevelTryNew('B', 70, 65),
+      core.ratingLevelTryNew('B', 70, 0),
     ]),
   sabr_parameter_data_new: () => [
     core.sabrParameterDataNew(0.2, 1, 0, -0.5),
@@ -274,14 +282,18 @@ const CASES = {
     config().extensionKeys(),
   ],
   rating_registry: () => ({
-    default_scale_id: registry.defaultScaleId(),
-    default_score: registry.defaultScorecardScore(),
     scale_ids: registry.scaleIds(),
-    policy: registry.unknownScalePolicy().toString(),
-    known: registry.isKnownRatingScale(registry.defaultScaleId()),
-    scale: registry.ratingScale(registry.defaultScaleId()),
+    known: registry.isKnownRatingScale(' SP '),
+    scale: registry.ratingScale('sp'),
+    source: registry.entry('moodys').source,
+    classify: core.scorecardScaleClassify(registry.ratingScale('sp'), 77.5).name,
+    level_position: core.scorecardScaleLevelPosition(registry.ratingScale('sp'), ' bbb '),
     extension_key: core.ratingScalesExtensionKey(),
-    from_config: core.registryFromConfig(new core.FinstackConfig()).defaultScaleId(),
+    from_config: (() => {
+      const cfg = new core.FinstackConfig();
+      cfg.setExtension(core.ratingScalesExtensionKey(), JSON.parse(registry.toJson()));
+      return core.registryFromConfig(cfg).scaleIds();
+    })(),
   }),
   credit_rating: () => [
     new core.CreditRating('Baa3').toString(),
@@ -562,7 +574,6 @@ test('enum classes expose every Rust variant and round-trip their names', () => 
   const families = [
     [core.PeriodKind, ['daily', 'weekly', 'monthly', 'quarterly', 'semiAnnual', 'annual']],
     [core.RoundingMode, ['bankers', 'midpointAwayFromZero', 'towardZero', 'floor', 'ceil']],
-    [core.UnknownScalePolicy, ['error', 'fallbackToDefault', 'warnAndFallback']],
   ];
   for (const [family, factories] of families) {
     const names = factories.map((factory) => family[factory]().toString());
@@ -580,10 +591,6 @@ test('enum classes expose every Rust variant and round-trip their names', () => 
     ['a', 'b', 'c', 'd']
   );
   assert.equal(core.RoundingMode.fromJson(core.RoundingMode.floor().toJson()).toString(), 'floor');
-  assert.equal(
-    core.UnknownScalePolicy.fromJson(core.UnknownScalePolicy.error().toJson()).toString(),
-    'error'
-  );
 });
 
 test('every ISO-4217 currency has a Currency static', () => {

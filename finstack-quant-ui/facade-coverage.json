@@ -206,7 +206,6 @@
     "core.FxRateResult": "getter",
     "core.RoundingMode": "data-constructor",
     "core.TenorUnit": "data-constructor",
-    "core.UnknownScalePolicy": "data-constructor",
     "core.VolCubeExpirySlice": "data-constructor",
     "core.cashFlowValidate": "validator",
     "core.cfKindParse": "data-constructor",

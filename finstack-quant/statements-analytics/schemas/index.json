@@ -416,7 +416,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scorecard_config.schema.json",
-      "bytes": 2590,
+      "bytes": 2641,
       "kind": "input",
       "path": "schemas/statements_analytics/1/scorecard_config.schema.json",
       "summary": "Configuration for credit scorecard analysis.",

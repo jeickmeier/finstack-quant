@@ -216,8 +216,11 @@ says otherwise.
 **Runtime extensions.** `CorkscrewExtension` validates roll-forward articulation
 after evaluation (`expected = prev + Σ changes − Σ decreases`); pair
 `add_roll_forward` increase/disposal nodes with `CorkscrewAccount.changes` /
-`decreases`. `CreditScorecardExtension` applies weighted metric scoring with
-embedded S&P / Moody's / Fitch scales. Both are plain structs — `new(cfg)`
+`decreases`. `CreditScorecardExtension` applies weighted metric scoring on a
+scale from a caller-supplied `RatingScaleRegistry` (no embedded or default
+scale); the selected entry is snapshotted at construction and threshold and
+minimum-rating labels are checked against it. Both are plain structs —
+`CorkscrewExtension::new(cfg)` and `CreditScorecardExtension::new(cfg, &registry)?`,
 then `execute(&model, &results)` — not trait objects.
 
 ## Conventions

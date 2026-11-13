@@ -7,7 +7,7 @@ pub mod dates;
 pub mod market_data;
 mod math;
 pub(crate) mod money;
-mod rating_scales;
+pub(crate) mod rating_scales;
 mod schema;
 pub(crate) mod table;
 pub(crate) mod types;

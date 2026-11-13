@@ -474,20 +474,23 @@ export interface CoreNamespace {
    */
   readonly toleranceConfigNew: typeof wasm.toleranceConfigNew;
   /**
-   * Construct a validated rating threshold row on the 0–100 scorecard scale.
+   * Construct a validated scorecard band on the 0–100 scale.
    *
    * # Arguments
    *
-   * * `name` - Nonblank rating label, retained verbatim (for example `"AAA"`).
-   * * `score` - Finite representative score in the inclusive range `[0, 100]`.
-   * * `min_score` - Finite minimum qualifying score in `[0, 100]`.
+   * * `name` - Band label (for example `"AAA"`); outer whitespace is trimmed and
+   *   the label must be nonblank and not an unrated status (`NR`, `NOTRATED`,
+   *   `NOT RATED`, `UNRATED`).
+   * * `score` - Finite representative score in `[0, 100]`, not below `min_score`.
+   * * `min_score` - Finite inclusive lower bound of the band in `[0, 100]`.
    *
    * @returns A `RatingLevel` plain object with `name`, `score` and `min_score`.
    * @throws `TypeError` (kind `invalid_type`) for a non-string name or non-number
-   * score; `FinstackError` (kind `validation`) for a blank name or invalid score.
-   * @param name - Nonblank rating label, retained verbatim (for example `"AAA"`).
-   * @param score - Finite representative score in the inclusive range `[0, 100]`.
-   * @param minScore - Finite minimum qualifying score in `[0, 100]`.
+   * score; `FinstackError` (kind `validation`) for a blank or reserved name, an
+   * invalid score, or a score below the minimum.
+   * @param name - Band label (for example `"AAA"`); outer whitespace is trimmed and the label must be nonblank and not an unrated status (`NR`, `NOTRATED`, `NOT RATED`, `UNRATED`).
+   * @param score - Finite representative score in `[0, 100]`, not below `minScore`.
+   * @param minScore - Finite inclusive lower bound of the band in `[0, 100]`.
    * @example
    * ```typescript
    * import init, { core } from "finstack-quant-wasm";
@@ -498,34 +501,97 @@ export interface CoreNamespace {
    */
   readonly ratingLevelTryNew: typeof wasm.ratingLevelTryNew;
   /**
-   * Construct a validated best-to-worst scorecard scale.
+   * Construct a validated best-to-worst scorecard scale covering `[0, 100]`.
    *
    * # Arguments
    *
-   * * `scale_name` - Display name stored verbatim and used in validation messages.
+   * * `scale_name` - Scale name, outer whitespace trimmed; must be nonblank.
    * * `description` - Optional description; pass `null` or `undefined` for none.
-   * * `ratings` - Nonempty array (or its JSON text) of `RatingLevel` objects;
-   *   names must be unique and both score and minimum score must strictly descend.
+   * * `ratings` - Nonempty array (or its JSON text) of `RatingLevel` objects
+   *   ordered best to worst: labels unique after trim and ASCII case folding,
+   *   score and minimum strictly descending, the worst minimum `0`, and each
+   *   representative score below the preceding band's minimum.
    *
-   * @returns A `ScorecardScale` plain object preserving the supplied rating order.
+   * @returns A `ScorecardScale` plain object preserving the supplied band order.
    * @throws `TypeError` (kind `invalid_type`) for mistyped string arguments;
-   * `FinstackError` (kind `validation`) for malformed, empty, duplicated, out-of-range
-   * or incorrectly ordered rating data. Description precedes ratings as in Rust.
-   * @param scaleName - Display name stored verbatim and used in validation messages.
+   * `FinstackError` (kind `validation`) for a blank name or bands that are
+   * empty, colliding, out of order, leave a gap below the worst band, or hold
+   * a representative outside its band. Description precedes ratings as in Rust.
+   * @param scaleName - Scale name, outer whitespace trimmed; must be nonblank.
    * @param description - Optional description; pass `null` or `undefined` for none.
-   * @param ratings - Nonempty array (or its JSON text) of `RatingLevel` objects; names must be unique and both score and minimum score must strictly descend.
+   * @param ratings - Nonempty array (or its JSON text) of `RatingLevel` objects ordered best to worst: labels unique after trim and ASCII case folding, score and minimum strictly descending, the worst minimum `0`, and each representative score below the preceding band's minimum.
    * @example
    * ```typescript
    * import init, { core } from "finstack-quant-wasm";
    * await init();
    * const scale = core.scorecardScaleTryNew("custom", undefined, [
-   *   core.ratingLevelTryNew("A", 90, 85),
-   *   core.ratingLevelTryNew("B", 70, 65),
+   *   core.ratingLevelTryNew("A", 90, 80),
+   *   core.ratingLevelTryNew("B", 70, 0),
    * ]);
    * console.log(scale.ratings.length); // 2
    * ```
    */
   readonly scorecardScaleTryNew: typeof wasm.scorecardScaleTryNew;
+  /**
+   * Classify a score into its band on a scorecard scale (Rust `ScorecardScale::classify`).
+   *
+   * # Arguments
+   *
+   * * `scale` - `ScorecardScale` plain object (or JSON text); validated again.
+   * * `score` - Score on the inclusive 0–100 scale; each boundary belongs to
+   *   the better band.
+   *
+   * @returns The `RatingLevel` the score falls in.
+   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
+   * `FinstackError` (kind `validation`) for an invalid scale or a score that
+   * is non-finite or outside `[0, 100]`.
+   * @param scale - `ScorecardScale` plain object (or JSON text); validated again.
+   * @param score - Score on the inclusive 0–100 scale; each boundary belongs to the better band.
+   * @example
+   * ```typescript
+   * import init, { core } from "finstack-quant-wasm";
+   * await init();
+   * const scale = core.scorecardScaleTryNew("custom", undefined, [
+   *   core.ratingLevelTryNew("A", 90, 80),
+   *   core.ratingLevelTryNew("B", 70, 0),
+   * ]);
+   * console.log(core.scorecardScaleClassify(scale, 80).name); // "A"
+   * ```
+   */
+  readonly scorecardScaleClassify: typeof wasm.scorecardScaleClassify;
+  /**
+   * Best-to-worst position (`0` is best) of a band label (Rust `ScorecardScale::level_position`).
+   *
+   * # Arguments
+   *
+   * * `scale` - `ScorecardScale` plain object (or JSON text); validated again.
+   * * `label` - Band label, matched after outer trim and ASCII case folding.
+   *
+   * @returns The zero-based position of the band.
+   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
+   * `FinstackError` (kind `validation`) for an invalid scale or an unknown label.
+   * @param scale - `ScorecardScale` plain object (or JSON text); validated again.
+   * @param label - Band label, matched after outer trim and ASCII case folding.
+   */
+  readonly scorecardScaleLevelPosition: typeof wasm.scorecardScaleLevelPosition;
+  /**
+   * Construct a validated registry entry (Rust `RatingScaleEntry::try_new`).
+   *
+   * # Arguments
+   *
+   * * `id` - Scale id; normalized by outer trim and ASCII lowercasing, nonblank.
+   * * `source` - Provenance of the scale's numbers (policy, owner, vintage);
+   *   trimmed and nonblank.
+   * * `scale` - `ScorecardScale` plain object (or JSON text).
+   *
+   * @returns A `{ id, source, scale }` plain object with the normalized id.
+   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
+   * `FinstackError` (kind `validation`) for a blank id or source or an invalid scale.
+   * @param id - Scale id; normalized by outer trim and ASCII lowercasing, nonblank.
+   * @param source - Provenance of the scale's numbers (policy, owner, vintage); trimmed and nonblank.
+   * @param scale - `ScorecardScale` plain object (or JSON text).
+   */
+  readonly ratingScaleEntryTryNew: typeof wasm.ratingScaleEntryTryNew;
   /**
    * Construct validated SABR parameter data for a volatility-cube node.
    *
@@ -563,28 +629,19 @@ export interface CoreNamespace {
   readonly Attributes: typeof wasm.Attributes;
   readonly RoundingMode: typeof wasm.RoundingMode;
   readonly FinstackConfig: typeof wasm.FinstackConfig;
-  readonly UnknownScalePolicy: typeof wasm.UnknownScalePolicy;
   readonly RatingScaleRegistry: typeof wasm.RatingScaleRegistry;
   /**
-   * The rating-scale registry compiled into the library (Rust `embedded_registry`).
-   *
-   * @returns A copy of the embedded `RatingScaleRegistry`.
-   * @throws If the embedded registry fails validation (not expected).
-   */
-  readonly embeddedRegistry: typeof wasm.embeddedRegistry;
-  /**
-   * Rating-scale registry selected by a configuration (Rust `registry_from_config`).
+   * Rating-scale registry held in a configuration (Rust `registry_from_config`).
    *
    * # Arguments
    *
-   * * `config` - Configuration to read; when its extensions hold the
-   *   `ratingScalesExtensionKey()` section, that section replaces the embedded
-   *   registry, otherwise the embedded registry is returned.
+   * * `config` - Configuration whose extensions hold the
+   *   `ratingScalesExtensionKey()` section; there is no embedded fallback.
    *
    * @returns The validated `RatingScaleRegistry`.
    * @throws `FinstackError` (kind `validation`) if the extension section is
-   * malformed or fails registry validation.
-   * @param config - Configuration to read; when its extensions hold the `ratingScalesExtensionKey()` section, that section replaces the embedded registry, otherwise the embedded registry is returned.
+   * absent, malformed or fails registry validation.
+   * @param config - Configuration whose extensions hold the `ratingScalesExtensionKey()` section; there is no embedded fallback.
    */
   readonly registryFromConfig: typeof wasm.registryFromConfig;
   /**
@@ -10573,17 +10630,19 @@ export interface StatementsAnalyticsNamespace {
   /**
    * Validate a scorecard configuration.
    *
-   * Twin of Python `validate_scorecard_config` and `ScorecardConfig.validate`
-   * (Rust `CreditScorecardExtension::validate_config`). Returns `undefined`
-   * when the configuration is valid.
+   * Twin of Python `ScorecardConfig.validate` (Rust
+   * `CreditScorecardExtension::validate_config`). Returns `undefined` when the
+   * configuration is valid.
    * @param config - `ScorecardConfig` to check (object or JSON).
+   * @param registry - Caller-supplied `RatingScaleRegistry` holding `config.rating_scale`.
    *
    * # Errors
    *
-   * Throws with kind `validation` if `config` is malformed, the rating scale is
-   * unsupported, a metric weight is negative or non-finite, the total weight is
-   * implausible, a threshold range is invalid, or the explicit period is not a
-   * valid period identifier.
+   * Throws with kind `validation` if `config` is malformed, the registry has no
+   * such rating scale, a threshold or minimum-rating label is unknown to the
+   * selected scale or repeats, a metric weight is negative or non-finite, the
+   * total weight is implausible, or the explicit period is not a valid period
+   * identifier.
    */
   readonly validateScorecardConfig: typeof wasm.validateScorecardConfig;
   /**

@@ -290,8 +290,9 @@ test('plain-object constructor factories use Rust validation and defaults', () =
     );
   }
   const high = core.ratingLevelTryNew('A', 90, 85);
-  const low = core.ratingLevelTryNew('B', 70, 65);
-  for (const ratings of [[], [high, high], [low, high]]) {
+  const low = core.ratingLevelTryNew('B', 70, 0);
+  const gap = core.ratingLevelTryNew('B', 70, 65);
+  for (const ratings of [[], [high, high], [low, high], [high, gap]]) {
     assert.throws(
       () => core.scorecardScaleTryNew('invalid', null, ratings),
       (error) => error.kind === 'validation'

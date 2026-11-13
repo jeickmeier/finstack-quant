@@ -283,10 +283,20 @@ impl JsCorkscrewExtension {
 /// builder.valueScalar("ebitda", { "2025Q1": 100 });
 /// const model = builder.build();
 /// const results = new statements.Evaluator().evaluate(model);
-/// const extension = new statements_analytics.CreditScorecardExtension({
-///   rating_scale: "sp",
-///   metrics: [{ name: "leverage", formula: "debt / ebitda", weight: 1.0, thresholds: { AAA: [0, 1], BBB: [1, 4] } }],
-/// });
+/// const scale = core.scorecardScaleTryNew("Internal", undefined, [
+///   core.ratingLevelTryNew("AAA", 95, 90),
+///   core.ratingLevelTryNew("BBB", 60, 0),
+/// ]);
+/// const registry = new core.RatingScaleRegistry([
+///   core.ratingScaleEntryTryNew("internal", "credit policy 2026", scale),
+/// ]);
+/// const extension = new statements_analytics.CreditScorecardExtension(
+///   {
+///     rating_scale: "internal",
+///     metrics: [{ name: "leverage", formula: "debt / ebitda", weight: 1.0, thresholds: { AAA: [0, 1], BBB: [1, 4] } }],
+///   },
+///   registry,
+/// );
 /// extension.execute(model, results).status;
 /// extension.free();
 /// ```
@@ -297,22 +307,37 @@ pub struct JsCreditScorecardExtension {
 
 #[wasm_bindgen(js_class = CreditScorecardExtension)]
 impl JsCreditScorecardExtension {
-    /// Create the extension from its configuration.
+    /// Create the extension on a scale of the supplied registry; the selected
+    /// entry is resolved once and kept as a snapshot.
     ///
-    /// @param config - `ScorecardConfig`: `rating_scale`, the weighted `metrics` with their rating thresholds, and the optional `min_rating` and `period` (object or JSON).
+    /// @param config - `ScorecardConfig`: `rating_scale` (an id in `registry`), the weighted `metrics` with their rating thresholds, and the optional `min_rating` and `period` (object or JSON).
+    /// @param registry - Caller-supplied `RatingScaleRegistry` holding `config.rating_scale`.
     /// @returns The configured extension.
-    /// @throws Error with kind `validation` if `config` is malformed.
+    /// @throws Error with kind `validation` if `config` is malformed, names a scale the registry does not hold, or uses a threshold or minimum-rating label the selected scale does not hold or repeats.
     #[wasm_bindgen(constructor)]
     pub fn new(
         #[wasm_bindgen(
             unchecked_param_type = "generated.statements_analytics.ScorecardConfig | string"
         )]
         config: JsValue,
+        registry: &crate::api::core::rating_scales::JsRatingScaleRegistry,
     ) -> Result<JsCreditScorecardExtension, JsValue> {
         let config: ScorecardConfig = from_js_json(&config, "config")?;
-        Ok(JsCreditScorecardExtension {
-            inner: CreditScorecardExtension::new(config),
-        })
+        CreditScorecardExtension::new(config, &registry.inner)
+            .map(|inner| JsCreditScorecardExtension { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Snapshot of the selected registry entry.
+    ///
+    /// Twin of Python `CreditScorecardExtension.rating_scale` (Rust
+    /// `CreditScorecardExtension::rating_scale`).
+    ///
+    /// @returns The `{ id, source, scale }` entry the extension was built on.
+    /// @throws Error only if the entry cannot be converted to a JavaScript object.
+    #[wasm_bindgen(js_name = ratingScale, unchecked_return_type = "RatingScaleEntry")]
+    pub fn rating_scale(&self) -> Result<JsValue, JsValue> {
+        to_js_value(self.inner.rating_scale())
     }
 
     /// Configuration the extension was created with.
@@ -350,24 +375,27 @@ impl JsCreditScorecardExtension {
 
 /// Validate a scorecard configuration.
 ///
-/// Twin of Python `validate_scorecard_config` and `ScorecardConfig.validate`
-/// (Rust `CreditScorecardExtension::validate_config`). Returns `undefined`
-/// when the configuration is valid.
+/// Twin of Python `ScorecardConfig.validate` (Rust
+/// `CreditScorecardExtension::validate_config`). Returns `undefined` when the
+/// configuration is valid.
 /// @param config - `ScorecardConfig` to check (object or JSON).
+/// @param registry - Caller-supplied `RatingScaleRegistry` holding `config.rating_scale`.
 ///
 /// # Errors
 ///
-/// Throws with kind `validation` if `config` is malformed, the rating scale is
-/// unsupported, a metric weight is negative or non-finite, the total weight is
-/// implausible, a threshold range is invalid, or the explicit period is not a
-/// valid period identifier.
+/// Throws with kind `validation` if `config` is malformed, the registry has no
+/// such rating scale, a threshold or minimum-rating label is unknown to the
+/// selected scale or repeats, a metric weight is negative or non-finite, the
+/// total weight is implausible, or the explicit period is not a valid period
+/// identifier.
 #[wasm_bindgen(js_name = validateScorecardConfig)]
 pub fn validate_scorecard_config(
     #[wasm_bindgen(
         unchecked_param_type = "generated.statements_analytics.ScorecardConfig | string"
     )]
     config: JsValue,
+    registry: &crate::api::core::rating_scales::JsRatingScaleRegistry,
 ) -> Result<(), JsValue> {
     let config: ScorecardConfig = from_js_json(&config, "config")?;
-    CreditScorecardExtension::validate_config(&config).map_err(to_js_err)
+    CreditScorecardExtension::validate_config(&config, &registry.inner).map_err(to_js_err)
 }

@@ -5,7 +5,7 @@ use serde_json::Value;
 use crate::dates::{PeriodPlan, Schedule, ScheduleSpec};
 use crate::market_data::context::MarketContextState;
 use crate::market_data::surfaces::VolCubeExpirySlice;
-use crate::rating_scales::ScorecardScale;
+use crate::rating_scales::{RatingScaleEntry, ScorecardScale};
 use crate::table::TableEnvelope;
 use crate::{Error, Result};
 
@@ -149,10 +149,38 @@ fn schedule_examples() -> Result<Vec<Value>> {
     example(&crate::dates::ScheduleBuilder::from(schedule_spec_example()?).build()?)
 }
 
-/// The default scorecard scale of the rating-scale registry compiled into the library.
+/// A three-band illustrative scorecard scale covering `[0, 100]`; its numbers
+/// are an example policy, not an agency calibration.
 fn scorecard_scale_examples() -> Result<Vec<Value>> {
-    let registry = crate::rating_scales::embedded_registry()?;
-    example(registry.rating_scale(registry.default_scale_id())?)
+    use crate::rating_scales::{RatingLevel, ScorecardScale};
+    example(&ScorecardScale::try_new(
+        "Illustrative internal scale",
+        Some("Example utility bands; not an agency calibration".to_string()),
+        vec![
+            RatingLevel::try_new("A", 90.0, 80.0)?,
+            RatingLevel::try_new("B", 70.0, 50.0)?,
+            RatingLevel::try_new("C", 20.0, 0.0)?,
+        ],
+    )?)
+}
+
+/// The illustrative scale of [`scorecard_scale_examples`] registered under an
+/// id with its provenance.
+fn rating_scale_entry_examples() -> Result<Vec<Value>> {
+    use crate::rating_scales::{RatingLevel, RatingScaleEntry, ScorecardScale};
+    example(&RatingScaleEntry::try_new(
+        "illustrative",
+        "Example utility bands; not an agency calibration",
+        ScorecardScale::try_new(
+            "Illustrative internal scale",
+            None,
+            vec![
+                RatingLevel::try_new("A", 90.0, 80.0)?,
+                RatingLevel::try_new("B", 70.0, 50.0)?,
+                RatingLevel::try_new("C", 20.0, 0.0)?,
+            ],
+        )?,
+    )?)
 }
 
 /// A one-year-expiry normal-volatility slice over two tenors and three strikes.
@@ -229,6 +257,14 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     "Named scorecard rating scale: rating levels ordered best to worst with score thresholds."
 )
     .with_examples(scorecard_scale_examples),
+    crate::schema_artifact!(
+    RatingScaleEntry,
+    "rating_scales",
+    "rating_scale_entry",
+    Output,
+    "One registered scorecard scale with its normalized id and the provenance of its numbers."
+)
+    .with_examples(rating_scale_entry_examples),
     crate::schema_artifact!(
     VolCubeExpirySlice,
     "market_data",

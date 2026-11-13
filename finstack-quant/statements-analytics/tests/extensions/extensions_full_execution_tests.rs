@@ -13,6 +13,14 @@ use finstack_quant_statements_analytics::extensions::{
 };
 use finstack_quant_statements_analytics::templates::roll_forward;
 
+/// Caller-supplied test registry (agency-style labels, test-owned numbers).
+fn agency_style_registry() -> finstack_quant_core::rating_scales::RatingScaleRegistry {
+    finstack_quant_core::rating_scales::RatingScaleRegistry::from_json(include_str!(
+        "../data/agency_style_rating_scales.json"
+    ))
+    .expect("valid test rating-scale registry")
+}
+
 // Corkscrew Extension Full Execution Tests
 
 #[test]
@@ -412,7 +420,8 @@ fn test_scorecard_extension_with_valid_config() {
         period: None,
     };
 
-    let extension = CreditScorecardExtension::new(config);
+    let extension =
+        CreditScorecardExtension::new(config, &agency_style_registry()).expect("valid scorecard");
 
     // Execute extension via inherent method
     let report = extension.execute(&model, &results).unwrap();
@@ -495,7 +504,8 @@ fn test_scorecard_moodys_rating_scale() {
         period: None,
     };
 
-    let extension = CreditScorecardExtension::new(config);
+    let extension =
+        CreditScorecardExtension::new(config, &agency_style_registry()).expect("valid scorecard");
 
     let report = extension.execute(&model, &results).unwrap();
 
@@ -507,9 +517,11 @@ fn test_scorecard_moodys_rating_scale() {
 fn test_scorecard_rejects_retired_fitch_alias() {
     let config = ScorecardConfig {
         rating_scale: "Fitch".into(),
-        ..Default::default()
+        metrics: vec![],
+        min_rating: None,
+        period: None,
     };
-    assert!(CreditScorecardExtension::validate_config(&config).is_err());
+    assert!(CreditScorecardExtension::validate_config(&config, &agency_style_registry()).is_err());
 }
 
 #[test]
@@ -585,7 +597,8 @@ fn test_scorecard_with_minimum_rating_warning() {
         period: None,
     };
 
-    let extension = CreditScorecardExtension::new(config);
+    let extension =
+        CreditScorecardExtension::new(config, &agency_style_registry()).expect("valid scorecard");
 
     let report = extension.execute(&model, &results).unwrap();
 
@@ -681,7 +694,8 @@ fn test_scorecard_multiple_metrics_weighted() {
         period: None,
     };
 
-    let extension = CreditScorecardExtension::new(config);
+    let extension =
+        CreditScorecardExtension::new(config, &agency_style_registry()).expect("valid scorecard");
 
     let report = extension.execute(&model, &results).unwrap();
 
@@ -723,7 +737,8 @@ fn test_scorecard_metric_evaluation_error_handling() {
         period: None,
     };
 
-    let extension = CreditScorecardExtension::new(config);
+    let extension =
+        CreditScorecardExtension::new(config, &agency_style_registry()).expect("valid scorecard");
 
     let report = extension.execute(&model, &results).unwrap();
 
@@ -827,7 +842,9 @@ fn test_scorecard_non_finite_metric_excluded_and_weights_renormalized() {
     let (model, results) = two_metric_model();
 
     // Default period = last (Q2, no actuals): leverage = 150/0 = inf → NM.
-    let extension = CreditScorecardExtension::new(leverage_coverage_config());
+    let extension =
+        CreditScorecardExtension::new(leverage_coverage_config(), &agency_style_registry())
+            .expect("valid scorecard");
     let report = extension.execute(&model, &results).unwrap();
 
     assert_eq!(report.status, ScorecardStatus::Success);
@@ -871,7 +888,8 @@ fn test_scorecard_period_selection() {
     let mut config = leverage_coverage_config();
     config.period = Some("2025Q1".into());
 
-    let extension = CreditScorecardExtension::new(config);
+    let extension =
+        CreditScorecardExtension::new(config, &agency_style_registry()).expect("valid scorecard");
     let report = extension.execute(&model, &results).unwrap();
 
     assert_eq!(report.status, ScorecardStatus::Success);
@@ -900,7 +918,8 @@ fn test_scorecard_unknown_period_is_error() {
     let mut config = leverage_coverage_config();
     config.period = Some("2030Q4".into());
 
-    let extension = CreditScorecardExtension::new(config);
+    let extension =
+        CreditScorecardExtension::new(config, &agency_style_registry()).expect("valid scorecard");
     let err = extension
         .execute(&model, &results)
         .expect_err("period absent from the model must be an error");

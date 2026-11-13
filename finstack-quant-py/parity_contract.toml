@@ -133,8 +133,8 @@ note = "Documented host flattening (both hosts): Rust market_data::{term_structu
 [crates.core.module_symbols.rating_scales]
 python_package = "finstack_quant.core.rating_scales"
 public = [
-    "UnknownScalePolicy", "RatingLevel", "ScorecardScale", "RatingScaleRegistry",
-    "embedded_registry", "registry_from_config", "RATING_SCALES_EXTENSION_KEY",
+    "RatingLevel", "ScorecardScale", "RatingScaleEntry", "RatingScaleRegistry",
+    "registry_from_config", "RATING_SCALES_EXTENSION_KEY",
 ]
 
 [crates.core.module_symbols.table]
@@ -2104,8 +2104,11 @@ js = "core"
 
 [parity.modules."finstack_quant.core.rating_scales"]
 js = "core"
-types = { RatingLevel = "RatingLevel", ScorecardScale = "ScorecardScale" }
-constructors = { RatingLevel = "core.ratingLevelTryNew", ScorecardScale = "core.scorecardScaleTryNew" }
+types = { RatingLevel = "RatingLevel", ScorecardScale = "ScorecardScale", RatingScaleEntry = "RatingScaleEntry" }
+constructors = { RatingLevel = "core.ratingLevelTryNew", ScorecardScale = "core.scorecardScaleTryNew", RatingScaleEntry = "core.ratingScaleEntryTryNew" }
+
+[parity.members."finstack_quant.core.rating_scales.ScorecardScale"]
+renames = { classify = { js = "core.scorecardScaleClassify", reason = "WASM `ScorecardScale` values are plain objects; the Rust method is a free function taking the scale" }, level_position = { js = "core.scorecardScaleLevelPosition", reason = "WASM `ScorecardScale` values are plain objects; the Rust method is a free function taking the scale" } }
 
 [parity.modules."finstack_quant.core.schema"]
 js = "core.schema"

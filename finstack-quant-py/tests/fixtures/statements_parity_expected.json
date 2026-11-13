@@ -2016,6 +2016,7 @@
           "period": "2025Q1",
           "rating": "AAA",
           "rating_scale": "sp",
+          "rating_scale_source": "Test fixture: S&P-style labels with test-owned utility bands; not an agency calibration",
           "total_score": 100.0,
           "weight_coverage": 1.0
         },

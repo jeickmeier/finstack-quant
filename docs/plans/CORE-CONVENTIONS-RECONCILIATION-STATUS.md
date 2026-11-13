@@ -112,7 +112,7 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 24 | E4b | committed (`E4b-1:` decision, `E4b-2:` maturity rule, `E4b-4:` date regime) — five-date resolver not done | E4b-1 docs only; E4b-2 and E4b-4 slice-gate (all stages; E4b-4 after gen-write); notebooks 101/101 | CDS Decision entry rewritten as a Reconciliation entry (Decision 235, Reconciliation 93) | O7 recorded as accepted in CDS materialization (calibration-framework 07) and CDS legs (credit 12) |
 | 25 | G1 | committed (`G1:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16,366 (16,365 + the mid-coupon make-whole re-expectation, re-run 19/19); python-test 14,008 / 112 skip; wasm-test 1,087; ui-check 1,527; doctests and the Linux run skipped by owner request | 017 entry: runtime reconciliation recorded (qualification remains); context-free-XIRR entry removed; record 017 status updated | Guess-free `irr`/`xirr`, fixed ACT/365F clock, canonical per-date net, full log bracket via fallible shared `solve_in_bracket`, one acceptance gate; `YieldBasis` (ACT/365F, ACT/360) with explicit loan `yield_basis` (O11); bond floor `day_count` removed; MC path IRR removed; see Needs review |
 | 26 | G2 | committed (`G2:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16358; core doctests 285; python-test 13988; python-lint; wasm-test 1085; wasm-lint; ui-check | 019 entry: CreditRating part recorded; record 019 partly reconciled | `D` = 21 and `NR` off the ladder; no `Ord`, hand-written `PartialOrd` (`NR` incomparable with rated values, equal to itself); `ladder_position()`; `notches_to`/`to_moodys_string -> Result` (`NR` arithmetic and Moody's `D` error); finite canonical/Moody's/status alias tables replace suffix stripping; the models rating-factor table and the structured-credit `rating_haircuts` move from `BTreeMap` to `IndexMap` (ladder order / wire order); Python ordering of `NR` against a rated value raises `TypeError` |
-| 27 | G3 | not attempted (run budget; plan sized M/L) | | | See Needs review: classify validation and embedded-data retirement must land together |
+| 27 | G3 | **committed** (`G3:` in git log) | workspace check; rust-test (statements-analytics, core); gen-write; slice-gate (lint, rust-test, gen-check, python-test, wasm-test, ui-check); notebooks 101/101 | 019 entry: registry and scorecard part reconciled; remaining is qualification and owner policies | Per D3: embedded scales, `embedded_registry`, default score/scale and `UnknownScalePolicy` removed; `RatingScaleRegistry`/`RatingScaleEntry`/`ScorecardScale`/`RatingLevel` privately validated (nonblank source, strict ids, reserved unrated labels, `[0, 100]` coverage, representative self-membership); `ScorecardScale::classify`; `CreditScorecardExtension::new(config, &registry)` snapshots the entry; hosts, schema (`rating_scale_entry`), parity ledger, tests and notebooks supply explicit registries |
 | 28 | G4 | committed (`G4:` in git log) | workspace rust-lint; gen-write (nothing moved); workspace rust-test 16,371; python-test 14,008 / 112 skip; wasm-test 1,087; ui-check 1,527; doctests and the Linux run skipped by owner request | 016 part of the 015/016 entry: runtime reconciliation recorded (qualification and product review remain); record 016 status updated | `npv`/`npv_amounts(as_of, flows, include_today)`; validate-before-select, no unused source query, `df_between_dates`, exact Money and checked scalar paths; shared `NeumaierAccumulator::checked_add`/`checked_total`; `flat_discount_factor` underflow error; schedule helpers take `include_today`; private trade-NPV copy removed; see Needs review |
 | 29 | F1 | not attempted (run budget; plan sized M) | | | About 200 sites in about 50 files (fiscal presets 48+ in 19 files, `PeriodId::annual` 72 in 20, `next_fiscal`/`prev_fiscal` 39, plus host presets) |
 | 30 | F2 | not attempted (run budget; dep F1) | | | |
@@ -1145,18 +1145,27 @@ logged under Needs review.
   by core and structured credit) was added to `finstack-quant-models` so the
   rating-factor table keeps a deterministic order once `CreditRating` lost
   `Ord`.
-- **G3 not attempted (run budget).** Record 019 #7 and #9 couple the new
-  `classify` representative rule with retiring the embedded sp/moodys data:
-  the embedded `sp` scale already violates the rule (AA+ representative 95 is
-  not below AAA's minimum 95), and #7 forbids repairing those numbers, so the
-  validation cannot ship without removing `embedded_registry()` and having
-  scorecards resolve one snapshot from a supplied registry. Counted
-  rating-scale sites: Python binding 95 and stub 79, WASM binding 69, the
-  statements-analytics scorecard extension 12, schema examples 4, host tests
-  about 50, two notebooks (one, `registry_defaults_and_overrides.ipynb`, is
-  about the embedded defaults being removed). The scorecard API has two
-  defensible registry-supply shapes (explicit registry argument versus the
-  config extension), which is a design choice for the owner.
+- **G3 (record 019 #6–#13, owner decision D3).**
+  - **Fixtures restate no agency numbers.** Tests use one test-owned
+    registry (`statements-analytics/tests/data/agency_style_rating_scales.json`,
+    copied to `finstack-quant-py/tests/data/` for both hosts): S&P/Moody's-style
+    labels with minima moved to `score - 4` so every representative sits in
+    its own band. Its `source` says it is not an agency calibration. No
+    expected rating changed in the Rust suites.
+  - **Weighted total at exactly 100.** `classify` rejects scores above 100
+    with no clipping (record #9), so a weighted average of all-100 band scores
+    that rounds above 100 by one ulp would error. Not observed in the suites.
+  - **Report data gains `rating_scale_source`.** The scorecard report
+    records the selected entry's provenance next to its id, for replay
+    (record #8); the statements cross-host golden was regenerated.
+  - **`ScorecardConfig.validate` takes the registry** in Python and WASM
+    (`validateScorecardConfig(config, registry)`), since scale and label checks
+    need it. `metrics` keeps its empty-list default (not a financial default).
+  - **Not done here:** the threshold interval/tie/missing-factor methods and
+    other credit registries (ECL policy, credit assumptions, rating factors)
+    belong to their own owners (record #12); the WASM `compounding_arg`
+    default to continuous compounding in `market_discount.rs` was observed in
+    passing and is outside this slice.
 - **A1 not closed.** The 020 register entry stays open as Evidence. Equality,
   adjacent and already-beyond observations, window/history behavior, and
   settlement/discount boundaries at each consumer were not independently

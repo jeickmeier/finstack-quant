@@ -109,8 +109,9 @@ want it; domain-specific numerics (stochastic processes, payoffs) belong in
 | `validation::{require_or, require_with, validate_*}` | Convention-agnostic invariant checks returning `Result`. |
 | `explain::{ExplainOpts, ExplanationTrace, TraceEntry}` | Opt-in computation tracing, off and zero-cost by default. |
 
-`rating_scales` holds the neutral shared scorecard-scale registry
-(`data/rating_scales/`). Product-independent credit engines and assumptions
+`rating_scales` holds the caller-supplied scorecard-scale registry: no scale
+is embedded, every registry is supplied directly or through the
+`core.rating_scales.v1` configuration extension. Product-independent credit engines and assumptions
 live in `finstack-quant-models::credit`.
 
 ### Expression engine

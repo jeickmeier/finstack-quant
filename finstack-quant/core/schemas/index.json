@@ -46,8 +46,17 @@
       "type_name": "VolCubeExpirySlice"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/rating_scales/1/rating_scale_entry.schema.json",
+      "bytes": 3253,
+      "kind": "output",
+      "path": "schemas/rating_scales/1/rating_scale_entry.schema.json",
+      "summary": "One registered scorecard scale with its normalized id and the provenance of its numbers.",
+      "title": "RatingScaleEntry",
+      "type_name": "RatingScaleEntry"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/rating_scales/1/scorecard_scale.schema.json",
-      "bytes": 3882,
+      "bytes": 2180,
       "kind": "output",
       "path": "schemas/rating_scales/1/scorecard_scale.schema.json",
       "summary": "Named scorecard rating scale: rating levels ordered best to worst with score thresholds.",

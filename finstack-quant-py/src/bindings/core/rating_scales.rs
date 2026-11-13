@@ -1,83 +1,40 @@
 //! Python bindings for [`finstack_quant_core::rating_scales`].
 //!
-//! Exposes the shared credit rating-scale registry (scorecard scales such as
-//! S&P / Moody's), the rating-level threshold rows, and the
-//! [`UnknownScalePolicy`] enum used by scorecards. The classes here mirror the
-//! Rust types one-for-one; arithmetic and lookup logic stays in Rust.
+//! Exposes the caller-supplied credit rating-scale registry, its entries,
+//! scorecard scales and their bands. No scale is embedded and nothing falls
+//! back to a default; the classes mirror the Rust types one-for-one and all
+//! classification and lookup logic stays in Rust.
 
 use super::config::PyFinstackConfig;
-use crate::bindings::macros::{label_enum, wire_methods};
+use crate::bindings::macros::wire_methods;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::rating_scales::{
-    RATING_SCALES_EXTENSION_KEY, RatingLevel, RatingScaleRegistry, ScorecardScale,
-    UnknownScalePolicy, embedded_registry, registry_from_config,
+    RATING_SCALES_EXTENSION_KEY, RatingLevel, RatingScaleEntry, RatingScaleRegistry,
+    ScorecardScale, registry_from_config,
 };
 use pyo3::exceptions::PyIndexError;
 use pyo3::prelude::*;
 use pyo3::types::{PyIterator, PyList, PyModule};
 
-/// Policy applied when a scorecard names an unknown rating scale.
-///
-/// Enum-style class: ``ERROR`` rejects unknown names, ``FALLBACK_TO_DEFAULT``
-/// resolves them to the registry's default scale, and ``WARN_AND_FALLBACK``
-/// does the same and logs a warning.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.core.rating_scales import UnknownScalePolicy
-/// >>> UnknownScalePolicy.from_name("error") == UnknownScalePolicy.ERROR
-/// True
-#[pyclass(
-    module = "finstack_quant.core.rating_scales",
-    name = "UnknownScalePolicy",
-    frozen,
-    eq,
-    hash,
-    skip_from_py_object
-)]
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct PyUnknownScalePolicy {
-    /// Underlying Rust policy variant.
-    pub(crate) inner: UnknownScalePolicy,
-}
-
-impl PyUnknownScalePolicy {
-    /// Build a Python wrapper from a Rust [`UnknownScalePolicy`].
-    pub(crate) const fn from_inner(inner: UnknownScalePolicy) -> Self {
-        Self { inner }
-    }
-}
-
-label_enum!(PyUnknownScalePolicy, UnknownScalePolicy, "UnknownScalePolicy", from_name, {
-    /// Reject unknown scale names.
-    ERROR => Error,
-    /// Fall back to the configured default scale for unknown names.
-    FALLBACK_TO_DEFAULT => FallbackToDefault,
-    /// Fall back to the default scale and log a warning.
-    WARN_AND_FALLBACK => WarnAndFallback,
-});
-wire_methods!(
-    PyUnknownScalePolicy,
-    UnknownScalePolicy,
-    "UnknownScalePolicy",
-    json_only
-);
-
-/// A single rating threshold row on a scorecard scale.
+/// One band of a scorecard scale: a label, its representative score and the
+/// band's inclusive lower bound.
 ///
 /// Parameters
 /// ----------
 /// name : str
-///     Rating label (``"BBB+"``, ``"Baa1"``); must not be blank.
+///     Band label (``"BBB+"``, ``"Baa1"``); outer whitespace is trimmed and the
+///     label must be nonblank and not an unrated status (``NR``, ``NOTRATED``,
+///     ``NOT RATED``, ``UNRATED``).
 /// score : float
-///     Representative score on the inclusive 0-100 scorecard scale.
+///     Representative score, finite in ``[0, 100]`` and not below *min_score*.
 /// min_score : float
-///     Minimum score (inclusive 0-100) that qualifies for this rating.
+///     Inclusive lower bound of the band, finite in ``[0, 100]``.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If *name* is blank or either score is non-finite or outside 0-100.
+///     If *name* is blank or reserved, a score is non-finite or outside
+///     ``[0, 100]``, or *score* is below *min_score*.
 ///
 /// Examples
 /// --------
@@ -104,9 +61,8 @@ impl PyRatingLevel {
 
 #[pymethods]
 impl PyRatingLevel {
-    /// Construct and validate a rating level from its name and score
-    /// thresholds. Raises ``ValueError`` on a blank name or a score outside
-    /// the inclusive 0-100 range.
+    /// Construct and validate a band. Raises ``ValueError`` on a blank or
+    /// reserved name, a score outside ``[0, 100]``, or *score* below *min_score*.
     #[new]
     #[pyo3(text_signature = "(name, score, min_score)")]
     fn new(name: String, score: f64, min_score: f64) -> PyResult<Self> {
@@ -115,29 +71,31 @@ impl PyRatingLevel {
             .map_err(core_to_py)
     }
 
-    /// Rating name (e.g. ``"AAA"`` or ``"Aaa"``).
+    /// Band label, outer whitespace trimmed.
     #[getter]
     fn name(&self) -> &str {
-        &self.inner.name
+        self.inner.get_name()
     }
 
-    /// Numeric score on the 0-100 scorecard scale.
+    /// Representative score of the band on the 0-100 scale.
     #[getter]
     fn score(&self) -> f64 {
-        self.inner.score
+        self.inner.get_score()
     }
 
-    /// Minimum score threshold for this rating.
+    /// Inclusive lower bound of the band on the 0-100 scale.
     #[getter]
     fn min_score(&self) -> f64 {
-        self.inner.min_score
+        self.inner.get_min_score()
     }
 
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
             "RatingLevel(name={:?}, score={}, min_score={})",
-            self.inner.name, self.inner.score, self.inner.min_score
+            self.inner.get_name(),
+            self.inner.get_score(),
+            self.inner.get_min_score()
         )
     }
 
@@ -152,34 +110,41 @@ impl PyRatingLevel {
 
 wire_methods!(PyRatingLevel, RatingLevel, "RatingLevel");
 
-/// A named, ordered (best-to-worst) list of scorecard rating thresholds.
+/// A named best-to-worst list of scorecard bands covering ``[0, 100]``.
 ///
-/// Distinct from ``finstack_quant.models.credit.migration.RatingScale``, which
-/// models the state set of a migration matrix. Supports ``len(scale)``,
-/// iteration and indexing over its ``RatingLevel`` rows.
+/// For minima ``m0 > m1 > ... > m_last = 0`` the best band is ``[m0, 100]``
+/// and each later band is ``[m_i, m_(i-1))``; every representative score
+/// classifies to its own band. Distinct from
+/// ``finstack_quant.models.credit.migration.RatingScale``, which models the
+/// state set of a migration matrix. Supports ``len(scale)``, iteration and
+/// indexing over its ``RatingLevel`` rows.
 ///
 /// Parameters
 /// ----------
 /// scale_name : str
-///     Scale identifier (``"S&P"``, ``"Moody's"``).
+///     Scale name; outer whitespace is trimmed and it must be nonblank.
 /// ratings : list[RatingLevel]
-///     Levels ordered best-to-worst; ``score`` and ``min_score`` must strictly
-///     descend and names must be unique.
+///     Bands ordered best-to-worst; ``score`` and ``min_score`` strictly
+///     descend, labels are unique after trim and ASCII case folding, and the
+///     worst band's ``min_score`` is ``0``.
 /// description : str | None
 ///     Optional human-readable description.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If *ratings* is empty, contains duplicate names, or is not strictly
-///     ordered best-to-worst.
+///     If the name is blank, *ratings* is empty, labels collide, the order is
+///     not strictly best-to-worst, the worst minimum is not ``0``, or a
+///     representative score falls outside its band.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.core.rating_scales import RatingLevel, ScorecardScale
-/// >>> scale = ScorecardScale("custom", [RatingLevel("A", 90.0, 85.0), RatingLevel("B", 70.0, 65.0)])
+/// >>> scale = ScorecardScale("custom", [RatingLevel("A", 90.0, 80.0), RatingLevel("B", 70.0, 0.0)])
 /// >>> [level.name for level in scale]
 /// ['A', 'B']
+/// >>> scale.classify(80.0).name
+/// 'A'
 #[pyclass(
     module = "finstack_quant.core.rating_scales",
     name = "ScorecardScale",
@@ -200,9 +165,9 @@ impl PyScorecardScale {
 
 #[pymethods]
 impl PyScorecardScale {
-    /// Construct and validate a scorecard scale. Raises ``ValueError`` if
-    /// ``ratings`` is empty, has duplicate names, or is not strictly ordered
-    /// best-to-worst.
+    /// Construct and validate a scorecard scale. Raises ``ValueError`` on a
+    /// blank name, empty or colliding bands, a non best-to-worst order, a gap
+    /// below the worst band, or a representative outside its band.
     #[new]
     #[pyo3(signature = (scale_name, ratings, description = None))]
     #[pyo3(text_signature = "(scale_name, ratings, description=None)")]
@@ -217,43 +182,61 @@ impl PyScorecardScale {
             .map_err(core_to_py)
     }
 
-    /// Scale name (e.g. ``"S&P"`` or ``"Moody's"``).
+    /// Scale name, outer whitespace trimmed.
     #[getter]
     fn scale_name(&self) -> &str {
-        &self.inner.scale_name
+        self.inner.get_scale_name()
     }
 
     /// Optional human-readable description.
     #[getter]
     fn description(&self) -> Option<&str> {
-        self.inner.description.as_deref()
+        self.inner.get_description()
     }
 
-    /// Ordered list of rating levels from best to worst.
+    /// Bands ordered best to worst.
     #[getter]
     fn ratings(&self) -> Vec<PyRatingLevel> {
         self.inner
-            .ratings
+            .get_ratings()
             .iter()
             .cloned()
             .map(PyRatingLevel::from_inner)
             .collect()
     }
 
-    /// Number of rating levels on this scale.
+    /// Classify a score into its band; each boundary belongs to the better
+    /// band. Raises ``ValueError`` if *score* is non-finite or outside
+    /// ``[0, 100]``.
+    #[pyo3(text_signature = "(self, score)")]
+    fn classify(&self, score: f64) -> PyResult<PyRatingLevel> {
+        self.inner
+            .classify(score)
+            .map(|level| PyRatingLevel::from_inner(level.clone()))
+            .map_err(core_to_py)
+    }
+
+    /// Best-to-worst position (``0`` is best) of a band label, matched after
+    /// trim and ASCII case folding. Raises ``ValueError`` for an unknown label.
+    #[pyo3(text_signature = "(self, label)")]
+    fn level_position(&self, label: &str) -> PyResult<usize> {
+        self.inner.level_position(label).map_err(core_to_py)
+    }
+
+    /// Number of bands on this scale.
     fn __len__(&self) -> usize {
-        self.inner.ratings.len()
+        self.inner.get_ratings().len()
     }
 
     /// ``scale[i]`` — the ``i``-th rating level (negative indices supported).
     fn __getitem__(&self, index: isize) -> PyResult<PyRatingLevel> {
-        let len = self.inner.ratings.len() as isize;
+        let len = self.inner.get_ratings().len() as isize;
         let resolved = if index < 0 { index + len } else { index };
         if resolved < 0 || resolved >= len {
             return Err(PyIndexError::new_err("ScorecardScale index out of range"));
         }
         Ok(PyRatingLevel::from_inner(
-            self.inner.ratings[resolved as usize].clone(),
+            self.inner.get_ratings()[resolved as usize].clone(),
         ))
     }
 
@@ -275,8 +258,8 @@ impl PyScorecardScale {
     fn __repr__(&self) -> String {
         format!(
             "ScorecardScale(scale_name={:?}, ratings={})",
-            self.inner.scale_name,
-            self.inner.ratings.len()
+            self.inner.get_scale_name(),
+            self.inner.get_ratings().len()
         )
     }
 
@@ -290,18 +273,113 @@ impl PyScorecardScale {
 
 wire_methods!(PyScorecardScale, ScorecardScale, "ScorecardScale");
 
-/// Versioned registry of scorecard rating scales and defaults.
+/// One registered scale with its normalized id and provenance.
 ///
-/// Obtain one via ``embedded_registry()`` (the bundled default) or
-/// ``registry_from_config(config)``; resolve scales by canonical id with
-/// ``rating_scale(name)``.
+/// Parameters
+/// ----------
+/// id : str
+///     Scale id; normalized by trim and ASCII lowercasing, nonblank.
+/// source : str
+///     Provenance of the scale's numbers (policy, owner, vintage); trimmed
+///     and nonblank.
+/// scale : ScorecardScale
+///     The scale definition.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If the normalized id or the source is blank.
 ///
 /// Examples
 /// --------
-/// >>> from finstack_quant.core.rating_scales import embedded_registry
-/// >>> registry = embedded_registry()
-/// >>> registry.rating_scale(" SP ").scale_name
-/// 'S&P'
+/// >>> from finstack_quant.core.rating_scales import RatingLevel, RatingScaleEntry, ScorecardScale
+/// >>> scale = ScorecardScale("Internal", [RatingLevel("A", 90.0, 80.0), RatingLevel("B", 70.0, 0.0)])
+/// >>> RatingScaleEntry(" Internal ", "credit policy 2026", scale).id
+/// 'internal'
+#[pyclass(
+    module = "finstack_quant.core.rating_scales",
+    name = "RatingScaleEntry",
+    skip_from_py_object
+)]
+#[derive(Clone, Debug)]
+pub struct PyRatingScaleEntry {
+    /// Underlying Rust entry.
+    pub(crate) inner: RatingScaleEntry,
+}
+
+#[pymethods]
+impl PyRatingScaleEntry {
+    /// Construct and validate an entry. Raises ``ValueError`` if the
+    /// normalized id or the source is blank.
+    #[new]
+    #[pyo3(text_signature = "(id, source, scale)")]
+    fn new(id: String, source: String, scale: PyRef<'_, PyScorecardScale>) -> PyResult<Self> {
+        RatingScaleEntry::try_new(id, source, scale.inner.clone())
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
+    /// Normalized scale id.
+    #[getter]
+    fn id(&self) -> &str {
+        self.inner.get_id()
+    }
+
+    /// Provenance of the scale's numbers.
+    #[getter]
+    fn source(&self) -> &str {
+        self.inner.get_source()
+    }
+
+    /// The scale definition.
+    #[getter]
+    fn scale(&self) -> PyScorecardScale {
+        PyScorecardScale::from_inner(self.inner.get_scale().clone())
+    }
+
+    /// Return ``repr(self)``.
+    fn __repr__(&self) -> String {
+        format!(
+            "RatingScaleEntry(id={:?}, source={:?})",
+            self.inner.get_id(),
+            self.inner.get_source()
+        )
+    }
+
+    /// Structural equality on id, source and scale.
+    fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
+        other
+            .extract::<PyRef<'_, PyRatingScaleEntry>>()
+            .map(|rhs| self.inner == rhs.inner)
+            .unwrap_or(false)
+    }
+}
+
+/// Caller-supplied registry of scorecard rating scales.
+///
+/// Build one from entries, ``RatingScaleRegistry.from_json(json)`` or
+/// ``registry_from_config(config)``; resolve scales strictly by id with
+/// ``rating_scale(id)``. There is no embedded or default registry.
+///
+/// Parameters
+/// ----------
+/// rating_scales : list[RatingScaleEntry]
+///     Entries in registry order; at least one, with unique ids.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If the list is empty or ids repeat.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.core.rating_scales import (
+/// ...     RatingLevel, RatingScaleEntry, RatingScaleRegistry, ScorecardScale,
+/// ... )
+/// >>> scale = ScorecardScale("Internal", [RatingLevel("A", 90.0, 80.0), RatingLevel("B", 70.0, 0.0)])
+/// >>> registry = RatingScaleRegistry([RatingScaleEntry("internal", "credit policy 2026", scale)])
+/// >>> registry.rating_scale(" INTERNAL ").scale_name
+/// 'Internal'
 #[pyclass(
     module = "finstack_quant.core.rating_scales",
     name = "RatingScaleRegistry",
@@ -322,25 +400,28 @@ impl PyRatingScaleRegistry {
 
 #[pymethods]
 impl PyRatingScaleRegistry {
-    /// Configured default scorecard score for threshold gaps.
-    #[pyo3(text_signature = "(self)")]
-    fn default_scorecard_score(&self) -> f64 {
-        self.inner.default_scorecard_score()
+    /// Construct and validate a registry. Raises ``ValueError`` if
+    /// *rating_scales* is empty or ids repeat.
+    #[new]
+    #[pyo3(text_signature = "(rating_scales)")]
+    fn new(rating_scales: Vec<PyRef<'_, PyRatingScaleEntry>>) -> PyResult<Self> {
+        RatingScaleRegistry::try_new(rating_scales.iter().map(|e| e.inner.clone()).collect())
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
-    /// Configured default rating-scale id.
-    #[pyo3(text_signature = "(self)")]
-    fn default_scale_id(&self) -> &str {
-        self.inner.default_scale_id()
+    /// Registered entries in registry order.
+    #[getter]
+    fn rating_scales(&self) -> Vec<PyRatingScaleEntry> {
+        self.inner
+            .get_rating_scales()
+            .iter()
+            .cloned()
+            .map(|inner| PyRatingScaleEntry { inner })
+            .collect()
     }
 
-    /// Configured unknown-scale policy.
-    #[pyo3(text_signature = "(self)")]
-    fn unknown_scale_policy(&self) -> PyUnknownScalePolicy {
-        PyUnknownScalePolicy::from_inner(self.inner.unknown_scale_policy())
-    }
-
-    /// Canonical normalized id of every registered scale, in registry order.
+    /// Normalized id of every registered scale, in registry order.
     #[pyo3(text_signature = "(self)")]
     fn scale_ids(&self) -> Vec<String> {
         self.inner
@@ -350,20 +431,30 @@ impl PyRatingScaleRegistry {
             .collect()
     }
 
-    /// Return ``True`` if ``name`` is a known canonical id after trimming and ASCII case folding.
-    #[pyo3(text_signature = "(self, name)")]
-    fn is_known_rating_scale(&self, name: &str) -> bool {
-        self.inner.is_known_rating_scale(name)
+    /// Return ``True`` if *id* is registered after trim and ASCII lowercasing.
+    #[pyo3(text_signature = "(self, id)")]
+    fn is_known_rating_scale(&self, id: &str) -> bool {
+        self.inner.is_known_rating_scale(id)
     }
 
-    /// Resolve a canonical scale id to a ``ScorecardScale``.
-    ///
-    /// Honours the registry's unknown-scale policy: depending on the policy
-    /// this may fall back to the default scale or raise ``ValueError``.
-    #[pyo3(text_signature = "(self, name)")]
-    fn rating_scale(&self, name: &str) -> PyResult<PyScorecardScale> {
+    /// Resolve a registered entry by id. Raises ``ValueError`` for an
+    /// unknown id; no alias or fallback is applied.
+    #[pyo3(text_signature = "(self, id)")]
+    fn entry(&self, id: &str) -> PyResult<PyRatingScaleEntry> {
         self.inner
-            .rating_scale(name)
+            .entry(id)
+            .map(|inner| PyRatingScaleEntry {
+                inner: inner.clone(),
+            })
+            .map_err(core_to_py)
+    }
+
+    /// Resolve a registered scale by id. Raises ``ValueError`` for an
+    /// unknown id; no alias or fallback is applied.
+    #[pyo3(text_signature = "(self, id)")]
+    fn rating_scale(&self, id: &str) -> PyResult<PyScorecardScale> {
+        self.inner
+            .rating_scale(id)
             .map(|scale| PyScorecardScale::from_inner(scale.clone()))
             .map_err(core_to_py)
     }
@@ -371,9 +462,8 @@ impl PyRatingScaleRegistry {
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(
-            "RatingScaleRegistry(default_scale_id={:?}, default_score={})",
-            self.inner.default_scale_id(),
-            self.inner.default_scorecard_score()
+            "RatingScaleRegistry(scale_ids={:?})",
+            self.inner.scale_ids()
         )
     }
 
@@ -411,19 +501,10 @@ impl PyRatingScaleRegistry {
     }
 }
 
-/// Return the embedded (built-in) rating-scale registry.
-#[pyfunction]
-#[pyo3(name = "embedded_registry", text_signature = "()")]
-fn py_embedded_registry() -> PyResult<PyRatingScaleRegistry> {
-    embedded_registry()
-        .map(|reg| PyRatingScaleRegistry::from_inner(reg.clone()))
-        .map_err(core_to_py)
-}
-
-/// Load a rating-scale registry from a ``FinstackConfig``.
+/// Load the rating-scale registry held in a ``FinstackConfig``.
 ///
-/// Falls back to the embedded registry when the config does not override the
-/// ``core.rating_scales.v1`` extension key.
+/// Raises ``ValueError`` if the ``core.rating_scales.v1`` extension is absent
+/// or invalid; there is no embedded fallback.
 #[pyfunction]
 #[pyo3(name = "registry_from_config", text_signature = "(config)")]
 fn py_registry_from_config(config: PyRef<'_, PyFinstackConfig>) -> PyResult<PyRatingScaleRegistry> {
@@ -437,15 +518,14 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "rating_scales")?;
     m.setattr(
         "__doc__",
-        "Shared credit rating-scale registry (scorecard scales) from finstack-quant-core.",
+        "Caller-supplied credit rating-scale registry (scorecard scales) from finstack-quant-core.",
     )?;
 
-    m.add_class::<PyUnknownScalePolicy>()?;
     m.add_class::<PyRatingLevel>()?;
     m.add_class::<PyScorecardScale>()?;
+    m.add_class::<PyRatingScaleEntry>()?;
     m.add_class::<PyRatingScaleRegistry>()?;
 
-    m.add_function(wrap_pyfunction!(py_embedded_registry, &m)?)?;
     m.add_function(wrap_pyfunction!(py_registry_from_config, &m)?)?;
 
     // Surface the extension key as the single Python entry point.
@@ -456,10 +536,9 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         [
             "RATING_SCALES_EXTENSION_KEY",
             "RatingLevel",
+            "RatingScaleEntry",
             "RatingScaleRegistry",
             "ScorecardScale",
-            "UnknownScalePolicy",
-            "embedded_registry",
             "registry_from_config",
         ],
     )?;

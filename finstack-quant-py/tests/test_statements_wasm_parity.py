@@ -24,6 +24,7 @@ import pytest
 from finstack_quant import statements as st, statements_analytics as sa
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
+from finstack_quant.core.rating_scales import RatingScaleRegistry
 
 FIXTURES = Path(__file__).parent / "fixtures"
 INPUTS: dict[str, Any] = json.loads((FIXTURES / "statements_parity_inputs.json").read_text())
@@ -220,7 +221,10 @@ def analytics_cases() -> dict[str, Any]:
     cork_spec = cork_model.build()
     cork_result = st.Evaluator().evaluate(cork_spec)
     corkscrew = sa.CorkscrewExtension(sa.CorkscrewConfig.from_json(json.dumps(INPUTS["corkscrew_config"])))
-    scorecard = sa.CreditScorecardExtension(sa.ScorecardConfig.from_json(json.dumps(INPUTS["scorecard_config"])))
+    scorecard = sa.CreditScorecardExtension(
+        sa.ScorecardConfig.from_json(json.dumps(INPUTS["scorecard_config"])),
+        RatingScaleRegistry.from_json(json.dumps(INPUTS["rating_scales"])),
+    )
 
     def evaluated(model: st.FinancialModelSpec, node: str, period: str) -> float | None:
         return st.Evaluator().evaluate(model).get(node, period)

@@ -8,6 +8,14 @@ use finstack_quant_statements::{
 use finstack_quant_statements_analytics::analysis::*;
 use finstack_quant_statements_analytics::extensions::*;
 
+/// Caller-supplied test registry (agency-style labels, test-owned numbers).
+fn agency_style_registry() -> finstack_quant_core::rating_scales::RatingScaleRegistry {
+    finstack_quant_core::rating_scales::RatingScaleRegistry::from_json(include_str!(
+        "data/agency_style_rating_scales.json"
+    ))
+    .expect("valid test rating-scale registry")
+}
+
 fn monetary_model(currency: Currency) -> FinancialModelSpec {
     {
         let mut model_builder = ModelBuilder::new("money");
@@ -184,12 +192,16 @@ fn corkscrew_rejects_nan_in_strict_and_report_modes() {
 fn empty_scorecard_has_no_fabricated_rating() {
     let model = monetary_model(Currency::USD);
     let results = Evaluator::new().evaluate(&model).unwrap();
-    let report = CreditScorecardExtension::new(ScorecardConfig {
-        rating_scale: "sp".into(),
-        metrics: vec![],
-        min_rating: None,
-        period: None,
-    })
+    let report = CreditScorecardExtension::new(
+        ScorecardConfig {
+            rating_scale: "sp".into(),
+            metrics: vec![],
+            min_rating: None,
+            period: None,
+        },
+        &agency_style_registry(),
+    )
+    .expect("valid scorecard")
     .execute(&model, &results)
     .unwrap();
     assert_eq!(report.status, ScorecardStatus::Failed);

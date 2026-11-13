@@ -172,7 +172,18 @@ def _ledoit_wolf() -> dict[str, Any]:
 
 US_FEDERAL = dates.FiscalConfig.us_federal()
 NYSE = dates.HolidayCalendar("nyse")
-REGISTRY = rating_scales.embedded_registry()
+REGISTRY = rating_scales.RatingScaleRegistry.from_json(
+    (Path(__file__).parent / "data" / "agency_style_rating_scales.json").read_text()
+)
+
+
+def _registry_config() -> config.FinstackConfig:
+    """A configuration carrying REGISTRY under the rating-scale extension key."""
+    cfg = config.FinstackConfig()
+    cfg.set_extension(rating_scales.RATING_SCALES_EXTENSION_KEY, json.loads(REGISTRY.to_json()))
+    return cfg
+
+
 SERIES = [100.0, 101.5, 99.75, 102.25, 103.0]
 
 CASES: dict[str, Callable[[], Any]] = {
@@ -184,7 +195,7 @@ CASES: dict[str, Callable[[], Any]] = {
     "rating_level_try_new": lambda: json.loads(rating_scales.RatingLevel("AAA", 95, 90).to_json()),
     "scorecard_scale_try_new": lambda: json.loads(
         rating_scales.ScorecardScale(
-            "custom", [rating_scales.RatingLevel("A", 90, 85), rating_scales.RatingLevel("B", 70, 65)], "fixture"
+            "custom", [rating_scales.RatingLevel("A", 90, 85), rating_scales.RatingLevel("B", 70, 0)], "fixture"
         ).to_json()
     ),
     "sabr_parameter_data_new": lambda: [
@@ -295,14 +306,14 @@ CASES: dict[str, Callable[[], Any]] = {
         _config().extension_keys(),
     ],
     "rating_registry": lambda: {
-        "default_scale_id": REGISTRY.default_scale_id(),
-        "default_score": REGISTRY.default_scorecard_score(),
         "scale_ids": REGISTRY.scale_ids(),
-        "policy": str(REGISTRY.unknown_scale_policy()),
-        "known": REGISTRY.is_known_rating_scale(REGISTRY.default_scale_id()),
-        "scale": json.loads(REGISTRY.rating_scale(REGISTRY.default_scale_id()).to_json()),
+        "known": REGISTRY.is_known_rating_scale(" SP "),
+        "scale": json.loads(REGISTRY.rating_scale("sp").to_json()),
+        "source": REGISTRY.entry("moodys").source,
+        "classify": REGISTRY.rating_scale("sp").classify(77.5).name,
+        "level_position": REGISTRY.rating_scale("sp").level_position(" bbb "),
         "extension_key": rating_scales.RATING_SCALES_EXTENSION_KEY,
-        "from_config": rating_scales.registry_from_config(config.FinstackConfig()).default_scale_id(),
+        "from_config": rating_scales.registry_from_config(_registry_config()).scale_ids(),
     },
     "credit_rating": lambda: [
         str(types.CreditRating("Baa3")),

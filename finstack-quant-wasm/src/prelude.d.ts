@@ -36,6 +36,7 @@ import type {
   PeriodPlan,
   RateCalibrationRecipe,
   RatingLevel,
+  RatingScaleEntry,
   SabrParameterData,
   ScheduleSpec,
   ScorecardScale,
@@ -287,7 +288,7 @@ export type {
   ScorecardScale,
   ToleranceConfig,
 };
-export type { Period, RatingLevel } from '../types/generated/core/index.js';
+export type { Period, RatingLevel, RatingScaleEntry } from '../types/generated/core/index.js';
 export type {
   DrawdownEpisode,
   LookbackSample,

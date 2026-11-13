@@ -4397,9 +4397,10 @@ export interface ScorecardConfig {
    */
   period?: string | null;
   /**
-   * Canonical rating-scale id (`sp` or `moodys`); lookup ignores outer whitespace and ASCII case.
+   * Id of the scale in the supplied registry; lookup ignores outer
+   * whitespace and ASCII case. Required: there is no default scale.
    */
-  rating_scale?: string;
+  rating_scale: string;
 }
 /**
  * Definition of a scorecard metric.

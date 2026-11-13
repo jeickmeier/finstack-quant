@@ -42,11 +42,18 @@
             "bytes": 2852
           },
           {
+            "path": "schemas/rating_scales/1/rating_scale_entry.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/rating_scales/1/rating_scale_entry.schema.json",
+            "type_name": "RatingScaleEntry",
+            "kind": "output",
+            "bytes": 3253
+          },
+          {
             "path": "schemas/rating_scales/1/scorecard_scale.schema.json",
             "$id": "https://finstack_quant.dev/schemas/rating_scales/1/scorecard_scale.schema.json",
             "type_name": "ScorecardScale",
             "kind": "output",
-            "bytes": 3882
+            "bytes": 2180
           },
           {
             "path": "schemas/table/1/table_envelope.schema.json",
@@ -4127,11 +4134,19 @@
           },
           {
             "domain": "core",
+            "path": "schemas/rating_scales/1/rating_scale_entry.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/rating_scales/1/rating_scale_entry.schema.json",
+            "type_name": "RatingScaleEntry",
+            "kind": "output",
+            "bytes": 3253
+          },
+          {
+            "domain": "core",
             "path": "schemas/rating_scales/1/scorecard_scale.schema.json",
             "$id": "https://finstack_quant.dev/schemas/rating_scales/1/scorecard_scale.schema.json",
             "type_name": "ScorecardScale",
             "kind": "output",
-            "bytes": 3882
+            "bytes": 2180
           },
           {
             "domain": "core",

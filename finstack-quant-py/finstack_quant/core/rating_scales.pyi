@@ -1,17 +1,22 @@
 """
 Type stubs for ``finstack_quant.core.rating_scales``.
 
-Bindings for the shared credit rating-scale registry (scorecard scales such as
-S&P and Moody's) from the ``finstack-quant-core`` Rust crate.
+Bindings for the caller-supplied credit rating-scale registry (scorecard
+scales) from the ``finstack-quant-core`` Rust crate. No scale is embedded and
+nothing falls back to a default: every registry is built from entries, loaded
+with ``RatingScaleRegistry.from_json`` or read from the
+``core.rating_scales.v1`` configuration extension. A scale's numbers are the
+scorecard author's utility policy, not an agency calibration.
 
 Distinct from ``finstack_quant.models.credit.migration.RatingScale``, which models
 the ordered state set of a credit-migration transition matrix.
 
 Examples
 --------
->>> from finstack_quant.core.rating_scales import RatingLevel
->>> RatingLevel("BBB", 70.0, 65.0).name
-'BBB'
+>>> from finstack_quant.core.rating_scales import RatingLevel, ScorecardScale
+>>> scale = ScorecardScale("Internal", [RatingLevel("A", 90.0, 80.0), RatingLevel("B", 70.0, 0.0)])
+>>> scale.classify(79.5).name
+'B'
 
 """
 
@@ -23,126 +28,15 @@ import pandas as pd
 
 from finstack_quant.core.config import FinstackConfig
 
-class UnknownScalePolicy:
-    """
-    Policy for unknown scorecard rating-scale names.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.rating_scales import UnknownScalePolicy
-    >>> str(UnknownScalePolicy.from_name("error"))
-    'error'
-
-    """
-
-    ERROR: UnknownScalePolicy
-    """Reject unknown scale names (raises ``ValueError``)."""
-
-    FALLBACK_TO_DEFAULT: UnknownScalePolicy
-    """Use the configured default scale for unknown scale names."""
-
-    WARN_AND_FALLBACK: UnknownScalePolicy
-    """Use the default scale and let callers emit a warning."""
-
-    @classmethod
-    def from_name(cls, name: str) -> UnknownScalePolicy:
-        """
-        Parse a policy from its snake_case name, case-insensitively.
-
-        Parameters
-        ----------
-        name : str
-            One of ``"error"``, ``"fallback_to_default"``, or
-            ``"warn_and_fallback"``, in any ASCII case; surrounding whitespace
-            is ignored.
-
-        Returns
-        -------
-        UnknownScalePolicy
-            Matching policy constant.
-
-        Raises
-        ------
-        ValueError
-            If ``name`` is not a recognized policy.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.rating_scales import UnknownScalePolicy
-        >>> str(UnknownScalePolicy.from_name("error"))
-        'error'
-
-        """
-
-    @classmethod
-    def from_json(cls, json: str) -> UnknownScalePolicy:
-        """
-        Deserialize a policy from JSON.
-
-        Parameters
-        ----------
-        json : str
-            JSON document matching the policy schema.
-
-        Returns
-        -------
-        UnknownScalePolicy
-
-        Raises
-        ------
-        ValueError
-            If *json* is not one of the exact JSON strings ``"error"``,
-            ``"fallback_to_default"``, or ``"warn_and_fallback"``.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.rating_scales import UnknownScalePolicy
-        >>> str(UnknownScalePolicy.from_json(UnknownScalePolicy.ERROR.to_json()))
-        'error'
-
-        """
-        ...
-    def __repr__(self) -> str:
-        """Return a debug representation of this policy.
-
-        Returns
-        -------
-        str
-        """
-        ...
-    def __str__(self) -> str:
-        """Return the policy name.
-
-        Returns
-        -------
-        str
-        """
-        ...
-    def __eq__(self, other: object) -> bool:
-        """Return whether two policies are equal.
-
-        Returns
-        -------
-        bool
-        """
-        ...
-    def __hash__(self) -> int:
-        """Return a hash for this policy.
-
-        Returns
-        -------
-        int
-        """
-        ...
-
 class RatingLevel:
     """
-    A single rating threshold row on a scorecard scale.
+    One band of a scorecard scale: a label, its representative score and the
+    band's inclusive lower bound.
 
     Examples
     --------
     >>> from finstack_quant.core.rating_scales import RatingLevel
-    >>> level = RatingLevel("BBB", 70.0, 65.0)
+    >>> level = RatingLevel(" BBB ", 70.0, 65.0)
     >>> (level.name, level.score, level.min_score)
     ('BBB', 70.0, 65.0)
 
@@ -150,27 +44,30 @@ class RatingLevel:
 
     def __init__(self, name: str, score: float, min_score: float) -> None:
         """
-        Construct one rating threshold row.
+        Construct and validate one band.
 
         Parameters
         ----------
         name : str
-            Rating label (e.g. ``"BBB+"``, ``"Baa1"``).
+            Band label (e.g. ``"BBB+"``, ``"Baa1"``); outer whitespace is
+            trimmed and the label must be nonblank and not an unrated status
+            (``NR``, ``NOTRATED``, ``NOT RATED``, ``UNRATED``).
         score : float
-            Representative score on the 0–100 scorecard scale for this rating.
+            Representative score of the band, finite in ``[0, 100]`` and not
+            below *min_score*.
         min_score : float
-            Minimum score threshold required to qualify for this rating.
+            Inclusive lower bound of the band, finite in ``[0, 100]``.
 
         Raises
         ------
         ValueError
-            If *name* is blank or either score is non-finite or outside the
-            inclusive 0-100 range.
+            If *name* is blank or reserved, a score is non-finite or outside
+            ``[0, 100]``, or *score* is below *min_score*.
         """
         ...
 
     def __eq__(self, other: object) -> bool:
-        """Return whether two levels have the same name, score and min_score.
+        """Return whether two bands have the same name, score and min_score.
 
         Returns
         -------
@@ -180,12 +77,13 @@ class RatingLevel:
     @property
     def name(self) -> str:
         """
-        Rating name, for example ``"AAA"`` or ``"Aaa"``.
+        Band label as supplied, outer whitespace trimmed.
 
         Returns
         -------
         str
-            Rating label.
+            The band's label with outer whitespace removed, as matched by
+            threshold and minimum-rating lookups.
 
         Notes
         -----
@@ -195,12 +93,12 @@ class RatingLevel:
     @property
     def score(self) -> float:
         """
-        Numeric score on the 0-100 scorecard scale.
+        Representative score of the band on the 0-100 scale.
 
         Returns
         -------
         float
-            Representative score for the rating.
+            Representative score.
 
         Notes
         -----
@@ -210,12 +108,12 @@ class RatingLevel:
     @property
     def min_score(self) -> float:
         """
-        Minimum score threshold for this rating.
+        Inclusive lower bound of the band on the 0-100 scale.
 
         Returns
         -------
         float
-            Lower bound on the scorecard scale.
+            Lower bound.
 
         Notes
         -----
@@ -224,7 +122,7 @@ class RatingLevel:
 
     def to_json(self) -> str:
         """
-        Serialize this rating level to a JSON string.
+        Serialize this band to a JSON string.
 
         Returns
         -------
@@ -240,12 +138,12 @@ class RatingLevel:
     @classmethod
     def from_json(cls, json: str) -> RatingLevel:
         """
-        Deserialize a rating level from JSON.
+        Deserialize and validate a band from JSON.
 
         Parameters
         ----------
         json : str
-            JSON document matching the rating-level schema.
+            JSON document with ``name``, ``score`` and ``min_score``.
 
         Returns
         -------
@@ -255,9 +153,8 @@ class RatingLevel:
         Raises
         ------
         ValueError
-            If *json* is malformed, has unknown or missing fields, names a
-            blank level, or gives either score as non-finite or outside
-            ``[0, 100]``.
+            If *json* is malformed, has unknown or missing fields, or fails the
+            constructor's validation.
 
         Examples
         --------
@@ -269,7 +166,7 @@ class RatingLevel:
         """
         ...
     def __repr__(self) -> str:
-        """Return a debug representation of this rating level.
+        """Return a debug representation of this band.
 
         Returns
         -------
@@ -279,17 +176,20 @@ class RatingLevel:
 
 class ScorecardScale:
     """
-    A named, ordered list of scorecard rating thresholds.
+    A named best-to-worst list of scorecard bands covering ``[0, 100]``.
 
-    Distinct from ``finstack_quant.models.credit.migration.RatingScale`` (which models
-    the ordered state set of a credit-migration / transition matrix).
+    For minima ``m0 > m1 > ... > m_last = 0`` the best band is ``[m0, 100]``
+    and each later band is ``[m_i, m_(i-1))``; every representative score
+    classifies to its own band. Distinct from
+    ``finstack_quant.models.credit.migration.RatingScale`` (which models the
+    ordered state set of a credit-migration / transition matrix).
 
     Examples
     --------
     >>> from finstack_quant.core.rating_scales import RatingLevel, ScorecardScale
-    >>> scale = ScorecardScale("custom", [RatingLevel("BBB", 70.0, 65.0)], description="Example")
-    >>> (scale.scale_name, scale.description, len(scale.ratings))
-    ('custom', 'Example', 1)
+    >>> scale = ScorecardScale("custom", [RatingLevel("A", 90.0, 80.0), RatingLevel("B", 70.0, 0.0)])
+    >>> ([level.name for level in scale], scale.classify(80.0).name, scale.level_position(" b "))
+    (['A', 'B'], 'A', 1)
 
     """
 
@@ -300,90 +200,134 @@ class ScorecardScale:
         description: str | None = None,
     ) -> None:
         """
-        Construct a scorecard scale from ordered rating levels.
+        Construct and validate a scorecard scale.
 
         Parameters
         ----------
         scale_name : str
-            Scale identifier (e.g. ``"S&P"``, ``"Moody's"``).
+            Scale name; outer whitespace is trimmed and it must be nonblank.
         ratings : list[RatingLevel]
-            Ordered levels from best to worst.
-        description : str, optional
-            Human-readable description of the scale.
+            Bands ordered best-to-worst: ``score`` and ``min_score`` strictly
+            descend, labels are unique after trim and ASCII case folding, the
+            worst band's ``min_score`` is ``0``, and each representative score
+            is below the preceding band's minimum.
+        description : str | None, default None
+            Optional human-readable description.
 
         Raises
         ------
         ValueError
-            If *ratings* is empty, contains duplicate names, or is not
-            strictly ordered best-to-worst (both ``score`` and ``min_score``
-            must strictly descend).
+            If the name is blank, *ratings* is empty, labels collide, the order
+            is not strictly best-to-worst, the worst minimum is not ``0``, or a
+            representative score falls outside its band.
         """
         ...
-
     def __getitem__(self, index: int) -> RatingLevel:
-        """Return the ``index``-th rating level (negative indices supported).
+        """
+        Return the band at *index* (negative indices supported).
+
+        Parameters
+        ----------
+        index : int
+            Zero-based position, best band first.
+
+        Returns
+        -------
+        RatingLevel
+            The band at that position.
 
         Raises
         ------
         IndexError
             If *index* is out of range.
-
-        Returns
-        -------
-        RatingLevel
         """
         ...
-
     def __iter__(self) -> Iterator[RatingLevel]:
-        """Iterate over rating levels best-to-worst.
+        """Iterate over bands best-to-worst.
 
         Returns
         -------
         Iterator[RatingLevel]
         """
         ...
-
     def __eq__(self, other: object) -> bool:
-        """Return whether two scales are structurally equal.
+        """Return whether two scales have the same name, description and bands.
 
         Returns
         -------
         bool
         """
         ...
-
     def to_dataframe(self) -> pd.DataFrame:
         """
-        Rating levels as a pandas ``DataFrame``.
+        Bands as a pandas ``DataFrame``.
+
+        A presentation view with columns ``name``, ``score`` and ``min_score``
+        (one row per band, best first), not a complete policy snapshot.
 
         Returns
         -------
         pandas.DataFrame
-            One row per level, best first, with columns ``name`` (str),
-            ``score`` (float64) and ``min_score`` (float64).
+            One row per band.
 
         Raises
         ------
         ImportError
             If pandas is not installed.
+        """
+        ...
+    def classify(self, score: float) -> RatingLevel:
+        """
+        Classify a score into its band.
 
-        Examples
-        --------
-        >>> from finstack_quant.core.rating_scales import RatingLevel, ScorecardScale
-        >>> scale = ScorecardScale("custom", [RatingLevel("A", 90.0, 85.0), RatingLevel("B", 70.0, 65.0)])
-        >>> list(scale.to_dataframe()["name"])
-        ['A', 'B']
+        Returns the first band whose minimum the score meets; each boundary
+        belongs to the better band. There is no epsilon, clipping or fallback.
+
+        Parameters
+        ----------
+        score : float
+            Score on the inclusive 0-100 scale.
+
+        Returns
+        -------
+        RatingLevel
+            The band the score falls in.
+
+        Raises
+        ------
+        ValueError
+            If *score* is non-finite or outside ``[0, 100]``.
+        """
+        ...
+    def level_position(self, label: str) -> int:
+        """
+        Best-to-worst position of a band label (``0`` is best).
+
+        Parameters
+        ----------
+        label : str
+            Band label, matched after outer trim and ASCII case folding.
+
+        Returns
+        -------
+        int
+            Zero-based position of the band.
+
+        Raises
+        ------
+        ValueError
+            If the scale has no band with that label.
         """
         ...
     @property
     def scale_name(self) -> str:
         """
-        Scale name, for example ``"S&P"`` or ``"Moody's"``.
+        Scale name, outer whitespace trimmed.
 
         Returns
         -------
         str
-            Scale identifier.
+            The scale's display name with outer whitespace removed.
 
         Notes
         -----
@@ -397,8 +341,8 @@ class ScorecardScale:
 
         Returns
         -------
-        str or None
-            Description text when set.
+        str | None
+            Description, or ``None`` when absent.
 
         Notes
         -----
@@ -408,12 +352,12 @@ class ScorecardScale:
     @property
     def ratings(self) -> list[RatingLevel]:
         """
-        Ordered rating levels from best to worst.
+        Bands ordered best to worst.
 
         Returns
         -------
         list[RatingLevel]
-            Rating threshold rows.
+            Copies of the scale's bands.
 
         Notes
         -----
@@ -438,12 +382,13 @@ class ScorecardScale:
     @classmethod
     def from_json(cls, json: str) -> ScorecardScale:
         """
-        Deserialize a scorecard scale from JSON.
+        Deserialize and validate a scale from JSON.
 
         Parameters
         ----------
         json : str
-            JSON document matching the scorecard-scale schema.
+            JSON document with ``scale_name``, optional ``description`` and
+            ``ratings``.
 
         Returns
         -------
@@ -453,21 +398,20 @@ class ScorecardScale:
         Raises
         ------
         ValueError
-            If *json* is malformed, has unknown or missing fields, or its
-            ratings are empty, duplicated, invalid, or not strictly ordered
-            best-to-worst by both score fields.
+            If *json* is malformed, has unknown or missing fields, or fails the
+            constructor's validation.
 
         Examples
         --------
         >>> from finstack_quant.core.rating_scales import RatingLevel, ScorecardScale
-        >>> scale = ScorecardScale("custom", [RatingLevel("BBB", 70.0, 65.0)])
-        >>> ScorecardScale.from_json(scale.to_json()).ratings[0].name
-        'BBB'
+        >>> scale = ScorecardScale("custom", [RatingLevel("A", 90.0, 80.0), RatingLevel("B", 70.0, 0.0)])
+        >>> ScorecardScale.from_json(scale.to_json()) == scale
+        True
 
         """
         ...
     def __len__(self) -> int:
-        """Return the number of rating levels on this scale.
+        """Return the number of bands.
 
         Returns
         -------
@@ -483,140 +427,240 @@ class ScorecardScale:
         """
         ...
 
-class RatingScaleRegistry:
+class RatingScaleEntry:
     """
-    Versioned registry of scorecard scales and policy.
+    One registered scale with its normalized id and provenance.
 
     Examples
     --------
-    >>> from finstack_quant.core.config import FinstackConfig
-    >>> from finstack_quant.core.rating_scales import registry_from_config
-    >>> registry = registry_from_config(FinstackConfig())
-    >>> (registry.default_scale_id(), registry.default_scorecard_score(), str(registry.unknown_scale_policy()))
-    ('sp', 50.0, 'fallback_to_default')
-    >>> (registry.is_known_rating_scale(" SP "), registry.rating_scale(" SP ").scale_name)
-    (True, 'S&P')
+    >>> from finstack_quant.core.rating_scales import RatingLevel, RatingScaleEntry, ScorecardScale
+    >>> scale = ScorecardScale("Internal", [RatingLevel("A", 90.0, 80.0), RatingLevel("B", 70.0, 0.0)])
+    >>> entry = RatingScaleEntry(" Internal ", "credit policy 2026", scale)
+    >>> (entry.id, entry.source, entry.scale.scale_name)
+    ('internal', 'credit policy 2026', 'Internal')
 
     """
 
-    def default_scorecard_score(self) -> float:
+    def __init__(self, id: str, source: str, scale: ScorecardScale) -> None:
         """
-        Return the configured default scorecard score for threshold gaps.
-
-        Returns
-        -------
-        float
-            Default score on the 0–100 scale used when interpolating between
-            published rating thresholds.
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
-        """
-
-    def default_scale_id(self) -> str:
-        """
-        Return the configured default rating-scale id.
-
-        Returns
-        -------
-        str
-            Default scale identifier (e.g. ``"sp"``).
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
-        """
-
-    def scale_ids(self) -> list[str]:
-        """
-        Canonical normalized id of every registered scale, in registry order.
-
-        Registry ids are trimmed and ASCII-lowercased during loading.
-
-        Returns
-        -------
-        list[str]
-            Canonical scale ids such as ``["sp", "moodys"]``.
-
-        Notes
-        -----
-        This method does not raise.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.rating_scales import embedded_registry
-        >>> "sp" in embedded_registry().scale_ids()
-        True
-        """
-        ...
-
-    def unknown_scale_policy(self) -> UnknownScalePolicy:
-        """
-        Return the configured policy for unknown scale names.
-
-        Returns
-        -------
-        UnknownScalePolicy
-            Error, fallback, or warn-and-fallback policy.
-
-        Notes
-        -----
-        This method does not raise; it returns the stored or derived value.
-        """
-
-    def is_known_rating_scale(self, name: str) -> bool:
-        """
-        Return whether ``name`` is a known canonical id after trimming and ASCII case folding.
+        Construct and validate an entry.
 
         Parameters
         ----------
-        name : str
-            Canonical id (`sp` or `moodys`); surrounding whitespace and ASCII case are ignored.
-
-        Returns
-        -------
-        bool
-            ``True`` when the name resolves without applying the unknown-scale
-            policy.
-
-        Notes
-        -----
-        This method does not raise; it returns ``True`` or ``False``.
-        """
-
-    def rating_scale(self, name: str) -> ScorecardScale:
-        """
-        Resolve a canonical scale id to a :class:`ScorecardScale`.
-
-        Honours the configured unknown-scale policy: this may fall back to the
-        default scale or raise ``ValueError``.
-
-        Parameters
-        ----------
-        name : str
-            Canonical id (``"sp"`` or ``"moodys"``); surrounding whitespace and ASCII case are ignored.
-
-        Returns
-        -------
-        ScorecardScale
-            Resolved scale with ordered rating thresholds.
+        id : str
+            Scale id; normalized by outer trim and ASCII lowercasing and
+            nonblank after normalization.
+        source : str
+            Provenance of the scale's numbers (policy, owner, vintage); outer
+            whitespace trimmed and nonblank. A brand name alone is not a
+            quantitative calibration.
+        scale : ScorecardScale
+            The scale definition.
 
         Raises
         ------
         ValueError
-            When policy is ``ERROR`` and ``name`` is unknown.
-
+            If the normalized id or the source is blank.
         """
-
-    def to_json(self) -> str:
+        ...
+    @property
+    def id(self) -> str:
         """
-        Serialize this registry to a JSON string.
+        Normalized scale id.
 
         Returns
         -------
         str
-            Canonical JSON representation of this `RatingScaleRegistry`, suitable for a matching `from_json` call.
+            Trimmed, ASCII-lowercase id.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+
+    @property
+    def source(self) -> str:
+        """
+        Provenance of the scale's numbers.
+
+        Returns
+        -------
+        str
+            Trimmed source text.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+
+    @property
+    def scale(self) -> ScorecardScale:
+        """
+        The scale definition.
+
+        Returns
+        -------
+        ScorecardScale
+            A copy of the entry's scale.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+
+    def __eq__(self, other: object) -> bool:
+        """Return whether two entries have the same id, source and scale.
+
+        Returns
+        -------
+        bool
+        """
+        ...
+    def __repr__(self) -> str:
+        """Return a debug representation of this entry.
+
+        Returns
+        -------
+        str
+        """
+        ...
+
+class RatingScaleRegistry:
+    """
+    Caller-supplied registry of scorecard rating scales.
+
+    Build one from entries, with ``RatingScaleRegistry.from_json(json)`` or
+    with ``registry_from_config(config)``; resolve scales strictly by id.
+    There is no embedded or default registry.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.rating_scales import (
+    ...     RatingLevel,
+    ...     RatingScaleEntry,
+    ...     RatingScaleRegistry,
+    ...     ScorecardScale,
+    ... )
+    >>> scale = ScorecardScale("Internal", [RatingLevel("A", 90.0, 80.0), RatingLevel("B", 70.0, 0.0)])
+    >>> registry = RatingScaleRegistry([RatingScaleEntry("internal", "credit policy 2026", scale)])
+    >>> (registry.scale_ids(), registry.rating_scale(" INTERNAL ").scale_name)
+    (['internal'], 'Internal')
+
+    """
+
+    def __init__(self, rating_scales: list[RatingScaleEntry]) -> None:
+        """
+        Construct and validate a registry.
+
+        Parameters
+        ----------
+        rating_scales : list[RatingScaleEntry]
+            Entries in registry order; at least one, with unique ids.
+
+        Raises
+        ------
+        ValueError
+            If *rating_scales* is empty or ids repeat.
+        """
+        ...
+    @property
+    def rating_scales(self) -> list[RatingScaleEntry]:
+        """
+        Registered entries in registry order.
+
+        Returns
+        -------
+        list[RatingScaleEntry]
+            Copies of the entries.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+
+    def scale_ids(self) -> list[str]:
+        """
+        Normalized id of every registered scale, in registry order.
+
+        Returns
+        -------
+        list[str]
+            Trimmed, ASCII-lowercase ids.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+    def is_known_rating_scale(self, id: str) -> bool:
+        """
+        Return whether *id* is registered after trim and ASCII lowercasing.
+
+        Parameters
+        ----------
+        id : str
+            Scale id to look up.
+
+        Returns
+        -------
+        bool
+            ``True`` when the registry holds the id.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+    def entry(self, id: str) -> RatingScaleEntry:
+        """
+        Resolve a registered entry by id.
+
+        Parameters
+        ----------
+        id : str
+            Scale id; outer whitespace and ASCII case are ignored. No alias or
+            fallback is applied.
+
+        Returns
+        -------
+        RatingScaleEntry
+            The entry with that id.
+
+        Raises
+        ------
+        ValueError
+            If the registry has no scale with that id.
+        """
+        ...
+    def rating_scale(self, id: str) -> ScorecardScale:
+        """
+        Resolve a registered scale by id.
+
+        Parameters
+        ----------
+        id : str
+            Scale id; outer whitespace and ASCII case are ignored. No alias or
+            fallback is applied.
+
+        Returns
+        -------
+        ScorecardScale
+            The scale with that id.
+
+        Raises
+        ------
+        ValueError
+            If the registry has no scale with that id.
+        """
+        ...
+    def to_json(self) -> str:
+        """
+        Serialize the registry to a JSON string.
+
+        Returns
+        -------
+        str
+            ``finstack_quant.rating_scales/2`` document, suitable for a matching `from_json` call.
 
         Raises
         ------
@@ -627,31 +671,37 @@ class RatingScaleRegistry:
     @classmethod
     def from_json(cls, json: str) -> RatingScaleRegistry:
         """
-        Deserialize a registry from JSON.
+        Deserialize and validate a registry from JSON.
 
         Parameters
         ----------
         json : str
-            JSON document with schema ``finstack_quant.rating_scales/2`` and exactly one ``id`` per scale; ids are trimmed and ASCII-lowercased.
+            ``finstack_quant.rating_scales/2`` document with a nonempty
+            ``rating_scales`` list of ``{id, source, scale}`` entries.
 
         Returns
         -------
         RatingScaleRegistry
+            Validated registry.
 
         Raises
         ------
         ValueError
-            If *json* is malformed or violates the supported schema version,
-            identifier, default-scale, score-range, or rating-order
-            invariants.
+            If *json* is malformed or the registry, an entry or a scale fails
+            validation.
 
         Examples
         --------
-        >>> from finstack_quant.core.config import FinstackConfig
-        >>> from finstack_quant.core.rating_scales import RatingScaleRegistry, registry_from_config
-        >>> registry = registry_from_config(FinstackConfig())
-        >>> RatingScaleRegistry.from_json(registry.to_json()).default_scale_id()
-        'sp'
+        >>> from finstack_quant.core.rating_scales import (
+        ...     RatingLevel,
+        ...     RatingScaleEntry,
+        ...     RatingScaleRegistry,
+        ...     ScorecardScale,
+        ... )
+        >>> scale = ScorecardScale("Internal", [RatingLevel("A", 90.0, 80.0), RatingLevel("B", 70.0, 0.0)])
+        >>> registry = RatingScaleRegistry([RatingScaleEntry("internal", "credit policy 2026", scale)])
+        >>> RatingScaleRegistry.from_json(registry.to_json()) == registry
+        True
 
         """
         ...
@@ -664,7 +714,7 @@ class RatingScaleRegistry:
         """
         ...
     def __eq__(self, other: object) -> bool:
-        """Return whether two registries are structurally equal under canonical Rust equality; signed zeros compare equal.
+        """Return whether two registries hold the same entries.
 
         Returns
         -------
@@ -672,72 +722,47 @@ class RatingScaleRegistry:
         """
         ...
 
-def embedded_registry() -> RatingScaleRegistry:
-    """
-    Return the embedded (built-in) rating-scale registry.
-
-    Returns
-    -------
-    RatingScaleRegistry
-        Registry shipped with the library containing standard agency scales.
-
-    Raises
-    ------
-    ValueError
-        If the embedded rating-scale registry cannot be constructed.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.rating_scales import embedded_registry
-    >>> reg = embedded_registry()
-    >>> reg.is_known_rating_scale("sp")
-    True
-    """
-
 def registry_from_config(config: FinstackConfig) -> RatingScaleRegistry:
     """
-    Load a registry from a :class:`FinstackConfig` extension.
-
-    Falls back to :func:`embedded_registry` when the config does not override
-    :data:`RATING_SCALES_EXTENSION_KEY`.
+    Load the rating-scale registry held in a configuration.
 
     Parameters
     ----------
     config : FinstackConfig
-        Application configuration possibly carrying a custom scales extension.
+        Configuration whose :data:`RATING_SCALES_EXTENSION_KEY` extension holds
+        the registry document.
 
     Returns
     -------
     RatingScaleRegistry
-        Embedded or config-overridden registry.
+        The validated configured registry.
 
     Raises
     ------
     ValueError
-        If the configured extension is malformed or violates rating-scale
-        registry invariants.
+        If the extension is absent, malformed or violates registry invariants;
+        there is no embedded fallback.
 
     Examples
     --------
     >>> from finstack_quant.core.config import FinstackConfig
     >>> from finstack_quant.core.rating_scales import registry_from_config
-    >>> registry = registry_from_config(FinstackConfig())
-    >>> (registry.default_scale_id(), registry.default_scorecard_score(), str(registry.unknown_scale_policy()))
-    ('sp', 50.0, 'fallback_to_default')
-    >>> (registry.is_known_rating_scale(" SP "), registry.rating_scale(" SP ").scale_name)
-    (True, 'S&P')
+    >>> try:
+    ...     registry_from_config(FinstackConfig())
+    ... except ValueError:
+    ...     print("no registry configured")
+    no registry configured
 
     """
 
 RATING_SCALES_EXTENSION_KEY: str
-"""Configuration-extension key used to override the embedded registry."""
+"""Configuration-extension key holding a caller-supplied registry."""
 
 __all__ = [
     "RATING_SCALES_EXTENSION_KEY",
     "RatingLevel",
+    "RatingScaleEntry",
     "RatingScaleRegistry",
     "ScorecardScale",
-    "UnknownScalePolicy",
-    "embedded_registry",
     "registry_from_config",
 ]

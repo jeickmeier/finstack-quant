@@ -22,7 +22,7 @@ import {
   plain,
 } from './statements_parity_support.mjs';
 
-const { statements, statements_analytics: sa } = facade;
+const { core, statements, statements_analytics: sa } = facade;
 const MODEL = INPUTS.model;
 
 function evaluate(model) {
@@ -67,7 +67,10 @@ test('statements_analytics matches the cross-host golden', () => {
   const corkModel = corkBuilder.build();
   const corkResult = evaluate(corkModel);
   const corkscrew = new sa.CorkscrewExtension(INPUTS.corkscrew_config);
-  const scorecard = new sa.CreditScorecardExtension(INPUTS.scorecard_config);
+  const scorecard = new sa.CreditScorecardExtension(
+    INPUTS.scorecard_config,
+    core.RatingScaleRegistry.fromJson(INPUTS.rating_scales)
+  );
 
   const rolled = sa.addRollForwardWithOpening(MODEL, 'debt', ['revenue'], ['cogs'], 10.0);
   const vintage = sa.addVintageBuildup(MODEL, 'book', 'revenue', [1.0, 0.5]);
@@ -433,9 +436,11 @@ test('plSummaryReport returns the Rust table of the text report', () => {
 });
 
 test('validateScorecardConfig and the spec validators run the Rust checks', () => {
-  assert.equal(sa.validateScorecardConfig(INPUTS.scorecard_config), undefined);
+  const registry = core.RatingScaleRegistry.fromJson(INPUTS.rating_scales);
+  assert.equal(sa.validateScorecardConfig(INPUTS.scorecard_config, registry), undefined);
   assert.throws(
-    () => sa.validateScorecardConfig({ ...INPUTS.scorecard_config, rating_scale: 'Martian' }),
+    () =>
+      sa.validateScorecardConfig({ ...INPUTS.scorecard_config, rating_scale: 'Martian' }, registry),
     (e) => e.kind === 'validation'
   );
   assert.equal(JSON.parse(sa.validateLeaseSpecJson(INPUTS.lease)).node_id, 'lease_a');
@@ -519,7 +524,11 @@ test('DependencyTracer and the extensions reject malformed inputs', () => {
     (e) => e.kind === 'validation'
   );
   assert.throws(
-    () => new sa.CreditScorecardExtension({ metrics: 'none' }),
+    () =>
+      new sa.CreditScorecardExtension(
+        { metrics: 'none' },
+        core.RatingScaleRegistry.fromJson(INPUTS.rating_scales)
+      ),
     (e) => e.kind === 'validation'
   );
 });

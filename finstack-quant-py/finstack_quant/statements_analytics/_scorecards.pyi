@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 import pandas as pd
+from finstack_quant.core.rating_scales import RatingScaleEntry, RatingScaleRegistry
 from finstack_quant.statements import FinancialModelSpec, StatementResult
 
 class ScorecardMetric:
@@ -218,8 +219,8 @@ class ScorecardConfig:
     Parameters
     ----------
     rating_scale : str
-        Rating-scale identifier used to interpret metric thresholds; defaults
-        to the canonical ``"sp"`` scale.
+        Id of the scale, in the registry the extension is built with, used to
+        interpret metric thresholds. Required: there is no default scale.
     metrics : list[ScorecardMetric]
         Weighted metric definitions used to calculate the composite rating.
     min_rating : str or None
@@ -231,15 +232,15 @@ class ScorecardConfig:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import ScorecardConfig
-    >>> config = ScorecardConfig(period="2025Q1")
+    >>> config = ScorecardConfig("internal", period="2025Q1")
     >>> (config.rating_scale, config.period, config.metrics)
-    ('sp', '2025Q1', [])
+    ('internal', '2025Q1', [])
 
     """
 
     def __init__(
         self,
-        rating_scale: str | None = None,
+        rating_scale: str,
         metrics: list[ScorecardMetric] = ...,
         min_rating: str | None = None,
         period: str | None = None,
@@ -249,9 +250,9 @@ class ScorecardConfig:
 
         Parameters
         ----------
-        rating_scale : str | None, default None
-            Canonical id (``"sp"`` or ``"moodys"``) used to interpret thresholds.
-            None uses the Rust default, ``"sp"``.
+        rating_scale : str
+            Id of the scale in the supplied registry; matched after trim and
+            ASCII lowercasing.
         metrics : list[ScorecardMetric]
             Weighted metric definitions included in the composite rating.
         min_rating : str or None, default None
@@ -269,7 +270,7 @@ class ScorecardConfig:
     @property
     def rating_scale(self) -> str:
         """
-        Configured rating scale identifier (for example ``"sp"`` or ``"moodys"``).
+        Id of the scale in the supplied registry.
 
         Returns
         -------
@@ -330,14 +331,22 @@ class ScorecardConfig:
         This accessor does not raise; it returns the stored value.
         """
         ...
-    def validate(self) -> None:
+    def validate(self, registry: RatingScaleRegistry) -> None:
         """
-        Validate this object's invariants without executing a report.
+        Validate this configuration against a registry without executing.
+
+        Parameters
+        ----------
+        registry : RatingScaleRegistry
+            Caller-supplied registry holding ``rating_scale``.
 
         Raises
         ------
         ValueError
-            If required fields are missing, out of range, or internally inconsistent.
+            If the registry has no such scale, a threshold or minimum-rating
+            label is unknown to the selected scale or repeats after trim and
+            ASCII case folding, a weight is negative or non-finite, the total
+            weight is implausible, or the period is not a valid period id.
         """
         ...
     def to_json(self) -> str:
@@ -604,30 +613,60 @@ class CreditScorecardExtension:
     """
     Credit scorecard extension for rating assignment and stress testing.
 
+    The selected registry entry is resolved once at construction and kept
+    as an immutable snapshot; threshold and minimum-rating labels are checked
+    against it before any evaluation.
+
     Examples
     --------
+    >>> from finstack_quant.core.rating_scales import (
+    ...     RatingLevel,
+    ...     RatingScaleEntry,
+    ...     RatingScaleRegistry,
+    ...     ScorecardScale,
+    ... )
     >>> from finstack_quant.statements_analytics import ScorecardConfig, CreditScorecardExtension
-    >>> CreditScorecardExtension(ScorecardConfig()).config().rating_scale
-    'sp'
+    >>> scale = ScorecardScale("Internal", [RatingLevel("A", 90.0, 80.0), RatingLevel("B", 70.0, 0.0)])
+    >>> registry = RatingScaleRegistry([RatingScaleEntry("internal", "credit policy 2026", scale)])
+    >>> CreditScorecardExtension(ScorecardConfig("internal"), registry).rating_scale.source
+    'credit policy 2026'
 
     """
 
-    def __init__(self, config: ScorecardConfig) -> None:
+    def __init__(self, config: ScorecardConfig, registry: RatingScaleRegistry) -> None:
         """
-        Create an extension driven by ``config``.
+        Create an extension on a scale of the supplied registry.
 
         Parameters
         ----------
         config : ScorecardConfig
-            Rating scale, weighted metrics, and period-selection policy to use.
+            Rating scale id, weighted metrics, and period-selection policy to use.
+        registry : RatingScaleRegistry
+            Caller-supplied registry holding ``config.rating_scale``.
 
         Returns
         -------
         None
 
+        Raises
+        ------
+        ValueError
+            If ``ScorecardConfig.validate`` rejects *config* against *registry*.
+        """
+        ...
+    @property
+    def rating_scale(self) -> RatingScaleEntry:
+        """
+        Snapshot of the selected registry entry.
+
+        Returns
+        -------
+        RatingScaleEntry
+            The id, source and scale the extension was built on.
+
         Notes
         -----
-        Construction does not raise; arguments are stored as supplied.
+        This accessor does not raise; it returns the stored value.
         """
         ...
     def config(self) -> ScorecardConfig:

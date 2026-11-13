@@ -168,8 +168,12 @@ class TestScorecardConfig:
         assert json.loads(cfg.to_json())["period"] == "2024Q1"
 
     def test_period_defaults_to_none(self) -> None:
-        cfg = ScorecardConfig()
+        cfg = ScorecardConfig("sp")
         assert cfg.period is None
+
+    def test_rating_scale_is_required(self) -> None:
+        with pytest.raises(TypeError):
+            ScorecardConfig()  # type: ignore[call-arg]
 
 
 class TestRollForward:

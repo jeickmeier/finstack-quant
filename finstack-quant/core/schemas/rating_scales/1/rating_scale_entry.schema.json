@@ -1,0 +1,110 @@
+{
+  "$defs": {
+    "RatingLevel": {
+      "additionalProperties": false,
+      "description": "One band of a scorecard scale: a label, its representative score and the\nband's lower bound.",
+      "properties": {
+        "min_score": {
+          "description": "Inclusive lower bound of the band on the 0–100 scale.",
+          "format": "double",
+          "type": "number"
+        },
+        "name": {
+          "description": "Band label, for example `AAA` or `Aaa`; outer whitespace trimmed.",
+          "type": "string"
+        },
+        "score": {
+          "description": "Representative score of the band on the inclusive 0–100 scale.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "score",
+        "min_score"
+      ],
+      "type": "object"
+    },
+    "ScorecardScale": {
+      "additionalProperties": false,
+      "description": "Scorecard rating-scale definition: a named, best-to-worst list of bands\nthat covers the whole `[0, 100]` score domain.\n\nNamed `ScorecardScale` (rather than just `RatingScale`) to disambiguate\nfrom `finstack_quant_models::credit::migration::RatingScale`, which models\nthe ordered state set of a credit-migration / transition matrix.",
+      "properties": {
+        "description": {
+          "description": "Human-readable description.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ratings": {
+          "description": "Bands ordered best to worst.",
+          "items": {
+            "$ref": "#/$defs/RatingLevel"
+          },
+          "type": "array"
+        },
+        "scale_name": {
+          "description": "Scale name, for example `Internal corporate`; outer whitespace trimmed.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scale_name",
+        "ratings"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/rating_scales/1/rating_scale_entry.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One registered scorecard scale with its normalized id and the provenance of its numbers.",
+  "examples": [
+    {
+      "id": "illustrative",
+      "scale": {
+        "ratings": [
+          {
+            "min_score": 80.0,
+            "name": "A",
+            "score": 90.0
+          },
+          {
+            "min_score": 50.0,
+            "name": "B",
+            "score": 70.0
+          },
+          {
+            "min_score": 0.0,
+            "name": "C",
+            "score": 20.0
+          }
+        ],
+        "scale_name": "Illustrative internal scale"
+      },
+      "source": "Example utility bands; not an agency calibration"
+    }
+  ],
+  "properties": {
+    "id": {
+      "description": "Scale identifier, outer-trimmed and ASCII-lowercased.",
+      "type": "string"
+    },
+    "scale": {
+      "$ref": "#/$defs/ScorecardScale",
+      "description": "The scale definition."
+    },
+    "source": {
+      "description": "Provenance of the scale's numbers (policy, owner, vintage).",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "source",
+    "scale"
+  ],
+  "title": "RatingScaleEntry",
+  "type": "object"
+}

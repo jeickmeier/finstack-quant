@@ -707,7 +707,6 @@
       "SifmaSettlementClass",
       "Tenor",
       "TenorUnit",
-      "UnknownScalePolicy",
       "VolCube",
       "VolCubeExpirySlice",
       "VolSurface",
@@ -734,7 +733,6 @@
       "createDate",
       "dateFromEpochDays",
       "daysSinceEpoch",
-      "embeddedRegistry",
       "endOfMonth",
       "erf",
       "finiteCount",
@@ -773,6 +771,7 @@
       "quantile",
       "quarter",
       "ratingLevelTryNew",
+      "ratingScaleEntryTryNew",
       "ratingScalesExtensionKey",
       "realizedVariance",
       "realizedVarianceOhlc",
@@ -781,6 +780,8 @@
       "sampleStdOrNan",
       "sampleVarianceOrNan",
       "schema",
+      "scorecardScaleClassify",
+      "scorecardScaleLevelPosition",
       "scorecardScaleTryNew",
       "sifmaSettlementDate",
       "standardNormalInvCdf",
@@ -800,6 +801,15 @@
     "kind": "function"
   },
   "core.scorecardScaleTryNew": {
+    "kind": "function"
+  },
+  "core.scorecardScaleClassify": {
+    "kind": "function"
+  },
+  "core.scorecardScaleLevelPosition": {
+    "kind": "function"
+  },
+  "core.ratingScaleEntryTryNew": {
     "kind": "function"
   },
   "core.sabrParameterDataNew": {
@@ -1104,31 +1114,20 @@
     ],
     "getters": ["roundingMode", "tolerances"]
   },
-  "core.UnknownScalePolicy": {
-    "kind": "class",
-    "constructor": false,
-    "statics": ["error", "fallbackToDefault", "fromJson", "fromName", "warnAndFallback"],
-    "methods": ["free", "toJson", "toString"],
-    "getters": []
-  },
   "core.RatingScaleRegistry": {
     "kind": "class",
-    "constructor": false,
+    "constructor": true,
     "statics": ["fromJson"],
     "methods": [
-      "defaultScaleId",
-      "defaultScorecardScore",
+      "entry",
       "free",
       "isKnownRatingScale",
       "ratingScale",
+      "ratingScales",
       "scaleIds",
-      "toJson",
-      "unknownScalePolicy"
+      "toJson"
     ],
     "getters": []
-  },
-  "core.embeddedRegistry": {
-    "kind": "function"
   },
   "core.registryFromConfig": {
     "kind": "function"
@@ -4223,7 +4222,7 @@
     "kind": "class",
     "constructor": true,
     "statics": [],
-    "methods": ["config", "execute", "free"],
+    "methods": ["config", "execute", "free", "ratingScale"],
     "getters": []
   },
   "statements_analytics.runSensitivity": {

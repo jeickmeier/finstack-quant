@@ -9,6 +9,7 @@
 //!
 //! Reports and configs are JSON round-trippable via `to_json`/`from_json`.
 
+use crate::bindings::core::rating_scales::{PyRatingScaleEntry, PyRatingScaleRegistry};
 use crate::bindings::extract::{extract_model_ref, extract_results_ref};
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
@@ -148,8 +149,9 @@ wire_methods!(
 ///
 /// Parameters
 /// ----------
-/// rating_scale : str | None
-///     Canonical id (``"sp"`` or ``"moodys"``); None uses the Rust default (``"sp"``).
+/// rating_scale : str
+///     Id of the scale in the registry the extension is built with; matched
+///     after trim and ASCII lowercasing. Required: there is no default scale.
 /// metrics : list[ScorecardMetric]
 ///     Scorecard metrics to evaluate.
 /// min_rating : str | None
@@ -171,19 +173,16 @@ pub struct PyScorecardConfig {
 #[pymethods]
 impl PyScorecardConfig {
     #[new]
-    #[pyo3(signature = (rating_scale=None, metrics=Vec::new(), min_rating=None, period=None))]
+    #[pyo3(signature = (rating_scale, metrics=Vec::new(), min_rating=None, period=None))]
     fn new(
-        rating_scale: Option<&str>,
+        rating_scale: &str,
         metrics: Vec<PyScorecardMetric>,
         min_rating: Option<&str>,
         period: Option<&str>,
     ) -> Self {
         Self {
             inner: rust_scorecards::ScorecardConfig {
-                rating_scale: rating_scale.map_or_else(
-                    || rust_scorecards::ScorecardConfig::default().rating_scale,
-                    str::to_string,
-                ),
+                rating_scale: rating_scale.to_string(),
                 metrics: metrics.into_iter().map(|m| m.inner).collect(),
                 min_rating: min_rating.map(str::to_string),
                 period: period.map(str::to_string),
@@ -191,7 +190,7 @@ impl PyScorecardConfig {
         }
     }
 
-    /// Canonical rating-scale identifier (``"sp"`` or ``"moodys"``).
+    /// Id of the scale in the supplied registry.
     #[getter]
     fn rating_scale(&self) -> &str {
         &self.inner.rating_scale
@@ -224,9 +223,10 @@ impl PyScorecardConfig {
             .collect()
     }
 
-    /// Validate the configuration without executing.
-    fn validate(&self) -> PyResult<()> {
-        rust_scorecards::CreditScorecardExtension::validate_config(&self.inner)
+    /// Validate the configuration against a registry without executing.
+    #[pyo3(text_signature = "(self, registry)")]
+    fn validate(&self, registry: PyRef<'_, PyRatingScaleRegistry>) -> PyResult<()> {
+        rust_scorecards::CreditScorecardExtension::validate_config(&self.inner, &registry.inner)
             .map_err(crate::errors::statements_to_py)
     }
 
@@ -396,11 +396,24 @@ pub struct PyCreditScorecardExtension {
 
 #[pymethods]
 impl PyCreditScorecardExtension {
-    /// Construct an extension with its configuration.
+    /// Construct an extension on a scale of the supplied registry; the
+    /// selected entry is resolved once and kept as a snapshot.
     #[new]
-    fn new(config: PyScorecardConfig) -> Self {
-        Self {
-            inner: rust_scorecards::CreditScorecardExtension::new(config.inner),
+    #[pyo3(text_signature = "(config, registry)")]
+    fn new(
+        config: PyScorecardConfig,
+        registry: PyRef<'_, PyRatingScaleRegistry>,
+    ) -> PyResult<Self> {
+        rust_scorecards::CreditScorecardExtension::new(config.inner, &registry.inner)
+            .map(|inner| Self { inner })
+            .map_err(crate::errors::statements_to_py)
+    }
+
+    /// Snapshot of the selected registry entry (id, source and scale).
+    #[getter]
+    fn rating_scale(&self) -> PyRatingScaleEntry {
+        PyRatingScaleEntry {
+            inner: self.inner.rating_scale().clone(),
         }
     }
 

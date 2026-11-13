@@ -16,7 +16,7 @@ import pytest
 
 from finstack_quant.core.config import FinstackConfig, RoundingMode, ToleranceConfig
 from finstack_quant.core.money import Money
-from finstack_quant.core.rating_scales import RatingLevel, ScorecardScale, embedded_registry
+from finstack_quant.core.rating_scales import RatingLevel, RatingScaleEntry, RatingScaleRegistry, ScorecardScale
 from finstack_quant.core.types import Attributes, Bps, CreditRating, Rate
 
 
@@ -222,16 +222,17 @@ class TestRatingScales:
             RatingLevel("BBB", 170.0, 65.0)
         with pytest.raises(ValueError, match=r"not ordered best-to-worst"):
             ScorecardScale("bad", [RatingLevel("B", 70.0, 65.0), RatingLevel("A", 90.0, 85.0)])
-        scale = ScorecardScale("ok", [RatingLevel("A", 90.0, 85.0), RatingLevel("B", 70.0, 65.0)])
+        scale = ScorecardScale("ok", [RatingLevel("A", 90.0, 85.0), RatingLevel("B", 70.0, 0.0)])
         assert [level.name for level in scale] == ["A", "B"]
-        assert scale[-1] == RatingLevel("B", 70.0, 65.0)
+        assert scale[-1] == RatingLevel("B", 70.0, 0.0)
         assert scale == ScorecardScale.from_json(scale.to_json())
         assert list(scale.to_dataframe()["name"]) == ["A", "B"]
 
     def test_registry_scale_ids(self) -> None:
-        registry = embedded_registry()
-        assert "sp" in registry.scale_ids()
-        assert registry == embedded_registry()
+        scale = ScorecardScale("ok", [RatingLevel("A", 90.0, 85.0), RatingLevel("B", 70.0, 0.0)])
+        registry = RatingScaleRegistry([RatingScaleEntry("internal", "test policy", scale)])
+        assert registry.scale_ids() == ["internal"]
+        assert registry == RatingScaleRegistry.from_json(registry.to_json())
 
 
 class TestMathAdditions:
@@ -272,7 +273,6 @@ def _label_enum_classes() -> list[type]:
         TenorUnit,
     )
     from finstack_quant.core.market_data import FxConversionPolicy, FxQuoteConvention
-    from finstack_quant.core.rating_scales import UnknownScalePolicy
 
     return [
         RoundingMode,
@@ -283,7 +283,6 @@ def _label_enum_classes() -> list[type]:
         PeriodKind,
         FxConversionPolicy,
         FxQuoteConvention,
-        UnknownScalePolicy,
         SifmaSettlementClass,
         CreditRating,
     ]

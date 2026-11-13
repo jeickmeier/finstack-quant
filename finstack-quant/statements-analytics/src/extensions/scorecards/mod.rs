@@ -1,14 +1,16 @@
 //! Credit scorecard analysis extension.
 //!
 //! Credit rating assignment from financial metrics and configurable
-//! thresholds. Supports S&P, Moody's, and Fitch scales, weighted scoring,
-//! and optional minimum-rating compliance checks.
+//! thresholds on a caller-supplied scorecard scale, with weighted scoring and
+//! optional minimum-rating compliance checks. The scale is resolved once from
+//! the supplied [`RatingScaleRegistry`] and kept as an immutable snapshot;
+//! there is no embedded or default scale (record CORE-CONVENTIONS-019).
 //!
 //! # Configuration Schema
 //!
 //! ```json
 //! {
-//!   "rating_scale": "sp",
+//!   "rating_scale": "internal",
 //!   "metrics": [
 //!     {
 //!       "name": "debt_to_ebitda",
@@ -45,6 +47,7 @@
 //! # Example Usage
 //!
 //! ```no_run
+//! use finstack_quant_core::rating_scales::RatingScaleRegistry;
 //! use finstack_quant_statements_analytics::extensions::{
 //!     CreditScorecardExtension, ScorecardConfig, ScorecardMetric,
 //! };
@@ -53,11 +56,13 @@
 //!
 //! # fn main() -> finstack_quant_statements::Result<()> {
 //! # let model: FinancialModelSpec = unimplemented!("build a model");
+//! # let registry_json: &str = unimplemented!("a finstack_quant.rating_scales/2 document");
+//! let registry = RatingScaleRegistry::from_json(registry_json)?;
 //! let mut evaluator = Evaluator::new();
 //! let results = evaluator.evaluate(&model)?;
 //!
 //! let config = ScorecardConfig {
-//!     rating_scale: "sp".into(),
+//!     rating_scale: "internal".into(),
 //!     metrics: vec![ScorecardMetric {
 //!         name: "debt_to_ebitda".into(),
 //!         formula: "total_debt / ttm(ebitda)".into(),
@@ -69,41 +74,36 @@
 //!     period: None,
 //! };
 //!
-//! let extension = CreditScorecardExtension::new(config);
+//! let extension = CreditScorecardExtension::new(config, &registry)?;
 //! let report = extension.execute(&model, &results)?;
 //! # let _ = report;
 //! # Ok(())
 //! # }
 //! ```
 
-use finstack_quant_core::rating_scales::ScorecardScale;
+use finstack_quant_core::rating_scales::{RatingScaleEntry, RatingScaleRegistry};
 use finstack_quant_statements::Result;
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::FinancialModelSpec;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-/// Get the appropriate rating scale based on name.
-fn get_rating_scale(scale_name: &str) -> Result<&'static ScorecardScale> {
-    Ok(finstack_quant_core::rating_scales::embedded_registry()?.rating_scale(scale_name)?)
-}
-
-fn is_supported_rating_scale(scale_name: &str) -> bool {
-    finstack_quant_core::rating_scales::embedded_registry()
-        .map(|registry| registry.is_known_rating_scale(scale_name))
-        .unwrap_or(false)
-}
-
 /// Credit scorecard analysis extension for rating and stress testing.
 ///
 /// **Features:**
 /// - Credit rating assignment using weighted metric scores
-/// - Support for the canonical `sp` and `moodys` scorecard scales
-/// - Configurable thresholds per rating level
-/// - Minimum rating compliance checks
+/// - One caller-supplied scale, resolved once and snapshotted at construction
+/// - Configurable thresholds per rating level, validated against that scale
+/// - Minimum rating compliance checks on positions in that scale
 pub struct CreditScorecardExtension {
     /// Extension configuration
     config: ScorecardConfig,
+    /// Immutable snapshot of the selected registry entry.
+    scale: RatingScaleEntry,
+    /// Per metric (config order): threshold bounds keyed by band position.
+    thresholds: Vec<IndexMap<usize, (f64, f64)>>,
+    /// Band position of `config.min_rating`, if configured.
+    min_position: Option<usize>,
 }
 
 /// Configuration for credit scorecard analysis.
@@ -111,8 +111,8 @@ pub struct CreditScorecardExtension {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ScorecardConfig {
-    /// Canonical rating-scale id (`sp` or `moodys`); lookup ignores outer whitespace and ASCII case.
-    #[serde(default = "default_rating_scale")]
+    /// Id of the scale in the supplied registry; lookup ignores outer
+    /// whitespace and ASCII case. Required: there is no default scale.
     pub rating_scale: String,
 
     /// List of metrics to evaluate
@@ -130,17 +130,6 @@ pub struct ScorecardConfig {
     /// only periods up to (and including) the rated period as history.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub period: Option<String>,
-}
-
-impl Default for ScorecardConfig {
-    fn default() -> Self {
-        Self {
-            rating_scale: default_rating_scale(),
-            metrics: Vec::new(),
-            min_rating: None,
-            period: None,
-        }
-    }
 }
 
 /// Definition of a scorecard metric.
@@ -165,10 +154,6 @@ pub struct ScorecardMetric {
     /// Description
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-}
-
-fn default_rating_scale() -> String {
-    "sp".into()
 }
 
 fn default_weight() -> f64 {
@@ -212,12 +197,38 @@ pub struct ScorecardReport {
 }
 
 impl CreditScorecardExtension {
-    /// Create a new credit scorecard extension with the given configuration.
+    /// Create a credit scorecard extension on a scale of the supplied registry.
+    ///
+    /// The selected entry (scale, id and source) is resolved once and kept
+    /// as an immutable snapshot; threshold labels and the minimum rating are
+    /// resolved against it here, before any evaluation.
     ///
     /// # Arguments
     /// * `config` - Pre-built [`ScorecardConfig`] driving the analysis
-    pub fn new(config: ScorecardConfig) -> Self {
-        Self { config }
+    /// * `registry` - Caller-supplied rating-scale registry holding
+    ///   `config.rating_scale`
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error if [`Self::validate_config`] rejects the
+    /// configuration.
+    pub fn new(config: ScorecardConfig, registry: &RatingScaleRegistry) -> Result<Self> {
+        let Resolved {
+            scale,
+            thresholds,
+            min_position,
+        } = Self::resolve(&config, registry)?;
+        Ok(Self {
+            config,
+            scale,
+            thresholds,
+            min_position,
+        })
+    }
+
+    /// The snapshot of the selected registry entry.
+    pub fn rating_scale(&self) -> &RatingScaleEntry {
+        &self.scale
     }
 
     /// Get the current configuration.
@@ -225,23 +236,67 @@ impl CreditScorecardExtension {
         &self.config
     }
 
-    /// Validate a configuration without executing.
+    /// Validate a configuration against a registry without executing.
     ///
-    /// Useful for schema-style checks before constructing the extension.
+    /// # Arguments
+    /// * `config` - Configuration to check
+    /// * `registry` - Caller-supplied rating-scale registry
     ///
     /// # Errors
     ///
-    /// Returns an invalid-input error for an unsupported rating scale,
+    /// Returns an invalid-input error for a scale id the registry does not
+    /// hold, a threshold or minimum-rating label the selected scale does not
+    /// hold or that repeats after outer trim and ASCII case folding,
     /// negative/non-finite metric weights, implausible nonzero total weights,
     /// or an invalid explicit period ID.
-    pub fn validate_config(config: &ScorecardConfig) -> Result<()> {
-        if !is_supported_rating_scale(&config.rating_scale) {
-            return Err(finstack_quant_statements::Error::invalid_input(format!(
-                "Unsupported rating_scale '{}'. Expected one of: sp, moodys",
-                config.rating_scale
-            )));
-        }
+    pub fn validate_config(config: &ScorecardConfig, registry: &RatingScaleRegistry) -> Result<()> {
+        Self::resolve(config, registry).map(|_| ())
+    }
 
+    /// Validate `config` and resolve its scale snapshot, per-metric threshold
+    /// positions and minimum-rating position.
+    fn resolve(config: &ScorecardConfig, registry: &RatingScaleRegistry) -> Result<Resolved> {
+        let invalid = |message: String| finstack_quant_statements::Error::invalid_input(message);
+        let scale = registry
+            .entry(&config.rating_scale)
+            .map_err(|e| invalid(format!("Unsupported rating_scale: {e}")))?
+            .clone();
+        let mut thresholds = Vec::with_capacity(config.metrics.len());
+        for metric in &config.metrics {
+            let mut positions = IndexMap::new();
+            for (label, bounds) in &metric.thresholds {
+                let position = scale.get_scale().level_position(label).map_err(|e| {
+                    invalid(format!("Scorecard metric '{}' threshold: {e}", metric.name))
+                })?;
+                if positions.insert(position, *bounds).is_some() {
+                    return Err(invalid(format!(
+                        "Scorecard metric '{}' repeats threshold label '{}'",
+                        metric.name,
+                        label.trim()
+                    )));
+                }
+            }
+            thresholds.push(positions);
+        }
+        let min_position = config
+            .min_rating
+            .as_deref()
+            .map(|label| {
+                scale
+                    .get_scale()
+                    .level_position(label)
+                    .map_err(|e| invalid(format!("Scorecard min_rating: {e}")))
+            })
+            .transpose()?;
+        Self::validate_settings(config)?;
+        Ok(Resolved {
+            scale,
+            thresholds,
+            min_position,
+        })
+    }
+
+    fn validate_settings(config: &ScorecardConfig) -> Result<()> {
         for metric in &config.metrics {
             if !metric.weight.is_finite() || metric.weight < 0.0 {
                 return Err(finstack_quant_statements::Error::invalid_input(format!(
@@ -323,8 +378,6 @@ impl CreditScorecardExtension {
         let _span = tracing::info_span!("statements_analytics.credit_scorecard.execute").entered();
 
         let config = &self.config;
-        Self::validate_config(config)?;
-
         let target_period = Self::resolve_target_period(config, model)?;
 
         let mut scores = Vec::new();
@@ -333,12 +386,12 @@ impl CreditScorecardExtension {
         let mut excluded = 0usize;
 
         let mut base_context = None;
-        for metric_config in &config.metrics {
+        for (metric_config, thresholds) in config.metrics.iter().zip(&self.thresholds) {
             match self.evaluate_metric(
                 metric_config,
+                thresholds,
                 model,
                 results,
-                config,
                 target_period,
                 &mut base_context,
             ) {
@@ -361,16 +414,26 @@ impl CreditScorecardExtension {
             errors.push("Credit rating unavailable: no usable positive-weight evidence".into());
         }
 
-        let rating = total_score
-            .map(|score| self.determine_rating(score, &config.rating_scale))
+        let scale = self.scale.get_scale();
+        let rated = total_score
+            .map(|score| {
+                let level = scale.classify(score)?;
+                Ok::<_, finstack_quant_core::Error>((
+                    level.get_name().to_string(),
+                    scale.level_position(level.get_name())?,
+                ))
+            })
             .transpose()?;
+        let rating = rated.as_ref().map(|(name, _)| name.clone());
 
-        if let (Some(min_rating), Some(rating)) = (&config.min_rating, &rating)
-            && !self.meets_minimum_rating(rating, min_rating, &config.rating_scale)?
+        if let (Some(min_rating), Some(min_position), Some((rating, position))) =
+            (&config.min_rating, self.min_position, &rated)
+            && *position > min_position
         {
             warnings.push(format!(
                 "Credit rating {} is below minimum required {}",
-                rating, min_rating
+                rating,
+                min_rating.trim()
             ));
         }
 
@@ -412,7 +475,11 @@ impl CreditScorecardExtension {
         );
         data.insert(
             "rating_scale".into(),
-            serde_json::json!(config.rating_scale),
+            serde_json::json!(self.scale.get_id()),
+        );
+        data.insert(
+            "rating_scale_source".into(),
+            serde_json::json!(self.scale.get_source()),
         );
         data.insert(
             "period".into(),
@@ -504,9 +571,9 @@ impl CreditScorecardExtension {
     fn evaluate_metric(
         &self,
         metric: &ScorecardMetric,
+        thresholds: &IndexMap<usize, (f64, f64)>,
         model: &FinancialModelSpec,
         results: &StatementResult,
-        config: &ScorecardConfig,
         target_period: &finstack_quant_core::dates::Period,
         base_context: &mut Option<finstack_quant_statements::evaluator::EvaluationContext>,
     ) -> Result<MetricEvaluation> {
@@ -537,7 +604,7 @@ impl CreditScorecardExtension {
 
         // An unmatched value is excluded rather than silently scoring
         // the registry default.
-        match self.matching_threshold_score(value, &metric.thresholds, &config.rating_scale)? {
+        match self.matching_threshold_score(value, thresholds) {
             Some(score) => Ok(MetricEvaluation {
                 score: Some(MetricScore {
                     metric_name: metric.name.clone(),
@@ -551,37 +618,37 @@ impl CreditScorecardExtension {
                 score: None,
                 warning: Some(format!(
                     "Credit scorecard metric '{}' thresholds did not match value {} for {}; excluding factor and renormalizing weights",
-                    metric.name, value, config.rating_scale
+                    metric.name,
+                    value,
+                    self.scale.get_id()
                 )),
             }),
         }
     }
 
+    /// Representative score of the best band whose threshold contains `value`.
     fn matching_threshold_score(
         &self,
         value: f64,
-        thresholds: &indexmap::IndexMap<String, (f64, f64)>,
-        rating_scale: &str,
-    ) -> Result<Option<f64>> {
-        let scale = get_rating_scale(rating_scale)?;
-
-        // Boundary convention: buckets are matched in registry order
-        // (best rating first) and every bucket is closed on both ends
-        // `[min, max]`. A value on the shared boundary between two adjacent
-        // buckets therefore matches both, and best-first iteration resolves
-        // it to the **better** rating — regardless of whether the metric is
-        // higher-is-better (coverage-style, shared boundary is the better
-        // bucket's lower bound) or lower-is-better (leverage-style, shared
-        // boundary is the better bucket's upper bound).
-        Ok(scale.ratings.iter().find_map(|level| {
-            thresholds.get(&level.name).and_then(|(min, max)| {
-                if value >= *min && value <= *max {
-                    Some(level.score)
-                } else {
-                    None
-                }
+        thresholds: &IndexMap<usize, (f64, f64)>,
+    ) -> Option<f64> {
+        // Boundary convention: buckets are matched in scale order (best
+        // band first) and every bucket is closed on both ends `[min, max]`.
+        // A value on the shared boundary between two adjacent buckets
+        // therefore matches both, and best-first iteration resolves it to
+        // the **better** band — regardless of whether the metric is
+        // higher-is-better (coverage-style) or lower-is-better
+        // (leverage-style).
+        self.scale
+            .get_scale()
+            .get_ratings()
+            .iter()
+            .enumerate()
+            .find_map(|(position, level)| {
+                thresholds.get(&position).and_then(|(min, max)| {
+                    (value >= *min && value <= *max).then_some(level.get_score())
+                })
             })
-        }))
     }
 
     /// Calculate weighted average score.
@@ -598,49 +665,13 @@ impl CreditScorecardExtension {
         let score = scores.iter().map(|s| s.score * s.weight).sum::<f64>() / total_weight;
         score.is_finite().then_some(score)
     }
+}
 
-    /// Determine rating based on total score.
-    ///
-    /// Uses the configured rating scale to map a numeric score to a credit rating.
-    /// Supports S&P, Moody's, and Fitch scales.
-    fn determine_rating(&self, score: f64, rating_scale: &str) -> Result<String> {
-        let scale = get_rating_scale(rating_scale)?;
-
-        for level in &scale.ratings {
-            if score >= level.min_score {
-                return Ok(level.name.clone());
-            }
-        }
-
-        Ok(scale
-            .ratings
-            .last()
-            .map(|l| l.name.clone())
-            .unwrap_or_default())
-    }
-
-    /// Check if rating meets minimum requirement.
-    ///
-    /// Compares ratings using the configured rating scale with exact matching.
-    /// Returns true if the rating is equal to or better than the minimum.
-    fn meets_minimum_rating(
-        &self,
-        rating: &str,
-        min_rating: &str,
-        rating_scale: &str,
-    ) -> Result<bool> {
-        let scale = get_rating_scale(rating_scale)?;
-
-        // Find positions in the rating scale (lower index = better rating).
-        // Use exact string matching to avoid false matches (e.g., "AA" matching "A").
-        let rating_pos = scale.ratings.iter().position(|l| l.name == rating);
-        let min_pos = scale.ratings.iter().position(|l| l.name == min_rating);
-
-        match (rating_pos, min_pos) {
-            (Some(r), Some(m)) => Ok(r <= m), // Lower index = better rating
-            _ => Ok(false),
-        }
-    }
+/// Scale snapshot and label positions resolved from a configuration.
+struct Resolved {
+    scale: RatingScaleEntry,
+    thresholds: Vec<IndexMap<usize, (f64, f64)>>,
+    min_position: Option<usize>,
 }
 
 /// Score for a single metric.
@@ -662,31 +693,90 @@ struct MetricEvaluation {
 mod tests {
     use super::*;
 
-    fn extension() -> CreditScorecardExtension {
-        CreditScorecardExtension::new(ScorecardConfig {
-            rating_scale: "sp".into(),
-            metrics: vec![],
-            min_rating: None,
-            period: None,
-        })
+    fn registry() -> RatingScaleRegistry {
+        RatingScaleRegistry::from_json(
+            r#"{"schema":"finstack_quant.rating_scales/2","rating_scales":[{
+                "id":"internal","source":"test policy",
+                "scale":{"scale_name":"Internal","ratings":[
+                    {"name":"AAA","score":100.0,"min_score":96.0},
+                    {"name":"AA+","score":95.0,"min_score":91.0},
+                    {"name":"AA","score":90.0,"min_score":0.0}
+                ]}}]}"#,
+        )
+        .expect("valid registry")
+    }
+
+    fn extension_with(thresholds: &[(&str, (f64, f64))]) -> CreditScorecardExtension {
+        CreditScorecardExtension::new(
+            ScorecardConfig {
+                rating_scale: "internal".into(),
+                metrics: vec![ScorecardMetric {
+                    name: "m".into(),
+                    formula: "1".into(),
+                    weight: 1.0,
+                    thresholds: thresholds
+                        .iter()
+                        .map(|(label, bounds)| ((*label).to_string(), *bounds))
+                        .collect(),
+                    description: None,
+                }],
+                min_rating: None,
+                period: None,
+            },
+            &registry(),
+        )
+        .expect("valid extension")
+    }
+
+    fn score(extension: &CreditScorecardExtension, value: f64) -> Option<f64> {
+        extension.matching_threshold_score(value, &extension.thresholds[0])
     }
 
     #[test]
     fn unmatched_value_returns_no_score() {
-        let extension = extension();
-        let mut thresholds = indexmap::IndexMap::new();
-        thresholds.insert("AAA".to_string(), (0.0, 1.0));
+        let extension = extension_with(&[("AAA", (0.0, 1.0))]);
+        assert_eq!(
+            score(&extension, 2.5),
+            None,
+            "unmatched value must not score a fallback"
+        );
+    }
 
-        let score = extension
-            .matching_threshold_score(2.5, &thresholds, "S&P")
-            .expect("registry score");
-
-        assert_eq!(score, None, "unmatched value must not score a fallback");
+    #[test]
+    fn unknown_scale_threshold_and_min_rating_labels_are_rejected() {
+        let config = |scale: &str, label: &str, min: Option<&str>| ScorecardConfig {
+            rating_scale: scale.into(),
+            metrics: vec![ScorecardMetric {
+                name: "m".into(),
+                formula: "1".into(),
+                weight: 1.0,
+                thresholds: [(label.to_string(), (0.0, 1.0))].into_iter().collect(),
+                description: None,
+            }],
+            min_rating: min.map(str::to_string),
+            period: None,
+        };
+        let registry = registry();
+        assert!(CreditScorecardExtension::new(config("sp", "AAA", None), &registry).is_err());
+        assert!(CreditScorecardExtension::new(config("internal", "BBB", None), &registry).is_err());
+        assert!(
+            CreditScorecardExtension::new(config("internal", "AAA", Some("NR")), &registry)
+                .is_err()
+        );
+        assert!(
+            CreditScorecardExtension::new(config(" INTERNAL ", " aa+ ", Some("aa")), &registry)
+                .is_ok()
+        );
+        let mut repeated = config("internal", "AAA", None);
+        repeated.metrics[0]
+            .thresholds
+            .insert(" aaa ".into(), (1.0, 2.0));
+        assert!(CreditScorecardExtension::new(repeated, &registry).is_err());
     }
 
     #[test]
     fn calculate_weighted_score_treats_sub_epsilon_weights_as_zero() {
-        let extension = extension();
+        let extension = extension_with(&[]);
         let scores = vec![MetricScore {
             metric_name: "leverage".to_string(),
             value: 2.5,
@@ -694,100 +784,55 @@ mod tests {
             weight: f64::EPSILON / 4.0,
         }];
 
-        let weighted = extension.calculate_weighted_score(&scores);
-
-        assert_eq!(weighted, None);
+        assert_eq!(extension.calculate_weighted_score(&scores), None);
     }
 
     // Scorecard boundary convention
     //
-    // Buckets are matched in registry order (best rating first) and every
-    // bucket is closed `[min, max]`, so a value on a shared boundary always
-    // resolves to the *better* of the two adjacent ratings — for both
-    // higher-is-better (coverage) and lower-is-better (leverage) metrics.
+    // Buckets are matched in scale order (best band first) and every bucket
+    // is closed `[min, max]`, so a value on a shared boundary always resolves
+    // to the *better* of the two adjacent bands — for both higher-is-better
+    // (coverage) and lower-is-better (leverage) metrics.
 
-    /// With adjacent buckets `AAA: [95, 100]` and `AA+: [90, 95]`, a value
-    /// of exactly 95 sits on the shared boundary and must land in AAA
-    /// (the better bucket, matched first in registry order).
     #[test]
     fn scorecard_top_boundary_value_lands_in_best_bucket() {
-        let extension = extension();
-        let mut thresholds = indexmap::IndexMap::new();
-        thresholds.insert("AAA".to_string(), (95.0, 100.0));
-        thresholds.insert("AA+".to_string(), (90.0, 95.0));
-
-        // Value 95 is the boundary between AAA and AA+. Top bucket
-        // gets [min, max] — so 95 is AAA.
+        let extension = extension_with(&[("AAA", (95.0, 100.0)), ("AA+", (90.0, 95.0))]);
         assert_eq!(
-            extension
-                .matching_threshold_score(95.0, &thresholds, "S&P")
-                .expect("registry score"),
+            score(&extension, 95.0),
             Some(100.0),
             "top-bucket upper bound is inclusive"
         );
-        // Value 100 is the absolute max → still AAA (top-bucket-closed).
-        assert_eq!(
-            extension
-                .matching_threshold_score(100.0, &thresholds, "S&P")
-                .expect("registry score"),
-            Some(100.0)
-        );
+        assert_eq!(score(&extension, 100.0), Some(100.0));
     }
 
-    /// At a shared boundary between two non-top ratings the better rating
-    /// wins because it is matched first in registry order and all buckets
-    /// are closed.
     #[test]
     fn scorecard_non_top_shared_boundary_goes_to_better_rating() {
-        let extension = extension();
-        let mut thresholds = indexmap::IndexMap::new();
-        thresholds.insert("AAA".to_string(), (95.0, 100.0));
-        thresholds.insert("AA+".to_string(), (90.0, 95.0));
-        thresholds.insert("AA".to_string(), (85.0, 90.0));
-
-        // 90.0 — boundary between AA+ and AA → AA+ (better).
+        let extension = extension_with(&[
+            ("AAA", (95.0, 100.0)),
+            ("AA+", (90.0, 95.0)),
+            ("AA", (85.0, 90.0)),
+        ]);
         assert_eq!(
-            extension
-                .matching_threshold_score(90.0, &thresholds, "S&P")
-                .expect("registry score"),
+            score(&extension, 90.0),
             Some(95.0),
             "shared boundary 90.0 between AA+ and AA must resolve to AA+ (better)"
         );
-        // 85.0 — lower bound of AA: lands in AA.
         assert_eq!(
-            extension
-                .matching_threshold_score(85.0, &thresholds, "S&P")
-                .expect("registry score"),
+            score(&extension, 85.0),
             Some(90.0),
             "lower-bound value must land in the bucket it bounds"
         );
     }
 
-    /// Direction consistency: for a lower-is-better (leverage-type) metric
-    /// the better bucket's *upper* bound is the shared boundary — a value
-    /// exactly on it must land in the better bucket, not the worse one.
     #[test]
     fn scorecard_leverage_boundary_goes_to_better_rating() {
-        let extension = extension();
-        let mut thresholds = indexmap::IndexMap::new();
-        thresholds.insert("AAA".to_string(), (0.0, 1.0));
-        thresholds.insert("AA+".to_string(), (1.0, 2.0));
-        thresholds.insert("AA".to_string(), (2.0, 3.0));
-
-        // Leverage exactly 2.0 — boundary between AA+ and AA → AA+ (better).
+        let extension =
+            extension_with(&[("AAA", (0.0, 1.0)), ("AA+", (1.0, 2.0)), ("AA", (2.0, 3.0))]);
         assert_eq!(
-            extension
-                .matching_threshold_score(2.0, &thresholds, "S&P")
-                .expect("registry score"),
+            score(&extension, 2.0),
             Some(95.0),
             "leverage 2.0x on the AA+/AA boundary must resolve to AA+ (better)"
         );
-        // Leverage 1.0 — boundary between AAA and AA+ → AAA.
-        assert_eq!(
-            extension
-                .matching_threshold_score(1.0, &thresholds, "S&P")
-                .expect("registry score"),
-            Some(100.0)
-        );
+        assert_eq!(score(&extension, 1.0), Some(100.0));
     }
 }

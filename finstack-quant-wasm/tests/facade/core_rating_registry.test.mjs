@@ -8,43 +8,47 @@ await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
 });
 
-test('rating registry normalizes canonical ids and rejects retired aliases', () => {
-  const source = core.embeddedRegistry();
-  const value = JSON.parse(source.toJson());
-  source.free();
+const document = () =>
+  JSON.parse(
+    readFileSync(
+      new URL(
+        '../../../finstack-quant-py/tests/data/agency_style_rating_scales.json',
+        import.meta.url
+      ),
+      'utf8'
+    )
+  );
+
+test('rating registry normalizes ids and rejects unknown ids without fallback', () => {
+  const value = document();
   assert.equal(value.schema, 'finstack_quant.rating_scales/2');
-  value.scorecard_policy.unknown_scale_policy = 'error';
-  value.scorecard_policy.default_scale_id = ' SP ';
   value.rating_scales[0].id = ' Sp ';
   const registry = core.RatingScaleRegistry.fromJson(value);
   assert.deepEqual(registry.scaleIds(), ['sp', 'moodys']);
-  assert.equal(registry.defaultScaleId(), 'sp');
-  assert.equal(registry.ratingScale(' SP ').scale_name, 'S&P');
-  assert.equal(registry.ratingScale(' MOODYS ').scale_name, "Moody's");
+  assert.equal(registry.ratingScale(' SP ').scale_name, 'S&P-style test scale');
+  assert.match(registry.entry(' MOODYS ').source, /^Test fixture/);
   for (const alias of ['S&P', 'Fitch', 'standard_and_poors', "Moody's"]) {
     assert.equal(registry.isKnownRatingScale(alias), false);
-    assert.throws(() => registry.ratingScale(alias));
+    assert.throws(
+      () => registry.ratingScale(alias),
+      (e) => e.kind === 'validation'
+    );
+    assert.throws(
+      () => registry.entry(alias),
+      (e) => e.kind === 'validation'
+    );
   }
   registry.free();
-  for (const policy of ['fallback_to_default', 'warn_and_fallback']) {
-    value.scorecard_policy.unknown_scale_policy = policy;
-    const fallback = core.RatingScaleRegistry.fromJson(value);
-    assert.equal(fallback.isKnownRatingScale('Fitch'), false);
-    assert.equal(fallback.ratingScale('Fitch').scale_name, 'S&P');
-    fallback.free();
-  }
 });
 
-test('rating registry rejects legacy schema and fields and invalid normalized ids', () => {
-  const source = core.embeddedRegistry();
-  const value = JSON.parse(source.toJson());
-  source.free();
+test('rating registry rejects legacy fields, empty lists and invalid ids or sources', () => {
+  const value = document();
   for (const mutate of [
     (v) => {
       v.schema = 'finstack_quant.rating_scales/1';
     },
     (v) => {
-      v.scorecard_policy.aliases = [];
+      v.scorecard_policy = { default_score: 50 };
     },
     (v) => {
       v.rating_scales[0].ids = ['sp'];
@@ -55,9 +59,56 @@ test('rating registry rejects legacy schema and fields and invalid normalized id
     (v) => {
       v.rating_scales[1].id = '  ';
     },
+    (v) => {
+      v.rating_scales[0].source = ' ';
+    },
+    (v) => {
+      v.rating_scales = [];
+    },
   ]) {
     const invalid = structuredClone(value);
     mutate(invalid);
-    assert.throws(() => core.RatingScaleRegistry.fromJson(invalid));
+    assert.throws(
+      () => core.RatingScaleRegistry.fromJson(invalid),
+      (e) => e.kind === 'validation'
+    );
   }
+});
+
+test('scales cover [0, 100], classify to the better band and hold their representatives', () => {
+  const scale = core.scorecardScaleTryNew('Internal', undefined, [
+    core.ratingLevelTryNew('A', 90, 80),
+    core.ratingLevelTryNew('B', 70, 0),
+  ]);
+  assert.equal(core.scorecardScaleClassify(scale, 80).name, 'A');
+  assert.equal(core.scorecardScaleClassify(scale, 0).name, 'B');
+  assert.equal(core.scorecardScaleLevelPosition(scale, ' b '), 1);
+  for (const bad of [-0.1, 100.1, Number.NaN]) {
+    assert.throws(
+      () => core.scorecardScaleClassify(scale, bad),
+      (e) => e.kind === 'validation'
+    );
+  }
+  assert.throws(
+    () => core.scorecardScaleTryNew('gap', undefined, [core.ratingLevelTryNew('A', 90, 80)]),
+    (e) => e.kind === 'validation'
+  );
+  assert.throws(
+    () => core.ratingLevelTryNew('Not Rated', 50, 0),
+    (e) => e.kind === 'validation'
+  );
+  const registry = new core.RatingScaleRegistry([
+    core.ratingScaleEntryTryNew(' Internal ', 'credit policy 2026', scale),
+  ]);
+  assert.deepEqual(registry.scaleIds(), ['internal']);
+  assert.equal(registry.ratingScales()[0].id, 'internal');
+  assert.throws(
+    () => new core.RatingScaleRegistry([]),
+    (e) => e.kind === 'validation'
+  );
+  assert.throws(
+    () => core.registryFromConfig(new core.FinstackConfig()),
+    (e) => e.kind === 'validation'
+  );
+  registry.free();
 });
