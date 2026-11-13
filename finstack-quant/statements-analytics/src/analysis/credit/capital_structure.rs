@@ -1189,7 +1189,7 @@ mod tests {
             vec![("TL", term_loan(date!(2030 - 01 - 01)))],
             vec![],
         );
-        let year = PeriodId::annual(2025);
+        let year = PeriodId::annual(2025).expect("valid annual period");
         let mut results = StatementResult::new();
         let mut cashflows = CapitalStructureCashflows::new();
         cashflows

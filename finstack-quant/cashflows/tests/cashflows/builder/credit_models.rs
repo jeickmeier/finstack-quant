@@ -612,7 +612,7 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
     );
 
     let periods = vec![Period {
-        id: PeriodId::annual(2025),
+        id: PeriodId::annual(2025).expect("valid annual period"),
         start: base,
         end: Date::from_calendar_date(2026, Month::January, 1).unwrap(),
         is_actual: true,
@@ -678,7 +678,7 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
         .unwrap();
 
     let pv = pv_map
-        .get(&PeriodId::annual(2025))
+        .get(&PeriodId::annual(2025).expect("valid annual period"))
         .and_then(|ccy_map| ccy_map.get(&Currency::USD))
         .expect("expected USD PV for 2025");
 

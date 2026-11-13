@@ -337,7 +337,10 @@ fn pik_toggle_rejects_hedge_targets_and_keeps_explicit_debt_targets() {
                 .expect("annual period");
             model_builder.value(
                 "cash",
-                &[(PeriodId::annual(2025), AmountOrScalar::scalar(10.0))],
+                &[(
+                    PeriodId::annual(2025).expect("valid annual period"),
+                    AmountOrScalar::scalar(10.0),
+                )],
             );
             model_builder
                 .build()
@@ -358,7 +361,10 @@ fn pik_toggle_rejects_hedge_targets_and_keeps_explicit_debt_targets() {
             .expect("annual period");
         model_builder.value(
             "cash",
-            &[(PeriodId::annual(2025), AmountOrScalar::scalar(10.0))],
+            &[(
+                PeriodId::annual(2025).expect("valid annual period"),
+                AmountOrScalar::scalar(10.0),
+            )],
         );
         model_builder
             .build()
@@ -1006,7 +1012,7 @@ fn implicit_issuance_rejects_negative_principal_and_keeps_zero_at_zero() {
 
 #[test]
 fn newly_funded_loan_preserves_contractual_pik_in_its_first_period() {
-    let period = PeriodId::annual(2025);
+    let period = PeriodId::annual(2025).expect("valid annual period");
     let issue = date!(2025 - 01 - 01);
     let mut loan = loan(issue);
     loan.rate = RateSpec::Fixed { rate: 0.08 };
@@ -1059,8 +1065,8 @@ fn newly_funded_loan_preserves_contractual_pik_in_its_first_period() {
 
 #[test]
 fn contractual_pik_is_redeemed_at_maturity_and_capitalized_once() {
-    let period = PeriodId::annual(2025);
-    let next = PeriodId::annual(2026);
+    let period = PeriodId::annual(2025).expect("valid annual period");
+    let next = PeriodId::annual(2026).expect("valid annual period");
     let issue = date!(2025 - 01 - 01);
     let mut loan = loan(issue);
     loan.maturity = date!(2025 - 10 - 01);

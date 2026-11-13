@@ -881,7 +881,10 @@ mod tests {
                 .expect("periods");
             model_builder_1.value_money(
                 "ufcf",
-                &[(PeriodId::annual(2025), Money::from((0_i64, Currency::USD)))],
+                &[(
+                    PeriodId::annual(2025).expect("valid annual period"),
+                    Money::from((0_i64, Currency::USD)),
+                )],
             );
             model_builder_1.with_meta("currency", serde_json::json!("USD"));
             model_builder_1.build().expect("model")

@@ -258,13 +258,16 @@ impl JsPeriodId {
     /// * `year` - Calendar year of the period.
     ///
     /// @returns The annual `PeriodId`.
-    /// @throws `TypeError` if `year` is not an integer.
+    /// @throws `TypeError` if `year` is not an integer; `FinstackError` (kind
+    /// `validation`) when the year's bounds are outside the supported date range.
     /// @param year - Calendar year of the period.
     #[wasm_bindgen(js_name = annual)]
     pub fn annual(
         #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
     ) -> Result<JsPeriodId, JsValue> {
-        Ok(Self::from_inner(PeriodId::annual(js_int(&year, "year")?)))
+        PeriodId::annual(js_int(&year, "year")?)
+            .map(Self::from_inner)
+            .map_err(to_js_err)
     }
 
     /// Build a half-year identifier.

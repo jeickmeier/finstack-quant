@@ -375,7 +375,7 @@ pub struct CreditAssessmentPoint {
 /// let assessment = CreditAssessment::compute(&results, q4)?;
 /// assert_eq!(assessment.period, "2025Q4");
 /// // A period the results do not contain is an error, not a null assessment.
-/// assert!(CreditAssessment::compute(&results, PeriodId::annual(2025)).is_err());
+/// assert!(CreditAssessment::compute(&results, PeriodId::annual(2025).expect("valid annual period")).is_err());
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

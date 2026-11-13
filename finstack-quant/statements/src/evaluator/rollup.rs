@@ -216,7 +216,7 @@ impl StatementResult {
     ///     ]),
     /// };
     /// let annual = quarterly.rollup(&model, &spec)?;
-    /// let year = PeriodId::annual(2025);
+    /// let year = PeriodId::annual(2025).expect("valid annual period");
     /// assert_eq!(annual.get("revenue", &year), Some(400.0));
     /// assert_eq!(annual.get("cash", &year), Some(40.0));
     /// assert_eq!(annual.get("margin", &year), Some(0.25));

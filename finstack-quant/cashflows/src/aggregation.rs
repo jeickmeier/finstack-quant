@@ -1323,7 +1323,11 @@ mod period_contract_tests {
             .build()
             .expect("valid cashflow"),
         ];
-        let periods = vec![period(PeriodId::annual(2025), base, d(2026, 1, 1))];
+        let periods = vec![period(
+            PeriodId::annual(2025).expect("valid annual period"),
+            base,
+            d(2026, 1, 1),
+        )];
         let disc = NanDiscount { base };
 
         let result = pv_by_period(&flows, &periods, &disc, None, None, base);
@@ -1338,7 +1342,11 @@ mod period_contract_tests {
     fn pv_by_period_validates_periods_on_empty_flows() {
         let base = d(2025, 1, 1);
         let disc = NanDiscount { base };
-        let periods = vec![period(PeriodId::annual(2025), d(2026, 1, 1), d(2025, 1, 1))];
+        let periods = vec![period(
+            PeriodId::annual(2025).expect("valid annual period"),
+            d(2026, 1, 1),
+            d(2025, 1, 1),
+        )];
         let err = pv_by_period(&[], &periods, &disc, None, None, base)
             .expect_err("inverted period must be rejected even with no flows");
         assert!(
@@ -1384,14 +1392,19 @@ mod period_contract_tests {
             .build()
             .expect("valid cashflow"),
         ];
-        let periods = vec![period(PeriodId::annual(2025), d(2025, 1, 1), d(2026, 1, 1))];
+        let periods = vec![period(
+            PeriodId::annual(2025).expect("valid annual period"),
+            d(2025, 1, 1),
+            d(2026, 1, 1),
+        )];
         let disc = UnitDiscount { base };
 
         let out = pv_by_period(&flows, &periods, &disc, None, None, base)
             .expect("pv aggregation succeeds");
 
         // With df = 1.0 only the future flow contributes PV.
-        let pv = out[&PeriodId::annual(2025)][&Currency::USD].amount();
+        let pv =
+            out[&PeriodId::annual(2025).expect("valid annual period")][&Currency::USD].amount();
         assert!((pv - 200.0).abs() < 1e-12, "expected 200, got {pv}");
 
         // Nominal aggregation still includes the historical flows.
@@ -1400,7 +1413,8 @@ mod period_contract_tests {
             .map(|cf| (cf.get_date(), cf.get_amount()))
             .collect();
         let nominal = aggregate_by_period(&dated, &periods).expect("nominal aggregation");
-        let total = nominal[&PeriodId::annual(2025)][&Currency::USD].amount();
+        let total =
+            nominal[&PeriodId::annual(2025).expect("valid annual period")][&Currency::USD].amount();
         assert!((total - 350.0).abs() < 1e-12, "expected 350, got {total}");
     }
 }

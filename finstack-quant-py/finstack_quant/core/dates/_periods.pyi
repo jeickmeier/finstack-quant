@@ -244,9 +244,11 @@ class PeriodId:
         PeriodId
             Calendar-year identifier formatted as ``YYYY``.
 
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
+        Raises
+        ------
+        ValueError
+            If the year's start or exclusive end (January 1 of the next year)
+            is outside the supported date range.
 
         Examples
         --------

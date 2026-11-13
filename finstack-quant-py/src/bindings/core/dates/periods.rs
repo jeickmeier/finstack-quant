@@ -146,11 +146,14 @@ impl PyPeriodId {
             .map_err(core_to_py)
     }
 
-    /// Build an annual period identifier.
+    /// Build a Gregorian annual period identifier. Raises ``ValueError`` when
+    /// the year's bounds are outside the supported date range.
     #[classmethod]
     #[pyo3(text_signature = "(cls, year)")]
-    fn annual(_cls: &Bound<'_, PyType>, year: i32) -> Self {
-        Self::from_inner(PeriodId::annual(year))
+    fn annual(_cls: &Bound<'_, PyType>, year: i32) -> PyResult<Self> {
+        PeriodId::annual(year)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// Build a semi-annual period identifier (``half`` is 1 or 2).

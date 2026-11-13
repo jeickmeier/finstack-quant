@@ -192,7 +192,7 @@ fn a_declared_method_applies_with_an_empty_spec() {
     let annual = quarterly
         .rollup(&model, &empty_annual_spec())
         .expect("annual rollup");
-    let year = PeriodId::annual(2024);
+    let year = PeriodId::annual(2024).expect("valid annual period");
 
     close(annual.get("cash", &year), 40.0);
     close(annual.get("total_debt", &year), 10.0);
@@ -239,7 +239,7 @@ fn lines_built_through_the_builder_roll_up_with_their_declared_method() {
         .expect("evaluation")
         .rollup(&model, &empty_annual_spec())
         .expect("annual rollup");
-    let year = PeriodId::annual(2024);
+    let year = PeriodId::annual(2024).expect("valid annual period");
 
     close(annual.get("flow", &year), 100.0);
     close(annual.get("balance", &year), 40.0);
@@ -265,7 +265,7 @@ fn a_line_declaring_nothing_sums_whatever_its_tags_say() {
     let annual = quarterly
         .rollup(&model, &empty_annual_spec())
         .expect("annual rollup");
-    let year = PeriodId::annual(2024);
+    let year = PeriodId::annual(2024).expect("valid annual period");
 
     close(annual.get("revenue", &year), 460.0);
     close(annual.get("ebitda", &year), 115.0);
@@ -290,7 +290,7 @@ fn a_spec_entry_overrides_the_declared_method() {
             },
         )
         .expect("annual rollup");
-    let year = PeriodId::annual(2024);
+    let year = PeriodId::annual(2024).expect("valid annual period");
 
     close(annual.get("cash", &year), 100.0);
     close(annual.get("tagged_balance", &year), 1.0);
@@ -359,7 +359,13 @@ fn a_node_declaring_formula_without_a_formula_is_an_error_naming_it() {
             },
         )
         .expect("spec overrides the declaration");
-    close(summed.get("revenue", &PeriodId::annual(2024)), 460.0);
+    close(
+        summed.get(
+            "revenue",
+            &PeriodId::annual(2024).expect("valid annual period"),
+        ),
+        460.0,
+    );
 }
 
 #[test]
@@ -403,7 +409,10 @@ fn quarterly_results_roll_up_to_annual_flows_balances_and_ratios() {
     let annual = quarterly
         .rollup(&model, &annual_spec())
         .expect("annual rollup");
-    let (y2024, y2025) = (PeriodId::annual(2024), PeriodId::annual(2025));
+    let (y2024, y2025) = (
+        PeriodId::annual(2024).expect("valid annual period"),
+        PeriodId::annual(2025).expect("valid annual period"),
+    );
 
     // Flows sum, including formula flows left at the default.
     close(annual.get("revenue", &y2024), 460.0);
@@ -644,7 +653,7 @@ fn bundled_ratio_metrics_roll_up_as_ratios() {
     let annual = quarterly
         .rollup(&model, &empty_annual_spec())
         .expect("annual rollup");
-    let year = PeriodId::annual(2025);
+    let year = PeriodId::annual(2025).expect("valid annual period");
     // Flows still sum.
     close(annual.get("fin.gross_profit", &year), 184.0);
     close(annual.get("fin.ebitda", &year), 92.0);

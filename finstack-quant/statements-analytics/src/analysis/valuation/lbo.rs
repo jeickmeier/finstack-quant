@@ -218,7 +218,7 @@ pub struct LboResult {
 ///     exit_multiple: 9.5,
 ///     exit_metric_node: "ebitda".to_string(),
 ///     exit_net_debt_node: "total_debt".to_string(),
-///     exit_period: PeriodId::annual(2029),
+///     exit_period: PeriodId::annual(2029).expect("valid annual period"),
 ///     check_mappings: None,
 /// };
 ///
@@ -361,12 +361,12 @@ mod tests {
                 "ebitda",
                 &[
                     (
-                        PeriodId::annual(2025),
+                        PeriodId::annual(2025).expect("valid annual period"),
                         AmountOrScalar::amount(22.0, finstack_quant_core::currency::Currency::USD)
                             .unwrap(),
                     ),
                     (
-                        PeriodId::annual(2026),
+                        PeriodId::annual(2026).expect("valid annual period"),
                         AmountOrScalar::amount(26.4, finstack_quant_core::currency::Currency::USD)
                             .unwrap(),
                     ),
@@ -376,12 +376,12 @@ mod tests {
                 "total_debt",
                 &[
                     (
-                        PeriodId::annual(2025),
+                        PeriodId::annual(2025).expect("valid annual period"),
                         AmountOrScalar::amount(115.0, finstack_quant_core::currency::Currency::USD)
                             .unwrap(),
                     ),
                     (
-                        PeriodId::annual(2026),
+                        PeriodId::annual(2026).expect("valid annual period"),
                         AmountOrScalar::amount(35.0, finstack_quant_core::currency::Currency::USD)
                             .unwrap(),
                     ),
@@ -414,7 +414,7 @@ mod tests {
             exit_multiple: 9.5,
             exit_metric_node: "ebitda".to_string(),
             exit_net_debt_node: "total_debt".to_string(),
-            exit_period: PeriodId::annual(2026),
+            exit_period: PeriodId::annual(2026).expect("valid annual period"),
             check_mappings: None,
         }
     }
@@ -477,7 +477,10 @@ mod tests {
                 .expect("valid periods");
             model_builder.value(
                 "ebitda",
-                &[(PeriodId::annual(2025), AmountOrScalar::scalar(22.0))],
+                &[(
+                    PeriodId::annual(2025).expect("valid annual period"),
+                    AmountOrScalar::scalar(22.0),
+                )],
             );
             model_builder.build().expect("valid model")
         };

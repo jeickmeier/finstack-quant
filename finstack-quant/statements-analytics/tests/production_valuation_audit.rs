@@ -43,7 +43,7 @@ fn credit_reports_and_checks_reject_mixed_currency_ratios() {
     use finstack_quant_statements_analytics::analysis::{
         CoverageFloorCheck, CreditAssessment, LeverageRangeCheck,
     };
-    let period = PeriodId::annual(2025);
+    let period = PeriodId::annual(2025).expect("valid annual period");
     let model = {
         let mut model_builder = ModelBuilder::new("mixed credit units");
         model_builder.periods("2025..2025", None).unwrap();
@@ -97,7 +97,7 @@ fn credit_checks_reject_overflowing_ratios() {
     use finstack_quant_statements::checks::{Check, CheckContext};
     use finstack_quant_statements::evaluator::Evaluator;
     use finstack_quant_statements_analytics::analysis::{CoverageFloorCheck, LeverageRangeCheck};
-    let period = PeriodId::annual(2025);
+    let period = PeriodId::annual(2025).expect("valid annual period");
     let model = {
         let mut model_builder = ModelBuilder::new("overflowing credit ratio");
         model_builder.periods("2025..2025", None).unwrap();
@@ -134,7 +134,7 @@ fn credit_reports_reject_contradictory_numeric_and_monetary_values() {
     use finstack_quant_core::{currency::Currency, money::Money};
     use finstack_quant_statements::evaluator::Evaluator;
     use finstack_quant_statements_analytics::analysis::CreditAssessment;
-    let period = PeriodId::annual(2025);
+    let period = PeriodId::annual(2025).expect("valid annual period");
     let model = {
         let mut model_builder = ModelBuilder::new("contradictory monetary projection");
         model_builder.periods("2025..2025", None).unwrap();
@@ -340,7 +340,7 @@ fn growth_terminal_flow_rejects_annual_identifier_on_partial_year() {
     use finstack_quant_core::{currency::Currency, dates::Period, money::Money};
     use finstack_quant_statements_analytics::analysis::{DcfInputs, DcfOptions, evaluate_dcf};
     use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
-    let period = PeriodId::annual(2025);
+    let period = PeriodId::annual(2025).expect("valid annual period");
     let model = {
         let mut model_builder = ModelBuilder::new("annual stub");
         model_builder
@@ -378,8 +378,8 @@ fn growth_terminal_flow_uses_complete_year_across_annual_stub_identifiers() {
     use finstack_quant_core::{currency::Currency, dates::Period, money::Money};
     use finstack_quant_statements_analytics::analysis::{DcfInputs, DcfOptions, evaluate_dcf};
     use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
-    let actual = PeriodId::annual(2024);
-    let forecast = PeriodId::annual(2025);
+    let actual = PeriodId::annual(2024).expect("valid annual period");
+    let forecast = PeriodId::annual(2025).expect("valid annual period");
     let model = {
         let mut model_builder = ModelBuilder::new("complete year across annual stubs");
         model_builder

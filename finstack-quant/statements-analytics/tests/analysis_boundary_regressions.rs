@@ -24,11 +24,11 @@ fn monetary_model(currency: Currency) -> FinancialModelSpec {
             "revenue",
             &[
                 (
-                    PeriodId::annual(2025),
+                    PeriodId::annual(2025).expect("valid annual period"),
                     AmountOrScalar::amount(100.0, currency).unwrap(),
                 ),
                 (
-                    PeriodId::annual(2026),
+                    PeriodId::annual(2026).expect("valid annual period"),
                     AmountOrScalar::amount(110.0, currency).unwrap(),
                 ),
             ],
@@ -41,7 +41,7 @@ fn monetary_model(currency: Currency) -> FinancialModelSpec {
 #[test]
 fn monetary_goal_seek_preserves_round_trip_and_currency() {
     let model = monetary_model(Currency::USD);
-    let period = PeriodId::annual(2025);
+    let period = PeriodId::annual(2025).expect("valid annual period");
     let solved = goal_seek(
         &model,
         &GoalSeekSpec {
@@ -75,7 +75,7 @@ fn variance_and_bridge_reject_currency_mismatch() {
     let comparison = Evaluator::new()
         .evaluate(&monetary_model(Currency::EUR))
         .unwrap();
-    let period = PeriodId::annual(2025);
+    let period = PeriodId::annual(2025).expect("valid annual period");
     assert!(
         run_variance(
             &base,
@@ -152,11 +152,10 @@ fn regression_rejects_unidentified_and_unaligned_samples() {
 fn corkscrew_rejects_nan_in_strict_and_report_modes() {
     let model = monetary_model(Currency::USD);
     let mut results = Evaluator::new().evaluate(&model).unwrap();
-    results
-        .nodes
-        .get_mut("revenue")
-        .unwrap()
-        .insert(PeriodId::annual(2026), f64::NAN);
+    results.nodes.get_mut("revenue").unwrap().insert(
+        PeriodId::annual(2026).expect("valid annual period"),
+        f64::NAN,
+    );
     results
         .nodes
         .insert("liability".into(), results.nodes["revenue"].clone());
@@ -211,8 +210,8 @@ fn empty_scorecard_has_no_fabricated_rating() {
 }
 
 fn dcf_model(debt_currency: Currency) -> FinancialModelSpec {
-    let opening = PeriodId::annual(2024);
-    let forecast = PeriodId::annual(2025);
+    let opening = PeriodId::annual(2024).expect("valid annual period");
+    let forecast = PeriodId::annual(2025).expect("valid annual period");
     {
         let mut model_builder = ModelBuilder::new("dcf-currencies");
         model_builder.periods("2024..2025", Some("2024")).unwrap();
@@ -322,7 +321,10 @@ fn credit_assessment_rejects_a_period_outside_the_results() {
     assert!(CreditAssessment::compute(&results, PeriodId::quarter(2025, 4).unwrap()).is_ok());
     // A period past the model and an annual id on a quarterly model are both
     // unknown: neither may come back as an all-null or truncated assessment.
-    for period in [PeriodId::quarter(2030, 1).unwrap(), PeriodId::annual(2025)] {
+    for period in [
+        PeriodId::quarter(2030, 1).unwrap(),
+        PeriodId::annual(2025).expect("valid annual period"),
+    ] {
         let error = CreditAssessment::compute(&results, period).unwrap_err();
         assert!(
             error

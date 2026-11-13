@@ -1573,15 +1573,15 @@ mod tests {
                 "ufcf",
                 &[
                     (
-                        PeriodId::annual(2025),
+                        PeriodId::annual(2025).expect("valid annual period"),
                         Money::from((100_i64, Currency::USD)),
                     ),
                     (
-                        PeriodId::annual(2026),
+                        PeriodId::annual(2026).expect("valid annual period"),
                         Money::from((110_i64, Currency::USD)),
                     ),
                     (
-                        PeriodId::annual(2027),
+                        PeriodId::annual(2027).expect("valid annual period"),
                         Money::from((120_i64, Currency::USD)),
                     ),
                 ],
@@ -1772,15 +1772,15 @@ mod tests {
                 "ufcf",
                 &[
                     (
-                        PeriodId::annual(2025),
+                        PeriodId::annual(2025).expect("valid annual period"),
                         Money::from((100_i64, Currency::USD)),
                     ),
                     (
-                        PeriodId::annual(2026),
+                        PeriodId::annual(2026).expect("valid annual period"),
                         Money::from((110_i64, Currency::USD)),
                     ),
                     (
-                        PeriodId::annual(2027),
+                        PeriodId::annual(2027).expect("valid annual period"),
                         Money::from((120_i64, Currency::USD)),
                     ),
                 ],
@@ -1789,15 +1789,15 @@ mod tests {
                 "ebitda",
                 &[
                     (
-                        PeriodId::annual(2025),
+                        PeriodId::annual(2025).expect("valid annual period"),
                         AmountOrScalar::amount(100.0, Currency::USD).unwrap(),
                     ),
                     (
-                        PeriodId::annual(2026),
+                        PeriodId::annual(2026).expect("valid annual period"),
                         AmountOrScalar::amount(125.0, Currency::USD).unwrap(),
                     ),
                     (
-                        PeriodId::annual(2027),
+                        PeriodId::annual(2027).expect("valid annual period"),
                         AmountOrScalar::amount(150.0, Currency::USD).unwrap(),
                     ),
                 ],

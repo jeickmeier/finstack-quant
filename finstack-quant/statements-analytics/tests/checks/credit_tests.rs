@@ -17,7 +17,7 @@ fn q(quarter: u8) -> PeriodId {
 }
 
 fn y() -> PeriodId {
-    PeriodId::annual(2025)
+    PeriodId::annual(2025).expect("valid annual period")
 }
 
 fn s(v: f64) -> AmountOrScalar {

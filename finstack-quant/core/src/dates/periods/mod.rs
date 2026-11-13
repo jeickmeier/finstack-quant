@@ -161,18 +161,6 @@ impl PeriodKind {
         }
     }
 
-    #[inline]
-    fn designator(self) -> Option<char> {
-        match self {
-            PeriodKind::Daily => Some('D'),
-            PeriodKind::Quarterly => Some('Q'),
-            PeriodKind::Monthly => Some('M'),
-            PeriodKind::Weekly => Some('W'),
-            PeriodKind::SemiAnnual => Some('H'),
-            PeriodKind::Annual => None,
-        }
-    }
-
     /// Highest index `self` can take in any year (Gregorian or fiscal).
     fn capacity(self) -> u16 {
         match self {
@@ -180,19 +168,6 @@ impl PeriodKind {
             PeriodKind::Weekly => 53,
             _ => self.periods_per_year(),
         }
-    }
-
-    fn parse_index_with_limit(self, raw: &str, max_index: u16) -> crate::Result<u16> {
-        let index: u16 = raw
-            .parse()
-            .map_err(|_| invalid_period(raw, "index is not a positive integer"))?;
-        if !(1..=max_index).contains(&index) {
-            return Err(invalid_period(
-                raw,
-                &format!("{self} index must be in 1..={max_index}"),
-            ));
-        }
-        Ok(index)
     }
 }
 
@@ -356,14 +331,18 @@ impl PeriodId {
     pub fn half(year: i32, h: u8) -> crate::Result<Self> {
         Self::try_new(year, u16::from(h), PeriodKind::SemiAnnual)
     }
-    /// Build an annual identifier.
-    pub fn annual(year: i32) -> Self {
-        Self {
-            year,
-            index: 1,
-            kind: PeriodKind::Annual,
-            fiscal: false,
-        }
+    /// Try to build a Gregorian annual identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when the year's start or exclusive end
+    /// (January 1 of the next year) is outside the supported date range.
+    ///
+    /// # Arguments
+    ///
+    /// * `year` - Gregorian calendar year.
+    pub fn annual(year: i32) -> crate::Result<Self> {
+        Self::try_new(year, 1, PeriodKind::Annual)
     }
 
     fn try_new(year: i32, index: u16, kind: PeriodKind) -> crate::Result<Self> {
@@ -374,6 +353,7 @@ impl PeriodId {
                 &format!("{kind} index must be in 1..={max} for {year}"),
             ));
         }
+        PeriodCalendar::Gregorian.bounds(year, kind, index)?;
         Ok(Self {
             year,
             index,
@@ -898,8 +878,12 @@ impl fmt::Display for PeriodId {
 
 impl FromStr for PeriodId {
     type Err = crate::Error;
+
+    /// Parse a standalone identifier: unprefixed text is Gregorian and must
+    /// have representable bounds; `FY` text is fiscal and is checked against
+    /// symbolic capacities only (D366, W53, M12, Q4, H2, annual 1).
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        parse_id(s, PeriodCalendar::Gregorian)
+        parse_id(s, IdContext::Standalone)
     }
 }
 

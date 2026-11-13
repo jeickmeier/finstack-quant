@@ -634,9 +634,18 @@ fn test_ttm_annual_data() {
         model_builder.value(
             "revenue",
             &[
-                (PeriodId::annual(2023), AmountOrScalar::scalar(1000.0)),
-                (PeriodId::annual(2024), AmountOrScalar::scalar(1100.0)),
-                (PeriodId::annual(2025), AmountOrScalar::scalar(1200.0)),
+                (
+                    PeriodId::annual(2023).expect("valid annual period"),
+                    AmountOrScalar::scalar(1000.0),
+                ),
+                (
+                    PeriodId::annual(2024).expect("valid annual period"),
+                    AmountOrScalar::scalar(1100.0),
+                ),
+                (
+                    PeriodId::annual(2025).expect("valid annual period"),
+                    AmountOrScalar::scalar(1200.0),
+                ),
             ],
         );
         model_builder
@@ -649,7 +658,12 @@ fn test_ttm_annual_data() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // Annual TTM should just return the value itself (1 period = 1 year)
-    let y2025_ttm = results.get("revenue_ttm", &PeriodId::annual(2025)).unwrap();
+    let y2025_ttm = results
+        .get(
+            "revenue_ttm",
+            &PeriodId::annual(2025).expect("valid annual period"),
+        )
+        .unwrap();
     assert_eq!(y2025_ttm, 1200.0, "Annual TTM = the value itself");
 }
 
@@ -1335,7 +1349,13 @@ fn test_periods_per_year() {
             .periods_per_year(),
         2
     );
-    assert_eq!(PeriodId::annual(2025).kind().periods_per_year(), 1);
+    assert_eq!(
+        PeriodId::annual(2025)
+            .expect("valid annual period")
+            .kind()
+            .periods_per_year(),
+        1
+    );
 }
 
 #[test]

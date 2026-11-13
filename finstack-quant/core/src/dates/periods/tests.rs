@@ -58,10 +58,15 @@ fn leap_fiscal_subperiods_partition_the_annual_interval() {
 
 #[test]
 fn actuals_cutoff_requires_matching_period_kind_and_calendar() {
-    for cutoff in ["2025Q1", "2025", "FY2025M02"] {
+    for cutoff in ["2025Q1", "2025"] {
         let error = build_periods("2025M01..M04", Some(cutoff)).unwrap_err();
         assert!(error.to_string().contains("same period kind and calendar"));
     }
+    let error = build_periods("2025M01..M04", Some("FY2025M02")).unwrap_err();
+    assert!(
+        error.to_string().contains("need a fiscal builder"),
+        "{error}"
+    );
     let fiscal = FiscalConfig::us_federal();
     assert!(build_fiscal_periods("FY2025M01..M04", fiscal, Some("2025Q1")).is_err());
     for plan in [
@@ -598,7 +603,8 @@ fn shift_matches_repeated_stepping_and_rolls_years() {
         PeriodId::week(2020, 53).expect("ISO week 53").shift(1),
         PeriodId::week(2021, 1)
     );
-    assert!(PeriodId::annual(i32::MAX).shift(1).is_err());
+    let last_fiscal_year: PeriodId = "FY2147483647".parse().expect("symbolic fiscal year");
+    assert!(last_fiscal_year.shift(1).is_err());
 }
 
 #[test]
@@ -625,8 +631,11 @@ fn quarterly_semi_and_annual_stepping() {
         PeriodId::half(2025, 1).expect("valid period fixture")
     );
     assert_eq!(
-        PeriodId::annual(2025).shift(1).expect("na"),
-        PeriodId::annual(2026)
+        PeriodId::annual(2025)
+            .expect("valid annual period")
+            .shift(1)
+            .expect("na"),
+        PeriodId::annual(2026).expect("valid annual period")
     );
 }
 
@@ -679,13 +688,14 @@ fn period_builder_does_not_step_beyond_the_requested_terminal_period() {
 
 #[test]
 fn period_year_stepping_rejects_integer_overflow() {
-    assert!(PeriodId::annual(i32::MAX).shift(1).is_err());
-    assert!(PeriodId::annual(i32::MIN).shift(-1).is_err());
-    assert!(
-        PeriodId::annual(i32::MAX)
-            .next_fiscal(FiscalConfig::us_federal())
-            .is_err()
-    );
+    // Gregorian years whose bounds are unrepresentable cannot be built.
+    assert!(PeriodId::annual(i32::MAX).is_err());
+    assert!(PeriodId::annual(i32::MIN).is_err());
+    let last: PeriodId = "FY2147483647".parse().expect("symbolic fiscal year");
+    let first: PeriodId = "FY-2147483648".parse().expect("symbolic fiscal year");
+    assert!(last.shift(1).is_err());
+    assert!(first.shift(-1).is_err());
+    assert!(last.next_fiscal(FiscalConfig::us_federal()).is_err());
 }
 
 #[test]
@@ -847,4 +857,87 @@ fn from_date_rejects_unrepresentable_period_boundaries() {
     assert!(
         PeriodId::from_date(Date::MAX.previous_day().unwrap(), PeriodKind::Daily, None).is_ok()
     );
+}
+
+#[test]
+fn period_grammar_is_exact_signed_and_round_trips() {
+    for (input, canonical) in [
+        ("+2025q1", "2025Q1"),
+        ("fy2025q1", "FY2025Q1"),
+        (" 02025M3 ", "2025M03"),
+        ("2025d7", "2025D007"),
+        ("-5Q1", "-5Q1"),
+        ("-5", "-5"),
+        ("0H2", "0H2"),
+        ("FY-3W53", "FY-3W53"),
+    ] {
+        let id: PeriodId = input.parse().unwrap_or_else(|e| panic!("{input}: {e}"));
+        assert_eq!(id.to_string(), canonical, "{input}");
+        assert_eq!(canonical.parse::<PeriodId>().expect("canonical"), id);
+    }
+    for bad in [
+        "2025Q+1",
+        "2025Q0",
+        "2025Q",
+        "2025QQ1",
+        "2025 Q1",
+        "2025-Q1",
+        "2025Q1.0",
+        "2025Q5",
+        "2025M13",
+        "2025D366",
+        "2026W54",
+        "FYFY2025",
+        "Q1",
+        "",
+        "2025A",
+        "2025Q1M2",
+        "99999999999Q1",
+        "1e3",
+    ] {
+        assert!(bad.parse::<PeriodId>().is_err(), "{bad:?} must be rejected");
+    }
+    // FY text is symbolic standalone: capacities only.
+    assert!("FY2025D366".parse::<PeriodId>().is_ok());
+    assert!("FY2025W54".parse::<PeriodId>().is_err());
+}
+
+#[test]
+fn ranges_classify_endpoints_by_grammar() {
+    assert_eq!(
+        build_periods("-5Q1..-4Q2", None)
+            .expect("negative years")
+            .periods
+            .len(),
+        6
+    );
+    assert_eq!(
+        build_periods("-5..-3", None)
+            .expect("negative annual")
+            .periods
+            .len(),
+        3
+    );
+    assert!(build_periods("2025Q1..QQ4", None).is_err());
+    assert!(build_periods("2025Q1..M4", None).is_err());
+    assert!(build_periods("2025Q1..Q4..Q4", None).is_err());
+    assert!(build_periods("2024..A", None).is_err());
+    assert!(
+        build_periods("FY2025Q1..Q2", None).is_err(),
+        "Gregorian builders reject FY"
+    );
+    assert!(build_periods("2025Q1..Q2", Some("FY2025Q1")).is_err());
+    let fiscal = FiscalConfig::new(10, 1).expect("valid fiscal start");
+    let plan = build_fiscal_periods("2025Q1..FY2025Q2", fiscal, None).expect("fiscal builder");
+    assert!(plan.periods.iter().all(|period| period.id.is_fiscal()));
+}
+
+#[test]
+fn constructors_validate_actual_gregorian_bounds() {
+    assert!(PeriodId::annual(2025).is_ok());
+    assert!(PeriodId::annual(i32::MAX).is_err());
+    assert!(PeriodId::day(2024, 366).is_ok());
+    assert!(PeriodId::day(2025, 366).is_err());
+    assert!(PeriodId::week(2026, 53).is_ok());
+    assert!(PeriodId::week(2025, 53).is_err());
 }

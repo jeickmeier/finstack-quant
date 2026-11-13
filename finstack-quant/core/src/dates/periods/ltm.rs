@@ -175,8 +175,15 @@ mod tests {
         assert!(window.is_complete());
 
         let annual = build_periods("2023..2025", None).expect("plan").periods;
-        let window = ltm_window(PeriodId::annual(2024), &annual).unwrap();
-        assert_eq!(window.slots, vec![PeriodId::annual(2024)]);
+        let window = ltm_window(
+            PeriodId::annual(2024).expect("valid annual period"),
+            &annual,
+        )
+        .unwrap();
+        assert_eq!(
+            window.slots,
+            vec![PeriodId::annual(2024).expect("valid annual period")]
+        );
         assert!(window.is_complete());
     }
 

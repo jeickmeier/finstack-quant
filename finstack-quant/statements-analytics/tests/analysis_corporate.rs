@@ -678,15 +678,15 @@ fn annual_gordon_terminal_value_unchanged() {
             "ufcf",
             &[
                 (
-                    PeriodId::annual(2025),
+                    PeriodId::annual(2025).expect("valid annual period"),
                     Money::new(400_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::annual(2026),
+                    PeriodId::annual(2026).expect("valid annual period"),
                     Money::new(440_000.0, Currency::USD).expect("valid money fixture"),
                 ),
                 (
-                    PeriodId::annual(2027),
+                    PeriodId::annual(2027).expect("valid annual period"),
                     Money::new(480_000.0, Currency::USD).expect("valid money fixture"),
                 ),
             ],

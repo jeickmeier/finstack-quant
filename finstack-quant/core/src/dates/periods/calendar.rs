@@ -84,12 +84,13 @@ pub(super) fn build_periods_with_calendar(
     calendar: PeriodCalendar,
     actuals_until: Option<&str>,
 ) -> crate::Result<PeriodPlan> {
-    let (start, end) = parse_range(range, calendar)?;
+    let context = IdContext::Builder(calendar);
+    let (start, end) = parse_range(range, context)?;
     // Reject unsupported dates and excessive work before allocating any periods.
     calendar.bounds(start.year, start.kind, start.index)?;
     calendar.bounds(end.year, end.kind, end.index)?;
     let actual_cut = actuals_until
-        .map(|value| parse_id(value, calendar))
+        .map(|value| parse_id(value, context))
         .transpose()?;
     if let Some(cut) = actual_cut {
         if cut.kind != start.kind || cut.fiscal != start.fiscal {

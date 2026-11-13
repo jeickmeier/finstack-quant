@@ -226,7 +226,7 @@ fn regression_rejects_constant_predictor_and_unequal_lengths() {
 fn monetary_goal_seek_returns_a_valid_updated_model() {
     use finstack_quant_core::{currency::Currency, dates::PeriodId};
     use finstack_quant_statements::{builder::ModelBuilder, types::AmountOrScalar};
-    let period = PeriodId::annual(2025);
+    let period = PeriodId::annual(2025).expect("valid annual period");
     let model = {
         let mut model_builder = ModelBuilder::new("monetary-goal");
         model_builder.periods("2025..2025", None).unwrap();
