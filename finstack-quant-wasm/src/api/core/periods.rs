@@ -361,73 +361,40 @@ impl JsPeriodId {
         self.inner.is_fiscal()
     }
 
-    /// Move by a signed number of periods of the same kind and calendar
+    /// Move by a whole number of periods of the same kind in `calendar`
     /// (Rust `PeriodId::shift`).
     ///
     /// # Arguments
     ///
     /// * `periods` - Whole number of periods to move; negative moves back and
-    ///   `0` returns the identifier unchanged.
+    ///   `0` returns the identifier after validating it.
+    /// * `calendar` - The identifier's calendar context: `"gregorian"` for an
+    ///   unprefixed identifier, `{ fiscal: { start_month, start_day } }` for an
+    ///   `FY` identifier.
     ///
-    /// @returns The `PeriodId` `periods` steps away, rolling the year where needed.
+    /// @returns The `PeriodId` `periods` steps away in `calendar`.
     /// @throws `TypeError` (kind `invalid_type`) when `periods` is not a whole
-    /// number; `FinstackError` (kind `validation`) when the year would
-    /// overflow, or for a fiscal daily identifier that would leave days
-    /// `1..=365`, whose length depends on the fiscal calendar (use
-    /// `nextFiscal` / `prevFiscal`).
-    /// @param periods - Whole number of periods to move; negative moves back and `0` returns the identifier unchanged.
+    /// number; `FinstackError` (kind `validation`) when `calendar` does not
+    /// match the identifier, the identifier is not a period of `calendar`, or
+    /// the result leaves the supported range.
+    /// @param periods - Whole number of periods to move; negative moves back and `0` returns the identifier after validating it.
+    /// @param calendar - The identifier's calendar context: `"gregorian"` for an unprefixed identifier, `{ fiscal: { start_month, start_day } }` for an `FY` identifier.
     #[wasm_bindgen(js_name = shift)]
     pub fn shift(
         &self,
         #[wasm_bindgen(unchecked_param_type = "number")] periods: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "PeriodPlan['calendar']")] calendar: JsValue,
     ) -> Result<JsPeriodId, JsValue> {
         let periods: i32 = crate::utils::input::js_int(&periods, "periods")?;
+        let calendar: finstack_quant_core::dates::PeriodCalendar =
+            serde_json::from_value(crate::utils::input::js_json_value(&calendar, "calendar")?)
+                .map_err(|error| {
+                    to_js_err(finstack_quant_core::Error::Validation(format!(
+                        "calendar: {error}"
+                    )))
+                })?;
         self.inner
-            .shift(periods)
-            .map(Self::from_inner)
-            .map_err(to_js_err)
-    }
-
-    /// Step forward to the next fiscal period (Rust `PeriodId::next_fiscal`).
-    ///
-    /// # Arguments
-    ///
-    /// * `fiscal_config` - Fiscal-year start used to size fiscal weeks and days.
-    ///
-    /// @returns The following `PeriodId`, marked fiscal.
-    /// @throws `FinstackError` (kind `validation`) if the configuration has an
-    /// invalid fiscal start date for the year or the fiscal-year boundary is
-    /// outside the supported date range.
-    /// @param fiscalConfig - Fiscal-year start used to size fiscal weeks and days.
-    #[wasm_bindgen(js_name = nextFiscal)]
-    pub fn next_fiscal(
-        &self,
-        #[wasm_bindgen(js_name = "fiscalConfig")] fiscal_config: &JsFiscalConfig,
-    ) -> Result<JsPeriodId, JsValue> {
-        self.inner
-            .next_fiscal(fiscal_config.inner)
-            .map(Self::from_inner)
-            .map_err(to_js_err)
-    }
-
-    /// Step back to the previous fiscal period (Rust `PeriodId::prev_fiscal`).
-    ///
-    /// # Arguments
-    ///
-    /// * `fiscal_config` - Fiscal-year start used to size fiscal weeks and days.
-    ///
-    /// @returns The preceding `PeriodId`, marked fiscal.
-    /// @throws `FinstackError` (kind `validation`) if the configuration has an
-    /// invalid fiscal start date for the year or the fiscal-year boundary is
-    /// outside the supported date range.
-    /// @param fiscalConfig - Fiscal-year start used to size fiscal weeks and days.
-    #[wasm_bindgen(js_name = prevFiscal)]
-    pub fn prev_fiscal(
-        &self,
-        #[wasm_bindgen(js_name = "fiscalConfig")] fiscal_config: &JsFiscalConfig,
-    ) -> Result<JsPeriodId, JsValue> {
-        self.inner
-            .prev_fiscal(fiscal_config.inner)
+            .shift(periods, calendar)
             .map(Self::from_inner)
             .map_err(to_js_err)
     }

@@ -217,32 +217,3 @@ pub(super) fn checked_year_offset(year: i32, offset: i32) -> crate::Result<i32> 
         )
     })
 }
-
-/// Step one period forward or backward using the year capacity of `calendar`.
-pub(super) fn step(
-    mut id: PeriodId,
-    calendar: PeriodCalendar,
-    forward: bool,
-) -> crate::Result<PeriodId> {
-    let max = calendar.max_index(id.year, id.kind)?;
-    if id.index == 0 || id.index > max {
-        return Err(invalid_period(
-            &id.to_string(),
-            "period index is outside this year's range",
-        ));
-    }
-    if forward {
-        if id.index >= max {
-            id.year = checked_year_offset(id.year, 1)?;
-            id.index = 1;
-        } else {
-            id.index += 1;
-        }
-    } else if id.index == 1 {
-        id.year = checked_year_offset(id.year, -1)?;
-        id.index = calendar.max_index(id.year, id.kind)?;
-    } else {
-        id.index -= 1;
-    }
-    Ok(id)
-}

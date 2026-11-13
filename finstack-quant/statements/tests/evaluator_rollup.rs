@@ -182,7 +182,7 @@ fn a_target_period_with_any_forecast_source_is_not_actual() {
         .expect("annual rollup");
     assert_eq!(
         annual
-            .periods
+            .get_periods()
             .iter()
             .map(|period| period.is_actual)
             .collect::<Vec<_>>(),
@@ -194,7 +194,7 @@ fn a_target_period_with_any_forecast_source_is_not_actual() {
 fn an_evaluated_result_carries_the_model_periods() {
     let model = quarterly_model();
     let quarterly = Evaluator::new().evaluate(&model).expect("evaluation");
-    assert_eq!(quarterly.periods, model.periods.periods);
+    assert_eq!(quarterly.periods.as_ref(), Some(&model.periods));
 }
 
 #[test]
@@ -447,7 +447,7 @@ fn quarterly_results_roll_up_to_annual_flows_balances_and_ratios() {
 
     assert_eq!(annual.meta.num_periods, 2);
     assert_eq!(
-        annual.periods,
+        annual.get_periods(),
         [
             Period {
                 id: y2024,

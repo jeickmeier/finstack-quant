@@ -23,7 +23,11 @@ fn test_context_set_and_get_value() {
 
     let mut ctx = EvaluationContext::new(
         PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        &[],
+        &finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            Vec::new(),
+        )
+        .expect("empty plan"),
         std::sync::Arc::new(node_to_column),
         std::sync::Arc::new(IndexMap::new()),
     );
@@ -42,7 +46,11 @@ fn test_context_unknown_node_error() {
 
     let ctx = EvaluationContext::new(
         PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        &[],
+        &finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            Vec::new(),
+        )
+        .expect("empty plan"),
         std::sync::Arc::new(IndexMap::new()),
         std::sync::Arc::new(IndexMap::new()),
     );

@@ -17,29 +17,20 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::{DayCount, DayCountContext, PeriodId, PeriodKind};
 use finstack_quant_core::expr::{Expr, ExprNode};
 use finstack_quant_core::math::ZERO_TOLERANCE;
-use time::Duration;
 
 /// Offset exactly in calendar periods, independent of the number of stored observations.
 /// Out-of-range dates have no observation and return `None` without a linear walk.
-pub(crate) fn offset_period(context: &EvaluationContext, offset: i32) -> Option<PeriodId> {
+/// The period `offset` periods from the current one, stepped in the model
+/// plan's calendar (record CORE-CONVENTIONS-014 #7).
+///
+/// `Ok(None)` means the target leaves the supported date range, so the
+/// series has no value there; a source that is not a period of the plan's
+/// calendar is an error, not a missing value.
+pub(crate) fn offset_period(context: &EvaluationContext, offset: i32) -> Result<Option<PeriodId>> {
     let period = context.period_id;
-    if offset == 0 {
-        return Some(period);
-    }
-    if period.is_fiscal() && period.kind() == PeriodKind::Daily {
-        if let Some((start, _)) = context.history.period_bounds(&period) {
-            let target = start.checked_add(Duration::days(i64::from(offset)))?;
-            return context
-                .history
-                .period_starting_on(target, PeriodKind::Daily, true);
-        }
-        // Without model dates only same-year backward offsets are resolvable;
-        // a fiscal year's length depends on its calendar.
-        if offset > 0 {
-            return None;
-        }
-    }
-    period.shift(offset).ok()
+    let calendar = context.history.model_plan()?.calendar;
+    period.shift(0, calendar)?;
+    Ok(period.shift(offset, calendar).ok())
 }
 
 /// Read an expression at an earlier calendar slot without compressing gaps.
@@ -93,7 +84,7 @@ pub(crate) fn eval_lag(
         return evaluate_formula(&args[0], context, node_id);
     }
 
-    let Some(target_period) = offset_period(context, -lag_periods) else {
+    let Some(target_period) = offset_period(context, -lag_periods)? else {
         return Ok(f64::NAN);
     };
     historical_expression_value(&args[0], target_period, context, node_id)
@@ -133,7 +124,7 @@ pub(crate) fn eval_diff(
         return Ok(if v.is_finite() { 0.0 } else { f64::NAN });
     }
 
-    let Some(target_period) = offset_period(context, -lag_periods) else {
+    let Some(target_period) = offset_period(context, -lag_periods)? else {
         return Ok(f64::NAN);
     };
     let current_value = evaluate_formula(&args[0], context, node_id)?;
@@ -170,7 +161,7 @@ pub(crate) fn eval_pct_change(
         return Ok(if v.is_finite() { 0.0 } else { f64::NAN });
     }
 
-    let Some(target_period) = offset_period(context, -lag_periods) else {
+    let Some(target_period) = offset_period(context, -lag_periods)? else {
         return Ok(f64::NAN);
     };
     let current_value = evaluate_formula(&args[0], context, node_id)?;
@@ -251,7 +242,7 @@ pub(crate) fn eval_growth_rate(
     if !current_value.is_finite() {
         return Ok(f64::NAN);
     }
-    let Some(target_period) = offset_period(context, -periods) else {
+    let Some(target_period) = offset_period(context, -periods)? else {
         return Ok(f64::NAN);
     };
     let start_value = historical_expression_value(&args[0], target_period, context, node_id)?;
@@ -339,7 +330,7 @@ pub(crate) fn eval_shift(
         return Ok(f64::NAN);
     }
 
-    let Some(target_period) = offset_period(context, -shift_periods) else {
+    let Some(target_period) = offset_period(context, -shift_periods)? else {
         return Ok(f64::NAN);
     };
     historical_expression_value(&args[0], target_period, context, node_id)

@@ -179,16 +179,17 @@ impl_repr_html_via_dataframe!(PyCreditAssessment);
 ///     period of ``results.periods`` up to ``period``, in timeline order.
 ///     Ratios are ``None`` when their inputs have mixed scalar/money
 ///     representations, different currencies, or non-finite arithmetic.
-///     Trailing-year ratios require all annual, semiannual, quarterly or monthly
-///     periods, including fiscal periods, or the complete Gregorian daily year
-///     ending after the assessment date. Weekly and fiscal-daily ratios are
-///     unavailable because the result does not contain their date calendar.
+///     Trailing-year ratios step through the results' period plan in its own
+///     calendar: they need every annual, semiannual, quarterly or monthly period
+///     of the twelve months, or every calendar day of a daily plan (a
+///     business-day grid is incomplete, so its ratios are ``None``).
 ///
 /// Raises
 /// ------
 /// ValueError
 ///     If ``period`` is not a valid period identifier, is not one of
-///     ``results.periods``, or ``results`` is malformed JSON.
+///     ``results.periods``, ``results`` is malformed JSON, or the results'
+///     period plan is weekly (a weekly plan has no twelve-month window).
 ///
 /// Examples
 /// --------
@@ -222,15 +223,17 @@ fn credit_assessment(results: &Bound<'_, PyAny>, period: &str) -> PyResult<PyCre
 /// Returns
 /// -------
 /// str
-///     Formatted credit assessment report text. Trailing-year ratios require a
-///     complete annual, semiannual, quarterly, monthly or Gregorian daily year;
-///     weekly and fiscal-daily ratios are reported as unavailable.
+///     Formatted credit assessment report text. Trailing-year ratios step
+///     through the results' period plan and are omitted when the twelve
+///     months are incomplete; a daily plan needs every calendar day.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If ``period`` is not a valid period identifier or ``results`` is
-///     malformed JSON.
+///     If ``period`` is not a valid period identifier, ``results`` is
+///     malformed JSON, ``results`` hold ``ebitda`` or ``interest_expense``
+///     without a period plan, ``period`` is not in that plan, or the plan
+///     is weekly.
 ///
 /// Examples
 /// --------
@@ -244,7 +247,9 @@ fn credit_assessment(results: &Bound<'_, PyAny>, period: &str) -> PyResult<PyCre
 fn credit_assessment_report_text(results: &Bound<'_, PyAny>, period: &str) -> PyResult<String> {
     let results = extract_results_ref(results)?;
     let period = parse_period_id(period)?;
-    Ok(CreditAssessmentReport::new(&results, period).to_string())
+    Ok(CreditAssessmentReport::new(&results, period)
+        .map_err(crate::errors::statements_to_py)?
+        .to_string())
 }
 
 /// P&L summary of selected line items across periods.

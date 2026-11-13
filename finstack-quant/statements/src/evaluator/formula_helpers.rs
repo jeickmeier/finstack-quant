@@ -138,7 +138,11 @@ mod tests {
 
         EvaluationContext::new(
             current_period,
-            &[],
+            &finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                Vec::new(),
+            )
+            .expect("empty plan"),
             Arc::new(node_to_column),
             Arc::new(historical),
         )

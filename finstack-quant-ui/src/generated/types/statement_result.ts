@@ -625,15 +625,15 @@ export interface StatementResultWire {
     };
   };
   /**
-   * The periods `nodes` is keyed by, in timeline order, with their dates and
-   * actual/forecast split.
+   * The period plan `nodes` is keyed by: the periods in timeline order,
+   * with their dates and actual/forecast split, and their calendar context.
    *
-   * [`Evaluator`](crate::evaluator::Evaluator) records the model's periods and
-   * [`rollup`](Self::rollup) records its target periods, where a target is
-   * actual only when every source period is. Empty only for hand-built
-   * results, such as [`new`](Self::new).
+   * [`Evaluator`](crate::evaluator::Evaluator) records the model's plan and
+   * [`rollup`](Self::rollup) records its target periods in the model's
+   * calendar, where a target is actual only when every source period is.
+   * `None` only for hand-built results, such as [`new`](Self::new).
    */
-  periods: D_29936D53E5E53Cef8284[];
+  periods?: D_6F601764Dacadc213E87 | null;
   /**
    * Required wire-format schema version. Only numeric `1` is accepted.
    */
@@ -2373,6 +2373,38 @@ export interface DD812Cec4E88E45C1B673 {
    * Warnings encountered during evaluation (division by zero, NaN propagation, etc.)
    */
   warnings?: D_76Adf23Abc095Fd56514[];
+}
+/**
+ * Builder/plan for a contiguous sequence of periods and their actual/forecast split.
+ *
+ * Periods are returned in ascending order and are intended to form a contiguous
+ * run of model periods. Each [`Period`] uses the crate-wide `[start, end)`
+ * interval convention, so the `end` of one period naturally aligns with the
+ * `start` of the next.
+ */
+export interface D_6F601764Dacadc213E87 {
+  /**
+   * Calendar context of every period in the plan, retained once.
+   */
+  calendar:
+    | "gregorian"
+    | {
+        fiscal: DC44E4163513F1741Db76;
+      };
+  /**
+   * Ordered periods produced by the parser.
+   */
+  periods: D_29936D53E5E53Cef8284[];
+}
+/**
+ * Configuration for fiscal year periods.
+ *
+ * Always holds a start month in `1..=12` and a start day in `1..=31`;
+ * deserialization applies the same validation as [`FiscalConfig::new`].
+ */
+export interface DC44E4163513F1741Db76 {
+  start_day: number;
+  start_month: number;
 }
 /**
  * A concrete period with start/end dates and actual/forecast flag.

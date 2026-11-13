@@ -2,7 +2,7 @@
 
 use crate::types::NodeValueType;
 use finstack_quant_core::cashflow::CFKind;
-use finstack_quant_core::dates::{Date, Period, PeriodId};
+use finstack_quant_core::dates::{Date, PeriodId, PeriodPlan};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::wire::SchemaVersion;
 use indexmap::IndexMap;
@@ -52,14 +52,15 @@ pub struct StatementResult {
     /// Required wire-format schema version. Only numeric `1` is accepted.
     pub schema_version: SchemaVersion,
 
-    /// The periods `nodes` is keyed by, in timeline order, with their dates and
-    /// actual/forecast split.
+    /// The period plan `nodes` is keyed by: the periods in timeline order,
+    /// with their dates and actual/forecast split, and their calendar context.
     ///
-    /// [`Evaluator`](crate::evaluator::Evaluator) records the model's periods and
-    /// [`rollup`](Self::rollup) records its target periods, where a target is
-    /// actual only when every source period is. Empty only for hand-built
-    /// results, such as [`new`](Self::new).
-    pub periods: Vec<Period>,
+    /// [`Evaluator`](crate::evaluator::Evaluator) records the model's plan and
+    /// [`rollup`](Self::rollup) records its target periods in the model's
+    /// calendar, where a target is actual only when every source period is.
+    /// `None` only for hand-built results, such as [`new`](Self::new).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub periods: Option<PeriodPlan>,
 
     /// Map of node_id → (period_id → value). Native values are f64; JSON uses
     /// numbers for finite values and `"nan"`, `"inf"`, `"-inf"` for non-finite cells.
@@ -207,7 +208,7 @@ impl Default for StatementResult {
     fn default() -> Self {
         Self {
             schema_version: SchemaVersion::CURRENT,
-            periods: Vec::new(),
+            periods: None,
             nodes: IndexMap::new(),
             monetary_nodes: IndexMap::new(),
             node_value_types: IndexMap::new(),
@@ -226,6 +227,15 @@ impl StatementResult {
     /// an evaluation.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// The periods `nodes` is keyed by, in timeline order; empty for a
+    /// hand-built result without a period plan.
+    #[must_use]
+    pub fn get_periods(&self) -> &[finstack_quant_core::dates::Period] {
+        self.periods
+            .as_ref()
+            .map_or(&[], |plan| plan.periods.as_slice())
     }
 
     /// Get the value for a node at a specific period.

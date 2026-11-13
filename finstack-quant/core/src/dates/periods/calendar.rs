@@ -147,7 +147,7 @@ pub(super) fn build_periods_with_calendar(
             is_actual: actual_cut.is_some_and(|cut| current <= cut),
         });
         if index + 1 < count {
-            current = step(current, calendar, true)?;
+            current = current.shift(1, calendar)?;
         }
     }
     Ok(PeriodPlan { calendar, periods })

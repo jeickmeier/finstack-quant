@@ -220,9 +220,11 @@ const CASES = {
   }),
   // --- dates: periods and schedules ---------------------------------------------
   period_id: () => [
-    core.PeriodId.parse('2025M12').shift(1).toString(),
-    core.PeriodId.quarter(2025, 1).shift(-1).toString(),
-    core.PeriodId.parse('FY2025Q4').nextFiscal(usFederal).toString(),
+    core.PeriodId.parse('2025M12').shift(1, 'gregorian').toString(),
+    core.PeriodId.quarter(2025, 1).shift(-1, 'gregorian').toString(),
+    core.PeriodId.parse('FY2025Q4')
+      .shift(1, { fiscal: { start_month: 10, start_day: 1 } })
+      .toString(),
     core.PeriodId.week(2025, 5).kind.periodsPerYear,
   ],
   period_kind_prior_observation_date: () =>

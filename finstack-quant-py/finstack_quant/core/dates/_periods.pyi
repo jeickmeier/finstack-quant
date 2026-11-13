@@ -415,92 +415,43 @@ class PeriodId:
         """
         ...
 
-    def shift(self, periods: int) -> PeriodId:
+    def shift(self, periods: int, calendar: str | dict[str, object]) -> PeriodId:
         """
-        Move by a signed number of periods of the same frequency and calendar.
+        Move by a signed number of periods of the same kind in a calendar.
 
         Parameters
         ----------
         periods : int
             Number of periods to move; negative moves back and ``0`` returns
-            the identifier unchanged.
+            the identifier unchanged after validating it in ``calendar``.
+        calendar : str or dict
+            Serde form of the identifier's calendar context: ``"gregorian"``
+            for unprefixed ids, or ``{"fiscal": {"start_month": m,
+            "start_day": d}}`` for ``FY`` ids. The fiscal start sets how many
+            weeks and days a fiscal year holds.
 
         Returns
         -------
         PeriodId
-
-            Period ``periods`` steps away, with year rollover. Gregorian daily
-            and weekly ids move by 1 or 7 calendar days; fiscal weeks roll
-            after week 53.
+            Period ``periods`` steps away, with year rollover. Daily ids move
+            by calendar days; Gregorian weeks by 7 days; fiscal weeks roll
+            after the fiscal year's last week.
 
         Raises
         ------
         ValueError
-            If the result's year is out of range, or a fiscal daily identifier
-            would leave days ``1..=365`` (the fiscal year's length depends on
-            its calendar; use :meth:`next_fiscal` / :meth:`prev_fiscal` with an
-            explicit :class:`FiscalConfig`).
+            If ``calendar`` is malformed, the identifier's fiscal flag does
+            not match ``calendar``, the identifier does not exist in that
+            calendar, or the result leaves the supported range.
 
         Examples
         --------
         >>> from finstack_quant.core.dates import PeriodId
-        >>> str(PeriodId.quarter(2025, 4).shift(1))
+        >>> str(PeriodId.quarter(2025, 4).shift(1, "gregorian"))
         '2026Q1'
-        >>> str(PeriodId.quarter(2025, 1).shift(-1))
-        '2024Q4'
-        """
-        ...
-
-    def next_fiscal(self, fiscal_config: FiscalConfig) -> PeriodId:
-        """
-        Next period using fiscal-year week/day capacity.
-
-        Weekly fiscal IDs can advance through a partial week 53 even when the
-        same-numbered ISO Gregorian year has only 52 weeks.
-
-        Parameters
-        ----------
-        fiscal_config : FiscalConfig
-            Fiscal-year start month and day used to determine the next fiscal
-            week, month, quarter, or year boundary.
-
-        Returns
-        -------
-        PeriodId
-            Following fiscal period of the same kind, with week and day
-            capacity determined by ``fiscal_config``.
-
-        Raises
-        ------
-        ValueError
-            If *fiscal_config* does not define a valid fiscal-year start date,
-            or the next fiscal boundary is outside the supported date range.
-
-        """
-        ...
-
-    def prev_fiscal(self, fiscal_config: FiscalConfig) -> PeriodId:
-        """
-        Previous period using fiscal-year week/day capacity.
-
-        Parameters
-        ----------
-        fiscal_config : FiscalConfig
-            Fiscal-year start month and day used to determine the preceding
-            fiscal week, month, quarter, or year boundary.
-
-        Returns
-        -------
-        PeriodId
-            Preceding fiscal period of the same kind, with week and day
-            capacity determined by ``fiscal_config``.
-
-        Raises
-        ------
-        ValueError
-            If *fiscal_config* does not define a valid fiscal-year start date,
-            or the preceding fiscal boundary is outside the supported date range.
-
+        >>> fiscal = {"fiscal": {"start_month": 10, "start_day": 1}}
+        >>> str(PeriodId.parse("FY2025Q1").shift(-1, fiscal))
+        'FY2024Q4'
         """
         ...
 

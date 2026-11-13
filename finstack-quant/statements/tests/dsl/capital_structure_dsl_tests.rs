@@ -106,7 +106,11 @@ fn test_context_get_cs_value_interest_total() {
 
     let mut context = EvaluationContext::new(
         period_id,
-        &[],
+        &finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            Vec::new(),
+        )
+        .expect("empty plan"),
         std::sync::Arc::new(node_to_column),
         std::sync::Arc::new(historical),
     );
@@ -168,7 +172,11 @@ fn test_context_get_cs_value_principal_instrument() {
 
     let mut context = EvaluationContext::new(
         period_id,
-        &[],
+        &finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            Vec::new(),
+        )
+        .expect("empty plan"),
         std::sync::Arc::new(node_to_column),
         std::sync::Arc::new(historical),
     );
@@ -208,7 +216,11 @@ fn test_context_get_cs_value_no_cs_error() {
 
     let context = EvaluationContext::new(
         period_id,
-        &[],
+        &finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            Vec::new(),
+        )
+        .expect("empty plan"),
         std::sync::Arc::new(node_to_column),
         std::sync::Arc::new(historical),
     );
@@ -232,7 +244,11 @@ fn test_context_get_cs_value_invalid_component() {
 
     let mut context = EvaluationContext::new(
         period_id,
-        &[],
+        &finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            Vec::new(),
+        )
+        .expect("empty plan"),
         std::sync::Arc::new(node_to_column),
         std::sync::Arc::new(historical),
     );

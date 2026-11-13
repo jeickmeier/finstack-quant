@@ -248,9 +248,9 @@ CASES: dict[str, Callable[[], Any]] = {
     },
     # --- dates: periods and schedules -------------------------------------------
     "period_id": lambda: [
-        str(dates.PeriodId.parse("2025M12").shift(1)),
-        str(dates.PeriodId.quarter(2025, 1).shift(-1)),
-        str(dates.PeriodId.parse("FY2025Q4").next_fiscal(US_FEDERAL)),
+        str(dates.PeriodId.parse("2025M12").shift(1, "gregorian")),
+        str(dates.PeriodId.quarter(2025, 1).shift(-1, "gregorian")),
+        str(dates.PeriodId.parse("FY2025Q4").shift(1, {"fiscal": {"start_month": 10, "start_day": 1}})),
         dates.PeriodId.week(2025, 5).kind.periods_per_year,
     ],
     "period_kind_prior_observation_date": lambda: _iso(dates.PeriodKind.QUARTERLY.prior_observation_date("2025-03-31")),

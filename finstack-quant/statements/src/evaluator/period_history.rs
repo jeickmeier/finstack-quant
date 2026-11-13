@@ -5,9 +5,8 @@
 
 use crate::types::NodeId;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::dates::{Period, PeriodId, PeriodKind};
+use finstack_quant_core::dates::{Period, PeriodId, PeriodPlan};
 use indexmap::IndexMap;
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
 /// Columnar history of evaluated node values, one row per period.
@@ -17,8 +16,8 @@ pub struct PeriodHistory {
     period_index: IndexMap<PeriodId, usize>,
     rows: Vec<Vec<Option<f64>>>,
     period_bounds: Arc<IndexMap<PeriodId, (Date, Date)>>,
-    periods_by_start: Arc<BTreeMap<(PeriodKind, bool, Date), PeriodId>>,
-    periods: Arc<[Period]>,
+    /// The model's period plan; `None` only for an empty history.
+    plan: Option<Arc<PeriodPlan>>,
 }
 
 impl PeriodHistory {
@@ -35,8 +34,7 @@ impl PeriodHistory {
             period_index: IndexMap::new(),
             rows: Vec::new(),
             period_bounds: Arc::default(),
-            periods_by_start: Arc::default(),
-            periods: Arc::from(Vec::new()),
+            plan: None,
         }
     }
 
@@ -47,8 +45,9 @@ impl PeriodHistory {
     /// expression evaluation without copying the model timeline per context.
     pub(crate) fn with_periods(
         node_to_column: Arc<IndexMap<NodeId, usize>>,
-        periods: &[Period],
+        plan: &PeriodPlan,
     ) -> Self {
+        let periods: &[Period] = plan;
         let mut history = Self::new(node_to_column);
         history.period_bounds = Arc::new(
             periods
@@ -56,39 +55,24 @@ impl PeriodHistory {
                 .map(|period| (period.id, (period.start, period.end)))
                 .collect(),
         );
-        history.periods_by_start = Arc::new(
-            periods
-                .iter()
-                .map(|period| {
-                    (
-                        (period.id.kind(), period.id.is_fiscal(), period.start),
-                        period.id,
-                    )
-                })
-                .collect(),
-        );
-        history.periods = Arc::from(periods);
+        history.plan = Some(Arc::new(plan.clone()));
         history
     }
 
-    /// The model's periods with their dates; empty for history built without them.
-    pub(crate) fn model_periods(&self) -> &[Period] {
-        &self.periods
+    /// The model's period plan with its calendar context.
+    ///
+    /// # Errors
+    ///
+    /// Returns an evaluation error for an empty history, which has no plan.
+    pub(crate) fn model_plan(&self) -> crate::error::Result<&PeriodPlan> {
+        self.plan
+            .as_deref()
+            .ok_or_else(|| crate::error::Error::eval("evaluation history has no period plan"))
     }
 
     /// Explicit start and exclusive end dates for a model period.
     pub(crate) fn period_bounds(&self, period: &PeriodId) -> Option<(Date, Date)> {
         self.period_bounds.get(period).copied()
-    }
-
-    /// Model period starting on a given date at a matching frequency/calendar.
-    pub(crate) fn period_starting_on(
-        &self,
-        date: Date,
-        kind: PeriodKind,
-        fiscal: bool,
-    ) -> Option<PeriodId> {
-        self.periods_by_start.get(&(kind, fiscal, date)).copied()
     }
 
     /// Build history from the named per-period maps used by tests and the
@@ -106,7 +90,7 @@ impl PeriodHistory {
     #[must_use]
     pub fn from_named_maps(
         node_to_column: Arc<IndexMap<NodeId, usize>>,
-        periods: &[Period],
+        plan: &PeriodPlan,
         named: &IndexMap<PeriodId, IndexMap<String, f64>>,
     ) -> Self {
         let mut col_map = (*node_to_column).clone();
@@ -120,7 +104,7 @@ impl PeriodHistory {
         }
         let node_to_column = Arc::new(col_map);
         let n = node_to_column.len();
-        let mut history = Self::with_periods(Arc::clone(&node_to_column), periods);
+        let mut history = Self::with_periods(Arc::clone(&node_to_column), plan);
         history.rows.reserve(named.len());
         history.period_index.reserve(named.len());
         for (period, values) in named {
@@ -257,7 +241,8 @@ mod tests {
         named.insert(q1, IndexMap::from_iter([("revenue".to_string(), 10.0)]));
         named.insert(q2, IndexMap::from_iter([("revenue".to_string(), 12.0)]));
 
-        let history = PeriodHistory::from_named_maps(Arc::clone(&cols), &[], &named);
+        let plan = finstack_quant_core::dates::build_periods("2025Q1..Q2", None).expect("plan");
+        let history = PeriodHistory::from_named_maps(Arc::clone(&cols), &plan, &named);
         assert_eq!(history.get_value("revenue", &q1), Some(10.0));
         assert_eq!(history.get_value("revenue", &q2), Some(12.0));
         let keys: Vec<_> = history.keys().copied().collect();

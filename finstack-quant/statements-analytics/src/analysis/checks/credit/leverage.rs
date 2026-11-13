@@ -62,7 +62,7 @@ impl Check for LeverageRangeCheck {
             let Some(debt) = get_finite_node_value(context.results, &self.debt_node, pid) else {
                 continue;
             };
-            let Some(ebitda) = trailing_sum_at(context.results, self.ebitda_node.as_str(), pid)
+            let Some(ebitda) = trailing_sum_at(context.results, self.ebitda_node.as_str(), pid)?
             else {
                 continue;
             };

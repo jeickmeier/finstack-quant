@@ -808,7 +808,11 @@ mod tests {
         }
         let mut ctx = EvaluationContext::new(
             period,
-            &[],
+            &finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                Vec::new(),
+            )
+            .expect("empty plan"),
             std::sync::Arc::new(node_to_column),
             std::sync::Arc::new(IndexMap::new()),
         );

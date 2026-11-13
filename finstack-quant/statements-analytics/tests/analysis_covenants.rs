@@ -33,7 +33,7 @@ fn results(leverage: [f64; 4], coverage: [f64; 4]) -> StatementResult {
             ("leverage".to_string(), series(leverage)),
             ("interest_coverage".to_string(), series(coverage)),
         ]),
-        periods: model().periods.periods,
+        periods: Some(model().periods),
         ..StatementResult::default()
     }
 }

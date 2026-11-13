@@ -40,7 +40,7 @@ impl<'a> ModelTimeSeries for StatementsAdapter<'a> {
 
     fn period_end_date(&self, period: &PeriodId) -> Result<Date> {
         self.results
-            .periods
+            .get_periods()
             .iter()
             .find(|p| p.id == *period)
             .and_then(|p| p.end.previous_day())
@@ -52,7 +52,7 @@ impl<'a> ModelTimeSeries for StatementsAdapter<'a> {
     }
     fn period_start_date(&self, period: &PeriodId) -> Result<Date> {
         self.results
-            .periods
+            .get_periods()
             .iter()
             .find(|p| p.id == *period)
             .map(|p| p.start)
@@ -156,7 +156,11 @@ pub fn evaluate_covenants(
 
 /// Identifiers of the result periods, in timeline order.
 fn period_ids(results: &StatementResult) -> Vec<PeriodId> {
-    results.periods.iter().map(|period| period.id).collect()
+    results
+        .get_periods()
+        .iter()
+        .map(|period| period.id)
+        .collect()
 }
 
 /// Forecast covenant breaches based on statement results.
@@ -205,10 +209,10 @@ mod tests {
     use indexmap::IndexMap;
     use time::Month;
 
-    fn calendar() -> Vec<finstack_quant_core::dates::Period> {
+    fn calendar() -> finstack_quant_core::dates::PeriodPlan {
         let mut model_builder = finstack_quant_statements::builder::ModelBuilder::new("calendar");
         model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.build().unwrap().periods.periods
+        model_builder.build().unwrap().periods
     }
 
     #[test]
@@ -218,12 +222,20 @@ mod tests {
         let id: PeriodId = "FY2025Q1".parse().unwrap();
         let results = StatementResult {
             nodes: IndexMap::from([("leverage".into(), IndexMap::from([(id, 3.)]))]),
-            periods: vec![Period {
-                id,
-                start: date!(2024 - 07 - 01),
-                end: date!(2024 - 10 - 01),
-                is_actual: false,
-            }],
+            periods: Some(
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Fiscal(
+                        finstack_quant_core::dates::FiscalConfig::new(7, 1).unwrap(),
+                    ),
+                    vec![Period {
+                        id,
+                        start: date!(2024 - 07 - 01),
+                        end: date!(2024 - 10 - 01),
+                        is_actual: false,
+                    }],
+                )
+                .unwrap(),
+            ),
             ..Default::default()
         };
         let spec = CovenantSpec::with_metric(
@@ -284,7 +296,13 @@ mod tests {
         let periods = [period.id];
         let results = StatementResult {
             nodes: IndexMap::from([("leverage".into(), IndexMap::from([(periods[0], 3.0)]))]),
-            periods: vec![period],
+            periods: Some(
+                finstack_quant_core::dates::PeriodPlan::try_new(
+                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                    vec![period],
+                )
+                .expect("valid period plan"),
+            ),
             ..Default::default()
         };
         let covenant = CovenantSpec::with_metric(
@@ -351,7 +369,7 @@ mod tests {
 
         let results = StatementResult {
             nodes,
-            periods: calendar(),
+            periods: Some(calendar()),
             ..StatementResult::default()
         };
 
@@ -385,7 +403,7 @@ mod tests {
 
         let results = StatementResult {
             nodes,
-            periods: calendar(),
+            periods: Some(calendar()),
             ..StatementResult::default()
         };
 

@@ -445,7 +445,11 @@ fn empty_debt_context() -> (
     let period = PeriodId::quarter(2025, 1).expect("valid quarter");
     let mut context = EvaluationContext::new(
         period,
-        &[],
+        &finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            Vec::new(),
+        )
+        .expect("empty plan"),
         Arc::new([(NodeId::new("cash"), 0)].into_iter().collect()),
         Arc::new(IndexMap::new()),
     );

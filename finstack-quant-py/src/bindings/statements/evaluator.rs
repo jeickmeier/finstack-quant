@@ -129,7 +129,7 @@ impl PyStatementResult {
     #[getter]
     fn periods(&self) -> Vec<PyPeriod> {
         self.inner
-            .periods
+            .get_periods()
             .iter()
             .cloned()
             .map(PyPeriod::from_inner)

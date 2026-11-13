@@ -333,7 +333,8 @@ it("routes scenario sets, rollups and data-gap checks to WASM", async () => {
     native.statementResultRollup(resultsJson, canonical, specJson),
   );
   expect(Object.keys(annual.nodes.revenue)).toEqual(["2024", "2025"]);
-  expect(annual.periods).toEqual([
+  expect(annual.periods?.calendar).toEqual("gregorian");
+  expect(annual.periods?.periods).toEqual([
     {
       id: "2024",
       start: "2024-01-01",

@@ -27,7 +27,7 @@ use crate::evaluator::formula::evaluate_formula;
 use crate::evaluator::formula_helpers::is_truthy;
 use crate::evaluator::results::{EvalStats, NumericMode, StatementResult};
 use crate::types::{FinancialModelSpec, NodeId, NodeValueType, RollupMethod};
-use finstack_quant_core::dates::{Period, PeriodId, PeriodKind};
+use finstack_quant_core::dates::{Period, PeriodId, PeriodKind, PeriodPlan};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -233,13 +233,14 @@ impl StatementResult {
         let eval_order = &prepared.eval_order;
         let node_to_column = Arc::clone(&prepared.node_to_column);
         let target_periods: Vec<Period> = buckets.iter().map(|b| b.period.clone()).collect();
+        let target_plan = PeriodPlan::try_new(model.periods.calendar, target_periods)?;
         let mut history = Arc::new(PeriodHistory::with_periods(
             Arc::clone(&node_to_column),
-            &target_periods,
+            &target_plan,
         ));
 
         let mut rolled = StatementResult::new();
-        rolled.periods = target_periods;
+        rolled.periods = Some(target_plan);
         let mut warnings = Vec::new();
         for bucket in &buckets {
             let target = bucket.period.id;

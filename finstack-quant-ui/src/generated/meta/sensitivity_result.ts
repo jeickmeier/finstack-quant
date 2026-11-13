@@ -138,6 +138,28 @@ export default [
     "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead."
   },
   {
+    "path": "#/$defs/d_252882fd4de989358c9c",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodCalendar",
+    "description": "Calendar context that bounds and steps period identifiers.\n\nAn unprefixed identifier belongs to `Gregorian`, an `FY` identifier to\n`Fiscal(config)`. A [`PeriodPlan`] retains its calendar once; operations\nthat resolve or step an identifier take this context explicitly (record\nCORE-CONVENTIONS-014 #4)."
+  },
+  {
+    "path": "#/$defs/d_252882fd4de989358c9c/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodCalendar/oneOf/0",
+    "const": "gregorian",
+    "description": "Gregorian years with ISO 8601 weeks."
+  },
+  {
+    "path": "#/$defs/d_252882fd4de989358c9c/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodCalendar/oneOf/1",
+    "description": "Fiscal years opening on the configured month and day."
+  },
+  {
+    "path": "#/$defs/d_252882fd4de989358c9c/oneOf/1/properties/fiscal",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodCalendar/oneOf/1/properties/fiscal",
+    "ref": "#/$defs/FiscalConfig",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FiscalConfig"
+  },
+  {
     "path": "#/$defs/d_288b30976e4551573cdd",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Materiality",
     "description": "Materiality context attached to a finding, describing its quantitative\nsignificance."
@@ -493,6 +515,29 @@ export default [
     "path": "#/$defs/d_6df778c161860d725fb3/properties/perturbations/items",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json#/$defs/ParameterSpec/properties/perturbations/items",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_6f601764dacadc213e87",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodPlan",
+    "description": "Builder/plan for a contiguous sequence of periods and their actual/forecast split.\n\nPeriods are returned in ascending order and are intended to form a contiguous\nrun of model periods. Each [`Period`] uses the crate-wide `[start, end)`\ninterval convention, so the `end` of one period naturally aligns with the\n`start` of the next."
+  },
+  {
+    "path": "#/$defs/d_6f601764dacadc213e87/properties/calendar",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodPlan/properties/calendar",
+    "description": "Calendar context of every period in the plan, retained once.",
+    "ref": "#/$defs/PeriodCalendar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodCalendar"
+  },
+  {
+    "path": "#/$defs/d_6f601764dacadc213e87/properties/periods",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodPlan/properties/periods",
+    "description": "Ordered periods produced by the parser."
+  },
+  {
+    "path": "#/$defs/d_6f601764dacadc213e87/properties/periods/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodPlan/properties/periods/items",
+    "ref": "#/$defs/Period",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Period"
   },
   {
     "path": "#/$defs/d_76adf23abc095fd56514",
@@ -1689,6 +1734,25 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#"
   },
   {
+    "path": "#/$defs/d_c44e4163513f1741db76",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FiscalConfig",
+    "description": "Configuration for fiscal year periods.\n\nAlways holds a start month in `1..=12` and a start day in `1..=31`;\ndeserialization applies the same validation as [`FiscalConfig::new`]."
+  },
+  {
+    "path": "#/$defs/d_c44e4163513f1741db76/properties/start_day",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FiscalConfig/properties/start_day",
+    "format": "uint8",
+    "maximum": 31,
+    "minimum": 1
+  },
+  {
+    "path": "#/$defs/d_c44e4163513f1741db76/properties/start_month",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FiscalConfig/properties/start_month",
+    "format": "uint8",
+    "maximum": 12,
+    "minimum": 1
+  },
+  {
     "path": "#/$defs/d_c7156583a7d399a69ae5",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CFKind",
     "description": "Enumeration of cash-flow kinds for classification and ordering.\n\nUsed to distinguish between different types of cashflows for\nproper sequencing, risk calculation, and accounting treatment.\n\n# Sign Convention\n\nThe enum itself is **view agnostic**: individual instruments are\nresponsible for mapping these kinds into a holder or issuer view.\nBy convention in this crate:\n\n| Kind | Holder View (Long) | Issuer View (Short) |\n|------|-------------------|---------------------|\n| Interest (Fixed/Float) | Positive (receive) | Negative (pay) |\n| Notional (initial) | Negative (pay) | Positive (receive) |\n| Notional (final) | Positive (receive) | Negative (pay) |\n| Amortization | Positive (receive) | Negative (pay) |\n| PIK | Increases notional | Increases liability |\n| Fee | Negative (pay) | Positive (receive) |\n\nWhen constructing cashflow schedules, instruments should apply the appropriate\nsign based on the economic perspective being represented.\n\n# Cashflow Categories\n\nVariants are grouped by category:\n- **Interest**: `Fixed`, `Floating`, `Stub`\n- **Inflation**: `InflationCoupon`\n- **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`, `LcFee`, `FrontingFee`\n- **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`\n- **Revolving**: `RevolvingDraw`, `RevolvingRepayment`\n- **Credit Events**: `DefaultedNotional`, `Recovery`\n- **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.\n\n# Labels\n\n`Display`, `FromStr`, and serde share one snake_case label per kind\n(`\"fixed\"`, `\"floating\"`, `\"pre_payment\"`). `FromStr` is ASCII\ncase-insensitive and ignores surrounding whitespace; serde accepts only\nthe canonical label."
@@ -2093,7 +2157,6 @@ export default [
           "parallel": false
         },
         "nodes": {},
-        "periods": [],
         "schema_version": 1
       }
     ],
@@ -2195,13 +2258,17 @@ export default [
   {
     "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/periods",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/periods",
-    "description": "The periods `nodes` is keyed by, in timeline order, with their dates and\nactual/forecast split.\n\n[`Evaluator`](crate::evaluator::Evaluator) records the model's periods and\n[`rollup`](Self::rollup) records its target periods, where a target is\nactual only when every source period is. Empty only for hand-built\nresults, such as [`new`](Self::new)."
+    "description": "The period plan `nodes` is keyed by: the periods in timeline order,\nwith their dates and actual/forecast split, and their calendar context.\n\n[`Evaluator`](crate::evaluator::Evaluator) records the model's plan and\n[`rollup`](Self::rollup) records its target periods in the model's\ncalendar, where a target is actual only when every source period is.\n`None` only for hand-built results, such as [`new`](Self::new)."
   },
   {
-    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/periods/items",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/periods/items",
-    "ref": "#/$defs/Period",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Period"
+    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/periods/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/periods/anyOf/0",
+    "ref": "#/$defs/PeriodPlan",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodPlan"
+  },
+  {
+    "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/periods/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/periods/anyOf/1"
   },
   {
     "path": "#/$defs/d_e16cdf8ba4a9961e2f68/properties/schema_version",

@@ -7813,15 +7813,15 @@ export interface StatementResult {
     };
   };
   /**
-   * The periods `nodes` is keyed by, in timeline order, with their dates and
-   * actual/forecast split.
+   * The period plan `nodes` is keyed by: the periods in timeline order,
+   * with their dates and actual/forecast split, and their calendar context.
    *
-   * [`Evaluator`](crate::evaluator::Evaluator) records the model's periods and
-   * [`rollup`](Self::rollup) records its target periods, where a target is
-   * actual only when every source period is. Empty only for hand-built
-   * results, such as [`new`](Self::new).
+   * [`Evaluator`](crate::evaluator::Evaluator) records the model's plan and
+   * [`rollup`](Self::rollup) records its target periods in the model's
+   * calendar, where a target is actual only when every source period is.
+   * `None` only for hand-built results, such as [`new`](Self::new).
    */
-  periods: Period[];
+  periods?: PeriodPlan | null;
   /**
    * Required wire-format schema version. Only numeric `1` is accepted.
    */

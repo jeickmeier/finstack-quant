@@ -324,15 +324,10 @@ export function StatementsWorkbench({
     null;
   const annual = useMemo(
     () =>
-      model && rollup.data
+      // A native rollup result always carries its annual period plan.
+      model && rollup.data?.periods
         ? {
-            model: {
-              ...model,
-              periods: {
-                calendar: model.periods.calendar,
-                periods: rollup.data.periods,
-              },
-            },
+            model: { ...model, periods: rollup.data.periods },
             result: rollup.data,
           }
         : null,

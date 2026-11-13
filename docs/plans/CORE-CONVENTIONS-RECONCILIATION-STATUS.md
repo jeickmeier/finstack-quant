@@ -114,9 +114,9 @@ failed only in `wasm-fmt`/`wasm-lint` because the fresh worktree had no
 | 26 | G2 | committed (`G2:` in git log) | workspace rust-lint; gen-write; workspace rust-test 16358; core doctests 285; python-test 13988; python-lint; wasm-test 1085; wasm-lint; ui-check | 019 entry: CreditRating part recorded; record 019 partly reconciled | `D` = 21 and `NR` off the ladder; no `Ord`, hand-written `PartialOrd` (`NR` incomparable with rated values, equal to itself); `ladder_position()`; `notches_to`/`to_moodys_string -> Result` (`NR` arithmetic and Moody's `D` error); finite canonical/Moody's/status alias tables replace suffix stripping; the models rating-factor table and the structured-credit `rating_haircuts` move from `BTreeMap` to `IndexMap` (ladder order / wire order); Python ordering of `NR` against a rated value raises `TypeError` |
 | 27 | G3 | **committed** (`G3:` in git log) | workspace check; rust-test (statements-analytics, core); gen-write; slice-gate (lint, rust-test, gen-check, python-test, wasm-test, ui-check); notebooks 101/101 | 019 entry: registry and scorecard part reconciled; remaining is qualification and owner policies | Per D3: embedded scales, `embedded_registry`, default score/scale and `UnknownScalePolicy` removed; `RatingScaleRegistry`/`RatingScaleEntry`/`ScorecardScale`/`RatingLevel` privately validated (nonblank source, strict ids, reserved unrated labels, `[0, 100]` coverage, representative self-membership); `ScorecardScale::classify`; `CreditScorecardExtension::new(config, &registry)` snapshots the entry; hosts, schema (`rating_scale_entry`), parity ledger, tests and notebooks supply explicit registries |
 | 28 | G4 | committed (`G4:` in git log) | workspace rust-lint; gen-write (nothing moved); workspace rust-test 16,371; python-test 14,008 / 112 skip; wasm-test 1,087; ui-check 1,527; doctests and the Linux run skipped by owner request | 016 part of the 015/016 entry: runtime reconciliation recorded (qualification and product review remain); record 016 status updated | `npv`/`npv_amounts(as_of, flows, include_today)`; validate-before-select, no unused source query, `df_between_dates`, exact Money and checked scalar paths; shared `NeumaierAccumulator::checked_add`/`checked_total`; `flat_discount_factor` underflow error; schedule helpers take `include_today`; private trade-NPV copy removed; see Needs review |
-| 29 | F1 | **committed except `shift`** (`F1a:` structural ordering; `F1b:` grammar; `F1c:` fiscal presets); the context-aware `shift` bullet moves to F2 (see Needs review) | F1a: rust-test, python-test, wasm-test and notebooks under a temporary trap on cross-kind/context comparisons; slice-gate. F1b: core tests; slice-gate. F1c: slice-gate; notebooks 101/101 | | F1a: `PeriodKind::rank` and hand-written `Ord` (`(year, rank, index, fiscal)`) replace the declaration-order derive and the date-based mixed-kind comparator; the trap found a core test (re-expressed) and the statements model, which now rejects mixed-kind/context period lists (record #8; see Needs review). F1b: one exact grammar (outer trim, ASCII case-insensitive `FY`, signed `i32` year with normalized sign/zeros, exactly one designator plus an unsigned index of at least 1); ranges classify a relative end by grammar (negative years work; `..QQ4` and repeated `..` fail); standalone `FY` text stays symbolic (capacities only) while Gregorian builders and cutoffs reject it; Gregorian constructors and parsing check representable bounds; `PeriodId::annual` is fallible in Rust, Python and WASM. F1c: `FiscalConfig::default` and the US federal/UK/Japan/Australia presets removed in Rust, Python and WASM; only `calendar_year()` (January 1) stays, and the analytics FYTD path already selects it explicitly when the config is omitted (O8); fixtures, docs and a notebook state month and day |
-| 30 | F2 | **in progress** (`F2a:` plan calendar; `F2b:` statements model holds its plan) | F2a: slice-gate; core parity golden regenerated. F2b: slice-gate; temporary bounds inventory over all Rust suites; statements and canonical goldens regenerated; notebooks 101/101 | | F2a: `PeriodCalendar` is public (serde `"gregorian"` / `{"fiscal": {...}}`, JSON schema) and `PeriodPlan` carries a required `calendar` set by both builders; Python `PeriodPlan.calendar` returns the serde form, WASM plans carry it as a plain field. F2b: `FinancialModelSpec.periods` is a `PeriodPlan` (wire `{"calendar", "periods"}`), so the model retains its calendar (record #4); `PeriodPlan::try_new` and plan restore reject a period whose fiscal flag does not match the calendar; `ModelBuilder::periods_explicit` takes a plan in Rust, Python and WASM; `PeriodPlan` derefs to its period slice so read access is unchanged; fixtures, tests, the UI and six notebooks follow the new wire |
-| 31 | F3 | not attempted (run budget; dep F2) | | | |
+| 29 | F1 | committed (`F1a:` structural ordering; `F1b:` grammar; `F1c:` fiscal presets; the context-aware `shift` landed with F3 in `F2c/F3:`) | F1a: rust-test, python-test, wasm-test and notebooks under a temporary trap on cross-kind/context comparisons; slice-gate. F1b: core tests; slice-gate. F1c: slice-gate; notebooks 101/101 | | F1a: `PeriodKind::rank` and hand-written `Ord` (`(year, rank, index, fiscal)`) replace the declaration-order derive and the date-based mixed-kind comparator; the trap found a core test (re-expressed) and the statements model, which now rejects mixed-kind/context period lists (record #8; see Needs review). F1b: one exact grammar (outer trim, ASCII case-insensitive `FY`, signed `i32` year with normalized sign/zeros, exactly one designator plus an unsigned index of at least 1); ranges classify a relative end by grammar (negative years work; `..QQ4` and repeated `..` fail); standalone `FY` text stays symbolic (capacities only) while Gregorian builders and cutoffs reject it; Gregorian constructors and parsing check representable bounds; `PeriodId::annual` is fallible in Rust, Python and WASM. F1c: `FiscalConfig::default` and the US federal/UK/Japan/Australia presets removed in Rust, Python and WASM; only `calendar_year()` (January 1) stays, and the analytics FYTD path already selects it explicitly when the config is omitted (O8); fixtures, docs and a notebook state month and day |
+| 30 | F2 | **committed except private state** (`F2a:` plan calendar; `F2b:` statements model holds its plan; `F2c/F3:` results hold their plan); private validated `Period`/`PeriodPlan` fields not done (see Needs review) | F2a: slice-gate; core parity golden regenerated. F2b: slice-gate; temporary bounds inventory over all Rust suites; statements and canonical goldens regenerated; notebooks 101/101 | | F2a: `PeriodCalendar` is public (serde `"gregorian"` / `{"fiscal": {...}}`, JSON schema) and `PeriodPlan` carries a required `calendar` set by both builders; Python `PeriodPlan.calendar` returns the serde form, WASM plans carry it as a plain field. F2b: `FinancialModelSpec.periods` is a `PeriodPlan` (wire `{"calendar", "periods"}`), so the model retains its calendar (record #4); `PeriodPlan::try_new` and plan restore reject a period whose fiscal flag does not match the calendar; `ModelBuilder::periods_explicit` takes a plan in Rust, Python and WASM; `PeriodPlan` derefs to its period slice so read access is unchanged; fixtures, tests, the UI and six notebooks follow the new wire |
+| 31 | F3 | committed (`F2c/F3:` in git log) | slice-gate: every stage passes except all-audit (a newly published soupsieve 2.9.1 advisory in `uv.lock`, unrelated to the diff; see Needs review); notebooks 101/101; workspace rust-test; python-test (non-doctest tier incl. slow: 14,081 pass, 2 CDS golden failures traced to E4b-4, see Needs review); wasm-test; ui tsc; slice-gate after gen-write; core and statements parity goldens and the tornado fixture regenerated | 014 entry: shift/LTM items recorded as reconciled | `PeriodId::shift(periods, calendar)` validates the id in its calendar and steps daily by calendar days, Gregorian weeks by 7 days and other kinds by ordinal slot with the calendar's capacity; `next_fiscal`/`prev_fiscal` removed in Rust, Python and WASM (record #7). `ltm_window(target, plan)` requires the target in the plan, rejects weekly plans, requires every calendar day for daily plans (a business-day grid is incomplete) and counts slots the plan lacks as missing (#11, #12). Statements `PeriodHistory`, `EvaluationContext` and YTD use the model plan; `ttm()` propagates window errors instead of NaN; `StatementResult.periods` is the evaluated `Option<PeriodPlan>`; statements-analytics trailing sums, leverage, coverage and the leverage check return `Result`, and `CreditAssessmentReport::new` is fallible so `Display` cannot fail; changelog LTM entry rewritten; see Needs review |
 | 32 | F4 | not attempted (run budget; dep F3) | | | |
 | 33 | F5 | not attempted (run budget; plan sized L) | | | |
 | 34 | F6 | committed (`F6:` in git log) | lint, rust-test, python-test, wasm-test, all-audit (slice-gate; after gen-write) | 013 entry: config/policy items recorded as reconciled; record 013 status updated; STATEMENTS-CAPITAL-09 observed text updated | Required `pivot_currency: Option<Currency>`; no FX config/matrix/policy defaults; explicit pivots at ~165 Rust and ~60 host sites (`None` unless a deliberate hub); `PeriodAverage` removed; required host `rate` policy; calibration `fx: Option<FxConfig>`; statements `PeriodEnd` fallback removed; see Needs review |
@@ -684,16 +684,49 @@ logged under Needs review.
   reconciled with its owning use; that owner (valuation growth on stub years)
   has not chosen, so canonical-bounds validation is not enforced yet (it
   belongs to F2's private-state step).
-- **F1 `shift` lands with F2.** A context-aware `PeriodId::shift(periods,
-  calendar)` (record #7) needs the caller's `PeriodCalendar`. Core's builder
-  and `ltm_window` and the hosts can supply it, but statements (YTD,
-  `lag`/`lead` in `formula_timeseries.rs:42`, LTM) has none: a model stores
-  `Vec<Period>` and no fiscal configuration, and record #4 says owning models
-  retain the context instead of rebuilding it from `is_fiscal()`. So the
-  statements model must carry its calendar first. The patch is kept and
-  applied in F2 once the model holds it. Design taken there: the model holds
-  its periods with the plan's calendar (the alternative, a sibling field next
-  to `Vec<Period>`, needs cross-field checks on every restore).
+- **F1 `shift` landed with F3.** Statements had no calendar to pass to a
+  context-aware `PeriodId::shift(periods, calendar)` (record #7), so it waited
+  until the model held its plan (F2b). The model holds its periods with the
+  plan's calendar rather than a sibling field next to `Vec<Period>`, which
+  would need cross-field checks on every restore.
+- **F2 private validated state not done.** `Period` and `PeriodPlan` fields
+  stay public: `PeriodPlan::try_new` and plan deserialization check the
+  fiscal flag against the calendar, but canonical bounds are not enforced
+  because the two stub-year fixtures above have no owner decision, and
+  making the fields private touches about 20 direct field users. Record #10
+  stays open for it.
+- **F3 business-day grids have no daily LTM.** Record 014 #11 requires full
+  calendar-day coverage: an absent weekend or holiday row is not proven zero.
+  A business-day model's `ttm()` is therefore NaN, and its credit leverage,
+  coverage and capital-structure LTM are `None` (`ltm_periods_required` 365,
+  found 261). Before F3 the statements window summed the 261 trading days and
+  the credit window already demanded every day; both now follow the record.
+  Two tests were re-expressed to the accepted rule (not weakened): the
+  statements business-day case and the capital-structure daily case.
+- **F3 weekly LTM is an error.** A weekly plan has no twelve-month window
+  (52 weeks is 364 days; a fiscal week 53 may be short), so `ttm()` on a
+  weekly model fails evaluation and statements-analytics weekly credit sums
+  return an error rather than `None`. The weekly-TTM regression test now
+  pins the error.
+- **F3 `StatementResult.periods` is `Option<PeriodPlan>`.** Results carry the
+  evaluated plan (rollups build theirs in the model calendar); hand-built
+  results omit it. Trailing sums need it only when the node exists, so
+  empty or node-free results still report "unavailable" rather than erroring.
+  `CreditAssessmentReport` computes its ratios in a fallible `new` so its
+  `Display` cannot fail (a `fmt::Error` panicked in `to_string`).
+- **F3 `PeriodHistory` steps the model plan.** Lags, YTD and TTM use the plan
+  calendar; `offset_period` validates the current id in that calendar and
+  then returns the shifted id if representable. Formula-level unit tests
+  build a Gregorian plan from their own history span.
+- **New soupsieve advisory (F3 gate).** `all-audit` started failing on
+  GHSA-4j63-6c4x-wfg4 and GHSA-mmhr-3c5m-f64f against `soupsieve 2.9.1` in
+  `uv.lock`, a transitive Python dependency. Nothing in this run touched it;
+  the fix is a lockfile upgrade, handled before the final gate.
+- **Nightly tier not run per slice; failures found.** A full Python run
+  (doctest and slow tiers included) at F3 found stub doctests and two slow
+  CDS goldens failing from earlier slices of this run (for example the
+  `CdsTrancheBuilder` example lacked the E4b-4 `date_regime`). These are
+  addressed in their own commit after F3.
 - **F1a mixed-kind statement models are rejected.** `FinancialModelSpec`
   checked chronology with `next.id <= prev.id` and keyed its history by
   `PeriodId` in ordered maps, which only worked for mixed-frequency timelines

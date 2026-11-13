@@ -137,7 +137,7 @@ fn period_errors_name_the_value_and_grammar() {
 fn next_rolls_to_next_iso_year_after_last_week() {
     let next = PeriodId::week(2021, 52)
         .expect("valid period fixture")
-        .shift(1)
+        .shift(1, PeriodCalendar::Gregorian)
         .expect("next week");
     assert_eq!(next, PeriodId::week(2022, 1).expect("valid period fixture"));
 }
@@ -146,7 +146,7 @@ fn next_rolls_to_next_iso_year_after_last_week() {
 fn prev_rolls_to_previous_iso_year_last_week() {
     let prev = PeriodId::week(2022, 1)
         .expect("valid period fixture")
-        .shift(-1)
+        .shift(-1, PeriodCalendar::Gregorian)
         .expect("previous week");
     assert_eq!(
         prev,
@@ -459,10 +459,22 @@ fn fiscal_week_stepping_uses_fiscal_year_capacity() {
         fiscal: true,
     };
 
-    assert_eq!(week_52.next_fiscal(federal).expect("FY week 53"), week_53);
-    assert_eq!(week_53.next_fiscal(federal).expect("next FY"), next_year);
     assert_eq!(
-        next_year.prev_fiscal(federal).expect("previous FY week"),
+        week_52
+            .shift(1, PeriodCalendar::Fiscal(federal))
+            .expect("FY week 53"),
+        week_53
+    );
+    assert_eq!(
+        week_53
+            .shift(1, PeriodCalendar::Fiscal(federal))
+            .expect("next FY"),
+        next_year
+    );
+    assert_eq!(
+        next_year
+            .shift(-1, PeriodCalendar::Fiscal(federal))
+            .expect("previous FY week"),
         week_53
     );
 
@@ -479,7 +491,7 @@ fn fiscal_week_stepping_uses_fiscal_year_capacity() {
     assert_eq!(
         PeriodId::week(2025, 52)
             .expect("valid period fixture")
-            .shift(1)
+            .shift(1, PeriodCalendar::Gregorian)
             .expect("ISO next remains Gregorian"),
         PeriodId::week(2026, 1).expect("valid period fixture")
     );
@@ -491,7 +503,7 @@ fn fiscal_week_53_display_parse_and_serde_roundtrip() {
     let plan = build_fiscal_periods("FY2025W52..W52", federal, None).expect("fiscal weekly period");
     let week_53 = plan.periods[0]
         .id
-        .next_fiscal(federal)
+        .shift(1, PeriodCalendar::Fiscal(federal))
         .expect("FY2025 week 53");
 
     assert_eq!(week_53.to_string(), "FY2025W53");
@@ -506,50 +518,6 @@ fn fiscal_week_53_display_parse_and_serde_roundtrip() {
         week_53
     );
     assert!(PeriodId::from_str("2025W53").is_err());
-}
-
-#[test]
-fn fiscal_stepping_needs_a_calendar_only_across_fiscal_day_365() {
-    let federal = FiscalConfig::new(10, 1).expect("valid fiscal start");
-    let week = PeriodId::from_str("FY2025W52").expect("fiscal week");
-    for id in [week, week.next_fiscal(federal).expect("FY2025W53")] {
-        assert_eq!(id.shift(1), id.next_fiscal(federal));
-    }
-    assert_eq!(
-        PeriodId::from_str("FY2026W01")
-            .expect("fiscal week")
-            .shift(-1),
-        PeriodId::from_str("FY2026W01")
-            .expect("fiscal week")
-            .prev_fiscal(federal)
-    );
-    assert_eq!(
-        PeriodId::from_str("FY2025Q1")
-            .expect("fiscal quarter")
-            .shift(-1),
-        PeriodId::from_str("FY2024Q4")
-    );
-
-    let day_365 = PeriodId::from_str("FY2025D365").expect("fiscal day");
-    let next_error = day_365
-        .shift(1)
-        .expect_err("FY day 366 depends on the calendar");
-    assert!(next_error.to_string().contains("next_fiscal"));
-    let day_1 = PeriodId::from_str("FY2025D001").expect("fiscal day");
-    let prev_error = day_1
-        .shift(-1)
-        .expect_err("prior FY length depends on the calendar");
-    assert!(prev_error.to_string().contains("prev_fiscal"));
-    assert_eq!(day_365.shift(-364), Ok(day_1));
-
-    assert_eq!(
-        PeriodId::from_str("2025W52")
-            .expect("ISO week")
-            .shift(1)
-            .expect("ISO next")
-            .to_string(),
-        "2026W01"
-    );
 }
 
 #[test]
@@ -571,48 +539,88 @@ fn period_plan_serde_roundtrip() {
 }
 
 #[test]
-fn fiscal_daily_shift_is_overflow_safe_and_zero_is_identity() {
-    let leap_day = PeriodId::from_str("FY2024D366").expect("leap fiscal day");
-    assert_eq!(leap_day.shift(0), Ok(leap_day));
-    let day = PeriodId::from_str("FY2025D010").expect("fiscal day");
-    assert!(day.shift(i32::MAX).is_err());
-    assert!(day.shift(i32::MIN).is_err());
+fn shift_walks_plans_contiguously_in_each_calendar() {
+    // Oracle independent of `shift`: consecutive plan periods meet, and each
+    // period is the one `from_date` finds for its own start.
+    let october = PeriodCalendar::Fiscal(FiscalConfig::new(10, 1).expect("valid fiscal start"));
+    for (range, calendar) in [
+        ("2023D300..2025D60", PeriodCalendar::Gregorian),
+        ("2019W40..2021W20", PeriodCalendar::Gregorian),
+        ("2023M11..2026M02", PeriodCalendar::Gregorian),
+        ("FY2023D300..FY2025D60", october),
+        ("FY2023W40..FY2025W20", october),
+        ("FY2023Q3..FY2026Q2", october),
+    ] {
+        let plan = match calendar {
+            PeriodCalendar::Gregorian => build_periods(range, None),
+            PeriodCalendar::Fiscal(config) => build_fiscal_periods(range, config, None),
+        }
+        .expect("plan");
+        for pair in plan.periods.windows(2) {
+            assert_eq!(
+                pair[0].end, pair[1].start,
+                "{range}: {} -> {}",
+                pair[0].id, pair[1].id
+            );
+            assert_eq!(pair[0].id.shift(1, calendar), Ok(pair[1].id), "{range}");
+            assert_eq!(pair[1].id.shift(-1, calendar), Ok(pair[0].id), "{range}");
+        }
+        for period in &plan.periods {
+            assert_eq!(
+                PeriodId::from_date(period.start, period.id.kind(), calendar.fiscal_config()),
+                Ok(period.id)
+            );
+        }
+        let first = plan.periods[0].id;
+        let last = plan.periods[plan.periods.len() - 1].id;
+        let span = i32::try_from(plan.periods.len() - 1).expect("span");
+        assert_eq!(first.shift(span, calendar), Ok(last), "{range}");
+    }
 }
 
 #[test]
-fn shift_matches_repeated_stepping_and_rolls_years() {
-    for code in ["2024D360", "2020W50", "2025M11", "2025Q3", "2025H2", "2025"] {
-        let id = PeriodId::from_str(code).expect("period");
-        let mut forward = id;
-        let mut backward = id;
-        for n in 1..=60 {
-            forward = step(forward, PeriodCalendar::Gregorian, true).expect("next");
-            backward = step(backward, PeriodCalendar::Gregorian, false).expect("prev");
-            assert_eq!(id.shift(n), Ok(forward), "{code} +{n}");
-            assert_eq!(id.shift(-n), Ok(backward), "{code} -{n}");
-        }
-        assert_eq!(id.shift(0), Ok(id));
-    }
-    assert_eq!(
-        PeriodId::quarter(2025, 3).expect("q").shift(-10),
-        PeriodId::quarter(2023, 1)
+fn shift_pins_calendar_boundaries_and_context() {
+    let october = PeriodCalendar::Fiscal(FiscalConfig::new(10, 1).expect("valid fiscal start"));
+    // A zero shift still validates the source: FY2025 (Oct 2024 - Sep 2025) has 365 days.
+    assert!(
+        PeriodId::from_str("FY2025D366")
+            .expect("symbolic")
+            .shift(0, october)
+            .is_err()
     );
+    // FY2024 (Oct 2023 - Sep 2024) holds February 29, so it has 366 days.
+    let leap_last = PeriodId::from_str("FY2024D366").expect("symbolic");
     assert_eq!(
-        PeriodId::day(2024, 366).expect("leap day").shift(1),
-        PeriodId::day(2025, 1)
+        leap_last.shift(1, october),
+        Ok(PeriodId::from_str("FY2025D001").expect("day"))
     );
+    let w53 = PeriodId::from_str("FY2025W53").expect("symbolic");
     assert_eq!(
-        PeriodId::week(2020, 53).expect("ISO week 53").shift(1),
-        PeriodId::week(2021, 1)
+        w53.shift(1, october),
+        Ok(PeriodId::from_str("FY2026W01").expect("week"))
     );
-    let last_fiscal_year: PeriodId = "FY2147483647".parse().expect("symbolic fiscal year");
-    assert!(last_fiscal_year.shift(1).is_err());
+    // Context mismatch in both directions.
+    assert!(
+        PeriodId::quarter(2025, 1)
+            .expect("q")
+            .shift(1, october)
+            .is_err()
+    );
+    assert!(
+        PeriodId::from_str("FY2025Q1")
+            .expect("q")
+            .shift(1, PeriodCalendar::Gregorian)
+            .is_err()
+    );
+    let day = PeriodId::from_str("FY2025D010").expect("fiscal day");
+    assert!(day.shift(i32::MAX, october).is_err());
+    assert!(day.shift(i32::MIN, october).is_err());
 }
 
 #[test]
 fn daily_next_rolls_year_on_last_ordinal() {
     let last = PeriodId::day(2023, 365).expect("valid period fixture");
-    let next = last.shift(1).expect("next day");
+    let next = last.shift(1, PeriodCalendar::Gregorian).expect("next day");
     assert_eq!(next, PeriodId::day(2024, 1).expect("valid period fixture"));
 }
 
@@ -621,21 +629,21 @@ fn quarterly_semi_and_annual_stepping() {
     assert_eq!(
         PeriodId::quarter(2025, 4)
             .expect("valid period fixture")
-            .shift(1)
+            .shift(1, PeriodCalendar::Gregorian)
             .expect("nq"),
         PeriodId::quarter(2026, 1).expect("valid period fixture")
     );
     assert_eq!(
         PeriodId::half(2025, 2)
             .expect("valid period fixture")
-            .shift(-1)
+            .shift(-1, PeriodCalendar::Gregorian)
             .expect("ph"),
         PeriodId::half(2025, 1).expect("valid period fixture")
     );
     assert_eq!(
         PeriodId::annual(2025)
             .expect("valid annual period")
-            .shift(1)
+            .shift(1, PeriodCalendar::Gregorian)
             .expect("na"),
         PeriodId::annual(2026).expect("valid annual period")
     );
@@ -695,12 +703,9 @@ fn period_year_stepping_rejects_integer_overflow() {
     assert!(PeriodId::annual(i32::MIN).is_err());
     let last: PeriodId = "FY2147483647".parse().expect("symbolic fiscal year");
     let first: PeriodId = "FY-2147483648".parse().expect("symbolic fiscal year");
-    assert!(last.shift(1).is_err());
-    assert!(first.shift(-1).is_err());
-    assert!(
-        last.next_fiscal(FiscalConfig::new(10, 1).expect("valid fiscal start"))
-            .is_err()
-    );
+    let october = PeriodCalendar::Fiscal(FiscalConfig::new(10, 1).expect("valid fiscal start"));
+    assert!(last.shift(1, october).is_err());
+    assert!(first.shift(-1, october).is_err());
 }
 
 #[test]

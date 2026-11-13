@@ -1876,7 +1876,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-result.json",
-      "sha256": "3ec2567884f07d6d149d0eb5d32efc01f9244c62c2cd07979e537186d3331090"
+      "sha256": "89bfdb4a806bbfd9469c110f014e703a443bbbdd4bf0d896c39128d0f44d651e"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-check-report.json",
@@ -1916,7 +1916,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity.json",
-      "sha256": "119afae5d95db70ceff088788726832a074a788c2b4d7eab26d4c2579e12bb6d"
+      "sha256": "300dc4d2e70b1866887c857213fe7642dac1fe7f60b9d90a621d90005d8683a5"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-goal-seek-run.json",
@@ -1976,7 +1976,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/capital-structure/cases.json",
-      "sha256": "e7d14f4344a322e670c3a46253c4dc1e0e6cb38961db8458d9db6da63439407e"
+      "sha256": "cdb1b47d8786509aecd6c00035de8a0e83f58213e1a7a62cf104ffb7ce04b5a0"
     },
     {
       "path": "finstack-quant-ui/tests/statements/relative-value/cases.json",

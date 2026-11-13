@@ -576,6 +576,14 @@ mod tests {
         let mut node_to_column = IndexMap::new();
         node_to_column.insert(crate::types::NodeId::new(node_id), 0);
 
+        let first = historical_values
+            .iter()
+            .map(|(period, _)| *period)
+            .min()
+            .map_or(current_period, |first| first.min(current_period));
+        let plan =
+            finstack_quant_core::dates::build_periods(&format!("{first}..{current_period}"), None)
+                .expect("fixture plan");
         let mut historical = IndexMap::new();
         for (period, value) in historical_values {
             let mut values = IndexMap::new();
@@ -585,7 +593,7 @@ mod tests {
 
         let mut context = EvaluationContext::new(
             current_period,
-            &[],
+            &plan,
             std::sync::Arc::new(node_to_column),
             std::sync::Arc::new(historical),
         );
@@ -1124,7 +1132,11 @@ mod tests {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             period,
-            &[],
+            &finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                Vec::new(),
+            )
+            .expect("empty plan"),
             std::sync::Arc::new(IndexMap::new()),
             std::sync::Arc::new(IndexMap::new()),
         );
@@ -1193,7 +1205,11 @@ mod tests {
         let period = PeriodId::month(2025, 3).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             period,
-            &[],
+            &finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                Vec::new(),
+            )
+            .expect("empty plan"),
             std::sync::Arc::new(IndexMap::new()),
             std::sync::Arc::new(IndexMap::new()),
         );
@@ -1250,7 +1266,11 @@ mod tests {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             period,
-            &[],
+            &finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                Vec::new(),
+            )
+            .expect("empty plan"),
             std::sync::Arc::new(IndexMap::new()),
             std::sync::Arc::new(IndexMap::new()),
         );
@@ -1306,7 +1326,11 @@ mod tests {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             period,
-            &[],
+            &finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                Vec::new(),
+            )
+            .expect("empty plan"),
             std::sync::Arc::new(IndexMap::new()),
             std::sync::Arc::new(IndexMap::new()),
         );
@@ -1333,7 +1357,11 @@ mod tests {
         let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             p2,
-            &[],
+            &finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                Vec::new(),
+            )
+            .expect("empty plan"),
             std::sync::Arc::new(IndexMap::new()),
             std::sync::Arc::new(IndexMap::new()),
         );
@@ -1356,7 +1384,11 @@ mod tests {
         let p2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
         let mut context = EvaluationContext::new(
             p2,
-            &[],
+            &finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                Vec::new(),
+            )
+            .expect("empty plan"),
             std::sync::Arc::new(IndexMap::new()),
             std::sync::Arc::new(IndexMap::new()),
         );

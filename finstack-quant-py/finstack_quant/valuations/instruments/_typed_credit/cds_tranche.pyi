@@ -746,7 +746,7 @@ class CdsTrancheBuilder:
     new builder per instrument. Required fields: ``id``, ``index_name``,
     ``series``, ``attach_pct``, ``detach_pct``, ``notional``, ``maturity``,
     ``coupon_bp``, ``frequency``, ``day_count``,
-    ``discount_curve_id``, ``credit_index_id``, ``side``.
+    ``discount_curve_id``, ``credit_index_id``, ``side``, ``date_regime``.
 
     Examples
     --------
@@ -770,6 +770,7 @@ class CdsTrancheBuilder:
     ...     .discount_curve_id("USD-OIS")
     ...     .credit_index_id("CDX-IG-42-CURVE")
     ...     .side("pay")
+    ...     .date_regime("standard")
     ...     .build()
     ... )
     >>> tranche.coupon_bp

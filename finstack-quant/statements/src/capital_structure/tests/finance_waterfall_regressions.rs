@@ -37,8 +37,16 @@ fn context_for(period: PeriodId, values: &[(&str, f64)]) -> EvaluationContext {
         .enumerate()
         .map(|(index, (name, _))| (NodeId::new(*name), index))
         .collect();
-    let mut context =
-        EvaluationContext::new(period, &[], Arc::new(columns), Arc::new(IndexMap::new()));
+    let mut context = EvaluationContext::new(
+        period,
+        &finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            Vec::new(),
+        )
+        .expect("empty plan"),
+        Arc::new(columns),
+        Arc::new(IndexMap::new()),
+    );
     for (name, value) in values {
         context.set_value(name, *value).expect("declared node");
     }

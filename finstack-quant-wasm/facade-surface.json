@@ -1259,7 +1259,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["annual", "day", "half", "month", "parse", "quarter", "week"],
-    "methods": ["free", "nextFiscal", "prevFiscal", "shift", "toString"],
+    "methods": ["free", "shift", "toString"],
     "getters": ["index", "isFiscal", "kind", "year"]
   },
   "core.FiscalConfig": {

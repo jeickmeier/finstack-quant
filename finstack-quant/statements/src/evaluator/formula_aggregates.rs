@@ -214,7 +214,8 @@ pub(crate) fn evaluate_period_aggregate_function(
         Function::Ytd => {
             require_args("ytd", args, 1, node_id)?;
             let current = context.period_id;
-            let start_of_year = current.shift(1 - i32::from(current.index()))?;
+            let calendar = context.history.model_plan()?.calendar;
+            let start_of_year = current.shift(1 - i32::from(current.index()), calendar)?;
             sum_expression_range(&args[0], context, start_of_year, current, node_id)
         }
         Function::Qtd => {
@@ -272,12 +273,10 @@ pub(crate) fn evaluate_period_aggregate_function(
             require_args("ttm", args, 1, node_id)?;
             // The window is twelve calendar months of model periods; see
             // `ltm_window` for the daily (calendar- or business-day) rule.
-            let Ok(window) = finstack_quant_core::dates::ltm_window(
+            let window = finstack_quant_core::dates::ltm_window(
                 context.period_id,
-                context.history.model_periods(),
-            ) else {
-                return Ok(f64::NAN);
-            };
+                context.history.model_plan()?,
+            )?;
             if !window.is_complete() {
                 return Ok(f64::NAN);
             }

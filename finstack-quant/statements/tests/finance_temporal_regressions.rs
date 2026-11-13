@@ -232,7 +232,11 @@ fn parser_produced_cs_references_work_in_historical_functions() {
     // statement rows for every cashflow snapshot.
     let mut context = EvaluationContext::new(
         current,
-        &[],
+        &finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            Vec::new(),
+        )
+        .expect("empty plan"),
         Arc::new(IndexMap::new()),
         Arc::new(IndexMap::new()),
     );
@@ -277,7 +281,11 @@ fn cashflow_period_aggregates_resolve_only_the_requested_window() {
     let old = PeriodId::month(2024, 12).unwrap();
     let mut context = EvaluationContext::new(
         current,
-        &[],
+        &finstack_quant_core::dates::PeriodPlan::try_new(
+            finstack_quant_core::dates::PeriodCalendar::Gregorian,
+            Vec::new(),
+        )
+        .expect("empty plan"),
         Arc::new(IndexMap::new()),
         Arc::new(IndexMap::new()),
     );
@@ -369,11 +377,20 @@ fn daily_ttm_sums_twelve_calendar_months_of_calendar_and_business_days() {
         let result = Evaluator::new()
             .evaluate(&model_builder.build().unwrap())
             .unwrap();
-        // 2025 has 365 calendar days and 261 weekdays; a fixed 252-row window
-        // would cover only about 8.3 months of a calendar-day model.
-        let expected = if business_only { 261.0 } else { 365.0 };
+        // A calendar-day model sums 2025's 365 days. A business-day grid is
+        // not full calendar-day coverage (absent rows do not prove weekends
+        // or holidays), so its window is incomplete (record
+        // CORE-CONVENTIONS-014 #11).
         let year_end = PeriodId::day(2025, 365).unwrap();
-        close(result.get("ltm", &year_end).unwrap(), expected);
+        let ltm = result.get("ltm", &year_end).unwrap();
+        if business_only {
+            assert!(
+                ltm.is_nan(),
+                "business-day LTM must be incomplete, got {ltm}"
+            );
+        } else {
+            close(ltm, 365.0);
+        }
         // 2024-12-30 has one uncovered day (2023-12-31) in its window.
         assert!(
             result
@@ -415,44 +432,32 @@ fn model_rejects_periods_of_mixed_kinds() {
     }
 }
 
-/// Trailing twelve months of fiscal weeks is a full year of days. Counting
-/// 52 blocks let the short final block of the fiscal year stand in for a
-/// whole week, so every window crossing the year end summed 359 days.
+/// Weekly TTM is not a twelve-month window: 52 weeks is 364 days and a
+/// fiscal week 53 may be short (record CORE-CONVENTIONS-014 #11), so a
+/// weekly model's `ttm` is an evaluation error rather than a value.
 #[test]
-fn fiscal_weekly_ttm_covers_a_full_year_of_days() {
-    let periods = build_fiscal_periods(
-        "FY2024W1..FY2025W10",
-        FiscalConfig::new(10, 1).expect("valid fiscal start"),
-        None,
-    )
-    .unwrap()
-    .periods;
-    let values: Vec<_> = periods
-        .iter()
-        .map(|period| {
-            let days = (period.end - period.start).whole_days() as f64;
-            (period.id, AmountOrScalar::scalar(days))
-        })
-        .collect();
-    let model = {
-        let mut model_builder = ModelBuilder::new("fiscal-weekly-ttm");
-        model_builder
-            .periods_explicit(fixture_plan(periods.clone()))
-            .unwrap();
+fn weekly_ttm_is_an_evaluation_error() {
+    for plan in [
+        build_periods("2024W1..2025W10", None).unwrap(),
+        build_fiscal_periods(
+            "FY2024W1..FY2025W10",
+            FiscalConfig::new(10, 1).expect("valid fiscal start"),
+            None,
+        )
+        .unwrap(),
+    ] {
+        let values: Vec<_> = plan
+            .periods
+            .iter()
+            .map(|period| (period.id, AmountOrScalar::scalar(1.0)))
+            .collect();
+        let mut model_builder = ModelBuilder::new("weekly-ttm");
+        model_builder.periods_explicit(plan).unwrap();
         model_builder.value("x", &values);
         model_builder.compute("trailing", "ttm(x)").unwrap();
-        model_builder.build().unwrap()
-    };
-    let result = Evaluator::new().evaluate(&model).unwrap();
-    // Fiscal 2024 (October 2023 to September 2024) holds 29 February 2024,
-    // and so does every twelve-month window ending in these weeks.
-    for period in periods
-        .iter()
-        .filter(|p| p.id.year() == 2025 || p.id.index() == 53)
-    {
-        close(result.get("trailing", &period.id).unwrap(), 366.0);
+        let err = Evaluator::new()
+            .evaluate(&model_builder.build().unwrap())
+            .expect_err("weekly TTM is rejected");
+        assert!(err.to_string().contains("weekly"), "{err}");
     }
-    // A year of history is not yet available one block earlier.
-    let week_52 = periods.iter().find(|p| p.id.index() == 52).unwrap();
-    assert!(result.get("trailing", &week_52.id).unwrap().is_nan());
 }

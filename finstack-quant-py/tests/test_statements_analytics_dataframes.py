@@ -46,7 +46,6 @@ def _statement_result(revenue_by_period: dict[str, float]) -> dict[str, object]:
     """Minimal canonical `StatementResult` payload with one node."""
     return {
         "schema_version": 1,
-        "periods": [],
         "nodes": {"revenue": revenue_by_period},
         "meta": {
             "eval_time_ms": None,

@@ -1029,19 +1029,19 @@ mod tests {
     }
 
     #[test]
-    fn daily_ltm_covers_twelve_calendar_months_of_business_days() {
+    fn daily_ltm_needs_every_calendar_day_of_the_year() {
         let (results, model, days) = business_day_fixture();
         let at = *days.last().expect("last day");
         let summary =
             capital_structure_summary(&results, &model, &config(at, None)).expect("summary");
-        // 2025 has 261 weekdays; a fixed 252-row window would read ~8.3 months
-        // short of that and overstate leverage.
-        assert_eq!(summary.ltm_periods_required, 261);
+        // A business-day grid holds 2025's 261 weekdays of its 365 calendar
+        // days; absent rows do not prove weekends or holidays, so the window
+        // is incomplete (record CORE-CONVENTIONS-014 #11).
+        assert_eq!(summary.ltm_periods_required, 365);
         assert_eq!(summary.ltm_periods_found, 261);
-        assert_eq!(summary.ltm_ebitda, Some(usd(261.0)));
-        assert_close(summary.total_leverage, 1.0);
-        let interest = summary.tranches[0].ltm_interest.expect("interest").amount();
-        assert!((interest - 26.1).abs() < 1e-9, "{interest}");
+        assert_eq!(summary.ltm_ebitda, None);
+        assert_eq!(summary.total_leverage, None);
+        assert_eq!(summary.tranches[0].ltm_interest, None);
     }
 
     #[test]

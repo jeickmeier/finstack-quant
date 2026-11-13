@@ -406,14 +406,17 @@
         "2025": 0.8395104895104896
       }
     },
-    "rollup.periods": [
-      {
-        "end": "2026-01-01",
-        "id": "2025",
-        "is_actual": false,
-        "start": "2025-01-01"
-      }
-    ],
+    "rollup.periods": {
+      "calendar": "gregorian",
+      "periods": [
+        {
+          "end": "2026-01-01",
+          "id": "2025",
+          "is_actual": false,
+          "start": "2025-01-01"
+        }
+      ]
+    },
     "rollup.spec_overrides": {
       "2025": 100.0
     }

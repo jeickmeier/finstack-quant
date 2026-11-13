@@ -588,14 +588,16 @@ pub fn pl_summary_report_text(
 
 /// Generate a credit assessment report as formatted text.
 ///
-/// Trailing-year ratios require a complete annual, semiannual, quarterly,
-/// monthly or Gregorian daily year. Weekly and fiscal-daily ratios are
-/// unavailable because the result does not contain their date calendar.
+/// Trailing-year ratios step through the results' period plan and are
+/// omitted when the twelve months are incomplete; a daily plan needs every
+/// calendar day.
 ///
 /// # Errors
 ///
-/// Rejects malformed `results_json` or an `period` value that is not a valid
-/// statement period identifier.
+/// Rejects malformed `results_json`, a `period` value that is not a valid
+/// statement period identifier, results holding `ebitda` or
+/// `interest_expense` without a period plan, a `period` outside that plan,
+/// or a weekly plan.
 /// @param resultsJson - Evaluated statement-result JSON.
 /// @param period - Statement period identifier, such as `2025Q4` or `2025A`.
 /// @returns Returns a human-readable text report, not JSON.
@@ -612,7 +614,8 @@ pub fn credit_assessment_report_text(
     let period: finstack_quant_core::dates::PeriodId = period.parse().map_err(to_js_err)?;
     let report = finstack_quant_statements_analytics::analysis::CreditAssessmentReport::new(
         &results, period,
-    );
+    )
+    .map_err(to_js_err)?;
     Ok(report.to_string())
 }
 
@@ -622,10 +625,11 @@ pub fn credit_assessment_report_text(
 /// of the results' `periods` up to `period`, in timeline order.
 /// Ratios are `null` when their inputs have mixed scalar/money representations,
 /// different currencies, or non-finite arithmetic.
-/// Trailing-year ratios require all annual, semiannual, quarterly or monthly
-/// periods, including fiscal periods, or the complete Gregorian daily year
-/// ending after the assessment date. Weekly and fiscal-daily ratios are `null`
-/// because the result does not contain their date calendar.
+/// Trailing-year ratios step through the results' period plan in its own
+/// calendar: they need every annual, semiannual, quarterly or monthly period
+/// of the twelve months, or every calendar day of a daily plan (a
+/// business-day grid is incomplete, so its ratios are `null`). A weekly plan
+/// is an error.
 ///
 /// # Errors
 ///

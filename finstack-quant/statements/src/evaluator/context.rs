@@ -9,7 +9,7 @@ use crate::error::{Error, Result};
 use crate::evaluator::PeriodHistory;
 use crate::evaluator::results::EvalWarning;
 use crate::types::NodeId;
-use finstack_quant_core::dates::{Period, PeriodId, PeriodKind};
+use finstack_quant_core::dates::{PeriodId, PeriodKind, PeriodPlan};
 use indexmap::IndexMap;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -104,20 +104,21 @@ impl EvaluationContext {
     /// let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     /// let mut columns = IndexMap::new();
     /// columns.insert(NodeId::new("revenue"), 0);
-    /// let ctx = EvaluationContext::new(period, &[], Arc::new(columns), Arc::new(IndexMap::new()));
+    /// let plan = finstack_quant_core::dates::build_periods("2025Q1..Q1", None)?;
+    /// let ctx = EvaluationContext::new(period, &plan, Arc::new(columns), Arc::new(IndexMap::new()));
     /// assert_eq!(ctx.period_id, period);
     /// # Ok(())
     /// # }
     /// ```
     pub fn new(
         period_id: PeriodId,
-        periods: &[Period],
+        plan: &PeriodPlan,
         node_to_column: Arc<IndexMap<NodeId, usize>>,
         named_maps: Arc<IndexMap<PeriodId, IndexMap<String, f64>>>,
     ) -> Self {
         let history = Arc::new(PeriodHistory::from_named_maps(
             node_to_column,
-            periods,
+            plan,
             named_maps.as_ref(),
         ));
         Self::new_with_history(period_id, history, Arc::new(IndexMap::new()))
@@ -385,7 +386,11 @@ mod tests {
 
         let ctx = EvaluationContext::new(
             PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            &[],
+            &finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                Vec::new(),
+            )
+            .expect("empty plan"),
             Arc::new(node_to_column),
             Arc::new(IndexMap::new()),
         );
@@ -400,7 +405,11 @@ mod tests {
 
         let mut ctx = EvaluationContext::new(
             PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            &[],
+            &finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                Vec::new(),
+            )
+            .expect("empty plan"),
             Arc::new(node_to_column),
             Arc::new(IndexMap::new()),
         );
@@ -424,7 +433,11 @@ mod tests {
 
         let ctx = EvaluationContext::new(
             PeriodId::quarter(2025, 2).expect("valid period fixture"),
-            &[],
+            &finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                Vec::new(),
+            )
+            .expect("empty plan"),
             Arc::new(node_to_column),
             Arc::new(historical),
         );
@@ -451,7 +464,11 @@ mod tests {
 
         let ctx = EvaluationContext::new(
             PeriodId::quarter(2025, 2).expect("valid period fixture"),
-            &[],
+            &finstack_quant_core::dates::PeriodPlan::try_new(
+                finstack_quant_core::dates::PeriodCalendar::Gregorian,
+                Vec::new(),
+            )
+            .expect("empty plan"),
             Arc::new(node_to_column),
             Arc::new(historical),
         );

@@ -157,26 +157,25 @@ def test_schedule_builder_fluent_setter_preserves_exceptions() -> None:
 
 
 def test_fiscal_week_stepping_includes_week_53() -> None:
-    fiscal = FiscalConfig(10, 1)
+    fiscal = {"fiscal": {"start_month": 10, "start_day": 1}}
     week_52 = PeriodId.parse("FY2025W52")
 
-    week_53 = week_52.next_fiscal(fiscal)
+    week_53 = week_52.shift(1, fiscal)
     assert str(week_53) == "FY2025W53"
     assert week_53.is_fiscal
     assert PeriodId.parse(str(week_53)) == week_53
-    assert str(week_53.next_fiscal(fiscal)) == "FY2026W01"
-    assert week_53.prev_fiscal(fiscal) == week_52
+    assert str(week_53.shift(1, fiscal)) == "FY2026W01"
+    assert PeriodId.parse("FY2026W01").shift(-1, fiscal) == week_53
 
-    assert str(PeriodId.parse("2025W52").shift(1)) == "2026W01"
+    assert str(PeriodId.parse("2025W52").shift(1, "gregorian")) == "2026W01"
+    assert str(PeriodId.parse("FY2025D365").shift(1, fiscal)) == "FY2026D001"
 
-    assert week_52.shift(1) == week_53
-    assert str(week_53.shift(1)) == "FY2026W01"
-    assert PeriodId.parse("FY2026W01").shift(-1) == week_53
 
-    with pytest.raises(ValueError, match="next_fiscal"):
-        PeriodId.parse("FY2025D365").shift(1)
-    with pytest.raises(ValueError, match="prev_fiscal"):
-        PeriodId.parse("FY2025D001").shift(-1)
+def test_shift_rejects_a_mismatched_calendar() -> None:
+    with pytest.raises(ValueError, match="calendar"):
+        PeriodId.parse("FY2025Q1").shift(1, "gregorian")
+    with pytest.raises(ValueError, match="calendar"):
+        PeriodId.quarter(2025, 1).shift(1, {"fiscal": {"start_month": 10, "start_day": 1}})
 
 
 def test_schedule_builder_from_spec_and_dataframe() -> None:

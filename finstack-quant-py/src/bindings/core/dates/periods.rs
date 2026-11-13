@@ -207,30 +207,16 @@ impl PyPeriodId {
         self.inner.is_fiscal()
     }
 
-    /// Move by ``periods`` periods of the same kind and calendar (negative moves back).
-    ///
-    /// Fiscal daily ids can only move within days ``1..=365``; use
-    /// ``next_fiscal`` / ``prev_fiscal`` to cross a fiscal-year end.
-    #[pyo3(text_signature = "(self, periods)")]
-    fn shift(&self, periods: i32) -> PyResult<Self> {
+    /// Move by ``periods`` periods of the same kind in ``calendar`` (negative
+    /// moves back). ``calendar`` is the serde form of the identifier's
+    /// calendar context: ``"gregorian"`` or
+    /// ``{"fiscal": {"start_month": m, "start_day": d}}``.
+    #[pyo3(text_signature = "(self, periods, calendar)")]
+    fn shift(&self, py: Python<'_>, periods: i32, calendar: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let calendar: finstack_quant_core::dates::PeriodCalendar =
+            crate::bindings::module_utils::py_to_serde(py, calendar, "calendar")?;
         self.inner
-            .shift(periods)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
-
-    /// Next period using fiscal-year week/day capacity.
-    fn next_fiscal(&self, fiscal_config: &PyFiscalConfig) -> PyResult<Self> {
-        self.inner
-            .next_fiscal(fiscal_config.inner)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
-
-    /// Previous period using fiscal-year week/day capacity.
-    fn prev_fiscal(&self, fiscal_config: &PyFiscalConfig) -> PyResult<Self> {
-        self.inner
-            .prev_fiscal(fiscal_config.inner)
+            .shift(periods, calendar)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
