@@ -1121,6 +1121,112 @@ phase, spread annuity, par and duration. Market, margin, runtime and host
 qualification remain pending.
 [Other fixed-income record 16](valuations-other-fixed-income/16-fi-index-trs.md#accepted-decision-for-checked-fixed-income-index-total-return-swaps).
 
+Equity and composition record 01 was accepted on 2026-11-14. Source and
+primary specifications plus independent duplicate-key and example-scale
+probes establish the selected convention. Runtime and host qualification
+remain pending.
+[Equity and composition record 01](valuations-equity-and-composition/01-contract-dispatch.md#accepted-decision-for-checked-instrument-loading-model-dispatch-and-metrics).
+
+Equity and composition record 02 was accepted on 2026-11-14. Independent
+arithmetic covers shares, FX, continuous carry and ex-phase entitlement with
+actual payment factors. Market, entitlement, runtime and host qualification
+remain pending.
+[Equity and composition record 02](valuations-equity-and-composition/02-spot-and-carry.md#accepted-decision-for-checked-cash-equity-valuation-and-dividend-carry).
+
+Equity and composition record 03 was accepted on 2026-11-14. Independent
+arithmetic covers fixing and payment clocks, quanto correction, resampled
+smile risk and clearing variation. Market, venue, runtime and host
+qualification remain pending.
+[Equity and composition record 03](valuations-equity-and-composition/03-equity-future.md#accepted-decision-for-checked-equity-futures-carry-quanto-and-clearing).
+
+Equity and composition record 04 was accepted on 2026-11-14. Independent
+arithmetic covers settlement-adjusted spread clocks, conversion and risk,
+final variation and a published exchange comparison. Venue, runtime and host
+qualification remain pending.
+[Equity and composition record 04](valuations-equity-and-composition/04-total-return-future.md#accepted-decision-for-checked-equity-total-return-futures).
+
+Equity and composition record 05 was accepted on 2026-11-14. Independent
+arithmetic covers live quote points and pillar risk, final variation,
+option premium styles and exercise-versus-clearing references. Venue,
+runtime and host qualification remain pending.
+[Equity and composition record 05](valuations-equity-and-composition/05-vol-index-and-listed-options.md#accepted-decision-for-checked-volatility-index-futures-and-listed-futures-options).
+
+Equity and composition record 06 was accepted on 2026-11-14. Independent
+arithmetic covers signed cash, remaining stock and strike amounts, and
+exercise-to-payment horizon results. Venue, runtime and host qualification
+remain pending.
+[Equity and composition record 06](valuations-equity-and-composition/06-option-lifecycle.md#accepted-decision-for-checked-equity-option-exercise-and-settlement).
+
+Equity and composition record 07 was accepted on 2026-11-14. Independent
+arithmetic covers dated European price and Greeks, finite escrowed trees and
+exercise phases. Market, runtime and host qualification remain pending.
+[Equity and composition record 07](valuations-equity-and-composition/07-black-tree-and-direct-greeks.md#accepted-decision-for-checked-live-equity-option-pricing-and-greeks).
+
+Equity and composition record 08 was accepted on 2026-11-14. Independent
+arithmetic covers a signed-yield sensitivity, the five-node derivative and
+gross premium inversion. Market, runtime and host qualification remain pending.
+[Equity and composition record 08](valuations-equity-and-composition/08-selected-risk-and-implied-vol.md#accepted-decision-for-checked-selected-model-equity-risk-and-implied-volatility).
+
+Equity and composition record 09 was accepted on 2026-11-14. Independent
+checks cover delayed-payment Black premiums, the widened 1D grid, American
+stopping and a stochastic Heston Fourier comparator. Production PDE,
+selected-model risk and host qualification remain pending.
+[Equity and composition record 09](valuations-equity-and-composition/09-equity-pde.md#accepted-decision-for-checked-equity-blackscholes-and-heston-pde-pricing).
+
+Equity and composition record 10 was accepted on 2026-11-14. Independent
+checks cover dated Fourier payment, the deterministic-variance limit
+and separate QE-M sampling and time-step effects. Production runtime,
+Philox replay, risk and host qualification remain pending.
+[Equity and composition record 10](valuations-equity-and-composition/10-heston-adapters.md#accepted-decision-for-checked-dated-heston-fourier-and-monte-carlo-pricing).
+
+Equity and composition record 11 was accepted on 2026-11-14. Independent
+checks cover exact strip alignment, the parity-call price gate and fixed-grid
+rough volatility reference prices. Production pricing, replay, market risk
+and host qualification remain pending.
+[Equity and composition record 11](valuations-equity-and-composition/11-rough-volatility-adapters.md#accepted-decision-for-checked-equity-rough-volatility-adapters).
+
+Equity and composition record 12 was accepted on 2026-11-14. Independent
+checks cover dated carry and quote-clock variance, a deferred payoff,
+held reset and initial levels, and responsive ATM delta. Runtime,
+Philox replay, product risk and host qualification remain pending.
+[Equity and composition record 12](valuations-equity-and-composition/12-path-gbm.md#accepted-decision-for-checked-atm-term-gbm-and-pinned-equity-path-risk).
+
+Equity and composition record 13 was accepted on 2026-11-14. Independent
+checks cover coupon memory and call ordering, dated cash and redemption,
+holder theta, and a one-observation live risk comparator. Production
+pricing, replay, market risk and host qualification remain pending.
+[Equity and composition record 13](valuations-equity-and-composition/13-autocallable.md#accepted-decision-for-checked-dated-autocallable-pricing-and-risk).
+
+Equity and composition record 14 was accepted on 2026-11-14. Independent
+checks cover additive and compounded clipped returns, dated payment and
+holder theta, and one-reset price and delta comparators. Production
+pricing, replay, market risk and host qualification remain pending.
+[Equity and composition record 14](valuations-equity-and-composition/14-cliquet.md#accepted-decision-for-checked-dated-cliquet-pricing-and-risk).
+
+Equity and composition record 15 was accepted on 2026-11-14. Independent
+checks cover seasoned and forward-start forecast arithmetic, dated cash and
+sensitivity units. Production pricing, market-source and tail evidence,
+discrete-model risk and host qualification remain pending.
+[Equity and composition record 15](valuations-equity-and-composition/15-variance-swap.md#accepted-decision-for-checked-equity-variance-swap-pricing-and-risk).
+
+Equity and composition record 16 was accepted on 2026-11-14. Independent
+checks cover dated equity carry, dividend payment elections, financing and
+replacement par, and exact spot-shock cash. Production pricing, agreement
+and margin, risk and host qualification remain pending.
+[Equity and composition record 16](valuations-equity-and-composition/16-equity-trs.md#accepted-decision-for-checked-dated-equity-total-return-swaps).
+
+Equity and composition record 17 was accepted on 2026-11-14. Independent
+checks cover period midpoint and terminal timing, Gordon, H-model and exit
+terminal formulas, common-equity dilution and the full WACC reprice.
+Production pricing, statement reconciliation and host qualification remain pending.
+[Equity and composition record 17](valuations-equity-and-composition/17-corporate-dcf.md#accepted-decision-for-checked-corporate-dcf-and-dilution).
+
+Equity and composition record 18 was accepted on 2026-11-14. Independent
+checks cover event ordering, the partial catch-up discrepancy, stepped
+promote, escrow and final clawback. Production allocation, fund terms
+and host qualification remain pending.
+[Equity and composition record 18](valuations-equity-and-composition/18-private-fund-waterfall.md#accepted-decision-for-checked-private-fund-waterfalls-and-final-clawback).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

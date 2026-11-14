@@ -84,7 +84,7 @@
    economics. [Canonical schema publication](../core-numerics/schema-publication.md),
    [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/json-schema-core),
    [current example](../../../../finstack-quant/valuations/src/schema/examples.rs),
-   [composite history](24-composite-history.md).
+   [composite history](24-composite-valuation-history.md).
 
 ## Observed behavior
 

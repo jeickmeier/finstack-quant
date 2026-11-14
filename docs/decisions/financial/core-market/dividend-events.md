@@ -15,8 +15,9 @@ accepted [Money precision](../core-conventions/012-money-decimal-precision.md),
 [date/information phases](../conventions/0045-financial-clocks-and-date-boundaries.md)
 and [record12's validated scalar boundary](scalar-series-and-fixings.md#accepted-decision-validated-values-literal-sampling-and-qualified-exact-fixings).
 
-[Equity carry](../valuations-equity-and-composition/02-spot-and-carry.md),
-[smile forward inputs](../calibration-targets/09-equity-forward-inputs.md),
+The [accepted cash-equity carry and entitlement package](../valuations-equity-and-composition/02-spot-and-carry.md#accepted-decision-for-checked-cash-equity-valuation-and-dividend-carry)
+selects an ex-phase entitlement rule and actual payment-date discounting.
+[Smile forward inputs](../calibration-targets/09-equity-forward-inputs.md),
 [option adapters](../valuations-equity-and-composition/07-black-tree-and-direct-greeks.md),
 [lattice dividends](../models-numerical/dividends-and-lattice-exercise.md),
 [Monte Carlo jumps](../models-monte-carlo/06-cash-dividend-jumps.md) and

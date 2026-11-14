@@ -1,7 +1,8 @@
 # ADR 0027: Vanilla equity and FX option model selection
 
-**Decision status:** Draft — observed implementation; adoption and rationale
-pending agreement.
+**Decision status:** Equity lifecycle and baseline model selection accepted in
+records 06 and 07. Remaining FX and alternative-model choices retain their
+own record status.
 
 **Implementation status:** Observed for vanilla `EquityOption` and `FxOption`
 entry points and registered alternatives; not a completeness assessment.
@@ -12,13 +13,17 @@ entry points and registered alternatives; not a completeness assessment.
 
 **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`
 
-## Decision awaiting adoption
+## Accepted equity baseline and lifecycle
 
-The proposed decision covers the default model/exercise mapping for vanilla
-equity and FX options, its supported input and lifecycle domains, and its
-accuracy requirements.
-Observed registration and source-documented motivation do not approve the
-model, calibration provenance or numerical settings.
+The accepted [equity lifecycle](06-option-lifecycle.md#accepted-decision-for-checked-equity-option-exercise-and-settlement)
+resolves authoritative exercise and settlement before live pricing. The
+accepted [live equity baseline](07-black-tree-and-direct-greeks.md#accepted-decision-for-checked-live-equity-option-pricing-and-greeks)
+uses `black_scholes` for European exercise and `tree` for American and
+Bermudan exercise, with explicit Leisen–Reimer or CRR construction on the
+tree route. The equity `black76` alias is retired in the accepted contract.
+Product default selection is from the admitted exercise style, with required
+controls and the qualified dividend, settlement and risk basis in the owners.
+Runtime and host reconciliation are pending.
 
 This selection record covers `EquityOption` and European `FxOption`. Futures
 options, barriers, digitals, touch, quanto and path-dependent products have
@@ -54,10 +59,11 @@ inputs, formulas, defaults, failure branches and evidence.
 | --- | --- |
 | Equity observed exercise, expiry, cash/physical delivery and lifecycle Greeks | [Exercise and settlement lifecycle](06-option-lifecycle.md) |
 | Equity baseline, dividend inputs, LR caller settings and direct Greeks | [Black/tree pricing](07-black-tree-and-direct-greeks.md) |
+| Equity selected-model sensitivity bases and explicitly elected premium inversion | [Selected-model risk and implied volatility](08-selected-risk-and-implied-vol.md#accepted-decision-for-checked-selected-model-equity-risk-and-implied-volatility) |
 | FX formulation, expiry behavior, input units and delta conventions | [FX vanilla valuation](../valuations-fx-and-exotics/fx-vanilla-delta.md) |
-| PDE domains, numerical grids and allowed exercise/dividends | [PDE adapters](09-equity-pde.md) |
-| Explicit Heston inputs, Fourier and QE Monte Carlo settings | [Heston adapters](10-heston-adapters.md) |
-| Rough-model inputs, variance strip, transform/simulation and diagnostics | [Rough-volatility adapters](11-rough-volatility-adapters.md) |
+| Equity PDE model keys, domains, dated payoffs, exercise and risk | [Accepted PDE adapters](09-equity-pde.md#accepted-decision-for-checked-equity-blackscholes-and-heston-pde-pricing) |
+| Equity Heston input block, dated payoff, bounded Fourier and explicit QE-M run | [Accepted Heston adapters](10-heston-adapters.md#accepted-decision-for-checked-dated-heston-fourier-and-monte-carlo-pricing) |
+| Rough-model inputs, variance strip, transform/simulation and diagnostics | [Accepted rough-volatility adapters](11-rough-volatility-adapters.md#accepted-decision-for-checked-equity-rough-volatility-adapters) |
 | Shared quote and parameter resolution | [Model-input resolution](../valuations-framework/model-resolution.md) |
 
 The shared [spot formulas](../models-analytic/spot-vanilla-and-greeks.md),
@@ -76,13 +82,12 @@ restoring remaining dividends at exercise, and to express FX pricing in a
 Garman–Kohlhagen form equivalent to Black on a covered-interest-parity forward.
 These mechanics and their evidence are retained in the detailed owners.
 
-The proposed adoption rationale is to use closed forms for supported European
-lognormal cases, a tree for contractual early exercise, and explicitly selected
-richer models where appropriate. Closed forms avoid exercise-grid error; trees
-and PDEs introduce discretization; stochastic-volatility methods add parameter,
-integration or simulation uncertainty. No agreed comparison selecting LR and
-its configured step count over alternatives was identified. These are reasons
-to assess, not accepted rankings.
+The equity package selects closed form for supported European lognormal
+cases and a caller-configured tree for supported early exercise. Closed
+forms avoid exercise-grid error. Tree, PDE and stochastic-volatility routes
+have their own numerical and evidence requirements. Qualify each exercise
+grid and keep any preference between the admitted tree constructions on its
+supported price and sensitivity evidence.
 
 ## Adoption and evidence boundary
 

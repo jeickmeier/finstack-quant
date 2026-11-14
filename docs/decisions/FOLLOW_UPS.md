@@ -1420,6 +1420,80 @@ Delivery operations, market, runtime and host qualification remain pending.
 The checked fixed-income index TRS package was accepted on 2026-11-14.
 Market, margin, runtime and host qualification remain pending.
 [Other fixed-income record 16](financial/valuations-other-fixed-income/16-fi-index-trs.md#accepted-decision-for-checked-fixed-income-index-total-return-swaps).
+
+The checked instrument loading, model dispatch and metrics package was
+accepted on 2026-11-14. Runtime and host qualification remain pending.
+[Equity and composition record 01](financial/valuations-equity-and-composition/01-contract-dispatch.md#accepted-decision-for-checked-instrument-loading-model-dispatch-and-metrics).
+
+The checked cash-equity valuation and dividend carry package was accepted on
+2026-11-14. Market, entitlement, runtime and host qualification remain pending.
+[Equity and composition record 02](financial/valuations-equity-and-composition/02-spot-and-carry.md#accepted-decision-for-checked-cash-equity-valuation-and-dividend-carry).
+
+The checked equity futures package was accepted on 2026-11-14. Market,
+venue, runtime and host qualification remain pending.
+[Equity and composition record 03](financial/valuations-equity-and-composition/03-equity-future.md#accepted-decision-for-checked-equity-futures-carry-quanto-and-clearing).
+
+The checked equity total-return futures package was accepted on 2026-11-14.
+Venue, runtime and host qualification remain pending.
+[Equity and composition record 04](financial/valuations-equity-and-composition/04-total-return-future.md#accepted-decision-for-checked-equity-total-return-futures).
+
+The checked volatility-index futures and listed futures-option package was
+accepted on 2026-11-14. Venue, runtime and host qualification remain pending.
+[Equity and composition record 05](financial/valuations-equity-and-composition/05-vol-index-and-listed-options.md#accepted-decision-for-checked-volatility-index-futures-and-listed-futures-options).
+
+The checked equity option exercise and settlement package was accepted on
+2026-11-14. Venue, runtime and host qualification remain pending.
+[Equity and composition record 06](financial/valuations-equity-and-composition/06-option-lifecycle.md#accepted-decision-for-checked-equity-option-exercise-and-settlement).
+
+The checked live equity option pricing and Greeks package was accepted on
+2026-11-14. Market, runtime and host qualification remain pending.
+[Equity and composition record 07](financial/valuations-equity-and-composition/07-black-tree-and-direct-greeks.md#accepted-decision-for-checked-live-equity-option-pricing-and-greeks).
+
+The checked selected-model equity risk and implied-volatility package was
+accepted on 2026-11-14. Runtime, market and host qualification remain pending.
+[Equity and composition record 08](financial/valuations-equity-and-composition/08-selected-risk-and-implied-vol.md#accepted-decision-for-checked-selected-model-equity-risk-and-implied-volatility).
+
+The equity Black–Scholes and Heston PDE package was accepted on 2026-11-14.
+Production pricing, risk and host qualification remain pending.
+[Equity and composition record 09](financial/valuations-equity-and-composition/09-equity-pde.md#accepted-decision-for-checked-equity-blackscholes-and-heston-pde-pricing).
+
+The dated equity Heston Fourier and QE-M package was accepted on 2026-11-14.
+Runtime pricing, replay, risk and host qualification remain pending.
+[Equity and composition record 10](financial/valuations-equity-and-composition/10-heston-adapters.md#accepted-decision-for-checked-dated-heston-fourier-and-monte-carlo-pricing).
+
+The equity rough Heston and rough Bergomi adapter package was accepted on
+2026-11-14. Runtime pricing, replay, market risk and host qualification remain pending.
+[Equity and composition record 11](financial/valuations-equity-and-composition/11-rough-volatility-adapters.md#accepted-decision-for-checked-equity-rough-volatility-adapters).
+
+The ATM term-GBM and pinned equity path-risk package was accepted on
+2026-11-14. Runtime pricing, replay, product risk and host qualification
+remain pending.
+[Equity and composition record 12](financial/valuations-equity-and-composition/12-path-gbm.md#accepted-decision-for-checked-atm-term-gbm-and-pinned-equity-path-risk).
+
+The dated autocallable package was accepted on 2026-11-14. Runtime pricing,
+settlement, market risk and host qualification remain pending.
+[Equity and composition record 13](financial/valuations-equity-and-composition/13-autocallable.md#accepted-decision-for-checked-dated-autocallable-pricing-and-risk).
+
+The dated cliquet package was accepted on 2026-11-14. Runtime pricing,
+reset and payment phases, market risk and host qualification remain pending.
+[Equity and composition record 14](financial/valuations-equity-and-composition/14-cliquet.md#accepted-decision-for-checked-dated-cliquet-pricing-and-risk).
+
+The equity variance swap package was accepted on 2026-11-14. Production
+pricing, market sources and tails, risk and host qualification remain pending.
+[Equity and composition record 15](financial/valuations-equity-and-composition/15-variance-swap.md#accepted-decision-for-checked-equity-variance-swap-pricing-and-risk).
+
+The dated equity total-return swap package was accepted on 2026-11-14.
+Production pricing, entitlement, margin and host qualification remain pending.
+[Equity and composition record 16](financial/valuations-equity-and-composition/16-equity-trs.md#accepted-decision-for-checked-dated-equity-total-return-swaps).
+
+The corporate DCF and dilution package was accepted on 2026-11-14.
+Production pricing, forecast economics, statements and host qualification remain pending.
+[Equity and composition record 17](financial/valuations-equity-and-composition/17-corporate-dcf.md#accepted-decision-for-checked-corporate-dcf-and-dilution).
+
+The dated private-fund waterfall and final clawback package was accepted on
+2026-11-14. Production allocation, agreement mapping and host qualification remain pending.
+[Equity and composition record 18](financial/valuations-equity-and-composition/18-private-fund-waterfall.md#accepted-decision-for-checked-private-fund-waterfalls-and-final-clawback).
+
 Other unadopted choices retain their stated Proposed or Draft status. Acceptance does not certify
 observed implementations.
 Numerical suites were not rerun in the original documentation audits.

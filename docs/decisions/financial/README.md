@@ -1161,6 +1161,100 @@ financing and verified par spread, curve and hedge risk, margin and reporting.
 All sixteen other fixed-income records are accepted.
 [Other fixed-income record 16](valuations-other-fixed-income/16-fi-index-trs.md#accepted-decision-for-checked-fixed-income-index-total-return-swaps).
 
+The checked instrument loading, model dispatch and metrics package was accepted
+on 2026-11-14. It covers strict admission, post-overlay validation, exact
+registry selection, role-aware result metadata and schema qualification.
+[Equity and composition record 01](valuations-equity-and-composition/01-contract-dispatch.md#accepted-decision-for-checked-instrument-loading-model-dispatch-and-metrics).
+
+The checked cash-equity valuation and dividend carry package was accepted on
+2026-11-14. It covers explicit shares and quote exposure, dated funding and
+carry, payment-date discounting and separate actual holder claims.
+[Equity and composition record 02](valuations-equity-and-composition/02-spot-and-carry.md#accepted-decision-for-checked-cash-equity-valuation-and-dividend-carry).
+
+The checked equity futures package was accepted on 2026-11-14. It covers
+fixing-date carry, fixed-conversion quanto, phased clearing, selected-mark
+risk and qualified cash reporting.
+[Equity and composition record 03](valuations-equity-and-composition/03-equity-future.md#accepted-decision-for-checked-equity-futures-carry-quanto-and-clearing).
+
+The checked equity total-return futures package was accepted on 2026-11-14.
+It covers qualified spread-to-points conversion, a contract-specific spread
+clock, selected-mark sensitivities and phased clearing and cash reporting.
+[Equity and composition record 04](valuations-equity-and-composition/04-total-return-future.md#accepted-decision-for-checked-equity-total-return-futures).
+
+The checked volatility-index futures and listed futures-option package was
+accepted on 2026-11-14. It covers exact quote and fixing authority,
+futures-point DeltaVol, matched option models, and exercise and cash state.
+[Equity and composition record 05](valuations-equity-and-composition/05-vol-index-and-listed-options.md#accepted-decision-for-checked-volatility-index-futures-and-listed-futures-options).
+
+The checked equity option exercise and settlement package was accepted on
+2026-11-14. It covers authoritative exercise state, signed cash and ordinary
+physical claims, claim-specific risk and horizon and reporting rules.
+[Equity and composition record 06](valuations-equity-and-composition/06-option-lifecycle.md#accepted-decision-for-checked-equity-option-exercise-and-settlement).
+
+The checked live equity option pricing and Greeks package was accepted on
+2026-11-14. It covers exact model selection, separate fixing and payment,
+qualified dividend and volatility bases, exact tree placement and matched risk.
+[Equity and composition record 07](valuations-equity-and-composition/07-black-tree-and-direct-greeks.md#accepted-decision-for-checked-live-equity-option-pricing-and-greeks).
+
+The checked selected-model equity risk and implied-volatility package was
+accepted on 2026-11-14. It covers matched raw reprices, typed sensitivity
+experiments, Dividend01 on actual signed yield and bounded European
+Black–Scholes inversion on the observed gross premium basis.
+[Equity and composition record 08](valuations-equity-and-composition/08-selected-risk-and-implied-vol.md#accepted-decision-for-checked-selected-model-equity-risk-and-implied-volatility).
+
+The equity Black–Scholes and Heston PDE package was accepted on 2026-11-14.
+It covers dated fixing and payment, qualified American stopping,
+widened log-spot domains, strict unit bounds and matched risk.
+[Equity and composition record 09](valuations-equity-and-composition/09-equity-pde.md#accepted-decision-for-checked-equity-blackscholes-and-heston-pde-pricing).
+
+The dated equity Heston Fourier and QE-M package was accepted on 2026-11-14.
+It covers scoped model inputs, the actual payment discount, bounded Fourier,
+explicit fixed-budget simulation and separate sampling, bias and risk evidence.
+[Equity and composition record 10](valuations-equity-and-composition/10-heston-adapters.md#accepted-decision-for-checked-dated-heston-fourier-and-monte-carlo-pricing).
+
+The equity rough Heston and rough Bergomi adapter package was accepted on
+2026-11-14. It covers scoped model inputs and dated payment, qualified
+variance sources and exact break alignment, bounded parity estimation,
+explicit history work and matched risk.
+[Equity and composition record 11](valuations-equity-and-composition/11-rough-volatility-adapters.md#accepted-decision-for-checked-equity-rough-volatility-adapters).
+
+The ATM term-GBM and pinned equity path-risk package was accepted on
+2026-11-14. It covers dated carry and native-clock ATM variance, exact
+live observation grids, qualified held fixing state, explicit simulation
+work and responsive selected-model risk.
+[Equity and composition record 12](valuations-equity-and-composition/12-path-gbm.md#accepted-decision-for-checked-atm-term-gbm-and-pinned-equity-path-risk).
+
+The dated autocallable package was accepted on 2026-11-14. It covers
+observation rows and qualified fixings, coupon-first replay and redemption,
+per-leg dated settlement and one held-spot holder horizon scenario.
+[Equity and composition record 13](valuations-equity-and-composition/13-autocallable.md#accepted-decision-for-checked-dated-autocallable-pricing-and-risk).
+
+The dated cliquet package was accepted on 2026-11-14. It covers distinct
+strike-setting and reset roles, checked return accumulation and one dated
+option payment, paired risk precision and phase-based holder theta.
+[Equity and composition record 14](valuations-equity-and-composition/14-cliquet.md#accepted-decision-for-checked-dated-cliquet-pricing-and-risk).
+
+The equity variance swap package was accepted on 2026-11-14. It covers
+qualified scheduled history, close-to-close interval forecasts,
+complete-history OHLC settlement, dated cash and active-source risk.
+[Equity and composition record 15](valuations-equity-and-composition/15-variance-swap.md#accepted-decision-for-checked-equity-variance-swap-pricing-and-risk).
+
+The dated equity total-return swap package was accepted on 2026-11-14.
+It covers qualified reset and cash state, explicit carry and payment roles,
+dividend treatment, shared financing and par, and qualified margin repricing.
+[Equity and composition record 16](valuations-equity-and-composition/16-equity-trs.md#accepted-decision-for-checked-dated-equity-total-return-swaps).
+
+The corporate DCF and dilution package was accepted on 2026-11-14.
+It covers authored forecast and terminal timing, normalized annual growth
+terminal cash flow, the checked common-equity bridge and treasury-stock
+active set, and full WACC repricing.
+[Equity and composition record 17](valuations-equity-and-composition/17-corporate-dcf.md#accepted-decision-for-checked-corporate-dcf-and-dilution).
+
+The dated private-fund waterfall and final clawback package was accepted on
+2026-11-14. It covers exact event order, dated hurdle and complete LP
+allocation, reachable catch-up and promote, explicit escrow and final settlement.
+[Equity and composition record 18](valuations-equity-and-composition/18-private-fund-waterfall.md#accepted-decision-for-checked-private-fund-waterfalls-and-final-clawback).
+
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the
 accepted perspective/sign contracts; broader margin methodology retains its
