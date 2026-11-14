@@ -1388,6 +1388,38 @@ Issue, benchmark, runtime and host qualification remain pending.
 The checked loan quotes, cash cost and effective-interest package was accepted on 2026-11-14.
 Legal, market, origination, runtime and host qualification remain pending.
 [Other fixed-income record 06](financial/valuations-other-fixed-income/06-loan-quotes-eir.md#accepted-decision-for-checked-loan-quotes-cash-cost-and-effective-interest).
+The checked term-loan cashflow compilation package was accepted on 2026-11-14.
+Contract, servicing, runtime and host qualification remain pending.
+[Other fixed-income record 07](financial/valuations-other-fixed-income/07-term-loan-cashflows.md#accepted-decision-for-checked-term-loan-cashflow-compilation).
+The checked term-loan valuation and exercise package was accepted on 2026-11-14.
+Contract, model, market, runtime and host qualification remain pending.
+[Other fixed-income record 08](financial/valuations-other-fixed-income/08-term-loan-pricing.md#accepted-decision-for-checked-term-loan-valuation-and-exercise).
+The checked term-loan workout yields and risk package was accepted on 2026-11-14.
+Legal, market, model, runtime and host qualification remain pending.
+[Other fixed-income record 09](financial/valuations-other-fixed-income/09-term-loan-risk-yields.md#accepted-decision-for-checked-term-loan-workout-yields-and-risk).
+The checked revolver cashflows package was accepted on 2026-11-14.
+Contract servicing, model, runtime and host qualification remain pending.
+[Other fixed-income record 10](financial/valuations-other-fixed-income/10-revolver-cashflows.md#accepted-decision-for-checked-revolver-contractual-cashflows).
+The checked revolver simulation and default valuation package was accepted on 2026-11-14.
+Contract, market, model, runtime and host qualification remain pending.
+[Other fixed-income record 11](financial/valuations-other-fixed-income/11-revolver-monte-carlo-credit.md#accepted-decision-for-checked-revolver-simulation-and-default-valuation).
+The checked revolver quotes, exposure and risk package was accepted on 2026-11-14.
+Legal, market, model, runtime and host qualification remain pending.
+[Other fixed-income record 12](financial/valuations-other-fixed-income/12-revolver-quotes-risk.md#accepted-decision-for-checked-revolver-quotes-exposure-and-risk).
+The checked agency MBS projection and cash ownership package was accepted on 2026-11-14.
+Issuer, servicing, market, runtime and host qualification remain pending.
+[Other fixed-income record 13](financial/valuations-other-fixed-income/13-mbs-projection.md#accepted-decision-for-checked-agency-mbs-projection-and-cash-ownership).
+The checked agency MBS rate risk and OAS package was accepted on 2026-11-14.
+Borrower-model, market, runtime and host qualification remain pending.
+[Other fixed-income record 14](financial/valuations-other-fixed-income/14-mbs-risk-oas.md#accepted-decision-for-checked-agency-mbs-rate-risk-and-oas).
+
+The checked TBA settlement and dollar-roll package was accepted on 2026-11-14.
+Delivery operations, market, runtime and host qualification remain pending.
+[Other fixed-income record 15](financial/valuations-other-fixed-income/15-tba-and-dollar-roll.md#accepted-decision-for-checked-tba-settlement-and-dollar-rolls).
+
+The checked fixed-income index TRS package was accepted on 2026-11-14.
+Market, margin, runtime and host qualification remain pending.
+[Other fixed-income record 16](financial/valuations-other-fixed-income/16-fi-index-trs.md#accepted-decision-for-checked-fixed-income-index-total-return-swaps).
 Other unadopted choices retain their stated Proposed or Draft status. Acceptance does not certify
 observed implementations.
 Numerical suites were not rerun in the original documentation audits.

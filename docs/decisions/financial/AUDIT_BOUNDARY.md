@@ -1061,6 +1061,66 @@ restatement, running cash cost, and EIR with OID and PIK.
 Legal, market, runtime and host qualification remain pending.
 [Other fixed-income record 06](valuations-other-fixed-income/06-loan-quotes-eir.md#accepted-decision-for-checked-loan-quotes-cash-cost-and-effective-interest).
 
+Other fixed-income record 07 was accepted on 2026-11-14. Independent
+checks cover gross draw capacity, settled OID, live principal and PIK,
+margin timing and split fee bases. Contract, servicing, runtime and host
+qualification remain pending.
+[Other fixed-income record 07](valuations-other-fixed-income/07-term-loan-cashflows.md#accepted-decision-for-checked-term-loan-cashflow-compilation).
+
+Other fixed-income record 08 was accepted on 2026-11-14. Independent
+checks cover fixing and PIK, buyer financing and delayed cash, exact
+grid placement, par recovery, exercise and a discontinuous OAS fit.
+Contract, model, market, runtime and host qualification remain pending.
+[Other fixed-income record 08](valuations-other-fixed-income/08-term-loan-pricing.md#accepted-decision-for-checked-term-loan-valuation-and-exercise).
+
+Other fixed-income record 09 was accepted on 2026-11-14. Independent
+arithmetic covers qualified workout yields, quote financing, Z cash bands,
+recovery modes and default phases. Contract, model, market, runtime and
+host qualification remain pending.
+[Other fixed-income record 09](valuations-other-fixed-income/09-term-loan-risk-yields.md#accepted-decision-for-checked-term-loan-workout-yields-and-risk).
+
+Other fixed-income record 10 was accepted on 2026-11-14. Independent
+arithmetic covers elapsed accrual, phase admission, overnight growth,
+running fees and modeled funding timing. Contract servicing, model,
+runtime and host qualification remain pending.
+[Other fixed-income record 10](valuations-other-fixed-income/10-revolver-cashflows.md#accepted-decision-for-checked-revolver-contractual-cashflows).
+
+Other fixed-income record 11 was accepted on 2026-11-14. Independent
+arithmetic covers utilization, rate and bank covariance, CIR mean anchoring,
+conditional survival, phased pending recovery and estimator units. Contract,
+market, model, runtime and host qualification remain pending.
+[Other fixed-income record 11](valuations-other-fixed-income/11-revolver-monte-carlo-credit.md#accepted-decision-for-checked-revolver-simulation-and-default-valuation).
+
+Other fixed-income record 12 was accepted on 2026-11-14. Independent
+arithmetic covers settlement, DM and XIRR, cost and EIR, credit and rate
+risk, prompt default and draw spread attribution. Legal, market, model,
+runtime and host qualification remain pending.
+[Other fixed-income record 12](valuations-other-fixed-income/12-revolver-quotes-risk.md#accepted-decision-for-checked-revolver-quotes-exposure-and-risk).
+
+Other fixed-income record 13 was accepted on 2026-11-14. Independent
+arithmetic covers amortization, monthly interest, age and mortality, dated
+remittance, factor-based pending cash and buyer accrued. Issuer, servicing,
+market, runtime and host qualification remain pending.
+[Other fixed-income record 13](valuations-other-fixed-income/13-mbs-projection.md#accepted-decision-for-checked-agency-mbs-projection-and-cash-ownership).
+
+Other fixed-income record 14 was accepted on 2026-11-14. Independent
+arithmetic covers refinancing response, key-rate and effective risk, dated
+discounting, the price-fit residual and fixed-strip spread. Borrower-model,
+market, runtime and host qualification remain pending.
+[Other fixed-income record 14](valuations-other-fixed-income/14-mbs-risk-oas.md#accepted-decision-for-checked-agency-mbs-rate-risk-and-oas).
+
+Other fixed-income record 15 was accepted on 2026-11-14. Independent
+arithmetic covers delivered-face invoicing, original-date claim and invoice
+PV, phased roll netting and timed surviving-face financing and specialness.
+Delivery operations, market, runtime and host qualification remain pending.
+[Other fixed-income record 15](valuations-other-fixed-income/15-tba-and-dollar-roll.md#accepted-decision-for-checked-tba-settlement-and-dollar-rolls).
+
+Other fixed-income record 16 was accepted on 2026-11-14. Independent
+arithmetic covers exact and projected index returns, financing, payment
+phase, spread annuity, par and duration. Market, margin, runtime and host
+qualification remain pending.
+[Other fixed-income record 16](valuations-other-fixed-income/16-fi-index-trs.md#accepted-decision-for-checked-fixed-income-index-total-return-swaps).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

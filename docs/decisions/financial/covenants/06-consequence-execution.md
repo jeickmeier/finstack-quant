@@ -20,7 +20,7 @@ Conversions and target calls are exact dispatch choices: default sets status tru
 
 `InstrumentMutator + Clone` supplies transactional isolation only if cloning isolates mutable state and methods have no external side effects, as the source contract requires. Rollback of network/accounting effects is not implemented. An error discards the local applications vector even if prior actions committed; current history retains the successful prefix but not its application dates. Consumers must not interpret an error as whole-call rollback.
 
-The inspected [TermLoan adapter](../../../../finstack-quant/valuations/fixed-income/src/term_loan/types.rs) is an important boundary example: rate changes round to whole basis points; realized default, nonzero percentage sweeps and collateral requirements error without richer typed inputs; distribution blocks set metadata; maturity changes revalidate the loan. Those choices are owned outside this 14-file ledger. An engine template is not evidence that every declared action is executable on a given instrument.
+The inspected [TermLoan adapter](../../../../finstack-quant/valuations/fixed-income/src/term_loan/types.rs) is an important boundary example: the current rate-change adapter preserves fractional basis points without recording a dated coupon event; realized default, nonzero percentage sweeps and collateral requirements error without richer typed inputs; distribution blocks set metadata; maturity changes revalidate the loan. Those choices are owned outside this 14-file ledger. An engine template is not evidence that every declared action is executable on a given instrument.
 
 ## Rationale, alternatives and evidence
 

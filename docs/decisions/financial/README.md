@@ -1108,6 +1108,59 @@ explicit curve DM and annual-effective yield, covered funded balance-time,
 and an authorized origination cash ledger for effective interest.
 [Other fixed-income record 06](valuations-other-fixed-income/06-loan-quotes-eir.md#accepted-decision-for-checked-loan-quotes-cash-cost-and-effective-interest).
 
+The checked term-loan cashflow package was accepted on 2026-11-14.
+It binds covered funding and contractual dates, nonrevolving draw
+capacity, settled OID allocations, live principal phases, coupon
+and PIK elections and independently authored fee periods.
+[Other fixed-income record 07](valuations-other-fixed-income/07-term-loan-cashflows.md#accepted-decision-for-checked-term-loan-cashflow-compilation).
+
+The checked term-loan pricing and exercise package was accepted on
+2026-11-14. It uses original-cut fixing-led valuation, a separate
+settlement buyer bridge, exact rates or rates-credit lattice dates,
+eligible-par recovery and contractual exercise and OAS controls.
+[Other fixed-income record 08](valuations-other-fixed-income/08-term-loan-pricing.md#accepted-decision-for-checked-term-loan-valuation-and-exercise).
+
+The checked term-loan workout yields and risk package was accepted on
+2026-11-14. It uses actual buyer settlement, complete borrower workouts,
+separate quote laws, held model risk and phased recovery and default.
+[Other fixed-income record 09](valuations-other-fixed-income/09-term-loan-risk-yields.md#accepted-decision-for-checked-term-loan-workout-yields-and-risk).
+
+The checked revolver cashflows package was accepted on 2026-11-14.
+It uses covered elapsed state, exact phased revolving capacity, independently
+dated claims and fee parents, and modeled funding at explicit dated nodes.
+[Other fixed-income record 10](valuations-other-fixed-income/10-revolver-cashflows.md#accepted-decision-for-checked-revolver-contractual-cashflows).
+
+The checked revolver simulation and default valuation package was accepted on
+2026-11-14. It covers phased joint funding, fitted bank discounting, explicit
+credit modes, claim-level survival and recovery, and checked Monte Carlo results.
+[Other fixed-income record 11](valuations-other-fixed-income/11-revolver-monte-carlo-credit.md#accepted-decision-for-checked-revolver-simulation-and-default-valuation).
+
+The checked revolver quotes, exposure and risk package was accepted on
+2026-11-14. It covers actual buyer and accrued claims, cash-cost and EIR
+bases, phased exposure, same-path expected loss and distinct risk experiments.
+[Other fixed-income record 12](valuations-other-fixed-income/12-revolver-quotes-risk.md#accepted-decision-for-checked-revolver-quotes-exposure-and-risk).
+
+The checked agency MBS projection and cash ownership package was accepted on
+2026-11-14. It covers dated fixed-rate pool state, exact principal retirement,
+security-specific remittance, factor vintages and holder and purchaser claims.
+[Other fixed-income record 13](valuations-other-fixed-income/13-mbs-projection.md#accepted-decision-for-checked-agency-mbs-projection-and-cash-ownership).
+
+The checked agency MBS rate risk and OAS package was accepted on
+2026-11-14. It covers the shared monthly refinancing response, source-exact
+held-spread risk, dated Hull–White bank discounting and the verified buyer spread fit.
+[Other fixed-income record 14](valuations-other-fixed-income/14-mbs-risk-oas.md#accepted-decision-for-checked-agency-mbs-rate-risk-and-oas).
+
+The checked TBA settlement and dollar-roll package was accepted on
+2026-11-14. It covers dated delivery authority and actual face, transferred
+claims and invoice valuation, physical reporting and surviving-face financing.
+[Other fixed-income record 15](valuations-other-fixed-income/15-tba-and-dollar-roll.md#accepted-decision-for-checked-tba-settlement-and-dollar-rolls).
+
+The checked fixed-income index TRS package was accepted on 2026-11-14. It
+covers contractual return observations and settlement, explicit carry, shared
+financing and verified par spread, curve and hedge risk, margin and reporting.
+All sixteen other fixed-income records are accepted.
+[Other fixed-income record 16](valuations-other-fixed-income/16-fi-index-trs.md#accepted-decision-for-checked-fixed-income-index-total-return-swaps).
+
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the
 accepted perspective/sign contracts; broader margin methodology retains its
