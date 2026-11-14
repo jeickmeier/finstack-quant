@@ -965,6 +965,12 @@ co-dated cash, inverse uniqueness and the Japanese simple-yield clock.
 Runtime, market-specific quote, risk and host qualification remain pending.
 [Bond valuation record 10](valuations-bonds/10-quoted-yield.md#accepted-decision-for-checked-settlement-yield-and-price-inversion).
 
+Bond valuation record 11 was accepted on 2026-11-14. Independent
+checks cover issuer-controlled branch selection and ties, complete
+inverse admission, branch-dependent I-spread ambiguity and phased
+redemption. Contractual, market-quote, runtime and host qualification remain pending.
+[Bond valuation record 11](valuations-bonds/11-workout-yield.md#accepted-decision-for-checked-bond-workouts-and-yield-to-worst).
+
 Bond valuation record 12 was accepted on 2026-11-14. Independent
 examples cover the native discount clock, projected floating cash,
 benchmark path consistency, buyer-claim carry and discontinuous OAS.
@@ -1018,6 +1024,42 @@ checks cover signed returns, distinct minimizing exit paths, the
 ACT/365F leap-year rate, failed XIRR admission and retained exit cash.
 Historical coverage, contractual path, runtime and host qualification remain pending.
 [Bond valuation record 20](valuations-bonds/20-lifetime-returns.md#accepted-decision-for-checked-bond-issue-to-exit-returns).
+
+Other fixed-income record 01 was accepted on 2026-11-14. Independent
+checks cover fixed-deliverable carry, eight published CME factor
+examples, separate invoice arithmetic and variation accounting.
+Venue, market, runtime and host qualification remain pending.
+[Other fixed-income record 01](valuations-other-fixed-income/01-bond-futures.md#accepted-decision-for-checked-bond-futures-carry-factors-and-listed-marks).
+
+Other fixed-income record 02 was accepted on 2026-11-14. Independent
+checks cover CRR survival and recovery, terminal-only convergence,
+exact alignment, exercise comparisons, adjustments and pending claims.
+Contract, market, runtime and host qualification remain pending.
+[Other fixed-income record 02](valuations-other-fixed-income/02-convertible-lattice.md#accepted-decision-for-checked-convertible-lattice-and-exercise).
+
+Other fixed-income record 03 was accepted on 2026-11-14. Independent
+checks cover settlement cash and accrued, nonunique IV and trigger gaps,
+OAS held-transition repricing, and bump and horizon arithmetic.
+Legal, grid, market, runtime and host qualification remain pending.
+[Other fixed-income record 03](valuations-other-fixed-income/03-convertible-quotes-risk.md#accepted-decision-for-checked-convertible-quotes-and-risk).
+
+Other fixed-income record 04 was accepted on 2026-11-14. Independent
+checks reproduce US and UK reference examples and check Japanese
+reference geometry, real/nominal cash and hybrid floor arithmetic.
+Issue, volatility, model, runtime and host qualification remain pending.
+[Other fixed-income record 04](valuations-other-fixed-income/04-inflation-indexation.md#accepted-decision-for-checked-inflation-linked-bond-indexation-and-floors).
+
+Other fixed-income record 05 was accepted on 2026-11-14. Independent
+checks reproduce Treasury and AFT quote examples and cover analytic
+real duration, Fisher conversion and CPI and nominal risk arithmetic.
+Issue, benchmark, runtime and host qualification remain pending.
+[Other fixed-income record 05](valuations-other-fixed-income/05-inflation-yields-risk.md#accepted-decision-for-checked-inflation-bond-yields-breakeven-and-risk).
+
+Other fixed-income record 06 was accepted on 2026-11-14. Independent
+checks cover margin inversion and nonmonotone signed strips, annual yield
+restatement, running cash cost, and EIR with OID and PIK.
+Legal, market, runtime and host qualification remain pending.
+[Other fixed-income record 06](valuations-other-fixed-income/06-loan-quotes-eir.md#accepted-decision-for-checked-loan-quotes-cash-cost-and-effective-interest).
 
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons

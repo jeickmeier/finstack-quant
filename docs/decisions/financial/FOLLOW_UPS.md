@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **632 review items across 33 source scopes with open items**
+This backlog consolidates **633 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -19,16 +19,16 @@ evidence with the owning entry instead of duplicating task lists in records.
 
 The labels distinguish the work required:
 
-- **Observed** (129): a static implementation, contract, dispatch or
+- **Observed** (128): a static implementation, contract, dispatch or
   documentation difference. Its financial impact is not necessarily reproduced.
 - **Investigate** (44): a source-derived numerical or economic concern
   requiring targeted reproduction, an independent reference or convergence
   study before a defect conclusion.
-- **Decision** (182): a financial convention, supported domain, approximation,
+- **Decision** (178): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (217): implementation and verification work against an
+- **Reconciliation** (224): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
-- **Evidence** (60): a particular primary-reference, empirical-calibration,
+- **Evidence** (59): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
 
 These categories are not severity rankings. A decision can expose implementation
@@ -59,7 +59,7 @@ product consequences remain in their product scope.
 | [Shared valuation framework](#shared-valuation-framework) | 20 |
 | [Rates valuations](#rates-valuations) | 28 |
 | [Bond valuations](#bond-valuations) | 28 |
-| [Other fixed income](#other-fixed-income) | 19 |
+| [Other fixed income](#other-fixed-income) | 20 |
 | [Equity and composition](#equity-and-composition) | 20 |
 | [FX, commodities and exotics](#fx-commodities-and-exotics) | 19 |
 | [Structured credit](#structured-credit) | 24 |
@@ -604,7 +604,7 @@ product consequences remain in their product scope.
 
 - **Reconciliation — Accepted settlement yield conventions and price inversion.** Record 10 was accepted on 2026-11-14. Reconcile explicit nominal and named market profiles, settlement claim coordinates, U.S. Street final-period branch, Moosmüller anchor, scoped Japanese simple yield and a common monotone residual-checked inverse. Qualify price, risk, carry and host routes. [Accepted record 10](valuations-bonds/10-quoted-yield.md#accepted-decision-for-checked-settlement-yield-and-price-inversion).
 
-- **Decision — Bond workouts and yield to worst.** Review the proposed settlement price authority, exact issuer-controlled candidate set, phase-qualified buyer cash, complete finite YTW and checked monotone inverse, fixed-path-only I-spread and full-identity reporting. [Proposed record 11](valuations-bonds/11-workout-yield.md#proposed-decision-for-checked-bond-workouts-and-yield-to-worst).
+- **Reconciliation — Accepted bond workouts and yield to worst.** Record 11 was accepted on 2026-11-14. Reconcile settlement price authority, exact issuer-controlled candidates, phase-qualified buyer cash, complete finite YTW and checked monotone inverse, fixed-path-only I-spread and full-identity reporting. [Accepted record 11](valuations-bonds/11-workout-yield.md#accepted-decision-for-checked-bond-workouts-and-yield-to-worst).
 
 - **Reconciliation — Accepted bond spread definitions and price inversions.** Record 12 was accepted on 2026-11-14. Reconcile settlement Z and curve DM, explicit swap and sovereign benchmarks, qualified fixed-workout dependencies, selected-model OAS, returned-price residuals and shared failures and reporting. Required quote compounding remains governed by O6. [Accepted record 12](valuations-bonds/12-spread-quotes.md#accepted-decision-for-checked-bond-spreads-and-price-inversion).
 
@@ -632,13 +632,15 @@ product consequences remain in their product scope.
 
 - **Observed — Convertible model identity differs from residual terminology.** Total and cash components share DF*survival continuation plus fractional recovery; surviving stock drift includes hazard. This is not split-discount Tsiveriotis–Fernandes. Reconcile model/risk names and qualify the intended credit formulation independently. Records: [02](valuations-other-fixed-income/02-convertible-lattice.md), [03](valuations-other-fixed-income/03-convertible-quotes-risk.md).
 
-- **Decision — Convertible dilution and soft-call timing.** All validated dilution events immediately alter conversion ratio without as-of filtering. Soft-call days-above requirements use BGK trigger uplift rather than historical observation counts. Adopt future/event/history semantics and approximation accuracy, including already-passed mandatory dates, dividend protection, terminal split smoothing, soft-call approximation provenance and grid convergence. Records: [02](valuations-other-fixed-income/02-convertible-lattice.md).
+- **Reconciliation — Convertible lattice, exercise and realized adjustments.** Implement the accepted jump-to-zero CRR, eligible-par recovery, exact event placement, contractual choice and resolved settlement states, and effective-only adjustment rules. Qualify legal fixtures, lattice convergence and native/host pricing separately. [Accepted record 02](valuations-other-fixed-income/02-convertible-lattice.md#accepted-decision-for-checked-convertible-lattice-and-exercise).
 
-- **Observed — Convertible sensitivity contracts can alter validation/model paths.** Conversion01 bumps only ratio when ratio and price coexist, potentially violating consistency. Vega treats any down-reprice Validation error as one-sided permission; OAS shifts hazard when credit exists and discount otherwise. Define intended validation/fallback and economic risk experiment, reconcile synthetic-credit/OAS naming and set economically appropriate inverse-quote residual tolerances. Records: [03](valuations-other-fixed-income/03-convertible-quotes-risk.md).
+- **Reconciliation — Convertible settlement quotes, inverse fits and risk.** Implement the accepted settlement buyer-claim bridge, cash accrued, comparable diagnostics, separate OAS and implied hazard-spread fits, held-basis risk, and explicit spot ladder. Qualify settlement, quote and credit replay fixtures, grid/bump stability and consumer agreement. [Accepted record 03](valuations-other-fixed-income/03-convertible-quotes-risk.md#accepted-decision-for-checked-convertible-quotes-and-risk).
 
-- **Decision — Inflation-bond floor, yield and ownership.** Unknown protected CPI uses one Black ratio even with hybrid observed/projected anchors; published index-only data has zero projection risk. Breakeven compares nominal zero yield with real coupon-bond yield; real-yield same-day ownership differs from nominal PV. Horizon conversion has one-year error fallback and rounded frequency. Adopt hybrid publication fallback, floor-vol quote interpretation, jurisdiction contracts, unnormalized convexity units, same-day ownership, nominal breakeven reference and failure policy. Establish independent market/quote vectors. Records: [04](valuations-other-fixed-income/04-inflation-indexation.md), [05](valuations-other-fixed-income/05-inflation-yields-risk.md).
+- **Reconciliation — Inflation-bond reference, floors and nominal cash.** Implement the issue-specific reference and rounding, explicit point-in-time anchors and authorized release contingencies, qualified floors, real-par retirement and nominal PV/export. Qualify legal cash, live approximation, runtime and host evidence. [Accepted record 04](valuations-other-fixed-income/04-inflation-indexation.md#accepted-decision-for-checked-inflation-linked-bond-indexation-and-floors).
 
-- **Decision — Loan EIR fee eligibility and inverse policy.** Default EIR can include commitment, LC and fronting fees without accounting eligibility/staging. IRR may be nonunique and margin bounds are checked after solving. Define quote units, accounting scope, multiple-root policy and currency-scaled residual tolerances. Establish independent OID schedules with delayed draws and PIK. Records: [06](valuations-other-fixed-income/06-loan-quotes-eir.md).
+- **Reconciliation — Inflation-bond real yields, breakeven and risk.** Implement the accepted settlement and real quote profiles, checked inversion and analytic duration, comparable nominal coupon benchmark, explicit reference ratio and typed CPI/nominal risk. Qualify issue, benchmark, repricing, attribution and host evidence. [Accepted record 05](valuations-other-fixed-income/05-inflation-yields-risk.md#accepted-decision-for-checked-inflation-bond-yields-breakeven-and-risk).
+
+- **Reconciliation — Shared loan quotes, cash cost and effective interest.** Implement the accepted actual buyer strip, curve DM and XIRR controls, running cash over funded balance-time, commitment and fee authority, and original effective-interest ledger and adjustment reporting. Qualify entitlement, market quote, origination, runtime and host evidence. [Accepted record 06](valuations-other-fixed-income/06-loan-quotes-eir.md#accepted-decision-for-checked-loan-quotes-cash-cost-and-effective-interest).
 
 - **Decision — Term-loan principal and fee timing.** Over-amortization caps to funded balance; floating margin changes snap to accrual boundaries unlike fixed steps. Commitment-fee integration grids draws/commitment changes but needs other-principal-event cases. Adopt absolute OID allocation after draw stops and contractual timing. Records: [07](valuations-other-fixed-income/07-term-loan-cashflows.md).
 
@@ -666,7 +668,7 @@ product consequences remain in their product scope.
 
 - **Decision — Fixed-income index TRS is a carry/proxy model.** Exponential-yield carry omits constituent price, roll-down and credit MTM. DurationDv01/SIMM are signed N*duration*1bp rather than PV derivatives; one IR bucket omits financing/index-credit risk while VM uses carry PV. Negative finite duration is permitted. Adopt valuation/analytics/margin uses, yield day-count convention, fixing/initial-level precedence, negative-duration domain and missing-risk policy; establish an independent constituent-index reconciliation. Records: [16](valuations-other-fixed-income/16-fi-index-trs.md).
 
-- **Evidence — Bond-future exchange scope.** CTD and factor are caller-supplied; a CME-style factor helper does not cover every exchange. No basket optimization, delivery option or convexity is modeled. Establish exchange-rule provenance, contract-specific factor fixtures and accuracy limits/fair-value scope for the selected-CTD proxy; no independent delivery-option benchmark is established. Records: [01](valuations-other-fixed-income/01-bond-futures.md).
+- **Reconciliation — Bond-future carry, factors and listed marks.** Implement the accepted fixed-deliverable proxy with explicit financing, venue factor authority, retained cash and accrued, listed marking and variation, separate physical invoice and held-basis risk. Independently qualify venue coverage, payable cash, proxy responses and host agreement. [Accepted record 01](valuations-other-fixed-income/01-bond-futures.md#accepted-decision-for-checked-bond-futures-carry-factors-and-listed-marks).
 
 ## Equity and composition
 

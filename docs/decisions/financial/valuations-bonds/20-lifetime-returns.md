@@ -127,7 +127,9 @@
    right, its notice and exercise phase, redemption and actual cash
    dates. Omit a right only when adjudicated unavailable or unreachable
    on the elected basis. No arbitrary sample of windows, date-only
-   tuple or dependence on BONDS-11's draft workout enumeration.
+   tuple or dependence on the trade YTW candidate set. Share
+   qualified rights and cash preparation with BONDS-11 where its
+   settlement-buyer and this issue-holder experiment agree.
    Resolve state, stock and legal payment priority at the exact
    phase. Retain vested amounts paid earlier or independently owed,
    including properly admitted same-date or later receipts. Drop

@@ -1010,6 +1010,12 @@ coordinates, qualified named market profiles and price-residual
 checks for returned yields.
 [Bond valuation record 10](valuations-bonds/10-quoted-yield.md#accepted-decision-for-checked-settlement-yield-and-price-inversion).
 
+The bond workout package was accepted on 2026-11-14, completing all
+twenty detailed bond decisions. It specifies an issuer-controlled YTW
+minimum on a common settlement buyer basis, full branch verification
+for inverse YTW and fixed-path-only I-spread inversion.
+[Bond valuation record 11](valuations-bonds/11-workout-yield.md#accepted-decision-for-checked-bond-workouts-and-yield-to-worst).
+
 The bond spread package was accepted on 2026-11-14. It specifies
 settlement-native Z-spread and curve discount margin, separate swap
 and government benchmarks, selected-model buyer-claim OAS and checked
@@ -1065,6 +1071,42 @@ specifies explicit original investment, covered signed cash, net MOIC,
 canonical ACT/365F XIRR and complete issuer-call minima with exact cash
 phases and no skipped failed candidates.
 [Bond valuation record 20](valuations-bonds/20-lifetime-returns.md#accepted-decision-for-checked-bond-issue-to-exit-returns).
+
+The checked bond-futures package was accepted on 2026-11-14. It
+requires an explicit fixed deliverable, authoritative factor and
+financing, with listed marking and a separate physical delivery
+invoice on their own contractual bases.
+[Other fixed-income record 01](valuations-other-fixed-income/01-bond-futures.md#accepted-decision-for-checked-bond-futures-carry-factors-and-listed-marks).
+
+The convertible lattice package was accepted on 2026-11-14. It
+requires explicit default and market roles, exact event placement,
+contractual exercise and entitlement, and effective conversion
+adjustments. Surviving fixed cash and share claims keep their dated basis.
+[Other fixed-income record 02](valuations-other-fixed-income/02-convertible-lattice.md#accepted-decision-for-checked-convertible-lattice-and-exercise).
+
+The checked convertible quotes and risk package was accepted on
+2026-11-14. It uses matched buyer claims and signed cash accrued,
+with separate option-adjusted discount and issuer intensity fits,
+returned-price residuals and explicit dated risk experiments.
+[Other fixed-income record 03](valuations-other-fixed-income/03-convertible-quotes-risk.md#accepted-decision-for-checked-convertible-quotes-and-risk).
+
+The checked inflation-linked bond indexation and floors package was
+accepted on 2026-11-14. It binds issue-specific references and
+protection, point-in-time anchor resolution, real-par retirement
+and dated nominal cash and floor valuation.
+[Other fixed-income record 04](valuations-other-fixed-income/04-inflation-indexation.md#accepted-decision-for-checked-inflation-linked-bond-indexation-and-floors).
+
+The checked inflation-bond yields, breakeven and risk package was
+accepted on 2026-11-14. It uses explicit real settlement quote laws,
+analytic real duration, an authorized comparable nominal coupon
+benchmark and typed actual projection and nominal curve risk.
+[Other fixed-income record 05](valuations-other-fixed-income/05-inflation-yields-risk.md#accepted-decision-for-checked-inflation-bond-yields-breakeven-and-risk).
+
+The shared loan quotes, cash cost and effective-interest package was
+accepted on 2026-11-14. It requires an entitled buyer cash strip,
+explicit curve DM and annual-effective yield, covered funded balance-time,
+and an authorized origination cash ledger for effective interest.
+[Other fixed-income record 06](valuations-other-fixed-income/06-loan-quotes-eir.md#accepted-decision-for-checked-loan-quotes-cash-cost-and-effective-interest).
 
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the

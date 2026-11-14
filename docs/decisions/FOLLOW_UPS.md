@@ -1340,6 +1340,9 @@ Runtime, stochastic fit, market, risk and host qualification remain pending.
 The checked settlement yield and price inversion package was accepted on 2026-11-14.
 Runtime, market-specific quote, risk and host qualification remain pending.
 [Bond valuation record 10](financial/valuations-bonds/10-quoted-yield.md#accepted-decision-for-checked-settlement-yield-and-price-inversion).
+The checked bond workouts and YTW package was accepted on 2026-11-14, completing the twenty bond methodology decisions.
+Contractual, market-quote, runtime and host qualification remain pending.
+[Bond valuation record 11](financial/valuations-bonds/11-workout-yield.md#accepted-decision-for-checked-bond-workouts-and-yield-to-worst).
 The checked bond spreads and price inversion package was accepted on 2026-11-14.
 Runtime, market, workout, risk and host qualification remain pending.
 [Bond valuation record 12](financial/valuations-bonds/12-spread-quotes.md#accepted-decision-for-checked-bond-spreads-and-price-inversion).
@@ -1367,6 +1370,24 @@ Product, market, runtime and host qualification remain pending.
 The checked bond issue-to-exit package, including signed-net MOIC and the complete issuer-call minimum, was accepted on 2026-11-14.
 Contractual path, historical coverage, runtime and host qualification remain pending.
 [Bond valuation record 20](financial/valuations-bonds/20-lifetime-returns.md#accepted-decision-for-checked-bond-issue-to-exit-returns).
+The fixed-deliverable bond-futures proxy and separate physical invoice were accepted on 2026-11-14.
+Venue, market, runtime and host qualification remain pending.
+[Other fixed-income record 01](financial/valuations-other-fixed-income/01-bond-futures.md#accepted-decision-for-checked-bond-futures-carry-factors-and-listed-marks).
+The checked convertible lattice, exercise and settlement package was accepted on 2026-11-14.
+Contract, model, market, runtime and host qualification remain pending.
+[Other fixed-income record 02](financial/valuations-other-fixed-income/02-convertible-lattice.md#accepted-decision-for-checked-convertible-lattice-and-exercise).
+The checked convertible quote and risk package, including separate OAS and implied hazard-spread fits, was accepted on 2026-11-14.
+Legal, grid, market, runtime and host qualification remain pending.
+[Other fixed-income record 03](financial/valuations-other-fixed-income/03-convertible-quotes-risk.md#accepted-decision-for-checked-convertible-quotes-and-risk).
+The checked inflation-linked bond indexation and floors package was accepted on 2026-11-14.
+Issue, market, model, runtime and host qualification remain pending.
+[Other fixed-income record 04](financial/valuations-other-fixed-income/04-inflation-indexation.md#accepted-decision-for-checked-inflation-linked-bond-indexation-and-floors).
+The checked inflation-bond yields, breakeven and risk package was accepted on 2026-11-14.
+Issue, benchmark, runtime and host qualification remain pending.
+[Other fixed-income record 05](financial/valuations-other-fixed-income/05-inflation-yields-risk.md#accepted-decision-for-checked-inflation-bond-yields-breakeven-and-risk).
+The checked loan quotes, cash cost and effective-interest package was accepted on 2026-11-14.
+Legal, market, origination, runtime and host qualification remain pending.
+[Other fixed-income record 06](financial/valuations-other-fixed-income/06-loan-quotes-eir.md#accepted-decision-for-checked-loan-quotes-cash-cost-and-effective-interest).
 Other unadopted choices retain their stated Proposed or Draft status. Acceptance does not certify
 observed implementations.
 Numerical suites were not rerun in the original documentation audits.

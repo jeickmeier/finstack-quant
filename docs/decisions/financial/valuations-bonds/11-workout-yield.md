@@ -1,11 +1,11 @@
 # VALUATIONS-BONDS-11: Workout enumeration, yield to worst and inverse workout pricing
 
-**Decision status:** Draft — proposed package for review.
-**Implementation status:** Observed in the linked bond production scope; discrepancies are identified explicitly.
+**Decision status:** Accepted — complete checked workout package, including the issuer-controlled YTW minimum and fixed-path-only I-spread inversion, 2026-11-14.
+**Implementation status:** Runtime and caller reconciliation pending. Observed behavior is recorded below.
 **Validation status:** Source, primary references and independent arithmetic reviewed. Runtime, contractual, market-quote and host qualification pending.
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Proposed decision for checked bond workouts and yield to worst
+## Accepted decision for checked bond workouts and yield to worst
 
 1. **Bind one settlement price and one explicit quote law.** Keep the
    original valuation date, information and payment cuts, actual

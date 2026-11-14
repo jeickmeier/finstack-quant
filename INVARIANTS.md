@@ -622,6 +622,12 @@ an explicit quote law and its contractual yield coordinates. Returned
 yields reprice that same claim within the applicable currency tolerance.
 [Accepted settlement yield and price inversion](docs/decisions/financial/valuations-bonds/10-quoted-yield.md#accepted-decision-for-checked-settlement-yield-and-price-inversion).
 
+Bond YTW uses one settlement dirty basis and complete eligible issuer-call
+and maturity paths under the elected holder policy. The inverse verifies
+every branch at the represented price. I-spread inversion requires an
+explicit fixed-workout identity and its qualified benchmark.
+[Accepted bond workouts and yield to worst](docs/decisions/financial/valuations-bonds/11-workout-yield.md#accepted-decision-for-checked-bond-workouts-and-yield-to-worst).
+
 Bond spreads retain their declared settlement cash, benchmark or
 selected-model basis. Z-spread and curve discount margin shift the
 native discount law. OAS uses the qualified buyer claim at the original
@@ -676,6 +682,41 @@ signed cash ledger. MOIC uses net receipts and XIRR uses the canonical
 ACT/365F law. Worst returns require the complete eligible issuer-call
 scenario set, with separately resolved paths and failures per measure.
 [Accepted bond issue-to-exit returns](docs/decisions/financial/valuations-bonds/20-lifetime-returns.md#accepted-decision-for-checked-bond-issue-to-exit-returns).
+
+Bond-futures model points require one explicitly selected deliverable,
+authoritative factor and dated funding. Listed variation uses the applicable
+mark and clearing reference once. Actual delivery uses the official assigned
+security and invoice as a separate exchange.
+[Accepted bond-futures package](docs/decisions/financial/valuations-other-fixed-income/01-bond-futures.md#accepted-decision-for-checked-bond-futures-carry-factors-and-listed-marks).
+
+Convertible trees bind explicit issuer-equity and credit inputs, with
+exactly aligned events, prompt recovery on eligible par and contractual
+exercise by phase. Conversion adjustments apply once when effective.
+Fixed surviving cash and share claims keep their legal settlement basis.
+[Accepted convertible lattice](docs/decisions/financial/valuations-other-fixed-income/02-convertible-lattice.md#accepted-decision-for-checked-convertible-lattice-and-exercise).
+
+Convertible inverse quotes target the matched settlement buyer claim.
+OAS overlays discounting with equity transitions and issuer hazard held.
+Implied hazard spread moves issuer intensity under its own clock.
+[Accepted convertible quotes and risk](docs/decisions/financial/valuations-other-fixed-income/03-convertible-quotes-risk.md#accepted-decision-for-checked-convertible-quotes-and-risk).
+
+Inflation-linked bonds bind the original issue index and denominator,
+exact contractual reference and payment dates, and eligible observations
+at the knowledge cut. Real par retires separately from indexed nominal
+redemption. Live protected cash uses a qualified matching ratio model.
+[Accepted inflation-linked bond indexation and floors](docs/decisions/financial/valuations-other-fixed-income/04-inflation-indexation.md#accepted-decision-for-checked-inflation-linked-bond-indexation-and-floors).
+
+Inflation-bond real yields and duration use the elected unindexed
+settlement quote law. Breakeven compares authorized bond yields on
+a comparable basis after annual growth conversion. CPI risk moves
+projected anchors and nominal rate risk moves its named nominal inputs.
+[Accepted inflation-bond yields, breakeven and risk](docs/decisions/financial/valuations-other-fixed-income/05-inflation-yields-risk.md#accepted-decision-for-checked-inflation-bond-yields-breakeven-and-risk).
+
+Loan quotes use the matched settlement buyer cash and authorized dirty
+price. Curve DM and annual-effective loan yield keep their own clocks
+and eligibility. Running cash cost uses covered funded balance-time.
+The effective-interest calculation requires a qualified original ledger.
+[Accepted shared loan quotes and effective interest](docs/decisions/financial/valuations-other-fixed-income/06-loan-quotes-eir.md#accepted-decision-for-checked-loan-quotes-cash-cost-and-effective-interest).
 
 Construct and restore private validated state atomically; preserve complete model
 values/order/identity/source in snapshots and distinguish lossy presentation tables.

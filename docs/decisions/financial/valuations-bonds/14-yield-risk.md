@@ -16,7 +16,8 @@
    maturity scenario assuming no voluntary exercise or one explicitly
    selected, independently qualified fixed exit. Preserve its full
    contractual identity, rights and actual cash dates. A path dependent
-   on the draft workout record remains unavailable until qualified.
+   on workout preparation requires the accepted BONDS-11 law and
+   independent qualification for this risk basis.
    Remove the clean-price trigger and default workout selection for
    these measures. Hold scenario, exercise, entitlement, cash amounts,
    projected coupons, fixings and quote clock fixed when differentiating.
