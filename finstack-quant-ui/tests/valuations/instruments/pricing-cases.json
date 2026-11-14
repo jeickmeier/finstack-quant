@@ -42,8 +42,8 @@
         "description": "Change waterfall.tranches.0.coupon from 0.035 to 0.036; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "40593053.20381211", "currency": "USD" },
-        "edited": { "amount": "40737428.17085773", "currency": "USD" }
+        "baseline": { "amount": "40592630.39239389", "currency": "USD" },
+        "edited": { "amount": "40736917.72199193", "currency": "USD" }
       }
     },
     {
@@ -102,8 +102,8 @@
         "description": "Change trade_price from 98.5 to 99; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "893572.677143404", "currency": "USD" },
-        "edited": { "amount": "848183.070220579", "currency": "USD" }
+        "baseline": { "amount": "893443.9415738825", "currency": "USD" },
+        "edited": { "amount": "848054.3346510567", "currency": "USD" }
       }
     },
     {
@@ -1137,8 +1137,8 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "45529.489867531", "currency": "USD" },
-        "edited": { "amount": "50082.438854296", "currency": "USD" }
+        "baseline": { "amount": "45529.83375602029", "currency": "USD" },
+        "edited": { "amount": "50082.8171316199", "currency": "USD" }
       }
     },
     {

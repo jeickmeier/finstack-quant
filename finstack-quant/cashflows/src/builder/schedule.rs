@@ -624,10 +624,9 @@ impl CashFlowSchedule {
 
     /// Internal future-flow filtering step for composed schedule normalization.
     pub(crate) fn normalize_public(mut self, as_of: Date) -> finstack_quant_core::Result<Self> {
-        {
+        if !self.has_multiple_principal_currencies() {
             let initial = self.notional.initial;
-            let enforce_non_negative = initial.amount_decimal() >= rust_decimal::Decimal::ZERO
-                && !self.has_multiple_principal_currencies();
+            let non_negative_initial = initial.amount_decimal() >= rust_decimal::Decimal::ZERO;
             let mut balance = initial;
             let mut max_scale = initial.amount().abs().max(1.0);
             let order = self
@@ -640,7 +639,7 @@ impl CashFlowSchedule {
                 if balance_date < as_of {
                     if let Some(prev_date) = prev_pre_as_of_date
                         && prev_date != balance_date
-                        && enforce_non_negative
+                        && non_negative_initial
                     {
                         settle_rebased_balance(
                             &mut balance,
@@ -684,7 +683,7 @@ impl CashFlowSchedule {
                     );
                 }
             }
-            if enforce_non_negative {
+            if non_negative_initial {
                 let check_date = prev_pre_as_of_date.unwrap_or(as_of);
                 settle_rebased_balance(
                     &mut balance,
@@ -2517,7 +2516,7 @@ mod tests {
         .expect("multi-currency composite pay leg should rebase");
 
         assert_eq!(normalized.get_notional().initial.currency(), Currency::USD);
-        assert_eq!(normalized.get_notional().initial.amount(), -100.0);
+        assert_eq!(normalized.get_notional().initial.amount(), 0.0);
         assert_eq!(normalized.get_flows().len(), 2);
         normalized
             .dated_flows()

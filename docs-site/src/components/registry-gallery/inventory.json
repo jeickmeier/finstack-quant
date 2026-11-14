@@ -1832,19 +1832,19 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
-      "sha256": "a5e7fa8eeb9f2543279551b54e41fe3a919a77191cf2c17a27d3f96804e39ad1"
+      "sha256": "0bf378c1df46c9b3bf81392c3fcfa96e0adf88c6871c1af039833e967df57290"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-      "sha256": "78cca148d0c2fca65ca101fb15fcbea2cb11517ddfb438959d9c2eb4a380a753"
+      "sha256": "46b35f94c9f94a0eb3124955df84be061ed3b4b252bb692535dc2cd704369d28"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/exposures/cases.json",
-      "sha256": "7097778861183bc4875d420cee8fb6f2c5310f03b85691b82d68faf3b71a2a35"
+      "sha256": "43d7ae30c5a55c095a5bde292cb4dc24a96a09c29c0596d14e012f5df6e9874e"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/attribution/cases.json",
-      "sha256": "46cc2f0bc7f0e45cacc81c19f1d3d69cce183d6713e60c109745b93f901d84f9"
+      "sha256": "16041ee1b98be1d88026962db62f2b1d8cefe62feeadfbcc87bfa0c8dbbe4c40"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/returns/cases.json",
