@@ -300,8 +300,15 @@ fn day_count_context_supports_context_dependent_conventions() {
             .is_err()
     );
 
-    let isma_ctx =
-        JsDayCountContext::new(None, Some(JsValue::from("6M")), None, None, None).expect("context");
+    let period = js_sys::Array::of2(&JsValue::from(start), &JsValue::from(end));
+    let isma_ctx = JsDayCountContext::new(
+        None,
+        Some(JsValue::from("6M")),
+        None,
+        Some(JsValue::from(period)),
+        None,
+    )
+    .expect("context");
     let isma = JsDayCount::act_act_isma()
         .year_fraction(JsValue::from(start), JsValue::from(end), &isma_ctx)
         .unwrap();

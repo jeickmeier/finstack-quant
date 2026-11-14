@@ -9,10 +9,10 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use pyo3::IntoPyObjectExt;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyModule, PyString};
+use pyo3::types::PyModule;
 
 use crate::bindings::core::currency::extract_currency;
-use crate::bindings::core::money::{PyMoney, decimal_to_py, is_python_decimal, money_from_amount};
+use crate::bindings::core::money::{PyMoney, decimal_to_py, money_from_amount};
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::errors::core_to_py;
@@ -93,46 +93,67 @@ impl PyMarketContext {
     /// ------
     /// TypeError
     ///     If ``curve`` is not one of the supported types.
+    /// ValueError
+    ///     If a volatility surface, FX delta-vol surface, or vol cube ``id`` is
+    ///     already registered in another volatility registry, or replacing a
+    ///     curve invalidates a bound credit index.
     #[pyo3(text_signature = "(self, curve)")]
     fn insert<'py>(
         mut slf: PyRefMut<'py, Self>,
         curve: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         if let Ok(discount_curve) = curve.extract::<PyRef<'_, PyDiscountCurve>>() {
-            slf.inner.insert_mut(Arc::clone(&discount_curve.inner));
+            slf.inner
+                .try_insert_mut(Arc::clone(&discount_curve.inner))
+                .map_err(core_to_py)?;
             return Ok(slf);
         }
         if let Ok(fc) = curve.extract::<PyRef<'_, PyForwardCurve>>() {
-            slf.inner.insert_mut(Arc::clone(&fc.inner));
+            slf.inner
+                .try_insert_mut(Arc::clone(&fc.inner))
+                .map_err(core_to_py)?;
             return Ok(slf);
         }
         if let Ok(hc) = curve.extract::<PyRef<'_, PyHazardCurve>>() {
-            slf.inner.insert_mut(Arc::clone(&hc.inner));
+            slf.inner
+                .try_insert_mut(Arc::clone(&hc.inner))
+                .map_err(core_to_py)?;
             return Ok(slf);
         }
         if let Ok(ic) = curve.extract::<PyRef<'_, PyInflationCurve>>() {
-            slf.inner.insert_mut(Arc::clone(&ic.inner));
+            slf.inner
+                .try_insert_mut(Arc::clone(&ic.inner))
+                .map_err(core_to_py)?;
             return Ok(slf);
         }
         if let Ok(pc) = curve.extract::<PyRef<'_, PyPriceCurve>>() {
-            slf.inner.insert_mut(Arc::clone(&pc.inner));
+            slf.inner
+                .try_insert_mut(Arc::clone(&pc.inner))
+                .map_err(core_to_py)?;
             return Ok(slf);
         }
         if let Ok(bc) = curve.extract::<PyRef<'_, PyBaseCorrelationCurve>>() {
-            slf.inner.insert_mut(Arc::clone(&bc.inner));
+            slf.inner
+                .try_insert_mut(Arc::clone(&bc.inner))
+                .map_err(core_to_py)?;
             return Ok(slf);
         }
         if let Ok(vs) = curve.extract::<PyRef<'_, PyVolSurface>>() {
-            slf.inner.insert_surface_mut(Arc::clone(&vs.inner));
+            slf.inner
+                .try_insert_surface_mut(Arc::clone(&vs.inner))
+                .map_err(core_to_py)?;
             return Ok(slf);
         }
         if let Ok(fxd) = curve.extract::<PyRef<'_, PyFxDeltaVolSurface>>() {
             slf.inner
-                .insert_fx_delta_vol_surface_mut(Arc::clone(&fxd.inner));
+                .try_insert_fx_delta_vol_surface_mut(Arc::clone(&fxd.inner))
+                .map_err(core_to_py)?;
             return Ok(slf);
         }
         if let Ok(vc) = curve.extract::<PyRef<'_, PyVolCube>>() {
-            slf.inner.insert_vol_cube_mut(Arc::clone(&vc.inner));
+            slf.inner
+                .try_insert_vol_cube_mut(Arc::clone(&vc.inner))
+                .map_err(core_to_py)?;
             return Ok(slf);
         }
         Err(PyTypeError::new_err(
@@ -163,12 +184,15 @@ impl PyMarketContext {
     /// ----------
     /// id : str
     ///     Identifier for the scalar.
-    /// value : float | int | decimal.Decimal
-    ///     Price or unitless value. Monetary ``Decimal`` values keep full
-    ///     precision; a unitless ``Decimal`` converts to ``float``.
+    /// value : float | int | str | decimal.Decimal | Money
+    ///     Price or unitless value. A ``Money`` value carries its own currency
+    ///     and exact ``Decimal`` amount; monetary ``int``, ``str`` and
+    ///     ``Decimal`` values keep full precision; unitless scalars convert to
+    ///     ``float`` (``bool`` is rejected).
     /// currency : Currency | str, optional
-    ///     When given, the scalar is a monetary price in this currency;
-    ///     otherwise it is unitless.
+    ///     When given, the scalar is a monetary price in this currency (if
+    ///     ``value`` is ``Money``, ``currency`` must match its currency);
+    ///     otherwise a numeric ``value`` is stored as unitless.
     ///
     /// Returns
     /// -------
@@ -178,7 +202,10 @@ impl PyMarketContext {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``value`` is non-finite (Rust ``MarketScalar::from_parts``).
+    ///     If ``value`` is non-finite, cannot be parsed as a decimal price, or
+    ///     ``currency`` conflicts with a ``Money`` ``value``.
+    /// TypeError
+    ///     If ``value`` is a ``bool`` or unsupported type.
     #[pyo3(signature = (id, value, currency=None), text_signature = "(self, id, value, currency=None)")]
     fn insert_price<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -187,13 +214,22 @@ impl PyMarketContext {
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let currency = currency.map(extract_currency).transpose()?;
-        let scalar = match currency {
-            // A Decimal or decimal-text price keeps its exact Decimal amount.
-            Some(currency) if is_python_decimal(value)? || value.is_instance_of::<PyString>() => {
-                MarketScalar::Price(money_from_amount(value, currency)?)
+        let scalar = if let Ok(money) = value.extract::<PyRef<'_, PyMoney>>() {
+            if let Some(ccy) = currency
+                && ccy != money.inner.currency()
+            {
+                return Err(crate::errors::value_error(format!(
+                    "currency argument ({ccy}) does not match Money currency ({})",
+                    money.inner.currency()
+                )));
             }
-            _ => MarketScalar::from_parts(extract_f64(value, "price value")?, currency)
-                .map_err(core_to_py)?,
+            MarketScalar::Price(money.inner)
+        } else {
+            match currency {
+                Some(ccy) => MarketScalar::Price(money_from_amount(value, ccy)?),
+                None => MarketScalar::unitless(extract_f64(value, "price value")?)
+                    .map_err(core_to_py)?,
+            }
         };
         slf.inner.insert_price_mut(id, scalar);
         Ok(slf)
@@ -552,7 +588,7 @@ impl PyMarketContext {
     /// Parameters
     /// ----------
     /// days : int
-    ///     Signed 64-bit calendar days to roll (may be negative).
+    ///     Non-negative 64-bit calendar days to roll (``0`` clones curves unchanged).
     ///
     /// Returns
     /// -------
@@ -562,7 +598,8 @@ impl PyMarketContext {
     /// Raises
     /// ------
     /// ValueError
-    ///     If a rolled base date exceeds the supported date range or a curve cannot be rebuilt after rolling.
+    ///     If ``days < 0``, a rolled base date exceeds the supported date range,
+    ///     a curve cannot be rebuilt after rolling, or a bound credit index fails to rebind.
     /// OverflowError
     ///     If ``days`` is outside the signed 64-bit integer range.
     #[pyo3(text_signature = "(self, days)")]

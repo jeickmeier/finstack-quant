@@ -143,6 +143,27 @@ fn check_square_finite(matrix: &[f64], n: usize) -> std::result::Result<(), Chol
     Ok(())
 }
 
+/// Reject an `n × n` matrix whose off-diagonal entries violate symmetry beyond
+/// `SYMMETRY_TOLERANCE * max_abs_entry`.
+fn check_symmetric(matrix: &[f64], n: usize) -> std::result::Result<(), CholeskyError> {
+    let scale = matrix.iter().map(|v| v.abs()).fold(0.0_f64, f64::max);
+    let tolerance = SYMMETRY_TOLERANCE * scale;
+    for row in 0..n {
+        for col in (row + 1)..n {
+            let diff = (matrix[row * n + col] - matrix[col * n + row]).abs();
+            if diff > tolerance {
+                return Err(CholeskyError::NotSymmetric {
+                    row,
+                    col,
+                    diff,
+                    tolerance,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
 /// `n * n` for an error message, or a note that it overflows.
 fn square_len_label(n: usize) -> String {
     square_len(n).map_or_else(
@@ -214,6 +235,14 @@ pub enum CorrelationError {
     /// Symmetric eigendecomposition failed during a correlation operation.
     #[error("Symmetric eigendecomposition failed")]
     EigenDecompositionFailed,
+    /// Solver options for nearest-correlation projection are invalid.
+    #[error("Invalid nearest-correlation options: max_iter={max_iter}, tol={tol}")]
+    InvalidOptions {
+        /// Requested iteration budget (must be positive).
+        max_iter: usize,
+        /// Requested Frobenius-norm tolerance (must be finite and positive).
+        tol: f64,
+    },
 }
 
 impl From<CorrelationError> for crate::Error {
@@ -289,6 +318,20 @@ pub enum CholeskyError {
         row: usize,
         /// The column index
         col: usize,
+    },
+    /// Matrix is not symmetric within the relative symmetry tolerance.
+    #[error(
+        "Matrix is not symmetric at [{row}, {col}]: |A[{row},{col}] - A[{col},{row}]| = {diff} > {tolerance}"
+    )]
+    NotSymmetric {
+        /// Upper-triangle row index where asymmetry was detected.
+        row: usize,
+        /// Upper-triangle column index where asymmetry was detected.
+        col: usize,
+        /// Absolute difference `|A[row, col] - A[col, row]|`.
+        diff: f64,
+        /// Scale-relative symmetry tolerance that was exceeded.
+        tolerance: f64,
     },
 }
 
@@ -473,7 +516,8 @@ fn is_exactly_lower_triangular(factor: &[f64], n: usize) -> bool {
 ///
 /// - [`CholeskyError::DimensionMismatch`] if `matrix.len() != n * n`
 /// - [`CholeskyError::NonFiniteInput`] if any entry is NaN or infinite
-/// - [`CholeskyError::NotPositiveDefinite`] if a pivot is significantly negative
+/// - [`CholeskyError::NotSymmetric`] if the matrix violates symmetry beyond relative tolerance
+/// - [`CholeskyError::NotPositiveDefinite`] if a diagonal or pivot is significantly negative
 ///
 /// # Example
 ///
@@ -500,12 +544,20 @@ pub fn cholesky_correlation(
     if n == 0 {
         return CorrelationFactor::from_parts(vec![], 0);
     }
+    check_symmetric(matrix, n)?;
 
-    // Maximum diagonal value — used to set relative tolerance.
+    // Maximum diagonal magnitude — used to set scale-relative tolerance.
     let max_diag = (0..n)
-        .map(|i| matrix[i * n + i])
-        .fold(f64::NEG_INFINITY, f64::max);
-    let tol = PIVOT_TOLERANCE_RELATIVE * max_diag.abs();
+        .map(|i| matrix[i * n + i].abs())
+        .fold(0.0_f64, f64::max);
+    let tol = PIVOT_TOLERANCE_RELATIVE * max_diag;
+
+    for row in 0..n {
+        let diag = matrix[row * n + row];
+        if diag < -tol {
+            return Err(CholeskyError::NotPositiveDefinite { diag, row });
+        }
+    }
 
     // Work copy of the matrix that we reduce in-place (Schur complement updates).
     let mut a: Vec<f64> = matrix.to_vec();
@@ -519,9 +571,15 @@ pub fn cholesky_correlation(
     let mut effective_rank = 0usize;
 
     for step in 0..n {
-        // Complete diagonal pivoting: find largest remaining diagonal.
+        // Complete diagonal pivoting: find largest remaining diagonal, breaking
+        // equal-pivot ties toward the smallest index so identity/equicorrelation
+        // inputs preserve index order `[0..n]`.
         let pivot_idx = (step..n)
-            .max_by(|&ai, &bi| a[ai * n + ai].total_cmp(&a[bi * n + bi]))
+            .max_by(|&ai, &bi| {
+                a[ai * n + ai]
+                    .total_cmp(&a[bi * n + bi])
+                    .then_with(|| bi.cmp(&ai))
+            })
             .unwrap_or(step);
 
         let pivot_val = a[pivot_idx * n + pivot_idx];
@@ -616,9 +674,9 @@ pub fn cholesky_correlation(
         }
     }
 
-    // `from_parts` inspects the unpermuted factor. Unit-diagonal correlation
-    // inputs typically swap, but a covariance already in pivot order can still
-    // come out exactly lower triangular.
+    // `from_parts` inspects the unpermuted factor. Equal-diagonal correlation
+    // inputs preserve index order at step 0, whereas larger later pivots place
+    // non-zero entries above the diagonal.
     CorrelationFactor::from_parts(l_orig, n)
 }
 
@@ -641,8 +699,10 @@ pub fn cholesky_correlation(
 ///
 /// # Errors
 ///
-/// Returns [`CholeskyError::DimensionMismatch`] if `matrix.len() != n * n`, or
-/// [`CholeskyError::NonFiniteInput`] if `matrix` contains NaN or infinity.
+/// Returns [`CholeskyError::DimensionMismatch`] if `matrix.len() != n * n`,
+/// [`CholeskyError::NonFiniteInput`] if `matrix` contains NaN or infinity, or
+/// [`CholeskyError::NotSymmetric`] if `matrix` violates symmetry beyond
+/// relative tolerance.
 ///
 /// # Example
 ///
@@ -671,6 +731,7 @@ pub fn symmetric_eigen(
     if n == 0 {
         return Ok((Vec::new(), Vec::new()));
     }
+    check_symmetric(matrix, n)?;
 
     let a = nalgebra::DMatrix::from_fn(n, n, |i, j| matrix[i * n + j]);
     let eig = nalgebra::SymmetricEigen::new(a);
@@ -816,6 +877,7 @@ pub fn rows_of(matrix: &nalgebra::DMatrix<f64>) -> Vec<Vec<f64>> {
 /// # Errors
 ///
 /// Returns `CholeskyError` if:
+/// - Matrix is not symmetric within relative tolerance (`NotSymmetric`)
 /// - Matrix is not positive semi-definite (diagonal becomes negative)
 /// - Matrix is numerically singular (division by near-zero)
 /// - Matrix dimensions don't match
@@ -864,6 +926,7 @@ pub fn cholesky_decomposition_into(
             actual: l.len(),
         });
     }
+    check_symmetric(matrix, n)?;
 
     let matrix_scale = (0..n)
         .map(|i| matrix[i * n + i].abs())
@@ -1537,10 +1600,17 @@ mod tests {
 
     #[test]
     fn triangular_flag_reflects_pivot_reality() {
-        // Unit-diagonal correlation inputs tie on every initial pivot, so
-        // complete pivoting swaps and the unpermuted factor is generally NOT
-        // triangular — the flag must stay off there.
+        // Equal-pivot tie-breaking selects the smallest index, so identity and
+        // equicorrelation matrices preserve index order `[0..n]` and stay lower
+        // triangular.
         let n = 8;
+        let identity: Vec<f64> = (0..n * n)
+            .map(|k| if k / n == k % n { 1.0 } else { 0.0 })
+            .collect();
+        let id_factor = cholesky_correlation(&identity, n).expect("valid");
+        assert!(id_factor.triangular);
+        assert_eq!(id_factor.factor_matrix(), identity.as_slice());
+
         let rho = 0.5_f64;
         let corr: Vec<f64> = (0..n * n)
             .map(|k| {
@@ -1549,7 +1619,24 @@ mod tests {
             })
             .collect();
         let factor = cholesky_correlation(&corr, n).expect("valid");
-        assert!(!factor.triangular);
+        assert!(factor.triangular);
+
+        // When Schur-complement diagonals reorder variables (step 1 has
+        // `a[1,1] = 0.19 < a[2,2] = 1.0`), the unpermuted factor is NOT lower
+        // triangular and the flag must turn off while `apply` stays exact.
+        let reordered = vec![
+            1.0, 0.9, 0.0, //
+            0.9, 1.0, 0.2, //
+            0.0, 0.2, 1.0,
+        ];
+        let reordered_factor = cholesky_correlation(&reordered, 3).expect("valid");
+        assert!(!reordered_factor.triangular);
+        let z3 = [0.4, -0.6, 0.2];
+        let mut fast3 = vec![0.0; 3];
+        reordered_factor.apply(&z3, &mut fast3).expect("matching");
+        let mut ref3 = vec![0.0; 3];
+        dense_apply(&reordered_factor, &z3, &mut ref3);
+        assert_eq!(fast3, ref3);
 
         // A covariance-style input whose diagonals are already in pivot order
         // never swaps; its factor comes out exactly lower triangular and the
@@ -1870,15 +1957,25 @@ mod tests {
 
     #[test]
     fn pivoted_cholesky_apply_preserves_correlated_shocks_in_original_order() {
+        // Equal-diagonal correlation preserves original order `[0, 1]` -> lower triangular.
         let corr = vec![1.0, 0.5, 0.5, 1.0];
-        let f = cholesky_correlation(&corr, 2).expect("should succeed");
-        let z = vec![0.0, 1.0];
+        let f_corr = cholesky_correlation(&corr, 2).expect("should succeed");
         let mut z_corr = vec![0.0; 2];
+        f_corr
+            .apply(&[1.0, 0.0], &mut z_corr)
+            .expect("dimension match");
+        assert!((z_corr[0] - 1.0).abs() < 1e-12, "z_corr[0] = {}", z_corr[0]);
+        assert!((z_corr[1] - 0.5).abs() < 1e-12, "z_corr[1] = {}", z_corr[1]);
 
-        f.apply(&z, &mut z_corr).expect("dimension match");
-
+        // Unequal diagonal `[1.0, 4.0]` pivots variable 1 first, placing `0.5` above the
+        // diagonal in original variable order: `factor = [[sqrt(0.75), 0.5], [0.0, 2.0]]`.
+        let cov = vec![1.0, 1.0, 1.0, 4.0];
+        let f_piv = cholesky_correlation(&cov, 2).expect("should succeed");
+        f_piv
+            .apply(&[0.0, 1.0], &mut z_corr)
+            .expect("dimension match");
         assert!((z_corr[0] - 0.5).abs() < 1e-12, "z_corr[0] = {}", z_corr[0]);
-        assert!((z_corr[1] - 1.0).abs() < 1e-12, "z_corr[1] = {}", z_corr[1]);
+        assert!((z_corr[1] - 2.0).abs() < 1e-12, "z_corr[1] = {}", z_corr[1]);
     }
 
     #[test]
@@ -2428,5 +2525,32 @@ mod ledoit_wolf_tests {
         assert!(ledoit_wolf_shrinkage(&[1.0, 2.0, 3.0], 2, 2).is_err());
         // non-finite
         assert!(ledoit_wolf_shrinkage(&[1.0, f64::NAN, 2.0, 3.0], 2, 2).is_err());
+    }
+
+    #[test]
+    fn asymmetric_matrices_are_rejected_across_factorizations() {
+        use crate::math::linalg::{
+            CholeskyError, cholesky_correlation, cholesky_decomposition, symmetric_eigen,
+        };
+        let asym = vec![1.0, 0.5, 0.4, 1.0];
+        assert!(matches!(
+            cholesky_decomposition(&asym, 2),
+            Err(CholeskyError::NotSymmetric { row: 0, col: 1, .. })
+        ));
+        assert!(matches!(
+            cholesky_correlation(&asym, 2),
+            Err(CholeskyError::NotSymmetric { row: 0, col: 1, .. })
+        ));
+        assert!(matches!(
+            symmetric_eigen(&asym, 2),
+            Err(CholeskyError::NotSymmetric { row: 0, col: 1, .. })
+        ));
+
+        // Up-front negative diagonal check reports the exact offending row.
+        let neg_diag = vec![1.0, 0.0, 0.0, -0.25];
+        assert!(matches!(
+            cholesky_correlation(&neg_diag, 2),
+            Err(CholeskyError::NotPositiveDefinite { row: 1, diag }) if (diag - -0.25).abs() < 1e-15
+        ));
     }
 }

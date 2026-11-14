@@ -87,6 +87,113 @@ impl ForwardCurve {
             .build()
     }
 
+    /// Construct a forward curve implied by zero-rate pillars under `compounding`.
+    ///
+    /// Each `(time_years, zero_rate)` pillar is converted to a discount factor
+    /// `DF(t)` under `compounding` (with a `(0, 1)` anchor added if absent), and
+    /// simple forward rates `F(t, t + tenor_years) = (DF(t) / DF(t + tenor_years) - 1) / tenor_years`
+    /// are derived at each pillar time. Negative zero rates are supported
+    /// whenever `compounding` produces strictly positive discount factors (for
+    /// example, `1 + r * t > 0` under simple compounding or `1 + r / m > 0`
+    /// under periodic compounding). Day count and reset lag follow the same
+    /// curve-ID inference as [`ForwardCurve::builder`].
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique curve identifier (for example `"EUR-EURIBOR-3M"`).
+    /// * `tenor_years` - Positive index accrual tenor in years (`0.25` for 3M).
+    /// * `base_date` - Valuation date anchoring `t = 0`.
+    /// * `points` - `(time_years, zero_rate)` pillars with rates as decimal
+    ///   fractions (`0.04` is 4% and `-0.005` is -50 bps); times must be finite,
+    ///   non-negative, and distinct.
+    /// * `compounding` - Compounding convention under which `zero_rate` is quoted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `points` is empty, `tenor_years` is non-finite or
+    /// non-positive, any pillar time is negative or non-finite, any zero rate is
+    /// non-finite or outside `compounding`'s positive-DF domain, or the derived
+    /// forward curve fails validation.
+    pub fn from_zero_rates(
+        id: impl Into<CurveId>,
+        tenor_years: f64,
+        base_date: Date,
+        points: &[(f64, f64)],
+        compounding: crate::math::Compounding,
+    ) -> crate::Result<Self> {
+        if !tenor_years.is_finite() || tenor_years <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "ForwardCurve::from_zero_rates tenor must be finite and positive, got {tenor_years}"
+            )));
+        }
+        if points.is_empty() {
+            return Err(crate::InputError::TooFewPoints.into());
+        }
+        let id: CurveId = id.into();
+        let (day_count, reset_lag) = infer_forward_curve_defaults(id.as_str());
+
+        let mut df_knots = Vec::with_capacity(points.len() + 1);
+        let mut has_negative_rate = false;
+        for &(t, r) in points {
+            if !t.is_finite() || t < 0.0 || !r.is_finite() {
+                return Err(crate::Error::Validation(format!(
+                    "ForwardCurve::from_zero_rates requires finite non-negative times and finite rates, got (t={t}, r={r})"
+                )));
+            }
+            let df = compounding.df_from_rate(r, t);
+            if !df.is_finite() || df <= 0.0 {
+                return Err(crate::Error::Validation(format!(
+                    "ForwardCurve::from_zero_rates pillar (t={t}, r={r}) under {compounding:?} produced invalid discount factor {df}"
+                )));
+            }
+            if r < 0.0 || df > 1.0 {
+                has_negative_rate = true;
+            }
+            df_knots.push((t, df));
+        }
+        if !df_knots.iter().any(|&(t, _)| t == 0.0) {
+            df_knots.push((0.0, 1.0));
+        }
+
+        let mut disc_builder =
+            crate::market_data::term_structures::DiscountCurve::builder(id.clone())
+                .base_date(base_date)
+                .day_count(day_count)
+                .knots(df_knots);
+        if has_negative_rate {
+            disc_builder =
+                disc_builder.validation(crate::market_data::term_structures::ValidationMode::Raw {
+                    allow_non_monotonic: true,
+                    forward_floor: None,
+                });
+        }
+        let disc = disc_builder.build()?;
+        let mut forward_rates = Vec::with_capacity(disc.knots().len());
+        for &t in disc.knots() {
+            let df_start = disc.df(t);
+            let df_end = disc.df(t + tenor_years);
+            if !df_start.is_finite() || !df_end.is_finite() || df_start <= 0.0 || df_end <= 0.0 {
+                return Err(crate::Error::Validation(format!(
+                    "ForwardCurve::from_zero_rates cannot derive forward at t={t}: DF(t)={df_start}, DF(t+tenor)={df_end}"
+                )));
+            }
+            let forward_rate = (df_start / df_end - 1.0) / tenor_years;
+            if !forward_rate.is_finite() {
+                return Err(crate::Error::Validation(format!(
+                    "ForwardCurve::from_zero_rates derived non-finite forward rate at t={t}"
+                )));
+            }
+            forward_rates.push((t, forward_rate));
+        }
+
+        Self::builder(id, tenor_years)
+            .base_date(base_date)
+            .day_count(day_count)
+            .reset_lag(reset_lag)
+            .knots(forward_rates)
+            .build()
+    }
+
     /// Curve-basis forward rate starting on `date` for the curve's tenor.
     ///
     /// Converts `date` to curve time with [`ForwardCurve::curve_time`] (dates

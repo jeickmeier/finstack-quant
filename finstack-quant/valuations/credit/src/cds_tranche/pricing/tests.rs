@@ -1918,10 +1918,9 @@ fn homogeneous_path_boundary_default_prob_does_not_panic() {
     // (p <= 0 → −∞). The pricer-side clamp remains
     // load-bearing for *numerics* (−∞ would still poison the quadrature), but
     // the panic itself is gone by design.
-    assert_eq!(
-        standard_normal_inv_cdf(-1e-15_f64),
-        f64::NEG_INFINITY,
-        "standard_normal_inv_cdf must saturate to -inf (not panic) for p < 0"
+    assert!(
+        standard_normal_inv_cdf(-1e-15_f64).is_nan(),
+        "standard_normal_inv_cdf must return NaN (not panic or saturate) for p < 0"
     );
 
     // ── Part 2: homogeneous pricer must not panic and must return finite EL ──

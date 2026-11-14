@@ -124,13 +124,6 @@ impl HazardCurve {
             }
             *lambda = shifted;
         }
-        let (interp_knots, interp_sp) = survival_pillars(&self.knots, &lambdas);
-        let interp = InterpStyle::LogLinear.build_enum(
-            interp_knots.into_boxed_slice(),
-            interp_sp.into_boxed_slice(),
-            ExtrapolationPolicy::FlatForward,
-            ValidationPolicy::Strict,
-        )?;
         self.lambdas = lambdas;
         // The stored par-spread quotes were calibrated to the *unbumped*
         // hazards; keeping them would make `cds_quote_bp` report stale quotes.
@@ -139,7 +132,6 @@ impl HazardCurve {
         self.par_tenors = Box::new([]);
         self.par_spreads_bp = Box::new([]);
         self.hazard_calibration = None;
-        self.interp = interp;
         Ok(())
     }
     /// Create a curve with every model hazard rate shifted in basis-point units.
@@ -171,24 +163,26 @@ impl HazardCurve {
 
     /// Create a curve with direct hazard-rate shocks at tenor segments.
     ///
-    /// An exact knot match shocks that knot. Otherwise the segment containing
-    /// the requested tenor is shocked; targets beyond the final knot are a
-    /// no-op. A curve with a single knot has no segment to shock, so every
-    /// tenor shock is applied to that knot as one parallel bump. Requests are
-    /// applied in order, so repeated targets are additive.
-    /// Stored par-spread and calibration recipes are intentionally removed.
+    /// An exact knot match shocks that knot; otherwise the segment `(tᵢ₋₁, tᵢ]`
+    /// containing the requested positive tenor is shocked. Non-positive tenors
+    /// and tenors beyond the final knot return an error instead of silently
+    /// no-oping. A curve with a single knot shocks that sole intensity for any
+    /// positive tenor up to that knot. Requests are applied in order, so
+    /// repeated targets are additive. Stored par-spread and calibration recipes
+    /// are intentionally removed.
     ///
     /// # Arguments
     ///
     /// * `targets_bp` - Ordered `(tenor_years, bump_bp)` shocks. Tenors are
-    ///   measured from the curve base date and bumps are additive hazard-rate
-    ///   basis points.
+    ///   strictly positive year fractions measured from the curve base date and
+    ///   bumps are additive hazard-rate basis points.
     ///
     /// # Errors
     ///
-    /// Returns an error when a tenor or bump is non-finite, the curve is
-    /// malformed, any requested shock produces a negative or non-finite
-    /// hazard rate, or rebuilding the shocked curve fails validation.
+    /// Returns an error when a tenor or bump is non-finite, a tenor is
+    /// non-positive or exceeds the final knot, any requested shock produces a
+    /// negative or non-finite hazard rate, or rebuilding the shocked curve
+    /// fails validation.
     pub fn with_tenor_hazard_rate_bumps_bp(
         &self,
         targets_bp: &[(f64, f64)],
@@ -199,10 +193,18 @@ impl HazardCurve {
             .map(|(_, hazard_rate)| hazard_rate)
             .collect();
         if knots.len() < 2 {
+            let max_tenor = knots.first().copied().unwrap_or(0.0);
             let total_bp = targets_bp.iter().try_fold(0.0, |total, (tenor, bump_bp)| {
                 if !tenor.is_finite() || !bump_bp.is_finite() {
                     return Err(crate::InputError::UnsupportedBump {
                         reason: "hazard-rate tenor and basis-point bump must be finite".to_string(),
+                    });
+                }
+                if *tenor <= 0.0 || (max_tenor > 0.0 && *tenor > max_tenor + 1e-6) {
+                    return Err(crate::InputError::UnsupportedBump {
+                        reason: format!(
+                            "hazard-rate bump tenor {tenor} lies outside active knot range (0, {max_tenor}]"
+                        ),
                     });
                 }
                 Ok(total + bump_bp)
@@ -218,16 +220,23 @@ impl HazardCurve {
                 }
                 .into());
             }
-            if *tenor > last_knot + 1e-6 {
-                continue;
+            if *tenor <= 0.0 || *tenor > last_knot + 1e-6 {
+                return Err(crate::InputError::UnsupportedBump {
+                    reason: format!(
+                        "hazard-rate bump tenor {tenor} lies outside active knot range (0, {last_knot}]"
+                    ),
+                }
+                .into());
             }
-            let target_index = knots
+            let min_active_idx = usize::from(knots[0] == 0.0);
+            let target_index = knots[min_active_idx..]
                 .iter()
                 .position(|knot| (*knot - tenor).abs() <= 1e-6)
+                .map(|offset| min_active_idx + offset)
                 .unwrap_or_else(|| {
                     knots
                         .partition_point(|&knot| knot < *tenor)
-                        .min(knots.len() - 1)
+                        .clamp(min_active_idx, knots.len() - 1)
                 });
             let shifted = hazard_rates[target_index] + bump_bp * ONE_BASIS_POINT;
             if !shifted.is_finite() || shifted < 0.0 {
@@ -248,24 +257,32 @@ impl HazardCurve {
     ///
     /// This creates a new curve with:
     /// - Base date advanced by `days`
-    /// - Knot times shifted backwards (t' = t - dt_years)
-    /// - Points with t' <= 0 are filtered out (expired)
+    /// - Knot times shifted backwards (`t' = t - dt_years`)
+    /// - Points with `t' <= 1e-8` are filtered out (expired)
     /// - Hazard rates are preserved (no carry/theta adjustment)
+    /// - Stale calibration recipes and par-spread quotes cleared
     ///
     /// # Arguments
-    /// * `days` - Signed calendar-day shift; negative values move the base date backward.
+    /// * `days` - Non-negative calendar-day shift; `0` returns an unmodified clone and negative values are rejected.
     ///
     /// # Returns
     /// A new hazard curve with updated base date and shifted knots.
     ///
     /// # Errors
     ///
-    /// Returns an error if the day-count calculation fails, fewer than two
-    /// knot points remain after the roll, or the rebuilt curve violates a
-    /// construction invariant. `days` is signed; a negative value moves the
-    /// base date backward rather than rejecting the request.
+    /// Returns an error if `days < 0`, the day-count calculation fails, a multi-segment
+    /// curve expires completely, or the rebuilt curve violates a construction
+    /// invariant.
     /// Returns a validation error if the rolled base date exceeds the supported calendar range.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
+        if days < 0 {
+            return Err(crate::Error::Validation(format!(
+                "HazardCurve::roll_forward requires non-negative days, got {days}"
+            )));
+        }
+        if days == 0 {
+            return Ok(self.clone());
+        }
         let new_base = self.base.add_days(days)?;
         let dt_years = self.day_count.signed_year_fraction(
             self.base,
@@ -273,38 +290,29 @@ impl HazardCurve {
             crate::dates::DayCountContext::default(),
         )?;
 
-        // Anchor the active post-roll hazard at the new origin, then retain
-        // future hazard changes. This preserves conditional survival rather
-        // than re-attributing the first surviving lambda to the whole front
-        // segment.
-        let mut rolled_points = Vec::with_capacity(self.knots.len() + 1);
-        rolled_points.push((0.0, self.hazard_rate(dt_years)));
-        rolled_points.extend(crate::market_data::term_structures::common::roll_knots(
+        let active_lambda = self.hazard_rate(dt_years);
+        let surviving = crate::market_data::term_structures::common::roll_knots(
             &self.knots,
             &self.lambdas,
             dt_years,
-        ));
-
-        if rolled_points.len() < 2 {
-            return Err(crate::InputError::TooFewPoints.into());
-        }
-
-        let rolled_par_points = crate::market_data::term_structures::common::roll_knots(
-            &self.par_tenors,
-            &self.par_spreads_bp,
-            dt_years,
         );
 
-        let mut builder = self
-            .metadata_builder(self.id.clone())
-            .base_date(new_base)
-            .knots(rolled_points);
-
-        if !rolled_par_points.is_empty() {
-            builder = builder.par_spreads(rolled_par_points);
+        let mut rolled_points = Vec::with_capacity(surviving.len() + 2);
+        rolled_points.push((0.0, active_lambda));
+        if surviving.is_empty() {
+            if self.knots.len() == 1 {
+                rolled_points.push((1.0, active_lambda));
+            } else {
+                return Err(crate::InputError::TooFewPoints.into());
+            }
+        } else {
+            rolled_points.extend(surviving);
         }
 
-        builder.build()
+        self.metadata_builder(self.id.clone())
+            .base_date(new_base)
+            .knots(rolled_points)
+            .build()
     }
 }
 

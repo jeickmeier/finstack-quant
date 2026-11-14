@@ -203,7 +203,11 @@ impl MarketContext {
     where
         I: IntoIterator<Item = (CurveId, Arc<VolSurface>)>,
     {
-        self.surfaces = Arc::new(surfaces.into_iter().collect());
+        let map: crate::FxHashMap<CurveId, Arc<VolSurface>> = surfaces.into_iter().collect();
+        for id in map.keys() {
+            self.evict_conflicting_vol_registries(id.as_str(), super::VolRegistry::Surfaces);
+        }
+        self.surfaces = Arc::new(map);
         self
     }
 
@@ -226,7 +230,7 @@ impl MarketContext {
         mut pred: impl FnMut(&CurveId, &CurveStorage) -> bool,
     ) -> Vec<CurveId> {
         Arc::make_mut(&mut self.curves).retain(|id, curve| pred(id, curve));
-        let mut invalidated = self.rebind_all_credit_indices();
+        let mut invalidated = self.prune_invalidated_credit_indices();
         invalidated.sort();
         invalidated
     }
@@ -250,7 +254,11 @@ impl MarketContext {
     where
         I: IntoIterator<Item = (CurveId, Arc<VolCube>)>,
     {
-        self.vol_cubes = Arc::new(cubes.into_iter().collect());
+        let map: crate::FxHashMap<CurveId, Arc<VolCube>> = cubes.into_iter().collect();
+        for id in map.keys() {
+            self.evict_conflicting_vol_registries(id.as_str(), super::VolRegistry::VolCubes);
+        }
+        self.vol_cubes = Arc::new(map);
         self
     }
 
@@ -261,7 +269,14 @@ impl MarketContext {
     where
         I: IntoIterator<Item = (CurveId, Arc<FxDeltaVolSurface>)>,
     {
-        self.fx_delta_vol_surfaces = Arc::new(surfaces.into_iter().collect());
+        let map: crate::FxHashMap<CurveId, Arc<FxDeltaVolSurface>> = surfaces.into_iter().collect();
+        for id in map.keys() {
+            self.evict_conflicting_vol_registries(
+                id.as_str(),
+                super::VolRegistry::FxDeltaVolSurfaces,
+            );
+        }
+        self.fx_delta_vol_surfaces = Arc::new(map);
         self
     }
 

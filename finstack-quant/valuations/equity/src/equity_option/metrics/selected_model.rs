@@ -78,19 +78,6 @@ fn selected_equity_theta(context: &MetricContext) -> Result<f64> {
         .cloned()
         .unwrap_or_else(|| option.metric_pricing_overrides.clone());
     let days_per_year = overrides.theta_days_per_year();
-    if (option.expiry - context.as_of).whole_days() == 1 {
-        // A forward stencil would cross into the observed-expiry state and
-        // require an exercise observation that does not yet exist. Use a
-        // backward calendar roll while both valuation points remain live.
-        let previous_date = context
-            .as_of
-            .checked_sub(time::Duration::days(1))
-            .ok_or_else(|| finstack_quant_core::Error::Validation("theta date underflow".into()))?;
-        let previous_market = context.curves.roll_forward(-1)?;
-        let current = context.reprice_raw(&context.curves, context.as_of)?;
-        let previous = context.reprice_raw(&previous_market, previous_date)?;
-        return Ok((current - previous) * 365.0 / days_per_year);
-    }
     overrides.theta_period = Some(finstack_quant_core::dates::Tenor::daily());
     let mut daily = MetricContext::new(
         Arc::clone(&context.instrument),

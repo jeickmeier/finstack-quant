@@ -72,7 +72,7 @@ mod tests {
         let vol = 0.20_f64;
         let vol_surface = VolSurface::builder(CurveId::new("USD-INFL-VOL"))
             .expiries(&[0.5, 1.0, 2.0, 5.0])
-            .strikes(&[0.0, 0.01, 0.02, 0.03, 0.05])
+            .strikes(&[0.005, 0.01, 0.02, 0.03, 0.05])
             .row(&[vol, vol, vol, vol, vol])
             .row(&[vol, vol, vol, vol, vol])
             .row(&[vol, vol, vol, vol, vol])

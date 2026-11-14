@@ -58,7 +58,7 @@ wasm.Tenor.prototype.toYearsWithContext = function toYearsWithContext(
  *
  * @param curve - A `DiscountCurve`, `ForwardCurve`, `HazardCurve`, `InflationCurve`, `PriceCurve`, `BaseCorrelationCurve`, `VolSurface`, `FxDeltaVolSurface` or `VolCube` handle; its data is shared with the context, not copied.
  * @returns This context, updated in place, so calls can be chained.
- * @throws `TypeError` (kind `invalid_type`) if `curve` is not one of those handles.
+ * @throws `TypeError` (kind `invalid_type`) if `curve` is not one of those handles; `FinstackError` (kind `validation`) if a volatility surface, FX delta-vol surface or vol cube `id` is already registered in another volatility registry or replacing a curve invalidates a bound credit index.
  *
  * @facadeClass MarketContext
  * @member insert(curve: MarketContextCurve): this
@@ -93,9 +93,38 @@ wasm.MarketContext.prototype.insert = function insert(curve) {
   throw error;
 };
 
+// `MarketContext.insertPrice` accepts a `Money` handle, an exact decimal
+// string (with `currency`), or a `number`. wasm-bindgen cannot borrow a union
+// of a handle and primitives, so the `Money` and scalar exports are joined here.
+/**
+ * Store a market scalar: a unitless number, or a monetary price in a currency
+ * (Rust `MarketContext::insert_price_mut`).
+ *
+ * @param id - Identifier to store the scalar under.
+ * @param value - Finite `number`, exact decimal `string` (when `currency` is supplied), or `Money` handle.
+ * @param currency - ISO-4217 code that makes a `number` or decimal `string` a monetary price (must match `value.currency` if `value` is a `Money` handle); omitted stores a unitless number or keeps a `Money` handle's currency.
+ * @returns This context, updated in place, so calls can be chained.
+ * @throws `TypeError` (kind `invalid_type`) for a mistyped argument or a decimal string without `currency`; `FinstackError` (kind `validation`) for an unknown or mismatched currency, an unparsable decimal string, or a non-finite number.
+ *
+ * @facadeClass MarketContext
+ * @member insertPrice(id: string, value: number | string | Money, currency?: string | null): this
+ */
+const rawInsertPriceMoney = wasm.MarketContext.prototype.insertPriceMoney;
+const rawInsertPriceScalar = wasm.MarketContext.prototype.insertPriceScalar;
+delete wasm.MarketContext.prototype.insertPriceMoney;
+delete wasm.MarketContext.prototype.insertPriceScalar;
+// wasm-bindgen cannot borrow a union of a `Money` handle and scalar primitives: dispatches on `instanceof Money`.
+wasm.MarketContext.prototype.insertPrice = function insertPrice(id, value, currency = undefined) {
+  if (value instanceof wasm.Money) {
+    rawInsertPriceMoney.call(this, id, value, currency);
+  } else {
+    rawInsertPriceScalar.call(this, id, value, currency);
+  }
+  return this;
+};
+
 chain(wasm.MarketContext, [
   'insertFx',
-  'insertPrice',
   'insertCreditIndex',
   'insertSeries',
   'insertInflationIndex',

@@ -559,6 +559,14 @@ test('unknown names carry the Rust error kind', () => {
   );
   assert.throws(() => core.PeriodId.month(2025, 13), kind('validation'));
   assert.throws(() => core.normCdfWithParams(0.0, 0.0, -1.0), kind('validation'));
+  assert.throws(() => core.normCdfWithParams(Number.NaN, 0.0, 1.0), kind('validation'));
+  assert.throws(() => core.studentTInvCdf(-0.1, 5.0), kind('validation'));
+  assert.throws(() => core.studentTInvCdf(1.1, 5.0), kind('validation'));
+  assert.equal(core.studentTInvCdf(0.0, 5.0), -Infinity);
+  assert.equal(core.studentTInvCdf(1.0, 5.0), Infinity);
+  assert.ok(Number.isNaN(core.standardNormalInvCdf(-0.1)));
+  assert.throws(() => core.choleskyDecomposition([1.0, 0.5, 0.4, 1.0], 2), kind('validation'));
+  assert.throws(() => core.symmetricEigen([1.0, 0.5, 0.4, 1.0], 2), kind('validation'));
   assert.throws(() => core.thirdWednesday(13, 2025), kind('validation'));
   assert.throws(() => core.thirdWednesday(3, 1e9), kind('validation'));
 });
@@ -710,6 +718,39 @@ test('MarketContext inserts change the context in place and share curve data', (
     baseCorrelation().correlation(5.0)
   );
   assert.equal(market().getCreditIndex('CDX-IG-43').indexCreditCurve.id, 'CDX-IG-HZD');
+
+  const exactMoney = core.Money.fromDecimalStr('9007199254740993.25', new core.Currency('EUR'));
+  context
+    .insertPrice('EXACT-STR', '9007199254740993.5', 'USD')
+    .insertPrice('EXACT-MONEY', exactMoney)
+    .insertPrice('MATCHING-CCY', exactMoney, 'EUR');
+  assert.deepEqual(context.getPrice('EXACT-STR'), {
+    price: { amount: '9007199254740993.5', currency: 'USD' },
+  });
+  assert.deepEqual(context.getPrice('EXACT-MONEY'), {
+    price: { amount: '9007199254740993.25', currency: 'EUR' },
+  });
+  assert.throws(
+    () => context.insertPrice('MISMATCH', exactMoney, 'USD'),
+    kind('validation', /currency argument/)
+  );
+  const laggedCpi = new core.InflationIndex('US-CPI', [['2025-01-01', 300.0]], 'USD', 'step', 3);
+  assert.equal(laggedCpi.lag, '3M');
+});
+
+test('MarketContext rejects cross-volatility-registry ID collisions and negative rollForward days', () => {
+  const context = new core.MarketContext();
+  context.insert(core.DiscountCurve.flat('SHARED', '2025-01-02', 0.04));
+  context.insertPrice('SHARED', 100.0);
+  context.insertSeries(new core.ScalarTimeSeries('SHARED', [['2025-01-02', 1.0]]));
+  context.insert(new core.VolSurface('SHARED', [1.0], [100.0], [0.2]));
+  assert.equal(context.getDiscount('SHARED').id, 'SHARED');
+  assert.equal(context.getSeries('SHARED').id, 'SHARED');
+  assert.throws(
+    () => context.insert(new core.FxDeltaVolSurface('SHARED', [1.0], [0.12], [0.01], [0.002])),
+    kind('validation', /already registered/)
+  );
+  assert.throws(() => context.rollForward(-1), kind('validation', /non-negative/));
 });
 
 test('FinstackConfig extensions hold JSON values, not JSON text', () => {

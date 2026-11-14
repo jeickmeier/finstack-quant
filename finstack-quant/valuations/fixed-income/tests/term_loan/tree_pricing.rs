@@ -642,8 +642,8 @@ fn term_loan_tree_prices_are_bit_pinned() {
     // Both lattices move by a few ulps between macOS and the Linux libm on
     // GitHub Actions.
     const PINS: [[u64; 2]; 2] = [
-        [4_711_601_891_810_740_309, 4_711_280_227_318_290_591],
-        [4_711_601_891_810_740_308, 4_711_280_227_318_290_586],
+        [4_711_601_891_810_740_309, 4_711_280_227_318_290_588],
+        [4_711_601_891_810_740_308, 4_711_280_227_318_290_583],
     ];
     assert!(
         PINS.contains(&got),

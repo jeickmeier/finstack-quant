@@ -315,13 +315,93 @@ impl MarketContext {
                     .is_some_and(|curves| curves.values().any(|c| c.id().as_str() == id_str))
         })
     }
+}
 
-    /// Rebind all credit indices to current curves.
-    ///
-    /// Returns the IDs of any credit indices that were invalidated (removed)
-    /// because their required curves are no longer present or changed type.
-    /// Callers can inspect this list to detect unexpected state transitions.
-    pub(crate) fn rebind_all_credit_indices(&mut self) -> Vec<CurveId> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum VolRegistry {
+    Surfaces,
+    VolCubes,
+    FxDeltaVolSurfaces,
+}
+
+impl VolRegistry {
+    pub(crate) const fn label(self) -> &'static str {
+        match self {
+            Self::Surfaces => "surfaces",
+            Self::VolCubes => "vol_cubes",
+            Self::FxDeltaVolSurfaces => "fx_delta_vol_surfaces",
+        }
+    }
+}
+
+impl MarketContext {
+    pub(crate) fn conflicting_vol_registry(
+        &self,
+        id: &str,
+        target: VolRegistry,
+    ) -> Option<VolRegistry> {
+        if target != VolRegistry::Surfaces && self.surfaces.contains_key(id) {
+            return Some(VolRegistry::Surfaces);
+        }
+        if target != VolRegistry::VolCubes && self.vol_cubes.contains_key(id) {
+            return Some(VolRegistry::VolCubes);
+        }
+        if target != VolRegistry::FxDeltaVolSurfaces && self.fx_delta_vol_surfaces.contains_key(id)
+        {
+            return Some(VolRegistry::FxDeltaVolSurfaces);
+        }
+        None
+    }
+
+    pub(crate) fn ensure_vol_id_available(
+        &self,
+        id: &str,
+        target: VolRegistry,
+    ) -> crate::Result<()> {
+        if let Some(existing) = self.conflicting_vol_registry(id, target) {
+            return Err(crate::Error::Validation(format!(
+                "MarketContext volatility id '{id}' cannot be inserted into '{}': already registered in '{}'",
+                target.label(),
+                existing.label()
+            )));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn evict_conflicting_vol_registries(&mut self, id: &str, target: VolRegistry) {
+        if target != VolRegistry::Surfaces && self.surfaces.contains_key(id) {
+            Arc::make_mut(&mut self.surfaces).remove(id);
+        }
+        if target != VolRegistry::VolCubes && self.vol_cubes.contains_key(id) {
+            Arc::make_mut(&mut self.vol_cubes).remove(id);
+        }
+        if target != VolRegistry::FxDeltaVolSurfaces && self.fx_delta_vol_surfaces.contains_key(id)
+        {
+            Arc::make_mut(&mut self.fx_delta_vol_surfaces).remove(id);
+        }
+    }
+
+    pub(crate) fn unsupported_vol_surface_bump_error(
+        &self,
+        id: &str,
+        operation: &str,
+    ) -> Option<crate::Error> {
+        if self.vol_cubes.contains_key(id) {
+            return Some(crate::Error::Validation(format!(
+                "Cannot apply {operation} to '{id}': registered as VolCube, which does not support VolSurface grid bumps"
+            )));
+        }
+        if self.fx_delta_vol_surfaces.contains_key(id) {
+            return Some(crate::Error::Validation(format!(
+                "Cannot apply {operation} to '{id}': registered as FxDeltaVolSurface, which does not support VolSurface grid bumps"
+            )));
+        }
+        None
+    }
+
+    /// Rebind all credit indices to current curves, dropping any whose dependencies
+    /// were removed or replaced with an incompatible curve type.
+    pub(crate) fn prune_invalidated_credit_indices(&mut self) -> Vec<CurveId> {
         if self.credit_indices.is_empty() {
             return Vec::new();
         }
@@ -334,11 +414,11 @@ impl MarketContext {
                 Ok(index) => {
                     rebuilt.insert(id.clone(), Arc::new(index));
                 }
-                Err(_err) => {
+                Err(err) => {
                     invalidated.push(id.clone());
                     tracing::warn!(
                         credit_index_id = id.as_str(),
-                        error = %_err,
+                        error = %err,
                         "dropping credit index after failed curve rebinding"
                     );
                 }
@@ -347,6 +427,28 @@ impl MarketContext {
 
         self.credit_indices = Arc::new(rebuilt);
         invalidated
+    }
+
+    /// Rebind all credit indices to current curves atomically.
+    ///
+    /// Returns an error without mutating `self.credit_indices` if any credit
+    /// index fails to rebind against the updated curves.
+    pub(crate) fn rebind_all_credit_indices(&mut self) -> crate::Result<()> {
+        if self.credit_indices.is_empty() {
+            return Ok(());
+        }
+        let mut rebuilt = FxHashMap::default();
+        rebuilt.reserve(self.credit_indices.len());
+
+        for (id, data) in self.credit_indices.iter() {
+            let index = self.rebind_credit_index_data(data).map_err(|err| {
+                crate::Error::Validation(format!("Failed to rebind credit index '{id}': {err}"))
+            })?;
+            rebuilt.insert(id.clone(), Arc::new(index));
+        }
+
+        self.credit_indices = Arc::new(rebuilt);
+        Ok(())
     }
 }
 

@@ -110,11 +110,19 @@
 //! // ACT/ACT (ISDA): 181 days / 366 days (leap year) = 0.4945355191256831
 //! let yf_isda = DayCount::ActAct.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
 //!
-//! // ACT/ACT (ISMA): frequency-only helper for regular coupon periods
-//! // Returns year fractions: a full 6-month regular period = 0.5 years
+//! // ACT/ACT (ISMA): contained single-period ICMA formula
+//! // Returns year fractions: a full 6-month nominal period = 0.5 years
 //! let frequency = Tenor::semi_annual(); // Semi-annual
 //! let yf_isma = DayCount::ActActIsma
-//!     .year_fraction(start, end, DayCountContext { frequency: Some(frequency), ..DayCountContext::default() })
+//!     .year_fraction(
+//!         start,
+//!         end,
+//!         DayCountContext {
+//!             frequency: Some(frequency),
+//!             coupon_period: Some((start, end)),
+//!             ..DayCountContext::default()
+//!         },
+//!     )
 //!     .expect("Year fraction calculation should succeed");
 //! // yf_isma ≈ 0.5 (one full semi-annual period in years)
 //! ```
@@ -130,8 +138,8 @@ use time::Date;
 
 use crate::InputError;
 use act_act::{
-    validate_act_act_isma_context, year_fraction_act_act_afb, year_fraction_act_act_isda,
-    year_fraction_act_act_isma_with_ctx,
+    validate_act_act_isma_context, validate_act_act_isma_interval, year_fraction_act_act_afb,
+    year_fraction_act_act_isda, year_fraction_act_act_isma_with_ctx,
 };
 use other::{
     validate_act_365l_context, validate_act_365l_interval, year_fraction_act_365l,
@@ -227,10 +235,12 @@ use crate::dates::Tenor;
 ///   yields exactly 1.0.
 /// - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
 ///   (days in segment) / (days in that year) for each segment, and sum.
-/// - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
-///   frequency, take (actual days) / (actual days in coupon period) for each,
-///   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-///   first/last coupons also supply the enclosing regular `coupon_period`.
+/// - **`ActActIsma`** (ICMA): single-period contained ICMA fraction
+///   `actual_days(start, end) / (coupons_per_year * actual_days(coupon_period))`.
+///   Requires both `frequency` (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`)
+///   and the enclosing unadjusted nominal `coupon_period` in
+///   [`DayCountContext`]; spans crossing nominal coupon boundaries must be
+///   sliced by the schedule builder before calling `year_fraction`.
 /// - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
 ///   **backwards from `end`** until the candidate is before `start`; each
 ///   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -318,7 +328,11 @@ use crate::dates::Tenor;
 ///
 /// // Actual/Actual (ICMA): one full semi-annual period is 0.5
 /// let (start, end) = (date(2025, Month::January, 15), date(2025, Month::July, 15));
-/// let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
+/// let ctx = DayCountContext {
+///     frequency: Some(Tenor::semi_annual()),
+///     coupon_period: Some((start, end)),
+///     ..Default::default()
+/// };
 /// assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
 ///
 /// // Business/252: Monday to next Monday is 4 business days, because the
@@ -473,9 +487,8 @@ pub enum DayCount {
     /// Actual/Actual (ICMA) day count convention.
     ///
     /// Actual days over (actual days in the coupon period × coupons per year).
-    /// Requires a coupon frequency. Explicit reference coupon boundaries must
-    /// be unadjusted regular dates from the contractual nominal month grid,
-    /// not payment dates.
+    /// Requires an ICMA coupon frequency (`1M`, `2M`, `3M`, `4M`, `6M`, `12M`,
+    /// `1Y`) and the enclosing unadjusted nominal `coupon_period`.
     ///
     /// # Standards Reference
     ///
@@ -516,7 +529,7 @@ impl DayCount {
     ///
     /// Provide any required context via [`DayCountContext`]:
     /// - `Bus/252` requires a holiday calendar
-    /// - `Act/Act (ISMA)` requires a coupon frequency
+    /// - `Act/Act (ISMA)` requires both a coupon frequency and the enclosing nominal `coupon_period`
     /// - `Act/365L` requires the enclosing coupon boundaries
     ///
     /// # Arguments
@@ -543,14 +556,14 @@ impl DayCount {
     /// - [`InputError::MissingFrequencyForActActIsma`](crate::InputError::MissingFrequencyForActActIsma):
     ///   Using `ActActIsma` without a frequency in `ctx`
     /// - [`InputError::MissingCouponPeriodForActActIsma`](crate::InputError::MissingCouponPeriodForActActIsma):
-    ///   Using `ActActIsma` on an irregular coupon without `ctx.coupon_period`
+    ///   Using `ActActIsma` without `ctx.coupon_period`
     /// - [`InputError::ActActIsmaUnsupportedFrequency`](crate::InputError::ActActIsmaUnsupportedFrequency):
-    ///   Using `ActActIsma` with a Day or Week frequency
+    ///   Using `ActActIsma` with a frequency outside `{1M, 2M, 3M, 4M, 6M, 12M, 1Y}`
     /// - `Error::Validation`: using `Act365L` without an enclosing
-    ///   `coupon_period`, or supplying accrual dates outside that coupon
-    ///   (checked for equal dates too)
+    ///   `coupon_period`, or supplying accrual dates outside `coupon_period`
+    ///   for `Act365L` or `ActActIsma` (checked for equal dates too)
     /// - `Error::Validation`: supplying ICMA reference endpoints that do not
-    ///   reproduce one unadjusted nominal month grid
+    ///   reproduce one unadjusted nominal month grid of `frequency`
     ///
     /// # Examples
     ///
@@ -578,8 +591,14 @@ impl DayCount {
         // equal-date zero (CORE-CONVENTIONS-001).
         self.validate_context(ctx)?;
         if start == end {
-            if self == DayCount::Act365L {
-                validate_act_365l_interval(start, end, ctx)?;
+            match self {
+                DayCount::Act365L => {
+                    validate_act_365l_interval(start, end, ctx)?;
+                }
+                DayCount::ActActIsma => {
+                    validate_act_act_isma_interval(start, end, ctx)?;
+                }
+                _ => {}
             }
             return Ok(0.0);
         }
@@ -607,13 +626,15 @@ impl DayCount {
     ///   `bus_basis` is zero
     /// - `Error::Validation`: `coupon_period` is empty or inverted, or an
     ///   ACT/ACT ICMA reference period does not reproduce one nominal month
-    ///   grid, or ACT/365L lacks `coupon_period`
+    ///   grid of `frequency`, or ACT/365L lacks `coupon_period`
     /// - [`InputError::MissingCalendarForBus252`](crate::InputError::MissingCalendarForBus252):
     ///   `Bus252` without a calendar
     /// - [`InputError::MissingFrequencyForActActIsma`](crate::InputError::MissingFrequencyForActActIsma):
     ///   `ActActIsma` without a frequency
+    /// - [`InputError::MissingCouponPeriodForActActIsma`](crate::InputError::MissingCouponPeriodForActActIsma):
+    ///   `ActActIsma` without `coupon_period`
     /// - [`InputError::ActActIsmaUnsupportedFrequency`](crate::InputError::ActActIsmaUnsupportedFrequency):
-    ///   `ActActIsma` with a Day or Week frequency and no `coupon_period`
+    ///   `ActActIsma` with a frequency outside `{1M, 2M, 3M, 4M, 6M, 12M, 1Y}`
     /// - `Error::Validation`: `ThirtyE360Isda` without an explicit
     ///   `end_is_termination_date`
     ///
@@ -828,9 +849,8 @@ mod parse_tests {
 #[cfg(test)]
 mod tests {
     use super::DayCount;
-    use super::act_act::act_act_isma_year_fraction_with_reference_period;
     use crate::InputError;
-    use crate::dates::DayCountContext;
+    use crate::dates::{DayCountContext, Tenor, TenorUnit};
     use time::Date;
     use time::macros::date;
 
@@ -909,59 +929,89 @@ mod tests {
     }
 
     #[test]
-    fn act_act_isma_reference_period_rejects_excessive_recursion_depth() {
-        let result = act_act_isma_year_fraction_with_reference_period(
-            date!(1700 - 01 - 01),
-            date!(1700 - 01 - 02),
-            date!(2025 - 01 - 01),
-            date!(2025 - 07 - 01),
+    fn act_act_isma_requires_contained_interval_including_equal_dates() {
+        let period = (date!(2025 - 01 - 15), date!(2025 - 07 - 15));
+        let ctx = DayCountContext {
+            frequency: Some(Tenor::semi_annual()),
+            coupon_period: Some(period),
+            ..DayCountContext::default()
+        };
+        assert_eq!(
+            DayCount::ActActIsma
+                .year_fraction(period.0, period.1, ctx)
+                .expect("contained full period"),
+            0.5
         );
-
-        assert!(
-            result.is_err(),
-            "far-away reference traversal should be rejected"
+        assert_eq!(
+            DayCount::ActActIsma
+                .year_fraction(period.0, period.0, ctx)
+                .expect("equal date inside period"),
+            0.0
         );
+        for (start, end) in [
+            (date!(2025 - 01 - 14), period.1),
+            (period.0, date!(2025 - 07 - 16)),
+            (date!(2025 - 07 - 16), date!(2025 - 07 - 16)),
+            (date!(1700 - 01 - 01), date!(1700 - 01 - 02)),
+        ] {
+            assert!(
+                DayCount::ActActIsma.year_fraction(start, end, ctx).is_err(),
+                "accrual [{start}, {end}] outside coupon_period must fail"
+            );
+        }
     }
 
     #[test]
-    fn act_act_isma_reference_period_preserves_eom_anchor_for_full_year() {
-        let fraction = act_act_isma_year_fraction_with_reference_period(
-            date!(2024 - 02 - 29),
-            date!(2025 - 02 - 28),
-            date!(2024 - 08 - 31),
-            date!(2025 - 02 - 28),
-        )
-        .expect("EOM reference traversal should succeed");
+    fn act_act_isma_accepts_eom_and_clamped_nominal_periods() {
+        let feb_period = (date!(2024 - 08 - 31), date!(2025 - 02 - 28));
+        let aug_period = (date!(2025 - 02 - 28), date!(2025 - 08 - 31));
+        let feb_ctx = DayCountContext {
+            frequency: Some(Tenor::semi_annual()),
+            coupon_period: Some(feb_period),
+            ..DayCountContext::default()
+        };
+        let aug_ctx = DayCountContext {
+            frequency: Some(Tenor::semi_annual()),
+            coupon_period: Some(aug_period),
+            ..DayCountContext::default()
+        };
 
-        assert_eq!(fraction, 1.0);
-    }
+        let front_stub = DayCount::ActActIsma
+            .year_fraction(date!(2024 - 10 - 15), date!(2025 - 02 - 28), feb_ctx)
+            .expect("contained front stub");
+        let back_stub = DayCount::ActActIsma
+            .year_fraction(date!(2025 - 02 - 28), date!(2025 - 05 - 15), aug_ctx)
+            .expect("contained back stub");
 
-    #[test]
-    fn act_act_isma_reference_period_preserves_eom_anchor_across_stubs() {
-        let front_stub = act_act_isma_year_fraction_with_reference_period(
-            date!(2024 - 04 - 15),
-            date!(2024 - 08 - 31),
-            date!(2024 - 08 - 31),
-            date!(2025 - 02 - 28),
-        )
-        .expect("front stub should succeed");
-        let back_stub = act_act_isma_year_fraction_with_reference_period(
-            date!(2025 - 02 - 28),
-            date!(2025 - 05 - 15),
-            date!(2024 - 08 - 31),
-            date!(2025 - 02 - 28),
-        )
-        .expect("back stub should succeed");
-
-        let expected_front = (date!(2024 - 08 - 31) - date!(2024 - 04 - 15)).whole_days() as f64
-            / (date!(2024 - 08 - 31) - date!(2024 - 02 - 29)).whole_days() as f64
-            * 0.5;
+        let expected_front = (date!(2025 - 02 - 28) - date!(2024 - 10 - 15)).whole_days() as f64
+            / (2.0 * (feb_period.1 - feb_period.0).whole_days() as f64);
         let expected_back = (date!(2025 - 05 - 15) - date!(2025 - 02 - 28)).whole_days() as f64
-            / (date!(2025 - 08 - 31) - date!(2025 - 02 - 28)).whole_days() as f64
-            * 0.5;
+            / (2.0 * (aug_period.1 - aug_period.0).whole_days() as f64);
 
         assert!((front_stub - expected_front).abs() < 1e-14);
         assert!((back_stub - expected_back).abs() < 1e-14);
+    }
+
+    #[test]
+    fn act_act_isma_rejects_unsupported_frequencies() {
+        for bad in [
+            Tenor::daily(),
+            Tenor::weekly(),
+            Tenor::new(5, TenorUnit::Months).expect("5M"),
+            Tenor::new(2, TenorUnit::Years).expect("2Y"),
+        ] {
+            let ctx = DayCountContext {
+                frequency: Some(bad),
+                coupon_period: Some((date!(2025 - 01 - 15), date!(2025 - 07 - 15))),
+                ..DayCountContext::default()
+            };
+            assert!(matches!(
+                DayCount::ActActIsma.validate_context(ctx),
+                Err(crate::Error::Input(
+                    InputError::ActActIsmaUnsupportedFrequency { .. }
+                ))
+            ));
+        }
     }
 
     // FromStr / Display roundtrip tests
@@ -1363,19 +1413,6 @@ mod tests {
         assert!(
             (yf_with - expected).abs() < 1e-10,
             "coupon_period path: {yf_with} vs expected {expected}"
-        );
-
-        // The reference-period path should match calling the function directly
-        let yf_direct = act_act_isma_year_fraction_with_reference_period(
-            settlement,
-            coupon_end,
-            coupon_start,
-            coupon_end,
-        )
-        .expect("direct call should succeed");
-        assert!(
-            (yf_with - yf_direct).abs() < 1e-14,
-            "coupon_period routing should match direct call: {yf_with} vs {yf_direct}"
         );
     }
 }

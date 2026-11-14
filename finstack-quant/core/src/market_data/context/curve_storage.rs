@@ -238,10 +238,10 @@ impl CurveStorage {
                 reason: "BasisSpreadCurve does not support bumping".to_string(),
             }
             .into()),
-            Self::Parametric(_) => Err(crate::InputError::UnsupportedBump {
-                reason: "ParametricCurve does not support bumping".to_string(),
+            Self::Parametric(arc) => {
+                Arc::make_mut(arc).bump_in_place(&spec)?;
+                Ok(())
             }
-            .into()),
         }
     }
 }

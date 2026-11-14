@@ -170,7 +170,7 @@ fn derived_fx_shocks_preserve_dates_policies_and_reciprocals() {
 }
 
 #[test]
-fn heterogeneous_context_rolls_backward_with_each_curves_time_basis() {
+fn backward_roll_is_rejected_across_context_and_curves() {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{
         BasisSpreadCurve, DiscountCurve, ForwardCurve, HazardCurve,
@@ -211,7 +211,14 @@ fn heterogeneous_context_rolls_backward_with_each_curves_time_basis() {
         .knots([(0.0, 0.001), (1.0, 0.002), (2.0, 0.003)])
         .build()
         .expect("basis curve");
-    let expected_discount = discount.df(1.0) / discount.df(-30.0 / 360.0);
+
+    assert!(discount.roll_forward(-30).is_err());
+    assert!(forward.roll_forward(-30).is_err());
+    assert!(hazard.roll_forward(-30).is_err());
+    assert!(inflation.roll_forward(-30).is_err());
+    assert!(price.roll_forward(-30).is_err());
+    assert!(basis.roll_forward(-30).is_err());
+
     let context = MarketContext::new()
         .insert(discount)
         .insert(forward)
@@ -219,33 +226,7 @@ fn heterogeneous_context_rolls_backward_with_each_curves_time_basis() {
         .insert(inflation)
         .insert(price)
         .insert(basis);
-    let rolled = context.roll_forward(-30).expect("backward context roll");
-    let expected_base = base() - time::Duration::days(30);
-    let discount = rolled.get_discount("DISCOUNT").expect("discount");
-    assert_eq!(discount.base_date(), expected_base);
-    assert!((discount.df(1.0 + 30.0 / 360.0) - expected_discount).abs() < 1e-12);
-    let forward = rolled.get_forward("FORWARD").expect("forward");
-    assert_eq!(forward.base_date(), expected_base);
-    assert!((forward.rate(1.0 + 30.0 / 365.0) - 0.04).abs() < 1e-12);
-    let hazard = rolled.get_hazard("HAZARD").expect("hazard");
-    assert_eq!(hazard.base_date(), expected_base);
-    assert!((hazard.hazard_rate(1.0 + 30.0 / 360.0) - 0.01).abs() < 1e-12);
-    let inflation = rolled.get_inflation_curve("INFLATION").expect("inflation");
-    assert_eq!(inflation.base_date(), expected_base);
-    assert!((inflation.cpi(1.0 + 30.0 / 365.0) - 306.0).abs() < 1e-12);
-    assert_eq!(
-        rolled.get_price_curve("PRICE").expect("price").base_date(),
-        expected_base
-    );
-    assert_eq!(
-        rolled
-            .curve("BASIS")
-            .and_then(|c| c.basis_spread())
-            .cloned()
-            .expect("basis")
-            .base_date(),
-        expected_base
-    );
+    assert!(context.roll_forward(-30).is_err());
 }
 
 #[test]

@@ -153,7 +153,7 @@
               "dv01": -926.8498348959256,
               "bucketed_dv01": -926.8498233541613,
               "theta": 91.96743388078175,
-              "cs01": -908.5606900539715,
+              "cs01": -908.5606900537387,
               "bucketed_dv01::USD-TREASURY::10y": -786.97045022354,
               "bucketed_dv01::USD-TREASURY::15y": -9.564487969968468,
               "bucketed_dv01::USD-TREASURY::1y": -3.58103819785174,
@@ -165,7 +165,7 @@
               "bucketed_dv01::USD-TREASURY::5y": -36.43549219018314,
               "bucketed_dv01::USD-TREASURY::6m": -1.0353061084169894,
               "bucketed_dv01::USD-TREASURY::7y": -62.18245247169398,
-              "cs01::US912828XG33": -908.5606900539715,
+              "cs01::US912828XG33": -908.5606900537387,
               "theta_period_days": 1
             },
             "meta": {
@@ -339,9 +339,9 @@
         },
         "cs01": {
           "metric_id": "cs01",
-          "total": -908.5606900539715,
+          "total": -908.5606900537387,
           "by_entity": {
-            "CREDIT": -908.5606900539715
+            "CREDIT": -908.5606900537387
           }
         },
         "bucketed_dv01::USD-TREASURY::10y": {
@@ -423,9 +423,9 @@
         },
         "cs01::US912828XG33": {
           "metric_id": "cs01::US912828XG33",
-          "total": -908.5606900539715,
+          "total": -908.5606900537387,
           "by_entity": {
-            "CREDIT": -908.5606900539715
+            "CREDIT": -908.5606900537387
           }
         },
         "bucketed_dv01::USD-OIS::10y": {
@@ -590,7 +590,7 @@
             "dv01": -926.8498348959256,
             "bucketed_dv01": -926.8498233541613,
             "theta": 91.96743388078175,
-            "cs01": -908.5606900539715,
+            "cs01": -908.5606900537387,
             "bucketed_dv01::USD-TREASURY::10y": -786.97045022354,
             "bucketed_dv01::USD-TREASURY::15y": -9.564487969968468,
             "bucketed_dv01::USD-TREASURY::1y": -3.58103819785174,
@@ -602,7 +602,7 @@
             "bucketed_dv01::USD-TREASURY::5y": -36.43549219018314,
             "bucketed_dv01::USD-TREASURY::6m": -1.0353061084169894,
             "bucketed_dv01::USD-TREASURY::7y": -62.18245247169398,
-            "cs01::US912828XG33": -908.5606900539715,
+            "cs01::US912828XG33": -908.5606900537387,
             "theta_period_days": 1
           }
         },

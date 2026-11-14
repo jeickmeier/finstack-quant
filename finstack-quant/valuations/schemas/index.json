@@ -119,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-      "bytes": 6328,
+      "bytes": 6300,
       "kind": "component",
       "path": "schemas/common/1/day_count.schema.json",
       "summary": "Day-count convention.",

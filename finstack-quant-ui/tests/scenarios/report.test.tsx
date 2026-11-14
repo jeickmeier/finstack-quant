@@ -37,7 +37,7 @@ it("shows the returned counters, shocks, time roll and carry as returned", () =>
     name: "Instrument carry",
   });
   expect(within(carry).getByText("US912828XG33")).toBeTruthy();
-  expect(within(timeRoll).getAllByTitle("4613.7452641314")).toHaveLength(2);
+  expect(within(timeRoll).getAllByTitle("4613.7452641316")).toHaveLength(2);
   expect(screen.getByText("No warnings")).toBeTruthy();
   const json = screen.getByRole("region", { name: "Application report" });
   expect(JSON.parse(json.querySelector("code")!.textContent!)).toEqual(roll);

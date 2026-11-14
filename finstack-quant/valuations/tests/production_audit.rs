@@ -794,6 +794,15 @@ fn m4_inflation_zero_strike_requires_normal_quotes_without_fabricated_conversion
     option.maturity = date!(2026 - 01 - 15);
     option.strike = rust_decimal::Decimal::ZERO;
     option.lag = Some(InflationLag::None);
+    assert!(
+        VolSurface::builder("USD-INFL-VOL")
+            .expiries(&[1.0, 2.0])
+            .strikes(&[0.0, 0.02])
+            .row(&[0.2, 0.2])
+            .row(&[0.2, 0.2])
+            .build()
+            .is_err()
+    );
     let market = MarketContext::new()
         .insert(
             DiscountCurve::builder("USD-OIS")
@@ -813,7 +822,7 @@ fn m4_inflation_zero_strike_requires_normal_quotes_without_fabricated_conversion
         .insert_surface(
             VolSurface::builder("USD-INFL-VOL")
                 .expiries(&[1.0, 2.0])
-                .strikes(&[0.0, 0.02])
+                .strikes(&[0.01, 0.02])
                 .row(&[0.2, 0.2])
                 .row(&[0.2, 0.2])
                 .build()

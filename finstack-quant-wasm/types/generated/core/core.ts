@@ -581,10 +581,12 @@ export type DateWire = string;
  *   yields exactly 1.0.
  * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
  *   (days in segment) / (days in that year) for each segment, and sum.
- * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
- *   frequency, take (actual days) / (actual days in coupon period) for each,
- *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
- *   first/last coupons also supply the enclosing regular `coupon_period`.
+ * - **`ActActIsma`** (ICMA): single-period contained ICMA fraction
+ *   `actual_days(start, end) / (coupons_per_year * actual_days(coupon_period))`.
+ *   Requires both `frequency` (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`)
+ *   and the enclosing unadjusted nominal `coupon_period` in
+ *   [`DayCountContext`]; spans crossing nominal coupon boundaries must be
+ *   sliced by the schedule builder before calling `year_fraction`.
  * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
  *   **backwards from `end`** until the candidate is before `start`; each
  *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -633,9 +635,8 @@ export type DayCount =
 /**
  * Extrapolation policy for evaluation outside the knot range.
  *
- * All [`InterpolationStrategy`](super::traits::InterpolationStrategy)
- * implementations honour this policy at both ends of the knot range.
- * Choose based on what behaviour the downstream pricer expects:
+ * Every interpolation strategy honours this policy at both ends of the knot
+ * range. Choose based on what behaviour the downstream pricer expects:
  *
  * - `FlatZero` (default): hold the boundary value constant.
  * - `FlatForward`: extend the boundary segment's slope, measured in the

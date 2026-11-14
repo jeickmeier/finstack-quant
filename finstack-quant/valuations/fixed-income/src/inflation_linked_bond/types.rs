@@ -2,9 +2,7 @@
 
 use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
-};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::InflationLag;
 use finstack_quant_core::money::Money;
@@ -431,6 +429,24 @@ impl InflationLinkedBond {
         let mut flows = Vec::with_capacity(periods.len() + 1);
         for period in &periods {
             let accrual_factor = period.accrual_year_fraction.max(0.0);
+            let coupon_period = if self.day_count == DayCount::ActActIsma {
+                if matches!(self.stub, StubKind::ShortFront | StubKind::LongFront) {
+                    finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period(
+                        self.day_count,
+                        self.frequency,
+                        [period.unadjusted_end],
+                        period.unadjusted_start,
+                    )
+                } else {
+                    self.frequency
+                        .months()
+                        .and_then(|m| i32::try_from(m).ok())
+                        .and_then(|m| period.unadjusted_start.add_months(m).ok())
+                        .map(|nom_end| (period.unadjusted_start, nom_end))
+                }
+            } else {
+                Some((period.accrual_start, period.accrual_end))
+            };
             flows.push(
                 CashFlowParams::new(
                     period.payment_date,
@@ -450,9 +466,10 @@ impl InflationLinkedBond {
                     None,
                     finstack_quant_core::dates::DayCountContextState {
                         calendar_id: None,
-                        coupon_period: Some((period.accrual_start, period.accrual_end)),
-                        end_is_termination_date: Some(false),
-                        frequency: None,
+                        coupon_period,
+                        end_is_termination_date: Some(period.accrual_end == self.maturity),
+                        frequency: (self.day_count == DayCount::ActActIsma)
+                            .then_some(self.frequency),
                         bus_basis: None,
                     },
                 )?)
@@ -659,18 +676,21 @@ impl InflationLinkedBond {
         //   df = (1 + y/f)^(-f*t)  then  r_ann = df^(-1/t) - 1
         //
         // For annual frequency, Periodic(1) == Annual, so no correction is applied.
-        let t = self
-            .day_count
-            .year_fraction(
-                as_of,
-                self.maturity,
-                DayCountContext {
-                    frequency: Some(self.frequency),
-                    ..Default::default()
-                },
-            )
-            .unwrap_or(1.0)
-            .max(1e-6); // guard against zero / expired bond
+        let ref_period = finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period(
+            self.day_count,
+            self.frequency,
+            [self.maturity],
+            as_of,
+        );
+        let t = finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_year_fraction(
+            self.day_count,
+            Some(self.frequency),
+            ref_period,
+            as_of,
+            self.maturity,
+        )
+        .unwrap_or(1.0)
+        .max(1e-6); // guard against zero / expired bond
 
         let n_f = self.frequency.payments_per_year()?.max(1.0);
         // ILB coupon frequencies are always an integer number of periods per

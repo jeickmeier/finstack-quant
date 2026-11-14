@@ -662,7 +662,8 @@ mod tests {
         let event = date!(2024 - 07 - 01);
         let maturity = date!(2025 - 01 - 01);
         let isma = DayCountContext {
-            frequency: Some(Tenor::semi_annual()),
+            frequency: Some(Tenor::annual()),
+            coupon_period: Some((base, maturity)),
             ..Default::default()
         };
         assert_eq!(

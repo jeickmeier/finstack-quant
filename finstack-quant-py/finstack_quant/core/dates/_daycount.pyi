@@ -128,9 +128,11 @@ class DayCount:
             Accrual end (exclusive); must not precede *start*.
         ctx : DayCountContext | None
             Context for conventions that need one: ``ACT_ACT_ISMA`` reads
-            ``frequency``, ``ACT_365L`` the enclosing contractual
+            both ``frequency`` (``1M``, ``2M``, ``3M``, ``4M``, ``6M``,
+            ``12M``, ``1Y``) and the enclosing unadjusted nominal
+            ``coupon_period``, ``ACT_365L`` reads the enclosing contractual
             ``coupon_period`` (partial accrual retains that coupon's
-            denominator), ``BUS_252`` reads ``calendar_id``.
+            denominator), and ``BUS_252`` reads ``calendar_id``.
 
         Returns
         -------
@@ -141,17 +143,22 @@ class DayCount:
         ------
         ValueError
             If *start* > *end* or the convention needs context that was not
-            supplied. ACT/365L raises
-            if the enclosing coupon dates are missing, or the requested
-            dates (equal dates included) lie outside that coupon. ICMA raises if reference
-            endpoints do not share an unadjusted nominal month grid.
+            supplied. ACT/365L and ACT/ACT ICMA raise if the enclosing
+            ``coupon_period`` is missing or the requested dates (equal dates
+            included) lie outside that coupon. ICMA also raises if reference
+            endpoints do not share one unadjusted nominal month grid of
+            ``frequency``.
         KeyError
             If *ctx* names an unknown calendar.
 
         Examples
         --------
         >>> from finstack_quant.core.dates import DayCount, DayCountContext
-        >>> DayCount.ACT_ACT_ISMA.year_fraction("2025-01-15", "2025-07-15", DayCountContext(frequency="6M"))
+        >>> DayCount.ACT_ACT_ISMA.year_fraction(
+        ...     "2025-01-15",
+        ...     "2025-07-15",
+        ...     DayCountContext(frequency="6M", coupon_period=("2025-01-15", "2025-07-15")),
+        ... )
         0.5
 
         """

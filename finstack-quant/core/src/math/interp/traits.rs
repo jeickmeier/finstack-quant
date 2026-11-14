@@ -36,64 +36,7 @@ use super::types::ExtrapolationPolicy;
 /// 3. **Handle extrapolation** by checking bounds before evaluation
 /// 4. **Implement analytical derivatives** in [`interp_prime`](Self::interp_prime)
 ///    when possible for better accuracy
-///
-/// # Example Implementation
-///
-/// ```
-/// use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpolationStrategy};
-///
-/// #[derive(Debug)]
-/// struct MyStrategy {
-///     slopes: Box<[f64]>,
-/// }
-///
-/// impl InterpolationStrategy for MyStrategy {
-///     fn from_raw(
-///         knots: &[f64],
-///         values: &[f64],
-///         _extrapolation: ExtrapolationPolicy,
-///     ) -> finstack_quant_core::Result<Self> {
-///         // Precompute per-segment slopes once, at construction.
-///         let slopes = knots
-///             .windows(2)
-///             .zip(values.windows(2))
-///             .map(|(t, v)| (v[1] - v[0]) / (t[1] - t[0]))
-///             .collect();
-///         Ok(Self { slopes })
-///     }
-///
-///     fn interp(
-///         &self,
-///         x: f64,
-///         knots: &[f64],
-///         values: &[f64],
-///         _extrapolation: ExtrapolationPolicy,
-///     ) -> f64 {
-///         let i = knots.partition_point(|&t| t <= x).saturating_sub(1);
-///         let i = i.min(self.slopes.len().saturating_sub(1));
-///         values[i] + self.slopes[i] * (x - knots[i])
-///     }
-///
-///     fn interp_prime(
-///         &self,
-///         x: f64,
-///         knots: &[f64],
-///         _values: &[f64],
-///         _extrapolation: ExtrapolationPolicy,
-///     ) -> f64 {
-///         let i = knots.partition_point(|&t| t <= x).saturating_sub(1);
-///         self.slopes[i.min(self.slopes.len().saturating_sub(1))]
-///     }
-/// }
-///
-/// let knots = [0.0, 1.0, 2.0];
-/// let values = [1.0, 2.0, 4.0];
-/// let strategy = MyStrategy::from_raw(&knots, &values, ExtrapolationPolicy::FlatZero)?;
-/// assert!((strategy.interp(1.5, &knots, &values, ExtrapolationPolicy::FlatZero) - 3.0).abs() < 1e-12);
-/// assert!((strategy.interp_prime(1.5, &knots, &values, ExtrapolationPolicy::FlatZero) - 2.0).abs() < 1e-12);
-/// # Ok::<(), finstack_quant_core::Error>(())
-/// ```
-pub trait InterpolationStrategy: Send + Sync + Debug {
+pub(crate) trait InterpolationStrategy: Send + Sync + Debug {
     /// Build strategy-specific state from raw knots and values.
     ///
     /// # Arguments

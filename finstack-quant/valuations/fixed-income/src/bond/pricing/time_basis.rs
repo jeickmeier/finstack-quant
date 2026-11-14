@@ -196,21 +196,23 @@ pub(crate) fn bond_model_schedule(bond: &Bond, as_of: Date) -> Result<BondModelS
 
     let day_count = bond.cashflow_spec.day_count();
     let frequency = bond.cashflow_spec.frequency();
-    let dc_ctx = DayCountContext {
-        frequency: Some(frequency),
-        coupon_period: icma_reference_period(
-            day_count,
-            frequency,
-            coupon_flows.iter().map(|&(d, _)| d),
-            as_of,
-        ),
-        ..DayCountContext::default()
-    };
+    let ref_period = icma_reference_period(
+        day_count,
+        frequency,
+        coupon_flows.iter().map(|&(d, _)| d),
+        as_of,
+    );
     let year_fraction = |date| {
         if day_count == DayCount::Act365L {
             Ok(finstack_quant_models::rates::clock::model_time(as_of, date))
         } else {
-            day_count.year_fraction(as_of, date, dc_ctx)
+            finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_year_fraction(
+                day_count,
+                Some(frequency),
+                ref_period,
+                as_of,
+                date,
+            )
         }
     };
     let horizon = coupon_flows

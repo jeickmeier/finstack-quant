@@ -702,6 +702,27 @@ fn find_active_periods_and_elapsed<'a>(
                     elapsed_end,
                     inputs.total_yf,
                 )?
+            } else if inputs.day_count == DayCount::ActActIsma {
+                let dc_elapsed = crate::builder::date_generation::icma_sliced_year_fraction(
+                    inputs.start,
+                    elapsed_end,
+                    elapsed_context,
+                    None,
+                    None,
+                )?
+                .max(0.0);
+                let dc_total = crate::builder::date_generation::icma_sliced_year_fraction(
+                    inputs.start,
+                    inputs.end,
+                    day_count_context,
+                    None,
+                    None,
+                )?;
+                if dc_total.is_finite() && dc_total > 0.0 {
+                    inputs.total_yf * dc_elapsed / dc_total
+                } else {
+                    dc_elapsed
+                }
             } else {
                 let dc_elapsed = inputs
                     .day_count

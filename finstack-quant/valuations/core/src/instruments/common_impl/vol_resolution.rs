@@ -165,6 +165,51 @@ pub fn resolve_sigma_at(
     Ok(resolved.sigma)
 }
 
+/// Resolve unshifted Black volatility for FX consumers with an explicit forward rate.
+///
+/// # Arguments
+///
+/// * `overrides` - Instrument quote overrides (`implied_volatility` takes precedence).
+/// * `curves` - Market context containing either a strike-quoted [`VolSurface`](finstack_quant_core::market_data::surfaces::VolSurface)
+///   or an [`FxDeltaVolSurface`](finstack_quant_core::market_data::surfaces::FxDeltaVolSurface).
+/// * `vol_surface_id` - Identifier of the FX volatility artifact.
+/// * `t` - Time to expiry in years on the volatility basis.
+/// * `strike` - Positive strike in domestic-per-foreign FX units.
+/// * `forward` - Positive FX forward rate in the same units as `strike`.
+#[inline]
+pub fn resolve_fx_sigma_at(
+    overrides: &MarketQuoteOverrides,
+    curves: &MarketContext,
+    vol_surface_id: &str,
+    t: f64,
+    strike: f64,
+    forward: f64,
+) -> Result<f64> {
+    if let Some(sigma) = overrides.implied_volatility {
+        if let Ok(source) = resolve_vol_source(curves, vol_surface_id)
+            && matches!(
+                source.get_convention(t, 0.0)?,
+                VolatilityConvention::ShiftedLognormal { .. }
+            )
+        {
+            return Err(Error::Validation(
+                "unshifted Black consumer cannot use a displaced volatility source".to_owned(),
+            ));
+        }
+        return validate_sigma(sigma);
+    }
+    let source = resolve_vol_source(curves, vol_surface_id)?;
+    if matches!(
+        source.get_convention(t, 0.0)?,
+        VolatilityConvention::ShiftedLognormal { .. }
+    ) {
+        return Err(Error::Validation(
+            "unshifted Black consumer cannot use a displaced volatility source".to_owned(),
+        ));
+    }
+    validate_sigma(source.get_fx_vol_clamped(t, strike, forward)?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

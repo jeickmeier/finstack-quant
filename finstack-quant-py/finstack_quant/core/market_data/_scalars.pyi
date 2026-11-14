@@ -318,6 +318,8 @@ class InflationIndex:
 
         Raises
         ------
+        TypeError
+            If an observation value or ``lag`` is ``bool`` or an unsupported type.
         ValueError
             If ``observations`` is empty or has duplicate dates, a label is
             unknown, a value is non-finite, or ``seasonality`` does not have
@@ -513,6 +515,8 @@ class InflationIndex:
         ------
         KeyError
             If a required monthly CPI observation is missing.
+        TypeError
+            If ``date`` is not date-like or ``lag_months`` is not an ``int`` (or is ``bool``).
         ValueError
             If the contract date cannot be parsed or a required month has multiple observations.
         """

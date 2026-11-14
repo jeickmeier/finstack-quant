@@ -316,7 +316,7 @@ fn benchmark_lm_global_sizes(c: &mut Criterion) {
                 .with_max_iterations(1);
             let solve = || {
                 solver
-                    .solve_system(
+                    .solve_least_squares(
                         |p, r| system.residuals(p, r),
                         black_box(&initial),
                         system.n_residuals,

@@ -1,7 +1,7 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
 use finstack_quant_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface};
 
 #[test]
 fn test_vol_surface_builder_basic() {
@@ -241,15 +241,24 @@ fn test_vol_surface_unsorted_strikes() {
 
 #[test]
 fn test_vol_surface_negative_strikes() {
-    // Negative strikes are allowed (for certain products like spreads)
-    let result = VolSurface::builder("TEST")
+    // Unshifted Black lognormal surfaces require strictly positive strikes.
+    assert!(
+        VolSurface::builder("TEST-BLACK")
+            .expiries(&[1.0])
+            .strikes(&[-10.0, 0.0, 10.0])
+            .row(&[0.2, 0.2, 0.2])
+            .build()
+            .is_err()
+    );
+
+    // Normal (Bachelier) surfaces allow non-positive strikes (e.g. spreads or negative rates).
+    let surf = VolSurface::builder("TEST")
+        .quote_type(VolQuoteType::Normal)
         .expiries(&[1.0])
         .strikes(&[-10.0, 0.0, 10.0])
         .row(&[0.2, 0.2, 0.2])
-        .build();
-    assert!(result.is_ok());
-
-    let surf = result.unwrap();
+        .build()
+        .expect("normal vol surface allows non-positive strikes");
     // Test interpolation with negative strikes
     assert!(
         (finstack_quant_models::volatility::get_surface_vol_clamped(&surf, 1.0, -10.0) - 0.2).abs()
@@ -341,7 +350,7 @@ fn test_vol_surface_parallel_bump_multiplicative_factor() {
 }
 
 #[test]
-fn test_vol_surface_bump_clamps_to_zero() {
+fn test_vol_surface_bump_rejects_negative_shocked_vol() {
     let surface = VolSurface::builder("TEST")
         .expiries(&[1.0])
         .strikes(&[100.0])
@@ -349,18 +358,31 @@ fn test_vol_surface_bump_clamps_to_zero() {
         .build()
         .unwrap();
 
-    // Large negative additive bump should clamp to zero
-    let bumped = surface
+    // Negative additive bump driving grid vol below zero must error instead of clamping.
+    assert!(
+        surface
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::Fraction,
+                value: -1.0,
+                bump_type: BumpType::Parallel,
+            })
+            .is_err()
+    );
+
+    let exact_zero = surface
         .apply_bump(BumpSpec {
             mode: BumpMode::Additive,
             units: BumpUnits::Fraction,
-            value: -1.0,
+            value: -0.005,
             bump_type: BumpType::Parallel,
         })
         .unwrap();
-    assert_eq!(
-        finstack_quant_models::volatility::get_surface_vol(&bumped, 1.0, 100.0).unwrap(),
-        0.0
+    assert!(
+        finstack_quant_models::volatility::get_surface_vol(&exact_zero, 1.0, 100.0)
+            .unwrap()
+            .abs()
+            < 1e-15
     );
 }
 

@@ -923,12 +923,31 @@ impl OnlineStats {
     /// Update with a new sample.
     ///
     /// Uses Welford's algorithm for numerical stability.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Observation to incorporate into the running sample moments.
     pub fn update(&mut self, value: f64) {
-        self.count += 1;
+        let Some(next_count) = self.count.checked_add(1) else {
+            self.mean = f64::NAN;
+            self.m2 = f64::NAN;
+            return;
+        };
+        self.count = next_count;
+        let n = self.count as f64;
         let delta = value - self.mean;
-        self.mean += delta / self.count as f64;
-        let delta2 = value - self.mean;
-        self.m2 += delta * delta2;
+        if delta.is_finite() {
+            self.mean += delta / n;
+            let delta2 = value - self.mean;
+            self.m2 += delta * delta2;
+        } else if value.is_finite() && self.mean.is_finite() {
+            let prev_mean = self.mean;
+            self.mean = prev_mean + (value / n - prev_mean / n);
+            self.m2 += (value - prev_mean) * (value - self.mean);
+        } else {
+            self.mean += delta / n;
+            self.m2 = f64::NAN;
+        }
     }
 
     /// Merge with another statistics accumulator.
@@ -937,6 +956,10 @@ impl OnlineStats {
     /// `combined_m2 = m2_a + m2_b + δ² · n_a · n_b / (n_a + n_b)`
     /// where `δ = mean_b − mean_a`. This is numerically stable even
     /// when the two sub-populations have very different means.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - Second accumulator whose observations are merged into `self`.
     pub fn merge(&mut self, other: &Self) {
         if other.count == 0 {
             return;
@@ -945,15 +968,26 @@ impl OnlineStats {
             *self = other.clone();
             return;
         }
+        let Some(total_count) = self.count.checked_add(other.count) else {
+            self.mean = f64::NAN;
+            self.m2 = f64::NAN;
+            return;
+        };
 
-        let total_count = self.count + other.count;
+        let n_a = self.count as f64;
+        let n_b = other.count as f64;
+        let total = total_count as f64;
+        let w_b = n_b / total;
+        let eff_n = n_a * w_b;
         let delta = other.mean - self.mean;
-        let combined_m2 = self.m2
-            + other.m2
-            + delta * delta * (self.count as f64) * (other.count as f64) / (total_count as f64);
+        let combined_m2 = self.m2 + other.m2 + delta * (delta * eff_n);
+        let combined_mean = if delta.is_finite() {
+            self.mean + delta * w_b
+        } else {
+            self.mean * (n_a / total) + other.mean * w_b
+        };
 
-        self.mean = (self.count as f64 * self.mean + other.count as f64 * other.mean)
-            / (total_count as f64);
+        self.mean = combined_mean;
         self.m2 = combined_m2;
         self.count = total_count;
     }
@@ -1075,21 +1109,54 @@ impl OnlineCovariance {
     /// Update with a new sample pair (x, y).
     ///
     /// Uses Welford's algorithm extended to covariance.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - Observation of the first variable.
+    /// * `y` - Paired observation of the second variable.
     pub fn update(&mut self, x: f64, y: f64) {
-        self.count += 1;
+        let Some(next_count) = self.count.checked_add(1) else {
+            self.mean_x = f64::NAN;
+            self.mean_y = f64::NAN;
+            self.m2_x = f64::NAN;
+            self.m2_y = f64::NAN;
+            self.c = f64::NAN;
+            return;
+        };
+        self.count = next_count;
         let n = self.count as f64;
 
-        let dx = x - self.mean_x;
-        let dy = y - self.mean_y;
-        self.mean_x += dx / n;
-        self.mean_y += dy / n;
+        let prev_mean_x = self.mean_x;
+        let prev_mean_y = self.mean_y;
+        let dx = x - prev_mean_x;
+        let dy = y - prev_mean_y;
 
-        self.m2_x += dx * (x - self.mean_x);
-        self.m2_y += dy * (y - self.mean_y);
-        self.c += dx * (y - self.mean_y);
+        if dx.is_finite() {
+            self.mean_x += dx / n;
+        } else if x.is_finite() && prev_mean_x.is_finite() {
+            self.mean_x = prev_mean_x + (x / n - prev_mean_x / n);
+        } else {
+            self.mean_x += dx / n;
+        }
+
+        if dy.is_finite() {
+            self.mean_y += dy / n;
+        } else if y.is_finite() && prev_mean_y.is_finite() {
+            self.mean_y = prev_mean_y + (y / n - prev_mean_y / n);
+        } else {
+            self.mean_y += dy / n;
+        }
+
+        self.m2_x += (x - prev_mean_x) * (x - self.mean_x);
+        self.m2_y += (y - prev_mean_y) * (y - self.mean_y);
+        self.c += (x - prev_mean_x) * (y - self.mean_y);
     }
 
     /// Merge with another covariance accumulator.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - Second covariance accumulator whose paired observations are merged into `self`.
     pub fn merge(&mut self, other: &Self) {
         if other.count == 0 {
             return;
@@ -1098,21 +1165,36 @@ impl OnlineCovariance {
             *self = other.clone();
             return;
         }
+        let Some(total_count) = self.count.checked_add(other.count) else {
+            self.mean_x = f64::NAN;
+            self.mean_y = f64::NAN;
+            self.m2_x = f64::NAN;
+            self.m2_y = f64::NAN;
+            self.c = f64::NAN;
+            return;
+        };
 
-        let total_count = self.count + other.count;
+        let n_a = self.count as f64;
+        let n_b = other.count as f64;
+        let total = total_count as f64;
+        let w_b = n_b / total;
+        let eff_n = n_a * w_b;
         let delta_x = other.mean_x - self.mean_x;
         let delta_y = other.mean_y - self.mean_y;
 
-        self.c += other.c
-            + delta_x * delta_y * (self.count as f64) * (other.count as f64) / (total_count as f64);
-        self.m2_x += other.m2_x
-            + delta_x * delta_x * (self.count as f64) * (other.count as f64) / (total_count as f64);
-        self.m2_y += other.m2_y
-            + delta_y * delta_y * (self.count as f64) * (other.count as f64) / (total_count as f64);
-        self.mean_x = (self.count as f64 * self.mean_x + other.count as f64 * other.mean_x)
-            / (total_count as f64);
-        self.mean_y = (self.count as f64 * self.mean_y + other.count as f64 * other.mean_y)
-            / (total_count as f64);
+        self.c += other.c + delta_x * (delta_y * eff_n);
+        self.m2_x += other.m2_x + delta_x * (delta_x * eff_n);
+        self.m2_y += other.m2_y + delta_y * (delta_y * eff_n);
+        self.mean_x = if delta_x.is_finite() {
+            self.mean_x + delta_x * w_b
+        } else {
+            self.mean_x * (n_a / total) + other.mean_x * w_b
+        };
+        self.mean_y = if delta_y.is_finite() {
+            self.mean_y + delta_y * w_b
+        } else {
+            self.mean_y * (n_a / total) + other.mean_y * w_b
+        };
         self.count = total_count;
     }
 
@@ -1852,5 +1934,25 @@ mod tests {
             )
             .expect("explicit"),
         );
+    }
+
+    #[test]
+    fn online_stats_and_covariance_merge_without_weighted_mean_overflow() {
+        let mut a = super::OnlineStats::new();
+        let mut b = super::OnlineStats::new();
+        let mut cov_a = super::OnlineCovariance::new();
+        let mut cov_b = super::OnlineCovariance::new();
+        for _ in 0..1000 {
+            a.update(1.0e306);
+            b.update(1.0e306);
+            cov_a.update(1.0e306, -1.0e306);
+            cov_b.update(1.0e306, -1.0e306);
+        }
+        a.merge(&b);
+        cov_a.merge(&cov_b);
+        assert!(a.mean().is_finite());
+        assert!((a.mean() - 1.0e306).abs() <= 1.0e292);
+        assert!(cov_a.mean_x().is_finite());
+        assert!(cov_a.mean_y().is_finite());
     }
 }

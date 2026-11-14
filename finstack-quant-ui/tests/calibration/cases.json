@@ -1421,11 +1421,11 @@
               "id": "ISSUER-A-CDS",
               "base": "2026-05-08",
               "knot_points": [
-                [1.1333333333333333, 0.013249799741950672],
-                [3.1638888888888888, 0.021307831291897554],
-                [5.191666666666666, 0.027701010927556717],
-                [7.222222222222222, 0.03219345836414565],
-                [10.266666666666667, 0.031316991414854244]
+                [1.1333333333333333, 0.013249799741950664],
+                [3.1638888888888888, 0.021307831291897512],
+                [5.191666666666666, 0.02770101092755658],
+                [7.222222222222222, 0.03219345836414582],
+                [10.266666666666667, 0.031316991414854306]
               ],
               "recovery_rate": 0.4,
               "issuer": "Issuer-A",
@@ -1858,11 +1858,11 @@
         "report": {
           "success": true,
           "residuals": {
-            "ISSUER-A-CDS:ISSUER-A-CDS-10Y:tolerance_ratio": 2.6020852139652106e-8,
-            "ISSUER-A-CDS:ISSUER-A-CDS-1Y:tolerance_ratio": 1.2613608074696359e-7,
-            "ISSUER-A-CDS:ISSUER-A-CDS-3Y:tolerance_ratio": 1.6696713456276768e-9,
-            "ISSUER-A-CDS:ISSUER-A-CDS-5Y:tolerance_ratio": 1.478851763270228e-8,
-            "ISSUER-A-CDS:ISSUER-A-CDS-7Y:tolerance_ratio": 3.53406540143375e-7,
+            "ISSUER-A-CDS:ISSUER-A-CDS-10Y:tolerance_ratio": 2.8796409701214998e-8,
+            "ISSUER-A-CDS:ISSUER-A-CDS-1Y:tolerance_ratio": 1.2388094022819374e-7,
+            "ISSUER-A-CDS:ISSUER-A-CDS-3Y:tolerance_ratio": 1.1058862159352145e-9,
+            "ISSUER-A-CDS:ISSUER-A-CDS-5Y:tolerance_ratio": 1.4094628242311558e-8,
+            "ISSUER-A-CDS:ISSUER-A-CDS-7Y:tolerance_ratio": 3.4507986745868635e-7,
             "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 4.773028194904327e-7,
             "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 3.2378011383116245e-7,
             "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 5.456968210637569e-7,
@@ -1871,11 +1871,11 @@
             "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 5.820766091346741e-9
           },
           "iterations": 391,
-          "objective_value": 0.000010078215884534505,
+          "objective_value": 0.000010078187698818825,
           "max_residual": 3.3414107747375965e-13,
-          "rmse": 1.0078215884534505e-13,
+          "rmse": 1.0078187698818824e-13,
           "max_residual_ratio": 0.000033414107747375965,
-          "rmse_ratio": 0.000010078215884534505,
+          "rmse_ratio": 0.000010078187698818825,
           "validation_passed": true,
           "convergence_reason": "Plan execution completed",
           "metadata": {
@@ -1912,18 +1912,18 @@
           "ISSUER-A-CDS": {
             "success": true,
             "residuals": {
-              "ISSUER-A-CDS-10Y": 2.6020852139652106e-16,
-              "ISSUER-A-CDS-1Y": -1.2613608074696359e-15,
-              "ISSUER-A-CDS-3Y": -1.6696713456276768e-17,
-              "ISSUER-A-CDS-5Y": 1.478851763270228e-16,
-              "ISSUER-A-CDS-7Y": -3.5340654014337503e-15
+              "ISSUER-A-CDS-10Y": 2.8796409701215e-16,
+              "ISSUER-A-CDS-1Y": -1.2388094022819374e-15,
+              "ISSUER-A-CDS-3Y": 1.1058862159352145e-17,
+              "ISSUER-A-CDS-5Y": 1.4094628242311558e-16,
+              "ISSUER-A-CDS-7Y": -3.4507986745868635e-15
             },
             "iterations": 344,
-            "objective_value": 1.6834789353274622e-15,
-            "max_residual": 3.5340654014337503e-15,
-            "rmse": 1.6834789353274622e-15,
+            "objective_value": 1.645938741377805e-15,
+            "max_residual": 3.4507986745868635e-15,
+            "rmse": 1.645938741377805e-15,
             "validation_passed": true,
-            "convergence_reason": "generic bootstrap calibration converged: max_residual (3.53e-15) within tolerance (1.00e-8)",
+            "convergence_reason": "generic bootstrap calibration converged: max_residual (3.45e-15) within tolerance (1.00e-8)",
             "metadata": {
               "calibration_type": "hazard_curve",
               "curve_id": "ISSUER-A-CDS",
@@ -1951,7 +1951,7 @@
             },
             "model_version": "ISDA Standard Model v1.8.2",
             "worst_quote_id": "ISSUER-A-CDS-7Y",
-            "worst_quote_residual": -3.5340654014337503e-15,
+            "worst_quote_residual": -3.4507986745868635e-15,
             "success_tolerance": 1e-8,
             "solver_method": "sequential_bootstrap",
             "residual_units": "pv_per_unit_notional"
@@ -2331,11 +2331,11 @@
               "id": "CDX-NA-IG-46",
               "base": "2026-05-08",
               "knot_points": [
-                [1.1333333333333333, 0.00828141443187219],
-                [3.1638888888888888, 0.014969844588757148],
-                [5.191666666666666, 0.024149828285938073],
-                [7.222222222222222, 0.023558385398847078],
-                [10.266666666666667, 0.025312484499632887]
+                [1.1333333333333333, 0.008281414431872193],
+                [3.1638888888888888, 0.01496984458875713],
+                [5.191666666666666, 0.02414982828593817],
+                [7.222222222222222, 0.023558385398846957],
+                [10.266666666666667, 0.025312484499632918]
               ],
               "recovery_rate": 0.4,
               "issuer": "CDX.NA.IG.46",
@@ -2768,11 +2768,11 @@
         "report": {
           "success": true,
           "residuals": {
-            "CDX-NA-IG-46:CDX-IG-46-10Y:tolerance_ratio": 5.2410333017949284e-8,
-            "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio": 1.8832591736073212e-8,
-            "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.000047808957313877354,
-            "CDX-NA-IG-46:CDX-IG-46-5Y:tolerance_ratio": 2.3087001060906331e-7,
-            "CDX-NA-IG-46:CDX-IG-46-7Y:tolerance_ratio": 1.971079549578647e-8,
+            "CDX-NA-IG-46:CDX-IG-46-10Y:tolerance_ratio": 7.73903510720153e-8,
+            "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio": 1.8745855562274372e-8,
+            "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.00004781173287143892,
+            "CDX-NA-IG-46:CDX-IG-46-5Y:tolerance_ratio": 2.3780890451297054e-7,
+            "CDX-NA-IG-46:CDX-IG-46-7Y:tolerance_ratio": 2.1098574276567916e-8,
             "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 4.365574568510055e-7,
             "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 1.3969838619232178e-7,
             "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 9.604264050722122e-8,
@@ -2781,11 +2781,11 @@
             "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 2.7284841053187847e-9
           },
           "iterations": 389,
-          "objective_value": 0.000014415846493023402,
-          "max_residual": 4.780895731387735e-13,
-          "rmse": 1.4415846493023398e-13,
-          "max_residual_ratio": 0.000047808957313877354,
-          "rmse_ratio": 0.000014415846493023402,
+          "objective_value": 0.000014416703947649557,
+          "max_residual": 4.781173287143892e-13,
+          "rmse": 1.4416703947649555e-13,
+          "max_residual_ratio": 0.00004781173287143892,
+          "rmse_ratio": 0.000014416703947649557,
           "validation_passed": true,
           "convergence_reason": "Plan execution completed",
           "metadata": {
@@ -2814,7 +2814,7 @@
             "version": "0.11.0"
           },
           "worst_quote_id": "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio",
-          "worst_quote_residual": 0.000047808957313877354,
+          "worst_quote_residual": 0.00004781173287143892,
           "solver_method": "plan_execution",
           "residual_units": "absolute_residual_over_step_tolerance"
         },
@@ -2822,16 +2822,16 @@
           "CDX-NA-IG-46": {
             "success": true,
             "residuals": {
-              "CDX-IG-46-10Y": -5.241033301794928e-16,
-              "CDX-IG-46-1Y": -1.8832591736073212e-16,
-              "CDX-IG-46-3Y": -4.780895731387735e-13,
-              "CDX-IG-46-5Y": 2.308700106090633e-15,
-              "CDX-IG-46-7Y": -1.971079549578647e-16
+              "CDX-IG-46-10Y": -7.739035107201531e-16,
+              "CDX-IG-46-1Y": -1.8745855562274372e-16,
+              "CDX-IG-46-3Y": -4.781173287143892e-13,
+              "CDX-IG-46-5Y": 2.3780890451297054e-15,
+              "CDX-IG-46-7Y": -2.1098574276567916e-16
             },
             "iterations": 343,
-            "objective_value": 2.1381081312351454e-13,
-            "max_residual": 4.780895731387735e-13,
-            "rmse": 2.1381081312351454e-13,
+            "objective_value": 2.1382353187001073e-13,
+            "max_residual": 4.781173287143892e-13,
+            "rmse": 2.1382353187001073e-13,
             "validation_passed": true,
             "convergence_reason": "generic bootstrap calibration converged: max_residual (4.78e-13) within tolerance (1.00e-8)",
             "metadata": {
@@ -2861,7 +2861,7 @@
             },
             "model_version": "ISDA Standard Model v1.8.2",
             "worst_quote_id": "CDX-IG-46-3Y",
-            "worst_quote_residual": -4.780895731387735e-13,
+            "worst_quote_residual": -4.781173287143892e-13,
             "success_tolerance": 1e-8,
             "solver_method": "sequential_bootstrap",
             "residual_units": "pv_per_unit_notional"
@@ -3379,11 +3379,11 @@
               "id": "CDX-NA-IG-46",
               "base": "2026-05-08",
               "knot_points": [
-                [1.1333333333333333, 0.00828141443187219],
-                [3.1638888888888888, 0.014969844588757148],
-                [5.191666666666666, 0.024149828285938073],
-                [7.222222222222222, 0.023558385398847078],
-                [10.266666666666667, 0.025312484499632887]
+                [1.1333333333333333, 0.008281414431872193],
+                [3.1638888888888888, 0.01496984458875713],
+                [5.191666666666666, 0.02414982828593817],
+                [7.222222222222222, 0.023558385398846957],
+                [10.266666666666667, 0.025312484499632918]
               ],
               "recovery_rate": 0.4,
               "issuer": "CDX.NA.IG.46",
@@ -3696,8 +3696,8 @@
               "id": "CDX-NA-IG-46_CORR",
               "detachment_points": [3, 7.000000000000001, 10, 15, 30],
               "correlations": [
-                0.2006620291791972, 0.21114989424040423, 0.21967934115476206,
-                0.23177041604879434, 0.24896498910116932
+                0.2006620291791978, 0.2111498942404058, 0.2196793411547649,
+                0.23177041604879903, 0.24896498910121265
               ]
             },
             {
@@ -3836,16 +3836,16 @@
         "report": {
           "success": true,
           "residuals": {
-            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-0-3:tolerance_ratio": 3.4694469519666666e-13,
-            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-10-15:tolerance_ratio": 9.187962890511201e-11,
-            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio": 4.5334106838860004e-12,
-            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-3-7:tolerance_ratio": 1.3010426069749997e-13,
-            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-7-10:tolerance_ratio": 9.685539407533335e-13,
-            "CDX-NA-IG-46:CDX-IG-46-10Y:tolerance_ratio": 5.2410333017949284e-8,
-            "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio": 1.8832591736073212e-8,
-            "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.000047808957313877354,
-            "CDX-NA-IG-46:CDX-IG-46-5Y:tolerance_ratio": 2.3087001060906331e-7,
-            "CDX-NA-IG-46:CDX-IG-46-7Y:tolerance_ratio": 1.971079549578647e-8,
+            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-0-3:tolerance_ratio": 0,
+            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-10-15:tolerance_ratio": 9.233499381755603e-11,
+            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio": 4.383067982634667e-12,
+            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-3-7:tolerance_ratio": 0,
+            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-7-10:tolerance_ratio": 5.348730717600001e-13,
+            "CDX-NA-IG-46:CDX-IG-46-10Y:tolerance_ratio": 7.73903510720153e-8,
+            "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio": 1.8745855562274372e-8,
+            "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.00004781173287143892,
+            "CDX-NA-IG-46:CDX-IG-46-5Y:tolerance_ratio": 2.3780890451297054e-7,
+            "CDX-NA-IG-46:CDX-IG-46-7Y:tolerance_ratio": 2.1098574276567916e-8,
             "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 4.365574568510055e-7,
             "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 1.3969838619232178e-7,
             "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 9.604264050722122e-8,
@@ -3854,11 +3854,11 @@
             "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 2.7284841053187847e-9
           },
           "iterations": 420,
-          "objective_value": 0.000011952988463201967,
-          "max_residual": 4.780895731387735e-13,
-          "rmse": 1.2172247803305032e-13,
-          "max_residual_ratio": 0.000047808957313877354,
-          "rmse_ratio": 0.000011952988463201967,
+          "objective_value": 0.000011953699427019608,
+          "max_residual": 4.781173287143892e-13,
+          "rmse": 1.2175044569811211e-13,
+          "max_residual_ratio": 0.00004781173287143892,
+          "rmse_ratio": 0.000011953699427019608,
           "validation_passed": true,
           "convergence_reason": "Plan execution completed",
           "metadata": {
@@ -3887,7 +3887,7 @@
             "version": "0.11.0"
           },
           "worst_quote_id": "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio",
-          "worst_quote_residual": 0.000047808957313877354,
+          "worst_quote_residual": 0.00004781173287143892,
           "solver_method": "plan_execution",
           "residual_units": "absolute_residual_over_step_tolerance"
         },
@@ -3895,16 +3895,16 @@
           "CDX-NA-IG-46": {
             "success": true,
             "residuals": {
-              "CDX-IG-46-10Y": -5.241033301794928e-16,
-              "CDX-IG-46-1Y": -1.8832591736073212e-16,
-              "CDX-IG-46-3Y": -4.780895731387735e-13,
-              "CDX-IG-46-5Y": 2.308700106090633e-15,
-              "CDX-IG-46-7Y": -1.971079549578647e-16
+              "CDX-IG-46-10Y": -7.739035107201531e-16,
+              "CDX-IG-46-1Y": -1.8745855562274372e-16,
+              "CDX-IG-46-3Y": -4.781173287143892e-13,
+              "CDX-IG-46-5Y": 2.3780890451297054e-15,
+              "CDX-IG-46-7Y": -2.1098574276567916e-16
             },
             "iterations": 343,
-            "objective_value": 2.1381081312351454e-13,
-            "max_residual": 4.780895731387735e-13,
-            "rmse": 2.1381081312351454e-13,
+            "objective_value": 2.1382353187001073e-13,
+            "max_residual": 4.781173287143892e-13,
+            "rmse": 2.1382353187001073e-13,
             "validation_passed": true,
             "convergence_reason": "generic bootstrap calibration converged: max_residual (4.78e-13) within tolerance (1.00e-8)",
             "metadata": {
@@ -3934,7 +3934,7 @@
             },
             "model_version": "ISDA Standard Model v1.8.2",
             "worst_quote_id": "CDX-IG-46-3Y",
-            "worst_quote_residual": -4.780895731387735e-13,
+            "worst_quote_residual": -4.781173287143892e-13,
             "success_tolerance": 1e-8,
             "solver_method": "sequential_bootstrap",
             "residual_units": "pv_per_unit_notional"
@@ -3942,18 +3942,18 @@
           "CDX-NA-IG-46-BASE-CORR-STEP": {
             "success": true,
             "residuals": {
-              "CDX-IG-46-0-3": 3.469446951966667e-16,
-              "CDX-IG-46-10-15": 9.187962890511202e-14,
-              "CDX-IG-46-15-30": -4.533410683886e-15,
-              "CDX-IG-46-3-7": -1.3010426069749997e-16,
-              "CDX-IG-46-7-10": 9.685539407533334e-16
+              "CDX-IG-46-0-3": 0,
+              "CDX-IG-46-10-15": 9.233499381755603e-14,
+              "CDX-IG-46-15-30": -4.383067982634667e-15,
+              "CDX-IG-46-3-7": 0,
+              "CDX-IG-46-7-10": 5.3487307176e-16
             },
             "iterations": 31,
-            "objective_value": 4.1142419507477176e-14,
-            "max_residual": 9.187962890511202e-14,
-            "rmse": 4.1142419507477176e-14,
+            "objective_value": 4.134065422179818e-14,
+            "max_residual": 9.233499381755603e-14,
+            "rmse": 4.134065422179818e-14,
             "validation_passed": true,
-            "convergence_reason": "generic bootstrap calibration converged: max_residual (9.19e-14) within tolerance (1.00e-3)",
+            "convergence_reason": "generic bootstrap calibration converged: max_residual (9.23e-14) within tolerance (1.00e-3)",
             "metadata": {
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
@@ -3977,7 +3977,7 @@
               "version": "0.11.0"
             },
             "worst_quote_id": "CDX-IG-46-10-15",
-            "worst_quote_residual": 9.187962890511202e-14,
+            "worst_quote_residual": 9.233499381755603e-14,
             "success_tolerance": 0.001,
             "solver_method": "sequential_bootstrap",
             "residual_units": "discounted_upfront_fraction"
@@ -4484,11 +4484,11 @@
               "id": "CDX-NA-IG-46",
               "base": "2026-05-08",
               "knot_points": [
-                [1.1333333333333333, 0.00828141443187219],
-                [3.1638888888888888, 0.014969844588757148],
-                [5.191666666666666, 0.024149828285938073],
-                [7.222222222222222, 0.023558385398847078],
-                [10.266666666666667, 0.025312484499632887]
+                [1.1333333333333333, 0.008281414431872193],
+                [3.1638888888888888, 0.01496984458875713],
+                [5.191666666666666, 0.02414982828593817],
+                [7.222222222222222, 0.023558385398846957],
+                [10.266666666666667, 0.025312484499632918]
               ],
               "recovery_rate": 0.4,
               "issuer": "CDX.NA.IG.46",
@@ -4919,9 +4919,9 @@
               "quote_type": "black_lognormal",
               "interpolation_mode": "total_variance",
               "vols_row_major": [
-                0.3603004829539502, 0.36029999999997564, 0.3603000000000512,
-                0.3700004681570287, 0.36999999977741754, 0.37000000024336244,
-                0.38000038958188986, 0.3799999921706879, 0.38000000690557406
+                0.3603004829534954, 0.3602999999999754, 0.3603000000000995,
+                0.3700004681569028, 0.36999999977741754, 0.37000000024338076,
+                0.38000038958201354, 0.37999999217070835, 0.3800000069055615
               ]
             }
           ],
@@ -4937,20 +4937,20 @@
         "report": {
           "success": true,
           "residuals": {
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.004:tolerance_ratio": 0.0004829539501649549,
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.0100:tolerance_ratio": 2.4424906541753444e-11,
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.0125:tolerance_ratio": 5.1181281435219717e-11,
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260917-0.004:tolerance_ratio": 0.0004681570286990677,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.004:tolerance_ratio": 0.000482953495417604,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.0100:tolerance_ratio": 2.4591439995447217e-11,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.0125:tolerance_ratio": 9.947598300641403e-11,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260917-0.004:tolerance_ratio": 0.00046815690279977673,
             "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260917-0.0100:tolerance_ratio": 2.2258245246931097e-7,
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260917-0.0125:tolerance_ratio": 2.433624413100688e-7,
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20261217-0.004:tolerance_ratio": 0.00038958188985915854,
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20261217-0.0100:tolerance_ratio": 0.000007829312087537232,
-            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20261217-0.0125:tolerance_ratio": 0.000006905574057025632,
-            "CDX-NA-IG-46:CDX-IG-46-10Y:tolerance_ratio": 5.2410333017949284e-8,
-            "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio": 1.8832591736073212e-8,
-            "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.000047808957313877354,
-            "CDX-NA-IG-46:CDX-IG-46-5Y:tolerance_ratio": 2.3087001060906331e-7,
-            "CDX-NA-IG-46:CDX-IG-46-7Y:tolerance_ratio": 1.971079549578647e-8,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260917-0.0125:tolerance_ratio": 2.433807599899751e-7,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20261217-0.004:tolerance_ratio": 0.0003895820135380035,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20261217-0.0100:tolerance_ratio": 0.00000782929165943358,
+            "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20261217-0.0125:tolerance_ratio": 0.000006905561511505454,
+            "CDX-NA-IG-46:CDX-IG-46-10Y:tolerance_ratio": 7.73903510720153e-8,
+            "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio": 1.8745855562274372e-8,
+            "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 0.00004781173287143892,
+            "CDX-NA-IG-46:CDX-IG-46-5Y:tolerance_ratio": 2.3780890451297054e-7,
+            "CDX-NA-IG-46:CDX-IG-46-7Y:tolerance_ratio": 2.1098574276567916e-8,
             "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 4.365574568510055e-7,
             "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 1.3969838619232178e-7,
             "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 9.604264050722122e-8,
@@ -4958,12 +4958,12 @@
             "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 5.911715561524033e-9,
             "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 2.7284841053187847e-9
           },
-          "iterations": 1088,
-          "objective_value": 0.00017415289937103718,
-          "max_residual": 4.829539501649549e-7,
-          "rmse": 1.7382443215149384e-7,
-          "max_residual_ratio": 0.0004829539501649549,
-          "rmse_ratio": 0.00017415289937103718,
+          "iterations": 1007,
+          "objective_value": 0.00017415287219741353,
+          "max_residual": 4.82953495417604e-7,
+          "rmse": 1.7382436581396543e-7,
+          "max_residual_ratio": 0.000482953495417604,
+          "rmse_ratio": 0.00017415287219741353,
           "validation_passed": true,
           "convergence_reason": "Plan execution completed",
           "metadata": {
@@ -4992,7 +4992,7 @@
             "version": "0.11.0"
           },
           "worst_quote_id": "CDX-NA-IG-46-CDSO-VOL-STEP:CDX-NA-IG-46-VOL-20260617-0.004:tolerance_ratio",
-          "worst_quote_residual": 0.0004829539501649549,
+          "worst_quote_residual": 0.000482953495417604,
           "solver_method": "plan_execution",
           "residual_units": "absolute_residual_over_step_tolerance"
         },
@@ -5000,16 +5000,16 @@
           "CDX-NA-IG-46": {
             "success": true,
             "residuals": {
-              "CDX-IG-46-10Y": -5.241033301794928e-16,
-              "CDX-IG-46-1Y": -1.8832591736073212e-16,
-              "CDX-IG-46-3Y": -4.780895731387735e-13,
-              "CDX-IG-46-5Y": 2.308700106090633e-15,
-              "CDX-IG-46-7Y": -1.971079549578647e-16
+              "CDX-IG-46-10Y": -7.739035107201531e-16,
+              "CDX-IG-46-1Y": -1.8745855562274372e-16,
+              "CDX-IG-46-3Y": -4.781173287143892e-13,
+              "CDX-IG-46-5Y": 2.3780890451297054e-15,
+              "CDX-IG-46-7Y": -2.1098574276567916e-16
             },
             "iterations": 343,
-            "objective_value": 2.1381081312351454e-13,
-            "max_residual": 4.780895731387735e-13,
-            "rmse": 2.1381081312351454e-13,
+            "objective_value": 2.1382353187001073e-13,
+            "max_residual": 4.781173287143892e-13,
+            "rmse": 2.1382353187001073e-13,
             "validation_passed": true,
             "convergence_reason": "generic bootstrap calibration converged: max_residual (4.78e-13) within tolerance (1.00e-8)",
             "metadata": {
@@ -5039,7 +5039,7 @@
             },
             "model_version": "ISDA Standard Model v1.8.2",
             "worst_quote_id": "CDX-IG-46-3Y",
-            "worst_quote_residual": -4.780895731387735e-13,
+            "worst_quote_residual": -4.781173287143892e-13,
             "success_tolerance": 1e-8,
             "solver_method": "sequential_bootstrap",
             "residual_units": "pv_per_unit_notional"
@@ -5047,20 +5047,20 @@
           "CDX-NA-IG-46-CDSO-VOL-STEP": {
             "success": true,
             "residuals": {
-              "CDX-NA-IG-46-VOL-20260617-0.004": 4.829539501649549e-7,
-              "CDX-NA-IG-46-VOL-20260617-0.0100": -2.4424906541753444e-14,
-              "CDX-NA-IG-46-VOL-20260617-0.0125": 5.1181281435219717e-14,
-              "CDX-NA-IG-46-VOL-20260917-0.004": 4.681570286990677e-7,
+              "CDX-NA-IG-46-VOL-20260617-0.004": 4.82953495417604e-7,
+              "CDX-NA-IG-46-VOL-20260617-0.0100": -2.4591439995447217e-14,
+              "CDX-NA-IG-46-VOL-20260617-0.0125": 9.947598300641403e-14,
+              "CDX-NA-IG-46-VOL-20260917-0.004": 4.6815690279977673e-7,
               "CDX-NA-IG-46-VOL-20260917-0.0100": -2.2258245246931097e-10,
-              "CDX-NA-IG-46-VOL-20260917-0.0125": 2.433624413100688e-10,
-              "CDX-NA-IG-46-VOL-20261217-0.004": 3.8958188985915854e-7,
-              "CDX-NA-IG-46-VOL-20261217-0.0100": -7.829312087537232e-9,
-              "CDX-NA-IG-46-VOL-20261217-0.0125": 6.905574057025632e-9
+              "CDX-NA-IG-46-VOL-20260917-0.0125": 2.433807599899751e-10,
+              "CDX-NA-IG-46-VOL-20261217-0.004": 3.895820135380035e-7,
+              "CDX-NA-IG-46-VOL-20261217-0.0100": -7.82929165943358e-9,
+              "CDX-NA-IG-46-VOL-20261217-0.0125": 6.905561511505454e-9
             },
-            "iterations": 699,
-            "objective_value": 2.5912216429397784e-7,
-            "max_residual": 4.829539501649549e-7,
-            "rmse": 2.5912216429397784e-7,
+            "iterations": 618,
+            "objective_value": 2.591220654038292e-7,
+            "max_residual": 4.82953495417604e-7,
+            "rmse": 2.591220654038292e-7,
             "validation_passed": true,
             "convergence_reason": "vol surface calibration converged: max_residual (4.83e-7) within tolerance (1.00e-3)",
             "metadata": {
@@ -5068,9 +5068,9 @@
               "calibrated_expiry_count": "3",
               "expiry_extrapolation_policy": "clamp",
               "sabr_parameters_at_bounds": "T=0.109589:nu;T=0.361644:nu;T=0.610959:nu",
-              "sabr_residual_evaluations": "T=0.109589:637;T=0.361644:281;T=0.610959:266",
-              "sabr_winning_iterations": "T=0.109589:16;T=0.361644:18;T=0.610959:16",
-              "sabr_winning_starts": "T=0.109589:alpha=0.36030000,nu=0.40000000,rho=0.60000000;T=0.361644:alpha=0.37000000,nu=0.40000000,rho=0.60000000;T=0.610959:alpha=0.38000000,nu=0.90000000,rho=-0.60000000",
+              "sabr_residual_evaluations": "T=0.109589:659;T=0.361644:363;T=0.610959:369",
+              "sabr_winning_iterations": "T=0.109589:27;T=0.361644:17;T=0.610959:15",
+              "sabr_winning_starts": "T=0.109589:alpha=0.36030000,nu=0.40000000,rho=-0.60000000;T=0.361644:alpha=0.37000000,nu=0.40000000,rho=0.60000000;T=0.610959:alpha=0.38000000,nu=0.40000000,rho=-0.60000000",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "vol_surface"
@@ -5093,7 +5093,7 @@
               "version": "0.11.0"
             },
             "worst_quote_id": "CDX-NA-IG-46-VOL-20260617-0.004",
-            "worst_quote_residual": 4.829539501649549e-7,
+            "worst_quote_residual": 4.82953495417604e-7,
             "success_tolerance": 0.001,
             "solver_method": "per_slice_least_squares",
             "residual_units": "quoted_volatility",
@@ -5102,40 +5102,40 @@
                 "expiry": 0.1095890410958904,
                 "parameters": {
                   "sabr": {
-                    "alpha": 0.3602999968224336,
+                    "alpha": 0.3602999968224332,
                     "beta": 1,
-                    "nu": 0.001,
-                    "rho": -0.00019570825662673652
+                    "nu": 0.0010000000000561905,
+                    "rho": -0.0001957072258450543
                   }
                 },
-                "iterations": 396,
-                "max_relative_quote_error": 0.0000013404217323479181
+                "iterations": 314,
+                "max_relative_quote_error": 0.0000013404204702126117
               },
               {
                 "expiry": 0.36164383561643837,
                 "parameters": {
                   "sabr": {
-                    "alpha": 0.36999998897241326,
+                    "alpha": 0.36999998897241226,
                     "beta": 1,
-                    "nu": 0.0010000000000000024,
-                    "rho": -0.00016332037731625615
+                    "nu": 0.0010000000000000015,
+                    "rho": -0.00016332003942653994
                   }
                 },
-                "iterations": 154,
-                "max_relative_quote_error": 0.0000012652892667542371
+                "iterations": 151,
+                "max_relative_quote_error": 0.0000012652889264858831
               },
               {
                 "expiry": 0.6109589041095891,
                 "parameters": {
                   "sabr": {
-                    "alpha": 0.3799999724663982,
+                    "alpha": 0.37999997246642037,
                     "beta": 1,
-                    "nu": 0.0010000000001364148,
-                    "rho": -0.000009423248241158255
+                    "nu": 0.001,
+                    "rho": -0.000009423449983780863
                   }
                 },
-                "iterations": 149,
-                "max_relative_quote_error": 0.0000010252154996293645
+                "iterations": 153,
+                "max_relative_quote_error": 0.0000010252158251000092
               }
             ]
           },
@@ -6087,58 +6087,58 @@
               "tenors": [2, 5, 10],
               "params": [
                 {
-                  "alpha": 0.006496448514305247,
+                  "alpha": 0.006496448504321107,
                   "beta": 0,
-                  "rho": 0.3210169001879719,
-                  "nu": 0.9649698789893464
+                  "rho": 0.32101692110989943,
+                  "nu": 0.9649699025289933
                 },
                 {
-                  "alpha": 0.006062817424010608,
+                  "alpha": 0.006062816207256896,
                   "beta": 0,
-                  "rho": 0.34001075769119193,
-                  "nu": 0.938118733164721
+                  "rho": 0.3400112788030045,
+                  "nu": 0.9381206817918755
                 },
                 {
-                  "alpha": 0.00562206604545072,
+                  "alpha": 0.005622066057082596,
                   "beta": 0,
-                  "rho": 0.3571007036733269,
-                  "nu": 0.9063291168149651
+                  "rho": 0.35710066351729153,
+                  "nu": 0.9063290748311916
                 },
                 {
-                  "alpha": 0.006453466737784147,
+                  "alpha": 0.006453468413278269,
                   "beta": 0,
-                  "rho": 0.2993957933769902,
-                  "nu": 0.8778965344809337
+                  "rho": 0.2993946384459991,
+                  "nu": 0.8778948704986875
                 },
                 {
-                  "alpha": 0.006042817802155546,
+                  "alpha": 0.006042817676120343,
                   "beta": 0,
-                  "rho": 0.3109825471273694,
-                  "nu": 0.8544192680879542
+                  "rho": 0.31098225002695895,
+                  "nu": 0.8544192258209458
                 },
                 {
-                  "alpha": 0.005536665324236017,
+                  "alpha": 0.005536667738686102,
                   "beta": 0,
-                  "rho": 0.35243887766662774,
-                  "nu": 0.8928588487529586
+                  "rho": 0.3524380678397464,
+                  "nu": 0.8928563858910996
                 },
                 {
-                  "alpha": 0.00624700378443456,
+                  "alpha": 0.006247004380597799,
                   "beta": 0,
-                  "rho": 0.2871261608420304,
-                  "nu": 0.8172847130251202
+                  "rho": 0.2871257985874466,
+                  "nu": 0.817284368204817
                 },
                 {
-                  "alpha": 0.005833429937047962,
+                  "alpha": 0.005833428776541451,
                   "beta": 0,
-                  "rho": 0.2992937280970742,
-                  "nu": 0.7973256121784547
+                  "rho": 0.29929395974226586,
+                  "nu": 0.7973261330502498
                 },
                 {
-                  "alpha": 0.005341987760289683,
+                  "alpha": 0.005341987777890654,
                   "beta": 0,
-                  "rho": 0.31569178122606856,
-                  "nu": 0.7724834406424892
+                  "rho": 0.31569177765226836,
+                  "nu": 0.7724834310765648
                 }
               ],
               "forwards": [
@@ -6165,40 +6165,40 @@
             "USD-SOFR-3M:FRA-SOFR-3M-3X6:tolerance_ratio": 1.7088872182076205e-10,
             "USD-SOFR-3M:FRA-SOFR-3M-6X9:tolerance_ratio": 3.3752626988081367e-10,
             "USD-SOFR-3M:FRA-SOFR-3M-9X12:tolerance_ratio": 6.66650276182775e-10,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.045:tolerance_ratio": 0.049848861565593656,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.055:tolerance_ratio": 0.09180918004507259,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.05:tolerance_ratio": 0.09959882945211745,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20320511-0.045:tolerance_ratio": 0.05491632189126572,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20320511-0.055:tolerance_ratio": 0.09304981462198113,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20320511-0.05:tolerance_ratio": 0.09636973479400755,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.045:tolerance_ratio": 0.06188529473347079,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.055:tolerance_ratio": 0.09310500459070471,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.05:tolerance_ratio": 0.09434285800435406,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.045:tolerance_ratio": 0.034729411531065714,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.055:tolerance_ratio": 0.08695481588241276,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.05:tolerance_ratio": 0.08432019268949456,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20330510-0.045:tolerance_ratio": 0.03514643952908363,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20330510-0.055:tolerance_ratio": 0.08534184330453709,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20330510-0.05:tolerance_ratio": 0.08345889117552553,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.045:tolerance_ratio": 0.04593912011659496,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.055:tolerance_ratio": 0.10211429269921361,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.05:tolerance_ratio": 0.09443516421741374,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.045:tolerance_ratio": 0.027340398336324113,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.055:tolerance_ratio": 0.08356177230622412,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.05:tolerance_ratio": 0.08425202044241911,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20360512-0.045:tolerance_ratio": 0.028439378572186803,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20360512-0.055:tolerance_ratio": 0.08456596968337352,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20360512-0.05:tolerance_ratio": 0.0836988561818466,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20410512-0.045:tolerance_ratio": 0.028531418827514955,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20410512-0.055:tolerance_ratio": 0.08411633975922289,
-            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20410512-0.05:tolerance_ratio": 0.08284471749105415
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.045:tolerance_ratio": 0.049848887148315944,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.055:tolerance_ratio": 0.09180920136282744,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20290511-0.05:tolerance_ratio": 0.09959880610301297,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20320511-0.045:tolerance_ratio": 0.054915419749480256,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20320511-0.055:tolerance_ratio": 0.09305083189157896,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20320511-0.05:tolerance_ratio": 0.09636910898281476,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.045:tolerance_ratio": 0.061885249988247064,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.055:tolerance_ratio": 0.09310496753048812,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20270508-20370511-0.05:tolerance_ratio": 0.09434290145101468,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.045:tolerance_ratio": 0.0347285708745277,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.055:tolerance_ratio": 0.08695353905691904,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20300510-0.05:tolerance_ratio": 0.0843214412197402,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20330510-0.045:tolerance_ratio": 0.03514580345698471,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20330510-0.055:tolerance_ratio": 0.08534167108386534,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20330510-0.05:tolerance_ratio": 0.08345919223650144,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.045:tolerance_ratio": 0.045940281518858095,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.055:tolerance_ratio": 0.10211281469447882,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.05:tolerance_ratio": 0.09443612197788537,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.045:tolerance_ratio": 0.027339971475267195,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.055:tolerance_ratio": 0.08356140797168242,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20330512-0.05:tolerance_ratio": 0.08425242287416213,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20360512-0.045:tolerance_ratio": 0.028439183167718155,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20360512-0.055:tolerance_ratio": 0.084566339762208,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20360512-0.05:tolerance_ratio": 0.0836985943184574,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20410512-0.045:tolerance_ratio": 0.028531425779437212,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20410512-0.055:tolerance_ratio": 0.08411633199143416,
+            "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20310508-20410512-0.05:tolerance_ratio": 0.0828447200405414
           },
-          "iterations": 759,
-          "objective_value": 0.06500155250529988,
-          "max_residual": 0.00015317143904882043,
-          "rmse": 0.00009750232875788005,
-          "max_residual_ratio": 0.10211429269921361,
-          "rmse_ratio": 0.06500155250529988,
+          "iterations": 762,
+          "objective_value": 0.06500152212854786,
+          "max_residual": 0.00015316922204171822,
+          "rmse": 0.00009750228319275203,
+          "max_residual_ratio": 0.10211281469447882,
+          "rmse_ratio": 0.06500152212854786,
           "validation_passed": true,
           "convergence_reason": "Plan execution completed",
           "metadata": {
@@ -6227,7 +6227,7 @@
             "version": "0.11.0"
           },
           "worst_quote_id": "USD-SWAPTION-NORMAL-VOL-STEP:USD-SWPTN-VOL-20280508-20380510-0.055:tolerance_ratio",
-          "worst_quote_residual": 0.10211429269921361,
+          "worst_quote_residual": 0.10211281469447882,
           "solver_method": "plan_execution",
           "residual_units": "absolute_residual_over_step_tolerance"
         },
@@ -6341,38 +6341,38 @@
           "USD-SWAPTION-NORMAL-VOL-STEP": {
             "success": true,
             "residuals": {
-              "USD-SWPTN-VOL-20270508-20290511-0.045": -0.00007477329234839049,
-              "USD-SWPTN-VOL-20270508-20290511-0.05": 0.00014939824417817618,
-              "USD-SWPTN-VOL-20270508-20290511-0.055": 0.00013771377006760888,
-              "USD-SWPTN-VOL-20270508-20320511-0.045": -0.00008237448283689858,
-              "USD-SWPTN-VOL-20270508-20320511-0.05": 0.00014455460219101133,
-              "USD-SWPTN-VOL-20270508-20320511-0.055": 0.00013957472193297168,
-              "USD-SWPTN-VOL-20270508-20370511-0.045": -0.0000928279421002062,
-              "USD-SWPTN-VOL-20270508-20370511-0.05": 0.0001415142870065311,
-              "USD-SWPTN-VOL-20270508-20370511-0.055": 0.00013965750688605706,
-              "USD-SWPTN-VOL-20280508-20300510-0.045": -0.000052094117296598574,
-              "USD-SWPTN-VOL-20280508-20300510-0.05": 0.00012648028903424185,
-              "USD-SWPTN-VOL-20280508-20300510-0.055": 0.00013043222382361913,
-              "USD-SWPTN-VOL-20280508-20330510-0.045": -0.00005271965929362545,
-              "USD-SWPTN-VOL-20280508-20330510-0.05": 0.0001251883367632883,
-              "USD-SWPTN-VOL-20280508-20330510-0.055": 0.00012801276495680563,
-              "USD-SWPTN-VOL-20280508-20380510-0.045": -0.00006890868017489244,
-              "USD-SWPTN-VOL-20280508-20380510-0.05": 0.00014165274632612062,
-              "USD-SWPTN-VOL-20280508-20380510-0.055": 0.00015317143904882043,
-              "USD-SWPTN-VOL-20310508-20330512-0.045": -0.00004101059750448617,
-              "USD-SWPTN-VOL-20310508-20330512-0.05": 0.00012637803066362866,
-              "USD-SWPTN-VOL-20310508-20330512-0.055": 0.00012534265845933618,
-              "USD-SWPTN-VOL-20310508-20360512-0.045": -0.000042659067858280206,
-              "USD-SWPTN-VOL-20310508-20360512-0.05": 0.00012554828427276989,
-              "USD-SWPTN-VOL-20310508-20360512-0.055": 0.00012684895452506027,
-              "USD-SWPTN-VOL-20310508-20410512-0.045": -0.000042797128241272436,
-              "USD-SWPTN-VOL-20310508-20410512-0.05": 0.00012426707623658124,
-              "USD-SWPTN-VOL-20310508-20410512-0.055": 0.00012617450963883434
+              "USD-SWPTN-VOL-20270508-20290511-0.045": -0.00007477333072247391,
+              "USD-SWPTN-VOL-20270508-20290511-0.05": 0.00014939820915451946,
+              "USD-SWPTN-VOL-20270508-20290511-0.055": 0.00013771380204424116,
+              "USD-SWPTN-VOL-20270508-20320511-0.045": -0.00008237312962422038,
+              "USD-SWPTN-VOL-20270508-20320511-0.05": 0.00014455366347422213,
+              "USD-SWPTN-VOL-20270508-20320511-0.055": 0.00013957624783736845,
+              "USD-SWPTN-VOL-20270508-20370511-0.045": -0.0000928278749823706,
+              "USD-SWPTN-VOL-20270508-20370511-0.05": 0.00014151435217652202,
+              "USD-SWPTN-VOL-20270508-20370511-0.055": 0.00013965745129573218,
+              "USD-SWPTN-VOL-20280508-20300510-0.045": -0.00005209285631179155,
+              "USD-SWPTN-VOL-20280508-20300510-0.05": 0.00012648216182961029,
+              "USD-SWPTN-VOL-20280508-20300510-0.055": 0.00013043030858537856,
+              "USD-SWPTN-VOL-20280508-20330510-0.045": -0.00005271870518547706,
+              "USD-SWPTN-VOL-20280508-20330510-0.05": 0.00012518878835475217,
+              "USD-SWPTN-VOL-20280508-20330510-0.055": 0.000128012506625798,
+              "USD-SWPTN-VOL-20280508-20380510-0.045": -0.00006891042227828714,
+              "USD-SWPTN-VOL-20280508-20380510-0.05": 0.00014165418296682806,
+              "USD-SWPTN-VOL-20280508-20380510-0.055": 0.00015316922204171822,
+              "USD-SWPTN-VOL-20310508-20330512-0.045": -0.000041009957212900794,
+              "USD-SWPTN-VOL-20310508-20330512-0.05": 0.0001263786343112432,
+              "USD-SWPTN-VOL-20310508-20330512-0.055": 0.00012534211195752362,
+              "USD-SWPTN-VOL-20310508-20360512-0.045": -0.000042658774751577234,
+              "USD-SWPTN-VOL-20310508-20360512-0.05": 0.0001255478914776861,
+              "USD-SWPTN-VOL-20310508-20360512-0.055": 0.00012684950964331199,
+              "USD-SWPTN-VOL-20310508-20410512-0.045": -0.00004279713866915582,
+              "USD-SWPTN-VOL-20310508-20410512-0.05": 0.0001242670800608121,
+              "USD-SWPTN-VOL-20310508-20410512-0.055": 0.00012617449798715125
             },
-            "iterations": 713,
-            "objective_value": 0.00011567111043368535,
-            "max_residual": 0.00015317143904882043,
-            "rmse": 0.00011567111043368535,
+            "iterations": 716,
+            "objective_value": 0.00011567105637785898,
+            "max_residual": 0.00015316922204171822,
+            "rmse": 0.00011567105637785898,
             "validation_passed": true,
             "convergence_reason": "swaption vol calibration converged: max_residual (1.53e-4) within tolerance (1.50e-3)",
             "metadata": {
@@ -6383,9 +6383,9 @@
               "interpolated_target_points": "6",
               "sabr_extrapolation_policy": "clamp",
               "sabr_parameters_at_bounds": "",
-              "sabr_residual_evaluations": "T=1.000000,tenor=2.000000:586;T=1.000000,tenor=5.000000:576;T=1.000000,tenor=10.000000:597;T=2.002740,tenor=2.000000:629;T=2.002740,tenor=5.000000:640;T=2.002740,tenor=10.000000:620;T=5.002740,tenor=2.000000:608;T=5.002740,tenor=5.000000:554;T=5.002740,tenor=10.000000:645",
-              "sabr_winning_iterations": "T=1.000000,tenor=2.000000:11;T=1.000000,tenor=5.000000:15;T=1.000000,tenor=10.000000:14;T=2.002740,tenor=2.000000:5;T=2.002740,tenor=5.000000:11;T=2.002740,tenor=10.000000:8;T=5.002740,tenor=2.000000:12;T=5.002740,tenor=5.000000:9;T=5.002740,tenor=10.000000:8",
-              "sabr_winning_starts": "T=1.000000,tenor=2.000000:alpha=0.00692263,nu=0.15000000,rho=-0.60000000;T=1.000000,tenor=5.000000:alpha=0.00643035,nu=0.15000000,rho=-0.60000000;T=1.000000,tenor=10.000000:alpha=0.00593330,nu=0.15000000,rho=-0.60000000;T=2.002740,tenor=2.000000:alpha=0.00717148,nu=0.90000000,rho=0.00000000;T=2.002740,tenor=5.000000:alpha=0.00667193,nu=0.90000000,rho=-0.60000000;T=2.002740,tenor=10.000000:alpha=0.00613576,nu=0.15000000,rho=0.00000000;T=5.002740,tenor=2.000000:alpha=0.00777105,nu=0.40000000,rho=0.60000000;T=5.002740,tenor=5.000000:alpha=0.00717136,nu=0.40000000,rho=0.60000000;T=5.002740,tenor=10.000000:alpha=0.00647180,nu=0.90000000,rho=0.00000000",
+              "sabr_residual_evaluations": "T=1.000000,tenor=2.000000:588;T=1.000000,tenor=5.000000:652;T=1.000000,tenor=10.000000:591;T=2.002740,tenor=2.000000:542;T=2.002740,tenor=5.000000:581;T=2.002740,tenor=10.000000:658;T=5.002740,tenor=2.000000:597;T=5.002740,tenor=5.000000:628;T=5.002740,tenor=10.000000:632",
+              "sabr_winning_iterations": "T=1.000000,tenor=2.000000:11;T=1.000000,tenor=5.000000:7;T=1.000000,tenor=10.000000:6;T=2.002740,tenor=2.000000:6;T=2.002740,tenor=5.000000:9;T=2.002740,tenor=10.000000:18;T=5.002740,tenor=2.000000:7;T=5.002740,tenor=5.000000:8;T=5.002740,tenor=10.000000:14",
+              "sabr_winning_starts": "T=1.000000,tenor=2.000000:alpha=0.00692263,nu=0.15000000,rho=0.60000000;T=1.000000,tenor=5.000000:alpha=0.00643035,nu=0.90000000,rho=0.60000000;T=1.000000,tenor=10.000000:alpha=0.00593330,nu=0.15000000,rho=0.00000000;T=2.002740,tenor=2.000000:alpha=0.00717148,nu=0.40000000,rho=0.00000000;T=2.002740,tenor=5.000000:alpha=0.00667193,nu=0.40000000,rho=-0.60000000;T=2.002740,tenor=10.000000:alpha=0.00613576,nu=0.15000000,rho=-0.60000000;T=5.002740,tenor=2.000000:alpha=0.00777105,nu=0.40000000,rho=-0.60000000;T=5.002740,tenor=5.000000:alpha=0.00717136,nu=0.15000000,rho=0.00000000;T=5.002740,tenor=10.000000:alpha=0.00647180,nu=0.90000000,rho=-0.60000000",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "swaption_vol"
@@ -6408,7 +6408,7 @@
               "version": "0.11.0"
             },
             "worst_quote_id": "USD-SWPTN-VOL-20280508-20380510-0.055",
-            "worst_quote_residual": 0.00015317143904882043,
+            "worst_quote_residual": 0.00015316922204171822,
             "success_tolerance": 0.0015,
             "solver_method": "per_slice_least_squares",
             "residual_units": "quoted_volatility"
@@ -6923,9 +6923,9 @@
               "quote_type": "black_lognormal",
               "interpolation_mode": "total_variance",
               "vols_row_major": [
-                0.2806396586120538, 0.2493742113759758, 0.22033908351684492,
-                0.2705621121606222, 0.23935538806404652, 0.21027601835156337,
-                0.26051184707270686, 0.2293671113037841, 0.20023563367754893
+                0.2806396586094364, 0.24937421137570334, 0.2203390835189196,
+                0.27056211216062237, 0.2393553880640467, 0.21027601835156334,
+                0.26051184707270675, 0.22936711130378448, 0.20023563367754965
               ]
             }
           ],
@@ -6992,15 +6992,15 @@
         "report": {
           "success": true,
           "residuals": {
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20260808-155.0:tolerance_ratio": 0.6396582570667442,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20260808-175.0:tolerance_ratio": 0.6257889761760449,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20260808-195.0:tolerance_ratio": 0.33908316412975537,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-155.0:tolerance_ratio": 0.5621121801484552,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-175.0:tolerance_ratio": 0.6446119164970898,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-195.0:tolerance_ratio": 0.276018371163117,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20270508-155.0:tolerance_ratio": 0.5118470727068503,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20270508-175.0:tolerance_ratio": 0.6328886962159164,
-            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20270508-195.0:tolerance_ratio": 0.23563367754891873,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20260808-155.0:tolerance_ratio": 0.6396582544493379,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20260808-175.0:tolerance_ratio": 0.6257889764484936,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20260808-195.0:tolerance_ratio": 0.33908316620442913,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-155.0:tolerance_ratio": 0.5621121801486217,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-175.0:tolerance_ratio": 0.6446119164969233,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-195.0:tolerance_ratio": 0.27601837116308925,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20270508-155.0:tolerance_ratio": 0.5118470727067392,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20270508-175.0:tolerance_ratio": 0.6328886962155278,
+            "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20270508-195.0:tolerance_ratio": 0.23563367754964037,
             "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 4.365574568510055e-7,
             "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 1.3969838619232178e-7,
             "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 9.604264050722122e-8,
@@ -7008,12 +7008,12 @@
             "USD-OIS:USD-SOFR-DEP-1M:tolerance_ratio": 5.911715561524033e-9,
             "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 2.7284841053187847e-9
           },
-          "iterations": 291,
-          "objective_value": 0.4034428043350653,
-          "max_residual": 0.0006446119164970898,
-          "rmse": 0.0004034428043350462,
-          "max_residual_ratio": 0.6446119164970898,
-          "rmse_ratio": 0.4034428043350653,
+          "iterations": 301,
+          "objective_value": 0.40344280420280076,
+          "max_residual": 0.0006446119164969233,
+          "rmse": 0.0004034428042027818,
+          "max_residual_ratio": 0.6446119164969233,
+          "rmse_ratio": 0.40344280420280076,
           "validation_passed": true,
           "convergence_reason": "Plan execution completed",
           "metadata": {
@@ -7042,7 +7042,7 @@
             "version": "0.11.0"
           },
           "worst_quote_id": "AAPL-EQUITY-VOL-STEP:AAPL-VOL-20261108-175.0:tolerance_ratio",
-          "worst_quote_residual": 0.6446119164970898,
+          "worst_quote_residual": 0.6446119164969233,
           "solver_method": "plan_execution",
           "residual_units": "absolute_residual_over_step_tolerance"
         },
@@ -7050,20 +7050,20 @@
           "AAPL-EQUITY-VOL-STEP": {
             "success": true,
             "residuals": {
-              "AAPL-VOL-20260808-155.0": 0.0006396582570667442,
-              "AAPL-VOL-20260808-175.0": -0.0006257889761760449,
-              "AAPL-VOL-20260808-195.0": 0.00033908316412975537,
-              "AAPL-VOL-20261108-155.0": 0.0005621121801484552,
-              "AAPL-VOL-20261108-175.0": -0.0006446119164970898,
-              "AAPL-VOL-20261108-195.0": 0.000276018371163117,
-              "AAPL-VOL-20270508-155.0": 0.0005118470727068503,
-              "AAPL-VOL-20270508-175.0": -0.0006328886962159164,
-              "AAPL-VOL-20270508-195.0": 0.00023563367754891873
+              "AAPL-VOL-20260808-155.0": 0.0006396582544493379,
+              "AAPL-VOL-20260808-175.0": -0.0006257889764484936,
+              "AAPL-VOL-20260808-195.0": 0.00033908316620442913,
+              "AAPL-VOL-20261108-155.0": 0.0005621121801486217,
+              "AAPL-VOL-20261108-175.0": -0.0006446119164969233,
+              "AAPL-VOL-20261108-195.0": 0.00027601837116308925,
+              "AAPL-VOL-20270508-155.0": 0.0005118470727067392,
+              "AAPL-VOL-20270508-175.0": -0.0006328886962155278,
+              "AAPL-VOL-20270508-195.0": 0.00023563367754964037
             },
-            "iterations": 245,
-            "objective_value": 0.0005208424207789505,
-            "max_residual": 0.0006446119164970898,
-            "rmse": 0.0005208424207789505,
+            "iterations": 255,
+            "objective_value": 0.0005208424206081979,
+            "max_residual": 0.0006446119164969233,
+            "rmse": 0.0005208424206081979,
             "validation_passed": true,
             "convergence_reason": "vol surface calibration converged: max_residual (6.45e-4) within tolerance (1.00e-3)",
             "metadata": {
@@ -7071,9 +7071,9 @@
               "calibrated_expiry_count": "3",
               "expiry_extrapolation_policy": "clamp",
               "sabr_parameters_at_bounds": "T=0.252055:rho;T=0.504110:rho;T=1.000000:rho",
-              "sabr_residual_evaluations": "T=0.252055:148;T=0.504110:153;T=1.000000:208",
-              "sabr_winning_iterations": "T=0.252055:7;T=0.504110:10;T=1.000000:35",
-              "sabr_winning_starts": "T=0.252055:alpha=3.29160147,nu=0.40000000,rho=-0.60000000;T=0.504110:alpha=3.14325364,nu=0.90000000,rho=0.00000000;T=1.000000:alpha=2.97542361,nu=0.40000000,rho=0.60000000",
+              "sabr_residual_evaluations": "T=0.252055:183;T=0.504110:186;T=1.000000:245",
+              "sabr_winning_iterations": "T=0.252055:11;T=0.504110:10;T=1.000000:35",
+              "sabr_winning_starts": "T=0.252055:alpha=3.29160147,nu=0.90000000,rho=-0.60000000;T=0.504110:alpha=3.14325364,nu=0.90000000,rho=0.60000000;T=1.000000:alpha=2.97542361,nu=0.40000000,rho=0.60000000",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
               "type": "vol_surface"
@@ -7096,7 +7096,7 @@
               "version": "0.11.0"
             },
             "worst_quote_id": "AAPL-VOL-20261108-175.0",
-            "worst_quote_residual": -0.0006446119164970898,
+            "worst_quote_residual": -0.0006446119164969233,
             "success_tolerance": 0.001,
             "solver_method": "per_slice_least_squares",
             "residual_units": "quoted_volatility",
@@ -7105,40 +7105,40 @@
                 "expiry": 0.25205479452054796,
                 "parameters": {
                   "sabr": {
-                    "alpha": 3.2969272810064942,
+                    "alpha": 3.296927281003191,
                     "beta": 0.5,
-                    "nu": 0.4099276635794846,
+                    "nu": 0.4099276635374178,
                     "rho": -0.99
                   }
                 },
-                "iterations": 67,
-                "max_relative_quote_error": 0.0025031634410415116
+                "iterations": 71,
+                "max_relative_quote_error": 0.0025031634421314175
               },
               {
                 "expiry": 0.5041095890410959,
                 "parameters": {
                   "sabr": {
-                    "alpha": 3.161298638317382,
+                    "alpha": 3.161298638317383,
                     "beta": 0.5,
-                    "nu": 0.42030544070526704,
+                    "nu": 0.4203054407052673,
                     "rho": -0.99
                   }
                 },
-                "iterations": 78,
-                "max_relative_quote_error": 0.002685882910162876
+                "iterations": 83,
+                "max_relative_quote_error": 0.0026858829101621823
               },
               {
                 "expiry": 1,
                 "parameters": {
                   "sabr": {
-                    "alpha": 3.0199191024776892,
+                    "alpha": 3.0199191024776932,
                     "beta": 0.5,
-                    "nu": 0.437039515293691,
+                    "nu": 0.43703951529368185,
                     "rho": -0.98999999999999
                   }
                 },
-                "iterations": 100,
-                "max_relative_quote_error": 0.0027516899835474625
+                "iterations": 101,
+                "max_relative_quote_error": 0.002751689983545773
               }
             ]
           },
@@ -8341,11 +8341,11 @@
               "id": "CDX-NA-IG-46",
               "base": "2026-05-08",
               "knot_points": [
-                [1.1333333333333333, 0.000009937935283072701],
-                [3.1638888888888888, 0.00003381578311481055],
-                [5.191666666666666, 0.00010216924120570083],
-                [7.222222222222222, 0.00013185284196128044],
-                [10.266666666666667, 0.00017617931001832516]
+                [1.1333333333333333, 0.000009937935283073799],
+                [3.1638888888888888, 0.00003381578311480862],
+                [5.191666666666666, 0.0001021692412057023],
+                [7.222222222222222, 0.00013185284196128429],
+                [10.266666666666667, 0.00017617931001832443]
               ],
               "recovery_rate": 0.4,
               "issuer": "CDX.NA.IG.46",
@@ -8815,16 +8815,16 @@
         "report": {
           "success": true,
           "residuals": {
-            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-0-3:tolerance_ratio": 0.07938759357004373,
+            "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-0-3:tolerance_ratio": 0.07938759357012325,
             "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-10-15:tolerance_ratio": 0.09209522472897021,
             "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-15-30:tolerance_ratio": 0.0920985266226968,
             "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-3-7:tolerance_ratio": 0.0920954100584628,
             "CDX-NA-IG-46-BASE-CORR-STEP:CDX-IG-46-7-10:tolerance_ratio": 0.09209053111266582,
-            "CDX-NA-IG-46:CDX-IG-46-10Y:tolerance_ratio": 0.000002057289546510653,
-            "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio": 0.0000019878815386423557,
-            "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 5.431768180857652e-9,
-            "CDX-NA-IG-46:CDX-IG-46-5Y:tolerance_ratio": 1.6124203887227587e-8,
-            "CDX-NA-IG-46:CDX-IG-46-7Y:tolerance_ratio": 4.091479996329913e-7,
+            "CDX-NA-IG-46:CDX-IG-46-10Y:tolerance_ratio": 0.00000205714860022823,
+            "CDX-NA-IG-46:CDX-IG-46-1Y:tolerance_ratio": 0.0000019879470142891785,
+            "CDX-NA-IG-46:CDX-IG-46-3Y:tolerance_ratio": 5.4358339390044724e-9,
+            "CDX-NA-IG-46:CDX-IG-46-5Y:tolerance_ratio": 1.600494164825418e-8,
+            "CDX-NA-IG-46:CDX-IG-46-7Y:tolerance_ratio": 4.090450004266052e-7,
             "USD-OIS:USD-OIS-SWAP-10Y:tolerance_ratio": 4.365574568510055e-7,
             "USD-OIS:USD-OIS-SWAP-1Y:tolerance_ratio": 1.3969838619232178e-7,
             "USD-OIS:USD-OIS-SWAP-2Y:tolerance_ratio": 9.604264050722122e-8,
@@ -8833,11 +8833,11 @@
             "USD-OIS:USD-SOFR-DEP-3M:tolerance_ratio": 2.7284841053187847e-9
           },
           "iterations": 689,
-          "objective_value": 0.050142477950227235,
+          "objective_value": 0.05014247795023485,
           "max_residual": 0.0000920985266226968,
-          "rmse": 0.000050142477944879015,
+          "rmse": 0.00005014247794488688,
           "max_residual_ratio": 0.0920985266226968,
-          "rmse_ratio": 0.050142477950227235,
+          "rmse_ratio": 0.05014247795023485,
           "validation_passed": true,
           "convergence_reason": "Plan execution completed",
           "metadata": {
@@ -8874,16 +8874,16 @@
           "CDX-NA-IG-46": {
             "success": true,
             "residuals": {
-              "CDX-IG-46-10Y": 2.057289546510653e-14,
-              "CDX-IG-46-1Y": 1.9878815386423557e-14,
-              "CDX-IG-46-3Y": 5.431768180857652e-17,
-              "CDX-IG-46-5Y": 1.6124203887227587e-16,
-              "CDX-IG-46-7Y": 4.091479996329913e-15
+              "CDX-IG-46-10Y": 2.05714860022823e-14,
+              "CDX-IG-46-1Y": 1.9879470142891785e-14,
+              "CDX-IG-46-3Y": 5.4358339390044724e-17,
+              "CDX-IG-46-5Y": 1.600494164825418e-16,
+              "CDX-IG-46-7Y": 4.090450004266052e-15
             },
             "iterations": 339,
-            "objective_value": 1.2924244557820277e-14,
-            "max_residual": 2.057289546510653e-14,
-            "rmse": 1.2924244557820277e-14,
+            "objective_value": 1.2923929134643227e-14,
+            "max_residual": 2.05714860022823e-14,
+            "rmse": 1.2923929134643227e-14,
             "validation_passed": true,
             "convergence_reason": "generic bootstrap calibration converged: max_residual (2.06e-14) within tolerance (1.00e-8)",
             "metadata": {
@@ -8913,7 +8913,7 @@
             },
             "model_version": "ISDA Standard Model v1.8.2",
             "worst_quote_id": "CDX-IG-46-10Y",
-            "worst_quote_residual": 2.057289546510653e-14,
+            "worst_quote_residual": 2.05714860022823e-14,
             "success_tolerance": 1e-8,
             "solver_method": "sequential_bootstrap",
             "residual_units": "pv_per_unit_notional"
@@ -8921,16 +8921,16 @@
           "CDX-NA-IG-46-BASE-CORR-STEP": {
             "success": true,
             "residuals": {
-              "CDX-IG-46-0-3": -0.00007938759357004373,
+              "CDX-IG-46-0-3": -0.00007938759357012325,
               "CDX-IG-46-10-15": -0.0000920952247289702,
               "CDX-IG-46-15-30": -0.0000920985266226968,
               "CDX-IG-46-3-7": -0.0000920954100584628,
               "CDX-IG-46-7-10": -0.00009209053111266583
             },
             "iterations": 304,
-            "objective_value": 0.00008969759139602675,
+            "objective_value": 0.00008969759139604081,
             "max_residual": 0.0000920985266226968,
-            "rmse": 0.00008969759139602675,
+            "rmse": 0.00008969759139604081,
             "validation_passed": true,
             "convergence_reason": "generic bootstrap calibration converged: max_residual (9.21e-5) within tolerance (1.00e-3)",
             "metadata": {

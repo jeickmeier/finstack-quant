@@ -423,6 +423,28 @@ def test_accrual_retains_contractual_day_count_context(
     assert accrued_interest(raw, as_of, cfg) == pytest.approx(expected, abs=1e-8)
 
 
+def test_icma_long_back_stub_preserves_february_roll_day_accrual() -> None:
+    spec = json.loads(_cashflow_spec())
+    spec.update(issue_date="2025-01-30", maturity="2025-03-15")
+    spec["coupon_program"][0]["spec"].update(
+        rate="0.12",
+        frequency={"count": 1, "unit": "months"},
+        day_count="act_act_isma",
+        business_day_convention="unadjusted",
+        stub="long_back",
+    )
+    raw = validate_cashflow_schedule_json(build_cashflow_schedule_json(json.dumps(spec)))
+    cfg = json.dumps({
+        "method": "linear",
+        "ex_coupon": None,
+        "include_pik": True,
+        "frequency": {"count": 1, "unit": "months"},
+    })
+    # [2025-01-30, 2025-02-28) = 1/12 year -> 10,000; [2025-02-28, 2025-03-15) inside
+    # [2025-02-28, 2025-03-30) = 15/(12*30) = 1/24 year -> 5,000 (total coupon 15,000).
+    assert accrued_interest(raw, "2025-02-28", cfg) == pytest.approx(10_000.0, abs=1e-8)
+
+
 def test_typed_accrual_reference_metadata_roundtrips() -> None:
     from finstack_quant.core.cashflow import CashFlow, CashFlowAccrual, CFKind
     from finstack_quant.core.dates import DayCount, DayCountContext

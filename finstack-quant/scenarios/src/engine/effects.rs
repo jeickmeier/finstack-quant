@@ -11,7 +11,7 @@ use crate::error::Result;
 use crate::spec::{CurveKind, OperationSpec};
 use crate::warning::Warning;
 use finstack_quant_core::FxHashSet;
-use finstack_quant_core::market_data::bumps::{BumpType, MarketBump};
+use finstack_quant_core::market_data::bumps::{BumpSpec, BumpType, Bumpable, MarketBump};
 use finstack_quant_core::market_data::context::CurveStorage;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::types::{CurveId, PriceId};
@@ -501,8 +501,14 @@ pub(super) fn apply_generated_effects(
             ScenarioEffect::PriceBump { id, pct } => {
                 flush_pending_bumps(sink.pending_bumps, ctx.market)?;
                 let before = ctx.market.get_price(id.as_str()).ok().map(scalar_level);
-                ctx.market
-                    .apply_price_bump_pct_in_place(id.as_str(), pct / 100.0)?;
+                if (pct + 100.0).abs() <= f64::EPSILON {
+                    let current = ctx.market.get_price(id.as_str())?.clone();
+                    let wiped = current.apply_bump(BumpSpec::multiplier(0.0))?;
+                    ctx.market.insert_price_mut(id.as_str(), wiped);
+                } else {
+                    ctx.market
+                        .apply_price_bump_fraction_in_place(id.as_str(), pct / 100.0)?;
+                }
                 let after = ctx.market.get_price(id.as_str()).ok().map(scalar_level);
                 sink.record_market_shock(
                     ScenarioMarketTarget::EquityPrice {

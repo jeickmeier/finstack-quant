@@ -499,6 +499,108 @@ fn builder_infers_market_conventions_from_curve_id() {
         .build()
         .expect("Generic forward curve should build");
     assert_eq!(generic.reset_lag(), 0);
+
+    let sofr_1d = ForwardCurve::builder("USD-SOFR-1D", 1.0 / 360.0)
+        .base_date(base)
+        .knots([(0.0, 0.03), (1.0, 0.035)])
+        .build()
+        .expect("USD-SOFR-1D should build");
+    assert_eq!(sofr_1d.day_count(), DayCount::Act360);
+    assert_eq!(sofr_1d.reset_lag(), 0);
+
+    for (id, expected_dc, expected_lag) in [
+        ("GBP-LIBOR-3M", DayCount::Act365F, 0),
+        ("AUD-BBSW-3M", DayCount::Act365F, 0),
+        ("CAD-CDOR-3M", DayCount::Act365F, 0),
+        ("NZD-BKBM-3M", DayCount::Act365F, 0),
+        ("EUR-EURIBOR-6M", DayCount::Act360, 2),
+        ("TESTR", DayCount::Act365F, 0),
+    ] {
+        let curve = ForwardCurve::builder(id, 0.25)
+            .base_date(base)
+            .knots([(0.0, 0.03), (1.0, 0.035)])
+            .build()
+            .expect("curve should build");
+        assert_eq!(curve.day_count(), expected_dc, "{id} day_count");
+        assert_eq!(curve.reset_lag(), expected_lag, "{id} reset_lag");
+    }
+}
+
+#[test]
+fn from_zero_rates_admits_negative_rates_within_domain() {
+    use crate::math::Compounding;
+    let base = Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid test date");
+    let neg = ForwardCurve::from_zero_rates(
+        "EUR-EURIBOR-3M",
+        0.25,
+        base,
+        &[(0.25, -0.01), (1.0, -0.008), (2.0, -0.005)],
+        Compounding::Simple,
+    )
+    .expect("negative zero rates with 1 + r*tau > 0 should succeed");
+    assert_eq!(neg.day_count(), DayCount::Act360);
+    assert_eq!(neg.reset_lag(), 2);
+    assert!((neg.rate(0.0) - (-0.01)).abs() < 1e-12);
+
+    // 1 + r * t <= 0 must be rejected.
+    assert!(
+        ForwardCurve::from_zero_rates(
+            "EUR-EURIBOR-3M",
+            0.25,
+            base,
+            &[(1.0, -1.0)],
+            Compounding::Simple,
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn mutations_clear_rate_calibration_and_near_zero_rolled_knots_round_trip() {
+    let json = serde_json::json!({
+        "id": "USD-SOFR-3M",
+        "base": "2025-01-01",
+        "reset_lag": 2,
+        "day_count": "act_365f",
+        "tenor": 0.25,
+        "knot_points": [[0.0, 0.04], [1.0 + 1e-12, 0.042], [5.0, 0.045]],
+        "projection_grid": [0.0, 1.0 + 1e-12, 5.0],
+        "interp_style": "linear",
+        "extrapolation": "flat_zero",
+        "rate_calibration": {
+            "currency": "USD",
+            "method": "bootstrap",
+            "curve_day_count": "act_365f",
+            "ois_compounding": null,
+            "role": { "projection": { "discount_curve_id": "USD-OIS" } },
+            "quotes": [{
+                "swap": {
+                    "index_id": "USD-SOFR-OIS",
+                    "pillar": { "tenor": { "count": 5, "unit": "years" } },
+                    "rate": 0.04,
+                    "spread_decimal": null
+                }
+            }]
+        },
+        "fx_policy": null
+    });
+    let curve: ForwardCurve = serde_json::from_value(json).expect("calibrated forward curve");
+    assert!(curve.rate_calibration().is_some());
+
+    let bumped = curve.apply_bump(BumpSpec::parallel_bp(10.0)).expect("bump");
+    assert!(bumped.rate_calibration().is_none());
+
+    let rebuilt = curve
+        .rebuild_with_knots([(0.0, 0.041), (5.0, 0.046)])
+        .expect("rebuild");
+    assert!(rebuilt.rate_calibration().is_none());
+
+    let rolled = curve.roll_forward(365).expect("roll onto near-zero knot");
+    assert!(rolled.rate_calibration().is_none());
+    let round_trip: ForwardCurve =
+        serde_json::from_str(&serde_json::to_string(&rolled).expect("serialize"))
+            .expect("rolled curve must survive serde round-trip");
+    assert_eq!(round_trip.knots(), rolled.knots());
 }
 
 #[test]

@@ -258,21 +258,40 @@ impl InflationCurve {
 
     /// CPI level at time `t` (years), without indexation lag.
     ///
+    /// Evaluates pre-base CPI pillars (`t < 0`) and the configured extrapolation
+    /// policy when `t` precedes the earliest pillar. At `t == 0.0`, returns
+    /// [`base_cpi`](Self::base_cpi) directly.
+    ///
     /// # Arguments
     ///
-    /// * `t` - Year-fraction time from the curve or surface base date to the query point
+    /// * `t` - Year-fraction time from the curve base date to the query point
     #[must_use]
     pub fn cpi(&self, t: f64) -> f64 {
-        if t <= 0.0 {
+        if t.is_nan() {
+            return f64::NAN;
+        }
+        if t == 0.0 {
             return self.base_cpi;
         }
         InterpRollState::eval(self.roll.as_ref(), &self.interp, t)
+    }
+
+    /// Earliest knot time supported by this curve (including rolled source pillars).
+    #[inline]
+    fn min_supported_time(&self) -> f64 {
+        self.roll
+            .as_ref()
+            .and_then(InterpRollState::min_supported_time)
+            .unwrap_or_else(|| self.knots.first().copied().unwrap_or(0.0))
     }
 
     /// CPI level at time `t` (years), adjusted for the indexation lag.
     ///
     /// Applies the lag as a **continuous shift**: evaluates the curve's own
     /// interpolation (LogLinear by default) at `t - indexation_lag_months/12`.
+    /// When `t - lag` precedes the earliest supported knot on the curve (for
+    /// example `0 <= t < lag` on a curve without pre-base CPI pillars), returns
+    /// `f64::NAN` rather than silently flattening lagged CPI to `base_cpi`.
     /// This is *not* the Canadian-model reference-index calculation used for
     /// bond settlement, which interpolates linearly between the two lagged
     /// *monthly* CPI prints weighted by day of month; that month-grid
@@ -287,11 +306,19 @@ impl InflationCurve {
     ///
     /// # Returns
     /// CPI level corresponding to `t - lag`, where lag is the configured
-    /// indexation lag in years (`indexation_lag_months / 12`).
+    /// indexation lag in years (`indexation_lag_months / 12`), or `f64::NAN`
+    /// if `t - lag` precedes the curve's earliest supported CPI pillar.
     #[must_use]
     pub fn cpi_with_lag(&self, t: f64) -> f64 {
+        if !t.is_finite() {
+            return f64::NAN;
+        }
         let lag_years = self.indexation_lag_months as f64 / 12.0;
-        self.cpi(t - lag_years)
+        let lagged_t = t - lag_years;
+        if lagged_t < self.min_supported_time() {
+            return f64::NAN;
+        }
+        self.cpi(lagged_t)
     }
 
     /// Principal indexation ratio at time `t` (years).
@@ -356,13 +383,35 @@ impl InflationCurve {
     ///   Chapter 2 (index ratio and indexation lag conventions). `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`
     #[must_use = "computed index ratio should not be discarded"]
     pub fn index_ratio(&self, t: f64) -> crate::Result<f64> {
+        if !t.is_finite() {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve '{}' index_ratio requires finite time t, got {t}",
+                self.id
+            )));
+        }
         if !(self.base_cpi.is_finite() && self.base_cpi > 0.0) {
             return Err(crate::Error::Validation(format!(
                 "InflationCurve '{}' base_cpi must be finite and positive to compute an index ratio, got {}",
                 self.id, self.base_cpi
             )));
         }
-        Ok(self.cpi_with_lag(t) / self.base_cpi)
+        let lag_years = self.indexation_lag_months as f64 / 12.0;
+        let lagged_t = t - lag_years;
+        let min_t = self.min_supported_time();
+        if lagged_t < min_t {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve '{}' lagged time {lagged_t:.6} (t={t:.6}, lag={}m) precedes earliest supported knot {min_t:.6}",
+                self.id, self.indexation_lag_months
+            )));
+        }
+        let lagged_cpi = self.cpi(lagged_t);
+        if !(lagged_cpi.is_finite() && lagged_cpi > 0.0) {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve '{}' lagged CPI at t={t:.6} must be finite and positive, got {lagged_cpi}",
+                self.id
+            )));
+        }
+        Ok(lagged_cpi / self.base_cpi)
     }
 
     /// Annualised inflation rate between `t1` and `t2` using CAGR formula.
@@ -422,7 +471,14 @@ impl InflationCurve {
     #[must_use = "computed CPI level should not be discarded"]
     pub fn cpi_on_date(&self, date: Date) -> crate::Result<f64> {
         let t = self.year_fraction_to(date)?;
-        Ok(self.cpi(t))
+        let cpi = self.cpi(t);
+        if !(cpi.is_finite() && cpi > 0.0) {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve '{}' CPI on {date} (t={t:.6}) is not finite and positive: {cpi}",
+                self.id
+            )));
+        }
+        Ok(cpi)
     }
     /// Helper: compute year fraction from base date to target date using curve's day-count.
     #[inline]
@@ -546,15 +602,20 @@ impl InflationCurve {
     /// - Base CPI is updated to the interpolated value at the roll time
     ///
     /// # Arguments
-    /// * `days` - Signed calendar-day shift; negative values move the base date backward.
+    /// * `days` - Non-negative calendar-day shift; `0` returns an unmodified clone and negative values are rejected.
     ///
     /// # Returns
     /// A new inflation curve with shifted knots and updated base CPI.
     ///
     /// # Errors
-    /// Returns an error if no knot points remain after filtering expired points.
+    /// Returns an error if `days < 0` or if no knot points remain after filtering expired points.
     /// Returns a validation error if the rolled base date exceeds the supported calendar range.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
+        if days < 0 {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve::roll_forward requires non-negative days, got {days}"
+            )));
+        }
         if days == 0 {
             return Ok(self.clone());
         }
@@ -774,27 +835,48 @@ impl Bumpable for InflationCurve {
         let bumped_id = spec.standard_bump_id(self.id());
         let base_cpi = self.base_cpi();
         // Shock the annualized zero inflation rate to time `t` and return the
-        // implied CPI level; the base CPI is a published fixing and never moves.
-        let shocked_cpi_from_rate = |t: f64, zero_rate: f64| -> f64 {
+        // implied CPI level; base and realized pre-base CPI fixings never move.
+        let try_shocked_cpi_from_rate = |t: f64, zero_rate: f64| -> crate::Result<f64> {
             let weight = spec.bump_type.weight(t);
             let bumped_zero_rate = if is_multiplicative {
-                (1.0 + zero_rate) * (1.0 + (shift - 1.0) * weight) - 1.0
+                zero_rate * (1.0 + (shift - 1.0) * weight)
             } else {
                 zero_rate + shift * weight
             };
-            base_cpi * (1.0 + bumped_zero_rate).powf(t)
+            if !bumped_zero_rate.is_finite() || 1.0 + bumped_zero_rate <= 0.0 {
+                return Err(crate::Error::Validation(format!(
+                    "InflationCurve '{}' bumped annual inflation rate at t={t:.6} must satisfy 1 + r > 0, got r={bumped_zero_rate}",
+                    self.id
+                )));
+            }
+            let cpi = base_cpi * (t * bumped_zero_rate.ln_1p()).exp();
+            if !cpi.is_finite() || cpi <= 0.0 {
+                return Err(crate::Error::Validation(format!(
+                    "InflationCurve '{}' bumped CPI level at t={t:.6} is not finite and positive: {cpi}",
+                    self.id
+                )));
+            }
+            Ok(cpi)
         };
         let shocked_cpi = |t: f64, cpi: f64| -> f64 {
             if t <= 0.0 {
                 return cpi;
             }
-            shocked_cpi_from_rate(t, ((cpi.ln() - base_cpi.ln()) / t).exp_m1())
+            let zero_rate = ((cpi.ln() - base_cpi.ln()) / t).exp_m1();
+            try_shocked_cpi_from_rate(t, zero_rate).unwrap_or(f64::NAN)
         };
 
         let builder = self.metadata_builder(bumped_id);
         // A rolled curve shocks its source pillars and reads its current
         // pillars back, so base and shocked curves share one interpolation.
         if let Some(roll) = &self.roll {
+            for &(source_t, source_cpi) in &roll.source_points {
+                let current_t = source_t - roll.offset;
+                if current_t > 0.0 {
+                    let zero_rate = ((source_cpi.ln() - base_cpi.ln()) / current_t).exp_m1();
+                    try_shocked_cpi_from_rate(current_t, zero_rate)?;
+                }
+            }
             let (state, levels) = roll.bump(
                 &self.interp,
                 ValidationPolicy::Strict,
@@ -807,13 +889,13 @@ impl Bumpable for InflationCurve {
                 .build();
         }
         let mut bumped_points = Vec::with_capacity(self.knots().len());
-        for &t in self.knots() {
+        for (&t, &cpi) in self.knots().iter().zip(self.cpi_levels.iter()) {
             if t <= 0.0 {
-                bumped_points.push((t, base_cpi));
+                bumped_points.push((t, cpi));
                 continue;
             }
             let zero_rate = self.inflation_rate(0.0, t)?;
-            bumped_points.push((t, shocked_cpi_from_rate(t, zero_rate)));
+            bumped_points.push((t, try_shocked_cpi_from_rate(t, zero_rate)?));
         }
         builder.knots(bumped_points).build()
     }
@@ -1041,7 +1123,76 @@ mod tests {
         assert!((bumped.cpi(0.0) - rolled.base_cpi()).abs() < 1e-12);
         assert!(bumped.cpi(1.0) > rolled.cpi(1.0));
 
-        let back = curve.roll_forward(-30).expect("backward roll");
-        assert_eq!(back.base_cpi(), 300.0);
+        assert!(curve.roll_forward(-30).is_err());
+    }
+
+    #[test]
+    fn multiplicative_bump_scales_zero_inflation_rate_not_gross_factor() {
+        use crate::market_data::bumps::{BumpMode, BumpType, BumpUnits};
+
+        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+        let curve = InflationCurve::builder("CPI-MULT")
+            .base_date(base)
+            .base_cpi(300.0)
+            .knots([(0.0, 300.0), (1.0, 306.0), (5.0, 300.0 * 1.02_f64.powi(5))])
+            .build()
+            .unwrap();
+
+        let bumped = curve
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Multiplicative,
+                units: BumpUnits::Factor,
+                value: 1.10,
+                bump_type: BumpType::Parallel,
+            })
+            .expect("1.10x multiplicative bump");
+
+        let r1 = bumped.inflation_rate(0.0, 1.0).unwrap();
+        let r5 = bumped.inflation_rate(0.0, 5.0).unwrap();
+        assert!(
+            (r1 - 0.022).abs() < 1e-12,
+            "1.10x bump on 2.00% zero inflation rate must give 2.20%, got {r1}"
+        );
+        assert!(
+            (r5 - 0.022).abs() < 1e-12,
+            "1.10x bump on 5Y 2.00% zero inflation rate must give 2.20%, got {r5}"
+        );
+
+        let too_negative = curve.apply_bump(BumpSpec {
+            mode: BumpMode::Additive,
+            units: BumpUnits::Fraction,
+            value: -1.05,
+            bump_type: BumpType::Parallel,
+        });
+        assert!(
+            too_negative.is_err(),
+            "bumped inflation rate with 1 + r <= 0 must be rejected"
+        );
+    }
+
+    #[test]
+    fn pre_base_knots_and_lag_domain_are_honored() {
+        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+        let with_pre_base = InflationCurve::builder("CPI-PREBASE")
+            .base_date(base)
+            .base_cpi(300.0)
+            .knots([(-0.5, 297.0), (0.0, 300.0), (1.0, 306.0)])
+            .interp(InterpStyle::Linear)
+            .indexation_lag_months(3)
+            .build()
+            .unwrap();
+        assert!((with_pre_base.cpi(-0.25) - 298.5).abs() < 1e-12);
+        assert!((with_pre_base.cpi_with_lag(0.0) - 298.5).abs() < 1e-12);
+        assert!((with_pre_base.index_ratio(0.0).unwrap() - 298.5 / 300.0).abs() < 1e-12);
+
+        let future_only = sample_curve();
+        assert!(
+            future_only.cpi_with_lag(0.1).is_nan(),
+            "lagged CPI before earliest knot must not flatten to base_cpi"
+        );
+        assert!(
+            future_only.index_ratio(0.1).is_err(),
+            "index_ratio must reject t - lag before earliest knot"
+        );
     }
 }

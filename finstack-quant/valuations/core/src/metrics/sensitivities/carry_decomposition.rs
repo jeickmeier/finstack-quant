@@ -26,7 +26,7 @@ use crate::metrics::period_cash::collect_period_cash_cached;
 use crate::metrics::sensitivities::theta::{calculate_theta_date, theta_termination_date};
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::Result;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::traits::Discounting;
 use std::sync::Arc;
 
@@ -66,19 +66,21 @@ impl YieldClock for AnnualYieldClock {
     ) -> Result<f64> {
         let frequency = Tenor::annual();
         let day_count = context.day_count.unwrap_or(DayCount::Act365F);
-        let dc_ctx = DayCountContext {
-            frequency: Some(frequency),
-            coupon_period: context.cashflows.as_deref().and_then(|flows| {
-                icma_reference_period(
-                    day_count,
-                    frequency,
-                    flows.iter().map(|(d, _)| *d),
-                    context.as_of,
-                )
-            }),
-            ..DayCountContext::default()
-        };
-        let tau = day_count.year_fraction(context.as_of, rolled_date, dc_ctx)?;
+        let ref_period = context.cashflows.as_deref().and_then(|flows| {
+            icma_reference_period(
+                day_count,
+                frequency,
+                flows.iter().map(|(d, _)| *d),
+                context.as_of,
+            )
+        });
+        let tau = crate::instruments::pricing::coupon_period::icma_year_fraction(
+            day_count,
+            Some(frequency),
+            ref_period,
+            context.as_of,
+            rolled_date,
+        )?;
         if tau <= 0.0 {
             return Ok(1.0);
         }

@@ -307,12 +307,19 @@ impl VolSurface {
     ///
     /// # Errors
     ///
-    /// Returns a validation error for a mismatched row count or non-finite shift.
+    /// Returns a validation error for a mismatched row count, non-finite shift,
+    /// or non-positive shifted strike (`strike + shift <= 0`).
     pub fn with_displacements(mut self, displacements: &[f64]) -> crate::Result<Self> {
         validate_displacements(
             VolQuoteType::ShiftedBlackLognormal,
             Some(displacements),
             self.expiries.len(),
+        )?;
+        validate_strike_domain(
+            self.secondary_axis,
+            VolQuoteType::ShiftedBlackLognormal,
+            &self.strikes,
+            Some(displacements),
         )?;
         self.quote_type = VolQuoteType::ShiftedBlackLognormal;
         self.displacements = Some(displacements.to_vec().into_boxed_slice());
@@ -374,9 +381,8 @@ impl VolSurface {
 
     /// Add an absolute bump to one grid point in place.
     ///
-    /// Coordinates map to the nearest clamped grid node. The updated
-    /// volatility is floored at zero, and the original value is returned for
-    /// reversal after a scratch bump.
+    /// Coordinates map to the nearest clamped grid node. Returns the original
+    /// volatility value for reversal after a scratch bump.
     ///
     /// # Arguments
     ///
@@ -384,6 +390,11 @@ impl VolSurface {
     /// * `strike` - Strike coordinate used to select the nearest grid column.
     /// * `bump_abs` - Absolute volatility change in decimal units; `0.01` is
     ///   one volatility point.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] if any input is non-finite or the shocked
+    /// volatility is non-finite or negative.
     pub fn bump_point_absolute_in_place(
         &mut self,
         expiry: f64,
@@ -398,12 +409,12 @@ impl VolSurface {
         let idx = self.nearest_grid_index(expiry, strike)?;
         let original = self.vols[idx];
         let bumped = original + bump_abs;
-        if !bumped.is_finite() {
-            return Err(crate::Error::Validation(
-                "bumped volatility is not finite".to_string(),
-            ));
+        if !bumped.is_finite() || bumped < 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "bumped volatility must be finite and non-negative, got {bumped}"
+            )));
         }
-        self.vols[idx] = bumped.max(0.0);
+        self.vols[idx] = bumped;
         Ok(original)
     }
 
@@ -508,15 +519,19 @@ impl Bumpable for VolSurface {
         if is_multiplicative {
             return self.scaled(raw_val);
         }
-        let bumped_vols: Box<[f64]> = self.vols.iter().map(|&v| (v + raw_val).max(0.0)).collect();
-        if bumped_vols.iter().any(|v| !v.is_finite()) {
-            return Err(crate::Error::Validation(
-                "bumped volatilities must be finite".to_string(),
-            ));
+        let mut bumped_vols = Vec::with_capacity(self.vols.len());
+        for &v in self.vols.iter() {
+            let next = v + raw_val;
+            if !next.is_finite() || next < 0.0 {
+                return Err(crate::Error::Validation(format!(
+                    "bumped volatilities must be finite and non-negative, got {next}"
+                )));
+            }
+            bumped_vols.push(next);
         }
 
         let mut bumped = self.clone();
-        bumped.vols = bumped_vols;
+        bumped.vols = bumped_vols.into_boxed_slice();
         Ok(bumped)
     }
 }
@@ -553,8 +568,8 @@ impl VolSurface {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`](crate::Error::Validation) when `pct` or any filter entry is non-finite or when a
-    /// scaled volatility overflows.
+    /// Returns [`Error::Validation`](crate::Error::Validation) when `pct` or any filter entry is non-finite, `pct < -100.0`,
+    /// or when a scaled volatility is negative or non-finite.
     pub fn apply_bucket_bump(
         &self,
         expiries_filter: Option<&[f64]>,
@@ -570,6 +585,11 @@ impl VolSurface {
             ));
         }
         let factor = 1.0 + pct / 100.0;
+        if factor < 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "bucket bump percentage must be at least -100%, got {pct}"
+            )));
+        }
         let (n_expiries, n_strikes) = self.grid_shape();
         let mut bumped = self.clone();
         for (ei, &expiry) in self.expiries.iter().enumerate().take(n_expiries) {
@@ -582,12 +602,13 @@ impl VolSurface {
                     .unwrap_or(true);
                 if expiry_match && strike_match {
                     let index = ei * n_strikes + si;
-                    bumped.vols[index] = (self.vols[index] * factor).max(0.0);
-                    if !bumped.vols[index].is_finite() {
-                        return Err(crate::Error::Validation(
-                            "bucket-bumped volatility is not finite".to_string(),
-                        ));
+                    let next = self.vols[index] * factor;
+                    if !next.is_finite() || next < 0.0 {
+                        return Err(crate::Error::Validation(format!(
+                            "bucket-bumped volatility must be finite and non-negative, got {next}"
+                        )));
                     }
+                    bumped.vols[index] = next;
                 }
             }
         }
@@ -748,6 +769,7 @@ impl VolSurface {
     ) -> crate::Result<Self> {
         validate_displacements(opts.quote_type, displacements, expiries.len())?;
         validate_grid(expiries, strikes, vols_row_major)?;
+        validate_strike_domain(opts.secondary_axis, opts.quote_type, strikes, displacements)?;
         Ok(Self {
             id: CurveId::new(id.as_ref()),
             expiries: expiries.to_vec().into_boxed_slice(),
@@ -849,6 +871,40 @@ pub(super) fn validate_grid(
     Ok(())
 }
 
+fn validate_strike_domain(
+    secondary_axis: VolSurfaceAxis,
+    quote_type: VolQuoteType,
+    strikes: &[f64],
+    displacements: Option<&[f64]>,
+) -> crate::Result<()> {
+    if secondary_axis != VolSurfaceAxis::Strike {
+        return Ok(());
+    }
+    match quote_type {
+        VolQuoteType::BlackLognormal => {
+            if let Some(&bad) = strikes.iter().find(|&&strike| strike <= 0.0) {
+                return Err(Error::Validation(format!(
+                    "Black lognormal volatility surface requires strictly positive strikes, got {bad}"
+                )));
+            }
+        }
+        VolQuoteType::ShiftedBlackLognormal => {
+            for &shift in displacements.unwrap_or(&[]) {
+                for &strike in strikes {
+                    let shifted = strike + shift;
+                    if !shifted.is_finite() || shifted <= 0.0 {
+                        return Err(Error::Validation(format!(
+                            "shifted Black volatility surface requires strike + displacement > 0 at every row, got strike={strike}, displacement={shift}"
+                        )));
+                    }
+                }
+            }
+        }
+        VolQuoteType::Normal => {}
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod displacement_tests {
     use super::*;
@@ -921,5 +977,79 @@ mod displacement_tests {
         let mut raw = serde_json::to_value(surface).unwrap();
         raw["expiries"][0] = serde_json::json!(-0.25);
         assert!(serde_json::from_value::<VolSurface>(raw).is_err());
+    }
+
+    #[test]
+    fn negative_vol_shocks_and_non_positive_lognormal_strikes_fail_closed() {
+        use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
+
+        let mut surface = VolSurface::from_grid(
+            "VOL",
+            &[1.0, 2.0],
+            &[90.0, 100.0],
+            &[0.20, 0.22, 0.21, 0.23],
+            Default::default(),
+            None,
+        )
+        .expect("surface");
+
+        let additive_down = BumpSpec {
+            mode: BumpMode::Additive,
+            units: BumpUnits::Fraction,
+            value: -0.25,
+            bump_type: BumpType::Parallel,
+        };
+        assert!(surface.apply_bump(additive_down).is_err());
+        assert!(
+            surface
+                .bump_point_absolute_in_place(1.0, 90.0, -0.25)
+                .is_err()
+        );
+        assert!((surface.vols()[0] - 0.20).abs() < 1e-12);
+        assert!(surface.apply_bucket_bump(None, None, -105.0).is_err());
+
+        for bad_strike in [-5.0, 0.0] {
+            assert!(
+                VolSurface::from_grid(
+                    "BAD-BLACK",
+                    &[1.0],
+                    &[bad_strike],
+                    &[0.2],
+                    Default::default(),
+                    None,
+                )
+                .is_err()
+            );
+        }
+        let mut raw_black = serde_json::to_value(&surface).expect("serialize black surface");
+        raw_black["strikes"][0] = serde_json::json!(0.0);
+        assert!(serde_json::from_value::<VolSurface>(raw_black).is_err());
+
+        let shifted_opts = VolGridOpts {
+            quote_type: VolQuoteType::ShiftedBlackLognormal,
+            ..VolGridOpts::default()
+        };
+        assert!(
+            VolSurface::from_grid(
+                "SHIFT-OK",
+                &[1.0],
+                &[-0.01, 0.02],
+                &[0.2, 0.2],
+                shifted_opts,
+                Some(&[0.02]),
+            )
+            .is_ok()
+        );
+        assert!(
+            VolSurface::from_grid(
+                "SHIFT-BAD",
+                &[1.0],
+                &[-0.02, 0.02],
+                &[0.2, 0.2],
+                shifted_opts,
+                Some(&[0.02]),
+            )
+            .is_err()
+        );
     }
 }

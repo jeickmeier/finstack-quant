@@ -98,11 +98,11 @@ pub fn bump_active_volatility<I: crate::instruments::Instrument + Clone>(
 
 /// Smallest implied vol on a surface's `(expiry, strike)` grid.
 ///
-/// An additive parallel vol bump of size `h` clamps the down-bumped surface
-/// (`σ - h`) at zero wherever `σ < h` (see `VolSurface`'s `Bumpable` impl).
-/// When that happens the down-bump no longer represents a `-h` move, so a
-/// central difference divided by the full `2h` is wrong. Callers use this
-/// minimum to detect the clamp and fall back to a one-sided difference.
+/// An additive parallel vol bump of size `-h` fails closed whenever any grid
+/// point has `σ < h` (see `VolSurface`'s `Bumpable` impl), and hits the zero
+/// boundary when `σ == h`. Callers use this minimum to detect when a down-bump
+/// would leave the positive-volatility domain and fall back to a one-sided
+/// difference.
 ///
 /// Returns `None` for an empty grid.
 pub fn min_grid_vol(
@@ -329,7 +329,7 @@ pub fn bump_scalar_price(
     bump_pct: f64,
 ) -> finstack_quant_core::Result<finstack_quant_core::market_data::context::MarketContext> {
     let mut bumped = context.clone();
-    bumped.apply_price_bump_pct_in_place(price_id, bump_pct)?;
+    bumped.apply_price_bump_fraction_in_place(price_id, bump_pct)?;
     Ok(bumped)
 }
 

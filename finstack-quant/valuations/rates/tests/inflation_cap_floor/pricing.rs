@@ -127,11 +127,13 @@ fn zero_and_day_lag_caplets_do_not_consume_unpublished_denominators() {
             .unwrap(),
         )
         .insert_surface(
-            finstack_quant_valuations_test_support::volatility::relabel_quote_type(
-                &flat_vol_surface("USD-INFL-VOL", &[0.01, 1.0], &[0.0], 0.01),
+            finstack_quant_valuations_test_support::volatility::flat_vol_surface_with_quote_type(
+                "USD-INFL-VOL",
+                &[0.01, 1.0],
+                &[0.0],
+                0.01,
                 VolQuoteType::Normal,
-            )
-            .expect("valid quote convention"),
+            ),
         );
     for (lag, start, end) in [
         (
@@ -358,11 +360,14 @@ fn test_floor_value_with_negative_forward_normal_model() {
     let disc = flat_discount_curve_with_day_count(0.01, as_of, "USD-OIS", DayCount::Act365F);
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, -0.01).unwrap();
     let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD, InflationLag::None);
-    let vol_surface = finstack_quant_valuations_test_support::volatility::relabel_quote_type(
-        &flat_vol_surface("US-CPI-VOL", &[1.0], &[0.0], 0.01),
-        finstack_quant_core::market_data::surfaces::VolQuoteType::Normal,
-    )
-    .expect("valid quote convention");
+    let vol_surface =
+        finstack_quant_valuations_test_support::volatility::flat_vol_surface_with_quote_type(
+            "US-CPI-VOL",
+            &[1.0],
+            &[0.0],
+            0.01,
+            finstack_quant_core::market_data::surfaces::VolQuoteType::Normal,
+        );
 
     let ctx = MarketContext::new()
         .insert(disc)

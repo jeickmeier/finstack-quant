@@ -239,6 +239,24 @@ pub(crate) fn vol_effects(
     ctx: &ExecutionContext,
 ) -> Result<Vec<ScenarioEffect>> {
     let mut warnings = Vec::new();
+    if ctx.market.get_vol_cube(vol_surface_id.as_str()).is_ok() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Cannot apply scenario volatility shock to '{}': registered as VolCube, which does not support VolSurface grid bumps",
+            vol_surface_id.as_str()
+        ))
+        .into());
+    }
+    if ctx
+        .market
+        .get_fx_delta_vol_surface(vol_surface_id.as_str())
+        .is_ok()
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Cannot apply scenario volatility shock to '{}': registered as FxDeltaVolSurface, which does not support VolSurface grid bumps",
+            vol_surface_id.as_str()
+        ))
+        .into());
+    }
     let surface = ctx.market.get_surface(vol_surface_id.as_str())?;
 
     if pct <= LARGE_NEGATIVE_VOL_SHOCK_PCT {

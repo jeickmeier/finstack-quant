@@ -127,23 +127,25 @@ pub(crate) fn flow_times(
     flows: &[(Date, Money)],
     as_of: Date,
 ) -> finstack_quant_core::Result<Vec<(Date, f64, Money)>> {
-    let ctx = DayCountContext {
-        frequency: Some(frequency),
-        coupon_period: icma_reference_period(
-            day_count,
-            frequency,
-            flows.iter().map(|(date, _)| *date),
-            as_of,
-        ),
-        ..DayCountContext::default()
-    };
+    let ref_period = icma_reference_period(
+        day_count,
+        frequency,
+        flows.iter().map(|(date, _)| *date),
+        as_of,
+    );
     flows
         .iter()
         .map(|&(date, amount)| {
             let time = if date <= as_of {
                 0.0
             } else {
-                day_count.year_fraction(as_of, date, ctx)?
+                finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_year_fraction(
+                    day_count,
+                    Some(frequency),
+                    ref_period,
+                    as_of,
+                    date,
+                )?
             };
             Ok((date, time, amount))
         })

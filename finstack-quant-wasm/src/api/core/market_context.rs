@@ -115,8 +115,11 @@ impl JsMarketContext {
     ///
     /// * `curve` - The `DiscountCurve` to store; an item with the same id is replaced.
     #[wasm_bindgen(skip_typescript, js_name = insertDiscountCurve)]
-    pub fn insert_discount_curve(&mut self, curve: &JsDiscountCurve) {
-        self.context_mut().insert_mut(Arc::clone(&curve.inner));
+    pub fn insert_discount_curve(&mut self, curve: &JsDiscountCurve) -> Result<(), JsValue> {
+        self.context_mut()
+            .try_insert_mut(Arc::clone(&curve.inner))
+            .map(|_| ())
+            .map_err(to_js_err)
     }
 
     /// Store a forward curve under its own id; `insert` dispatches here.
@@ -125,8 +128,11 @@ impl JsMarketContext {
     ///
     /// * `curve` - The `ForwardCurve` to store; an item with the same id is replaced.
     #[wasm_bindgen(skip_typescript, js_name = insertForwardCurve)]
-    pub fn insert_forward_curve(&mut self, curve: &JsForwardCurve) {
-        self.context_mut().insert_mut(Arc::clone(&curve.inner));
+    pub fn insert_forward_curve(&mut self, curve: &JsForwardCurve) -> Result<(), JsValue> {
+        self.context_mut()
+            .try_insert_mut(Arc::clone(&curve.inner))
+            .map(|_| ())
+            .map_err(to_js_err)
     }
 
     /// Store a hazard curve under its own id; `insert` dispatches here.
@@ -135,8 +141,11 @@ impl JsMarketContext {
     ///
     /// * `curve` - The `HazardCurve` to store; an item with the same id is replaced.
     #[wasm_bindgen(skip_typescript, js_name = insertHazardCurve)]
-    pub fn insert_hazard_curve(&mut self, curve: &JsHazardCurve) {
-        self.context_mut().insert_mut(Arc::clone(&curve.inner));
+    pub fn insert_hazard_curve(&mut self, curve: &JsHazardCurve) -> Result<(), JsValue> {
+        self.context_mut()
+            .try_insert_mut(Arc::clone(&curve.inner))
+            .map(|_| ())
+            .map_err(to_js_err)
     }
 
     /// Store a inflation curve under its own id; `insert` dispatches here.
@@ -145,8 +154,11 @@ impl JsMarketContext {
     ///
     /// * `curve` - The `InflationCurve` to store; an item with the same id is replaced.
     #[wasm_bindgen(skip_typescript, js_name = insertInflationCurve)]
-    pub fn insert_inflation_curve(&mut self, curve: &JsInflationCurve) {
-        self.context_mut().insert_mut(Arc::clone(&curve.inner));
+    pub fn insert_inflation_curve(&mut self, curve: &JsInflationCurve) -> Result<(), JsValue> {
+        self.context_mut()
+            .try_insert_mut(Arc::clone(&curve.inner))
+            .map(|_| ())
+            .map_err(to_js_err)
     }
 
     /// Store a price or volatility-index curve under its own id; `insert` dispatches here.
@@ -155,8 +167,11 @@ impl JsMarketContext {
     ///
     /// * `curve` - The `PriceCurve` to store; an item with the same id is replaced.
     #[wasm_bindgen(skip_typescript, js_name = insertPriceCurve)]
-    pub fn insert_price_curve(&mut self, curve: &JsPriceCurve) {
-        self.context_mut().insert_mut(Arc::clone(&curve.inner));
+    pub fn insert_price_curve(&mut self, curve: &JsPriceCurve) -> Result<(), JsValue> {
+        self.context_mut()
+            .try_insert_mut(Arc::clone(&curve.inner))
+            .map(|_| ())
+            .map_err(to_js_err)
     }
 
     /// Store a base-correlation curve under its own id; `insert` dispatches here.
@@ -165,8 +180,14 @@ impl JsMarketContext {
     ///
     /// * `curve` - The `BaseCorrelationCurve` to store; an item with the same id is replaced.
     #[wasm_bindgen(skip_typescript, js_name = insertBaseCorrelationCurve)]
-    pub fn insert_base_correlation_curve(&mut self, curve: &JsBaseCorrelationCurve) {
-        self.context_mut().insert_mut(Arc::clone(&curve.inner));
+    pub fn insert_base_correlation_curve(
+        &mut self,
+        curve: &JsBaseCorrelationCurve,
+    ) -> Result<(), JsValue> {
+        self.context_mut()
+            .try_insert_mut(Arc::clone(&curve.inner))
+            .map(|_| ())
+            .map_err(to_js_err)
     }
 
     /// Store a volatility surface under its own id; `insert` dispatches here.
@@ -175,9 +196,11 @@ impl JsMarketContext {
     ///
     /// * `curve` - The `VolSurface` to store; an item with the same id is replaced.
     #[wasm_bindgen(skip_typescript, js_name = insertVolSurface)]
-    pub fn insert_vol_surface(&mut self, curve: &JsVolSurface) {
+    pub fn insert_vol_surface(&mut self, curve: &JsVolSurface) -> Result<(), JsValue> {
         self.context_mut()
-            .insert_surface_mut(Arc::clone(&curve.inner));
+            .try_insert_surface_mut(Arc::clone(&curve.inner))
+            .map(|_| ())
+            .map_err(to_js_err)
     }
 
     /// Store a FX delta-quoted volatility surface under its own id; `insert` dispatches here.
@@ -186,9 +209,14 @@ impl JsMarketContext {
     ///
     /// * `curve` - The `FxDeltaVolSurface` to store; an item with the same id is replaced.
     #[wasm_bindgen(skip_typescript, js_name = insertFxDeltaVolSurface)]
-    pub fn insert_fx_delta_vol_surface(&mut self, curve: &JsFxDeltaVolSurface) {
+    pub fn insert_fx_delta_vol_surface(
+        &mut self,
+        curve: &JsFxDeltaVolSurface,
+    ) -> Result<(), JsValue> {
         self.context_mut()
-            .insert_fx_delta_vol_surface_mut(Arc::clone(&curve.inner));
+            .try_insert_fx_delta_vol_surface_mut(Arc::clone(&curve.inner))
+            .map(|_| ())
+            .map_err(to_js_err)
     }
 
     /// Store a SABR volatility cube under its own id; `insert` dispatches here.
@@ -197,9 +225,11 @@ impl JsMarketContext {
     ///
     /// * `curve` - The `VolCube` to store; an item with the same id is replaced.
     #[wasm_bindgen(skip_typescript, js_name = insertVolCube)]
-    pub fn insert_vol_cube(&mut self, curve: &JsVolCube) {
+    pub fn insert_vol_cube(&mut self, curve: &JsVolCube) -> Result<(), JsValue> {
         self.context_mut()
-            .insert_vol_cube_mut(Arc::clone(&curve.inner));
+            .try_insert_vol_cube_mut(Arc::clone(&curve.inner))
+            .map(|_| ())
+            .map_err(to_js_err)
     }
 
     /// Attach the FX matrix used for currency conversion (Rust `MarketContext::insert_fx_mut`).
@@ -216,37 +246,52 @@ impl JsMarketContext {
         self.context_mut().insert_fx_mut(Arc::clone(&fx.inner));
     }
 
-    /// Store a market scalar: a unitless number, or a price in a currency
-    /// (Rust `MarketContext::insert_price_mut`).
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Identifier to store the scalar under.
-    /// * `value` - Finite scalar value: an index level, a spot price, a
-    ///   recovery assumption and so on.
-    /// * `currency` - ISO-4217 code that makes the scalar a monetary price;
-    ///   omitted stores a unitless number.
-    ///
-    /// @returns This context, updated in place, so calls can be chained.
-    /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
-    /// `FinstackError` (kind `validation`) for an unknown currency or a
-    /// value that is not finite (Rust `MarketScalar::from_parts`).
-    /// @param id - Identifier to store the scalar under.
-    /// @param value - Finite scalar value: an index level, a spot price, a recovery assumption and so on.
-    /// @param currency - ISO-4217 code that makes the scalar a monetary price; omitted stores a unitless number.
-    #[wasm_bindgen(js_name = insertPrice)]
-    pub fn insert_price(
+    /// Store a `Money` scalar under `id` (raw helper for the `insertPrice` facade).
+    #[wasm_bindgen(skip_typescript, js_name = insertPriceMoney)]
+    pub fn insert_price_money(
         &mut self,
         #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] value: JsValue,
+        value: &JsMoney,
         #[wasm_bindgen(unchecked_optional_param_type = "string | null")] currency: Option<JsValue>,
     ) -> Result<(), JsValue> {
         let id = js_string(&id, "id")?;
-        let scalar = MarketScalar::from_parts(
-            js_f64(&value, "value")?,
-            js_opt_currency(currency.as_ref(), "currency")?,
-        )
-        .map_err(to_js_err)?;
+        if let Some(ccy) = js_opt_currency(currency.as_ref(), "currency")?
+            && ccy != value.inner.currency()
+        {
+            return Err(to_js_err(finstack_quant_core::Error::Validation(format!(
+                "currency argument ({ccy}) does not match Money currency ({})",
+                value.inner.currency()
+            ))));
+        }
+        self.context_mut()
+            .insert_price_mut(id, MarketScalar::Price(value.inner));
+        Ok(())
+    }
+
+    /// Store a numeric or decimal-string market scalar under `id` (raw helper
+    /// for the `insertPrice` facade).
+    #[wasm_bindgen(skip_typescript, js_name = insertPriceScalar)]
+    pub fn insert_price_scalar(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number | string")] value: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] currency: Option<JsValue>,
+    ) -> Result<(), JsValue> {
+        let id = js_string(&id, "id")?;
+        let currency = js_opt_currency(currency.as_ref(), "currency")?;
+        let scalar = if let Some(text) = value.as_string() {
+            let Some(ccy) = currency else {
+                return Err(crate::utils::input::invalid_type(
+                    "value",
+                    "decimal string requires a currency code; unitless scalars must be numbers",
+                ));
+            };
+            finstack_quant_core::money::Money::from_decimal_str(&text, ccy)
+                .map(MarketScalar::Price)
+                .map_err(to_js_err)?
+        } else {
+            MarketScalar::from_parts(js_f64(&value, "value")?, currency).map_err(to_js_err)?
+        };
         self.context_mut().insert_price_mut(id, scalar);
         Ok(())
     }
@@ -726,13 +771,14 @@ impl JsMarketContext {
     ///
     /// # Arguments
     ///
-    /// * `days` - Calendar days to advance each curve's base date; the curves
-    ///   keep their shape and drop expired pillars.
+    /// * `days` - Non-negative calendar days to advance each curve's base date;
+    ///   the curves keep their shape and drop expired pillars.
     ///
     /// @returns A new `MarketContext`; this context is unchanged.
-    /// @throws `TypeError` if `days` is not an integer; `FinstackError` if a
-    /// curve cannot be rolled (for example no pillar remains).
-    /// @param days - Calendar days to advance each curve's base date; the curves keep their shape and drop expired pillars.
+    /// @throws `TypeError` if `days` is not an integer; `FinstackError` (kind
+    /// `validation`) if `days < 0`, a curve cannot be rolled (for example no pillar
+    /// remains), or a bound credit index fails to rebind.
+    /// @param days - Non-negative calendar days to advance each curve's base date; the curves keep their shape and drop expired pillars.
     #[wasm_bindgen(js_name = rollForward)]
     pub fn roll_forward(
         &self,

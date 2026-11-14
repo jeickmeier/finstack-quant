@@ -75,7 +75,7 @@ it("leaves every omitted option to Rust and sends the instrument only when the s
   expect(native.scenarioSpecRequiresInstruments(roll!.scenarioJson)).toBe(true);
   expect(roll!.report.time_roll?.new_date).toBe("2025-02-03");
   expect(roll!.report.time_roll?.total_carry).toEqual({
-    USD: { amount: "4613.7452641314", currency: "USD" },
+    USD: { amount: "4613.7452641316", currency: "USD" },
   });
   expect(roll!.shocked.value).toEqual({
     amount: "1002074.2351148674",

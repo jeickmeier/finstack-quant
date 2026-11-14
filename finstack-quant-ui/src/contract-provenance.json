@@ -565,7 +565,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "5633d2e45fd816815f1e0a13f46b7487188ea25f4fae32a77d68a96d63b4b526",
+          "sha256": "5cc11461c7a20458cf1a2b65c81e4ab867c3ed847a5e4b0182d0a28c27a7a0f0",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -579,7 +579,7 @@
           "uri": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
           "pointer": "#",
           "source": "finstack-quant/calibration/schemas/calibration/1/calibration.schema.json",
-          "sha256": "ed3b1c3b8c6d3ca255384a202c2fb70ae658a3c4179ff95f545e3ac0c3b746f4",
+          "sha256": "b2a18a18eb96eb1ac51284849622e22fb6b8e6a77a2773bc618ee44890f00910",
           "description": "Canonical typed calibration request and result envelope."
         }
       ]
@@ -1352,7 +1352,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "5633d2e45fd816815f1e0a13f46b7487188ea25f4fae32a77d68a96d63b4b526",
+          "sha256": "5cc11461c7a20458cf1a2b65c81e4ab867c3ed847a5e4b0182d0a28c27a7a0f0",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -1419,7 +1419,7 @@
           "uri": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
           "pointer": "#",
           "source": "finstack-quant/scenarios/schemas/scenarios/1/scenario_spec.schema.json",
-          "sha256": "84053084b4bf087cffa71b19d98e124a6a41fe2c38c752a320ac30d5528fd20c",
+          "sha256": "8910dad1e9e75d4a6e179d8f3d19ec3e4af59aef06876e06de16a95340509812",
           "description": "Bare scenario specification: the ordered operations the scenario engine applies."
         }
       ]

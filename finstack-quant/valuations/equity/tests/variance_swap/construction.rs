@@ -21,7 +21,7 @@ fn test_builder_creates_valid_swap_with_all_required_fields() {
         .id(InstrumentId::new("VAR-TEST-001"))
         .underlying_ticker(UNDERLYING_ID.to_string())
         .spot_id(PriceId::new(UNDERLYING_ID))
-        .vol_surface_id(CurveId::new(UNDERLYING_ID))
+        .vol_surface_id(CurveId::new(VOL_SURFACE_ID))
         .div_yield_id_opt(Some(PriceId::new(format!("{}-DIVYIELD", UNDERLYING_ID))))
         .notional(Money::new(DEFAULT_NOTIONAL, Currency::USD).expect("valid money fixture"))
         .strike_variance(DEFAULT_STRIKE_VAR)

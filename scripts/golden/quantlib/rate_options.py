@@ -159,7 +159,7 @@ def _build_optionlet_fixture(
                     "USD-CAPFLOOR-VOL-QL",
                     volatility,
                     quote_type=vol_quote_type,
-                    strikes=[-0.01, strike, 0.10],
+                    strikes=[-0.01, strike, 0.10] if normal else [0.01, strike, 0.10],
                 )
             ],
         ),
@@ -351,7 +351,7 @@ def build_black_cap() -> dict[str, Any]:
                     "USD-CAPFLOOR-VOL-QL",
                     volatility,
                     quote_type="black_lognormal",
-                    strikes=[-0.01, strike, 0.10],
+                    strikes=[0.01, strike, 0.10],
                 )
             ],
         ),

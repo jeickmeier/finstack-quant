@@ -556,10 +556,11 @@ mod tests {
     }
 
     fn make_pd_curve() -> RawPdCurve {
-        RawPdCurve {
-            rating: "BBB".to_string(),
-            knots: vec![(0.0, 0.0), (1.0, 0.02), (2.0, 0.04), (5.0, 0.10)],
-        }
+        RawPdCurve::new(
+            "BBB",
+            vec![(0.0, 0.0), (1.0, 0.02), (2.0, 0.04), (5.0, 0.10)],
+        )
+        .expect("valid BBB PD curve")
     }
 
     #[test]

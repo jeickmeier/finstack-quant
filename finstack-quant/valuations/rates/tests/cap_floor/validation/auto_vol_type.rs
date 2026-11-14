@@ -39,11 +39,11 @@ fn flat_disc(rate: f64, base: Date, id: &str) -> DiscountCurve {
 fn flat_vol_surface(sigma: f64, id: &str) -> VolSurface {
     VolSurface::builder(id)
         .expiries(&[0.25, 0.5, 1.0, 2.0])
-        .strikes(&[-0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.05])
-        .row(&[sigma; 7])
-        .row(&[sigma; 7])
-        .row(&[sigma; 7])
-        .row(&[sigma; 7])
+        .strikes(&[0.01, 0.02, 0.03, 0.05])
+        .row(&[sigma; 4])
+        .row(&[sigma; 4])
+        .row(&[sigma; 4])
+        .row(&[sigma; 4])
         .build()
         .unwrap()
 }
@@ -132,11 +132,13 @@ fn auto_follows_normal_metadata_for_negative_forward() {
     let fixing = date!(2024 - 04 - 01);
     let payment = date!(2024 - 07 - 01);
     let ctx = context_from(as_of, -0.005, 0.005).insert_surface(
-        finstack_quant_valuations_test_support::volatility::relabel_quote_type(
-            &flat_vol_surface(0.005, "VOL"),
+        finstack_quant_valuations_test_support::volatility::flat_vol_surface_with_quote_type(
+            "VOL",
+            &[0.25, 0.5, 1.0, 2.0],
+            &[-0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.05],
+            0.005,
             finstack_quant_core::market_data::surfaces::VolQuoteType::Normal,
-        )
-        .expect("valid quote convention"),
+        ),
     );
     let auto = make_caplet(fixing, payment, -0.002, CapFloorVolType::Auto, true);
     let normal = make_caplet(fixing, payment, -0.002, CapFloorVolType::Normal, true);

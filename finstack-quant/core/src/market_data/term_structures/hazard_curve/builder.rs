@@ -199,6 +199,12 @@ impl HazardCurveBuilder {
                 "HazardCurve requires an explicit recovery_rate in [0, 1]".to_string(),
             )
         })?;
+        if !self.max_hazard_rate.is_finite() || self.max_hazard_rate <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "HazardCurve max_hazard_rate must be finite and positive, got {}",
+                self.max_hazard_rate
+            )));
+        }
 
         // Validate knot times and hazard rates: times must be finite/non-negative;
         // rates non-negative and finite; a zero-time anchor is allowed, but all
@@ -254,21 +260,13 @@ impl HazardCurveBuilder {
         }
         par_pts.sort_by(|a, b| a.0.total_cmp(&b.0));
         let (p_ten, p_spd): (Vec<f64>, Vec<f64>) = par_pts.into_iter().unzip();
-
-        // Convert hazard rates to survival probabilities for interpolation
-        // using the single canonical λ-attribution convention shared with
-        // `rebuild_interp` (see `survival_pillars`).
-        let (interp_kvec, interp_svec) = survival_pillars(&kvec, &lvec);
-
-        // Build interpolator over survival probabilities. The default
-        // LogLinear style implies a piecewise-constant hazard rate.
-        // Extrapolate with FlatForward (constant hazard rate at tail).
-        let interp = InterpStyle::LogLinear.build_enum(
-            interp_kvec.into_boxed_slice(),
-            interp_svec.into_boxed_slice(),
-            ExtrapolationPolicy::FlatForward,
-            ValidationPolicy::Strict,
-        )?;
+        for pair in p_ten.windows(2) {
+            if pair[1] <= pair[0] {
+                return Err(crate::Error::Validation(
+                    "hazard curve par spread tenors must be strictly increasing".to_string(),
+                ));
+            }
+        }
 
         Ok(HazardCurve {
             id: self.id,
@@ -285,7 +283,6 @@ impl HazardCurveBuilder {
             par_interp: self.par_interp,
             hazard_calibration: self.hazard_calibration,
             max_hazard_rate: self.max_hazard_rate,
-            interp,
             fx_policy: self.fx_policy,
         })
     }

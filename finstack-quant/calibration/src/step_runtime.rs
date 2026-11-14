@@ -277,18 +277,18 @@ pub(crate) fn apply_output(
 ) -> Result<()> {
     match output {
         StepOutput::Curve(curve) => {
-            context.insert_mut(curve);
+            context.try_insert_mut(curve)?;
         }
         StepOutput::Curves(curves) => {
             for curve in curves {
-                context.insert_mut(curve);
+                context.try_insert_mut(curve)?;
             }
         }
         StepOutput::Surface(surface) => {
-            context.insert_surface_mut(surface);
+            context.try_insert_surface_mut(surface)?;
         }
         StepOutput::VolCube(cube) => {
-            context.insert_vol_cube_mut(cube);
+            context.try_insert_vol_cube_mut(cube)?;
         }
         StepOutput::Scalars(values) => {
             for (key, value) in values {

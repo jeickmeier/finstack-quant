@@ -26,7 +26,62 @@
 //! - Wystup (2006), *FX Options and Structured Products*, Ch. 1 `docs/REFERENCES.md#wystup-fx-options`
 //! - Clark (2011), *Foreign Exchange Option Pricing*, Ch. 3-4 `docs/REFERENCES.md#clark-fx-options`
 
+use super::VolQuoteType;
 use crate::{error::InputError, types::CurveId};
+
+/// Delta convention governing how [`FxDeltaVolSurface`] maps wing deltas onto strikes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum FxDeltaConvention {
+    /// Premium-unadjusted forward delta (`Delta_call = N(d1)`).
+    #[default]
+    ForwardUnadjusted,
+}
+
+impl std::fmt::Display for FxDeltaConvention {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ForwardUnadjusted => write!(f, "forward_unadjusted"),
+        }
+    }
+}
+
+/// At-the-money strike convention on [`FxDeltaVolSurface`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum FxAtmConvention {
+    /// Forward delta-neutral straddle (`K_ATM = F * exp(0.5 * sigma_ATM^2 * T)`).
+    #[default]
+    DeltaNeutralStraddle,
+}
+
+impl std::fmt::Display for FxAtmConvention {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DeltaNeutralStraddle => write!(f, "delta_neutral_straddle"),
+        }
+    }
+}
+
+/// Butterfly quote convention on [`FxDeltaVolSurface`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum FxButterflyConvention {
+    /// Broker/smile two-volatility average (`0.5 * (sigma_call + sigma_put) - sigma_ATM`).
+    #[default]
+    Smile,
+}
+
+impl std::fmt::Display for FxButterflyConvention {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Smile => write!(f, "smile"),
+        }
+    }
+}
 
 /// Delta-quoted FX volatility surface.
 ///
@@ -208,6 +263,30 @@ impl FxDeltaVolSurface {
         self.bf_10d.as_deref()
     }
 
+    /// Quoting convention of the stored implied volatilities (`black_lognormal`).
+    #[inline]
+    pub fn quote_type(&self) -> VolQuoteType {
+        VolQuoteType::BlackLognormal
+    }
+
+    /// Delta convention governing delta-to-strike inversion (`forward_unadjusted`).
+    #[inline]
+    pub fn delta_convention(&self) -> FxDeltaConvention {
+        FxDeltaConvention::ForwardUnadjusted
+    }
+
+    /// At-the-money strike convention (`delta_neutral_straddle`).
+    #[inline]
+    pub fn atm_convention(&self) -> FxAtmConvention {
+        FxAtmConvention::DeltaNeutralStraddle
+    }
+
+    /// Butterfly quote convention (`smile`: wing average minus ATM).
+    #[inline]
+    pub fn butterfly_convention(&self) -> FxButterflyConvention {
+        FxButterflyConvention::Smile
+    }
+
     fn validate(
         expiries: &[f64],
         atm_vols: &[f64],
@@ -321,5 +400,38 @@ mod tests {
             err,
             crate::Error::Input(crate::InputError::NonPositiveValue)
         ));
+    }
+
+    #[test]
+    fn exposes_explicit_quote_delta_atm_and_butterfly_conventions() {
+        use super::{FxAtmConvention, FxButterflyConvention, FxDeltaConvention, VolQuoteType};
+
+        let surface = FxDeltaVolSurface::new(
+            "EURUSD-VOL",
+            vec![0.25, 1.0],
+            vec![0.08, 0.09],
+            vec![0.01, 0.015],
+            vec![0.005, 0.007],
+            None,
+            None,
+        )
+        .expect("valid FX delta vol surface");
+
+        assert_eq!(surface.quote_type(), VolQuoteType::BlackLognormal);
+        assert_eq!(
+            surface.delta_convention(),
+            FxDeltaConvention::ForwardUnadjusted
+        );
+        assert_eq!(
+            surface.atm_convention(),
+            FxAtmConvention::DeltaNeutralStraddle
+        );
+        assert_eq!(surface.butterfly_convention(), FxButterflyConvention::Smile);
+        assert_eq!(surface.delta_convention().to_string(), "forward_unadjusted");
+        assert_eq!(
+            surface.atm_convention().to_string(),
+            "delta_neutral_straddle"
+        );
+        assert_eq!(surface.butterfly_convention().to_string(), "smile");
     }
 }

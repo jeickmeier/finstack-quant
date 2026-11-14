@@ -869,7 +869,8 @@ impl SabrCalibrator {
                     weights: &weights,
                     beta,
                 };
-                let solution = solver.solve_system_with_jacobian(residuals, &derivatives, &initial);
+                let solution =
+                    solver.solve_least_squares_with_jacobian(residuals, &derivatives, &initial);
                 (solution, calls.get())
             },
             |solution| {
@@ -1049,7 +1050,7 @@ impl SabrCalibrator {
                             .map_or(1e6, |model_vol| weights[index] * (model_vol - market_vol));
                     }
                 };
-                let solution = solver.solve_system(residuals, &initial, market_vols.len());
+                let solution = solver.solve_least_squares(residuals, &initial, market_vols.len());
                 (solution, calls.get())
             },
             |solution| {

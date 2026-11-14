@@ -23,11 +23,12 @@ use time::Duration;
 
 const TOL: f64 = DAYCOUNT_TOLERANCE;
 
-/// ACT/ACT ICMA year fraction measured against an explicit regular coupon
-/// period. With `coupon_period` set the coupon frequency is not used.
-fn act_act_isma_year_fraction_with_reference_period(
+/// ACT/ACT ICMA year fraction measured against an explicit nominal coupon
+/// period and coupon frequency.
+fn icma_with_period(
     start: Date,
     end: Date,
+    frequency: Tenor,
     reference_start: Date,
     reference_end: Date,
 ) -> finstack_quant_core::Result<f64> {
@@ -35,7 +36,7 @@ fn act_act_isma_year_fraction_with_reference_period(
         start,
         end,
         DayCountContext {
-            frequency: Some(Tenor::semi_annual()),
+            frequency: Some(frequency),
             coupon_period: Some((reference_start, reference_end)),
             ..Default::default()
         },
@@ -817,27 +818,50 @@ fn act_act_afb_multi_year_whole_year_walk() {
     );
 }
 
-// Act/Act ISMA - Frequency-Dependent
+// Act/Act ISMA - Contained Nominal Period + Frequency
 
 #[test]
-fn actact_isma_requires_frequency() {
+fn actact_isma_requires_frequency_and_coupon_period() {
     let start = make_date(2025, 1, 1);
     let end = make_date(2025, 7, 1);
+    let semi = Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture");
 
-    // Without frequency, should error
-    let result = DayCount::ActActIsma.year_fraction(start, end, DayCountContext::default());
-    assert!(result.is_err());
+    // Empty context -> error
+    assert!(
+        DayCount::ActActIsma
+            .year_fraction(start, end, DayCountContext::default())
+            .is_err()
+    );
 
-    // With frequency, should work
+    // Frequency without coupon_period -> error even for a regular coupon
+    let freq_only = DayCountContext {
+        frequency: Some(semi),
+        ..DayCountContext::default()
+    };
+    let err = DayCount::ActActIsma
+        .year_fraction(start, end, freq_only)
+        .expect_err("missing coupon_period must fail");
+    assert!(err.to_string().contains("coupon_period"), "{err}");
+
+    // coupon_period without frequency -> error
+    let period_only = DayCountContext {
+        coupon_period: Some((start, end)),
+        ..DayCountContext::default()
+    };
+    assert!(
+        DayCount::ActActIsma
+            .year_fraction(start, end, period_only)
+            .is_err()
+    );
+
+    // Both frequency and enclosing nominal coupon_period -> succeeds
     let ctx = DayCountContext {
-        calendar: None,
-        frequency: Some(Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture")),
-        bus_basis: None,
-        coupon_period: None,
-        end_is_termination_date: None,
+        frequency: Some(semi),
+        coupon_period: Some((start, end)),
+        ..DayCountContext::default()
     };
     let yf = DayCount::ActActIsma.year_fraction(start, end, ctx).unwrap();
-    assert!(yf > 0.0);
+    assert!((yf - 0.5).abs() < TOL);
 }
 
 #[test]
@@ -845,109 +869,90 @@ fn actact_isma_full_coupon_period() {
     let start = make_date(2025, 1, 1);
     let end = make_date(2025, 7, 1);
 
-    let ctx = DayCountContext {
-        calendar: None,
-        frequency: Some(Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture")),
-        bus_basis: None,
-        coupon_period: None,
-        end_is_termination_date: None,
-    };
-
-    let yf = DayCount::ActActIsma.year_fraction(start, end, ctx).unwrap();
+    let yf = icma_with_period(start, end, Tenor::semi_annual(), start, end).unwrap();
 
     // Full semi-annual period = 0.5 year fraction (6 months / 12 months)
     assert!((yf - 0.5).abs() < TOL, "Expected 0.5, got {}", yf);
 }
 
 #[test]
-fn actact_isma_multiple_frequencies() {
-    let start = make_date(2025, 1, 1);
-    let end = make_date(2025, 4, 1);
+fn actact_isma_supported_frequencies() {
+    let cases = [
+        (
+            make_date(2025, 1, 1),
+            make_date(2025, 2, 1),
+            Tenor::monthly(),
+            1.0 / 12.0,
+        ),
+        (
+            make_date(2025, 1, 1),
+            make_date(2025, 3, 1),
+            Tenor::new(2, TenorUnit::Months).expect("2M"),
+            1.0 / 6.0,
+        ),
+        (
+            make_date(2025, 1, 1),
+            make_date(2025, 4, 1),
+            Tenor::quarterly(),
+            0.25,
+        ),
+        (
+            make_date(2025, 1, 1),
+            make_date(2025, 5, 1),
+            Tenor::new(4, TenorUnit::Months).expect("4M"),
+            1.0 / 3.0,
+        ),
+        (
+            make_date(2025, 1, 1),
+            make_date(2025, 7, 1),
+            Tenor::semi_annual(),
+            0.5,
+        ),
+        (
+            make_date(2025, 1, 1),
+            make_date(2026, 1, 1),
+            Tenor::new(12, TenorUnit::Months).expect("12M"),
+            1.0,
+        ),
+        (
+            make_date(2025, 1, 1),
+            make_date(2026, 1, 1),
+            Tenor::annual(),
+            1.0,
+        ),
+    ];
 
-    // Quarterly
-    let ctx_q = DayCountContext {
-        calendar: None,
-        frequency: Some(Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture")),
-        bus_basis: None,
-        coupon_period: None,
-        end_is_termination_date: None,
-    };
-    let yf_q = DayCount::ActActIsma
-        .year_fraction(start, end, ctx_q)
-        .unwrap();
-
-    // Monthly
-    let ctx_m = DayCountContext {
-        calendar: None,
-        frequency: Some(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture")),
-        bus_basis: None,
-        coupon_period: None,
-        end_is_termination_date: None,
-    };
-    let yf_m = DayCount::ActActIsma
-        .year_fraction(start, end, ctx_m)
-        .unwrap();
-
-    // Different frequencies should give the SAME year fraction for the same period
-    // Quarterly: 1 full period × 0.25 (quarterly) = 0.25 year fraction
-    assert!(
-        (yf_q - 0.25).abs() < TOL,
-        "Quarterly expected 0.25, got {}",
-        yf_q
-    );
-    // Monthly: 3 full periods × (1/12) = 0.25 year fraction
-    assert!(
-        (yf_m - 0.25).abs() < TOL,
-        "Monthly expected 0.25, got {}",
-        yf_m
-    );
+    for (start, end, freq, expected) in cases {
+        let yf = icma_with_period(start, end, freq, start, end).unwrap();
+        assert!(
+            (yf - expected).abs() < TOL,
+            "{freq}: expected {expected}, got {yf}"
+        );
+    }
 }
 
 #[test]
 fn actact_isma_eom_regular_period_is_exactly_half() {
-    // Regression for the the frequency-only
-    // quasi-coupon grid was anchored at `start.add_months(-frequency).expect("valid date shift")` and stepped
-    // cumulatively, so month-end starts drifted (grid Aug 28 instead of
-    // Aug 31) and a regular EOM semi-annual period returned
-    // 181/184 × 0.5 ≈ 0.49185. Anchoring k-multiples on `start` itself must
-    // give exactly 0.5.
-    let ctx = DayCountContext {
-        calendar: None,
-        frequency: Some(Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture")),
-        bus_basis: None,
-        coupon_period: None,
-        end_is_termination_date: None,
-    };
-
-    // [2025-08-31, 2026-02-28): Aug 31 + 6M (clamped) = Feb 28 → one full period.
-    let yf = DayCount::ActActIsma
-        .year_fraction(make_date(2025, 8, 31), make_date(2026, 2, 28), ctx)
-        .unwrap();
-    assert!((yf - 0.5).abs() < TOL, "Expected exactly 0.5, got {}", yf);
-
-    // [2025-03-31, 2025-09-30): Mar 31 + 6M (clamped) = Sep 30 → one full period.
-    let yf = DayCount::ActActIsma
-        .year_fraction(make_date(2025, 3, 31), make_date(2025, 9, 30), ctx)
-        .unwrap();
-    assert!((yf - 0.5).abs() < TOL, "Expected exactly 0.5, got {}", yf);
+    for (start, end) in [
+        (make_date(2025, 8, 31), make_date(2026, 2, 28)),
+        (make_date(2025, 3, 31), make_date(2025, 9, 30)),
+    ] {
+        let yf = icma_with_period(start, end, Tenor::semi_annual(), start, end).unwrap();
+        assert!((yf - 0.5).abs() < TOL, "Expected exactly 0.5, got {}", yf);
+    }
 }
 
 #[test]
-fn actact_isma_eom_grid_preserves_roll_day_across_short_month() {
-    // Multi-period span across a short month: grid anchored on Aug 31 must be
-    // Aug 31 / Feb 28 / Aug 31 (roll-day preserved), so two regular
-    // semi-annual EOM periods sum to exactly 1.0 .
-    let ctx = DayCountContext {
-        calendar: None,
-        frequency: Some(Tenor::new(6, TenorUnit::Months).expect("valid tenor fixture")),
-        bus_basis: None,
-        coupon_period: None,
-        end_is_termination_date: None,
-    };
-    let yf = DayCount::ActActIsma
-        .year_fraction(make_date(2025, 8, 31), make_date(2026, 8, 31), ctx)
-        .unwrap();
-    assert!((yf - 1.0).abs() < TOL, "Expected exactly 1.0, got {}", yf);
+fn actact_isma_rejects_multi_period_span_without_schedule_slicing() {
+    let start = make_date(2025, 8, 31);
+    let mid = make_date(2026, 2, 28);
+    let end = make_date(2026, 8, 31);
+    assert!(icma_with_period(start, end, Tenor::semi_annual(), start, mid).is_err());
+    assert!(icma_with_period(start, end, Tenor::semi_annual(), start, end).is_err());
+
+    let first = icma_with_period(start, mid, Tenor::semi_annual(), start, mid).unwrap();
+    let second = icma_with_period(mid, end, Tenor::semi_annual(), mid, end).unwrap();
+    assert!((first + second - 1.0).abs() < TOL);
 }
 
 #[test]
@@ -997,9 +1002,6 @@ fn actact_isma_backward_only_month_roll_requires_reference_period() {
             (fraction - expected).abs() < TOL,
             "{start} to {end}: {fraction}"
         );
-        let direct =
-            act_act_isma_year_fraction_with_reference_period(start, end, start, end).unwrap();
-        assert!((direct - expected).abs() < TOL);
     }
 }
 
@@ -1038,7 +1040,7 @@ fn actact_vs_actact_isma_comparison() {
         calendar: None,
         frequency: Some(Tenor::new(12, TenorUnit::Months).expect("valid tenor fixture")),
         bus_basis: None,
-        coupon_period: None,
+        coupon_period: Some((start, end)),
         end_is_termination_date: None,
     };
     let yf_isma = DayCount::ActActIsma
@@ -1089,9 +1091,6 @@ fn actact_isma_reference_period_preserves_short_month_coupon_tenor() {
             .year_fraction(start, end, context)
             .unwrap();
         assert!((full - expected).abs() < TOL, "{start} -> {end}: {full}");
-        let direct =
-            act_act_isma_year_fraction_with_reference_period(start, end, start, end).unwrap();
-        assert!((direct - expected).abs() < TOL);
         let mid = start + Duration::days(10);
         let accrued = DayCount::ActActIsma
             .year_fraction(start, mid, context)
@@ -1111,9 +1110,10 @@ fn actact_isma_reference_period_handles_short_front_stub_with_month_end_anchor()
     let reference_start = make_date(2025, 1, 31);
     let reference_end = make_date(2025, 7, 31);
 
-    let yf = act_act_isma_year_fraction_with_reference_period(
+    let yf = icma_with_period(
         start,
         end,
+        Tenor::semi_annual(),
         reference_start,
         reference_end,
     )
@@ -1131,151 +1131,99 @@ fn actact_isma_reference_period_handles_short_front_stub_with_month_end_anchor()
 }
 
 #[test]
-fn actact_isma_reference_period_handles_long_first_stub() {
+fn actact_isma_rejects_uncontained_long_stub_without_slicing() {
     let start = make_date(2025, 1, 31);
     let end = make_date(2025, 10, 15);
     let reference_start = make_date(2025, 7, 31);
     let reference_end = make_date(2026, 1, 31);
 
-    let yf = act_act_isma_year_fraction_with_reference_period(
+    assert!(
+        icma_with_period(
+            start,
+            end,
+            Tenor::semi_annual(),
+            reference_start,
+            reference_end,
+        )
+        .is_err()
+    );
+
+    // Explicit caller slicing across the two nominal periods yields the ICMA total.
+    let first = icma_with_period(
         start,
+        reference_start,
+        Tenor::semi_annual(),
+        start,
+        reference_start,
+    )
+    .unwrap();
+    let second = icma_with_period(
+        reference_start,
         end,
+        Tenor::semi_annual(),
         reference_start,
         reference_end,
     )
     .unwrap();
-
-    let first_regular = 0.5;
-    let stub_fraction = ((end - reference_start).whole_days() as f64
-        / (reference_end - reference_start).whole_days() as f64)
-        * 0.5;
-    let expected = first_regular + stub_fraction;
-    assert!(
-        (yf - expected).abs() < TOL,
-        "Expected {:.12}, got {:.12}",
-        expected,
-        yf
-    );
+    let expected = 0.5
+        + ((end - reference_start).whole_days() as f64
+            / (reference_end - reference_start).whole_days() as f64)
+            * 0.5;
+    assert!((first + second - expected).abs() < TOL);
 }
 
 #[test]
-fn actact_isma_reference_grid_preserves_roll_day_across_february() {
-    for (start, end, reference_start, reference_end, expected) in [
-        // Long last coupon: Jan 30 / Feb 28 / Mar 30, ending before Mar 30.
-        (
-            make_date(2025, 1, 30),
-            make_date(2025, 3, 15),
-            make_date(2025, 1, 30),
-            make_date(2025, 2, 28),
-            1.0 / 12.0 + 15.0 / 30.0 / 12.0,
-        ),
-        // A reference beginning at the clamp retains Mar 30's original roll.
-        (
-            make_date(2025, 1, 15),
-            make_date(2025, 3, 30),
-            make_date(2025, 2, 28),
-            make_date(2025, 3, 30),
-            15.0 / 31.0 / 12.0 + 2.0 / 12.0,
-        ),
-        // Backward traversal crosses February without changing Jan 30 to Jan 28.
-        (
-            make_date(2025, 1, 15),
-            make_date(2025, 4, 30),
-            make_date(2025, 3, 30),
-            make_date(2025, 4, 30),
-            15.0 / 31.0 / 12.0 + 3.0 / 12.0,
-        ),
-        // EOM continues to preserve the final day of every nominal month.
-        (
-            make_date(2025, 1, 31),
-            make_date(2025, 4, 15),
-            make_date(2025, 1, 31),
-            make_date(2025, 2, 28),
-            2.0 / 12.0 + 15.0 / 30.0 / 12.0,
-        ),
-    ] {
-        let direct = act_act_isma_year_fraction_with_reference_period(
-            start,
-            end,
-            reference_start,
-            reference_end,
-        )
-        .unwrap();
-        let contextual = DayCount::ActActIsma
-            .year_fraction(
-                start,
-                end,
-                DayCountContext {
-                    frequency: Some(Tenor::monthly()),
-                    coupon_period: Some((reference_start, reference_end)),
-                    ..Default::default()
-                },
-            )
-            .unwrap();
-        assert!(
-            (direct - expected).abs() < 1e-14,
-            "{start} -> {end}: expected {expected}, got {direct}"
-        );
-        assert_eq!(direct, contextual);
-    }
-}
+fn actact_isma_rejects_frequency_period_mismatch_and_non_nominal_endpoints() {
+    let start = make_date(2025, 1, 15);
+    let end = make_date(2025, 7, 15);
 
-#[test]
-fn actact_isma_rejects_reference_endpoints_outside_nominal_month_grid() {
-    let start = make_date(2024, 7, 15);
-    let end = make_date(2025, 1, 15);
-    let reference_start = make_date(2025, 1, 15);
-    let reference_end = make_date(2025, 7, 15);
-    assert_eq!(
-        act_act_isma_year_fraction_with_reference_period(
-            start,
-            end,
-            reference_start,
-            reference_end,
-        )
-        .unwrap(),
-        0.5,
-    );
-    // An adjusted payment date changes the inferred roll from the 15th to
-    // the 16th, which must not silently change the preceding coupon factor.
+    // 6-month coupon_period supplied with a 3M frequency must fail.
+    assert!(icma_with_period(start, end, Tenor::quarterly(), start, end).is_err());
+
+    // An adjusted payment date (16th instead of 15th) does not share the nominal month grid.
     let adjusted_end = make_date(2025, 7, 16);
-    assert!(act_act_isma_year_fraction_with_reference_period(
-        start,
-        end,
-        reference_start,
-        adjusted_end,
-    )
-    .is_err());
+    assert!(icma_with_period(start, end, Tenor::semi_annual(), start, adjusted_end).is_err());
+
+    // Non-EOM mismatch (Apr 29 -> May 31) is rejected, whereas EOM (Apr 30 -> May 31) succeeds.
     assert!(
-        DayCount::ActActIsma
-            .year_fraction(
-                start,
-                end,
-                DayCountContext {
-                    frequency: Some(Tenor::semi_annual()),
-                    coupon_period: Some((reference_start, adjusted_end)),
-                    ..Default::default()
-                },
-            )
-            .is_err()
+        icma_with_period(
+            make_date(2025, 4, 29),
+            make_date(2025, 5, 31),
+            Tenor::monthly(),
+            make_date(2025, 4, 29),
+            make_date(2025, 5, 31),
+        )
+        .is_err()
+    );
+    assert!(
+        icma_with_period(
+            make_date(2025, 4, 30),
+            make_date(2025, 5, 31),
+            Tenor::monthly(),
+            make_date(2025, 4, 30),
+            make_date(2025, 5, 31),
+        )
+        .is_ok()
     );
 }
 
 #[test]
 fn actact_isma_reference_period_rejects_invalid_ranges() {
     assert!(
-        act_act_isma_year_fraction_with_reference_period(
+        icma_with_period(
             make_date(2025, 3, 31),
             make_date(2025, 1, 15),
+            Tenor::semi_annual(),
             make_date(2024, 9, 30),
             make_date(2025, 3, 31),
         )
         .is_err()
     );
     assert!(
-        act_act_isma_year_fraction_with_reference_period(
+        icma_with_period(
             make_date(2025, 1, 15),
             make_date(2025, 3, 31),
+            Tenor::semi_annual(),
             make_date(2025, 3, 31),
             make_date(2025, 3, 31),
         )

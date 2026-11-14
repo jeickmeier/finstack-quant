@@ -229,14 +229,21 @@ impl BasisSpreadCurve {
     /// Knots at or before the new origin expire and are removed; unlike a
     /// discount curve, no new zero-time anchor is inserted.
     ///
+    /// # Arguments
+    ///
+    /// * `days` - Non-negative calendar-day shift; `0` clones unchanged and negative values are rejected.
+    ///
     /// # Errors
     ///
-    /// Returns an error if the day-count calculation fails, every knot expires
-    /// after the roll, or the shifted points cannot rebuild a valid
-    /// interpolator. `days` is signed, so a negative value moves the base date
-    /// backward.
+    /// Returns an error if `days < 0`, the day-count calculation fails, every knot expires
+    /// after the roll, or the shifted points cannot rebuild a valid interpolator.
     /// Returns a validation error if the rolled base date exceeds the supported calendar range.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
+        if days < 0 {
+            return Err(crate::Error::Validation(format!(
+                "BasisSpreadCurve::roll_forward requires non-negative days, got {days}"
+            )));
+        }
         if days == 0 {
             return Ok(self.clone());
         }

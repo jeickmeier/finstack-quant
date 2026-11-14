@@ -176,62 +176,6 @@ pub(crate) fn find_monotone_violation(values: &[f64], base_tol: f64) -> Option<(
     })
 }
 
-/// Flat-extrapolated piecewise-linear interpolation over `(x, y)` knots.
-///
-/// Knots must be sorted ascending by `x`. Queries outside the knot range
-/// clamp to the nearest endpoint value (flat extrapolation), which is the
-/// convention every caller in this workspace wants for spread, hazard and
-/// PD curves.
-///
-/// # Arguments
-///
-/// * `knots` - Ascending `(x, y)` pairs. An empty slice yields `0.0`.
-/// * `x` - Abscissa to evaluate, in the same units as the knot `x` values
-///   (year fractions for the curve callers in this workspace). Values below
-///   the first knot or above the last clamp to that endpoint's `y`.
-///
-/// # Returns
-///
-/// The interpolated `y`, or `0.0` when `knots` is empty.
-///
-/// # Examples
-///
-/// ```
-/// use finstack_quant_core::math::interp::interp_knots_flat;
-///
-/// let knots = [(0.0, 1.0), (2.0, 3.0)];
-/// assert!((interp_knots_flat(&knots, 1.0) - 2.0).abs() < 1e-12);
-/// // Flat outside the range.
-/// assert!((interp_knots_flat(&knots, -5.0) - 1.0).abs() < 1e-12);
-/// assert!((interp_knots_flat(&knots, 99.0) - 3.0).abs() < 1e-12);
-/// ```
-#[must_use]
-pub fn interp_knots_flat(knots: &[(f64, f64)], x: f64) -> f64 {
-    if knots.is_empty() {
-        return 0.0;
-    }
-    if x <= knots[0].0 {
-        return knots[0].1;
-    }
-    let last = knots[knots.len() - 1];
-    if x >= last.0 {
-        return last.1;
-    }
-    let idx = knots.partition_point(|k| k.0 < x);
-    if idx == 0 {
-        return knots[0].1;
-    }
-    let (x0, y0) = knots[idx - 1];
-    let (x1, y1) = knots[idx];
-    // Guard a zero-width interval: constructors reject duplicate knot times,
-    // but public-field structs can still carry `x1 == x0`, and the weight
-    // would be `0.0 / 0.0 = NaN` and poison every downstream figure.
-    if x1 <= x0 {
-        return y1;
-    }
-    y0 + (x - x0) / (x1 - x0) * (y1 - y0)
-}
-
 #[cfg(test)]
 mod knot_spacing_tests {
     use super::*;

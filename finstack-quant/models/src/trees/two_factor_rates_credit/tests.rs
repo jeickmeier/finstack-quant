@@ -1666,7 +1666,7 @@ fn rates_credit_tree_price_is_bit_pinned() {
         .expect("price");
     assert_eq!(
         price.to_bits(),
-        4_604_426_879_107_543_575_u64,
+        4_604_426_879_107_543_574_u64,
         "price={price}"
     );
 }

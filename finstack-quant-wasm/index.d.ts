@@ -6,7 +6,7 @@
 
 import type * as wasm from './pkg/finstack_quant_wasm.js';
 import type * as generated from './types/generated/index.js';
-import type { CashFlowBuilder, CashFlowSchedule, CreditIndexData, DayCountContext, DiscountCurve, FiscalConfig, FxMatrix, HazardCurve, HullWhiteParams, ImProfile, InflationIndex, JsonInput, LookbackReturns, MarketContext, MarketContextCurve, MoneyValue, MvaResult, Performance, PeriodStats, ScalarTimeSeries, ScheduleBuilder, start } from './pkg/finstack_quant_wasm.js';
+import type { CashFlowBuilder, CashFlowSchedule, CreditIndexData, DayCountContext, DiscountCurve, FiscalConfig, FxMatrix, HazardCurve, HullWhiteParams, ImProfile, InflationIndex, JsonInput, LookbackReturns, MarketContext, MarketContextCurve, Money, MoneyValue, MvaResult, Performance, PeriodStats, ScalarTimeSeries, ScheduleBuilder, start } from './pkg/finstack_quant_wasm.js';
 
 export { default } from './pkg/finstack_quant_wasm.js';
 export type * from './pkg/finstack_quant_wasm.js';
@@ -183,9 +183,20 @@ declare module './pkg/finstack_quant_wasm.js' {
      *
      * @param curve - A `DiscountCurve`, `ForwardCurve`, `HazardCurve`, `InflationCurve`, `PriceCurve`, `BaseCorrelationCurve`, `VolSurface`, `FxDeltaVolSurface` or `VolCube` handle; its data is shared with the context, not copied.
      * @returns This context, updated in place, so calls can be chained.
-     * @throws `TypeError` (kind `invalid_type`) if `curve` is not one of those handles.
+     * @throws `TypeError` (kind `invalid_type`) if `curve` is not one of those handles; `FinstackError` (kind `validation`) if a volatility surface, FX delta-vol surface or vol cube `id` is already registered in another volatility registry or replacing a curve invalidates a bound credit index.
      */
     insert(curve: MarketContextCurve): this;
+    /**
+     * Store a market scalar: a unitless number, or a monetary price in a currency
+     * (Rust `MarketContext::insert_price_mut`).
+     *
+     * @param id - Identifier to store the scalar under.
+     * @param value - Finite `number`, exact decimal `string` (when `currency` is supplied), or `Money` handle.
+     * @param currency - ISO-4217 code that makes a `number` or decimal `string` a monetary price (must match `value.currency` if `value` is a `Money` handle); omitted stores a unitless number or keeps a `Money` handle's currency.
+     * @returns This context, updated in place, so calls can be chained.
+     * @throws `TypeError` (kind `invalid_type`) for a mistyped argument or a decimal string without `currency`; `FinstackError` (kind `validation`) for an unknown or mismatched currency, an unparsable decimal string, or a non-finite number.
+     */
+    insertPrice(id: string, value: number | string | Money, currency?: string | null): this;
     /**
      * Store credit-index market data (Rust `MarketContext::insert_credit_index_mut`).
      *
@@ -227,27 +238,6 @@ declare module './pkg/finstack_quant_wasm.js' {
      * @param index - Inflation index to store; one with the same id is replaced.
      */
     insertInflationIndex(index: InflationIndex): this;
-    /**
-     * Store a market scalar: a unitless number, or a price in a currency
-     * (Rust `MarketContext::insert_price_mut`).
-     *
-     * # Arguments
-     *
-     * * `id` - Identifier to store the scalar under.
-     * * `value` - Finite scalar value: an index level, a spot price, a
-     *   recovery assumption and so on.
-     * * `currency` - ISO-4217 code that makes the scalar a monetary price;
-     *   omitted stores a unitless number.
-     *
-     * @returns This context, updated in place, so calls can be chained.
-     * @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
-     * `FinstackError` (kind `validation`) for an unknown currency or a
-     * value that is not finite (Rust `MarketScalar::from_parts`).
-     * @param id - Identifier to store the scalar under.
-     * @param value - Finite scalar value: an index level, a spot price, a recovery assumption and so on.
-     * @param currency - ISO-4217 code that makes the scalar a monetary price; omitted stores a unitless number.
-     */
-    insertPrice(id: string, value: number, currency?: string | null): this;
     /**
      * Store a scalar time series under its own id (Rust `MarketContext::insert_series_mut`).
      *
@@ -1170,8 +1160,8 @@ export interface CoreNamespace {
    * Throws a `TypeError` if `n` is non-finite, fractional, or negative. Throws
    * a JavaScript exception if `matrix` does not contain exactly `n * n`
    * entries (including when `n * n` overflows), or the matrix contains a
-   * non-finite value, is numerically singular under that relative criterion,
-   * or is not positive definite.
+   * non-finite value, is not symmetric, is numerically singular under that
+   * relative criterion, or is not positive definite.
    * @param matrix - Flat row-major finite entries of a symmetric positive-definite matrix.
    * @param n - Positive integral dimension in `1..=4294967295`; the input must have exactly `n * n` entries.
    * @returns Lower-triangular factor L as a flat row-major `Float64Array`.
@@ -1223,8 +1213,8 @@ export interface CoreNamespace {
    * (in the solver's order, not sorted) and a flat `n * n` `Float64Array` in
    * which `eigenvectors[i * n + k]` is component `i` of eigenvector `k`.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-   * `validation`) if `matrix` does not hold exactly `n * n` entries or contains
-   * a non-finite value.
+   * `validation`) if `matrix` does not hold exactly `n * n` entries, is not
+   * symmetric, or contains a non-finite value.
    * @param matrix - Flat row-major `n * n` entries of a symmetric matrix; it need not be positive definite.
    * @param n - Positive matrix dimension; `matrix` must contain exactly `n * n` entries.
    */
@@ -1484,9 +1474,10 @@ export interface CoreNamespace {
    *
    * @returns The probability that a `N(mean, stdDev²)` variable is at most `x`.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-   * `validation`) if `stdDev` is non-finite or not strictly positive.
-   * @param x - Point at which to evaluate the CDF.
-   * @param mean - Mean of the distribution, in the units of `x`.
+   * `validation`) if `stdDev` is non-finite or not strictly positive, `mean` is
+   * non-finite, or `x` is `NaN`.
+   * @param x - Point at which to evaluate the CDF (`±Infinity` accepted, `NaN` rejected).
+   * @param mean - Finite mean of the distribution, in the units of `x`.
    * @param stdDev - Strictly positive standard deviation (not the variance), in the units of `x`.
    */
   readonly normCdfWithParams: typeof wasm.normCdfWithParams;
@@ -1503,15 +1494,16 @@ export interface CoreNamespace {
    *
    * @returns The density of `N(mean, stdDev²)` at `x`.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-   * `validation`) if `stdDev` is non-finite or not strictly positive.
-   * @param x - Point at which to evaluate the density.
-   * @param mean - Mean of the distribution, in the units of `x`.
+   * `validation`) if `stdDev` is non-finite or not strictly positive, `mean` is
+   * non-finite, `x` is `NaN`, or the density overflows `f64`.
+   * @param x - Point at which to evaluate the density (`±Infinity` accepted, `NaN` rejected).
+   * @param mean - Finite mean of the distribution, in the units of `x`.
    * @param stdDev - Strictly positive standard deviation (not the variance), in the units of `x`.
    */
   readonly normPdfWithParams: typeof wasm.normPdfWithParams;
   /**
    * Inverse standard normal CDF Φ⁻¹(p).
-   * @param p - Probability input strictly between 0 and 1 for the inverse normal distribution.
+   * @param p - Probability in `[0, 1]` (`0` yields `-Infinity`, `1` yields `Infinity`, values outside `[0, 1]` yield `NaN`).
    * @returns Standard-normal quantile for probability `p`.
    */
   readonly standardNormalInvCdf: typeof wasm.standardNormalInvCdf;
@@ -1536,15 +1528,15 @@ export interface CoreNamespace {
    *
    * # Arguments
    *
-   * * `p` - Probability; `p <= 0` returns `-Infinity`, `p >= 1` returns
-   *   `Infinity` and `NaN` returns `NaN`.
-   * * `df` - Degrees of freedom, strictly positive.
+   * * `p` - Probability in `[0, 1]` (`0` returns `-Infinity`, `1` returns `Infinity`).
+   * * `df` - Degrees of freedom, finite and strictly positive.
    *
    * @returns The quantile `x` with `studentTCdf(x, df) === p`.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-   * `validation`) if `df` is non-finite or not strictly positive.
-   * @param p - Probability; `p <= 0` returns `-Infinity`, `p >= 1` returns `Infinity` and `NaN` returns `NaN`.
-   * @param df - Degrees of freedom, strictly positive.
+   * `validation`) if `df` is non-finite or not strictly positive, or `p` is
+   * non-finite or outside `[0, 1]`.
+   * @param p - Probability in `[0, 1]` (`0` returns `-Infinity`, `1` returns `Infinity`).
+   * @param df - Degrees of freedom, finite and strictly positive.
    */
   readonly studentTInvCdf: typeof wasm.studentTInvCdf;
   /**

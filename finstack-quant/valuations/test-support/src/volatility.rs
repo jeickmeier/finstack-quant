@@ -44,10 +44,32 @@ pub fn relabel_quote_type(
 ///
 /// * `id` - Surface identifier the market context is keyed by.
 /// * `expiries` - Expiry grid in years from the valuation date, ascending.
-/// * `strikes` - Strike grid in the surface's quote units, ascending.
+/// * `strikes` - Strike grid in the surface's quote units, ascending and strictly positive for Black lognormal quotes.
 /// * `vol` - Annualised volatility, as a decimal, written at every grid node.
 pub fn flat_vol_surface(id: &str, expiries: &[f64], strikes: &[f64], vol: f64) -> VolSurface {
-    let mut builder = VolSurface::builder(id).expiries(expiries).strikes(strikes);
+    flat_vol_surface_with_quote_type(id, expiries, strikes, vol, VolQuoteType::BlackLognormal)
+}
+
+/// Build a constant volatility surface under an explicit quote convention.
+///
+/// # Arguments
+///
+/// * `id` - Surface identifier the market context is keyed by.
+/// * `expiries` - Expiry grid in years from the valuation date, strictly ascending.
+/// * `strikes` - Strike grid in the surface's quote units, strictly ascending and compatible with `quote_type`.
+/// * `vol` - Annualised volatility in the units of `quote_type` (decimal lognormal volatility for Black or decimal rate volatility for Bachelier), written at every grid node.
+/// * `quote_type` - Quoted volatility convention stored on the surface.
+pub fn flat_vol_surface_with_quote_type(
+    id: &str,
+    expiries: &[f64],
+    strikes: &[f64],
+    vol: f64,
+    quote_type: VolQuoteType,
+) -> VolSurface {
+    let mut builder = VolSurface::builder(id)
+        .quote_type(quote_type)
+        .expiries(expiries)
+        .strikes(strikes);
     for _ in expiries {
         builder = builder.row(&vec![vol; strikes.len()]);
     }

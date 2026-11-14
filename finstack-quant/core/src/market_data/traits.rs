@@ -167,13 +167,24 @@ pub trait Discounting: Send + Sync {
     ///
     /// Canonical helper for `DF(from_t→to_t) = DF(0→to_t) / DF(0→from_t)`.
     ///
-    /// Returns `Ok(1.0)` when `from_t == to_t`.
+    /// Returns `Ok(1.0)` when `from_t == to_t` for finite non-negative times.
+    ///
+    /// # Arguments
+    ///
+    /// * `from_t` - Finite non-negative start year fraction from [`base_date`](Self::base_date).
+    /// * `to_t` - Finite non-negative end year fraction from [`base_date`](Self::base_date).
     ///
     /// # Errors
     ///
-    /// Returns an error if either discount factor is non-finite or non-positive.
+    /// Returns an error if either time is non-finite or negative, or if either
+    /// discount factor is non-finite or non-positive.
     #[inline]
     fn df_between_times(&self, from_t: f64, to_t: f64) -> crate::Result<f64> {
+        if !from_t.is_finite() || !to_t.is_finite() || from_t < 0.0 || to_t < 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "df_between_times requires finite non-negative times, got from_t={from_t}, to_t={to_t}"
+            )));
+        }
         // Exact comparison: degenerate-case guard for identical time arguments.
         #[allow(clippy::float_cmp)]
         if from_t == to_t {
@@ -208,8 +219,22 @@ pub trait Discounting: Send + Sync {
     /// Approximates the derivative of `-ln P(0,t)` using a centered finite
     /// difference around `t`, capped to a small local neighborhood:
     /// `f ≈ -ln(DF(start→end)) / (end - start)`.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Finite non-negative year fraction from [`base_date`](Self::base_date).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `t` is non-finite or negative, or when the local
+    /// discount-factor ratio cannot be evaluated.
     fn instantaneous_forward(&self, t: f64) -> crate::Result<f64> {
-        let eps = (t.abs() * 1e-4).clamp(1e-6, 1e-4);
+        if !t.is_finite() || t < 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "instantaneous_forward requires finite t >= 0, got {t}"
+            )));
+        }
+        let eps = (t * 1e-4).clamp(1e-6, 1e-4);
         let start = (t - eps).max(0.0);
         let end = t + eps;
         let df_ratio = self.df_between_times(start, end)?;
@@ -346,5 +371,24 @@ mod tests {
             expected,
             actual
         );
+    }
+
+    #[test]
+    fn df_between_times_and_instantaneous_forward_reject_invalid_times() {
+        let curve = FlatCurve::new("TEST", 0.95);
+        assert!(
+            curve
+                .df_between_times(f64::INFINITY, f64::INFINITY)
+                .is_err()
+        );
+        assert!(curve.df_between_times(f64::NAN, 1.0).is_err());
+        assert!(curve.df_between_times(0.0, f64::NAN).is_err());
+        assert!(curve.df_between_times(-0.1, 0.5).is_err());
+        assert!(curve.df_between_times(0.5, -0.1).is_err());
+
+        assert!(curve.instantaneous_forward(-1e-6).is_err());
+        assert!(curve.instantaneous_forward(-1.0).is_err());
+        assert!(curve.instantaneous_forward(f64::NAN).is_err());
+        assert!(curve.instantaneous_forward(f64::INFINITY).is_err());
     }
 }

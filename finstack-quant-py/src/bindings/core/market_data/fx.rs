@@ -142,6 +142,16 @@ fn optional_pivot(
     }
 }
 
+/// Extract a numeric FX value as `f64`, rejecting Python `bool`.
+fn extract_fx_float(value: &Bound<'_, PyAny>, field: &str) -> PyResult<f64> {
+    if value.is_instance_of::<pyo3::types::PyBool>() {
+        return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+            "{field} must be a number, not bool"
+        )));
+    }
+    value.extract::<f64>()
+}
+
 #[pymethods]
 impl PyFxMatrix {
     /// Create an empty FX matrix with an explicit routing pivot (Rust
@@ -167,12 +177,13 @@ impl PyFxMatrix {
         quote: &Bound<'_, PyAny>,
         date: &Bound<'_, PyAny>,
         policy: &Bound<'_, PyAny>,
-        rate: f64,
+        rate: &Bound<'_, PyAny>,
     ) -> PyResult<()> {
         let base_currency = extract_currency(base)?;
         let quote_currency = extract_currency(quote)?;
         let date = py_to_date(date)?;
         let policy = extract_fx_policy(policy)?;
+        let rate = extract_fx_float(rate, "rate")?;
         self.inner
             .set_quote_on(base_currency, quote_currency, date, policy, rate)
             .map_err(core_to_py)
@@ -225,11 +236,18 @@ impl PyFxMatrix {
     /// ValueError
     ///     If any rate is non-finite or non-positive; no quote is applied in that case.
     #[pyo3(text_signature = "(self, quotes)")]
-    fn set_quotes(&self, quotes: Vec<(Bound<'_, PyAny>, Bound<'_, PyAny>, f64)>) -> PyResult<()> {
+    fn set_quotes(
+        &self,
+        quotes: Vec<(Bound<'_, PyAny>, Bound<'_, PyAny>, Bound<'_, PyAny>)>,
+    ) -> PyResult<()> {
         let quotes = quotes
             .iter()
             .map(|(base, quote, rate)| {
-                Ok((extract_currency(base)?, extract_currency(quote)?, *rate))
+                Ok((
+                    extract_currency(base)?,
+                    extract_currency(quote)?,
+                    extract_fx_float(rate, "rate")?,
+                ))
             })
             .collect::<PyResult<Vec<_>>>()?;
         self.inner.set_quotes(&quotes).map_err(core_to_py)
@@ -250,6 +268,8 @@ impl PyFxMatrix {
     ///
     /// Raises
     /// ------
+    /// TypeError
+    ///     If a key is not ``str`` or a rate is not a number (or is ``bool``).
     /// ValueError
     ///     If a key is not a currency pair, a code is unknown, or a rate is invalid.
     #[staticmethod]
@@ -262,7 +282,7 @@ impl PyFxMatrix {
         for (key, value) in quotes.iter() {
             let pair: String = key.extract()?;
             let pair: CurrencyPair = pair.parse().map_err(core_to_py)?;
-            parsed.push((pair.base, pair.quote, value.extract::<f64>()?));
+            parsed.push((pair.base, pair.quote, extract_fx_float(&value, "rate")?));
         }
         FxMatrix::from_quotes(&parsed, optional_pivot(pivot_currency)?)
             .map(|matrix| Self {
@@ -346,7 +366,12 @@ impl PyFxPairConvention {
     /// * `pip_size` - Outright-rate increment per pip; finite and positive.
     #[new]
     #[pyo3(text_signature = "(base, quote, pip_size)")]
-    fn new(base: &Bound<'_, PyAny>, quote: &Bound<'_, PyAny>, pip_size: f64) -> PyResult<Self> {
+    fn new(
+        base: &Bound<'_, PyAny>,
+        quote: &Bound<'_, PyAny>,
+        pip_size: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        let pip_size = extract_fx_float(pip_size, "pip_size")?;
         FxPairConvention::new(extract_currency(base)?, extract_currency(quote)?, pip_size)
             .map(|inner| Self { inner })
             .map_err(core_to_py)
@@ -376,7 +401,8 @@ impl PyFxPairConvention {
     ///
     /// * `pips` - Signed forward points in pips; must be finite.
     #[pyo3(text_signature = "($self, pips)")]
-    fn rate_points(&self, pips: f64) -> PyResult<f64> {
+    fn rate_points(&self, pips: &Bound<'_, PyAny>) -> PyResult<f64> {
+        let pips = extract_fx_float(pips, "pips")?;
         self.inner.rate_points(pips).map_err(core_to_py)
     }
 
@@ -398,7 +424,8 @@ impl PyFxPairConvention {
 ///   finite and strictly positive; the reciprocal must also be a valid FX rate.
 #[pyfunction]
 #[pyo3(text_signature = "(rate)")]
-fn invert_fx_rate(rate: f64) -> PyResult<f64> {
+fn invert_fx_rate(rate: &Bound<'_, PyAny>) -> PyResult<f64> {
+    let rate = extract_fx_float(rate, "rate")?;
     rust_invert_fx_rate(rate).map_err(core_to_py)
 }
 

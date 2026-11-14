@@ -285,7 +285,9 @@ impl JsInflationIndex {
         #[wasm_bindgen(unchecked_optional_param_type = "string | null")] interpolation: Option<
             JsValue,
         >,
-        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] lag: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "string | number | null")] lag: Option<
+            JsValue,
+        >,
         #[wasm_bindgen(unchecked_optional_param_type = "NumericArray | null")] seasonality: Option<
             JsValue,
         >,

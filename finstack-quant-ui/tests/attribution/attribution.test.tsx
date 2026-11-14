@@ -87,9 +87,9 @@ it.each(
 );
 it("pins Rust's bond figures: an all-rates parallel shock, and carry plus rates over the rolled waterfall", () => {
   const parallel = workbench("usd-ois-50bp", "parallel");
-  expect(parallel.attribution!.total_pnl.amount).toBe("-4895.6576932264");
+  expect(parallel.attribution!.total_pnl.amount).toBe("-4895.6576932262");
   expect(parallel.attribution!.rates_curves_pnl.amount).toBe(
-    "-4895.6576932264",
+    "-4895.6576932262",
   );
   expect(parallel.attribution!.waterfall_steps).toBeUndefined();
   expect(
@@ -100,8 +100,8 @@ it("pins Rust's bond figures: an all-rates parallel shock, and carry plus rates 
   expect(sameDate.attribution!.waterfall_steps).toHaveLength(9);
   const rolled = workbench("roll-1m-25bp", "waterfall");
   expect(rolled.asOfT1).toBe("2025-02-03");
-  expect(rolled.attribution!.carry.amount).toBe("4613.7452641304");
-  expect(rolled.attribution!.rates_curves_pnl.amount).toBe("-2238.722127162");
+  expect(rolled.attribution!.carry.amount).toBe("4613.7452641308");
+  expect(rolled.attribution!.rates_curves_pnl.amount).toBe("-2238.7221271622");
   // Rust chains the steps in its default order: each pv_after is the next pv_before.
   const steps = rolled.attribution!.waterfall_steps!;
   expect(steps.map((step) => step.factor)).toEqual(

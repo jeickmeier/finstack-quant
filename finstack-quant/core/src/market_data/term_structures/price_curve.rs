@@ -292,34 +292,65 @@ impl PriceCurve {
 
     /// Forward price at time `t` (in years from base date).
     ///
+    /// Evaluates pre-base pillars (`t < 0`) and the configured extrapolation
+    /// policy when `t` precedes the earliest pillar. At `t == 0.0`, returns
+    /// [`spot_price`](Self::spot_price) directly.
+    ///
+    /// # Arguments
+    /// * `t` - Time in years from the curve base date.
+    ///
     /// # Returns
     /// The interpolated forward price at time `t`.
     #[must_use]
     #[inline]
     pub fn price(&self, t: f64) -> f64 {
-        if t <= 0.0 {
+        if t.is_nan() {
+            return f64::NAN;
+        }
+        if t == 0.0 {
             return self.spot_price;
         }
         InterpRollState::eval(self.roll.as_ref(), &self.interp, t)
     }
 
+    /// Earliest knot time supported by this curve (including rolled source pillars).
+    #[inline]
+    fn min_supported_time(&self) -> f64 {
+        self.roll
+            .as_ref()
+            .and_then(InterpRollState::min_supported_time)
+            .unwrap_or_else(|| self.knots.first().copied().unwrap_or(0.0))
+    }
+
     /// Forward price on a specific calendar date.
     ///
+    /// # Arguments
+    /// * `date` - Target calendar date evaluated under [`Self::day_count`].
+    ///
     /// # Errors
-    /// Returns an error if the date is before the base date.
+    /// Returns an error if `date` precedes the earliest supported pillar on the
+    /// curve or if the interpolated forward price is non-finite.
     pub fn price_on_date(&self, date: Date) -> crate::Result<f64> {
-        if date < self.base {
-            return Err(crate::Error::Validation(format!(
-                "Date {} is before curve base date {}",
-                date, self.base
-            )));
-        }
         let t = self.day_count.signed_year_fraction(
             self.base,
             date,
             crate::dates::DayCountContext::default(),
         )?;
-        Ok(self.price(t))
+        let min_t = self.min_supported_time();
+        if t < min_t {
+            return Err(crate::Error::Validation(format!(
+                "Date {} (t={t:.6}) precedes curve earliest supported time {min_t:.6} (base {})",
+                date, self.base
+            )));
+        }
+        let price = self.price(t);
+        if !price.is_finite() {
+            return Err(crate::Error::Validation(format!(
+                "PriceCurve '{}' price on {date} (t={t:.6}) is non-finite: {price}",
+                self.id
+            )));
+        }
+        Ok(price)
     }
 
     /// Current spot price (or spot index level for a vol-index curve).
@@ -509,15 +540,20 @@ impl PriceCurve {
     /// - Forward prices are preserved
     ///
     /// # Arguments
-    /// * `days` - Number of days to roll forward
+    /// * `days` - Non-negative calendar-day shift; `0` returns an unmodified clone and negative values are rejected.
     ///
     /// # Returns
     /// A new price curve with updated base date and shifted knots.
     ///
     /// # Errors
-    /// Returns an error if no future knot remains after filtering expired points.
+    /// Returns an error if `days < 0` or if no future knot remains after filtering expired points.
     /// Returns a validation error if the rolled base date exceeds the supported calendar range.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
+        if days < 0 {
+            return Err(crate::Error::Validation(format!(
+                "PriceCurve::roll_forward requires non-negative days, got {days}"
+            )));
+        }
         if days == 0 {
             return Ok(self.clone());
         }
@@ -1340,7 +1376,7 @@ mod tests {
     }
 
     #[test]
-    fn backward_roll_rebuilds_from_rolled_pillars() {
+    fn backward_roll_is_rejected() {
         let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
         let curve = PriceCurve::builder("PRICE-BACK")
             .base_date(base)
@@ -1349,9 +1385,7 @@ mod tests {
             .extrapolation(ExtrapolationPolicy::FlatForward)
             .build()
             .unwrap();
-        let back = curve.roll_forward(-365).expect("backward roll");
-        assert_eq!(back.spot_price(), 100.0);
-        assert!((back.price(2.0) - 110.0).abs() < 1e-12);
+        assert!(curve.roll_forward(-365).is_err());
     }
 
     #[test]
@@ -1480,5 +1514,20 @@ mod tests {
         let six_months = Date::from_calendar_date(2025, time::Month::July, 1).expect("Valid date");
         let fwd_price = curve.price_on_date(six_months).expect("Should succeed");
         assert!(fwd_price > 75.0 && fwd_price < 78.0);
+    }
+
+    #[test]
+    fn pre_base_pillars_and_left_extrapolation_are_evaluated() {
+        let base = Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid date");
+        let curve = PriceCurve::builder("WTI-PRE")
+            .base_date(base)
+            .spot_price(75.0)
+            .knots([(-0.5, 71.0), (0.0, 75.0), (1.0, 79.0)])
+            .interp(InterpStyle::Linear)
+            .extrapolation(ExtrapolationPolicy::None)
+            .build()
+            .expect("pre-base price curve");
+        assert!((curve.price(-0.25) - 73.0).abs() < 1e-12);
+        assert!(curve.price(-1.0).is_nan());
     }
 }

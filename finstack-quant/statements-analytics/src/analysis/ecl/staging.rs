@@ -573,54 +573,48 @@ mod tests {
 
     fn make_pd_curve() -> RawPdCurve {
         // A simple BBB curve: cumulative PD increases over time
-        RawPdCurve {
-            rating: "BBB".to_string(),
-            knots: vec![(0.0, 0.0), (1.0, 0.02), (5.0, 0.10), (10.0, 0.20)],
-        }
+        RawPdCurve::new(
+            "BBB",
+            vec![(0.0, 0.0), (1.0, 0.02), (5.0, 0.10), (10.0, 0.20)],
+        )
+        .expect("valid BBB PD curve")
     }
 
-    fn make_multi_rating_curves() -> MultiRatingCurve {
-        MultiRatingCurve {
-            curves: vec![
-                (
-                    "A".to_string(),
+    fn make_multi_rating_curves() -> RatingPdMap {
+        RatingPdMap::new(indexmap::IndexMap::from([
+            (
+                "A".to_string(),
+                RawPdCurve::new(
+                    "A",
                     vec![(0.0, 0.0), (1.0, 0.005), (5.0, 0.03), (10.0, 0.06)],
-                ),
-                (
-                    "BBB".to_string(),
+                )
+                .expect("valid A PD curve"),
+            ),
+            (
+                "BBB".to_string(),
+                RawPdCurve::new(
+                    "BBB",
                     vec![(0.0, 0.0), (1.0, 0.02), (5.0, 0.10), (10.0, 0.20)],
-                ),
-                (
-                    "BB".to_string(),
+                )
+                .expect("valid BBB PD curve"),
+            ),
+            (
+                "BB".to_string(),
+                RawPdCurve::new(
+                    "BB",
                     vec![(0.0, 0.0), (1.0, 0.05), (5.0, 0.20), (10.0, 0.40)],
-                ),
-                (
-                    "B".to_string(),
+                )
+                .expect("valid BB PD curve"),
+            ),
+            (
+                "B".to_string(),
+                RawPdCurve::new(
+                    "B",
                     vec![(0.0, 0.0), (1.0, 0.08), (5.0, 0.30), (10.0, 0.55)],
-                ),
-            ],
-        }
-    }
-
-    /// Helper: multi-rating PD source for staging tests.
-    struct MultiRatingCurve {
-        curves: Vec<(String, Vec<(f64, f64)>)>,
-    }
-
-    impl PdTermStructure for MultiRatingCurve {
-        fn cumulative_pd(&self, rating: &str, t: f64) -> finstack_quant_core::Result<f64> {
-            for (r, knots) in &self.curves {
-                if r == rating {
-                    return Ok(finstack_quant_core::math::interp::interp_knots_flat(
-                        knots, t,
-                    ));
-                }
-            }
-            Err(finstack_quant_core::Error::Validation(format!(
-                "Rating '{}' not found",
-                rating
-            )))
-        }
+                )
+                .expect("valid B PD curve"),
+            ),
+        ]))
     }
 
     fn base_exposure() -> Exposure {
@@ -729,18 +723,18 @@ mod tests {
 
         // PD-delta comparison needs curves for the custom labels: reuse the "A"
         // and "BB" knots under the custom names.
-        let pd = MultiRatingCurve {
-            curves: vec![
-                (
-                    "Strong".to_string(),
-                    vec![(0.0, 0.0), (1.0, 0.005), (10.0, 0.06)],
-                ),
-                (
-                    "Weak".to_string(),
-                    vec![(0.0, 0.0), (1.0, 0.05), (10.0, 0.40)],
-                ),
-            ],
-        };
+        let pd = RatingPdMap::new(IndexMap::from([
+            (
+                "Strong".to_string(),
+                RawPdCurve::new("Strong", vec![(0.0, 0.0), (1.0, 0.005), (10.0, 0.06)])
+                    .expect("valid Strong PD curve"),
+            ),
+            (
+                "Weak".to_string(),
+                RawPdCurve::new("Weak", vec![(0.0, 0.0), (1.0, 0.05), (10.0, 0.40)])
+                    .expect("valid Weak PD curve"),
+            ),
+        ]));
         let result = classify_stage_from_curves(&exposure, &pd, &pd, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
         assert!(result.triggers.iter().any(|t| matches!(

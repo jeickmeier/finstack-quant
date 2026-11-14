@@ -620,44 +620,63 @@ fn compute_monotone_slopes(xs: &[f64], ys: &[f64]) -> Box<[f64]> {
         })
         .unzip();
 
-    // Interior points
+    // Interior points: normalize adjacent widths and secants so neither
+    // h^2 * delta nor reciprocal 1 / delta can overflow or underflow.
     for i in 1..n - 1 {
-        if delta[i - 1] == 0.0 || delta[i] == 0.0 || delta[i - 1].signum() != delta[i].signum() {
+        let d_prev = delta[i - 1];
+        let d_curr = delta[i];
+        if !d_prev.is_finite()
+            || !d_curr.is_finite()
+            || d_prev == 0.0
+            || d_curr == 0.0
+            || d_prev.signum() != d_curr.signum()
+        {
             ms[i] = 0.0;
         } else {
-            let w1 = 2.0 * h[i] + h[i - 1];
-            let w2 = h[i] + 2.0 * h[i - 1];
-            ms[i] = (w1 + w2) / (w1 / delta[i - 1] + w2 / delta[i]);
+            let h_scale = h[i - 1].abs().max(h[i].abs());
+            let h_prev_norm = h[i - 1] / h_scale;
+            let h_curr_norm = h[i] / h_scale;
+            let w1 = 2.0 * h_curr_norm + h_prev_norm;
+            let w2 = h_curr_norm + 2.0 * h_prev_norm;
+
+            let d_scale = d_prev.abs().max(d_curr.abs());
+            let delta_prev_norm = d_prev / d_scale;
+            let delta_curr_norm = d_curr / d_scale;
+            ms[i] = d_scale
+                * (((w1 + w2) * delta_prev_norm * delta_curr_norm)
+                    / (w1 * delta_curr_norm + w2 * delta_prev_norm));
         }
     }
 
-    // Endpoints (monotone one-sided estimates)
-    // m0
-    ms[0] = ((2.0 * h[0] + h[1]) * delta[0] - h[0] * delta[1]) / (h[0] + h[1]);
+    // Endpoints (monotone one-sided estimates with normalized widths)
+    let h_scale_0 = h[0].abs().max(h[1].abs());
+    let h0 = h[0] / h_scale_0;
+    let h1 = h[1] / h_scale_0;
+    let denom_0 = h0 + h1;
+    ms[0] = ((2.0 * h0 + h1) / denom_0) * delta[0] - (h0 / denom_0) * delta[1];
     if ms[0].signum() != delta[0].signum() {
         ms[0] = 0.0;
-    } else if delta[0].signum() != delta[1].signum() && ms[0].abs() > 3.0 * delta[0].abs() {
-        ms[0] = 3.0 * delta[0];
+    } else if delta[0].signum() != delta[1].signum() && (ms[0] / 3.0).abs() > delta[0].abs() {
+        ms[0] = (3.0 * delta[0]).clamp(-f64::MAX, f64::MAX);
     }
 
-    // m_{n-1}
     let last = n - 1;
-    ms[last] = ((2.0 * h[last - 1] + h[last - 2]) * delta[last - 1]
-        - h[last - 1] * delta[last - 2])
-        / (h[last - 1] + h[last - 2]);
+    let h_scale_last = h[last - 1].abs().max(h[last - 2].abs());
+    let hl1 = h[last - 1] / h_scale_last;
+    let hl2 = h[last - 2] / h_scale_last;
+    let denom_last = hl1 + hl2;
+    ms[last] =
+        ((2.0 * hl1 + hl2) / denom_last) * delta[last - 1] - (hl1 / denom_last) * delta[last - 2];
     if ms[last].signum() != delta[last - 1].signum() {
         ms[last] = 0.0;
     } else if delta[last - 2].signum() != delta[last - 1].signum()
-        && ms[last].abs() > 3.0 * delta[last - 1].abs()
+        && (ms[last] / 3.0).abs() > delta[last - 1].abs()
     {
-        ms[last] = 3.0 * delta[last - 1];
+        ms[last] = (3.0 * delta[last - 1]).clamp(-f64::MAX, f64::MAX);
     }
 
     ms.into_boxed_slice()
 }
-
-/// Default epsilon for near-zero slope detection in MonotoneConvex.
-const DEFAULT_MONOTONE_CONVEX_EPSILON: f64 = 1e-14;
 
 /// Strategy for monotone-convex discount-factor interpolation (Hagan & West, 2006).
 ///
@@ -732,9 +751,8 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
             |policy| match policy {
                 Extension::FlatZero => values.first().copied().unwrap_or(f64::NAN),
                 Extension::FlatForward => {
-                    // Extrapolate using f[0] as constant forward rate
                     let dt = x - knots[0];
-                    let f0 = self.f.first().copied().unwrap_or(0.0);
+                    let f0 = self.left_boundary_forward();
                     let log_df0 = self.log_df.first().copied().unwrap_or(0.0);
                     let extra_integral = f0 * dt;
                     (-(log_df0 + extra_integral)).exp()
@@ -743,10 +761,9 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
             |policy| match policy {
                 Extension::FlatZero => values.last().copied().unwrap_or(f64::NAN),
                 Extension::FlatForward => {
-                    // Extrapolate using f[n-1] as constant forward rate
                     let x_last = knots.last().copied().unwrap_or(0.0);
                     let dt = x - x_last;
-                    let f_last = self.f.last().copied().unwrap_or(0.0);
+                    let f_last = self.right_boundary_forward();
                     let log_df_last = self.log_df.last().copied().unwrap_or(0.0);
                     let extra_integral = f_last * dt;
                     (-(log_df_last + extra_integral)).exp()
@@ -776,11 +793,11 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
             |policy| match policy {
                 Extension::FlatZero => 0.0,
                 Extension::FlatForward => {
-                    // d/dx[DF] = -f * DF for constant forward rate
                     let dt = x - knots[0];
-                    let extra_integral = self.f[0] * dt;
+                    let f0 = self.left_boundary_forward();
+                    let extra_integral = f0 * dt;
                     let df = (-(self.log_df[0] + extra_integral)).exp();
-                    -self.f[0] * df
+                    -f0 * df
                 }
             },
             |policy| match policy {
@@ -788,9 +805,10 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
                 Extension::FlatForward => {
                     let n = knots.len();
                     let dt = x - knots[n - 1];
-                    let extra_integral = self.f[n - 1] * dt;
+                    let f_last = self.right_boundary_forward();
+                    let extra_integral = f_last * dt;
                     let df = (-(self.log_df[n - 1] + extra_integral)).exp();
-                    -self.f[n - 1] * df
+                    -f_last * df
                 }
             },
         ) {
@@ -890,6 +908,23 @@ impl MonotoneConvexStrategy {
         }
     }
 
+    #[inline]
+    fn left_boundary_forward(&self) -> f64 {
+        let fd0 = self.fd[0];
+        let g_left = self.f[0] - fd0;
+        let g_right = self.f[1] - fd0;
+        fd0 + Self::forward_adjustment(0.0, g_left, g_right).0
+    }
+
+    #[inline]
+    fn right_boundary_forward(&self) -> f64 {
+        let last_seg = self.fd.len() - 1;
+        let fd_last = self.fd[last_seg];
+        let g_left = self.f[last_seg] - fd_last;
+        let g_right = self.f[last_seg + 1] - fd_last;
+        fd_last + Self::forward_adjustment(1.0, g_left, g_right).0
+    }
+
     /// Compute both the discount factor `DF(t)` and the instantaneous forward
     /// rate `f(t)` within segment `i` in a single pass, returning `(df, forward)`.
     ///
@@ -903,8 +938,7 @@ impl MonotoneConvexStrategy {
         let g_left = self.f[i] - fd_i;
         let g_right = self.f[i + 1] - fd_i;
 
-        let (g_x, g_integral) =
-            Self::forward_adjustment(x, g_left, g_right, DEFAULT_MONOTONE_CONVEX_EPSILON);
+        let (g_x, g_integral) = Self::forward_adjustment(x, g_left, g_right);
         let forward = fd_i + g_x;
 
         // DF: integral of f from t_i to t, then DF(t) = exp(-(log_df[i] + integral)).
@@ -916,7 +950,13 @@ impl MonotoneConvexStrategy {
 
     /// Hagan-West (2008), equations 27-34: `(g(x), integral_0^x g)`.
     /// The integral over the whole normalized segment is zero in every region.
-    fn forward_adjustment(x: f64, g0: f64, g1: f64, epsilon: f64) -> (f64, f64) {
+    fn forward_adjustment(x: f64, g0: f64, g1: f64) -> (f64, f64) {
+        // Region IV degenerate coordinate axes: when either endpoint excess
+        // vanishes, the only zero-integral monotone adjustment on [0, 1] is
+        // identically zero, including at x = 0 and x = 1.
+        if g0 == 0.0 || g1 == 0.0 {
+            return (0.0, 0.0);
+        }
         if x <= 0.0 {
             return (g0, 0.0);
         }
@@ -924,11 +964,8 @@ impl MonotoneConvexStrategy {
             return (g1, 0.0);
         }
         let opposite = (g0 < 0.0 && g1 > 0.0) || (g0 > 0.0 && g1 < 0.0);
-        if (g0.abs() <= epsilon && g1.abs() <= epsilon)
-            || (opposite && g1.abs() >= 0.5 * g0.abs() && g1.abs() <= 2.0 * g0.abs())
-        {
-            // Region I. Retain the polynomial even near the origin so endpoint
-            // deviations and the zero integral are preserved, without division.
+        if opposite && g1.abs() >= 0.5 * g0.abs() && g1.abs() <= 2.0 * g0.abs() {
+            // Region I.
             let g = g0 * (1.0 - 4.0 * x + 3.0 * x * x) + g1 * (-2.0 * x + 3.0 * x * x);
             let integral = x * (1.0 - x) * (g0 * (1.0 - x) - g1 * x);
             return (g, integral);
@@ -955,12 +992,7 @@ impl MonotoneConvexStrategy {
                 -g1 * (1.0 - x) - (g0 - g1) * dx * u * u / 3.0,
             );
         }
-        // Region IV: two quadratics meet at their common extremum. On the
-        // coordinate axes the limiting interior adjustment is zero; exact
-        // endpoint values were handled above, avoiding a zero-width division.
-        if g0 == 0.0 || g1 == 0.0 {
-            return (0.0, 0.0);
-        }
+        // Region IV: two quadratics meet at their common extremum.
         let sum = g0 + g1;
         let left_width = g1 / sum;
         let right_width = g0 / sum;

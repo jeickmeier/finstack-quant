@@ -84,11 +84,13 @@ fn risk_uses_selected_model_and_declared_bump_units() {
                 ))
                 .insert(flat_inflation_curve("US-CPI-U", as_of, 300.0, inflation).unwrap())
                 .insert_surface(
-                    finstack_quant_valuations_test_support::volatility::relabel_quote_type(
-                        &flat_vol_surface("US-CPI-VOL", &[1.0, 5.0], &[strike], vol),
+                    finstack_quant_valuations_test_support::volatility::flat_vol_surface_with_quote_type(
+                        "US-CPI-VOL",
+                        &[1.0, 5.0],
+                        &[strike],
+                        vol,
                         quote_type,
-                    )
-                    .expect("valid quote convention"),
+                    ),
                 )
         };
         let market = market_at_vol(sigma);

@@ -132,10 +132,10 @@ pub(crate) fn build_initial_context(
                 credit_states.push(c);
             }
             MarketDatum::FxVolSurface(s) => {
-                ctx.insert_fx_delta_vol_surface_mut(s.clone());
+                ctx.try_insert_fx_delta_vol_surface_mut(s.clone())?;
             }
             MarketDatum::VolCube(c) => {
-                ctx.insert_vol_cube_mut(c.clone());
+                ctx.try_insert_vol_cube_mut(c.clone())?;
             }
             // Quote variants are consumed per-step by the engine, not stored
             // on the market context.

@@ -277,6 +277,10 @@ class MarketContext:
         ------
         TypeError
             If ``curve`` is not one of the supported types.
+        ValueError
+            If a volatility surface, FX delta-vol surface, or vol cube ``id`` is
+            already registered in another volatility registry, or replacing a
+            curve invalidates a bound credit index.
         """
         ...
 
@@ -303,7 +307,7 @@ class MarketContext:
     def insert_price(
         self,
         id: str,
-        value: Union[float, int, Decimal],
+        value: Union[float, int, str, Decimal, Money],
         currency: Optional[Union[Currency, str]] = None,
     ) -> MarketContext:
         """
@@ -313,12 +317,15 @@ class MarketContext:
         ----------
         id : str
             Identifier for the scalar.
-        value : float, int or Decimal
-            Price or unitless value. Monetary ``Decimal`` values keep full
-            precision; a unitless ``Decimal`` converts to ``float``.
+        value : float, int, str, Decimal or Money
+            Price or unitless value. A ``Money`` value carries its own currency
+            and exact ``Decimal`` amount; monetary ``int``, ``str`` and
+            ``Decimal`` values keep full precision; unitless scalars convert to
+            ``float`` (``bool`` is rejected).
         currency : Currency or str, optional
-            When given, the scalar is a monetary price in this currency;
-            otherwise it is unitless.
+            When given, the scalar is a monetary price in this currency (if
+            ``value`` is ``Money``, ``currency`` must match its currency);
+            otherwise a numeric ``value`` is stored as unitless.
 
         Returns
         -------
@@ -328,9 +335,10 @@ class MarketContext:
         Raises
         ------
         ValueError
-            If ``value`` is non-finite.
+            If ``value`` is non-finite, cannot be parsed as a decimal price, or
+            ``currency`` conflicts with a ``Money`` ``value``.
         TypeError
-            If ``value`` is not numeric.
+            If ``value`` is ``bool`` or an unsupported type.
         """
         ...
 
@@ -871,7 +879,7 @@ class MarketContext:
         Parameters
         ----------
         days : int
-            Signed 64-bit calendar days to roll (may be negative).
+            Non-negative 64-bit calendar days to roll (``0`` clones curves unchanged).
 
         Returns
         -------
@@ -881,7 +889,8 @@ class MarketContext:
         Raises
         ------
         ValueError
-            If a rolled base date exceeds the supported date range or a curve cannot be rebuilt after rolling.
+            If ``days < 0``, a rolled base date exceeds the supported date range,
+            a curve cannot be rebuilt after rolling, or a bound credit index fails to rebind.
         OverflowError
             If ``days`` is outside the signed 64-bit integer range.
         """

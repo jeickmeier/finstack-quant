@@ -21,8 +21,7 @@ use std::marker::PhantomData;
 use crate::instruments::Instrument;
 use crate::instruments::{MarketDependencies, VolatilityDependency};
 use crate::metrics::finite_difference::{
-    apply_parallel_surface_bumps_in_place, bumped_volatility_override, revert_scratch_bumps,
-    scalar_numeric_value, volatility_override,
+    bumped_volatility_override, revert_scratch_bumps, scalar_numeric_value, volatility_override,
 };
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -305,30 +304,129 @@ where
     seeded
 }
 
+fn apply_dependency_surface_bumps_in_place(
+    context: &mut MarketContext,
+    vol_surface_ids: &[CurveId],
+    dependencies: &[VolatilityDependency],
+    bump_abs: f64,
+) -> Result<Vec<finstack_quant_core::market_data::context::ContextScratchBump>> {
+    use finstack_quant_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits};
+
+    let spec = BumpSpec {
+        mode: BumpMode::Additive,
+        units: BumpUnits::Fraction,
+        value: bump_abs,
+        bump_type: BumpType::Parallel,
+    };
+    let mut tokens = Vec::with_capacity(vol_surface_ids.len());
+    for vol_surface_id in vol_surface_ids {
+        let footprint_only = if bump_abs < 0.0 {
+            if let Ok(surface) = context.get_surface(vol_surface_id.as_str()) {
+                if min_grid_vol(&surface).is_some_and(|m| m + bump_abs < 0.0) {
+                    let matching: Vec<_> = dependencies
+                        .iter()
+                        .filter(|dep| dep.vol_surface_id == *vol_surface_id)
+                        .collect();
+                    let strikes = surface.strikes();
+                    if !matching.is_empty()
+                        && !strikes.is_empty()
+                        && matching.iter().all(|dep| dep.reference_strike.is_some())
+                    {
+                        let mut col_indices = Vec::new();
+                        for dep in matching {
+                            if let Some(strike) = dep.reference_strike {
+                                let lo_idx =
+                                    strikes.iter().rposition(|&s| s <= strike).unwrap_or(0);
+                                let hi_idx = strikes
+                                    .iter()
+                                    .position(|&s| s >= strike)
+                                    .unwrap_or(strikes.len() - 1);
+                                for idx in lo_idx..=hi_idx {
+                                    col_indices.push(idx);
+                                }
+                            }
+                        }
+                        col_indices.sort_unstable();
+                        col_indices.dedup();
+                        Some((
+                            surface.expiries().to_vec(),
+                            col_indices
+                                .into_iter()
+                                .map(|idx| strikes[idx])
+                                .collect::<Vec<_>>(),
+                        ))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        if let Some((expiries, footprint_strikes)) = footprint_only {
+            for expiry in expiries {
+                for &col_strike in &footprint_strikes {
+                    match context.apply_surface_point_absolute_bump_in_place(
+                        vol_surface_id.as_str(),
+                        expiry,
+                        col_strike,
+                        bump_abs,
+                    ) {
+                        Ok(token) => tokens.push(token),
+                        Err(error) => {
+                            revert_scratch_bumps(context, tokens)?;
+                            return Err(error);
+                        }
+                    }
+                }
+            }
+        } else {
+            match context.apply_surface_bump_in_place(vol_surface_id.as_str(), spec) {
+                Ok(token) => tokens.push(token),
+                Err(error) => {
+                    revert_scratch_bumps(context, tokens)?;
+                    return Err(error);
+                }
+            }
+        }
+    }
+    Ok(tokens)
+}
+
 fn eval_raw_with_scratch_bumps<I>(
     context: &MetricContext,
     scratch: &mut MarketContext,
     instrument: &I,
     as_of: Date,
     spot_bump: Option<(&str, f64)>,
-    vol_bump: Option<(&[CurveId], f64)>,
+    vol_bump: Option<(&[CurveId], &[VolatilityDependency], f64)>,
 ) -> Result<f64>
 where
     I: Instrument + Clone,
 {
     let bumped_instrument = match vol_bump {
-        Some((_, bump_abs)) => bumped_volatility_override(instrument, bump_abs)?,
+        Some((_, _, bump_abs)) => bumped_volatility_override(instrument, bump_abs)?,
         None => None,
     };
     let price_token = if let Some((spot_id, bump_pct)) = spot_bump {
-        Some(scratch.apply_price_bump_pct_in_place(spot_id, bump_pct)?)
+        Some(scratch.apply_price_bump_fraction_in_place(spot_id, bump_pct)?)
     } else {
         None
     };
 
     let surface_tokens = match vol_bump.filter(|_| bumped_instrument.is_none()) {
-        Some((vol_surface_ids, bump_abs)) => {
-            match apply_parallel_surface_bumps_in_place(scratch, vol_surface_ids, bump_abs) {
+        Some((vol_surface_ids, vol_dependencies, bump_abs)) => {
+            match apply_dependency_surface_bumps_in_place(
+                scratch,
+                vol_surface_ids,
+                vol_dependencies,
+                bump_abs,
+            ) {
                 Ok(tokens) => Some(tokens),
                 Err(err) => {
                     if let Some(token) = price_token {
@@ -577,7 +675,7 @@ where
                 vol_surface_ids = ?vol_surface_ids,
                 min_vol = min_vol,
                 bump_abs = bump_abs,
-                "vega down-bump would clamp σ at 0; using one-sided forward difference"
+                "vega down-bump would reach or breach σ <= 0; using one-sided forward difference"
             );
             context.with_market_scratch(|context, scratch| {
                 let pv_up = eval_raw_with_scratch_bumps(
@@ -586,7 +684,11 @@ where
                     &seeded_instrument,
                     as_of,
                     None,
-                    Some((&vol_surface_ids, bump_abs)),
+                    Some((
+                        &vol_surface_ids,
+                        &dependencies.volatility_dependencies,
+                        bump_abs,
+                    )),
                 )?;
                 let pv_base = context.reprice_instrument_raw(&seeded_instrument, scratch, as_of)?;
                 // Forward difference: (PV(σ+h) - PV(σ)) / h.
@@ -604,7 +706,11 @@ where
                     &seeded_instrument,
                     as_of,
                     None,
-                    Some((&vol_surface_ids, bump_abs)),
+                    Some((
+                        &vol_surface_ids,
+                        &dependencies.volatility_dependencies,
+                        bump_abs,
+                    )),
                 )?;
                 let pv_down = eval_raw_with_scratch_bumps(
                     context,
@@ -612,7 +718,11 @@ where
                     &seeded_instrument,
                     as_of,
                     None,
-                    Some((&vol_surface_ids, -bump_abs)),
+                    Some((
+                        &vol_surface_ids,
+                        &dependencies.volatility_dependencies,
+                        -bump_abs,
+                    )),
                 )?;
                 // Central difference: (PV(σ+h) - PV(σ-h)) / 2h.
                 crate::metrics::finite_difference::central_diff_by_width(
@@ -681,7 +791,11 @@ where
                 &seeded_instrument,
                 as_of,
                 None,
-                Some((&vol_surface_ids, bump_abs)),
+                Some((
+                    &vol_surface_ids,
+                    &dependencies.volatility_dependencies,
+                    bump_abs,
+                )),
             )?;
             let pv_down = eval_raw_with_scratch_bumps(
                 context,
@@ -689,7 +803,11 @@ where
                 &seeded_instrument,
                 as_of,
                 None,
-                Some((&vol_surface_ids, -bump_abs)),
+                Some((
+                    &vol_surface_ids,
+                    &dependencies.volatility_dependencies,
+                    -bump_abs,
+                )),
             )?;
             Ok((base_pv, pv_up, pv_down))
         })?;
@@ -765,7 +883,11 @@ where
                 &seeded_instrument,
                 as_of,
                 Some((spot_id, spot_bump.relative)),
-                Some((&vol_surface_ids, k_abs)),
+                Some((
+                    &vol_surface_ids,
+                    &dependencies.volatility_dependencies,
+                    k_abs,
+                )),
             )?;
             let v_pm = eval_raw_with_scratch_bumps(
                 context,
@@ -773,7 +895,11 @@ where
                 &seeded_instrument,
                 as_of,
                 Some((spot_id, spot_bump.relative)),
-                Some((&vol_surface_ids, -k_abs)),
+                Some((
+                    &vol_surface_ids,
+                    &dependencies.volatility_dependencies,
+                    -k_abs,
+                )),
             )?;
             let v_mp = eval_raw_with_scratch_bumps(
                 context,
@@ -781,7 +907,11 @@ where
                 &seeded_instrument,
                 as_of,
                 Some((spot_id, -spot_bump.relative)),
-                Some((&vol_surface_ids, k_abs)),
+                Some((
+                    &vol_surface_ids,
+                    &dependencies.volatility_dependencies,
+                    k_abs,
+                )),
             )?;
             let v_mm = eval_raw_with_scratch_bumps(
                 context,
@@ -789,7 +919,11 @@ where
                 &seeded_instrument,
                 as_of,
                 Some((spot_id, -spot_bump.relative)),
-                Some((&vol_surface_ids, -k_abs)),
+                Some((
+                    &vol_surface_ids,
+                    &dependencies.volatility_dependencies,
+                    -k_abs,
+                )),
             )?;
             Ok((v_pp, v_pm, v_mp, v_mm))
         })?;

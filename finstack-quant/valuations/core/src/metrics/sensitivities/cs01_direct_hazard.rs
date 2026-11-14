@@ -127,7 +127,11 @@ where
         let bump_bp = sens_config::resolve(context)?.credit_spread_bump_bp;
         let hazard = context.curves.get_hazard(hazard_id.as_str())?;
         let hazard_bp = spread_equivalent_hazard_bump_bp(hazard.as_ref(), bump_bp);
-        let tenors: Vec<f64> = hazard.knot_points().map(|(tenor, _)| tenor).collect();
+        let hazard_len = hazard.len();
+        let tenors: Vec<f64> = hazard
+            .knot_points()
+            .filter_map(|(tenor, _)| (tenor > 0.0 || hazard_len == 1).then_some(tenor))
+            .collect();
 
         let mut series = Vec::with_capacity(tenors.len());
         let mut total = 0.0;

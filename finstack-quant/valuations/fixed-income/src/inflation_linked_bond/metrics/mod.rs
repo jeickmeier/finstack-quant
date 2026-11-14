@@ -10,7 +10,6 @@ pub(crate) use inflation01::Inflation01Calculator;
 use self::inflation01::bumped_inflation_market;
 use crate::inflation_linked_bond::InflationLinkedBond;
 use finstack_quant_core::Result;
-use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::ZERO_TOLERANCE;
@@ -65,16 +64,26 @@ impl MetricCalculator for BreakevenInflationCalculator {
         let disc_curve = curves.get_discount(ilb.discount_curve_id.as_str())?;
 
         let day_count = disc_curve.day_count();
-        // Provide the coupon frequency so an ACT/ACT (ISMA) discount-curve day
-        // count does not error; ignored by other conventions.
-        let t = day_count.year_fraction(
-            context.as_of,
-            ilb.maturity,
-            DayCountContext {
-                frequency: Some(ilb.frequency),
-                ..Default::default()
-            },
-        )?;
+        // Provide the coupon frequency and quasi-coupon grid reference so an
+        // ACT/ACT (ISMA) discount-curve day count slices cleanly across periods;
+        // ignored by other conventions.
+        let t = if context.as_of < ilb.maturity {
+            let ref_period = finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period(
+                day_count,
+                ilb.frequency,
+                [ilb.maturity],
+                context.as_of,
+            );
+            finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_year_fraction(
+                day_count,
+                Some(ilb.frequency),
+                ref_period,
+                context.as_of,
+                ilb.maturity,
+            )?
+        } else {
+            0.0
+        };
         // Use annually-compounded (effective-annual) forward zero rate from
         // `as_of` to maturity so that the nominal yield passed to
         // `breakeven_inflation` is anchored at `as_of` on the same basis as

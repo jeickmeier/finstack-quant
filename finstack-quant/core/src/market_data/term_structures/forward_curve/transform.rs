@@ -17,11 +17,12 @@ impl ForwardCurve {
         builder
     }
 
-    /// Rebuild this curve with replacement knots while preserving all metadata.
+    /// Rebuild this curve with replacement knots while preserving structural metadata.
     ///
     /// This retains the id, tenor, reset lag, day count, interpolation,
-    /// extrapolation, projection grid, calibration provenance and FX policy.
-    /// Replacement pillars define a new interpolation; previous roll and shock
+    /// extrapolation, projection grid, and FX policy, while clearing stale
+    /// calibration provenance (`rate_calibration`) because replacement pillars
+    /// no longer match the original calibration quotes. Previous roll and shock
     /// transformations are not reapplied to them.
     ///
     /// When the replacement pillars reach past the end of the projection grid,
@@ -57,6 +58,7 @@ impl ForwardCurve {
             grid
         });
         self.metadata_builder(self.id.clone())
+            .rate_calibration_opt(None)
             .projection_grid_opt(projection_grid)
             .knots(knots)
             .build()
@@ -119,6 +121,7 @@ impl ForwardCurve {
         }
         self.forwards = forwards;
         self.transform = Some(transform);
+        self.rate_calibration = None;
         Ok(())
     }
 
@@ -135,13 +138,13 @@ impl ForwardCurve {
     /// re-measured from the new base date.
     ///
     /// # Arguments
-    /// * `days` - Signed calendar-day shift; negative values move the base date backward.
+    /// * `days` - Non-negative calendar-day shift; `0` returns an unmodified clone and negative values are rejected.
     ///
     /// # Returns
     /// A new forward curve with updated base date and shifted knots.
     ///
     /// # Errors
-    /// Returns an error if fewer than 2 knot points remain after filtering expired points.
+    /// Returns an error if `days < 0` or if fewer than 2 knot points remain after filtering expired points.
     ///
     /// # Examples
     /// ```
@@ -169,6 +172,11 @@ impl ForwardCurve {
     /// ```
     /// Returns a validation error if the rolled base date exceeds the supported calendar range.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
+        if days < 0 {
+            return Err(crate::Error::Validation(format!(
+                "ForwardCurve::roll_forward requires non-negative days, got {days}"
+            )));
+        }
         if days == 0 {
             return Ok(self.clone());
         }
@@ -190,15 +198,23 @@ impl ForwardCurve {
             return Err(crate::InputError::TooFewPoints.into());
         }
 
+        let last_rolled_knot = rolled_points
+            .iter()
+            .map(|&(time, _)| time)
+            .fold(0.0, f64::max);
         let projection_grid = self.projection_grid.as_ref().map(|grid| {
             let mut rolled = Vec::with_capacity(grid.len());
             rolled.push(0.0);
             rolled.extend(
                 grid.iter()
                     .copied()
-                    .filter(|time| *time > dt_years)
+                    .filter(|time| *time - dt_years > super::super::common::MIN_ROLLED_KNOT_GAP)
                     .map(|time| time - dt_years),
             );
+            while rolled.last().is_none_or(|&end| end < last_rolled_knot) {
+                let next = rolled.last().copied().unwrap_or(0.0) + self.tenor;
+                rolled.push(next);
+            }
             rolled
         });
 
@@ -210,6 +226,7 @@ impl ForwardCurve {
         transform.validate()?;
         let mut builder = self
             .metadata_builder(self.id.clone())
+            .rate_calibration_opt(None)
             .base_date(new_base)
             .projection_grid_opt(projection_grid)
             .knots(rolled_points);

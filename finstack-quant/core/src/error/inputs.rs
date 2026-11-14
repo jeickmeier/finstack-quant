@@ -172,11 +172,8 @@ pub enum InputError {
     #[error("DayCount::ActActIsma requires a coupon frequency in DayCountContext")]
     MissingFrequencyForActActIsma,
 
-    /// DayCount::ActActIsma requires the regular coupon period for an irregular stub.
-    #[error(
-        "DayCount::ActActIsma requires DayCountContext.coupon_period for an irregular coupon; \
-         frequency-only year fractions are valid only for a regular period"
-    )]
+    /// DayCount::ActActIsma requires the enclosing nominal coupon period.
+    #[error("DayCount::ActActIsma requires DayCountContext.coupon_period")]
     MissingCouponPeriodForActActIsma,
 
     /// Schedule payment or fixing lag is negative.
@@ -190,10 +187,12 @@ pub enum InputError {
     #[error("schedule payment or fixing lag requires a holiday calendar")]
     ScheduleLagRequiresCalendar,
 
-    /// DayCount::ActActIsma only supports month/year coupon frequencies.
-    #[error("DayCount::ActActIsma requires a Months/Years frequency, got {frequency}")]
+    /// DayCount::ActActIsma only supports regular ICMA coupon frequencies.
+    #[error(
+        "DayCount::ActActIsma requires a coupon frequency in {{1M, 2M, 3M, 4M, 6M, 12M, 1Y}}, got {frequency}"
+    )]
     ActActIsmaUnsupportedFrequency {
-        /// String form of the provided frequency (e.g., "2W", "10D").
+        /// String form of the provided frequency (e.g., "2W", "10D", "2Y").
         frequency: String,
     },
 

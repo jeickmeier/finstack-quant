@@ -1568,14 +1568,14 @@
           "metric": "recovery01",
           "value": {
             "ok": true,
-            "value": 7109.563406302006
+            "value": 7109.563406301075
           }
         },
         {
           "metric": "jump_to_default",
           "value": {
             "ok": true,
-            "value": -648814.7906242693
+            "value": -648814.7906242732
           }
         }
       ]

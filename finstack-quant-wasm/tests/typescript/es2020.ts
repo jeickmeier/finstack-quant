@@ -237,3 +237,11 @@ void priced.notAField;
 declare const cashflowBuilder: ReturnType<typeof cashflows.CashFlowSchedule.builder>;
 // @ts-expect-error the facade's `build(market?)` takes a `MarketContext`, not a string
 cashflowBuilder.build('USD-OIS');
+
+declare const typedMarket: InstanceType<typeof core.MarketContext>;
+declare const typedMoney: InstanceType<typeof core.Money>;
+typedMarket
+  .insertPrice('SPOT-DECIMAL', '9007199254740993.25', 'USD')
+  .insertPrice('SPOT-MONEY', typedMoney);
+const cpiNumericLag = new core.InflationIndex('US-CPI', [['2025-01-01', 300]], 'USD', 'step', 3);
+cpiNumericLag.free();

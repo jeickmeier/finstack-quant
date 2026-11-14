@@ -48,6 +48,7 @@ impl DiscountCurve {
         }
         self.dfs = dfs;
         self.transform = Some(transform);
+        self.rate_calibration = None;
         // Stress curves retain mathematical validation on JSON round-trips.
         // The original construction policy remains unchanged on `self`'s
         // source curve when using the public cloning bump methods.
@@ -75,13 +76,13 @@ impl DiscountCurve {
     /// and price/vol-index curve rolls, which already realize forwards.
     ///
     /// # Arguments
-    /// * `days` - Signed calendar-day shift; negative values move the base date backward.
+    /// * `days` - Non-negative calendar-day shift; `0` returns an unmodified clone and negative values are rejected.
     ///
     /// # Returns
     /// A new discount curve with updated base date and renormalized knots.
     ///
     /// # Errors
-    /// Returns an error if fewer than 2 knot points remain after filtering
+    /// Returns an error if `days < 0`, if fewer than 2 knot points remain after filtering
     /// expired points, or if `DF_old(dt)` is not positive and finite (which
     /// can only happen if extrapolation past the last knot misbehaves).
     ///
@@ -107,6 +108,11 @@ impl DiscountCurve {
     /// ```
     /// Returns a validation error if the rolled base date exceeds the supported calendar range.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
+        if days < 0 {
+            return Err(crate::Error::Validation(format!(
+                "DiscountCurve::roll_forward requires non-negative days, got {days}"
+            )));
+        }
         if days == 0 {
             return Ok(self.clone());
         }
@@ -167,6 +173,7 @@ impl DiscountCurve {
         rolled.knots = knots.into_boxed_slice();
         rolled.dfs = dfs.into_boxed_slice();
         rolled.transform = Some(transform);
+        rolled.rate_calibration = None;
         Ok(rolled)
     }
 }

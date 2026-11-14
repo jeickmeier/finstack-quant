@@ -778,9 +778,9 @@ where
             lb,
             ub,
         };
-        solver.solve_system_with_jacobian(residuals_func, &derivatives, initials)?
+        solver.solve_least_squares_with_jacobian(residuals_func, &derivatives, initials)?
     } else {
-        solver.solve_system(residuals_func, initials, n_residuals)?
+        solver.solve_least_squares(residuals_func, initials, n_residuals)?
     };
     // The LM core (`solve_system` / `solve_system_with_jacobian`)
     // runs without native box constraints: the residual closure clamps a *local*

@@ -10,7 +10,7 @@ use finstack_quant_core::dates::{
 
 use super::date_generation::{
     build_schedule_period, generate_periods_with_adjustment, icma_coupon_period,
-    validate_accrual_grid, validate_unique_payment_dates,
+    icma_sliced_year_fraction, validate_accrual_grid, validate_unique_payment_dates,
 };
 use super::specs::{RollRule, ScheduleParams};
 use finstack_quant_core::dates::calendar_by_id_strict;
@@ -192,7 +192,8 @@ impl<'a> BuildPeriodsParams<'a> {
 }
 
 /// Schedule conventions that resolve a period's [`DayCountContext`]: the
-/// coupon frequency, accrual day count, stub, end-of-month flag and roll rule.
+/// coupon frequency, accrual day count, stub, end-of-month flag and optional
+/// unclamped grid anchor.
 #[derive(Clone, Copy)]
 pub(crate) struct AccrualConventions {
     /// Coupon frequency of the regular grid.
@@ -203,6 +204,8 @@ pub(crate) struct AccrualConventions {
     pub(crate) stub: StubKind,
     /// Whether nominal dates roll to month-end.
     pub(crate) end_of_month: bool,
+    /// Optional regular grid anchor preserving unclamped roll day across February.
+    pub(crate) grid_anchor: Option<Date>,
 }
 
 impl AccrualConventions {
@@ -213,6 +216,7 @@ impl AccrualConventions {
             day_count: schedule.day_count,
             stub: schedule.stub,
             end_of_month: schedule.end_of_month,
+            grid_anchor: None,
         }
     }
 }
@@ -230,6 +234,7 @@ pub(crate) fn period_day_count_context<'a>(
         day_count,
         stub,
         end_of_month,
+        grid_anchor,
     } = conventions;
     // Regularity uses unadjusted dates (ISDA 2006 §4.16(c)); ICMA stubs use the adjacent regular coupon.
     let coupon_period = if day_count == DayCount::Act365L {
@@ -241,6 +246,7 @@ pub(crate) fn period_day_count_context<'a>(
             frequency,
             stub,
             end_of_month,
+            grid_anchor,
         )?
     };
     Ok(DayCountContext {
@@ -277,6 +283,10 @@ pub fn period_accrual(
         ));
     }
     let cal = calendar_by_id_strict(params.calendar_id)?;
+    let grid_anchor = match params.stub {
+        StubKind::ShortFront | StubKind::LongFront => params.end,
+        _ => params.start,
+    };
     let day_count_context = period_day_count_context(
         period,
         cal,
@@ -285,9 +295,19 @@ pub fn period_accrual(
             day_count: params.day_count,
             stub: params.stub,
             end_of_month: params.end_of_month,
+            grid_anchor: Some(grid_anchor),
         },
         period.unadjusted_end == params.end,
     )?;
+    if params.day_count == DayCount::ActActIsma {
+        return icma_sliced_year_fraction(
+            start,
+            end,
+            day_count_context,
+            Some(params.end_of_month),
+            Some(grid_anchor),
+        );
+    }
     contractual_accrual(
         params.day_count,
         (period.accrual_start, period.accrual_end),
@@ -346,6 +366,8 @@ pub(crate) fn contractual_accrual(
     if day_count == DayCount::Act365L {
         context.coupon_period = Some(full_period);
         day_count.year_fraction(start, end, context)
+    } else if day_count == DayCount::ActActIsma {
+        icma_sliced_year_fraction(start, end, context, None, None)
     } else {
         context.end_is_termination_date = context
             .end_is_termination_date
@@ -744,5 +766,47 @@ mod tests {
 
         let err = build_periods(params).expect_err("payment-date collision must be rejected");
         assert!(err.to_string().contains("same payment date"));
+    }
+
+    #[test]
+    fn long_front_and_back_icma_stubs_decompose_across_nominal_periods() {
+        // Long back stub: 2025-01-30 -> 2025-03-15 on a monthly day-30 grid
+        // splits into [2025-01-30, 2025-02-28) (full 1/12) + [2025-02-28, 2025-03-15)
+        // inside [2025-02-28, 2025-03-30) (15 / 30 * 1/12 = 1/24) -> 0.125.
+        let long_back = BuildPeriodsParams {
+            start: Date::from_calendar_date(2025, Month::January, 30).expect("valid date"),
+            end: Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
+            frequency: Tenor::monthly(),
+            stub: StubKind::LongBack,
+            business_day_convention: BusinessDayConvention::Unadjusted,
+            calendar_id: "weekends_only",
+            end_of_month: false,
+            day_count: DayCount::ActActIsma,
+            payment_lag_days: 0,
+            reset_lag_days: None,
+            adjust_accrual_dates: false,
+            roll_rule: RollRule::None,
+        };
+        let back_periods = build_periods(long_back).expect("long back ICMA stub");
+        assert_eq!(back_periods.len(), 1);
+        assert!((back_periods[0].accrual_year_fraction - 0.125).abs() < 1e-14);
+
+        // Long front stub: 2025-01-15 -> 2025-03-30 on a monthly day-30 grid
+        // produces a 1.5M long front stub [2025-01-15, 2025-02-28) decomposed
+        // into [2025-01-15, 2025-01-30) inside [2024-12-30, 2025-01-30)
+        // (15/31 * 1/12) + [2025-01-30, 2025-02-28) (1/12), followed by one
+        // regular [2025-02-28, 2025-03-30) period (1/12).
+        let long_front = BuildPeriodsParams {
+            start: Date::from_calendar_date(2025, Month::January, 15).expect("valid date"),
+            end: Date::from_calendar_date(2025, Month::March, 30).expect("valid date"),
+            frequency: Tenor::monthly(),
+            stub: StubKind::LongFront,
+            ..long_back
+        };
+        let front_periods = build_periods(long_front).expect("long front ICMA stub");
+        assert_eq!(front_periods.len(), 2);
+        let expected_front = 15.0 / (31.0 * 12.0) + 1.0 / 12.0;
+        assert!((front_periods[0].accrual_year_fraction - expected_front).abs() < 1e-14);
+        assert!((front_periods[1].accrual_year_fraction - 1.0 / 12.0).abs() < 1e-14);
     }
 }

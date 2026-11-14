@@ -36,8 +36,8 @@ fn norm_pdf(x: f64) -> f64 {
 
 /// Normal CDF with explicit mean and standard deviation: P(X ≤ x), X ~ N(mean, std_dev²).
 ///
-/// Raises ``ValueError`` if ``std_dev`` is not finite and strictly positive.
-/// Non-finite ``x`` or ``mean`` are not rejected; they follow IEEE-754 arithmetic.
+/// Raises ``ValueError`` if ``std_dev`` is not finite and strictly positive,
+/// ``mean`` is non-finite, or ``x`` is ``NaN``.
 #[pyfunction]
 #[pyo3(text_signature = "(x, mean, std_dev)")]
 fn norm_cdf_with_params(x: f64, mean: f64, std_dev: f64) -> PyResult<f64> {
@@ -46,8 +46,8 @@ fn norm_cdf_with_params(x: f64, mean: f64, std_dev: f64) -> PyResult<f64> {
 
 /// Normal PDF with explicit mean and standard deviation.
 ///
-/// Raises ``ValueError`` if ``std_dev`` is not finite and strictly positive.
-/// Non-finite ``x`` or ``mean`` are not rejected; they follow IEEE-754 arithmetic.
+/// Raises ``ValueError`` if ``std_dev`` is not finite and strictly positive,
+/// ``mean`` is non-finite, ``x`` is ``NaN``, or the density overflows ``float64``.
 #[pyfunction]
 #[pyo3(text_signature = "(x, mean, std_dev)")]
 fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> PyResult<f64> {
@@ -56,7 +56,7 @@ fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> PyResult<f64> {
 
 /// Inverse standard normal CDF (Φ⁻¹).
 ///
-/// Returns x such that Φ(x) = p.
+/// Returns x such that Φ(x) = p (`-inf` at `0.0`, `+inf` at `1.0`, and `nan` outside `[0, 1]`).
 #[pyfunction]
 #[pyo3(text_signature = "(p)")]
 fn standard_normal_inv_cdf(p: f64) -> f64 {
@@ -90,7 +90,8 @@ fn student_t_cdf(x: f64, df: f64) -> PyResult<f64> {
 
 /// Inverse Student-t CDF (quantile function).
 ///
-/// Returns x such that P(T ≤ x) = p where T ~ t(df).
+/// Returns x such that P(T ≤ x) = p where T ~ t(df). Raises ``ValueError`` if
+/// ``df`` is non-finite or non-positive, or ``p`` is non-finite or outside ``[0, 1]``.
 #[pyfunction]
 #[pyo3(text_signature = "(p, df)")]
 fn student_t_inv_cdf(p: f64, df: f64) -> PyResult<f64> {

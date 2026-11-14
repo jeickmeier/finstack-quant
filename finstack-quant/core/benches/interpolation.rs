@@ -5,8 +5,8 @@
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::math::interp::{
-    CubicHermiteStrategy, ExtrapolationPolicy, InterpolationStrategy, Interpolator, LinearStrategy,
-    LogLinearStrategy, MonotoneConvexStrategy, PiecewiseQuadraticForwardStrategy, ValidationPolicy,
+    CubicHermiteStrategy, ExtrapolationPolicy, Interpolator, LinearStrategy, LogLinearStrategy,
+    MonotoneConvexStrategy, PiecewiseQuadraticForwardStrategy, ValidationPolicy,
 };
 use std::hint::black_box;
 
@@ -23,15 +23,17 @@ fn create_test_curve(num_points: usize) -> (Box<[f64]>, Box<[f64]>) {
     (knots.into_boxed_slice(), dfs.into_boxed_slice())
 }
 
-fn create_interp<S: InterpolationStrategy>(num_points: usize) -> Interpolator<S> {
-    let (knots, dfs) = create_test_curve(num_points);
-    Interpolator::new(
-        knots,
-        dfs,
-        ExtrapolationPolicy::FlatZero,
-        ValidationPolicy::Strict,
-    )
-    .expect("valid positive, increasing interpolation fixture")
+macro_rules! create_interp {
+    ($strategy:ty, $num_points:expr) => {{
+        let (knots, dfs) = create_test_curve($num_points);
+        Interpolator::<$strategy>::new(
+            knots,
+            dfs,
+            ExtrapolationPolicy::FlatZero,
+            ValidationPolicy::Strict,
+        )
+        .expect("valid positive, increasing interpolation fixture")
+    }};
 }
 
 fn assert_close(actual: f64, expected: f64) {
@@ -76,85 +78,99 @@ fn expected_df(time: f64, num_points: usize, reference: Reference) -> f64 {
         + (t3 - t2) * 0.5 * slope(segment + 1)
 }
 
-fn check_queries<S: InterpolationStrategy>(
-    interp: &Interpolator<S>,
-    times: &[f64],
-    num_points: usize,
-    reference: Reference,
-) {
-    assert!(!times.is_empty());
-    for &time in times {
-        assert_close(
-            interp.interp(time),
-            expected_df(time, num_points, reference),
-        );
-    }
+macro_rules! check_queries {
+    ($interp:expr, $times:expr, $num_points:expr, $reference:expr) => {{
+        assert!(!$times.is_empty());
+        for &time in $times {
+            assert_close(
+                $interp.interp(time),
+                expected_df(time, $num_points, $reference),
+            );
+        }
+    }};
 }
 
-fn bench_strategy<S: InterpolationStrategy>(c: &mut Criterion, name: &str, reference: Reference) {
-    c.bench_function(&format!("interp_{name}_single"), |b| {
-        let interp = create_interp::<S>(20);
-        check_queries(&interp, &[2.5], 20, reference);
-        b.iter(|| black_box(black_box(&interp).interp(black_box(2.5))));
-    });
-
-    let mut group = c.benchmark_group(format!("interp_{name}_batch"));
-    let size = 100;
-    group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
-        let interp = create_interp::<S>(20);
-        let times: Vec<f64> = (0..size).map(|i| i as f64 * 0.1).collect();
-        check_queries(&interp, &times, 20, reference);
-        b.iter(|| {
-            let values: Vec<_> = black_box(&times)
-                .iter()
-                .map(|&t| interp.interp(t))
-                .collect();
-            black_box(values)
+macro_rules! bench_strategy {
+    ($c:expr, $strategy:ty, $name:expr, $reference:expr) => {{
+        $c.bench_function(&format!("interp_{}_single", $name), |b| {
+            let interp = create_interp!($strategy, 20);
+            check_queries!(&interp, &[2.5], 20, $reference);
+            b.iter(|| black_box(black_box(&interp).interp(black_box(2.5))));
         });
-    });
-    group.finish();
+
+        let mut group = $c.benchmark_group(format!("interp_{}_batch", $name));
+        let size = 100;
+        group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
+            let interp = create_interp!($strategy, 20);
+            let times: Vec<f64> = (0..size).map(|i| i as f64 * 0.1).collect();
+            check_queries!(&interp, &times, 20, $reference);
+            b.iter(|| {
+                let values: Vec<_> = black_box(&times)
+                    .iter()
+                    .map(|&t| interp.interp(t))
+                    .collect();
+                black_box(values)
+            });
+        });
+        group.finish();
+    }};
 }
 
 fn bench_scalar_and_batch(c: &mut Criterion) {
-    bench_strategy::<LinearStrategy>(c, "linear", Reference::Linear);
-    bench_strategy::<LogLinearStrategy>(c, "log_linear", Reference::FlatForward);
-    bench_strategy::<CubicHermiteStrategy>(c, "cubic_hermite", Reference::Hermite);
-    bench_strategy::<MonotoneConvexStrategy>(c, "monotone_convex", Reference::FlatForward);
+    bench_strategy!(c, LinearStrategy, "linear", Reference::Linear);
+    bench_strategy!(c, LogLinearStrategy, "log_linear", Reference::FlatForward);
+    bench_strategy!(c, CubicHermiteStrategy, "cubic_hermite", Reference::Hermite);
+    bench_strategy!(
+        c,
+        MonotoneConvexStrategy,
+        "monotone_convex",
+        Reference::FlatForward
+    );
 }
 
-fn bench_comparison<S: InterpolationStrategy>(
-    group: &mut criterion::BenchmarkGroup<'_, criterion::measurement::WallTime>,
-    name: &str,
-    reference: Reference,
-) {
-    group.bench_function(name, |b| {
-        let interp = create_interp::<S>(50);
-        let times: Vec<f64> = (0..100).map(|i| i as f64 * 0.05).collect();
-        check_queries(&interp, &times, 50, reference);
-        b.iter(|| {
-            let values: Vec<_> = black_box(&times)
-                .iter()
-                .map(|&t| interp.interp(t))
-                .collect();
-            black_box(values)
+macro_rules! bench_comparison {
+    ($group:expr, $strategy:ty, $name:expr, $reference:expr) => {{
+        $group.bench_function($name, |b| {
+            let interp = create_interp!($strategy, 50);
+            let times: Vec<f64> = (0..100).map(|i| i as f64 * 0.05).collect();
+            check_queries!(&interp, &times, 50, $reference);
+            b.iter(|| {
+                let values: Vec<_> = black_box(&times)
+                    .iter()
+                    .map(|&t| interp.interp(t))
+                    .collect();
+                black_box(values)
+            });
         });
-    });
+    }};
 }
 
 fn bench_interp_comparison(c: &mut Criterion) {
     let mut group = c.benchmark_group("interp_comparison");
-    bench_comparison::<LinearStrategy>(&mut group, "linear", Reference::Linear);
-    bench_comparison::<LogLinearStrategy>(&mut group, "log_linear", Reference::FlatForward);
-    bench_comparison::<CubicHermiteStrategy>(&mut group, "CubicHermite", Reference::Hermite);
-    bench_comparison::<MonotoneConvexStrategy>(
+    bench_comparison!(&mut group, LinearStrategy, "linear", Reference::Linear);
+    bench_comparison!(
         &mut group,
-        "MonotoneConvex",
-        Reference::FlatForward,
+        LogLinearStrategy,
+        "log_linear",
+        Reference::FlatForward
     );
-    bench_comparison::<PiecewiseQuadraticForwardStrategy>(
+    bench_comparison!(
         &mut group,
+        CubicHermiteStrategy,
+        "CubicHermite",
+        Reference::Hermite
+    );
+    bench_comparison!(
+        &mut group,
+        MonotoneConvexStrategy,
+        "MonotoneConvex",
+        Reference::FlatForward
+    );
+    bench_comparison!(
+        &mut group,
+        PiecewiseQuadraticForwardStrategy,
         "PiecewiseQuadraticForward",
-        Reference::FlatForward,
+        Reference::FlatForward
     );
     group.finish();
 }

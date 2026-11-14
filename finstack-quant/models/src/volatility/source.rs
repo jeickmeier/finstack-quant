@@ -74,9 +74,9 @@ impl VolSource {
 
     /// Evaluate Black/lognormal volatility.
     ///
-    /// For an FX-delta source, `tenor` carries the positive FX forward because
-    /// that artifact has no tenor axis. Surface sources select `tenor` or
-    /// `strike` according to their stored secondary-axis metadata.
+    /// Surface sources select `tenor` or `strike` according to their stored
+    /// secondary-axis metadata. FX-delta sources require an explicit FX forward
+    /// rate and must be queried via [`Self::get_fx_vol`] or [`Self::get_fx_vol_clamped`].
     /// Shifted-Black sources retain their displaced quote; callers must use
     /// [`Self::get_convention`] and apply its displacement to both forward and
     /// strike when pricing. The returned number is not converted to unshifted Black.
@@ -84,14 +84,13 @@ impl VolSource {
     /// # Arguments
     ///
     /// * `expiry` - Positive option expiry in years.
-    /// * `tenor` - Underlying tenor in years, or the positive FX forward for
-    ///   an FX-delta source.
+    /// * `tenor` - Underlying tenor in years (used by tenor-indexed surfaces and SABR cubes).
     /// * `strike` - Strike in the same units as the source's forward or grid.
     ///
     /// # Errors
     ///
     /// Returns an input or model validation error for out-of-grid checked
-    /// coordinates, invalid FX inputs, or a failed SABR expansion.
+    /// coordinates, an FX-delta source without an explicit forward, or a failed SABR expansion.
     pub fn get_vol(&self, expiry: f64, tenor: f64, strike: f64) -> Result<f64> {
         match self {
             Self::Surface(surface) => {
@@ -115,7 +114,9 @@ impl VolSource {
                 }
                 get_cube_vol(cube, expiry, tenor, strike, VolatilityConvention::Lognormal)
             }
-            Self::FxDelta(surface) => get_fx_delta_vol(surface, expiry, strike, tenor),
+            Self::FxDelta(_) => Err(Error::Validation(
+                "FX delta volatility sources require an explicit FX forward; use VolSource::get_fx_vol".into(),
+            )),
         }
     }
 
@@ -124,16 +125,82 @@ impl VolSource {
     /// # Arguments
     ///
     /// * `expiry` - Option expiry in years; finite values are clamped.
-    /// * `tenor` - Underlying tenor, or FX forward for an FX-delta source.
+    /// * `tenor` - Underlying tenor in years (used by tenor-indexed surfaces and SABR cubes).
     /// * `strike` - Strike in source units; finite grid coordinates are clamped.
     ///
     /// # Errors
     ///
-    /// Returns an error for incompatible quote metadata, non-finite coordinates,
-    /// or an invalid SABR/FX evaluation.
+    /// Returns an error for incompatible quote metadata, an FX-delta source without
+    /// an explicit forward, non-finite coordinates, or an invalid SABR evaluation.
     pub fn get_vol_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> Result<f64> {
         let (expiry, tenor, strike) = self.clamped_coordinates(expiry, tenor, strike)?;
         self.get_vol(expiry, tenor, strike)
+    }
+
+    /// Evaluate FX Black/lognormal volatility with an explicit FX forward rate.
+    ///
+    /// # Arguments
+    ///
+    /// * `expiry` - Positive option expiry in years within the stored expiry grid.
+    /// * `strike` - Positive strike in domestic-per-foreign FX units.
+    /// * `forward` - Positive FX forward rate in the same units as `strike`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for non-positive or out-of-grid coordinates, non-Black or
+    /// tenor-indexed surfaces, SABR cubes (which require an underlying tenor), or
+    /// invalid FX smile wing volatilities.
+    pub fn get_fx_vol(&self, expiry: f64, strike: f64, forward: f64) -> Result<f64> {
+        if !forward.is_finite() || forward <= 0.0 {
+            return Err(InputError::NonPositiveValue.into());
+        }
+        match self {
+            Self::FxDelta(surface) => {
+                segment(surface.expiries(), expiry)?;
+                get_fx_delta_vol(surface, expiry, strike, forward)
+            }
+            Self::Surface(surface) => {
+                surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
+                require_black_quotes(surface.quote_type())?;
+                get_surface_vol(surface, expiry, strike)
+            }
+            Self::Cube(_) | Self::CubeExpirySlice(_) => Err(Error::Validation(
+                "SABR cube volatility sources require an underlying tenor; use VolSource::get_vol"
+                    .into(),
+            )),
+        }
+    }
+
+    /// Evaluate FX Black/lognormal volatility with flat coordinate extrapolation and an explicit FX forward rate.
+    ///
+    /// # Arguments
+    ///
+    /// * `expiry` - Positive option expiry in years; clamped to stored expiry bounds.
+    /// * `strike` - Positive strike in domestic-per-foreign FX units; clamped to stored strike bounds.
+    /// * `forward` - Positive FX forward rate in the same units as `strike`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for non-positive or non-finite coordinates, non-Black or
+    /// tenor-indexed surfaces, SABR cubes, or invalid FX smile wing volatilities.
+    pub fn get_fx_vol_clamped(&self, expiry: f64, strike: f64, forward: f64) -> Result<f64> {
+        if !forward.is_finite() || forward <= 0.0 {
+            return Err(InputError::NonPositiveValue.into());
+        }
+        match self {
+            Self::FxDelta(surface) => get_fx_delta_vol(surface, expiry, strike, forward),
+            Self::Surface(surface) => {
+                surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
+                require_black_quotes(surface.quote_type())?;
+                let (clamped_expiry, _, clamped_strike) =
+                    self.clamped_coordinates(expiry, 0.0, strike)?;
+                get_surface_vol(surface, clamped_expiry, clamped_strike)
+            }
+            Self::Cube(_) | Self::CubeExpirySlice(_) => Err(Error::Validation(
+                "SABR cube volatility sources require an underlying tenor; use VolSource::get_vol_clamped"
+                    .into(),
+            )),
+        }
     }
 
     /// Evaluate normal/Bachelier volatility.

@@ -1939,7 +1939,7 @@ mod hagan_west_reference {
             log_discount += forward * (interval[1] - interval[0]);
             dfs.push((-log_discount).exp());
         }
-        Interpolator::new(
+        Interpolator::<MonotoneConvexStrategy>::new(
             knots.to_vec().into(),
             dfs.into(),
             ExtrapolationPolicy::FlatForward,
@@ -2096,31 +2096,112 @@ mod validated_interpolator_serde {
 
     #[test]
     fn deserialization_rebuilds_caches_for_every_strategy() {
-        fn check<S: InterpolationStrategy>() {
-            let raw = json!({"knots":[0.0,1.0,2.0],"values":[1.0,0.9,0.7],"extrapolation":"flat_forward","validation":"strict"});
-            let original: Interpolator<S> = serde_json::from_value(raw).unwrap();
-            let mut saved = serde_json::to_value(&original).unwrap();
-            assert!(saved.get("strategy").is_none());
-            saved["values"][1] = json!(0.8);
-            let rebuilt: Interpolator<S> = serde_json::from_value(saved).unwrap();
-            assert!((rebuilt.interp(1.0) - 0.8).abs() < 1e-14);
-            let fresh = Interpolator::<S>::new(
-                vec![0.0, 1.0, 2.0].into(),
-                vec![1.0, 0.8, 0.7].into(),
-                ExtrapolationPolicy::FlatForward,
-                ValidationPolicy::Strict,
-            )
-            .unwrap();
-            for x in [-0.2, 0.4, 1.0, 1.5, 3.0] {
-                assert!((rebuilt.interp(x) - fresh.interp(x)).abs() < 1e-14);
-                assert!((rebuilt.interp_prime(x) - fresh.interp_prime(x)).abs() < 1e-14);
-            }
+        macro_rules! check_strategy {
+            ($strategy:ty) => {{
+                let raw = json!({"knots":[0.0,1.0,2.0],"values":[1.0,0.9,0.7],"extrapolation":"flat_forward","validation":"strict"});
+                let original: Interpolator<$strategy> = serde_json::from_value(raw).unwrap();
+                let mut saved = serde_json::to_value(&original).unwrap();
+                assert!(saved.get("strategy").is_none());
+                saved["values"][1] = json!(0.8);
+                let rebuilt: Interpolator<$strategy> = serde_json::from_value(saved).unwrap();
+                assert!((rebuilt.interp(1.0) - 0.8).abs() < 1e-14);
+                let fresh = Interpolator::<$strategy>::new(
+                    vec![0.0, 1.0, 2.0].into(),
+                    vec![1.0, 0.8, 0.7].into(),
+                    ExtrapolationPolicy::FlatForward,
+                    ValidationPolicy::Strict,
+                )
+                .unwrap();
+                for x in [-0.2, 0.4, 1.0, 1.5, 3.0] {
+                    assert!((rebuilt.interp(x) - fresh.interp(x)).abs() < 1e-14);
+                    assert!((rebuilt.interp_prime(x) - fresh.interp_prime(x)).abs() < 1e-14);
+                }
+            }};
         }
-        check::<LinearStrategy>();
-        check::<LogLinearStrategy>();
-        check::<CubicHermiteStrategy>();
-        check::<MonotoneConvexStrategy>();
-        check::<PiecewiseQuadraticForwardStrategy>();
+        check_strategy!(LinearStrategy);
+        check_strategy!(LogLinearStrategy);
+        check_strategy!(CubicHermiteStrategy);
+        check_strategy!(MonotoneConvexStrategy);
+        check_strategy!(PiecewiseQuadraticForwardStrategy);
+    }
+
+    #[test]
+    fn monotone_convex_region_iv_axis_has_continuous_endpoint_forward_and_extrapolation() {
+        // 3-knot curve with fd = [0.0, -0.02]:
+        // - f[1] = 0.5 * (-0.02 + 0.0) = -0.01 (unclamped because fd[1] < 0)
+        // - f[0] = 1.5 * 0.0 - 0.5 * (-0.01) = +0.005, clamped to 0.0 because fd[0] >= 0
+        // Segment [0, 1] therefore lies on the Region IV degenerate axis with
+        // fd[0] = 0.0, g_left = 0.0, and g_right = -0.01 != 0.0.
+        // At t = 1.0, locate_segment_unchecked selects segment 0 at x_norm = 1.0;
+        // forward_adjustment(1.0, 0.0, -0.01) must return (0.0, 0.0) rather than jumping to g_right.
+        let knots = vec![0.0, 1.0, 2.0].into_boxed_slice();
+        let dfs = vec![1.0, 1.0, (0.02_f64).exp()].into_boxed_slice();
+        let interp = Interpolator::<MonotoneConvexStrategy>::new(
+            knots,
+            dfs,
+            ExtrapolationPolicy::FlatForward,
+            ValidationPolicy::Strict,
+        )
+        .expect("valid monotone convex curve");
+
+        let eps = 1e-9;
+        let prime_left_of_1 = interp.interp_prime(1.0 - eps);
+        let prime_at_1 = interp.interp_prime(1.0);
+        assert!(
+            prime_left_of_1.abs() < 1e-12 && prime_at_1.abs() < 1e-12,
+            "Region IV axis should not jump at segment right endpoint: prime(1.0-eps)={prime_left_of_1}, prime(1.0)={prime_at_1}"
+        );
+
+        // Last segment [2, 3] on Region IV degenerate axis (fd = [0.06, -0.02, 0.0] ->
+        // f[2] = -0.01, f[3] clamped to 0.0 -> g_left = -0.01, g_right = 0.0):
+        // right FlatForward slope must match the inward segment forward at t = 3.0.
+        let right_knots = vec![0.0, 1.0, 2.0, 3.0].into_boxed_slice();
+        let right_dfs =
+            vec![1.0, (-0.06_f64).exp(), (-0.04_f64).exp(), (-0.04_f64).exp()].into_boxed_slice();
+        let right_interp = Interpolator::<MonotoneConvexStrategy>::new(
+            right_knots,
+            right_dfs,
+            ExtrapolationPolicy::FlatForward,
+            ValidationPolicy::Strict,
+        )
+        .expect("valid mixed-sign forward curve");
+        let prime_inside = right_interp.interp_prime(3.0 - eps);
+        let prime_at_end = right_interp.interp_prime(3.0);
+        let prime_outside = right_interp.interp_prime(3.0 + eps);
+        assert!(
+            (prime_inside - prime_at_end).abs() < 1e-7
+                && (prime_inside - prime_outside).abs() < 1e-7,
+            "Right FlatForward slope must match inward segment forward: inside={prime_inside}, end={prime_at_end}, outside={prime_outside}"
+        );
+    }
+
+    #[test]
+    fn cubic_hermite_pchip_handles_extreme_knot_and_secant_scales() {
+        let large_knots = vec![0.0, 1.0e300, 2.0e300, 4.0e300].into_boxed_slice();
+        let large_vals = vec![1.0, 0.9, 0.7, 0.4].into_boxed_slice();
+        let large_interp = Interpolator::<CubicHermiteStrategy>::new(
+            large_knots,
+            large_vals,
+            ExtrapolationPolicy::FlatForward,
+            ValidationPolicy::Strict,
+        )
+        .expect("extreme knot scale should build");
+        let v_mid = large_interp.interp(1.5e300);
+        let p_mid = large_interp.interp_prime(1.5e300);
+        assert!(v_mid.is_finite() && (0.7..=0.9).contains(&v_mid));
+        assert!(p_mid.is_finite());
+
+        let tiny_knots = vec![0.0, 1.0, 2.0, 3.0].into_boxed_slice();
+        let tiny_vals = vec![0.0, 1.0e-300, 3.0e-300, 6.0e-300].into_boxed_slice();
+        let tiny_interp = Interpolator::<CubicHermiteStrategy>::new(
+            tiny_knots,
+            tiny_vals,
+            ExtrapolationPolicy::FlatForward,
+            ValidationPolicy::AllowNegative,
+        )
+        .expect("tiny secant scale should build");
+        let v_tiny = tiny_interp.interp(1.5);
+        assert!(v_tiny.is_finite() && (1.0e-300..=3.0e-300).contains(&v_tiny));
     }
 
     #[test]

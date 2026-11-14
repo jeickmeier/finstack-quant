@@ -109,6 +109,33 @@ pub(crate) fn is_regular_period(accrual_start: Date, accrual_end: Date, frequenc
         || step_tenor(accrual_end, frequency, -1) == Some(accrual_start)
 }
 
+const MAX_ICMA_GRID_STEPS: i32 = 2_400;
+
+/// Step `anchor` by `k * period_months`, optionally snapping to month-end.
+fn step_nominal_grid(
+    anchor: Date,
+    period_months: i32,
+    k: i32,
+    preserve_eom: bool,
+) -> finstack_quant_core::Result<Date> {
+    if k.abs() > MAX_ICMA_GRID_STEPS {
+        return Err(finstack_quant_core::Error::Validation(
+            "ACT/ACT ICMA nominal grid traversal exceeded supported range".into(),
+        ));
+    }
+    let months = k.checked_mul(period_months).ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "ACT/ACT ICMA nominal grid month offset overflows".into(),
+        )
+    })?;
+    let shifted = anchor.add_months(months)?;
+    Ok(if preserve_eom {
+        shifted.end_of_month()
+    } else {
+        shifted
+    })
+}
+
 /// ACT/ACT ICMA quasi-coupon reference anchored on the contractual stub side.
 ///
 /// # Arguments
@@ -118,6 +145,8 @@ pub(crate) fn is_regular_period(accrual_start: Date, accrual_end: Date, frequenc
 /// * `frequency` - Nominal coupon tenor.
 /// * `stub` - Selects the adjacent reference coupon for a plain-grid stub.
 /// * `end_of_month` - Whether a plain-grid reference date must retain month-end rolling.
+/// * `grid_anchor` - Optional regular schedule anchor (end for front stubs, start otherwise)
+///   preserving unclamped roll-day phase across February clamps.
 ///
 /// # Errors
 ///
@@ -128,7 +157,46 @@ pub(crate) fn icma_coupon_period(
     frequency: Tenor,
     stub: StubKind,
     end_of_month: bool,
+    grid_anchor: Option<Date>,
 ) -> finstack_quant_core::Result<(Date, Date)> {
+    if let (Some(anchor), Some(months_u32)) = (grid_anchor, frequency.months())
+        && let Ok(period_months) = i32::try_from(months_u32)
+        && period_months > 0
+    {
+        match stub {
+            StubKind::ShortFront | StubKind::LongFront => {
+                // Step backward from `anchor` to find `g(k + 1) == accrual_end`.
+                let mut k = -1;
+                while k >= -MAX_ICMA_GRID_STEPS {
+                    let g_end = step_nominal_grid(anchor, period_months, k + 1, end_of_month)?;
+                    if g_end == accrual_end {
+                        let g_start = step_nominal_grid(anchor, period_months, k, end_of_month)?;
+                        return Ok((g_start, g_end));
+                    }
+                    if g_end < accrual_end {
+                        break;
+                    }
+                    k -= 1;
+                }
+            }
+            _ => {
+                // Step forward from `anchor` to find `g(k) == accrual_start`.
+                let mut k = 0;
+                while k <= MAX_ICMA_GRID_STEPS {
+                    let g_start = step_nominal_grid(anchor, period_months, k, end_of_month)?;
+                    if g_start == accrual_start {
+                        let g_end = step_nominal_grid(anchor, period_months, k + 1, end_of_month)?;
+                        return Ok((g_start, g_end));
+                    }
+                    if g_start > accrual_start {
+                        break;
+                    }
+                    k += 1;
+                }
+            }
+        }
+    }
+
     if is_regular_period(accrual_start, accrual_end, frequency) {
         return Ok((accrual_start, accrual_end));
     }
@@ -154,6 +222,78 @@ pub(crate) fn icma_coupon_period(
             roll(step_tenor(accrual_end, frequency, -1).ok_or_else(out_of_range)?),
             accrual_end,
         )),
+    }
+}
+
+/// Evaluate `DayCount::ActActIsma` across one or more nominal ICMA periods by
+/// slicing `[start, end)` on the schedule's nominal quasi-coupon grid so every
+/// kernel call receives a single contained nominal `coupon_period`.
+pub(crate) fn icma_sliced_year_fraction(
+    start: Date,
+    end: Date,
+    context: finstack_quant_core::dates::DayCountContext<'_>,
+    end_of_month_override: Option<bool>,
+    grid_anchor_override: Option<Date>,
+) -> finstack_quant_core::Result<f64> {
+    if start > end {
+        return Err(finstack_quant_core::InputError::InvalidDateRange.into());
+    }
+    DayCount::ActActIsma.validate_context(context)?;
+    let (ref_start, ref_end) = context
+        .coupon_period
+        .ok_or(finstack_quant_core::InputError::MissingCouponPeriodForActActIsma)?;
+    if ref_start <= start && end <= ref_end {
+        return DayCount::ActActIsma.year_fraction(start, end, context);
+    }
+    if start == end {
+        return Ok(0.0);
+    }
+
+    let frequency = context
+        .frequency
+        .ok_or(finstack_quant_core::InputError::MissingFrequencyForActActIsma)?;
+    let period_months = frequency
+        .months()
+        .and_then(|m| i32::try_from(m).ok())
+        .filter(|&m| m > 0)
+        .ok_or_else(
+            || finstack_quant_core::InputError::ActActIsmaUnsupportedFrequency {
+                frequency: frequency.to_string(),
+            },
+        )?;
+
+    let preserve_eom = end_of_month_override.unwrap_or_else(|| {
+        ref_start == ref_start.end_of_month() && ref_end == ref_end.end_of_month()
+    });
+    let anchor = grid_anchor_override.unwrap_or(if ref_start.day() >= ref_end.day() {
+        ref_start
+    } else {
+        ref_end
+    });
+
+    let mut k = 0;
+    while step_nominal_grid(anchor, period_months, k, preserve_eom)? > start {
+        k -= 1;
+    }
+    while step_nominal_grid(anchor, period_months, k + 1, preserve_eom)? <= start {
+        k += 1;
+    }
+
+    let mut total = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+    loop {
+        let p_start = step_nominal_grid(anchor, period_months, k, preserve_eom)?;
+        let p_end = step_nominal_grid(anchor, period_months, k + 1, preserve_eom)?;
+        let slice_start = start.max(p_start);
+        let slice_end = end.min(p_end);
+        let slice_ctx = finstack_quant_core::dates::DayCountContext {
+            coupon_period: Some((p_start, p_end)),
+            ..context
+        };
+        total.add(DayCount::ActActIsma.year_fraction(slice_start, slice_end, slice_ctx)?);
+        if end <= p_end {
+            return Ok(total.total());
+        }
+        k += 1;
     }
 }
 

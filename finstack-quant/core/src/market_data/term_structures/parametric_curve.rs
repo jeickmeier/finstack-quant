@@ -41,7 +41,10 @@
 
 use crate::{
     dates::{Date, DateExt, DayCount},
-    market_data::traits::Discounting,
+    market_data::{
+        bumps::{BumpSpec, BumpType, Bumpable},
+        traits::Discounting,
+    },
     types::CurveId,
 };
 use serde::{Deserialize, Serialize};
@@ -92,12 +95,35 @@ pub enum NelsonSiegelModel {
     },
 }
 
+#[inline]
+fn ns_loadings(x: f64) -> (f64, f64) {
+    if x.abs() < 1e-4 {
+        let decay = 1.0 - x * (0.5 - x * ((1.0 / 6.0) - x * ((1.0 / 24.0) - x / 120.0)));
+        let hump = x * (0.5 - x * ((1.0 / 3.0) - x * (0.125 - x / 30.0)));
+        (decay, hump)
+    } else {
+        let decay = -(-x).exp_m1() / x;
+        let hump = decay - (-x).exp();
+        (decay, hump)
+    }
+}
+
 impl NelsonSiegelModel {
     /// Compute the zero rate at time `t` using the parametric formula.
     ///
-    /// Returns the continuously compounded zero rate.
+    /// Returns the continuously compounded zero rate, using a fifth-order
+    /// Taylor expansion for `|t / tau| < 1e-4` to preserve precision down to
+    /// the `t -> 0+` limit.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Time in years from the model origin. Non-positive finite times
+    ///   evaluate the short-rate limit `beta0 + beta1`; `NaN` propagates `NaN`.
     #[must_use]
     pub fn zero_rate(&self, t: f64) -> f64 {
+        if t.is_nan() {
+            return f64::NAN;
+        }
         if t <= 0.0 {
             return match self {
                 Self::Ns { beta0, beta1, .. } | Self::Nss { beta0, beta1, .. } => beta0 + beta1,
@@ -111,9 +137,8 @@ impl NelsonSiegelModel {
                 beta2,
                 tau,
             } => {
-                let x = t / tau;
-                let decay = (1.0 - (-x).exp()) / x;
-                beta0 + beta1 * decay + beta2 * (decay - (-x).exp())
+                let (decay, hump) = ns_loadings(t / tau);
+                beta0 + beta1 * decay + beta2 * hump
             }
             Self::Nss {
                 beta0,
@@ -123,14 +148,9 @@ impl NelsonSiegelModel {
                 tau1,
                 tau2,
             } => {
-                let x1 = t / tau1;
-                let x2 = t / tau2;
-                let decay1 = (1.0 - (-x1).exp()) / x1;
-                let decay2 = (1.0 - (-x2).exp()) / x2;
-                beta0
-                    + beta1 * decay1
-                    + beta2 * (decay1 - (-x1).exp())
-                    + beta3 * (decay2 - (-x2).exp())
+                let (decay1, hump1) = ns_loadings(t / tau1);
+                let (_, hump2) = ns_loadings(t / tau2);
+                beta0 + beta1 * decay1 + beta2 * hump1 + beta3 * hump2
             }
         }
     }
@@ -138,8 +158,16 @@ impl NelsonSiegelModel {
     /// Compute the instantaneous forward rate at time `t`.
     ///
     /// This is the analytical derivative of `z(t) * t` with respect to `t`.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Time in years from the model origin. Non-positive finite times
+    ///   evaluate the short-rate limit `beta0 + beta1`; `NaN` propagates `NaN`.
     #[must_use]
     pub fn forward_rate(&self, t: f64) -> f64 {
+        if t.is_nan() {
+            return f64::NAN;
+        }
         if t <= 0.0 {
             return self.zero_rate(0.0);
         }
@@ -383,7 +411,7 @@ impl ParametricCurve {
 
     /// Discount factor at time `t` (years from `base_date`).
     ///
-    /// Returns `1.0` for `t <= 0.0`.
+    /// Returns `1.0` for `t <= 0.0` (`NaN` propagates `NaN`).
     ///
     /// # Arguments
     ///
@@ -391,6 +419,9 @@ impl ParametricCurve {
     #[must_use]
     #[inline]
     pub fn df(&self, t: f64) -> f64 {
+        if t.is_nan() {
+            return f64::NAN;
+        }
         if t <= 0.0 {
             return 1.0;
         }
@@ -406,8 +437,19 @@ impl ParametricCurve {
     #[must_use]
     #[inline]
     pub fn zero_rate(&self, t: f64) -> f64 {
+        if t.is_nan() {
+            return f64::NAN;
+        }
         if t <= 0.0 {
-            return self.forward_rate(0.0);
+            return self.forward_rate(t);
+        }
+        if self.time_offset == 0.0 {
+            return self.model.zero_rate(t);
+        }
+        if t < 1e-6 * self.time_offset.abs().max(1.0) {
+            let half_s = 0.5 / 3.0_f64.sqrt();
+            return 0.5
+                * (self.forward_rate(t * (0.5 - half_s)) + self.forward_rate(t * (0.5 + half_s)));
         }
         let df = self.df(t);
         -df.ln() / t
@@ -415,19 +457,61 @@ impl ParametricCurve {
 
     /// Instantaneous forward rate at time `t`.
     ///
-    /// At the model origin (`t = 0` on an unrolled curve) this is the model's
-    /// short rate, `beta0 + beta1`. Times before the model origin, reached
-    /// only after a backward roll, carry a zero forward because the discount
-    /// factor is held at one there.
+    /// At `t = 0` on an unrolled curve this is the model's short rate,
+    /// `beta0 + beta1`. Strictly negative `t` (or times before the model origin)
+    /// carry a zero forward consistent with `df(t) == 1.0` for `t <= 0.0`.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Time in years from the curve's base date.
     #[must_use]
     #[inline]
     pub fn forward_rate(&self, t: f64) -> f64 {
+        if t.is_nan() {
+            return f64::NAN;
+        }
+        if t < 0.0 {
+            return 0.0;
+        }
         let source_time = self.time_offset + t;
         if source_time < 0.0 {
             0.0
         } else {
             self.model.forward_rate(source_time)
         }
+    }
+
+    /// Apply a parallel additive rate shock in-place by shifting `beta0`.
+    ///
+    /// Shifting `beta0` by `δr` shifts both `z(t)` and `f(t)` uniformly by `δr`
+    /// across all `t >= 0`, scaling `DF(t)` by `exp(-δr · t)` on both unrolled
+    /// and rolled parametric curves.
+    pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
+        if !matches!(spec.bump_type, BumpType::Parallel) {
+            return Err(crate::InputError::UnsupportedBump {
+                reason: "ParametricCurve only supports parallel additive rate bumps".to_string(),
+            }
+            .into());
+        }
+        let shift = spec.resolve_additive_or_error("ParametricCurve")?;
+        if shift == 0.0 {
+            return Ok(());
+        }
+        let mut bumped_model = self.model.clone();
+        match &mut bumped_model {
+            NelsonSiegelModel::Ns { beta0, .. } | NelsonSiegelModel::Nss { beta0, .. } => {
+                *beta0 += shift;
+            }
+        }
+        bumped_model.validate()?;
+        let normalization = source_discount_factor(&bumped_model, self.time_offset);
+        if !normalization.is_finite() || normalization <= 0.0 {
+            return Err(crate::Error::Validation(
+                "parametric-curve bump produced invalid discount normalization".to_string(),
+            ));
+        }
+        self.model = bumped_model;
+        Ok(())
     }
 
     /// Curve identifier.
@@ -456,16 +540,20 @@ impl ParametricCurve {
     ///
     /// # Arguments
     ///
-    /// * `days` - Signed calendar-day shift for the base date. Negative values
-    ///   move the base date backward; the curve day count maps the shift into
-    ///   source-model year fractions.
+    /// * `days` - Non-negative calendar-day shift for the base date; `0` returns an
+    ///   unmodified clone and negative values are rejected.
     ///
     /// # Errors
     ///
-    /// Returns an error if the rolled date is outside the supported calendar
+    /// Returns an error if `days < 0`, the rolled date is outside the supported calendar
     /// range, the source-time offset is non-finite, or its discount factor is
     /// non-finite or non-positive.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
+        if days < 0 {
+            return Err(crate::Error::Validation(format!(
+                "ParametricCurve::roll_forward requires non-negative days, got {days}"
+            )));
+        }
         if days == 0 {
             return Ok(self.clone());
         }
@@ -507,6 +595,25 @@ impl Discounting for ParametricCurve {
 
     fn df(&self, t: f64) -> f64 {
         Self::df(self, t)
+    }
+
+    fn instantaneous_forward(&self, t: f64) -> crate::Result<f64> {
+        if !t.is_finite() || t < 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "instantaneous_forward requires finite t >= 0, got {t}"
+            )));
+        }
+        Ok(self.forward_rate(t))
+    }
+}
+
+impl Bumpable for ParametricCurve {
+    /// Apply a parallel additive zero-rate shock by shifting `beta0`.
+    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
+        let mut bumped = self.clone();
+        bumped.id = spec.standard_bump_id(self.id());
+        bumped.bump_in_place(&spec)?;
+        Ok(bumped)
     }
 }
 
@@ -845,5 +952,86 @@ mod tests {
             tau2: 2.0,
         };
         assert!(model.validate().is_err());
+    }
+
+    #[test]
+    fn nss_small_t_taylor_limit_matches_short_rate() {
+        for model in [
+            NelsonSiegelModel::Ns {
+                beta0: 0.03,
+                beta1: -0.02,
+                beta2: 0.01,
+                tau: 2.0,
+            },
+            NelsonSiegelModel::Nss {
+                beta0: 0.04,
+                beta1: -0.02,
+                beta2: 0.015,
+                beta3: -0.008,
+                tau1: 1.5,
+                tau2: 5.0,
+            },
+        ] {
+            let short_rate = model.zero_rate(0.0);
+            let curve = ParametricCurve::builder("NSS-SMALL-T")
+                .base_date(base_date())
+                .model(model.clone())
+                .build()
+                .expect("valid curve");
+            for t in [1e-17, 1e-16, 1e-12, 1e-8, 1e-5] {
+                assert!(
+                    (model.zero_rate(t) - short_rate).abs() < 1e-4,
+                    "t={t}: z={}",
+                    model.zero_rate(t)
+                );
+                assert!(
+                    (curve.zero_rate(t) - short_rate).abs() < 1e-4,
+                    "t={t}: curve z={}",
+                    curve.zero_rate(t)
+                );
+            }
+            assert!(model.zero_rate(f64::NAN).is_nan());
+            assert!(curve.df(f64::NAN).is_nan());
+            assert!(curve.zero_rate(f64::NAN).is_nan());
+            assert!(curve.forward_rate(f64::NAN).is_nan());
+        }
+    }
+
+    #[test]
+    fn parametric_curve_parallel_bump_shifts_beta0_and_scales_df() {
+        let curve = ParametricCurve::builder("USD-NS")
+            .base_date(base_date())
+            .model(NelsonSiegelModel::Nss {
+                beta0: 0.03,
+                beta1: -0.01,
+                beta2: 0.005,
+                beta3: 0.002,
+                tau1: 1.5,
+                tau2: 5.0,
+            })
+            .build()
+            .expect("valid curve");
+
+        let bumped = curve
+            .apply_bump(BumpSpec::parallel_bp(25.0))
+            .expect("parallel bump");
+        for t in [0.25, 1.0, 5.0, 10.0] {
+            assert!((bumped.zero_rate(t) - (curve.zero_rate(t) + 0.0025)).abs() < 1e-14);
+            assert!((bumped.df(t) - curve.df(t) * (-0.0025 * t).exp()).abs() < 1e-14);
+        }
+
+        let rolled = curve.roll_forward(180).expect("roll");
+        let rolled_bumped = rolled
+            .apply_bump(BumpSpec::parallel_bp(25.0))
+            .expect("rolled parallel bump");
+        for t in [0.25, 1.0, 5.0] {
+            assert!((rolled_bumped.df(t) - rolled.df(t) * (-0.0025 * t).exp()).abs() < 1e-14);
+        }
+
+        assert!(
+            curve
+                .apply_bump(BumpSpec::triangular_key_rate_bp(0.5, 1.0, 2.0, 10.0))
+                .is_err()
+        );
     }
 }

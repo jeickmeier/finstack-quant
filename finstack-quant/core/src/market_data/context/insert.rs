@@ -10,7 +10,7 @@ use crate::market_data::term_structures::CreditIndexData;
 use crate::money::fx::FxMatrix;
 use crate::types::CurveId;
 
-use super::{CreditIndexState, CurveStorage, MarketContext};
+use super::{CreditIndexState, CurveStorage, MarketContext, VolRegistry};
 
 impl MarketContext {
     /// Insert a generic curve storage entry.
@@ -30,11 +30,32 @@ impl MarketContext {
         self
     }
 
+    /// Insert a generic curve storage entry, failing atomically if credit-index rebinding fails.
+    ///
+    /// # Arguments
+    ///
+    /// * `curve` - Any curve type convertible into [`CurveStorage`], keyed by its own id;
+    ///   replaces an existing curve with the same ID and atomically rebinds dependent credit indices.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if replacing an existing curve invalidates
+    /// a bound credit index.
+    pub fn try_insert<C>(mut self, curve: C) -> crate::Result<Self>
+    where
+        C: Into<CurveStorage>,
+    {
+        self.try_insert_mut(curve)?;
+        Ok(self)
+    }
+
     /// Insert a volatility surface.
     ///
     /// Accepts either an owned [`VolSurface`] or an `Arc<VolSurface>`.
     /// When passing an owned value, it will be wrapped in an `Arc` automatically.
     /// When passing an `Arc`, it is used directly (enabling surface sharing between contexts).
+    /// Any conflicting entry under the same ID in `vol_cubes` or `fx_delta_vol_surfaces`
+    /// is evicted; use [`Self::try_insert_surface`] to reject cross-registry volatility collisions.
     ///
     /// # Examples
     /// ```rust
@@ -72,6 +93,59 @@ impl MarketContext {
         self
     }
 
+    /// Insert a volatility surface, rejecting cross-registry volatility ID collisions.
+    ///
+    /// # Arguments
+    ///
+    /// * `surface` - Owned or shared volatility surface stored under `surface.id()`;
+    ///   replaces an existing `VolSurface` with the same ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `surface.id()` is already registered in
+    /// `vol_cubes` or `fx_delta_vol_surfaces`.
+    pub fn try_insert_surface(
+        mut self,
+        surface: impl Into<Arc<VolSurface>>,
+    ) -> crate::Result<Self> {
+        self.try_insert_surface_mut(surface)?;
+        Ok(self)
+    }
+
+    /// Insert an FX delta-quoted volatility surface.
+    ///
+    /// Accepts either an owned [`FxDeltaVolSurface`] or an `Arc<FxDeltaVolSurface>`.
+    ///
+    /// # Arguments
+    ///
+    /// * `surface` - Owned or shared FX delta-vol surface stored under `surface.id()`.
+    pub fn insert_fx_delta_vol_surface(
+        mut self,
+        surface: impl Into<Arc<FxDeltaVolSurface>>,
+    ) -> Self {
+        self.insert_fx_delta_vol_surface_mut(surface);
+        self
+    }
+
+    /// Insert an FX delta-quoted volatility surface, rejecting cross-registry volatility ID collisions.
+    ///
+    /// # Arguments
+    ///
+    /// * `surface` - Owned or shared FX delta-vol surface stored under `surface.id()`;
+    ///   replaces an existing `FxDeltaVolSurface` with the same ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `surface.id()` is already registered in
+    /// `surfaces` or `vol_cubes`.
+    pub fn try_insert_fx_delta_vol_surface(
+        mut self,
+        surface: impl Into<Arc<FxDeltaVolSurface>>,
+    ) -> crate::Result<Self> {
+        self.try_insert_fx_delta_vol_surface_mut(surface)?;
+        Ok(self)
+    }
+
     /// Insert a SABR volatility cube.
     ///
     /// Accepts either an owned [`VolCube`] or an `Arc<VolCube>`.
@@ -84,6 +158,22 @@ impl MarketContext {
     pub fn insert_vol_cube(mut self, cube: impl Into<Arc<VolCube>>) -> Self {
         self.insert_vol_cube_mut(cube);
         self
+    }
+
+    /// Insert a SABR volatility cube, rejecting cross-registry volatility ID collisions.
+    ///
+    /// # Arguments
+    ///
+    /// * `cube` - Owned or shared SABR vol cube stored under `cube.id()`;
+    ///   replaces an existing `VolCube` with the same ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `cube.id()` is already registered in
+    /// `surfaces` or `fx_delta_vol_surfaces`.
+    pub fn try_insert_vol_cube(mut self, cube: impl Into<Arc<VolCube>>) -> crate::Result<Self> {
+        self.try_insert_vol_cube_mut(cube)?;
+        Ok(self)
     }
 
     /// Insert a dividend schedule.
@@ -295,9 +385,43 @@ impl MarketContext {
         let affects_credit_indices = self.curve_affects_credit_indices(&id);
         Arc::make_mut(&mut self.curves).insert(id, curve);
         if affects_credit_indices {
-            let _invalidated = self.rebind_all_credit_indices();
+            let _invalidated = self.prune_invalidated_credit_indices();
         }
         self
+    }
+
+    /// Insert a generic curve storage entry in place, failing atomically if credit-index rebinding fails.
+    ///
+    /// # Arguments
+    ///
+    /// * `curve` - Any curve type convertible into [`CurveStorage`], keyed by its own id;
+    ///   replaces an existing curve with the same ID and atomically rebinds dependent credit indices.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if replacing an existing curve invalidates
+    /// a bound credit index.
+    pub fn try_insert_mut<C>(&mut self, curve: C) -> crate::Result<&mut Self>
+    where
+        C: Into<CurveStorage>,
+    {
+        let curve: CurveStorage = curve.into();
+        let id = curve.id().to_owned();
+        let affects_credit_indices = self.curve_affects_credit_indices(&id);
+        let previous = Arc::make_mut(&mut self.curves).insert(id.clone(), curve);
+        if affects_credit_indices && let Err(err) = self.rebind_all_credit_indices() {
+            let curves = Arc::make_mut(&mut self.curves);
+            match previous {
+                Some(prev) => {
+                    curves.insert(id, prev);
+                }
+                None => {
+                    curves.remove(id.as_str());
+                }
+            }
+            return Err(err);
+        }
+        Ok(self)
     }
 
     /// Insert a volatility surface, mutating in place.
@@ -306,8 +430,31 @@ impl MarketContext {
     pub fn insert_surface_mut(&mut self, surface: impl Into<Arc<VolSurface>>) -> &mut Self {
         let arc_surface = surface.into();
         let id = arc_surface.id().to_owned();
+        self.evict_conflicting_vol_registries(id.as_str(), VolRegistry::Surfaces);
         Arc::make_mut(&mut self.surfaces).insert(id, arc_surface);
         self
+    }
+
+    /// Insert a volatility surface in place, rejecting cross-registry volatility ID collisions.
+    ///
+    /// # Arguments
+    ///
+    /// * `surface` - Owned or shared volatility surface stored under `surface.id()`;
+    ///   replaces an existing `VolSurface` with the same ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `surface.id()` is already registered in
+    /// `vol_cubes` or `fx_delta_vol_surfaces`.
+    pub fn try_insert_surface_mut(
+        &mut self,
+        surface: impl Into<Arc<VolSurface>>,
+    ) -> crate::Result<&mut Self> {
+        let arc_surface = surface.into();
+        let id = arc_surface.id().to_owned();
+        self.ensure_vol_id_available(id.as_str(), VolRegistry::Surfaces)?;
+        Arc::make_mut(&mut self.surfaces).insert(id, arc_surface);
+        Ok(self)
     }
 
     /// Insert an FX delta-quoted volatility surface, mutating in place.
@@ -342,8 +489,31 @@ impl MarketContext {
     ) -> &mut Self {
         let arc_surface = surface.into();
         let id = arc_surface.id().to_owned();
+        self.evict_conflicting_vol_registries(id.as_str(), VolRegistry::FxDeltaVolSurfaces);
         Arc::make_mut(&mut self.fx_delta_vol_surfaces).insert(id, arc_surface);
         self
+    }
+
+    /// Insert an FX delta-quoted volatility surface in place, rejecting cross-registry volatility ID collisions.
+    ///
+    /// # Arguments
+    ///
+    /// * `surface` - Owned or shared FX delta-vol surface stored under `surface.id()`;
+    ///   replaces an existing `FxDeltaVolSurface` with the same ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `surface.id()` is already registered in
+    /// `surfaces` or `vol_cubes`.
+    pub fn try_insert_fx_delta_vol_surface_mut(
+        &mut self,
+        surface: impl Into<Arc<FxDeltaVolSurface>>,
+    ) -> crate::Result<&mut Self> {
+        let arc_surface = surface.into();
+        let id = arc_surface.id().to_owned();
+        self.ensure_vol_id_available(id.as_str(), VolRegistry::FxDeltaVolSurfaces)?;
+        Arc::make_mut(&mut self.fx_delta_vol_surfaces).insert(id, arc_surface);
+        Ok(self)
     }
 
     /// Insert a SABR volatility cube, mutating in place.
@@ -352,8 +522,31 @@ impl MarketContext {
     pub fn insert_vol_cube_mut(&mut self, cube: impl Into<Arc<VolCube>>) -> &mut Self {
         let arc = cube.into();
         let id = arc.id().to_owned();
+        self.evict_conflicting_vol_registries(id.as_str(), VolRegistry::VolCubes);
         Arc::make_mut(&mut self.vol_cubes).insert(id, arc);
         self
+    }
+
+    /// Insert a SABR volatility cube in place, rejecting cross-registry volatility ID collisions.
+    ///
+    /// # Arguments
+    ///
+    /// * `cube` - Owned or shared SABR vol cube stored under `cube.id()`;
+    ///   replaces an existing `VolCube` with the same ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `cube.id()` is already registered in
+    /// `surfaces` or `fx_delta_vol_surfaces`.
+    pub fn try_insert_vol_cube_mut(
+        &mut self,
+        cube: impl Into<Arc<VolCube>>,
+    ) -> crate::Result<&mut Self> {
+        let arc = cube.into();
+        let id = arc.id().to_owned();
+        self.ensure_vol_id_available(id.as_str(), VolRegistry::VolCubes)?;
+        Arc::make_mut(&mut self.vol_cubes).insert(id, arc);
+        Ok(self)
     }
 
     /// Insert a dividend schedule, mutating in place.
@@ -373,7 +566,8 @@ impl MarketContext {
     ///
     /// Mirrors [`Self::insert_price`] but takes `&mut self`.
     pub fn insert_price_mut(&mut self, id: impl AsRef<str>, price: MarketScalar) -> &mut Self {
-        Arc::make_mut(&mut self.prices).insert(CurveId::from(id.as_ref()), price);
+        let id = CurveId::from(id.as_ref());
+        Arc::make_mut(&mut self.prices).insert(id, price);
         self
     }
 

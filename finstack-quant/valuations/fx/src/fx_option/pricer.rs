@@ -425,4 +425,60 @@ mod delegation_tests {
         assert_eq!(g.delta_forward, 0.0);
         assert_eq!(g.rho_foreign, 0.0);
     }
+
+    #[test]
+    fn fx_delta_vol_surface_propagates_cirp_forward_instead_of_expiry() {
+        use finstack_quant_core::dates::DayCountContext;
+        use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
+        use finstack_quant_models::volatility::{VolSource, get_fx_delta_vol};
+
+        let as_of = date!(2024 - 01 - 01);
+        let expiry = date!(2024 - 04 - 02);
+        let mut option = build_option(expiry);
+        option.strike = 1.25;
+        option.vol_surface_id = CurveId::new("EURUSD-DELTA");
+
+        let fx_delta = FxDeltaVolSurface::new(
+            "EURUSD-DELTA",
+            vec![0.10, 0.25, 0.50, 1.0],
+            vec![0.09, 0.10, 0.11, 0.12],
+            vec![0.025, 0.025, 0.025, 0.025],
+            vec![0.008, 0.008, 0.008, 0.008],
+            None,
+            None,
+        )
+        .expect("fx delta surface");
+        let source = VolSource::FxDelta(Arc::new(fx_delta.clone()));
+        assert!(source.get_vol(0.25, 1.20, option.strike).is_err());
+
+        let market = build_market(as_of).insert_fx_delta_vol_surface(fx_delta.clone());
+        let t = option
+            .day_count
+            .year_fraction(as_of, expiry, DayCountContext::default())
+            .expect("year fraction");
+        let df_dom = market.get_discount("USD-OIS").expect("usd").df(t);
+        let df_for = market.get_discount("EUR-OIS").expect("eur").df(t);
+        let cirp_fwd = 1.20 * df_for / df_dom;
+
+        let expected_vol = get_fx_delta_vol(&fx_delta, t, option.strike, cirp_fwd)
+            .expect("expected fx delta vol at CIRP forward");
+        let wrong_expiry_as_fwd_vol = get_fx_delta_vol(&fx_delta, t, option.strike, t)
+            .expect("vol if expiry were passed as forward");
+        assert!(
+            (expected_vol - wrong_expiry_as_fwd_vol).abs() > 1e-3,
+            "test smile must distinguish forward={cirp_fwd} from expiry={t}"
+        );
+        assert!(
+            (source
+                .get_fx_vol(t, option.strike, cirp_fwd)
+                .expect("VolSource::get_fx_vol")
+                - expected_vol)
+                .abs()
+                < 1e-12
+        );
+
+        let pv = compute_pv(&option, &market, as_of).expect("fx option pv from fx delta surface");
+        let recovered = implied_vol(&option, &market, as_of, pv.amount()).expect("implied vol");
+        assert!((recovered - expected_vol).abs() < 1e-6);
+    }
 }

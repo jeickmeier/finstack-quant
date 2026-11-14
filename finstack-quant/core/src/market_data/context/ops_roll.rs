@@ -33,14 +33,15 @@ impl MarketContext {
     /// (see Notes below).
     ///
     /// # Arguments
-    /// * `days` - Signed calendar-day offset for each curve base date; negative values roll backward.
+    /// * `days` - Non-negative calendar-day offset for each curve base date; `0` clones curves unchanged and negative values are rejected.
     ///
     /// # Returns
     /// A new `MarketContext` with all curves rolled forward.
     ///
     /// # Errors
-    /// Returns an error if any rolled curve base date exceeds the supported
-    /// calendar range or a curve cannot be rebuilt (e.g., too few points remain).
+    /// Returns an error if `days < 0`, if any rolled curve base date exceeds the
+    /// supported calendar range, if a curve cannot be rebuilt (e.g., too few points
+    /// remain), or if any dependent credit index fails to rebind against the rolled curves.
     ///
     /// # Notes
     /// - Surfaces and other market data are cloned without modification
@@ -70,6 +71,11 @@ impl MarketContext {
     /// # }
     /// ```
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
+        if days < 0 {
+            return Err(crate::Error::Validation(format!(
+                "MarketContext::roll_forward requires non-negative days, got {days}"
+            )));
+        }
         tracing::debug!(
             days,
             curve_count = self.curves.len(),
@@ -96,7 +102,7 @@ impl MarketContext {
         let mut new_ctx = self.clone();
         new_ctx.curves = Arc::new(rolled_curves);
 
-        let _invalidated = new_ctx.rebind_all_credit_indices();
+        new_ctx.rebind_all_credit_indices()?;
 
         Ok(new_ctx)
     }

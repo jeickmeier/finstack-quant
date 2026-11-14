@@ -386,6 +386,24 @@ where
     Ok(sum * h / 3.0)
 }
 
+#[inline]
+fn midpoint(a: f64, b: f64) -> f64 {
+    if (a >= 0.0) == (b >= 0.0) {
+        a + 0.5 * (b - a)
+    } else {
+        0.5 * a + 0.5 * b
+    }
+}
+
+#[inline]
+fn half_width(a: f64, b: f64) -> f64 {
+    if (a >= 0.0) == (b >= 0.0) {
+        0.5 * (b - a)
+    } else {
+        0.5 * b - 0.5 * a
+    }
+}
+
 /// Adaptive quadrature using recursive Simpson's rule.
 ///
 /// This method automatically refines the integration grid in areas where
@@ -455,6 +473,20 @@ where
             "adaptive Simpson endpoints and tolerance must be finite with tol >= 0".to_string(),
         ));
     }
+    #[allow(clippy::float_cmp)]
+    if a == b {
+        let fa = f(a);
+        if fa.is_finite() {
+            return Ok(0.0);
+        }
+        return Err(InputError::SolverConvergenceFailed {
+            iterations: 0,
+            residual: f64::NAN,
+            last_x: a,
+            reason: format!("adaptive_simpson integrand was non-finite at endpoint {a:.6e}"),
+        }
+        .into());
+    }
     /// One Simpson panel `[a, b]`: the integrand at `a`, `b` and the midpoint
     /// (`fc`) plus the panel's whole-interval Simpson estimate.
     #[derive(Clone, Copy)]
@@ -485,14 +517,28 @@ where
             fc,
             whole,
         } = panel;
-        let c = (a + b) / 2.0;
+        let c = midpoint(a, b);
+        let d = midpoint(a, c);
+        let e = midpoint(c, b);
+        #[allow(clippy::float_cmp)]
+        if c == a || c == b || d == a || d == c || e == c || e == b {
+            return (f64::NAN, f64::INFINITY);
+        }
 
-        let fd = f((a + c) / 2.0);
-        let fe = f((c + b) / 2.0);
+        let fd = f(d);
+        let fe = f(e);
+        if !fa.is_finite()
+            || !fb.is_finite()
+            || !fc.is_finite()
+            || !fd.is_finite()
+            || !fe.is_finite()
+        {
+            return (f64::NAN, f64::NAN);
+        }
 
         // Use proper Simpson's rule for each sub-interval
-        let h_left = (c - a) / 6.0; // (c-a)/6 for left Simpson interval
-        let h_right = (b - c) / 6.0; // (b-c)/6 for right Simpson interval
+        let h_left = half_width(a, c) / 3.0;
+        let h_right = half_width(c, b) / 3.0;
         let left = h_left * (fa + 4.0 * fd + fc);
         let right = h_right * (fc + 4.0 * fe + fb);
         let total = left + right;
@@ -527,8 +573,8 @@ where
         (left_result + right_result, left_error + right_error)
     }
 
-    let c = (a + b) / 2.0;
-    let h = (b - a) / 6.0;
+    let c = midpoint(a, b);
+    let h = half_width(a, b) / 3.0;
     let fa = f(a);
     let fb = f(b);
     let fc = f(c);
@@ -624,6 +670,25 @@ where
         ));
     }
 
+    let paired = |x| {
+        let (first, second) = f(x);
+        [first, second]
+    };
+    #[allow(clippy::float_cmp)]
+    if a == b {
+        let fa = paired(a);
+        if fa.iter().all(|v| v.is_finite()) {
+            return Ok((0.0, 0.0));
+        }
+        return Err(InputError::SolverConvergenceFailed {
+            iterations: 0,
+            residual: f64::NAN,
+            last_x: a,
+            reason: format!("adaptive_simpson_pair integrand was non-finite at endpoint {a:.6e}"),
+        }
+        .into());
+    }
+
     #[derive(Clone, Copy)]
     struct PairPanel {
         a: f64,
@@ -652,11 +717,24 @@ where
             fc,
             whole,
         } = panel;
-        let c = (a + b) / 2.0;
-        let fd = f((a + c) / 2.0);
-        let fe = f((c + b) / 2.0);
-        let h_left = (c - a) / 6.0;
-        let h_right = (b - c) / 6.0;
+        let c = midpoint(a, b);
+        let d = midpoint(a, c);
+        let e = midpoint(c, b);
+        #[allow(clippy::float_cmp)]
+        if c == a || c == b || d == a || d == c || e == c || e == b {
+            return ([f64::NAN; 2], [f64::INFINITY; 2]);
+        }
+        let fd = f(d);
+        let fe = f(e);
+        if [fa, fb, fc, fd, fe]
+            .iter()
+            .flatten()
+            .any(|v| !v.is_finite())
+        {
+            return ([f64::NAN; 2], [f64::NAN; 2]);
+        }
+        let h_left = half_width(a, c) / 3.0;
+        let h_right = half_width(c, b) / 3.0;
         let left: [f64; 2] = std::array::from_fn(|i| h_left * (fa[i] + 4.0 * fd[i] + fc[i]));
         let right: [f64; 2] = std::array::from_fn(|i| h_right * (fc[i] + 4.0 * fe[i] + fb[i]));
         let total: [f64; 2] = std::array::from_fn(|i| left[i] + right[i]);
@@ -693,12 +771,8 @@ where
         )
     }
 
-    let paired = |x| {
-        let (first, second) = f(x);
-        [first, second]
-    };
-    let c = (a + b) / 2.0;
-    let h = (b - a) / 6.0;
+    let c = midpoint(a, b);
+    let h = half_width(a, b) / 3.0;
     let fa = paired(a);
     let fb = paired(b);
     let fc = paired(c);
@@ -874,18 +948,22 @@ where
             "Gauss-Legendre integration bounds must be finite".to_string(),
         ));
     }
+    let (xs, ws) = gl_nodes_weights(order)?;
     // Exact comparison: zero-width integration interval is a standard degenerate case.
     #[allow(clippy::float_cmp)]
     if a == b {
-        return Ok(0.0);
+        return Ok(if f(a).is_finite() { 0.0 } else { f64::NAN });
     }
-    let (xs, ws) = gl_nodes_weights(order)?;
-    let half = 0.5 * (b - a);
-    let mid = a + half;
+    let half = half_width(a, b);
+    let mid = midpoint(a, b);
     let mut acc = 0.0;
     for i in 0..xs.len() {
         let x = mid + half * xs[i];
-        acc += ws[i] * f(x);
+        let fx = f(x);
+        if !fx.is_finite() {
+            return Ok(f64::NAN);
+        }
+        acc += ws[i] * fx;
     }
     Ok(acc * half)
 }
@@ -1060,6 +1138,21 @@ where
         ));
     }
     gl_nodes_weights(order)?;
+    #[allow(clippy::float_cmp)]
+    if a == b {
+        return if f(a).is_finite() {
+            Ok(0.0)
+        } else {
+            Err(InputError::SolverConvergenceFailed {
+                iterations: 0,
+                residual: f64::NAN,
+                last_x: a,
+                reason: "gauss_legendre_integrate_adaptive integrand evaluated to NaN or infinity"
+                    .to_string(),
+            }
+            .into())
+        };
+    }
 
     fn recurse<F2>(
         f: F2,
@@ -1073,8 +1166,12 @@ where
     where
         F2: Fn(f64) -> f64 + Copy,
     {
+        let mid = midpoint(a, b);
+        #[allow(clippy::float_cmp)]
+        if mid == a || mid == b {
+            return Ok((f64::NAN, f64::INFINITY));
+        }
         let i1 = gauss_legendre_integrate(f, a, b, order)?;
-        let mid = a + 0.5 * (b - a);
         let i2_left = gauss_legendre_integrate(f, a, mid, order)?;
         let i2_right = gauss_legendre_integrate(f, mid, b, order)?;
         let i2 = i2_left + i2_right;
@@ -1094,7 +1191,7 @@ where
         Err(InputError::SolverConvergenceFailed {
             iterations: max_depth,
             residual: error_estimate,
-            last_x: a + 0.5 * (b - a),
+            last_x: midpoint(a, b),
             reason: format!(
                 "gauss_legendre_integrate_adaptive did not meet total tolerance {tol:.2e} at \
                  max_depth {max_depth} (interval [{a:.6e}, {b:.6e}], summed error estimate {error_estimate:.2e})"
@@ -1263,5 +1360,21 @@ mod tests {
         }
         assert!(gauss_legendre_integrate_adaptive(|_| f64::NAN, 0.0, 1.0, 2, 1e-8, 5).is_err());
         assert!(gauss_legendre_integrate_adaptive(|x| x, 0.0, 0.0, 3, 1e-8, 5).is_err());
+    }
+
+    #[test]
+    fn adaptive_quadrature_fails_closed_on_midpoint_collapse_and_handles_extreme_bounds() {
+        // Non-polynomial cusp with tol = 0.0 and large max_depth hits ULP midpoint
+        // collapse before `error_estimate <= 0.0`; must return SolverConvergenceFailed.
+        let cusp = |x: f64| (x - 0.3).abs().sqrt();
+        assert!(adaptive_simpson(cusp, 0.0, 1.0, 0.0, 200).is_err());
+        assert!(adaptive_simpson_pair(|x| (cusp(x), x), 0.0, 1.0, 0.0, 200).is_err());
+        assert!(gauss_legendre_integrate_adaptive(cusp, 0.0, 1.0, 4, 0.0, 200).is_err());
+
+        // Same-sign large bounds where `(a + b) / 2.0` would overflow `f64::MAX`
+        let a = 1.0e308_f64;
+        let b = 1.0e308_f64 + 1.0e295_f64;
+        let res = adaptive_simpson(|_| 1.0, a, b, 1.0e285, 10).expect("overflow-safe midpoint");
+        assert!((res - (b - a)).abs() <= 1.0e285);
     }
 }

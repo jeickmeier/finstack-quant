@@ -407,6 +407,10 @@
       "start_date": "2025-01-15",
       "end_date": "2025-07-15",
       "frequency": "6M",
+      "coupon_period": [
+        "2025-01-15",
+        "2025-07-15"
+      ],
       "expected": {
         "year_fraction": 0.5,
         "tolerance": 1e-14
@@ -421,6 +425,10 @@
       "start_date": "2025-01-01",
       "end_date": "2025-04-01",
       "frequency": "3M",
+      "coupon_period": [
+        "2025-01-01",
+        "2025-04-01"
+      ],
       "expected": {
         "year_fraction": 0.25,
         "tolerance": 1e-14
@@ -435,6 +443,10 @@
       "start_date": "2025-01-01",
       "end_date": "2026-01-01",
       "frequency": "1Y",
+      "coupon_period": [
+        "2025-01-01",
+        "2026-01-01"
+      ],
       "expected": {
         "year_fraction": 1.0,
         "tolerance": 1e-14
@@ -460,18 +472,22 @@
       "notes": "122 of 181 reference days x 1/2"
     },
     {
-      "id": "actact_icma_long_first_coupon",
-      "description": "Act/Act ICMA: two regular semi-annual coupons.",
+      "id": "actact_icma_short_back_stub",
+      "description": "Act/Act ICMA: short back stub inside its regular reference coupon.",
       "source": "hand",
       "convention": "act_act_isma",
       "start_date": "2025-01-15",
-      "end_date": "2026-01-15",
+      "end_date": "2025-04-15",
       "frequency": "6M",
+      "coupon_period": [
+        "2025-01-15",
+        "2025-07-15"
+      ],
       "expected": {
-        "year_fraction": 1.0,
+        "year_fraction": 0.24861878453038674,
         "tolerance": 1e-14
       },
-      "notes": "2 coupons x 1/2"
+      "notes": "90 of 181 reference days x 1/2"
     },
     {
       "id": "actact_icma_spanning_leap_year",
@@ -481,6 +497,10 @@
       "start_date": "2024-01-15",
       "end_date": "2024-07-15",
       "frequency": "6M",
+      "coupon_period": [
+        "2024-01-15",
+        "2024-07-15"
+      ],
       "expected": {
         "year_fraction": 0.5,
         "tolerance": 1e-14
@@ -495,6 +515,10 @@
       "start_date": "2025-01-01",
       "end_date": "2025-02-01",
       "frequency": "1M",
+      "coupon_period": [
+        "2025-01-01",
+        "2025-02-01"
+      ],
       "expected": {
         "year_fraction": 0.08333333333333333,
         "tolerance": 1e-14

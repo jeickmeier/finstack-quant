@@ -337,20 +337,17 @@ impl BondZSpreadPricingKernel {
                             *date,
                         )?
                     } else {
-                        day_count.year_fraction(
+                        finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_year_fraction(
+                            day_count,
+                            Some(bond.cashflow_spec.frequency()),
+                            finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period(
+                                day_count,
+                                bond.cashflow_spec.frequency(),
+                                spread_flows.iter().map(|(d, _)| *d),
+                                quote_date,
+                            ),
                             quote_date,
                             *date,
-                            DayCountContext {
-                                frequency: Some(bond.cashflow_spec.frequency()),
-                                coupon_period:
-                                    finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period(
-                                        day_count,
-                                        bond.cashflow_spec.frequency(),
-                                        spread_flows.iter().map(|(d, _)| *d),
-                                        quote_date,
-                                    ),
-                                ..DayCountContext::default()
-                            },
                         )?
                     };
                     let df_base = disc.df_between_dates(quote_date, *date)?;

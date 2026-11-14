@@ -23,19 +23,23 @@ test('monotone-convex interpolation preserves a flat zero-forward strip', () => 
   }
 });
 
-test('ACT/ACT ICMA keeps the January roll day after February clamping', () => {
+test('ACT/ACT ICMA enforces contained single-period slices and preserves roll day across February', () => {
   const dc = core.DayCount.actActIsma();
   const start = core.createDate(2025, 1, 30);
   const february = core.createDate(2025, 2, 28);
   const end = core.createDate(2025, 3, 15);
-  const context = new core.DayCountContext(null, core.Tenor.monthly().toString(), null, [
-    start,
-    february,
-  ]);
+  const march30 = core.createDate(2025, 3, 30);
+  const monthly = core.Tenor.monthly().toString();
+  const firstCtx = new core.DayCountContext(null, monthly, null, [start, february]);
+  const secondCtx = new core.DayCountContext(null, monthly, null, [february, march30]);
   try {
-    assert.ok(Math.abs(dc.yearFraction(start, end, context) - 0.125) < 1e-14);
+    assert.throws(() => dc.yearFraction(start, end, firstCtx), /coupon_period/);
+    const total =
+      dc.yearFraction(start, february, firstCtx) + dc.yearFraction(february, end, secondCtx);
+    assert.ok(Math.abs(total - 0.125) < 1e-14);
   } finally {
-    context.free();
+    firstCtx.free();
+    secondCtx.free();
     dc.free();
   }
 });

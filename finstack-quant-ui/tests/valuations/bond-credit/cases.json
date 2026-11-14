@@ -328,7 +328,7 @@
           "metric": "z_spread",
           "value": {
             "ok": true,
-            "value": 2.278277739371289e-11
+            "value": 2.2782779128436365e-11
           }
         },
         {
@@ -565,7 +565,7 @@
           "metric": "z_spread",
           "value": {
             "ok": true,
-            "value": 0.013392156081105314
+            "value": 0.013392156081105317
           }
         },
         {
@@ -653,7 +653,7 @@
           "metric": "cs01",
           "value": {
             "ok": true,
-            "value": -766.4657129079569
+            "value": -766.4657129080733
           }
         },
         {
@@ -745,7 +745,7 @@
           "metric": "breakeven",
           "value": {
             "ok": true,
-            "value": 13.861172395663345
+            "value": 13.86117239566124
           }
         }
       ]
@@ -790,7 +790,7 @@
           "metric": "z_spread",
           "value": {
             "ok": true,
-            "value": 0.009604808242933936
+            "value": 0.009604808242933933
           }
         },
         {
@@ -1026,7 +1026,7 @@
           "metric": "i_spread",
           "value": {
             "ok": true,
-            "value": 0.012314441712922109
+            "value": 0.01231444171292213
           }
         },
         {
@@ -1062,7 +1062,7 @@
           "metric": "asw_market",
           "value": {
             "ok": true,
-            "value": 0.012275533380796544
+            "value": 0.012275533380796571
           }
         },
         {
@@ -1108,7 +1108,7 @@
           "metric": "dv01",
           "value": {
             "ok": true,
-            "value": -764.0653065764927
+            "value": -764.0653065764345
           }
         },
         {
@@ -1133,14 +1133,14 @@
           "metric": "jump_to_default",
           "value": {
             "ok": true,
-            "value": -598439.0310809418
+            "value": -598439.0310809416
           }
         },
         {
           "metric": "theta",
           "value": {
             "ok": true,
-            "value": 10750.413228582358
+            "value": 10750.41322858259
           }
         },
         {
@@ -1154,7 +1154,7 @@
           "metric": "theta_roll_down",
           "value": {
             "ok": true,
-            "value": 10750.413228582358
+            "value": 10750.41322858259
           }
         },
         {
@@ -1175,14 +1175,14 @@
           "metric": "pull_to_par",
           "value": {
             "ok": true,
-            "value": 10597.72099482633
+            "value": 10597.720994826326
           }
         },
         {
           "metric": "roll_down",
           "value": {
             "ok": true,
-            "value": 152.69223375626098
+            "value": 152.6922337562646
           }
         },
         {
@@ -1252,7 +1252,7 @@
           "metric": "z_spread",
           "value": {
             "ok": true,
-            "value": 0.02622520336466365
+            "value": 0.02622520336466363
           }
         },
         {
@@ -1302,7 +1302,7 @@
           "metric": "discount_margin",
           "value": {
             "ok": true,
-            "value": 0.026225203365709986
+            "value": 0.02622520336570998
           }
         },
         {
@@ -1344,7 +1344,7 @@
           "metric": "cs01",
           "value": {
             "ok": true,
-            "value": -393.855798652512
+            "value": -393.85579865262844
           }
         },
         {

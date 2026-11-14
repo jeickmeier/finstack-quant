@@ -67,10 +67,13 @@ impl DiscountCurve {
     ///
     /// Each `(t, r)` pillar is converted to a discount factor under
     /// `compounding` (`DF = exp(-r t)` for continuous, `(1 + r)^-t` for
-    /// annual, and so on). A pillar at `t = 0` maps to `DF = 1` regardless of
-    /// its rate. The curve uses the builder defaults: `Act/365F` day count,
-    /// monotone-convex interpolation, flat-forward extrapolation and
-    /// market-standard validation.
+    /// annual, and so on). A pillar at `t = 0` maps to `DF = 1` provided `r`
+    /// is finite and inside `compounding`'s valid rate domain. The curve uses
+    /// the builder defaults: `Act/365F` day count, monotone-convex
+    /// interpolation, and flat-forward extrapolation. When all zero rates are
+    /// non-negative, market-standard validation applies; when negative zero
+    /// rates are supplied (`r < 0`, `DF > 1`), non-monotonic discount factors
+    /// are permitted so negative-rate curves build cleanly.
     ///
     /// # Arguments
     ///
@@ -84,10 +87,9 @@ impl DiscountCurve {
     ///
     /// # Errors
     ///
-    /// Returns an error when `points` is empty, a time or rate is non-finite,
-    /// a rate produces a non-positive discount factor, or the resulting knots
-    /// fail curve validation (duplicate times, non-monotonic discount factors,
-    /// implied forwards below the market-standard floor).
+    /// Returns an error when `points` is empty, a time is negative or
+    /// non-finite, a rate is non-finite or outside `compounding`'s domain
+    /// (`DF <= 0`), or the resulting knots fail curve validation.
     pub fn from_zero_rates(
         id: impl Into<CurveId>,
         base_date: Date,
@@ -98,23 +100,35 @@ impl DiscountCurve {
             return Err(crate::InputError::TooFewPoints.into());
         }
         let mut knots = Vec::with_capacity(points.len() + 1);
+        let mut has_negative_rate = false;
         for &(t, r) in points {
-            if !t.is_finite() || !r.is_finite() {
+            if !t.is_finite() || t < 0.0 || !r.is_finite() {
                 return Err(crate::Error::Validation(format!(
-                    "DiscountCurve::from_zero_rates requires finite pillars, got (t={t}, r={r})"
+                    "DiscountCurve::from_zero_rates requires finite non-negative times and finite rates, got (t={t}, r={r})"
                 )));
             }
-            let df = if t == 0.0 {
-                1.0
-            } else {
-                compounding.df_from_rate(r, t)
-            };
+            let df = compounding.df_from_rate(r, t);
+            if !df.is_finite() || df <= 0.0 {
+                return Err(crate::Error::Validation(format!(
+                    "DiscountCurve::from_zero_rates pillar (t={t}, r={r}) under {compounding:?} produced invalid discount factor {df}"
+                )));
+            }
+            if r < 0.0 || df > 1.0 {
+                has_negative_rate = true;
+            }
             knots.push((t, df));
         }
         if !knots.iter().any(|&(t, _)| t == 0.0) {
             knots.push((0.0, 1.0));
         }
-        Self::builder(id).base_date(base_date).knots(knots).build()
+        let mut builder = Self::builder(id).base_date(base_date).knots(knots);
+        if has_negative_rate {
+            builder = builder.validation(ValidationMode::Raw {
+                allow_non_monotonic: true,
+                forward_floor: None,
+            });
+        }
+        builder.build()
     }
 
     /// Construct a discount curve from dated discount-factor pillars.
@@ -166,11 +180,18 @@ impl DiscountCurve {
         if !knots.iter().any(|&(t, _)| t == 0.0) {
             knots.push((0.0, 1.0));
         }
-        Self::builder(id)
+        let has_above_unit_df = knots.iter().any(|&(_, df)| df > 1.0);
+        let mut builder = Self::builder(id)
             .base_date(base_date)
             .day_count(day_count)
-            .knots(knots)
-            .build()
+            .knots(knots);
+        if has_above_unit_df {
+            builder = builder.validation(ValidationMode::Raw {
+                allow_non_monotonic: true,
+                forward_floor: None,
+            });
+        }
+        builder.build()
     }
 
     /// Unique identifier of the curve.
@@ -562,12 +583,18 @@ impl DiscountCurve {
         builder
     }
 
-    /// Rebuild this curve with replacement knots while preserving all metadata.
+    /// Rebuild this curve with replacement knots while preserving structural metadata.
     ///
-    /// This retains interpolation, extrapolation, validation policy, calibration
-    /// provenance, minimum forward tenor, and FX policy. Replacement pillars
-    /// define a new interpolation; previous roll and shock transformations are
-    /// not reapplied to these replacement discount factors.
+    /// This retains interpolation, extrapolation, validation policy, minimum
+    /// forward tenor, and FX policy, while clearing stale calibration
+    /// provenance (`rate_calibration`) because replacement pillars no longer
+    /// match the original calibration quotes. Previous roll and shock
+    /// transformations are not reapplied to these replacement discount factors.
+    ///
+    /// # Arguments
+    ///
+    /// * `knots` - Replacement `(time, discount_factor)` pillars in years from
+    ///   [`base_date`](Self::base_date) under [`day_count`](Self::day_count).
     ///
     /// # Errors
     ///
@@ -577,7 +604,10 @@ impl DiscountCurve {
     where
         I: IntoIterator<Item = (f64, f64)>,
     {
-        self.metadata_builder(self.id.clone()).knots(knots).build()
+        self.metadata_builder(self.id.clone())
+            .rate_calibration_opt(None)
+            .knots(knots)
+            .build()
     }
 
     /// Builder pre-populated with this curve's full metadata but **no** knots.

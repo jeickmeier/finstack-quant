@@ -1,9 +1,12 @@
 //! Python bindings for `finstack_quant_core::math::linalg`.
 
 use finstack_quant_core::math::linalg;
-use numpy::{PyReadonlyArray2, PyUntypedArrayMethods};
+use numpy::{
+    PyArrayDescrMethods, PyReadonlyArray1, PyReadonlyArray2, PyUntypedArray, PyUntypedArrayMethods,
+};
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PyModule};
+use pyo3::types::{PyBool, PyBytes, PyFloat, PyInt, PyList, PyModule, PyString};
 
 use crate::errors::core_to_py;
 
@@ -19,30 +22,129 @@ fn cholesky_err(e: impl std::fmt::Display) -> PyErr {
     CholeskyError::new_err(e.to_string())
 }
 
-/// Extract a matrix in logical row-major order regardless of NumPy strides.
-fn extract_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize, usize)> {
-    if let Ok(array) = matrix.extract::<PyReadonlyArray2<'_, f64>>() {
-        let shape = array.shape();
-        let (rows, cols) = (shape[0], shape[1]);
-        return Ok((
-            crate::bindings::matrix_input::numpy_row_major(&array),
-            rows,
-            cols,
-        ));
+/// Extract a numeric scalar as `f64`, rejecting Python `bool` and NumPy `bool_`.
+fn extract_linalg_f64(elem: &Bound<'_, PyAny>, what: &str) -> PyResult<f64> {
+    if elem.is_instance_of::<PyBool>()
+        || elem
+            .get_type()
+            .name()
+            .is_ok_and(|name| name == "bool" || name == "bool_")
+    {
+        return Err(PyTypeError::new_err(format!(
+            "{what} must be a number, not bool"
+        )));
     }
-    let rows: Vec<Vec<f64>> = matrix
-        .extract()
-        .map_err(|_| crate::errors::value_error("expected a square nested list or 2-D array"))?;
-    let nrows = rows.len();
-    let ncols = rows.first().map_or(0, Vec::len);
-    for (i, row) in rows.iter().enumerate() {
-        if row.len() != ncols {
-            return Err(crate::errors::value_error(format!(
-                "Row {i} has length {} but expected {ncols} (ragged matrix)",
-                row.len()
+    elem.extract::<f64>()
+        .map_err(|_| PyTypeError::new_err(format!("{what} must be a number")))
+}
+
+/// Extract a 1-D numeric vector, rejecting `bool` and non-numeric types with `TypeError`.
+fn extract_vector(vec_obj: &Bound<'_, PyAny>, label: &str) -> PyResult<Vec<f64>> {
+    if let Ok(untyped) = vec_obj.cast::<PyUntypedArray>() {
+        let kind = untyped.dtype().kind();
+        if !matches!(kind, b'f' | b'i' | b'u') {
+            return Err(PyTypeError::new_err(format!(
+                "{label} must have a real numeric dtype, not bool or non-numeric"
             )));
         }
+        if untyped.ndim() != 1 {
+            return Err(crate::errors::value_error(format!(
+                "{label} must be a 1-D sequence, got {}-D array",
+                untyped.ndim()
+            )));
+        }
+        if let Ok(array) = vec_obj.extract::<PyReadonlyArray1<'_, f64>>() {
+            return Ok(array.as_array().iter().copied().collect());
+        }
     }
+    if vec_obj.is_instance_of::<PyString>() || vec_obj.is_instance_of::<PyBytes>() {
+        return Err(PyTypeError::new_err(format!(
+            "{label} must be a 1-D sequence of numbers"
+        )));
+    }
+    let iter = vec_obj
+        .try_iter()
+        .map_err(|_| PyTypeError::new_err(format!("{label} must be a 1-D sequence of numbers")))?;
+    let mut out = Vec::new();
+    for item in iter {
+        let item = item?;
+        out.push(extract_linalg_f64(&item, &format!("{label} element"))?);
+    }
+    Ok(out)
+}
+
+/// Extract a matrix in logical row-major order regardless of NumPy strides.
+///
+/// Shape mismatches (1-D numeric list, wrong array dimensionality, or ragged
+/// rows) raise `ValueError`; non-sequence containers, strings, `bool` values,
+/// and non-numeric entries raise `TypeError`.
+fn extract_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize, usize)> {
+    if let Ok(untyped) = matrix.cast::<PyUntypedArray>() {
+        let kind = untyped.dtype().kind();
+        if !matches!(kind, b'f' | b'i' | b'u') {
+            return Err(PyTypeError::new_err(
+                "matrix elements must have a real numeric dtype, not bool or non-numeric",
+            ));
+        }
+        if untyped.ndim() != 2 {
+            return Err(crate::errors::value_error(
+                "expected a square nested list or 2-D array",
+            ));
+        }
+        if let Ok(array) = matrix.extract::<PyReadonlyArray2<'_, f64>>() {
+            let shape = array.shape();
+            let (rows, cols) = (shape[0], shape[1]);
+            return Ok((
+                crate::bindings::matrix_input::numpy_row_major(&array),
+                rows,
+                cols,
+            ));
+        }
+    }
+    if matrix.is_instance_of::<PyString>() || matrix.is_instance_of::<PyBytes>() {
+        return Err(PyTypeError::new_err(
+            "expected a 2-D sequence of numbers or NumPy array",
+        ));
+    }
+    let outer = matrix
+        .try_iter()
+        .map_err(|_| PyTypeError::new_err("expected a 2-D sequence of numbers or NumPy array"))?;
+    let mut rows: Vec<Vec<f64>> = Vec::new();
+    for (i, row_res) in outer.enumerate() {
+        let row_obj = row_res?;
+        if row_obj.is_instance_of::<PyString>() || row_obj.is_instance_of::<PyBytes>() {
+            return Err(PyTypeError::new_err(
+                "expected a 2-D sequence of numbers, got string row",
+            ));
+        }
+        if !row_obj.is_instance_of::<PyBool>()
+            && (row_obj.is_instance_of::<PyFloat>() || row_obj.is_instance_of::<PyInt>())
+        {
+            return Err(crate::errors::value_error(
+                "expected a square nested list or 2-D array",
+            ));
+        }
+        let row_iter = row_obj.try_iter().map_err(|_| {
+            PyTypeError::new_err("expected a 2-D sequence of numbers or NumPy array")
+        })?;
+        let mut row = Vec::new();
+        for elem_res in row_iter {
+            let elem = elem_res?;
+            row.push(extract_linalg_f64(&elem, "matrix element")?);
+        }
+        if let Some(first) = rows.first()
+            && row.len() != first.len()
+        {
+            return Err(crate::errors::value_error(format!(
+                "Row {i} has length {} but expected {} (ragged matrix)",
+                row.len(),
+                first.len()
+            )));
+        }
+        rows.push(row);
+    }
+    let nrows = rows.len();
+    let ncols = rows.first().map_or(0, Vec::len);
     Ok((rows.into_iter().flatten().collect(), nrows, ncols))
 }
 
@@ -79,8 +181,9 @@ fn square_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize)> {
 /// # Errors
 ///
 /// Raises ``CholeskyError`` (a ``ValueError`` subclass) when the matrix is not
-/// positive-definite, is numerically singular, or contains non-finite entries.
-/// Raises ``ValueError`` when the input cannot be read as a square matrix.
+/// symmetric, not positive-definite, is numerically singular, or contains
+/// non-finite entries. Raises ``ValueError`` when the input cannot be read as a
+/// square matrix.
 #[pyfunction]
 #[pyo3(text_signature = "(matrix)")]
 fn cholesky_decomposition(py: Python<'_>, matrix: &Bound<'_, PyAny>) -> PyResult<Vec<Vec<f64>>> {
@@ -113,8 +216,13 @@ fn cholesky_decomposition(py: Python<'_>, matrix: &Bound<'_, PyAny>) -> PyResult
 /// contains values that cannot be converted to float.
 #[pyfunction]
 #[pyo3(text_signature = "(chol, b)")]
-fn cholesky_solve(py: Python<'_>, chol: &Bound<'_, PyAny>, b: Vec<f64>) -> PyResult<Vec<f64>> {
+fn cholesky_solve(
+    py: Python<'_>,
+    chol: &Bound<'_, PyAny>,
+    b: &Bound<'_, PyAny>,
+) -> PyResult<Vec<f64>> {
     let (flat, _) = square_matrix(chol)?;
+    let b = extract_vector(b, "b")?;
     let mut x = vec![0.0; b.len()];
     py.detach(|| linalg::cholesky_solve(&flat, &b, &mut x))
         .map_err(core_to_py)?;
@@ -131,11 +239,16 @@ fn cholesky_solve(py: Python<'_>, chol: &Bound<'_, PyAny>, b: Vec<f64>) -> PyRes
 /// as ``list[float]``. Returns L z as ``list[float]``.
 ///
 /// Raises ``ValueError`` when L is not square or z's length does not match L's
-/// dimension.
+/// dimension, and ``TypeError`` when inputs contain ``bool`` or non-numeric values.
 #[pyfunction]
 #[pyo3(text_signature = "(l, z)")]
-fn apply_lower_triangular(py: Python<'_>, l: &Bound<'_, PyAny>, z: Vec<f64>) -> PyResult<Vec<f64>> {
+fn apply_lower_triangular(
+    py: Python<'_>,
+    l: &Bound<'_, PyAny>,
+    z: &Bound<'_, PyAny>,
+) -> PyResult<Vec<f64>> {
     let (flat, n) = square_matrix(l)?;
+    let z = extract_vector(z, "z")?;
     py.detach(|| linalg::apply_lower_triangular(&flat, n, &z))
         .map_err(core_to_py)
 }
@@ -147,7 +260,7 @@ fn apply_lower_triangular(py: Python<'_>, l: &Bound<'_, PyAny>, z: Vec<f64>) -> 
 /// columns). Eigenvalues are not sorted. Accepts ``list[list[float]]`` or a
 /// ``numpy.ndarray``.
 ///
-/// Raises ``CholeskyError`` on a dimension mismatch or non-finite entries.
+/// Raises ``CholeskyError`` on asymmetry, a dimension mismatch, or non-finite entries.
 #[pyfunction]
 #[pyo3(text_signature = "(matrix)")]
 fn symmetric_eigen(

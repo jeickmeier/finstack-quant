@@ -729,7 +729,7 @@ fn lookback_fixture() -> (LookbackOption, MarketContext, Date) {
     let surface = VolSurface::from_grid(
         "SPX-VOL",
         &[0.0, 10.0],
-        &[0.0, 10_000.0],
+        &[1.0, 10_000.0],
         &[0.20, 0.20, 0.20, 0.20],
         Default::default(),
         None,

@@ -31,12 +31,14 @@ from finstack_quant.core.market_data import (
     DiscountCurve,
     ForwardCurve,
     FxConversionPolicy,
+    FxDeltaVolSurface,
     FxMatrix,
     FxPairConvention,
     HazardCurve,
     InflationIndex,
     MarketContext,
     ScalarTimeSeries,
+    VolSurface,
     invert_fx_rate,
 )
 from finstack_quant.core.money import Money
@@ -262,12 +264,23 @@ class TestCoreTypesParity:
         assert str(Rate(0.05)) == "0.05"
 
     def test_student_t_invalid_degrees_of_freedom_raises(self) -> None:
-        from finstack_quant.core.math import special_functions
+        from finstack_quant.core.math import linalg, special_functions
 
         with pytest.raises(ValueError, match="df"):
             special_functions.student_t_cdf(0.0, 0.0)
         with pytest.raises(ValueError, match="df"):
             special_functions.student_t_inv_cdf(0.5, math.nan)
+        for bad_p in (-0.1, 1.1, math.nan):
+            with pytest.raises(ValueError, match="probability p"):
+                special_functions.student_t_inv_cdf(bad_p, 5.0)
+        assert special_functions.student_t_inv_cdf(0.0, 5.0) == -math.inf
+        assert special_functions.student_t_inv_cdf(1.0, 5.0) == math.inf
+        assert math.isnan(special_functions.standard_normal_inv_cdf(-0.1))
+        assert math.isnan(special_functions.standard_normal_inv_cdf(1.1))
+        with pytest.raises(linalg.CholeskyError, match="not symmetric"):
+            linalg.cholesky_decomposition([[1.0, 0.5], [0.4, 1.0]])
+        with pytest.raises(linalg.CholeskyError, match="not symmetric"):
+            linalg.symmetric_eigen([[1.0, 0.5], [0.4, 1.0]])
 
     def test_credit_rating_notches_are_preserved_and_models_owns_warf(self) -> None:
         assert CreditRating("BBB+") == CreditRating.BBB_PLUS
@@ -304,10 +317,16 @@ class TestDayCountParity:
         with pytest.raises(ValueError, match="coupon_period"):
             DayCount.ACT_365L.year_fraction(start, end, DayCountContext(frequency="6M"))
 
-    def test_icma_long_last_coupon_preserves_roll_day_after_february(self) -> None:
-        start, end = date(2025, 1, 30), date(2025, 3, 15)
-        ctx = DayCountContext(frequency="1M", coupon_period=(start, date(2025, 2, 28)))
-        assert DayCount.ACT_ACT_ISMA.year_fraction(start, end, ctx) == pytest.approx(0.125, abs=1e-14)
+    def test_icma_requires_contained_interval_and_explicit_slicing(self) -> None:
+        start, feb, end = date(2025, 1, 30), date(2025, 2, 28), date(2025, 3, 15)
+        mar_30 = date(2025, 3, 30)
+        first_ctx = DayCountContext(frequency="1M", coupon_period=(start, feb))
+        second_ctx = DayCountContext(frequency="1M", coupon_period=(feb, mar_30))
+        with pytest.raises(ValueError, match="coupon_period"):
+            DayCount.ACT_ACT_ISMA.year_fraction(start, end, first_ctx)
+        first = DayCount.ACT_ACT_ISMA.year_fraction(start, feb, first_ctx)
+        second = DayCount.ACT_ACT_ISMA.year_fraction(feb, end, second_ctx)
+        assert first + second == pytest.approx(0.125, abs=1e-14)
 
     def test_thirty360_year_fraction(self) -> None:
         """30/360: exactly 6 months = 0.5."""
@@ -802,6 +821,28 @@ class TestMarketContextParity:
         retrieved = mc.get_discount("USD-OIS")
         assert retrieved.id == "USD-OIS"
 
+    def test_cross_vol_registry_id_collision_and_negative_roll_forward_raise_value_error(
+        self,
+    ) -> None:
+        mc = MarketContext()
+        mc.insert(
+            DiscountCurve(
+                "SHARED",
+                date(2024, 1, 1),
+                [(0.0, 1.0), (1.0, 0.95)],
+                day_count="act_365f",
+            )
+        )
+        mc.insert_price("SHARED", 100.0)
+        mc.insert_series(ScalarTimeSeries("SHARED", [(date(2024, 1, 1), 1.0)]))
+        mc.insert(VolSurface("SHARED", [1.0], [100.0], [0.2]))
+        assert mc.get_discount("SHARED").id == "SHARED"
+        assert mc.get_series("SHARED").id == "SHARED"
+        with pytest.raises(ValueError, match="already registered"):
+            mc.insert(FxDeltaVolSurface("SHARED", [1.0], [0.12], [0.01], [0.002]))
+        with pytest.raises(ValueError, match="non-negative"):
+            mc.roll_forward(-1)
+
     def test_insert_and_get_forward(self) -> None:
         """Insert a forward curve and retrieve by ID."""
         mc = MarketContext()
@@ -1126,3 +1167,65 @@ def test_hazard_conditional_default_prob_survives_low_unconditional_survival(rat
         curve.conditional_default_prob("not-a-date", end)
     with pytest.raises(TypeError):
         curve.conditional_default_prob(1.0, end)  # type: ignore[arg-type]
+
+
+def test_insert_price_preserves_large_int_and_money_handles() -> None:
+    exact_int = 2**53 + 1
+    mc = MarketContext()
+    mc.insert_price("LARGE-INT", exact_int, "USD")
+    mc.insert_price("STR-PRICE", "9007199254740993.25", "USD")
+    mc.insert_price("MONEY-HANDLE", Money.from_decimal(Decimal("123.456789012345678901"), "EUR"))
+    mc.insert_price("MONEY-MATCHING-CCY", Money(42.5, "GBP"), "GBP")
+
+    assert mc.get_price("LARGE-INT") == (Decimal(exact_int), "USD")
+    assert mc.get_price("STR-PRICE") == (Decimal("9007199254740993.25"), "USD")
+    assert mc.get_price("MONEY-HANDLE") == (Decimal("123.456789012345678901"), "EUR")
+    assert mc.get_price("MONEY-MATCHING-CCY") == (Decimal("42.5"), "GBP")
+
+    with pytest.raises(ValueError, match="currency argument"):
+        mc.insert_price("CONFLICT", Money(10.0, "USD"), "EUR")
+    with pytest.raises(TypeError):
+        mc.insert_price("BOOL-UNITLESS", True)  # type: ignore[arg-type]
+    with pytest.raises(TypeError):
+        mc.insert_price("BOOL-MONEY", True, "USD")  # type: ignore[arg-type]
+
+
+def test_core_bindings_reject_bool_as_numeric_input() -> None:
+    import numpy as np
+
+    from finstack_quant.core.math import linalg
+
+    rate = Rate(0.05)
+    bps = Bps(25)
+    curve = DiscountCurve.flat("USD-OIS", "2025-01-01", 0.04)
+    fx = FxMatrix(None)
+    conv = FxPairConvention("EUR", "USD", 0.0001)
+    cpi = InflationIndex("US-CPI", [("2025-01-01", 300.0)], "USD")
+
+    for call in (
+        lambda: rate * True,  # type: ignore[operator]
+        lambda: True * rate,  # type: ignore[operator]
+        lambda: rate / False,  # type: ignore[operator]
+        lambda: Bps(True),  # type: ignore[arg-type]
+        lambda: bps * True,  # type: ignore[operator]
+        lambda: True * bps,  # type: ignore[operator]
+        lambda: bps / True,  # type: ignore[operator]
+        lambda: fx.set_quotes([("EUR", "USD", True)]),  # type: ignore[list-item]
+        lambda: fx.set_quote_on("EUR", "USD", "2025-01-02", "cashflow_date", True),  # type: ignore[arg-type]
+        lambda: FxMatrix.from_dict({"EURUSD": True}, None),  # type: ignore[dict-item]
+        lambda: FxPairConvention("EUR", "USD", True),  # type: ignore[arg-type]
+        lambda: conv.rate_points(True),  # type: ignore[arg-type]
+        lambda: invert_fx_rate(True),  # type: ignore[arg-type]
+        lambda: curve.df(True),  # type: ignore[arg-type]
+        lambda: ScalarTimeSeries("S", [("2025-01-01", True)]),  # type: ignore[list-item]
+        lambda: InflationIndex("CPI", [("2025-01-01", 300.0)], "USD", lag=True),  # type: ignore[arg-type]
+        lambda: cpi.ref_cpi_months_lag("2025-04-01", True),  # type: ignore[arg-type]
+        lambda: linalg.cholesky_decomposition([[True, False], [False, True]]),  # type: ignore[list-item]
+        lambda: linalg.cholesky_decomposition(np.array([[True, False], [False, True]])),  # type: ignore[arg-type]
+        lambda: linalg.cholesky_decomposition([["bad"]]),  # type: ignore[list-item]
+        lambda: linalg.cholesky_solve([[2.0, 0.0], [0.0, 2.0]], [True, False]),  # type: ignore[list-item]
+        lambda: linalg.apply_lower_triangular([[2.0, 0.0], [0.0, 2.0]], [True, False]),  # type: ignore[list-item]
+        lambda: linalg.ledoit_wolf_shrinkage([[True, False], [False, True]]),  # type: ignore[list-item]
+    ):
+        with pytest.raises(TypeError):
+            call()

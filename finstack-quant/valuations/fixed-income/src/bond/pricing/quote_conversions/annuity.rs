@@ -52,30 +52,32 @@ pub fn fixed_leg_annuity(
         return Ok(0.0);
     }
 
-    let dc_ctx = DayCountContext {
-        frequency,
-        coupon_period: frequency.and_then(|frequency| {
-            finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period(
-                day_count,
-                frequency,
-                schedule.iter().copied(),
-                schedule[0],
-            )
-        }),
-        ..DayCountContext::default()
-    };
+    let ref_period = frequency.and_then(|frequency| {
+        finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period(
+            day_count,
+            frequency,
+            schedule.iter().copied(),
+            schedule[0],
+        )
+    });
     let mut ann = 0.0;
     let mut prev = schedule[0];
     for &d in &schedule[1..] {
-        let context = if day_count == finstack_quant_core::dates::DayCount::Act365L {
-            DayCountContext {
-                coupon_period: Some((prev, d)),
-                ..dc_ctx
-            }
+        let alpha = if day_count == finstack_quant_core::dates::DayCount::Act365L {
+            day_count.year_fraction(
+                prev,
+                d,
+                DayCountContext {
+                    frequency,
+                    coupon_period: Some((prev, d)),
+                    ..DayCountContext::default()
+                },
+            )?
         } else {
-            dc_ctx
+            finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_year_fraction(
+                day_count, frequency, ref_period, prev, d,
+            )?
         };
-        let alpha = day_count.year_fraction(prev, d, context)?;
         let p = disc.df_on_date(d)?;
         ann += alpha * p;
         prev = d;
@@ -697,5 +699,77 @@ mod tests {
             let expected = (end - start).whole_days() as f64 / denominator;
             assert!((annuity - expected).abs() < 1e-14, "{start} -> {end}");
         }
+    }
+
+    #[test]
+    fn shocked_discount_curve_drops_stale_swap_calibration_quotes_for_par_rate() {
+        use finstack_quant_core::currency::Currency;
+        use finstack_quant_core::dates::StubKind;
+        use finstack_quant_core::market_data::bumps::{BumpSpec, Bumpable};
+        use finstack_quant_core::market_data::term_structures::{
+            RateCalibrationCurveRole, RateCalibrationMethod, RateCalibrationPillar,
+            RateCalibrationQuote, RateCalibrationRecipe,
+        };
+        use finstack_quant_core::money::Money;
+        use finstack_quant_core::types::{CurveId, IndexId, Rate};
+
+        let base = date!(2025 - 01 - 02);
+        let maturity = date!(2030 - 01 - 02);
+        let recipe = RateCalibrationRecipe {
+            currency: Currency::USD,
+            method: RateCalibrationMethod::Bootstrap,
+            curve_day_count: DayCount::Act365F,
+            ois_compounding: None,
+            role: RateCalibrationCurveRole::Discount {
+                projection_curve_id: CurveId::new("USD-OIS"),
+            },
+            quotes: vec![
+                RateCalibrationQuote::Swap {
+                    index_id: IndexId::new("USD-SOFR-OIS"),
+                    pillar: RateCalibrationPillar::Tenor(Tenor::parse("2Y").expect("2Y")),
+                    rate: 0.04,
+                    spread_decimal: None,
+                },
+                RateCalibrationQuote::Swap {
+                    index_id: IndexId::new("USD-SOFR-OIS"),
+                    pillar: RateCalibrationPillar::Tenor(Tenor::parse("5Y").expect("5Y")),
+                    rate: 0.04,
+                    spread_decimal: None,
+                },
+            ],
+        };
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .knots([
+                (0.0, 1.0),
+                (2.0, (-0.04_f64 * 2.0).exp()),
+                (5.0, (-0.04_f64 * 5.0).exp()),
+            ])
+            .rate_calibration(recipe)
+            .build()
+            .expect("calibrated curve");
+        let bond = Bond::fixed(
+            "TEST-BOND",
+            Money::new(1_000_000.0, Currency::USD).expect("valid notional"),
+            Rate::from_decimal(0.05).expect("valid coupon rate"),
+            base,
+            maturity,
+            StubKind::None,
+            "USD-OIS",
+        )
+        .expect("fixed bond");
+
+        let base_par = curve_par_rate(&bond, &disc, base, maturity).expect("base par rate");
+        let shocked_disc = disc
+            .apply_bump(BumpSpec::parallel_bp(100.0))
+            .expect("100bp parallel bump");
+        assert!(shocked_disc.rate_calibration().is_none());
+        let shocked_par =
+            curve_par_rate(&bond, &shocked_disc, base, maturity).expect("shocked par rate");
+        assert!(
+            shocked_par > base_par + 0.008,
+            "shocked par rate must move with discount factors instead of reading stale swap quotes: base={base_par}, shocked={shocked_par}"
+        );
     }
 }

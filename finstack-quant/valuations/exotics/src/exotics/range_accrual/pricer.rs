@@ -26,7 +26,9 @@ use finstack_quant_models::monte_carlo::pricer::path_dependent::{
 };
 use finstack_quant_models::monte_carlo::process::gbm::{GbmParams, GbmProcess};
 use finstack_quant_valuations_core::instruments::Instrument;
-use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at;
+use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
+    resolve_fx_sigma_at, resolve_sigma_at,
+};
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, expect_inst,
 };
@@ -81,11 +83,12 @@ fn asset_growth(
         )?;
     finstack_quant_core::validation::validate_f64_positive(fx_spot, "RangeAccrual quanto FX spot")?;
     let fx_forward = fx_spot * asset_df / payoff_df;
-    let sigma_fx = resolve_sigma_at(
+    let sigma_fx = resolve_fx_sigma_at(
         &Default::default(),
         curves,
         quanto.fx_vol_surface_id.as_str(),
         t,
+        fx_forward,
         fx_forward,
     )?;
     Ok((-(q + quanto.correlation * sigma * sigma_fx) * t).exp() / asset_df)

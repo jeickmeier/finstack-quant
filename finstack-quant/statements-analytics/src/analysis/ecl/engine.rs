@@ -890,10 +890,11 @@ mod tests {
     }
 
     fn make_pd_curve() -> RawPdCurve {
-        RawPdCurve {
-            rating: "BBB".to_string(),
-            knots: vec![(0.0, 0.0), (1.0, 0.02), (2.0, 0.04), (5.0, 0.10)],
-        }
+        RawPdCurve::new(
+            "BBB",
+            vec![(0.0, 0.0), (1.0, 0.02), (2.0, 0.04), (5.0, 0.10)],
+        )
+        .expect("valid BBB PD curve")
     }
 
     #[test]
@@ -1337,10 +1338,8 @@ mod tests {
     fn test_ecl_hand_computed() {
         // Simple 2-bucket test with known marginal PDs.
         // Curve: cumulative PD at t=0 is 0, at t=0.5 is 0.01, at t=1.0 is 0.02
-        let curve = RawPdCurve {
-            rating: "TEST".to_string(),
-            knots: vec![(0.0, 0.0), (0.5, 0.01), (1.0, 0.02)],
-        };
+        let curve = RawPdCurve::new("TEST", vec![(0.0, 0.0), (0.5, 0.01), (1.0, 0.02)])
+            .expect("valid TEST PD curve");
         let exposure = Exposure {
             id: "HAND".to_string(),
             segments: vec![],

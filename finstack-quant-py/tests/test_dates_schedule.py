@@ -328,7 +328,9 @@ def test_tenor_constructor_forms_and_context_helpers() -> None:
     assert DayCount.from_name(" ACT_ACT_ISMA ") == DayCount.ACT_ACT_ISMA
     assert DayCount.from_name(" ACT_360 ") == DayCount.ACT_360
     assert DayCount.ACT_ACT_ISMA.year_fraction(
-        "2025-01-15", "2025-07-15", DayCountContext(frequency="6M")
+        "2025-01-15",
+        "2025-07-15",
+        DayCountContext(frequency="6M", coupon_period=("2025-01-15", "2025-07-15")),
     ) == pytest.approx(0.5)
 
     joint = HolidayCalendar("GBLO + nyse")
@@ -411,10 +413,16 @@ def test_business_day_shift_rejects_calendar_boundary() -> None:
         add_business_days("9999-12-31", 1, "weekends_only")
 
 
-@pytest.mark.parametrize("days", [-(2**63), 2**63 - 1])
-def test_market_roll_rejects_extreme_day_offsets(days: int) -> None:
+@pytest.mark.parametrize(
+    ("days", "match"),
+    [
+        (-(2**63), "non-negative days"),
+        (2**63 - 1, "supported date range"),
+    ],
+)
+def test_market_roll_rejects_extreme_day_offsets(days: int, match: str) -> None:
     from finstack_quant.core.market_data import DiscountCurve, MarketContext
 
     context = MarketContext().insert(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.05))
-    with pytest.raises(ValueError, match="supported date range"):
+    with pytest.raises(ValueError, match=match):
         context.roll_forward(days)

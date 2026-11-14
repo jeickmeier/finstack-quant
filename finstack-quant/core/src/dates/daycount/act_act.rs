@@ -5,143 +5,48 @@ use time::{Date, Month};
 use super::DayCountContext;
 use crate::InputError;
 use crate::dates::date_extensions::DateExt;
-use crate::dates::tenor::TenorUnit;
+use crate::dates::tenor::{Tenor, TenorUnit};
 
-const MAX_ACT_ACT_ISMA_PERIODS: usize = 512;
-
-/// Calculate ACT/ACT (ICMA/ISMA) year fraction using explicit reference coupon boundaries.
-///
-/// This helper is intended for irregular first/last coupons where the regular
-/// coupon period cannot be inferred from `start`, `end`, and `frequency` alone.
-/// The `reference_start`/`reference_end` pair must describe one unadjusted regular
-/// coupon period from the contractual schedule. Its nominal month length is
-/// inferred by rounding `12 * reference_days / 365`, so February clamping does
-/// not shorten the coupon tenor. The endpoints must reproduce the same nominal
-/// month grid; business-day-adjusted payment dates are not reference boundaries.
-/// Nominal boundaries outside that reference are generated from the original
-/// unclamped endpoint; if both endpoints are month-end, the grid retains EOM.
-///
-/// Use this helper when you already know the surrounding regular coupon period
-/// from the bond schedule. For regular coupons, prefer
-/// [`super::DayCount::ActActIsma`] with a [`DayCountContext`] that
-/// supplies only the coupon frequency.
-///
-/// # Arguments
-///
-/// * `start` - Accrual start date of the coupon being measured
-/// * `end` - Accrual end date of the coupon being measured
-/// * `reference_start` - Unadjusted start of the corresponding regular coupon period.
-/// * `reference_end` - Unadjusted end of that regular coupon period on the same nominal month grid.
-///
-/// # Returns
-///
-/// The ICMA/ISMA year fraction for the irregular coupon period.
-///
-/// # Errors
-///
-/// Returns an error if the accrual dates are reversed, the reference period is
-/// invalid, its endpoints do not reproduce one nominal month grid, or alignment
-/// exceeds the supported number of nominal periods.
-///
-/// # References
-///
-/// - ICMA convention background: `docs/REFERENCES.md#icma-rule-book`
-pub(super) fn act_act_isma_year_fraction_with_reference_period(
-    start: Date,
-    end: Date,
-    reference_start: Date,
-    reference_end: Date,
-) -> crate::Result<f64> {
-    if start > end {
-        return Err(InputError::InvalidDateRange.into());
-    }
-    if start == end {
-        return Ok(0.0);
-    }
-    if reference_start >= reference_end {
-        return Err(InputError::InvalidDateRange.into());
-    }
-
-    let reference_days = (reference_end - reference_start).whole_days() as f64;
-    let period_months = (12.0 * reference_days / 365.0).round() as u32;
-    if period_months == 0 {
-        return Err(crate::Error::Validation(
-            "ACT/ACT ISMA reference period must span at least one month".to_string(),
-        ));
-    }
-    let coupon_length_years = period_months as f64 / 12.0;
-    let preserve_eom = reference_start == reference_start.end_of_month()
-        && reference_end == reference_end.end_of_month();
-    // The larger day identifies the unclamped roll anchor: Jan 30 / Feb 28
-    // and Feb 28 / Mar 30 both describe a roll on the 30th. Generate every
-    // nominal date from that original anchor, never from a February clamp.
-    let (anchor, anchor_index) = if reference_start.day() >= reference_end.day() {
-        (reference_start, 0)
-    } else {
-        (reference_end, 1)
-    };
-    let period_months = i32::try_from(period_months).map_err(|_| {
-        crate::Error::Validation(
-            "ACT/ACT ISMA reference period length in months overflows i32".to_string(),
-        )
-    })?;
-    let boundary = |index: i32| -> crate::Result<Date> {
-        if index.unsigned_abs() as usize >= MAX_ACT_ACT_ISMA_PERIODS {
-            return Err(crate::Error::Validation(
-                "ACT/ACT ISMA reference-period traversal exceeded its supported range".into(),
-            ));
+/// Resolve the nominal period length in months for supported ICMA coupon frequencies.
+fn icma_period_months(frequency: Tenor) -> crate::Result<i32> {
+    match (frequency.unit(), frequency.count()) {
+        (TenorUnit::Months, m @ (1 | 2 | 3 | 4 | 6 | 12)) => Ok(m as i32),
+        (TenorUnit::Years, 1) => Ok(12),
+        _ => Err(InputError::ActActIsmaUnsupportedFrequency {
+            frequency: frequency.to_string(),
         }
-        let months = (index - anchor_index)
-            .checked_mul(period_months)
-            .ok_or_else(|| {
-                crate::Error::Validation(
-                    "ACT/ACT ISMA reference-period month offset overflows".to_string(),
-                )
-            })?;
-        let shifted = anchor.add_months(months)?;
-        Ok(if preserve_eom {
-            shifted.end_of_month()
-        } else {
-            shifted
-        })
-    };
-    if boundary(0)? != reference_start || boundary(1)? != reference_end {
-        return Err(crate::Error::Validation(
-            "ACT/ACT ISMA reference endpoints must share an unadjusted nominal month grid".into(),
-        ));
-    }
-    let mut index = 0;
-    let mut period_start = reference_start;
-    let mut period_end = reference_end;
-    while start < period_start {
-        index -= 1;
-        period_end = period_start;
-        period_start = boundary(index)?;
-    }
-    while start >= period_end {
-        index += 1;
-        period_start = period_end;
-        period_end = boundary(index + 1)?;
-    }
-
-    let mut total = 0.0;
-    loop {
-        if period_start >= period_end {
-            return Err(InputError::InvalidDateRange.into());
-        }
-        let overlap_start = start.max(period_start);
-        let overlap_end = end.min(period_end);
-        let overlap_days = (overlap_end - overlap_start).whole_days() as f64;
-        let coupon_days = (period_end - period_start).whole_days() as f64;
-        total += overlap_days / coupon_days * coupon_length_years;
-        if end <= period_end {
-            return Ok(total);
-        }
-        index += 1;
-        period_start = period_end;
-        period_end = boundary(index + 1)?;
+        .into()),
     }
 }
+
+/// Validate ACT/ACT (ICMA) context and return `(period_months, (period_start, period_end))`.
+fn validated_act_act_isma(ctx: DayCountContext<'_>) -> crate::Result<(i32, (Date, Date))> {
+    let frequency = ctx
+        .frequency
+        .ok_or(InputError::MissingFrequencyForActActIsma)?;
+    let period_months = icma_period_months(frequency)?;
+    let (period_start, period_end) = ctx
+        .coupon_period
+        .ok_or(InputError::MissingCouponPeriodForActActIsma)?;
+    if period_start >= period_end {
+        return Err(InputError::InvalidDateRange.into());
+    }
+
+    let month_span = (period_end.year() - period_start.year()) * 12
+        + (i32::from(u8::from(period_end.month())) - i32::from(u8::from(period_start.month())));
+    let shares_nominal_grid = month_span == period_months
+        && (period_start.add_months(period_months) == Ok(period_end)
+            || period_end.add_months(-period_months) == Ok(period_start));
+    if !shares_nominal_grid {
+        return Err(crate::Error::Validation(
+            "ACT/ACT ISMA coupon_period endpoints must share one unadjusted nominal month grid of frequency"
+                .to_string(),
+        ));
+    }
+
+    Ok((period_months, (period_start, period_end)))
+}
+
 /// ACT/ACT (ISDA): the integer count of complete calendar years between the
 /// two partial years, plus at most two partial-year fractions (days over that
 /// year's 365 or 366). Precondition: `start < end`.
@@ -161,83 +66,46 @@ pub(super) fn year_fraction_act_act_isda(start: Date, end: Date) -> f64 {
         + f64::from(end_days) / year_days(end.year())
 }
 
-// Context-aware helpers for year_fraction_impl
-
-/// Check ACT/ACT (ICMA) context: a frequency is required; an explicit
-/// reference period must reproduce one nominal month grid, and without one
-/// the frequency must be in months or years.
+/// Check ACT/ACT (ICMA) context: both an ICMA coupon frequency in
+/// `{1M, 2M, 3M, 4M, 6M, 12M, 1Y}` and a single unadjusted nominal
+/// `coupon_period` of that frequency are required.
 pub(super) fn validate_act_act_isma_context(ctx: DayCountContext<'_>) -> crate::Result<()> {
-    let frequency = ctx
-        .frequency
-        .ok_or(InputError::MissingFrequencyForActActIsma)?;
-    match ctx.coupon_period {
-        Some((ref_start, ref_end)) => {
-            act_act_isma_year_fraction_with_reference_period(ref_start, ref_end, ref_start, ref_end)
-                .map(|_| ())
-        }
-        None if matches!(frequency.unit(), TenorUnit::Weeks | TenorUnit::Days) => {
-            Err(InputError::ActActIsmaUnsupportedFrequency {
-                frequency: frequency.to_string(),
-            }
-            .into())
-        }
-        None => Ok(()),
-    }
+    validated_act_act_isma(ctx).map(|_| ())
 }
 
-/// ACT/ACT (ISMA) with context extraction.
+/// Check that `[start, end]` lies within the enclosing ICMA `coupon_period`.
+pub(super) fn validate_act_act_isma_interval(
+    start: Date,
+    end: Date,
+    ctx: DayCountContext<'_>,
+) -> crate::Result<()> {
+    let (period_start, period_end) = ctx
+        .coupon_period
+        .ok_or(InputError::MissingCouponPeriodForActActIsma)?;
+    if start < period_start || end > period_end {
+        return Err(crate::Error::Validation(format!(
+            "ACT/ACT ISMA accrual [{start}, {end}] must lie within coupon_period [{period_start}, {period_end}]"
+        )));
+    }
+    Ok(())
+}
+
+/// Contained single-period ACT/ACT (ICMA/ISMA) year fraction.
 ///
-/// When `ctx.coupon_period` is set, delegates to
-/// [`act_act_isma_year_fraction_with_reference_period`] for exact
-/// mid-coupon or stub accrual. Otherwise the frequency-only path is used
-/// only when `[start, end)` is a regular period of `frequency`; irregular
-/// coupons without a reference period return
-/// [`InputError::MissingCouponPeriodForActActIsma`].
+/// Requires `ctx.frequency` in `{1M, 2M, 3M, 4M, 6M, 12M, 1Y}` (`F = 12 / m`)
+/// and `ctx.coupon_period = Some((period_start, period_end))` spanning one
+/// unadjusted nominal period of `frequency` with `period_start <= start <= end <= period_end`.
 pub(super) fn year_fraction_act_act_isma_with_ctx(
     start: Date,
     end: Date,
     ctx: DayCountContext<'_>,
 ) -> crate::Result<f64> {
-    let frequency = ctx
-        .frequency
-        .ok_or(InputError::MissingFrequencyForActActIsma)?;
-    if let Some((ref_start, ref_end)) = ctx.coupon_period {
-        return act_act_isma_year_fraction_with_reference_period(start, end, ref_start, ref_end);
-    }
-    let (months, coupon_fraction) = match frequency.unit() {
-        TenorUnit::Months => (frequency.count() as i32, frequency.count() as f64 / 12.0),
-        TenorUnit::Years => (frequency.count() as i32 * 12, frequency.count() as f64),
-        TenorUnit::Weeks | TenorUnit::Days => {
-            return Err(InputError::ActActIsmaUnsupportedFrequency {
-                frequency: frequency.to_string(),
-            }
-            .into());
-        }
-    };
-    if start == end {
-        return Ok(0.0);
-    }
-    let mut total = 0.0;
-    // Anchor every boundary on start, preserving month-end clamping. Only
-    // complete periods are admitted without explicit reference dates.
-    if months > 0 {
-        for k in 1..=MAX_ACT_ACT_ISMA_PERIODS as i32 {
-            let Some(step) = k.checked_mul(months) else {
-                break;
-            };
-            let Ok(boundary) = start.add_months(step) else {
-                break;
-            };
-            total += coupon_fraction;
-            if boundary == end {
-                return Ok(total);
-            }
-            if boundary > end {
-                break;
-            }
-        }
-    }
-    Err(InputError::MissingCouponPeriodForActActIsma.into())
+    let (period_months, (period_start, period_end)) = validated_act_act_isma(ctx)?;
+    validate_act_act_isma_interval(start, end, ctx)?;
+    let actual_days = (end - start).whole_days() as f64;
+    let period_days = (period_end - period_start).whole_days() as f64;
+    let coupons_per_year = f64::from(12 / period_months);
+    Ok(actual_days / (coupons_per_year * period_days))
 }
 
 /// ACT/ACT AFB (Association Française des Banques / Actual/Actual Euro).

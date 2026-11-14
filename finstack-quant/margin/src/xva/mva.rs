@@ -345,6 +345,19 @@ pub(crate) fn compute_mva_internal(
 ) -> finstack_quant_core::Result<MvaResult> {
     im_profile.validate()?;
     validate_spread_curve(funding_spread_curve)?;
+    let spread_interp = if funding_spread_curve.len() >= 2 {
+        let (times, spreads): (Vec<f64>, Vec<f64>) = funding_spread_curve.iter().copied().unzip();
+        Some(finstack_quant_core::math::interp::Interpolator::<
+            finstack_quant_core::math::interp::LinearStrategy,
+        >::new(
+            times.into_boxed_slice(),
+            spreads.into_boxed_slice(),
+            finstack_quant_core::math::interp::ExtrapolationPolicy::FlatZero,
+            finstack_quant_core::math::interp::ValidationPolicy::AllowNegative,
+        )?)
+    } else {
+        None
+    };
 
     let n = im_profile.times.len();
     let mut mva = 0.0;
@@ -398,10 +411,11 @@ pub(crate) fn compute_mva_internal(
         // used by the FVA leg in `xva::cva`.
         let sp_mid =
             0.5 * (prev_own_sp + own_sp_t) * 0.5 * (prev_counterparty_sp + counterparty_sp_t);
-        let spread_mid = finstack_quant_core::math::interp::interp_knots_flat(
-            funding_spread_curve,
-            0.5 * (prev_t + t),
-        ) / BASIS_POINTS_PER_UNIT;
+        let spread_bp = match &spread_interp {
+            Some(interp) => interp.interp(0.5 * (prev_t + t)),
+            None => funding_spread_curve[0].1,
+        };
+        let spread_mid = spread_bp / BASIS_POINTS_PER_UNIT;
 
         mva += spread_mid * im_mid * df_mid * sp_mid * dt;
         im_time_integral += im_mid * dt;

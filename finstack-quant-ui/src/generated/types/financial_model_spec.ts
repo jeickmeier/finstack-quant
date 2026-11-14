@@ -203,10 +203,12 @@ export type D_557De6D70142Abc041E8 = string;
  *   yields exactly 1.0.
  * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
  *   (days in segment) / (days in that year) for each segment, and sum.
- * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
- *   frequency, take (actual days) / (actual days in coupon period) for each,
- *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
- *   first/last coupons also supply the enclosing regular `coupon_period`.
+ * - **`ActActIsma`** (ICMA): single-period contained ICMA fraction
+ *   `actual_days(start, end) / (coupons_per_year * actual_days(coupon_period))`.
+ *   Requires both `frequency` (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`)
+ *   and the enclosing unadjusted nominal `coupon_period` in
+ *   [`DayCountContext`]; spans crossing nominal coupon boundaries must be
+ *   sliced by the schedule builder before calling `year_fraction`.
  * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
  *   **backwards from `end`** until the candidate is before `start`; each
  *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -294,7 +296,11 @@ export type D_557De6D70142Abc041E8 = string;
  *
  * // Actual/Actual (ICMA): one full semi-annual period is 0.5
  * let (start, end) = (date(2025, Month::January, 15), date(2025, Month::July, 15));
- * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
+ * let ctx = DayCountContext {
+ *     frequency: Some(Tenor::semi_annual()),
+ *     coupon_period: Some((start, end)),
+ *     ..Default::default()
+ * };
  * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
  *
  * // Business/252: Monday to next Monday is 4 business days, because the
@@ -2145,10 +2151,12 @@ export interface D_78D4B16242Febe84F62B {
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
    *   (days in segment) / (days in that year) for each segment, and sum.
-   * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
-   *   frequency, take (actual days) / (actual days in coupon period) for each,
-   *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons also supply the enclosing regular `coupon_period`.
+   * - **`ActActIsma`** (ICMA): single-period contained ICMA fraction
+   *   `actual_days(start, end) / (coupons_per_year * actual_days(coupon_period))`.
+   *   Requires both `frequency` (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`)
+   *   and the enclosing unadjusted nominal `coupon_period` in
+   *   [`DayCountContext`]; spans crossing nominal coupon boundaries must be
+   *   sliced by the schedule builder before calling `year_fraction`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -2236,7 +2244,11 @@ export interface D_78D4B16242Febe84F62B {
    *
    * // Actual/Actual (ICMA): one full semi-annual period is 0.5
    * let (start, end) = (date(2025, Month::January, 15), date(2025, Month::July, 15));
-   * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::semi_annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
    * // Business/252: Monday to next Monday is 4 business days, because the
@@ -2822,10 +2834,12 @@ export interface D_09Ad66Dca63Dbc62Aee4 {
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
    *   (days in segment) / (days in that year) for each segment, and sum.
-   * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
-   *   frequency, take (actual days) / (actual days in coupon period) for each,
-   *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons also supply the enclosing regular `coupon_period`.
+   * - **`ActActIsma`** (ICMA): single-period contained ICMA fraction
+   *   `actual_days(start, end) / (coupons_per_year * actual_days(coupon_period))`.
+   *   Requires both `frequency` (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`)
+   *   and the enclosing unadjusted nominal `coupon_period` in
+   *   [`DayCountContext`]; spans crossing nominal coupon boundaries must be
+   *   sliced by the schedule builder before calling `year_fraction`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -2913,7 +2927,11 @@ export interface D_09Ad66Dca63Dbc62Aee4 {
    *
    * // Actual/Actual (ICMA): one full semi-annual period is 0.5
    * let (start, end) = (date(2025, Month::January, 15), date(2025, Month::July, 15));
-   * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::semi_annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
    * // Business/252: Monday to next Monday is 4 business days, because the
@@ -3124,10 +3142,12 @@ export interface D_63Aec3D47748D9F3D86A {
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
    *   (days in segment) / (days in that year) for each segment, and sum.
-   * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
-   *   frequency, take (actual days) / (actual days in coupon period) for each,
-   *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons also supply the enclosing regular `coupon_period`.
+   * - **`ActActIsma`** (ICMA): single-period contained ICMA fraction
+   *   `actual_days(start, end) / (coupons_per_year * actual_days(coupon_period))`.
+   *   Requires both `frequency` (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`)
+   *   and the enclosing unadjusted nominal `coupon_period` in
+   *   [`DayCountContext`]; spans crossing nominal coupon boundaries must be
+   *   sliced by the schedule builder before calling `year_fraction`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -3215,7 +3235,11 @@ export interface D_63Aec3D47748D9F3D86A {
    *
    * // Actual/Actual (ICMA): one full semi-annual period is 0.5
    * let (start, end) = (date(2025, Month::January, 15), date(2025, Month::July, 15));
-   * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::semi_annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
    * // Business/252: Monday to next Monday is 4 business days, because the
@@ -6370,10 +6394,12 @@ export interface D_756Aabf913F51B821A96 {
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
    *   (days in segment) / (days in that year) for each segment, and sum.
-   * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
-   *   frequency, take (actual days) / (actual days in coupon period) for each,
-   *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons also supply the enclosing regular `coupon_period`.
+   * - **`ActActIsma`** (ICMA): single-period contained ICMA fraction
+   *   `actual_days(start, end) / (coupons_per_year * actual_days(coupon_period))`.
+   *   Requires both `frequency` (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`)
+   *   and the enclosing unadjusted nominal `coupon_period` in
+   *   [`DayCountContext`]; spans crossing nominal coupon boundaries must be
+   *   sliced by the schedule builder before calling `year_fraction`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -6461,7 +6487,11 @@ export interface D_756Aabf913F51B821A96 {
    *
    * // Actual/Actual (ICMA): one full semi-annual period is 0.5
    * let (start, end) = (date(2025, Month::January, 15), date(2025, Month::July, 15));
-   * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::semi_annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
    * // Business/252: Monday to next Monday is 4 business days, because the
@@ -9470,10 +9500,12 @@ export interface D_8Dd62D29564577Ef6F97 {
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
    *   (days in segment) / (days in that year) for each segment, and sum.
-   * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
-   *   frequency, take (actual days) / (actual days in coupon period) for each,
-   *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons also supply the enclosing regular `coupon_period`.
+   * - **`ActActIsma`** (ICMA): single-period contained ICMA fraction
+   *   `actual_days(start, end) / (coupons_per_year * actual_days(coupon_period))`.
+   *   Requires both `frequency` (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`)
+   *   and the enclosing unadjusted nominal `coupon_period` in
+   *   [`DayCountContext`]; spans crossing nominal coupon boundaries must be
+   *   sliced by the schedule builder before calling `year_fraction`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -9561,7 +9593,11 @@ export interface D_8Dd62D29564577Ef6F97 {
    *
    * // Actual/Actual (ICMA): one full semi-annual period is 0.5
    * let (start, end) = (date(2025, Month::January, 15), date(2025, Month::July, 15));
-   * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::semi_annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
    * // Business/252: Monday to next Monday is 4 business days, because the
@@ -11128,10 +11164,12 @@ export interface DF6Da7F7Ae3129Fc74F07 {
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
    *   (days in segment) / (days in that year) for each segment, and sum.
-   * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
-   *   frequency, take (actual days) / (actual days in coupon period) for each,
-   *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons also supply the enclosing regular `coupon_period`.
+   * - **`ActActIsma`** (ICMA): single-period contained ICMA fraction
+   *   `actual_days(start, end) / (coupons_per_year * actual_days(coupon_period))`.
+   *   Requires both `frequency` (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`)
+   *   and the enclosing unadjusted nominal `coupon_period` in
+   *   [`DayCountContext`]; spans crossing nominal coupon boundaries must be
+   *   sliced by the schedule builder before calling `year_fraction`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -11219,7 +11257,11 @@ export interface DF6Da7F7Ae3129Fc74F07 {
    *
    * // Actual/Actual (ICMA): one full semi-annual period is 0.5
    * let (start, end) = (date(2025, Month::January, 15), date(2025, Month::July, 15));
-   * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::semi_annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
    * // Business/252: Monday to next Monday is 4 business days, because the
@@ -11532,10 +11574,12 @@ export interface D_450829Dac3A74A5C8761 {
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
    *   (days in segment) / (days in that year) for each segment, and sum.
-   * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
-   *   frequency, take (actual days) / (actual days in coupon period) for each,
-   *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons also supply the enclosing regular `coupon_period`.
+   * - **`ActActIsma`** (ICMA): single-period contained ICMA fraction
+   *   `actual_days(start, end) / (coupons_per_year * actual_days(coupon_period))`.
+   *   Requires both `frequency` (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`)
+   *   and the enclosing unadjusted nominal `coupon_period` in
+   *   [`DayCountContext`]; spans crossing nominal coupon boundaries must be
+   *   sliced by the schedule builder before calling `year_fraction`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -11623,7 +11667,11 @@ export interface D_450829Dac3A74A5C8761 {
    *
    * // Actual/Actual (ICMA): one full semi-annual period is 0.5
    * let (start, end) = (date(2025, Month::January, 15), date(2025, Month::July, 15));
-   * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::semi_annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
    * // Business/252: Monday to next Monday is 4 business days, because the
@@ -13847,10 +13895,12 @@ export interface DB925Ced0Cbd67041A76F {
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
    *   (days in segment) / (days in that year) for each segment, and sum.
-   * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
-   *   frequency, take (actual days) / (actual days in coupon period) for each,
-   *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons also supply the enclosing regular `coupon_period`.
+   * - **`ActActIsma`** (ICMA): single-period contained ICMA fraction
+   *   `actual_days(start, end) / (coupons_per_year * actual_days(coupon_period))`.
+   *   Requires both `frequency` (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`)
+   *   and the enclosing unadjusted nominal `coupon_period` in
+   *   [`DayCountContext`]; spans crossing nominal coupon boundaries must be
+   *   sliced by the schedule builder before calling `year_fraction`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -13938,7 +13988,11 @@ export interface DB925Ced0Cbd67041A76F {
    *
    * // Actual/Actual (ICMA): one full semi-annual period is 0.5
    * let (start, end) = (date(2025, Month::January, 15), date(2025, Month::July, 15));
-   * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::semi_annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
    * // Business/252: Monday to next Monday is 4 business days, because the
@@ -15159,10 +15213,12 @@ export interface DF6Da7F7Ae3129Fc74F071 {
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
    *   (days in segment) / (days in that year) for each segment, and sum.
-   * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
-   *   frequency, take (actual days) / (actual days in coupon period) for each,
-   *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons also supply the enclosing regular `coupon_period`.
+   * - **`ActActIsma`** (ICMA): single-period contained ICMA fraction
+   *   `actual_days(start, end) / (coupons_per_year * actual_days(coupon_period))`.
+   *   Requires both `frequency` (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`)
+   *   and the enclosing unadjusted nominal `coupon_period` in
+   *   [`DayCountContext`]; spans crossing nominal coupon boundaries must be
+   *   sliced by the schedule builder before calling `year_fraction`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -15250,7 +15306,11 @@ export interface DF6Da7F7Ae3129Fc74F071 {
    *
    * // Actual/Actual (ICMA): one full semi-annual period is 0.5
    * let (start, end) = (date(2025, Month::January, 15), date(2025, Month::July, 15));
-   * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::semi_annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
    * // Business/252: Monday to next Monday is 4 business days, because the
@@ -15527,10 +15587,12 @@ export interface D_450829Dac3A74A5C87611 {
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
    *   (days in segment) / (days in that year) for each segment, and sum.
-   * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
-   *   frequency, take (actual days) / (actual days in coupon period) for each,
-   *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
-   *   first/last coupons also supply the enclosing regular `coupon_period`.
+   * - **`ActActIsma`** (ICMA): single-period contained ICMA fraction
+   *   `actual_days(start, end) / (coupons_per_year * actual_days(coupon_period))`.
+   *   Requires both `frequency` (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`)
+   *   and the enclosing unadjusted nominal `coupon_period` in
+   *   [`DayCountContext`]; spans crossing nominal coupon boundaries must be
+   *   sliced by the schedule builder before calling `year_fraction`.
    * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
    *   **backwards from `end`** until the candidate is before `start`; each
    *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
@@ -15618,7 +15680,11 @@ export interface D_450829Dac3A74A5C87611 {
    *
    * // Actual/Actual (ICMA): one full semi-annual period is 0.5
    * let (start, end) = (date(2025, Month::January, 15), date(2025, Month::July, 15));
-   * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::semi_annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
    * // Business/252: Monday to next Monday is 4 business days, because the

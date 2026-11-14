@@ -348,6 +348,27 @@ fn validate_finite_positive(name: &str, value: f64) -> crate::Result<()> {
     Ok(())
 }
 
+fn standardize_normal(x: f64, mean: f64, std_dev: f64) -> crate::Result<f64> {
+    validate_finite_positive("std_dev", std_dev)?;
+    if !mean.is_finite() {
+        return Err(crate::Error::Validation(format!(
+            "mean must be finite, got {mean}"
+        )));
+    }
+    if x.is_nan() {
+        return Err(crate::Error::Validation("x must not be NaN".to_string()));
+    }
+    if !x.is_finite() {
+        return Ok(x);
+    }
+    let diff = x - mean;
+    Ok(if diff.is_finite() {
+        diff / std_dev
+    } else {
+        (x / std_dev) - (mean / std_dev)
+    })
+}
+
 /// General normal cumulative distribution function.
 ///
 /// Computes the CDF of `N(mean, std_dev^2)` by standardizing into the standard
@@ -355,23 +376,23 @@ fn validate_finite_positive(name: &str, value: f64) -> crate::Result<()> {
 /// `Φ((x - mean) / std_dev)`.
 ///
 /// `std_dev` is the standard deviation in the same units as `x` and `mean`,
-/// not the variance. `x` and `mean` are passed through IEEE-754 arithmetic;
-/// non-finite values therefore produce the corresponding floating-point CDF
-/// result rather than a validation error.
+/// not the variance. Infinite `x` values evaluate to their `0.0` / `1.0` tail
+/// limits; `NaN` `x` or non-finite `mean` returns a validation error.
 ///
 /// # Arguments
 ///
-/// * `x` - Point at which to evaluate the normal CDF.
-/// * `mean` - Mean of the normal distribution, in the same units as `x`.
-/// * `std_dev` - Strictly positive standard deviation, in the same units as
+/// * `x` - Point at which to evaluate the normal CDF (`±∞` accepted, `NaN` rejected).
+/// * `mean` - Finite mean of the normal distribution, in the same units as `x`.
+/// * `std_dev` - Strictly positive finite standard deviation, in the same units as
 ///   `x` and `mean`; this is not the variance.
 ///
 /// # Errors
 ///
-/// Returns an error only if `std_dev` is non-finite or not strictly positive.
+/// Returns an error if `std_dev` is non-finite or not strictly positive, `mean`
+/// is non-finite, or `x` is `NaN`.
 pub fn norm_cdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f64> {
-    validate_finite_positive("std_dev", std_dev)?;
-    Ok(norm_cdf((x - mean) / std_dev))
+    let z = standardize_normal(x, mean, std_dev)?;
+    Ok(norm_cdf(z))
 }
 
 /// General normal probability density function.
@@ -381,22 +402,38 @@ pub fn norm_cdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f6
 /// `φ((x - mean) / std_dev) / std_dev`.
 ///
 /// `std_dev` is the standard deviation in the same units as `x` and `mean`,
-/// not the variance. `x` and `mean` are passed through IEEE-754 arithmetic;
-/// non-finite values are not separately rejected.
+/// not the variance. Infinite `x` values return `0.0`; `NaN` `x`, non-finite
+/// `mean`, or density overflow returns a validation error.
 ///
 /// # Arguments
 ///
-/// * `x` - Point at which to evaluate the normal density.
-/// * `mean` - Mean of the normal distribution, in the same units as `x`.
-/// * `std_dev` - Strictly positive standard deviation, in the same units as
+/// * `x` - Point at which to evaluate the normal density (`±∞` accepted, `NaN` rejected).
+/// * `mean` - Finite mean of the normal distribution, in the same units as `x`.
+/// * `std_dev` - Strictly positive finite standard deviation, in the same units as
 ///   `x` and `mean`; this is not the variance.
 ///
 /// # Errors
 ///
-/// Returns an error only if `std_dev` is non-finite or not strictly positive.
+/// Returns an error if `std_dev` is non-finite or not strictly positive, `mean`
+/// is non-finite, `x` is `NaN`, or the resulting density overflows `f64`.
 pub fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f64> {
-    validate_finite_positive("std_dev", std_dev)?;
-    Ok(norm_pdf((x - mean) / std_dev) / std_dev)
+    let z = standardize_normal(x, mean, std_dev)?;
+    if !z.is_finite() {
+        return Ok(0.0);
+    }
+    let direct = norm_pdf(z) / std_dev;
+    if direct.is_finite() && direct > 0.0 {
+        return Ok(direct);
+    }
+    let log_density = -0.5 * (2.0 * std::f64::consts::PI).ln() - std_dev.ln() - 0.5 * z * z;
+    let density = log_density.exp();
+    if density.is_finite() {
+        Ok(density)
+    } else {
+        Err(crate::Error::Validation(
+            "normal density overflowed finite f64 range".to_string(),
+        ))
+    }
 }
 
 /// Inverse standard normal cumulative distribution function.
@@ -408,19 +445,18 @@ pub fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f6
 /// - Implied volatility solving
 ///
 /// # Arguments
-/// * `p` - Probability in (0, 1)
+/// * `p` - Probability in `[0, 1]`
 ///
 /// # Returns
 /// x such that Φ(x) = p
 ///
 /// # Domain-edge convention
 ///
-/// Out-of-domain inputs follow the standard saturating quantile convention
-/// instead of panicking (the underlying `statrs` implementation panics for
-/// `p ∉ [0, 1]`, including NaN):
-/// - `p <= 0.0` → `f64::NEG_INFINITY`
-/// - `p >= 1.0` → `f64::INFINITY`
-/// - `p.is_nan()` → `f64::NAN`
+/// Exact boundary probabilities map to signed infinity, while strictly
+/// out-of-domain inputs return `NaN` instead of panicking or silently saturating:
+/// - `p == 0.0` → `f64::NEG_INFINITY`
+/// - `p == 1.0` → `f64::INFINITY`
+/// - `p < 0.0`, `p > 1.0`, or `p.is_nan()` → `f64::NAN`
 ///
 /// # Examples
 ///
@@ -435,9 +471,10 @@ pub fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f6
 /// let p_back = norm_cdf(x);
 /// assert!((p_back - 0.84).abs() < 1e-6);
 ///
-/// // Domain edges saturate instead of panicking
+/// // Exact domain edges map to ±∞; out-of-domain inputs return NaN
 /// assert_eq!(standard_normal_inv_cdf(0.0), f64::NEG_INFINITY);
 /// assert_eq!(standard_normal_inv_cdf(1.0), f64::INFINITY);
+/// assert!(standard_normal_inv_cdf(-0.1).is_nan());
 /// assert!(standard_normal_inv_cdf(f64::NAN).is_nan());
 /// ```
 ///
@@ -452,13 +489,15 @@ pub fn norm_pdf_with_params(x: f64, mean: f64, std_dev: f64) -> crate::Result<f6
 #[inline]
 pub fn standard_normal_inv_cdf(p: f64) -> f64 {
     use statrs::distribution::ContinuousCDF;
-    if p.is_nan() {
+    if p.is_nan() || !(0.0..=1.0).contains(&p) {
         return f64::NAN;
     }
-    if p <= 0.0 {
+    #[allow(clippy::float_cmp)]
+    if p == 0.0 {
         return f64::NEG_INFINITY;
     }
-    if p >= 1.0 {
+    #[allow(clippy::float_cmp)]
+    if p == 1.0 {
         return f64::INFINITY;
     }
     STANDARD_NORMAL.inverse_cdf(p)
@@ -532,18 +571,19 @@ pub fn student_t_cdf(x: f64, df: f64) -> crate::Result<f64> {
 ///
 /// # Arguments
 ///
-/// * `p` - Probability in (0, 1)
-/// * `df` - Degrees of freedom (must be > 0)
+/// * `p` - Probability in `[0, 1]`
+/// * `df` - Degrees of freedom (must be finite and > 0)
 ///
 /// # Returns
 ///
-/// x such that F(x; df) = p
+/// x such that F(x; df) = p (`-∞` at `p = 0.0`, `+∞` at `p = 1.0`).
 ///
 /// # Domain-edge convention
 ///
-/// Mirrors [`standard_normal_inv_cdf`]: out-of-domain `p` saturates instead
-/// of panicking — `p <= 0.0` → `f64::NEG_INFINITY`, `p >= 1.0` →
-/// `f64::INFINITY`, `NaN` → `NaN`.
+/// Exact boundary probabilities `p == 0.0` and `p == 1.0` return
+/// `Ok(f64::NEG_INFINITY)` and `Ok(f64::INFINITY)`. Strictly out-of-domain or
+/// non-finite probabilities (`p < 0.0`, `p > 1.0`, `NaN`) return a validation
+/// error instead of silently saturating.
 ///
 /// # Examples
 ///
@@ -562,27 +602,40 @@ pub fn student_t_cdf(x: f64, df: f64) -> crate::Result<f64> {
 /// # Implementation
 ///
 /// This is a thin wrapper around `statrs::distribution::StudentsT::inverse_cdf`.
+///
 /// # Errors
-/// Returns a validation error when `df` is non-finite or not strictly positive.
+/// Returns a validation error when `df` is non-finite or not strictly positive,
+/// when `p` is non-finite or outside `[0, 1]`, or when an interior quantile
+/// overflows finite `f64`.
 pub fn student_t_inv_cdf(p: f64, df: f64) -> crate::Result<f64> {
     if !df.is_finite() || df <= 0.0 {
         return Err(crate::Error::Validation(format!(
             "student_t_inv_cdf requires finite df > 0, got {df}"
         )));
     }
-    if p.is_nan() {
-        return Ok(f64::NAN);
+    if !p.is_finite() || !(0.0..=1.0).contains(&p) {
+        return Err(crate::Error::Validation(format!(
+            "student_t_inv_cdf requires finite probability p in [0, 1], got {p}"
+        )));
     }
-    if p <= 0.0 {
+    #[allow(clippy::float_cmp)]
+    if p == 0.0 {
         return Ok(f64::NEG_INFINITY);
     }
-    if p >= 1.0 {
+    #[allow(clippy::float_cmp)]
+    if p == 1.0 {
         return Ok(f64::INFINITY);
     }
     use statrs::distribution::{ContinuousCDF, StudentsT};
-    StudentsT::new(0.0, 1.0, df)
+    let quantile = StudentsT::new(0.0, 1.0, df)
         .map(|dist| dist.inverse_cdf(p))
-        .map_err(|err| crate::Error::Validation(format!("invalid Student-t parameters: {err}")))
+        .map_err(|err| crate::Error::Validation(format!("invalid Student-t parameters: {err}")))?;
+    if !quantile.is_finite() {
+        return Err(crate::Error::Validation(format!(
+            "student_t_inv_cdf produced non-finite quantile for p={p}, df={df}"
+        )));
+    }
+    Ok(quantile)
 }
 
 #[cfg(test)]
@@ -619,45 +672,31 @@ mod tests {
     }
 
     #[test]
-    fn test_standard_normal_inv_cdf_out_of_domain_saturates() {
-        // Review 2026-06-09 (core math): statrs panics for p outside [0, 1]
-        // (including NaN); release builds had no guard. Saturating convention:
+    fn test_standard_normal_inv_cdf_domain_boundaries_and_out_of_domain() {
         assert!(standard_normal_inv_cdf(f64::NAN).is_nan());
-        assert_eq!(standard_normal_inv_cdf(-0.1), f64::NEG_INFINITY);
+        assert!(standard_normal_inv_cdf(-0.1).is_nan());
+        assert!(standard_normal_inv_cdf(-1e-15).is_nan());
         assert_eq!(standard_normal_inv_cdf(0.0), f64::NEG_INFINITY);
         assert_eq!(standard_normal_inv_cdf(1.0), f64::INFINITY);
-        assert_eq!(
-            standard_normal_inv_cdf(1.000_000_000_000_000_2),
-            f64::INFINITY
-        );
+        assert!(standard_normal_inv_cdf(1.000_000_000_000_000_2).is_nan());
     }
 
     #[test]
-    fn test_student_t_inv_cdf_out_of_domain_saturates() {
+    fn test_student_t_inv_cdf_domain_boundaries_and_out_of_domain() {
         for df in [5.0, 1000.0] {
+            assert!(student_t_inv_cdf(f64::NAN, df).is_err(), "df={df}");
+            assert!(student_t_inv_cdf(-0.1, df).is_err(), "df={df}");
             assert!(
-                student_t_inv_cdf(f64::NAN, df)
-                    .expect("valid checked inputs")
-                    .is_nan(),
+                student_t_inv_cdf(1.000_000_000_000_000_2, df).is_err(),
                 "df={df}"
             );
             assert_eq!(
-                student_t_inv_cdf(-0.1, df).expect("valid checked inputs"),
+                student_t_inv_cdf(0.0, df).expect("valid boundary 0.0"),
                 f64::NEG_INFINITY,
                 "df={df}"
             );
             assert_eq!(
-                student_t_inv_cdf(0.0, df).expect("valid checked inputs"),
-                f64::NEG_INFINITY,
-                "df={df}"
-            );
-            assert_eq!(
-                student_t_inv_cdf(1.0, df).expect("valid checked inputs"),
-                f64::INFINITY,
-                "df={df}"
-            );
-            assert_eq!(
-                student_t_inv_cdf(1.000_000_000_000_000_2, df).expect("valid checked inputs"),
+                student_t_inv_cdf(1.0, df).expect("valid boundary 1.0"),
                 f64::INFINITY,
                 "df={df}"
             );
@@ -1040,5 +1079,16 @@ mod tests {
     fn test_general_normal_helpers_reject_non_positive_std_dev() {
         assert!(norm_cdf_with_params(0.0, 0.0, 0.0).is_err());
         assert!(norm_pdf_with_params(0.0, 0.0, -1.0).is_err());
+        assert!(norm_cdf_with_params(f64::NAN, 0.0, 1.0).is_err());
+        assert!(norm_pdf_with_params(f64::NAN, 0.0, 1.0).is_err());
+        assert!(norm_cdf_with_params(0.0, f64::NAN, 1.0).is_err());
+        assert!(norm_pdf_with_params(0.0, f64::INFINITY, 1.0).is_err());
+        assert_eq!(norm_cdf_with_params(f64::INFINITY, 0.0, 1.0).unwrap(), 1.0);
+        assert_eq!(norm_pdf_with_params(f64::INFINITY, 0.0, 1.0).unwrap(), 0.0);
+        // Overflow-safe standardization when `x - mean` would overflow f64
+        assert!(
+            (norm_cdf_with_params(f64::MAX, -f64::MAX, f64::MAX).unwrap() - norm_cdf(2.0)).abs()
+                < 1e-12
+        );
     }
 }

@@ -53,7 +53,9 @@ mod vol_cube;
 mod vol_cube_expiry_slice;
 mod vol_surface;
 
-pub use fx_delta_vol_surface::FxDeltaVolSurface;
+pub use fx_delta_vol_surface::{
+    FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurface,
+};
 pub use sabr_parameter_data::SabrParameterData;
 pub use vol_cube::VolCube;
 pub use vol_cube_expiry_slice::VolCubeExpirySlice;

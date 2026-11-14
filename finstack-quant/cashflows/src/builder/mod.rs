@@ -44,7 +44,7 @@
 mod compiler;
 mod coupon_api;
 mod credit_rates;
-mod date_generation;
+pub(crate) mod date_generation;
 mod emission;
 mod floating_replay;
 mod orchestrator;

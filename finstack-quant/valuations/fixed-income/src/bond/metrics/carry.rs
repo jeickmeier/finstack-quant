@@ -4,7 +4,7 @@ use crate::bond::Bond;
 use crate::bond::pricing::quote_conversions::{YieldCompounding, df_from_yield};
 use crate::bond::pricing::time_basis::{act365l_year_fraction, bond_coupon_periods};
 use finstack_quant_core::Result;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_reference_period;
 use finstack_quant_valuations_core::metrics::MetricContext;
 use finstack_quant_valuations_core::metrics::sensitivities::carry_decomposition::YieldClock;
@@ -26,22 +26,24 @@ impl YieldClock for BondYieldClock {
         let bond: &Bond = context.instrument_as()?;
         let frequency = bond.cashflow_spec.frequency();
         let day_count = bond.cashflow_spec.day_count();
-        let dc_ctx = DayCountContext {
-            frequency: Some(frequency),
-            coupon_period: context.cashflows.as_deref().and_then(|flows| {
-                icma_reference_period(
-                    day_count,
-                    frequency,
-                    flows.iter().map(|(d, _)| *d),
-                    context.as_of,
-                )
-            }),
-            ..DayCountContext::default()
-        };
+        let ref_period = context.cashflows.as_deref().and_then(|flows| {
+            icma_reference_period(
+                day_count,
+                frequency,
+                flows.iter().map(|(d, _)| *d),
+                context.as_of,
+            )
+        });
         let tau = if day_count == DayCount::Act365L {
             act365l_year_fraction(&bond_coupon_periods(bond)?, context.as_of, rolled_date)?
         } else {
-            day_count.year_fraction(context.as_of, rolled_date, dc_ctx)?
+            finstack_quant_valuations_core::instruments::pricing::coupon_period::icma_year_fraction(
+                day_count,
+                Some(frequency),
+                ref_period,
+                context.as_of,
+                rolled_date,
+            )?
         };
         let df = df_from_yield(ytm, tau, YieldCompounding::Street, frequency)?;
         Ok(1.0 / df)

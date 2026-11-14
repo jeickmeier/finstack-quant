@@ -79,6 +79,8 @@ def apply_lower_triangular(
 
     Raises
     ------
+    TypeError
+        If ``l`` or ``z`` is not a numeric sequence/array or contains ``bool`` values.
     ValueError
         If ``l`` is not a square nested list / 2-D array, or ``z``'s
         length does not match L's dimension (core dimension-mismatch
@@ -120,9 +122,11 @@ def cholesky_decomposition(
     Raises
     ------
     CholeskyError
-        If the matrix is not positive-definite, is numerically singular,
-        or contains non-finite entries. This exception is a ``ValueError``
-        subclass.
+        If the matrix is not symmetric, not positive-definite, is numerically
+        singular, or contains non-finite entries. This exception is a
+        ``ValueError`` subclass.
+    TypeError
+        If ``matrix`` is not a numeric sequence/array or contains ``bool`` values.
     ValueError
         If the input is not a square matrix.
 
@@ -189,8 +193,7 @@ def symmetric_eigen(
     Parameters
     ----------
     matrix : list[list[float]] or numpy.ndarray
-        Symmetric square matrix (only symmetric input is meaningful; no
-        symmetry check is performed).
+        Finite symmetric square matrix in logical row and column order.
 
     Returns
     -------
@@ -202,7 +205,10 @@ def symmetric_eigen(
     Raises
     ------
     CholeskyError
-        If the matrix contains non-finite entries.
+        If the matrix is not symmetric within relative tolerance or contains
+        non-finite entries.
+    TypeError
+        If ``matrix`` is not a numeric sequence/array or contains ``bool`` values.
     ValueError
         If the input is not a square nested list / 2-D array.
 
@@ -247,6 +253,8 @@ def ledoit_wolf_shrinkage(
 
     Raises
     ------
+    TypeError
+        If ``observations`` is not a numeric sequence/array or contains ``bool`` values.
     ValueError
         If ``t < 2``, ``n == 0``, rows are ragged, or any entry is
         non-finite; also if centered observations or covariance entries

@@ -75,9 +75,10 @@ fn bench_daycount_actact_isma(c: &mut Criterion) {
             let end = date(end_year, end_month, 1);
             let ctx = DayCountContext {
                 frequency: Some(frequency),
+                coupon_period: Some((start, end)),
                 ..DayCountContext::default()
             };
-            assert!(start < end && ctx.coupon_period.is_none());
+            assert!(start < end);
             assert_fraction(
                 DayCount::ActActIsma
                     .year_fraction(start, end, ctx)

@@ -116,7 +116,7 @@
           "quote_type": "black_lognormal",
           "secondary_axis": "strike",
           "strikes": [
-            -0.01,
+            0.01,
             0.04,
             0.1
           ],

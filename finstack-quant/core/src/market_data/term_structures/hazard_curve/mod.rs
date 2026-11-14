@@ -71,10 +71,7 @@ use crate::{
     currency::Currency,
     dates::{Date, DayCount},
     error::InputError,
-    math::interp::{
-        ExtrapolationPolicy, Interp, InterpStyle, InterpolationStrategy, LinearStrategy,
-        LogLinearStrategy, ValidationPolicy,
-    },
+    math::interp::{ExtrapolationPolicy, InterpolationStrategy, LinearStrategy, LogLinearStrategy},
     types::CurveId,
 };
 
@@ -131,8 +128,6 @@ pub struct HazardCurve {
     hazard_calibration: Option<crate::market_data::term_structures::HazardCalibrationRecipe>,
     /// Largest hazard rate the builder accepts; rebuilds and the wire form keep it.
     max_hazard_rate: f64,
-    /// Interpolator for survival probabilities
-    interp: Interp,
     /// Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].
     fx_policy: Option<String>,
 }
@@ -228,5 +223,3 @@ mod transform;
 mod wire;
 pub use builder::HazardCurveBuilder;
 use wire::RawHazardCurve;
-
-use curve::survival_pillars;

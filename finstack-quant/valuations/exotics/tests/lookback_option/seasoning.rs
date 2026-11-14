@@ -62,7 +62,7 @@ fn create_test_market(as_of: Date) -> MarketContext {
     let surface = VolSurface::from_grid(
         "SPX-VOL",
         &[0.0, 10.0],
-        &[0.0, 10000.0],
+        &[1.0, 10000.0],
         &[0.20, 0.20, 0.20, 0.20],
         Default::default(),
         None,

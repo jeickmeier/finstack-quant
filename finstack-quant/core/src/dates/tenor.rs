@@ -1061,12 +1061,12 @@ mod tests {
         // 2025 is not a leap year, so 365 days / 365 = 1.0
         assert!((years - 1.0).abs() < 0.001);
 
-        // ActActIsma with calendar adjustment when unadjusted end lands on a weekend
-        // (2025-02-15 is a Saturday -> rolls to Monday 2025-02-17 under Following).
+        // ActActIsma with calendar adjustment when unadjusted end lands on a weekend:
+        // Preceding (2025-02-15 Sat -> 2025-02-14 Fri) stays inside the nominal
+        // reference period [2025-01-15, 2025-02-15], whereas Following (2025-02-17 Mon)
+        // spills past the supplied reference period and must error unless sliced.
         let cal = crate::dates::calendar_by_id_strict("target2").expect("target2 calendar");
         let start = Date::from_calendar_date(2025, Month::January, 15).expect("valid");
-        // The caller supplies the ICMA reference period; none is invented
-        // from the tenor.
         let reference = DayCountContext {
             frequency: Some(Tenor::monthly()),
             coupon_period: Some((
@@ -1079,12 +1079,24 @@ mod tests {
             .to_years_with_context(
                 start,
                 Some(cal),
-                BusinessDayConvention::Following,
+                BusinessDayConvention::Preceding,
                 DayCount::ActActIsma,
                 reference,
             )
-            .expect("ActActIsma with adjusted end date");
-        assert!(isma_years > 1.0 / 12.0);
+            .expect("ActActIsma with contained Preceding end date");
+        assert!((isma_years - 30.0 / (12.0 * 31.0)).abs() < 1e-14);
+        assert!(
+            Tenor::monthly()
+                .to_years_with_context(
+                    start,
+                    Some(cal),
+                    BusinessDayConvention::Following,
+                    DayCount::ActActIsma,
+                    reference,
+                )
+                .is_err(),
+            "adjusted endpoint beyond coupon_period must error"
+        );
         assert!(
             Tenor::monthly()
                 .to_years_with_context(

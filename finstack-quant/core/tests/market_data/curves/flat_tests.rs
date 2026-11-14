@@ -206,3 +206,86 @@ fn test_from_dates_uses_day_count_for_pillar_times() {
     let before = Date::from_calendar_date(2024, Month::June, 1).expect("valid date");
     assert!(DiscountCurve::from_dates("BAD", base_date(), &[(before, 0.99)], None).is_err());
 }
+
+#[test]
+fn test_from_zero_rates_negative_rates_and_zero_time_domain_validation() {
+    use finstack_quant_core::math::Compounding;
+    let neg = DiscountCurve::from_zero_rates(
+        "CHF-NEG",
+        base_date(),
+        &[(1.0, -0.0075), (2.0, -0.005)],
+        Compounding::Continuous,
+    )
+    .expect("negative zero rates should build");
+    assert!(neg.df(1.0) > 1.0);
+
+    // Out-of-domain periodic rate at t = 0 must be rejected.
+    assert!(
+        DiscountCurve::from_zero_rates(
+            "BAD-ZERO",
+            base_date(),
+            &[(0.0, -1.5), (1.0, 0.02)],
+            Compounding::Periodic(std::num::NonZeroU32::MIN),
+        )
+        .is_err()
+    );
+    assert!(
+        DiscountCurve::from_zero_rates(
+            "NEG-T",
+            base_date(),
+            &[(-0.5, 0.02), (1.0, 0.02)],
+            Compounding::Continuous,
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn test_rolled_discount_curve_near_zero_pillar_round_trips_and_clears_calibration() {
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::Tenor;
+    use finstack_quant_core::market_data::bumps::{BumpSpec, Bumpable};
+    use finstack_quant_core::market_data::term_structures::{
+        RateCalibrationCurveRole, RateCalibrationMethod, RateCalibrationPillar,
+        RateCalibrationQuote, RateCalibrationRecipe,
+    };
+    use finstack_quant_core::types::{CurveId, IndexId};
+
+    let recipe = RateCalibrationRecipe {
+        currency: Currency::USD,
+        method: RateCalibrationMethod::Bootstrap,
+        curve_day_count: DayCount::Act365F,
+        ois_compounding: None,
+        role: RateCalibrationCurveRole::Discount {
+            projection_curve_id: CurveId::new("USD-OIS"),
+        },
+        quotes: vec![RateCalibrationQuote::Swap {
+            index_id: IndexId::new("USD-SOFR-OIS"),
+            pillar: RateCalibrationPillar::Tenor(Tenor::parse("5Y").expect("5Y")),
+            rate: 0.04,
+            spread_decimal: None,
+        }],
+    };
+    let curve = DiscountCurve::builder("USD-OIS")
+        .base_date(base_date())
+        .knots([(0.0, 1.0), (1.0 + 1e-12, 0.96), (5.0, 0.82)])
+        .rate_calibration(recipe)
+        .build()
+        .expect("calibrated curve");
+    assert!(curve.rate_calibration().is_some());
+
+    let bumped = curve.apply_bump(BumpSpec::parallel_bp(10.0)).expect("bump");
+    assert!(bumped.rate_calibration().is_none());
+
+    let rebuilt = curve
+        .rebuild_with_knots([(0.0, 1.0), (5.0, 0.80)])
+        .expect("rebuild");
+    assert!(rebuilt.rate_calibration().is_none());
+
+    let rolled = curve.roll_forward(365).expect("roll onto near-zero pillar");
+    assert!(rolled.rate_calibration().is_none());
+    let restored: DiscountCurve =
+        serde_json::from_str(&serde_json::to_string(&rolled).expect("serialize"))
+            .expect("rolled curve must deserialize cleanly");
+    assert_eq!(restored.knots(), rolled.knots());
+}

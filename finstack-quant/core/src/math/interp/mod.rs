@@ -49,10 +49,9 @@ pub use strategies::{
     CubicHermiteStrategy, LinearStrategy, LogLinearStrategy, MonotoneConvexStrategy,
     PiecewiseQuadraticForwardStrategy,
 };
-pub use traits::InterpolationStrategy;
 pub use types::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
-pub use utils::interp_knots_flat;
 
+pub(crate) use traits::InterpolationStrategy;
 pub(crate) use types::Interp;
 pub(crate) use utils::{
     MIN_RELATIVE_KNOT_GAP, find_monotone_violation, validate_finite_series, validate_knot_spacing,

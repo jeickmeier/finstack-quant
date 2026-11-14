@@ -200,21 +200,23 @@ impl PyRate {
             .map_err(core_to_py)
     }
 
-    /// Multiply by a scalar ``float``.
-    fn __mul__(&self, rhs: f64) -> PyResult<Self> {
+    /// Multiply by a scalar ``float``; rejects ``bool``.
+    fn __mul__(&self, rhs: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let rhs = numeric_rate_input(rhs, "scalar")?;
         self.inner
             .checked_mul(rhs)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
 
-    /// Right-multiply by a scalar ``float`` (``2.0 * rate``).
-    fn __rmul__(&self, lhs: f64) -> PyResult<Self> {
+    /// Right-multiply by a scalar ``float`` (``2.0 * rate``); rejects ``bool``.
+    fn __rmul__(&self, lhs: &Bound<'_, PyAny>) -> PyResult<Self> {
         self.__mul__(lhs)
     }
 
-    /// Divide by a scalar ``float``; raises ``ValueError`` on zero divisor.
-    fn __truediv__(&self, rhs: f64) -> PyResult<Self> {
+    /// Divide by a scalar ``float``; rejects ``bool`` and raises ``ValueError`` on zero divisor.
+    fn __truediv__(&self, rhs: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let rhs = numeric_rate_input(rhs, "divisor")?;
         self.inner
             .checked_div(rhs)
             .map(Self::from_inner)
@@ -289,6 +291,16 @@ impl Hash for PyBps {
     }
 }
 
+/// Extract an integer scalar for [`PyBps`] arithmetic, rejecting `bool`.
+fn int_bps_scalar(value: &Bound<'_, PyAny>, what: &str) -> PyResult<i32> {
+    if value.is_instance_of::<pyo3::types::PyBool>() {
+        return Err(PyTypeError::new_err(format!(
+            "{what} must be an int, not bool"
+        )));
+    }
+    value.extract::<i32>()
+}
+
 #[pymethods]
 impl PyBps {
     /// Zero basis points.
@@ -297,12 +309,14 @@ impl PyBps {
 
     /// Construct from a whole basis-point value.
     ///
-    /// Raises ``ValueError`` for fractional input: the canonical Rust
-    /// ``Bps::try_new`` is integer-backed and rejects sub-bp quotes. Use a
-    /// decimal ``Rate`` (``Rate("62.5bp")``) for sub-bp precision.
+    /// Raises ``TypeError`` for ``bool`` or non-numeric input, and
+    /// ``ValueError`` for fractional input: the canonical Rust ``Bps::try_new``
+    /// is integer-backed and rejects sub-bp quotes. Use a decimal ``Rate``
+    /// (``Rate("62.5bp")``) for sub-bp precision.
     #[new]
     #[pyo3(text_signature = "(bp)")]
-    fn new(bp: f64) -> PyResult<Self> {
+    fn new(bp: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let bp = numeric_rate_input(bp, "bp")?;
         Bps::try_new(bp).map(Self::from_inner).map_err(core_to_py)
     }
 
@@ -389,21 +403,23 @@ impl PyBps {
             .map_err(core_to_py)
     }
 
-    /// Multiply basis points by an integer scalar.
-    fn __mul__(&self, rhs: i32) -> PyResult<Self> {
+    /// Multiply basis points by an integer scalar; rejects ``bool``.
+    fn __mul__(&self, rhs: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let rhs = int_bps_scalar(rhs, "scalar")?;
         self.inner
             .checked_mul(rhs)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
 
-    /// Right-multiply by an integer scalar (``3 * Bps(10)``).
-    fn __rmul__(&self, lhs: i32) -> PyResult<Self> {
+    /// Right-multiply by an integer scalar (``3 * Bps(10)``); rejects ``bool``.
+    fn __rmul__(&self, lhs: &Bound<'_, PyAny>) -> PyResult<Self> {
         self.__mul__(lhs)
     }
 
-    /// Divide basis points by an integer scalar; raises ``ValueError`` on zero.
-    fn __truediv__(&self, rhs: i32) -> PyResult<Self> {
+    /// Divide basis points by an integer scalar; rejects ``bool`` and raises ``ValueError`` on zero.
+    fn __truediv__(&self, rhs: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let rhs = int_bps_scalar(rhs, "divisor")?;
         self.inner
             .checked_div(rhs)
             .map(Self::from_inner)

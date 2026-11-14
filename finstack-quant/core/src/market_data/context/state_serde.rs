@@ -273,6 +273,60 @@ fn validate_restore_references(
         state.vol_cubes.iter().map(|entry| entry.id().to_string()),
     );
 
+    let mut vol_owners: crate::FxHashMap<String, &'static str> = crate::FxHashMap::default();
+    let mut record_vol_ids = |field: &'static str, ids: Vec<(String, String)>| {
+        let mut seen_in_field = FxHashSet::default();
+        for (pointer, id) in ids {
+            if !seen_in_field.insert(id.clone()) {
+                continue;
+            }
+            if let Some(existing_field) = vol_owners.get(&id).copied() {
+                report.push_bounded(
+                    limits,
+                    Diagnostic::new(
+                        "market-context/conflicting-id",
+                        LoadPhase::Semantic,
+                        Severity::Error,
+                        format!(
+                            "id '{id}' in MarketContextState.{field} conflicts with MarketContextState.{existing_field}"
+                        ),
+                    )
+                    .with_pointer(pointer)
+                    .with_contract(MARKET_CONTEXT_STATE_CONTRACT.id),
+                );
+            } else {
+                vol_owners.insert(id, field);
+            }
+        }
+    };
+    record_vol_ids(
+        "surfaces",
+        state
+            .surfaces
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (format!("/surfaces/{i}"), e.id().to_string()))
+            .collect(),
+    );
+    record_vol_ids(
+        "fx_delta_vol_surfaces",
+        state
+            .fx_delta_vol_surfaces
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (format!("/fx_delta_vol_surfaces/{i}"), e.id().to_string()))
+            .collect(),
+    );
+    record_vol_ids(
+        "vol_cubes",
+        state
+            .vol_cubes
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (format!("/vol_cubes/{i}"), e.id().to_string()))
+            .collect(),
+    );
+
     let hazard_ids: FxHashSet<&str> = state
         .curves
         .iter()
@@ -445,11 +499,11 @@ fn restore_market_context(
     let mut ctx = MarketContext::new();
 
     for curve_state in state.curves {
-        ctx.insert_mut(CurveStorage::from_state(curve_state));
+        ctx.try_insert_mut(CurveStorage::from_state(curve_state))?;
     }
 
     for surface in state.surfaces {
-        ctx.insert_surface_mut(surface);
+        ctx.try_insert_surface_mut(surface)?;
     }
 
     // Persisted state does not encode the original live FX provider, only the
@@ -483,11 +537,11 @@ fn restore_market_context(
     }
 
     for surface in state.fx_delta_vol_surfaces {
-        ctx.insert_fx_delta_vol_surface_mut(surface);
+        ctx.try_insert_fx_delta_vol_surface_mut(surface)?;
     }
 
     for cube in state.vol_cubes {
-        ctx.insert_vol_cube_mut(cube);
+        ctx.try_insert_vol_cube_mut(cube)?;
     }
 
     ctx.hierarchy = state.hierarchy;

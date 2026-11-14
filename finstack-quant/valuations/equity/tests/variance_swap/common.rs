@@ -17,6 +17,7 @@ use finstack_quant_valuations_equity::variance_swap::VarianceSwap;
 
 pub const DISC_ID: &str = "USD_OIS";
 pub const UNDERLYING_ID: &str = "SPX";
+pub const VOL_SURFACE_ID: &str = "SPX-VOL";
 pub const DEFAULT_NOTIONAL: f64 = 1_000_000.0;
 pub const DEFAULT_STRIKE_VAR: f64 = 0.04; // 20% vol => 0.04 variance
 
@@ -35,7 +36,7 @@ pub fn sample_swap(side: PayReceive) -> VarianceSwap {
         .id(InstrumentId::new(format!("VAR-{side:?}")))
         .underlying_ticker(UNDERLYING_ID.to_string())
         .spot_id(PriceId::new(UNDERLYING_ID))
-        .vol_surface_id(CurveId::new(UNDERLYING_ID))
+        .vol_surface_id(CurveId::new(VOL_SURFACE_ID))
         .div_yield_id_opt(Some(PriceId::new(format!("{}-DIVYIELD", UNDERLYING_ID))))
         .notional(Money::new(DEFAULT_NOTIONAL, Currency::USD).expect("valid money fixture"))
         .strike_variance(DEFAULT_STRIKE_VAR)
@@ -109,7 +110,7 @@ pub fn add_unitless(ctx: MarketContext, id: impl AsRef<str>, value: f64) -> Mark
         let strikes = [
             2_500.0, 3_500.0, 4_500.0, 5_000.0, 5_500.0, 6_500.0, 7_500.0,
         ];
-        let mut surface = VolSurface::builder(UNDERLYING_ID)
+        let mut surface = VolSurface::builder(VOL_SURFACE_ID)
             .expiries(&[0.25, 0.5, 1.0, 2.0])
             .strikes(&strikes);
         for _ in 0..4 {
@@ -132,7 +133,7 @@ pub fn add_surface(ctx: MarketContext, surface: VolSurface) -> MarketContext {
 
 /// Create a sample volatility surface for testing.
 pub fn sample_surface() -> VolSurface {
-    VolSurface::builder(UNDERLYING_ID)
+    VolSurface::builder(VOL_SURFACE_ID)
         .expiries(&[0.25, 0.50, 0.75, 1.0])
         .strikes(&[4_500.0, 4_800.0, 5_000.0, 5_200.0, 5_500.0])
         .row(&[0.32, 0.30, 0.29, 0.28, 0.27])

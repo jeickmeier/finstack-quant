@@ -210,7 +210,8 @@ class FxPairConvention:
         Raises
         ------
         TypeError
-            If ``base`` or ``quote`` is not a :class:`Currency` or ISO code.
+            If ``base`` or ``quote`` is not a :class:`Currency` or ISO code, or
+            ``pip_size`` is not a number (or is ``bool``).
         ValueError
             If a code is unrecognized, the currencies are equal, or
             ``pip_size`` is not finite and positive.
@@ -287,6 +288,8 @@ class FxPairConvention:
 
         Raises
         ------
+        TypeError
+            If ``pips`` is not a number, or is ``bool``.
         ValueError
             If ``pips`` or the product is not finite.
 
@@ -317,6 +320,8 @@ def invert_fx_rate(rate: float) -> float:
 
     Raises
     ------
+    TypeError
+        If *rate* is not a number, or is ``bool``.
     ValueError
         If *rate* is non-finite, zero or negative, or its reciprocal
         overflows.
@@ -405,6 +410,9 @@ class FxMatrix:
 
         Raises
         ------
+        TypeError
+            If a key is not ``str``, a rate is not a number (or is ``bool``),
+            or *pivot_currency* has an unsupported type.
         ValueError
             If a key is not a currency pair, a code is unknown, or a rate is
             non-finite or non-positive.
@@ -435,6 +443,8 @@ class FxMatrix:
 
         Raises
         ------
+        TypeError
+            If a currency or rate has an unsupported type (including ``bool``).
         ValueError
             If any rate is non-finite or non-positive; no quote is applied
             in that case.
@@ -470,6 +480,8 @@ class FxMatrix:
 
         Raises
         ------
+        TypeError
+            If an argument has an unsupported type (including ``bool`` for ``rate``).
         ValueError
             If ``rate`` is invalid or ``policy`` is not a recognised label.
         """

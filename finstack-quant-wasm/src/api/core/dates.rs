@@ -416,10 +416,11 @@ impl JsDayCount {
     /// (Rust `DayCount::year_fraction(start, end, ctx)`).
     ///
     /// The published facade makes `ctx` optional: an omitted context is the
-    /// empty Rust default (`new DayCountContext()`). Act/Act ISMA needs a
-    /// context frequency (or coupon period), Act/365L an enclosing coupon
-    /// period (accrual dates outside that coupon throw), and
-    /// Bus/252 a context calendar; all throw without them. ICMA reference
+    /// empty Rust default (`new DayCountContext()`). Act/Act ISMA needs both a
+    /// context frequency (`1M`, `2M`, `3M`, `4M`, `6M`, `12M` or `1Y`) and the
+    /// enclosing unadjusted nominal `couponPeriod`, Act/365L needs an enclosing
+    /// `couponPeriod` (accrual dates outside that coupon throw for both), and
+    /// Bus/252 needs a context calendar; all throw without them. ICMA reference
     /// endpoints outside one unadjusted nominal month grid throw.
     ///
     /// @param startEpochDays - Start date as days since 1970-01-01.

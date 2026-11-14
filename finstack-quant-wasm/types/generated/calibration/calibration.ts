@@ -1600,9 +1600,8 @@ export type FloatingLegCompounding =
 /**
  * Extrapolation policy for evaluation outside the knot range.
  *
- * All [`InterpolationStrategy`](super::traits::InterpolationStrategy)
- * implementations honour this policy at both ends of the knot range.
- * Choose based on what behaviour the downstream pricer expects:
+ * Every interpolation strategy honours this policy at both ends of the knot
+ * range. Choose based on what behaviour the downstream pricer expects:
  *
  * - `FlatZero` (default): hold the boundary value constant.
  * - `FlatForward`: extend the boundary segment's slope, measured in the

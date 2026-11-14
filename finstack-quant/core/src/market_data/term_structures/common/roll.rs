@@ -39,6 +39,14 @@ impl InterpRollState {
         }
     }
 
+    /// Earliest supported time on the current curve axis (`source_first - offset`).
+    #[inline]
+    pub(crate) fn min_supported_time(&self) -> Option<f64> {
+        self.source_points
+            .first()
+            .map(|&(time, _)| time - self.offset)
+    }
+
     /// Build a curve's source interpolation from its current pillars and
     /// optional roll state.
     ///
@@ -193,7 +201,12 @@ pub(crate) fn validate_pillars(
     Ok(())
 }
 
-/// Helper to shift knot times backward by `dt` and filter out expired points (t <= 0).
+/// Minimum year-fraction gap above `0.0` required for a rolled knot to remain
+/// distinct from a prepended `t = 0` origin anchor.
+pub(crate) const MIN_ROLLED_KNOT_GAP: f64 = 1e-8;
+
+/// Helper to shift knot times backward by `dt` and filter out expired or
+/// near-zero points (`new_t <= MIN_ROLLED_KNOT_GAP`).
 ///
 /// Used by the `roll_forward` implementations of every pillar-based curve.
 #[inline]
@@ -203,7 +216,11 @@ pub(crate) fn roll_knots(knots: &[f64], values: &[f64], dt: f64) -> Vec<(f64, f6
         .zip(values.iter())
         .filter_map(|(&t, &v)| {
             let new_t = t - dt;
-            if new_t > 0.0 { Some((new_t, v)) } else { None }
+            if new_t > MIN_ROLLED_KNOT_GAP {
+                Some((new_t, v))
+            } else {
+                None
+            }
         })
         .collect()
 }

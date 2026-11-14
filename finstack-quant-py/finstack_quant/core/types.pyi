@@ -368,6 +368,8 @@ class Bps:
 
         Raises
         ------
+        TypeError
+            If *bp* is not a number, or is a ``bool``.
         ValueError
             If *bp* is not finite or not a whole number of basis points.
 

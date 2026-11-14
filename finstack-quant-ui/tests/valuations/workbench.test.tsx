@@ -531,7 +531,7 @@ it(
     const timeRoll = await within(results).findByRole("region", {
       name: "Time roll",
     });
-    expect(within(timeRoll).getAllByTitle("4613.7452641314")).toHaveLength(2);
+    expect(within(timeRoll).getAllByTitle("4613.7452641316")).toHaveLength(2);
     // Rust's horizon return of the same base request under the applied
     // scenario; method and calendar stay unset.
     expect(

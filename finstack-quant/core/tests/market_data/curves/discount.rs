@@ -1477,7 +1477,8 @@ mod continuous_transform_regressions {
             InterpStyle::PiecewiseQuadraticForward,
         ] {
             let source = shaped(style);
-            for days in [-1, 1, 73, 365] {
+            assert!(source.roll_forward(-1).is_err());
+            for days in [0, 1, 73, 365] {
                 let offset = days as f64 / 365.0;
                 let rolled = source.roll_forward(days).expect("roll");
                 for t in [0.0, 0.02, 0.1, 0.5, 1.5, 3.0, 7.0] {

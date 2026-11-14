@@ -7,7 +7,6 @@
 use crate::quanto_option::types::QuantoOption;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::Instrument;
@@ -66,9 +65,6 @@ fn collect_quanto_inputs(
     // The quanto drift adjustment uses ATM-forward FX vol, so absolute-strike
     // surfaces must be queried at the CIRP forward rather than moneyness 1.0.
     let sigma_fx = if let Some(fx_vol_surface_id) = &inst.fx_vol_surface_id {
-        let fx_vol_surface = curves.get_surface(fx_vol_surface_id.as_str())?;
-        fx_vol_surface.require_quote_type(VolQuoteType::BlackLognormal)?;
-        fx_vol_surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
         let s_fx = crate::shared::resolve_fx_spot(
             curves,
             as_of,
@@ -83,7 +79,14 @@ fn collect_quanto_inputs(
             "ATM forward FX must be positive finite, got {atm_fwd_fx} \
              (spot={s_fx}, r_dom={r_dom}, r_for={r_for}, t={t})"
         );
-        finstack_quant_models::volatility::get_surface_vol_clamped(&fx_vol_surface, t, atm_fwd_fx)
+        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_fx_sigma_at(
+            &Default::default(),
+            curves,
+            fx_vol_surface_id.as_str(),
+            t,
+            atm_fwd_fx,
+            atm_fwd_fx,
+        )?
     } else {
         return Err(finstack_quant_core::Error::from(
             finstack_quant_core::InputError::NotFound {

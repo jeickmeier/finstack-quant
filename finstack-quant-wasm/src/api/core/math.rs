@@ -29,8 +29,8 @@ use wasm_bindgen::prelude::*;
 /// Throws a `TypeError` if `n` is non-finite, fractional, or negative. Throws
 /// a JavaScript exception if `matrix` does not contain exactly `n * n`
 /// entries (including when `n * n` overflows), or the matrix contains a
-/// non-finite value, is numerically singular under that relative criterion,
-/// or is not positive definite.
+/// non-finite value, is not symmetric, is numerically singular under that
+/// relative criterion, or is not positive definite.
 /// @param matrix - Flat row-major finite entries of a symmetric positive-definite matrix.
 /// @param n - Positive integral dimension in `1..=4294967295`; the input must have exactly `n * n` entries.
 /// @returns Lower-triangular factor L as a flat row-major `Float64Array`.
@@ -327,7 +327,7 @@ pub fn norm_pdf(
 }
 
 /// Inverse standard normal CDF Φ⁻¹(p).
-/// @param p - Probability input strictly between 0 and 1 for the inverse normal distribution.
+/// @param p - Probability in `[0, 1]` (`0` yields `-Infinity`, `1` yields `Infinity`, values outside `[0, 1]` yield `NaN`).
 /// @returns Standard-normal quantile for probability `p`.
 #[wasm_bindgen(js_name = standardNormalInvCdf)]
 pub fn standard_normal_inv_cdf(
@@ -392,8 +392,8 @@ pub fn neumaier_sum(
 /// (in the solver's order, not sorted) and a flat `n * n` `Float64Array` in
 /// which `eigenvectors[i * n + k]` is component `i` of eigenvector `k`.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-/// `validation`) if `matrix` does not hold exactly `n * n` entries or contains
-/// a non-finite value.
+/// `validation`) if `matrix` does not hold exactly `n * n` entries, is not
+/// symmetric, or contains a non-finite value.
 /// @param matrix - Flat row-major `n * n` entries of a symmetric matrix; it need not be positive definite.
 /// @param n - Positive matrix dimension; `matrix` must contain exactly `n * n` entries.
 #[wasm_bindgen(js_name = symmetricEigen, unchecked_return_type = "[Float64Array, Float64Array]")]
@@ -604,9 +604,10 @@ pub fn log_returns(
 ///
 /// @returns The probability that a `N(mean, stdDev²)` variable is at most `x`.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-/// `validation`) if `stdDev` is non-finite or not strictly positive.
-/// @param x - Point at which to evaluate the CDF.
-/// @param mean - Mean of the distribution, in the units of `x`.
+/// `validation`) if `stdDev` is non-finite or not strictly positive, `mean` is
+/// non-finite, or `x` is `NaN`.
+/// @param x - Point at which to evaluate the CDF (`±Infinity` accepted, `NaN` rejected).
+/// @param mean - Finite mean of the distribution, in the units of `x`.
 /// @param stdDev - Strictly positive standard deviation (not the variance), in the units of `x`.
 #[wasm_bindgen(js_name = normCdfWithParams)]
 pub fn norm_cdf_with_params(
@@ -634,9 +635,10 @@ pub fn norm_cdf_with_params(
 ///
 /// @returns The density of `N(mean, stdDev²)` at `x`.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-/// `validation`) if `stdDev` is non-finite or not strictly positive.
-/// @param x - Point at which to evaluate the density.
-/// @param mean - Mean of the distribution, in the units of `x`.
+/// `validation`) if `stdDev` is non-finite or not strictly positive, `mean` is
+/// non-finite, `x` is `NaN`, or the density overflows `f64`.
+/// @param x - Point at which to evaluate the density (`±Infinity` accepted, `NaN` rejected).
+/// @param mean - Finite mean of the distribution, in the units of `x`.
 /// @param stdDev - Strictly positive standard deviation (not the variance), in the units of `x`.
 #[wasm_bindgen(js_name = normPdfWithParams)]
 pub fn norm_pdf_with_params(
@@ -677,15 +679,15 @@ pub fn student_t_cdf(
 ///
 /// # Arguments
 ///
-/// * `p` - Probability; `p <= 0` returns `-Infinity`, `p >= 1` returns
-///   `Infinity` and `NaN` returns `NaN`.
-/// * `df` - Degrees of freedom, strictly positive.
+/// * `p` - Probability in `[0, 1]` (`0` returns `-Infinity`, `1` returns `Infinity`).
+/// * `df` - Degrees of freedom, finite and strictly positive.
 ///
 /// @returns The quantile `x` with `studentTCdf(x, df) === p`.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-/// `validation`) if `df` is non-finite or not strictly positive.
-/// @param p - Probability; `p <= 0` returns `-Infinity`, `p >= 1` returns `Infinity` and `NaN` returns `NaN`.
-/// @param df - Degrees of freedom, strictly positive.
+/// `validation`) if `df` is non-finite or not strictly positive, or `p` is
+/// non-finite or outside `[0, 1]`.
+/// @param p - Probability in `[0, 1]` (`0` returns `-Infinity`, `1` returns `Infinity`).
+/// @param df - Degrees of freedom, finite and strictly positive.
 #[wasm_bindgen(js_name = studentTInvCdf)]
 pub fn student_t_inv_cdf(
     #[wasm_bindgen(unchecked_param_type = "number")] p: JsValue,

@@ -29,11 +29,17 @@ fn observations_to_dataframe<'py>(
     dict_to_dataframe(py, &data, Some(index))
 }
 
-/// Extract an `f64` observation from a `float`, `int` or `decimal.Decimal`.
+/// Extract an `f64` observation from a `float`, `int` or `decimal.Decimal`
+/// (rejecting `bool`).
 ///
 /// A `Decimal` converts to `f64` with `Decimal::as_f64`; finiteness is
 /// checked by the Rust constructor that receives the value.
 pub(crate) fn extract_f64(value: &Bound<'_, PyAny>, field: &str) -> PyResult<f64> {
+    if value.is_instance_of::<pyo3::types::PyBool>() {
+        return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+            "{field} must be float, int, or decimal.Decimal, not bool"
+        )));
+    }
     if is_python_decimal(value)? {
         return Ok(decimal_from_py(value)?.as_f64());
     }
@@ -327,17 +333,24 @@ impl PyInflationIndex {
     ) -> PyResult<Self> {
         let lag = match lag {
             None => None,
-            Some(value) => Some(match value.extract::<u8>() {
-                Ok(months) => InflationLag::from(months),
-                _ => {
-                    let label: String = value.extract().map_err(|_| {
-                    crate::errors::value_error(
-                        "lag must be an int number of months or a string like \"3M\", \"90D\" or \"none\"",
-                    )
-                })?;
-                    label.parse::<InflationLag>().map_err(core_to_py)?
+            Some(value) => {
+                if value.is_instance_of::<pyo3::types::PyBool>() {
+                    return Err(pyo3::exceptions::PyTypeError::new_err(
+                        "lag must be an int number of months or a string, not bool",
+                    ));
                 }
-            }),
+                Some(match value.extract::<u8>() {
+                    Ok(months) => InflationLag::from(months),
+                    _ => {
+                        let label: String = value.extract().map_err(|_| {
+                            crate::errors::value_error(
+                                "lag must be an int number of months or a string like \"3M\", \"90D\" or \"none\"",
+                            )
+                        })?;
+                        label.parse::<InflationLag>().map_err(core_to_py)?
+                    }
+                })
+            }
         };
         let seasonality = match seasonality {
             None => None,
@@ -508,7 +521,17 @@ impl PyInflationIndex {
     /// ValueError
     ///     If the contract date cannot be parsed or a required month has multiple observations.
     #[pyo3(text_signature = "(self, date, lag_months)")]
-    fn ref_cpi_months_lag(&self, date: &Bound<'_, PyAny>, lag_months: u32) -> PyResult<f64> {
+    fn ref_cpi_months_lag(
+        &self,
+        date: &Bound<'_, PyAny>,
+        lag_months: &Bound<'_, PyAny>,
+    ) -> PyResult<f64> {
+        if lag_months.is_instance_of::<pyo3::types::PyBool>() {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "lag_months must be an int, not bool",
+            ));
+        }
+        let lag_months: u32 = lag_months.extract()?;
         self.inner
             .ref_cpi_months_lag(py_to_date(date)?, lag_months)
             .map_err(core_to_py)

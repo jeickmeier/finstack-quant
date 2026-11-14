@@ -98,6 +98,7 @@ impl Default for NearestCorrelationOpts {
 ///   from `1.0`.
 /// * [`CorrelationError::EigenDecompositionFailed`] if `input` contains a non-finite entry
 ///   or a PSD projection cannot decompose its symmetric input.
+/// * [`CorrelationError::InvalidOptions`] if `opts.tol` is non-finite or non-positive.
 /// * [`CorrelationError::DidNotConverge`] if the algorithm fails to converge within
 ///   `opts.max_iter` iterations.
 pub fn nearest_correlation(
@@ -105,6 +106,12 @@ pub fn nearest_correlation(
     n: usize,
     opts: NearestCorrelationOpts,
 ) -> Result<Vec<f64>, CorrelationError> {
+    if !opts.tol.is_finite() || opts.tol <= 0.0 {
+        return Err(CorrelationError::InvalidOptions {
+            max_iter: opts.max_iter,
+            tol: opts.tol,
+        });
+    }
     let size = n.checked_mul(n).filter(|&size| size == input.len());
     let Some(size) = size else {
         return Err(CorrelationError::InvalidSize {
@@ -142,14 +149,14 @@ pub fn nearest_correlation(
     }
 
     // Preserve the original off-diagonal objective. Projecting the diagonal
-    // to one is the exact solution whenever that matrix is already PSD;
-    // congruence rescaling would instead change the minimization target.
+    // to one is the exact solution whenever that matrix is already a valid
+    // correlation matrix; congruence rescaling would change the target.
     let y = symmetrize(input, n);
     let mut unit_diagonal = y.clone();
     for i in 0..n {
         unit_diagonal[i * n + i] = 1.0;
     }
-    if super::cholesky_correlation(&unit_diagonal, n).is_ok() {
+    if super::validate_correlation_matrix(&unit_diagonal, n).is_ok() {
         return Ok(unit_diagonal);
     }
 
@@ -178,15 +185,10 @@ pub fn nearest_correlation(
             next[i * n + i] = 1.0;
         }
 
-        if frobenius_diff(&next, &prev) < opts.tol {
-            // The converged iterate is the *diagonal*-projected matrix, whose
-            // smallest eigenvalue is only bounded by ≈ `opts.tol` from below.
-            // One final PSD projection followed by a unit-diagonal rescale
-            // (a congruence transform, which preserves PSD exactly) makes the
-            // postcondition unconditional even for loose user tolerances.
-            let mut out = project_psd(&next, n)?;
-            rescale_to_unit_diagonal(&mut out, n);
-            return Ok(out);
+        if frobenius_diff(&next, &prev) < opts.tol
+            && super::validate_correlation_matrix(&next, n).is_ok()
+        {
+            return Ok(next);
         }
         std::mem::swap(&mut prev, &mut next);
     }
@@ -195,26 +197,6 @@ pub fn nearest_correlation(
         max_iter: opts.max_iter,
         tol: opts.tol,
     })
-}
-
-/// Rescale a symmetric matrix to an exact unit diagonal in place:
-/// `x_ij ← x_ij / sqrt(d_i · d_j)` with the diagonal set to exactly `1.0`.
-///
-/// For a PSD input this is a congruence transform `D^{-1/2} X D^{-1/2}`, so
-/// positive semidefiniteness is preserved. Diagonal entries are clamped to a
-/// small positive floor before the square root as a defensive guard; inputs
-/// reaching this helper always have diagonals near 1.
-fn rescale_to_unit_diagonal(matrix: &mut [f64], n: usize) {
-    const MIN_DIAGONAL: f64 = 1e-12;
-    let inv_sqrt: Vec<f64> = (0..n)
-        .map(|i| 1.0 / matrix[i * n + i].max(MIN_DIAGONAL).sqrt())
-        .collect();
-    for i in 0..n {
-        for j in 0..n {
-            matrix[i * n + j] *= inv_sqrt[i] * inv_sqrt[j];
-        }
-        matrix[i * n + i] = 1.0;
-    }
 }
 
 /// Project a symmetric matrix onto the PSD cone by zeroing negative
@@ -490,6 +472,58 @@ mod tests {
         };
         let repaired = nearest_correlation(&input, 3, opts).expect("converges");
         validate_correlation_matrix(&repaired, 3).expect("valid despite loose tolerance");
+    }
+
+    #[test]
+    fn rejects_invalid_options() {
+        let input = vec![1.0, 0.5, 0.5, 1.0];
+        assert_eq!(
+            nearest_correlation(
+                &input,
+                2,
+                NearestCorrelationOpts {
+                    max_iter: 0,
+                    tol: 1e-8,
+                },
+            )
+            .expect("valid correlation matrix needs zero iterations"),
+            input
+        );
+        let indefinite = vec![1.0, 0.9, 0.9, 0.9, 1.0, -0.9, 0.9, -0.9, 1.0];
+        assert!(matches!(
+            nearest_correlation(
+                &indefinite,
+                3,
+                NearestCorrelationOpts {
+                    max_iter: 0,
+                    tol: 1e-8,
+                },
+            ),
+            Err(CorrelationError::DidNotConverge { max_iter: 0, .. })
+        ));
+        for opts in [
+            NearestCorrelationOpts {
+                max_iter: 100,
+                tol: 0.0,
+            },
+            NearestCorrelationOpts {
+                max_iter: 100,
+                tol: -1e-8,
+            },
+            NearestCorrelationOpts {
+                max_iter: 100,
+                tol: f64::NAN,
+            },
+            NearestCorrelationOpts {
+                max_iter: 100,
+                tol: f64::INFINITY,
+            },
+        ] {
+            assert!(matches!(
+                nearest_correlation(&input, 2, opts),
+                Err(CorrelationError::InvalidOptions { .. })
+            ));
+        }
     }
 
     /// Smoke test for the `n > 40` regime: the divide-and-conquer

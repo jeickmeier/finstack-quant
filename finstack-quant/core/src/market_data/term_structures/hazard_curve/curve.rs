@@ -111,7 +111,7 @@ impl HazardCurve {
                     "HazardCurve::from_survival_probs survival probability must be in (0, 1], got {sp} at t={t}"
                 )));
             }
-            if t <= 1e-9 {
+            if t == 0.0 {
                 if (sp - 1.0).abs() > 1e-12 {
                     return Err(crate::Error::Validation(format!(
                         "HazardCurve::from_survival_probs survival probability at t=0 must be 1, got {sp}"
@@ -129,7 +129,11 @@ impl HazardCurve {
                     "HazardCurve::from_survival_probs survival probability must be non-increasing, got {sp} at t={t} after {prev_sp}"
                 )));
             }
-            let lambda = -(sp / prev_sp).ln() / (t - prev_t);
+            let lambda = if sp.total_cmp(&prev_sp).is_eq() {
+                0.0
+            } else {
+                (prev_sp.ln() - sp.ln()) / (t - prev_t)
+            };
             knots.push((t, lambda));
             prev_t = t;
             prev_sp = sp;
@@ -144,49 +148,116 @@ impl HazardCurve {
             .build()
     }
 
+    /// Integrate piecewise-constant hazard `∫_{start}^{end} λ(u) du` over `0 <= start <= end`
+    /// with finite `start` and `end`.
+    #[inline]
+    pub(super) fn cumulative_hazard_between(&self, start_time: f64, end_time: f64) -> f64 {
+        if end_time <= start_time || end_time <= 0.0 {
+            return 0.0;
+        }
+        let a = start_time.max(0.0);
+        let b = end_time;
+        let mut acc = crate::math::summation::NeumaierAccumulator::new();
+        let mut previous_time = 0.0_f64;
+        for (&time, &lambda) in self.knots.iter().zip(self.lambdas.iter()) {
+            let overlap = b.min(time) - a.max(previous_time);
+            if overlap > 0.0 && lambda > 0.0 {
+                acc.add(lambda * overlap);
+            }
+            if time >= b {
+                return acc.total().max(0.0);
+            }
+            previous_time = time;
+        }
+        let tail_start = a.max(previous_time);
+        if b > tail_start {
+            let tail_lambda = self.lambdas[self.lambdas.len() - 1];
+            if tail_lambda > 0.0 {
+                acc.add(tail_lambda * (b - tail_start));
+            }
+        }
+        acc.total().max(0.0)
+    }
+
     /// Survival probability S(t) up to time `t` (in **years**).
     ///
     /// # Arguments
     ///
-    /// * `t` - Year-fraction time from the curve or surface base date to the query point
+    /// * `t` - Year-fraction time from the curve base date to the query point
     #[must_use]
     pub fn sp(&self, t: f64) -> f64 {
+        if t.is_nan() {
+            return f64::NAN;
+        }
         if t <= 0.0 {
             return 1.0;
         }
-        if let Some(&last_t) = self.knots.last()
-            && t > last_t
-        {
-            let survival_at_last = self.interp.interp(last_t);
-            let tail_hazard = self.lambdas[self.lambdas.len() - 1];
-            return survival_at_last * (-tail_hazard * (t - last_t)).exp();
+        if t == f64::INFINITY {
+            let tail_lambda = self.lambdas[self.lambdas.len() - 1];
+            if tail_lambda > 0.0 {
+                return 0.0;
+            }
+            let last_t = self.knots.last().copied().unwrap_or(0.0);
+            return (-self.cumulative_hazard_between(0.0, last_t)).exp();
         }
-        self.interp.interp(t)
+        (-self.cumulative_hazard_between(0.0, t)).exp()
+    }
+
+    /// Conditional survival probability `P(τ > t2 | τ > t1) = exp(-∫_{t1}^{t2} λ(u) du)`.
+    ///
+    /// Evaluates the local hazard integral directly so conditional survival
+    /// remains well-defined and free of `0.0 / 0.0` `NaN` when unconditional
+    /// survival `S(t1)` underflows on distressed long-dated curves.
+    ///
+    /// # Arguments
+    ///
+    /// * `t1` - Finite non-negative conditioning time in years from the base date.
+    /// * `t2` - Finite target time in years, greater than or equal to `t1`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `t1` or `t2` is non-finite,
+    /// `t1 < 0`, or `t2 < t1`.
+    #[must_use = "computed conditional survival probability should not be discarded"]
+    pub fn sp_between(&self, t1: f64, t2: f64) -> crate::Result<f64> {
+        if !t1.is_finite() || !t2.is_finite() || t1 < 0.0 || t2 < t1 {
+            return Err(crate::Error::Validation(format!(
+                "sp_between requires finite 0 <= t1 <= t2 (got t1={t1}, t2={t2})"
+            )));
+        }
+        if t1 >= t2 {
+            return Ok(1.0);
+        }
+        Ok((-self.cumulative_hazard_between(t1, t2)).exp())
     }
 
     /// Default probability between `t1` and `t2`.
     ///
-    /// Returns `S(t1) - S(t2)`, the probability of default occurring
-    /// in the interval `[t1, t2]`.
+    /// Returns `S(t1) - S(t2) = S(t1) * (1 - exp(-∫_{t1}^{t2} λ(u) du))`, the
+    /// unconditional probability of default occurring in `[t1, t2]`.
     ///
     /// # Errors
     ///
-    /// Returns an error if `t2 < t1`.
+    /// Returns an error if `t1` or `t2` is non-finite or `t2 < t1`.
     ///
     /// # Arguments
     ///
-    /// * `t1` - Start year-fraction of the forward or rate interval being queried
-    /// * `t2` - End year-fraction of the forward or rate interval being queried
+    /// * `t1` - Start year-fraction of the default interval being queried
+    /// * `t2` - End year-fraction of the default interval being queried
     #[must_use = "computed default probability should not be discarded"]
     pub fn default_prob(&self, t1: f64, t2: f64) -> crate::Result<f64> {
-        if t2 < t1 {
+        if !t1.is_finite() || !t2.is_finite() || t2 < t1 {
             return Err(crate::Error::Validation(format!(
-                "default_prob requires t2 >= t1 (t1={t1}, t2={t2})"
+                "default_prob requires finite t2 >= t1 (t1={t1}, t2={t2})"
             )));
         }
-        let sp1 = self.sp(t1);
-        let sp2 = self.sp(t2);
-        Ok(sp1 - sp2)
+        if t2 <= 0.0 || t1 >= t2 {
+            return Ok(0.0);
+        }
+        let a = t1.max(0.0);
+        let sp_a = (-self.cumulative_hazard_between(0.0, a)).exp();
+        let cond_pd = -(-self.cumulative_hazard_between(a, t2)).exp_m1();
+        Ok((sp_a * cond_pd).clamp(0.0, 1.0))
     }
 
     /// Default probability between two dates, conditional on survival to `start`.
@@ -225,28 +296,7 @@ impl HazardCurve {
         }
         let start_time = self.year_fraction_to(start)?.max(0.0);
         let end_time = self.year_fraction_to(end)?.max(0.0);
-        let mut integral = 0.0;
-        let mut previous_time = 0.0_f64;
-        for (&time, &lambda) in self.knots.iter().zip(self.lambdas.iter()) {
-            // Match survival_pillars: a redundant time-zero knot contributes
-            // neither a segment nor its hazard to the first positive segment.
-            if time <= 1e-9 {
-                continue;
-            }
-            let overlap = end_time.min(time) - start_time.max(previous_time);
-            if overlap > 0.0 {
-                integral += lambda * overlap;
-            }
-            if time >= end_time {
-                return Ok(-(-integral).exp_m1());
-            }
-            previous_time = time;
-        }
-        let tail_start = start_time.max(previous_time);
-        if end_time > tail_start {
-            integral += self.lambdas[self.lambdas.len() - 1] * (end_time - tail_start);
-        }
-        Ok(-(-integral).exp_m1())
+        Ok(-(-self.cumulative_hazard_between(start_time, end_time)).exp_m1())
     }
 
     /// Instantaneous hazard rate λ(t) at time `t`.
@@ -472,41 +522,4 @@ impl HazardCurve {
             ExtrapolationPolicy::FlatForward,
         )
     }
-}
-
-/// Convert piecewise-constant hazard knots `(tᵢ, λᵢ)` into survival-probability
-/// interpolation pillars `(tᵢ, S(tᵢ))` anchored at `(0, 1)`.
-///
-/// This is the **single canonical λ-attribution convention** used by both the
-/// builder (`HazardCurveBuilder::build`) and in-place rebuilds
-/// (`HazardCurve::rebuild_interp`, the `MarketContext::bump` / CS01 path):
-///
-/// - **Ending-segment attribution**: λᵢ applies to the segment *ending* at tᵢ
-///   (segment `(tᵢ₋₁, tᵢ]` accrues `λᵢ·(tᵢ − tᵢ₋₁)`; segment `(0, t₁]` uses λ₁).
-///   A redundant t≈0 knot is ignored for the integral; its lambda is not
-///   applied to `(0, t₁]`.
-///
-/// Sharing this function guarantees that bumping a curve in place with a
-/// zero-size bump is an exact no-op (no silent re-attribution of base hazards
-/// into spurious CS01 components).
-pub(super) fn survival_pillars(knots: &[f64], lambdas: &[f64]) -> (Vec<f64>, Vec<f64>) {
-    let mut interp_knots = Vec::with_capacity(knots.len() + 1);
-    let mut interp_sp = Vec::with_capacity(knots.len() + 1);
-    interp_knots.push(0.0);
-    interp_sp.push(1.0);
-
-    let mut accum = 0.0;
-    let mut prev_t = 0.0;
-
-    for (&t, &lambda) in knots.iter().zip(lambdas.iter()) {
-        if t <= 1e-9 {
-            continue;
-        }
-        accum += lambda * (t - prev_t);
-        interp_knots.push(t);
-        interp_sp.push((-accum).exp());
-        prev_t = t;
-    }
-
-    (interp_knots, interp_sp)
 }

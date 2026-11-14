@@ -118,20 +118,20 @@ where
                 revert_scratch_bumps(scratch, tokens_up)?;
                 let pv_up = pv_up?;
 
-                // The additive down-bump `σ - h` clamps at zero wherever `σ < h`,
-                // making a central difference divided by the full `2h` biased.
-                // Detect the clamp via the surface's minimum vol and fall back to
-                // a one-sided forward difference near zero vol.
+                // An additive down-bump `σ - h` is rejected when `σ < h` and
+                // hits the degenerate `σ = 0` boundary when `σ == h`. Detect
+                // low grid vol via the surface minimum and fall back to a
+                // one-sided forward difference near zero vol.
                 let min_vol = vol_surfaces
                     .iter()
                     .filter_map(|(_, surface)| min_grid_vol(surface))
                     .reduce(f64::min);
-                if min_vol.map(|m| m < bump_pct).unwrap_or(false) {
+                if min_vol.map(|m| m <= bump_pct).unwrap_or(false) {
                     tracing::warn!(
                         vol_surface_ids = ?vol_surface_ids,
                         min_vol = min_vol,
                         bump = bump_pct,
-                        "key-rate vega parallel down-bump would clamp σ at 0; \
+                        "key-rate vega parallel down-bump would reach or breach σ = 0; \
                          using one-sided forward difference"
                     );
                     let pv_base = ctx.reprice_instrument_raw(instrument, base_ctx, as_of)?;
@@ -175,7 +175,7 @@ where
             let mut rows = Vec::new();
             let base_raw = ctx.reprice_instrument_raw(instrument, base_ctx, as_of)?;
             for (id, surface, expiries, strikes) in &grids {
-                let one_sided = min_grid_vol(surface).is_some_and(|vol| vol < bump_pct);
+                let one_sided = min_grid_vol(surface).is_some_and(|vol| vol <= bump_pct);
                 for &expiry in expiries {
                     let mut row = vec![0.0; columns.len()];
                     for &strike in strikes {

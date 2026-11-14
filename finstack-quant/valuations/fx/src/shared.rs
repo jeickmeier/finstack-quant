@@ -164,6 +164,8 @@ pub(crate) struct FxOptionInputsNoVol {
     pub(crate) t: f64,
     /// Date-based domestic discount factor from `as_of` to expiry (`1.0` once expired).
     pub(crate) df_domestic: f64,
+    /// Date-based foreign discount factor from `as_of` to expiry (`1.0` once expired).
+    pub(crate) df_foreign: f64,
 }
 
 /// Shared FX option inputs including volatility.
@@ -250,6 +252,7 @@ fn collect_fx_option_inputs_no_vol_at_spot(
             r_foreign: 0.0,
             t: 0.0,
             df_domestic: 1.0,
+            df_foreign: 1.0,
         });
     }
 
@@ -285,6 +288,7 @@ fn collect_fx_option_inputs_no_vol_at_spot(
         r_foreign,
         t,
         df_domestic: df_d,
+        df_foreign: df_f,
     })
 }
 
@@ -312,13 +316,15 @@ pub(crate) fn collect_fx_option_inputs_at_spot(
         });
     }
 
+    let forward = no_vol.spot * no_vol.df_foreign / no_vol.df_domestic;
     let sigma =
-        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_sigma_at(
+        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_fx_sigma_at(
             &request.instrument_pricing_overrides.market_quotes,
             request.market,
             request.vol_surface_id,
             no_vol.t,
             request.strike,
+            forward,
         )?;
 
     Ok(FxOptionInputs {

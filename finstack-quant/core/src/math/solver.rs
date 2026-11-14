@@ -183,6 +183,15 @@ impl BrentSolver {
         self
     }
 
+    fn validate_controls(&self) -> Result<()> {
+        if !self.tolerance.is_finite() || self.tolerance <= 0.0 || self.max_iterations == 0 {
+            return Err(crate::Error::Validation(
+                "Brent solver requires positive finite tolerance and max_iterations >= 1".into(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Find bracket around the root starting from initial guess.
     ///
     /// The search is bounded by `bracket_min` and `bracket_max` to prevent
@@ -193,6 +202,7 @@ impl BrentSolver {
     {
         use crate::InputError;
 
+        self.validate_controls()?;
         if !initial_guess.is_finite()
             || !self.bracket_min.is_finite()
             || !self.bracket_max.is_finite()
@@ -203,7 +213,11 @@ impl BrentSolver {
             ));
         }
         let initial_guess = initial_guess.clamp(self.bracket_min, self.bracket_max);
-        let max_bracket_width = self.bracket_max - self.bracket_min;
+        let half_max_width = if (self.bracket_min >= 0.0) == (self.bracket_max >= 0.0) {
+            0.5 * (self.bracket_max - self.bracket_min)
+        } else {
+            0.5 * self.bracket_max - 0.5 * self.bracket_min
+        };
 
         let initial_size = self.initial_bracket_size.unwrap_or_else(|| {
             // Use 1% of the initial guess magnitude, with a minimum of 0.01
@@ -251,16 +265,21 @@ impl BrentSolver {
             }
 
             // Expand bracket with overflow protection
-            let width = b - a;
+            let half_width = if (a >= 0.0) == (b >= 0.0) {
+                0.5 * (b - a)
+            } else {
+                0.5 * b - 0.5 * a
+            };
 
-            // Stop if bracket is unreasonably wide
-            if width >= max_bracket_width {
+            // Stop if bracket spans the full configured domain
+            if half_width >= half_max_width {
                 break;
             }
 
             // Expand with bounds checking to prevent overflow
-            let next_a = (a - width * BRACKET_EXPANSION).max(self.bracket_min);
-            let next_b = (b + width * BRACKET_EXPANSION).min(self.bracket_max);
+            let expand_step = 2.0 * half_width * BRACKET_EXPANSION;
+            let next_a = (a - expand_step).max(self.bracket_min);
+            let next_b = (b + expand_step).min(self.bracket_max);
             if next_a < a {
                 let (prev_a, prev_fa) = (a, fa);
                 a = next_a;
@@ -470,6 +489,12 @@ impl BrentSolver {
     where
         Func: FnMut(f64) -> Result<f64>,
     {
+        self.validate_controls()?;
+        if !a.is_finite() || !b.is_finite() {
+            return Err(crate::Error::Validation(
+                "Brent bracket endpoints must be finite".into(),
+            ));
+        }
         let (lo, hi) = if a <= b { (a, b) } else { (b, a) };
         let flo = f(lo)?;
         let fhi = if lo.to_bits() == hi.to_bits() {
@@ -513,10 +538,8 @@ impl BrentSolver {
     where
         Func: FnMut(f64) -> Result<f64>,
     {
-        if !self.tolerance.is_finite()
-            || self.tolerance <= 0.0
-            || bracket.iter().any(|(x, _)| !x.is_finite())
-        {
+        self.validate_controls()?;
+        if bracket.iter().any(|(x, _)| !x.is_finite()) {
             return Err(crate::Error::Validation(
                 "evaluated Brent solve requires finite endpoints and a positive finite residual tolerance".into(),
             ));
@@ -617,7 +640,11 @@ impl BrentSolver {
             }
             // Convergence checks
             let tol1 = 2.0 * f64::EPSILON * b.abs() + 0.5 * self.tolerance;
-            let xm = 0.5 * (c - b);
+            let xm = if (b >= 0.0) == (c >= 0.0) {
+                0.5 * (c - b)
+            } else {
+                0.5 * c - 0.5 * b
+            };
             if fb == 0.0
                 || (require_residual && fb.abs() < self.tolerance)
                 || (!require_residual && xm.abs() <= tol1)
@@ -1156,5 +1183,73 @@ mod tests {
             )
             .expect("signed-zero root");
         assert_eq!(root, 0.0);
+    }
+
+    #[test]
+    fn brent_rejects_invalid_controls_and_nonfinite_brackets_before_callback() {
+        for bad_tol in [0.0, -1e-8, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let solver = BrentSolver::new().with_tolerance(bad_tol);
+            assert!(
+                solver
+                    .solve(|_| unreachable!("invalid tolerance"), 1.0)
+                    .is_err()
+            );
+            assert!(
+                solver
+                    .solve_in_bracket(|_| unreachable!("invalid tolerance"), 0.0, 2.0)
+                    .is_err()
+            );
+        }
+
+        let zero_iter = BrentSolver::new().with_max_iterations(0);
+        assert!(
+            zero_iter
+                .solve(|_| unreachable!("max_iterations == 0"), 1.0)
+                .is_err()
+        );
+        assert!(
+            zero_iter
+                .solve_in_bracket(|_| unreachable!("max_iterations == 0"), 0.0, 2.0)
+                .is_err()
+        );
+        assert!(
+            zero_iter
+                .solve_evaluated_bracket(
+                    |_| unreachable!("max_iterations == 0"),
+                    [(0.0, -1.0), (2.0, 1.0)]
+                )
+                .is_err()
+        );
+
+        let solver = BrentSolver::new();
+        for (a, b) in [
+            (f64::NAN, 1.0),
+            (0.0, f64::NAN),
+            (f64::NEG_INFINITY, 1.0),
+            (0.0, f64::INFINITY),
+        ] {
+            assert!(
+                solver
+                    .solve_in_bracket(|_| unreachable!("non-finite endpoint"), a, b)
+                    .is_err()
+            );
+        }
+
+        let wide_root = solver
+            .solve_in_bracket(
+                |x| {
+                    Ok(if x < 0.0 {
+                        -1.0
+                    } else if x > 0.0 {
+                        1.0
+                    } else {
+                        0.0
+                    })
+                },
+                -1e308,
+                1e308,
+            )
+            .expect("overflow-safe midpoint on [-1e308, 1e308]");
+        assert!(wide_root.abs() <= 1e-12);
     }
 }

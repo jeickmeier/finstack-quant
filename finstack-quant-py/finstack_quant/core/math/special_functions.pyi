@@ -43,8 +43,8 @@ def norm_cdf_with_params(x: float, mean: float, std_dev: float) -> float:
     Raises
     ------
     ValueError
-        If *std_dev* is not finite and strictly positive. Non-finite *x* or
-        *mean* are not rejected; they follow IEEE-754 arithmetic.
+        If *std_dev* is not finite and strictly positive, *mean* is non-finite,
+        or *x* is ``nan``.
 
     Examples
     --------
@@ -62,11 +62,11 @@ def norm_pdf_with_params(x: float, mean: float, std_dev: float) -> float:
     Parameters
     ----------
     x : float
-        Evaluation point.
+        Evaluation point (``+-inf`` accepted, ``nan`` rejected).
     mean : float
-        Distribution mean.
+        Finite distribution mean.
     std_dev : float
-        Distribution standard deviation; must be strictly positive.
+        Distribution standard deviation; must be finite and strictly positive.
 
     Returns
     -------
@@ -76,8 +76,8 @@ def norm_pdf_with_params(x: float, mean: float, std_dev: float) -> float:
     Raises
     ------
     ValueError
-        If *std_dev* is not finite and strictly positive. Non-finite *x* or
-        *mean* are not rejected; they follow IEEE-754 arithmetic.
+        If *std_dev* is not finite and strictly positive, *mean* is non-finite,
+        *x* is ``nan``, or the resulting density overflows ``float64``.
 
     Examples
     --------
@@ -182,17 +182,19 @@ def standard_normal_inv_cdf(p: float) -> float:
     Parameters
     ----------
     p : float
-        Probability in ``(0, 1)``.
+        Probability in ``[0, 1]``.
 
     Returns
     -------
     float
-        Quantile *x* such that ``Phi(x) = p``.
+        Quantile *x* such that ``Phi(x) = p`` (``-inf`` at ``0.0``, ``+inf`` at
+        ``1.0``, and ``nan`` outside ``[0, 1]``).
 
     Raises
     ------
     None
-        Out-of-range probabilities map to signed infinity; NaN propagates to the result.
+        Exact domain boundaries ``0.0`` and ``1.0`` return signed infinity;
+        probabilities outside ``[0, 1]`` and ``nan`` return ``nan``.
 
     Examples
     --------
@@ -296,20 +298,20 @@ def student_t_inv_cdf(p: float, df: float) -> float:
     Parameters
     ----------
     p : float
-        Probability in ``(0, 1)``.
+        Probability in ``[0, 1]``.
     df : float
         Degrees of freedom (:math:`\nu > 0`).
 
     Returns
     -------
     float
-        Quantile *x*.
+        Quantile *x* (``-inf`` at ``p == 0.0``, ``+inf`` at ``p == 1.0``).
 
     Raises
     ------
     ValueError
-        If ``df`` is non-finite or not positive. Probabilities at or beyond
-        the domain edges saturate to negative or positive infinity.
+        If ``df`` is non-finite or not positive, or ``p`` is non-finite or
+        outside ``[0, 1]``.
 
     Examples
     --------

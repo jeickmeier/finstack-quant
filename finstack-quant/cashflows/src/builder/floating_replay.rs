@@ -185,6 +185,14 @@ impl CompiledFloatingCoupon {
                 )));
             }
             period.accrual_factor
+        } else if period.day_count == DayCount::ActActIsma {
+            crate::builder::date_generation::icma_sliced_year_fraction(
+                period.accrual_start,
+                period.accrual_end,
+                period.day_count_context,
+                None,
+                None,
+            )?
         } else {
             period.day_count.year_fraction(
                 period.accrual_start,

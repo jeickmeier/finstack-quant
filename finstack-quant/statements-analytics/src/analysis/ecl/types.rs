@@ -10,7 +10,9 @@
 //! - [`RawPdCurve`] -- user-supplied PD term structure with linear interpolation
 //! - [`RatingPdMap`] -- rating-keyed map of [`RawPdCurve`] values
 
-use finstack_quant_core::math::interp::interp_knots_flat;
+use finstack_quant_core::math::interp::{
+    ExtrapolationPolicy, Interpolator, LinearStrategy, ValidationPolicy,
+};
 use finstack_quant_core::{Error, InputError, Result};
 use finstack_quant_models::credit::lgd::{CreditConversionFactor, EadCalculator};
 use indexmap::IndexMap;
@@ -350,6 +352,15 @@ impl Exposure {
                 }
                 prev_t = t;
             }
+            if schedule.len() >= 2 {
+                let (times, eads): (Vec<f64>, Vec<f64>) = schedule.iter().copied().unzip();
+                Interpolator::<LinearStrategy>::new(
+                    times.into_boxed_slice(),
+                    eads.into_boxed_slice(),
+                    ExtrapolationPolicy::FlatZero,
+                    ValidationPolicy::AllowNegative,
+                )?;
+            }
         }
         Ok(())
     }
@@ -375,7 +386,20 @@ impl Exposure {
     /// amounts, CCF outside `[0, 1]`).
     pub(crate) fn ead_at(&self, t: f64) -> Result<f64> {
         let drawn = match &self.ead_schedule {
-            Some(schedule) if !schedule.is_empty() => interp_knots_flat(schedule, t),
+            Some(schedule) if !schedule.is_empty() => {
+                if schedule.len() == 1 {
+                    schedule[0].1
+                } else {
+                    let (times, eads): (Vec<f64>, Vec<f64>) = schedule.iter().copied().unzip();
+                    let interp = Interpolator::<LinearStrategy>::new(
+                        times.into_boxed_slice(),
+                        eads.into_boxed_slice(),
+                        ExtrapolationPolicy::FlatZero,
+                        ValidationPolicy::AllowNegative,
+                    )?;
+                    interp.interp(t)
+                }
+            }
             _ => self.ead,
         };
         Ok(EadCalculator::new(drawn, self.undrawn, CreditConversionFactor::new(self.ccf)?)?.ead())
@@ -469,6 +493,10 @@ pub struct RawPdCurve {
     pub(super) rating: String,
     /// (time_years, cumulative_pd) knots, sorted by time, monotonically increasing.
     pub(super) knots: Vec<(f64, f64)>,
+    /// Pre-validated flat-extrapolated linear interpolator over `knots`.
+    #[serde(skip)]
+    #[cfg_attr(feature = "json-schema", schemars(skip))]
+    interp: Interpolator<LinearStrategy>,
 }
 
 /// Serde shadow type that routes `RawPdCurve` deserialization through
@@ -536,9 +564,17 @@ impl RawPdCurve {
                 )));
             }
         }
+        let (times, pds): (Vec<f64>, Vec<f64>) = knots.iter().copied().unzip();
+        let interp = Interpolator::<LinearStrategy>::new(
+            times.into_boxed_slice(),
+            pds.into_boxed_slice(),
+            ExtrapolationPolicy::FlatZero,
+            ValidationPolicy::AllowNegative,
+        )?;
         Ok(Self {
             rating: rating.into(),
             knots,
+            interp,
         })
     }
 
@@ -571,7 +607,12 @@ impl PdTermStructure for RawPdCurve {
                 self.rating, rating
             )));
         }
-        Ok(interp_knots_flat(&self.knots, t))
+        if !t.is_finite() {
+            return Err(Error::Validation(format!(
+                "RawPdCurve: horizon t must be finite (got {t})"
+            )));
+        }
+        Ok(self.interp.interp(t))
     }
 
     fn contains_rating(&self, rating: &str) -> bool {
@@ -614,7 +655,12 @@ impl PdTermStructure for RatingPdMap {
         let curve = self.curves.get(rating).ok_or_else(|| {
             Error::Validation(format!("RatingPdMap has no curve for rating '{rating}'"))
         })?;
-        Ok(interp_knots_flat(&curve.knots, t))
+        if !t.is_finite() {
+            return Err(Error::Validation(format!(
+                "RatingPdMap: horizon t must be finite (got {t})"
+            )));
+        }
+        Ok(curve.interp.interp(t))
     }
 
     fn contains_rating(&self, rating: &str) -> bool {
@@ -822,18 +868,29 @@ mod tests {
     }
 
     #[test]
-    fn test_interp_knots_flat_matches_expected_curve() {
-        let knots = vec![(1.0, 0.02), (2.0, 0.05), (5.0, 0.12)];
-        // Before first knot -> first value
-        assert!((interp_knots_flat(&knots, 0.5) - 0.02).abs() < 1e-10);
-        // At first knot
-        assert!((interp_knots_flat(&knots, 1.0) - 0.02).abs() < 1e-10);
-        // Midpoint of first segment
-        assert!((interp_knots_flat(&knots, 1.5) - 0.035).abs() < 1e-10);
-        // At second knot
-        assert!((interp_knots_flat(&knots, 2.0) - 0.05).abs() < 1e-10);
-        // After last knot -> flat extrapolation
-        assert!((interp_knots_flat(&knots, 10.0) - 0.12).abs() < 1e-10);
+    fn test_ead_schedule_flat_extrapolation_matches_expected_curve() {
+        let exposure = Exposure {
+            id: "EAD-SCHED".to_string(),
+            segments: vec![],
+            ead: 1.0,
+            undrawn: 0.0,
+            ccf: DEFAULT_REVOLVER_CCF,
+            eir: 0.0,
+            remaining_maturity_years: 10.0,
+            lgd: 0.4,
+            days_past_due: 0,
+            current_rating: None,
+            origination_rating: None,
+            qualitative_flags: QualitativeFlags::default(),
+            consecutive_performing_periods: 0,
+            previous_stage: None,
+            ead_schedule: Some(vec![(1.0, 0.02), (2.0, 0.05), (5.0, 0.12)]),
+        };
+        assert!((exposure.ead_at(0.5).unwrap() - 0.02).abs() < 1e-10);
+        assert!((exposure.ead_at(1.0).unwrap() - 0.02).abs() < 1e-10);
+        assert!((exposure.ead_at(1.5).unwrap() - 0.035).abs() < 1e-10);
+        assert!((exposure.ead_at(2.0).unwrap() - 0.05).abs() < 1e-10);
+        assert!((exposure.ead_at(10.0).unwrap() - 0.12).abs() < 1e-10);
     }
 
     #[test]
