@@ -56,12 +56,12 @@ resolve the stated scope question explicitly.
    never proof of a numerical defect, and ADR 0005 does not imply blanket
    bit-identical floating-point results.
 4. **Option-bearing bond CS01 scope.**
-   The [bond CS01 implementation](../../finstack-quant/valuations/fixed-income/src/bond/metrics/cs01.rs)
-   has a model-specific OAS branch when the active option-bearing model does
-   not consume a credit curve. Clarify its relationship to the supported-bond
-   z-spread rule in [ADR 0011](financial/valuations-bonds/0011-bond-cs01-without-hazard-curve.md).
-   The existing branch is neither silently approved as an exception nor
-   classified as a defect by this record.
+   The [accepted BONDS-16 scope](financial/valuations-bonds/16-spread-credit-risk.md#accepted-decision-for-checked-bond-spread-and-credit-risk)
+   requires an explicitly qualified fixed Z strip for supported option-bearing
+   bonds under [ADR 0011](financial/valuations-bonds/0011-bond-cs01-without-hazard-curve.md).
+   Reconcile the [live bond CS01 route](../../finstack-quant/valuations/fixed-income/src/bond/metrics/cs01.rs)
+   by removing the implicit OAS and parallel-bucket substitutions, and
+   qualify fixed-strip admission and no-hazard attribution independently.
 5. **Code-standard guidance and configuration.**
    Align contributor and agent guidance with the accepted policy and shared
    executable definitions under
@@ -1191,6 +1191,182 @@ Runtime, calibration, dated market and host qualification remain pending.
 The checked tranche cashflows and settlement package was accepted on
 2026-11-13. Runtime, dated market, calibration and host qualification remain pending.
 [Credit record 18](financial/models-and-valuations-credit/18-tranche-projection.md#accepted-decision-for-checked-tranche-cashflows-and-settlement).
+The checked tranche risk and default scenarios package was accepted on
+2026-11-13. Runtime, replay, dated market and host qualification remain pending.
+[Credit record 19](financial/models-and-valuations-credit/19-tranche-risk.md#accepted-decision-for-checked-tranche-risk-and-default-scenarios).
+The checked exchange and liability-management package was accepted on
+2026-11-13, completing review of all 20 detailed credit and liquidity records.
+Runtime and host qualification remain pending.
+[Credit record 20](financial/models-and-valuations-credit/20-liability-management.md#accepted-decision-for-checked-exchange-and-liability-management-arithmetic).
+The checked valuation dispatch and lifecycle package was accepted on
+2026-11-13. Runtime, replay and host qualification remain pending.
+[Valuation framework record 01](financial/valuations-framework/pricing-lifecycle.md#accepted-decision-for-checked-valuation-dispatch-and-lifecycle).
+The checked valuation model inputs and controls package was accepted on
+2026-11-13. Runtime, fit replay and host qualification remain pending.
+[Valuation framework record 02](financial/valuations-framework/model-resolution.md#accepted-decision-for-checked-valuation-model-inputs-and-controls).
+The checked listed futures and options package was accepted on 2026-11-13.
+Runtime, venue settlement, lattice accuracy and host qualification remain pending.
+[Valuation framework record 03](financial/valuations-framework/listed-products.md#accepted-decision-for-checked-listed-futures-and-options).
+The checked overnight projection and quote risk package was accepted on
+2026-11-13. Runtime, dated fixing and host qualification remain pending.
+[Valuation framework record 04](financial/valuations-framework/overnight-projection.md#accepted-decision-for-checked-overnight-projection-and-quote-risk).
+The checked dated rates-credit valuation package was accepted on 2026-11-13.
+Runtime, product-price, risk and host qualification remain pending.
+[Valuation framework record 05](financial/valuations-framework/rates-credit-grid.md#accepted-decision-for-checked-dated-rates-credit-valuation).
+The checked TRS legs and par spread package was accepted on 2026-11-13.
+Runtime, dated product and host qualification remain pending.
+[Valuation framework record 06](financial/valuations-framework/trs-legs.md#accepted-decision-for-checked-trs-legs-and-par-spread).
+The observation schedules and monitoring grids package was accepted on
+2026-11-13. Runtime, product-price and host qualification remain pending.
+[Valuation framework record 07](financial/valuations-framework/observation-grids.md#accepted-decision-for-checked-observation-schedules-and-monitoring-grids).
+The metric orchestration and reporting package was accepted on 2026-11-13.
+Runtime, reporting and host qualification remain pending.
+[Valuation framework record 08](financial/valuations-framework/metric-orchestration.md#accepted-decision-for-checked-metric-orchestration-and-reporting).
+The finite differences and rate risk package was accepted on 2026-11-13.
+Runtime, calibration-replay and host qualification remain pending.
+[Valuation framework record 09](financial/valuations-framework/finite-difference-rates.md#accepted-decision-for-checked-finite-differences-and-rate-risk).
+The checked credit sensitivities package was accepted on 2026-11-13.
+Runtime, calibration-replay and host qualification remain pending.
+[Valuation framework record 10](financial/valuations-framework/credit-sensitivities.md#accepted-decision-for-checked-credit-sensitivities).
+The checked option and FX sensitivities package was accepted on 2026-11-13.
+Runtime, financial accuracy and host qualification remain pending.
+[Valuation framework record 11](financial/valuations-framework/option-sensitivities.md#accepted-decision-for-checked-option-and-fx-sensitivities).
+The checked cross-factor risk package was accepted on 2026-11-13.
+Runtime, replay, attribution and host qualification remain pending.
+[Valuation framework record 12](financial/valuations-framework/cross-factor-risk.md#accepted-decision-for-checked-cross-factor-risk).
+The checked horizon theta, carry and breakeven package was accepted on 2026-11-14.
+Runtime, product and host qualification remain pending.
+[Valuation framework record 13](financial/valuations-framework/carry-theta-breakeven.md#accepted-decision-for-checked-horizon-theta-carry-and-breakeven).
+The checked historical scenario risk package was accepted on 2026-11-14.
+Runtime, calibration-replay, financial accuracy and host qualification remain pending.
+[Valuation framework record 14](financial/valuations-framework/historical-risk.md#accepted-decision-for-checked-historical-scenario-risk).
+The checked cashflow valuation and export package was accepted on 2026-11-14.
+Runtime, product and host qualification remain pending.
+[Valuation framework record 15](financial/valuations-framework/cashflow-export.md#accepted-decision-for-checked-cashflow-valuation-and-export).
+The checked convention selection and dated sources package was accepted on 2026-11-14.
+Full row, product, calibration and host qualification remain pending.
+[Valuation framework record 16](financial/valuations-framework/convention-selection.md#accepted-decision-for-checked-convention-selection-and-dated-sources).
+The checked inflation references and information dates package was accepted on 2026-11-14.
+Runtime, product, calibration and host qualification remain pending.
+[Valuation framework record 17](financial/valuations-framework/inflation-references.md#accepted-decision-for-checked-inflation-references-and-information-dates).
+The checked margin repricing and identity package was accepted on 2026-11-14.
+Runtime, replay, margin reporting and host qualification remain pending.
+[Valuation framework record 18](financial/valuations-framework/margin-bridge.md#accepted-decision-for-checked-margin-repricing-and-identity).
+The checked shared contract and stochastic controls package was accepted on 2026-11-14.
+Runtime, product, calibration and host qualification remain pending.
+[Valuation framework record 19](financial/valuations-framework/shared-contract-controls.md#accepted-decision-for-checked-shared-contract-and-stochastic-controls).
+The generated financial builder package was accepted on 2026-11-14,
+completing adoption of all 20 detailed shared valuation framework records.
+Macro, consumer, restore and host reconciliation and qualification remain pending.
+[Valuation framework record 20](financial/valuations-framework/builder-validation.md#accepted-decision-for-checked-generated-financial-builders).
+The checked deposit cashflows and quote inversion package was accepted on 2026-11-14.
+Runtime, calibration and host qualification remain pending.
+[Rates valuation record 01](financial/valuations-rates/01-deposits.md#accepted-decision-for-checked-deposit-cashflows-and-quote-inversion).
+The checked FRA fixing, settlement and risk package was accepted on 2026-11-14.
+Runtime, calibration, reporting and host qualification remain pending.
+[Rates valuation record 02](financial/valuations-rates/02-fra.md#accepted-decision-for-checked-fra-fixing-settlement-and-risk).
+The checked interest-rate swap cashflows and risk package was accepted on 2026-11-14.
+Runtime, calibration, margin and host qualification remain pending.
+[Rates valuation record 03](financial/valuations-rates/03-interest-rate-swaps.md#accepted-decision-for-checked-interest-rate-swap-cashflows-and-risk).
+The checked basis swap cashflows and par spreads package was accepted on 2026-11-14.
+Runtime, calibration and host qualification remain pending.
+[Rates valuation record 04](financial/valuations-rates/04-basis-swaps.md#accepted-decision-for-checked-basis-swap-cashflows-and-par-spreads).
+The checked cap and floor optionlet pricing package was accepted on 2026-11-14.
+Runtime, model, calibration and host qualification remain pending.
+[Rates valuation record 05](financial/valuations-rates/05-cap-floor-pricing.md#accepted-decision-for-checked-cap-and-floor-optionlet-pricing).
+The checked cap and floor risk and implied volatility package was accepted on 2026-11-14.
+Runtime, model, calibration and host qualification remain pending.
+[Rates valuation record 06](financial/valuations-rates/06-cap-floor-risk.md#accepted-decision-for-checked-cap-and-floor-risk-and-implied-volatility).
+The checked European swaption pricing and risk package was accepted on 2026-11-14.
+Runtime, model, calibration and host qualification remain pending.
+[Rates valuation record 07](financial/valuations-rates/07-european-swaptions.md#accepted-decision-for-checked-european-swaption-pricing-and-risk).
+The checked Hull–White swaption exercise and risk package was accepted on 2026-11-14.
+Runtime, numerical, calibration and host qualification remain pending.
+[Rates valuation record 08](financial/valuations-rates/08-hull-white-swaptions.md#accepted-decision-for-checked-hull-white-swaption-exercise-and-risk).
+The checked LMM Bermudan pricing and risk package was accepted on 2026-11-14.
+Runtime, numerical, calibration and host qualification remain pending.
+[Rates valuation record 09](financial/valuations-rates/09-lmm-bermudans.md#accepted-decision-for-checked-lmm-bermudan-pricing-and-risk).
+The checked rate futures and futures option risk package was accepted on 2026-11-14.
+Runtime, numerical, calibration and host qualification remain pending.
+[Rates valuation record 10](financial/valuations-rates/10-rate-futures.md#accepted-decision-for-checked-rate-futures-and-futures-option-risk).
+The checked CMS convexity pricing and risk package was accepted on 2026-11-14.
+Runtime, model and host qualification remain pending.
+[Rates valuation record 11](financial/valuations-rates/11-cms-convexity.md#accepted-decision-for-checked-cms-convexity-pricing-and-risk).
+The checked CMS smile replication and risk package was accepted on 2026-11-14.
+Runtime, model, market and host qualification remain pending.
+[Rates valuation record 12](financial/valuations-rates/12-cms-replication.md#accepted-decision-for-checked-cms-smile-replication-and-risk).
+The checked inflation swap cashflows and risk package was accepted on 2026-11-14.
+Runtime, calibration and host qualification remain pending.
+[Rates valuation record 13](financial/valuations-rates/13-inflation-swaps.md#accepted-decision-for-checked-inflation-swap-cashflows-and-risk).
+The checked inflation option cashflows, expiry and risk package was accepted on 2026-11-14.
+Runtime, market and host qualification remain pending.
+[Rates valuation record 14](financial/valuations-rates/14-inflation-options.md#accepted-decision-for-checked-inflation-option-cashflows-expiry-and-risk).
+The checked repo cashflows, collateral and risk package was accepted on 2026-11-14.
+Runtime, market, margin and host qualification remain pending.
+[Rates valuation record 15](financial/valuations-rates/15-repo.md#accepted-decision-for-checked-repo-cashflows-collateral-and-risk).
+The checked cross-currency swap cashflows, FX resets and risk package was accepted on 2026-11-14.
+Runtime, market, calibration and host qualification remain pending.
+[Rates valuation record 16](financial/valuations-rates/16-cross-currency-swaps.md#accepted-decision-for-checked-cross-currency-swap-cashflows-fx-resets-and-risk).
+The checked CMS spread cashflows, model and risk package was accepted on 2026-11-14.
+Runtime, market and host qualification remain pending.
+[Rates valuation record 17](financial/valuations-rates/17-cms-spread.md#accepted-decision-for-checked-cms-spread-cashflows-model-and-risk).
+The checked bond schedules and holder cash package was accepted on 2026-11-14.
+Runtime, market and host qualification remain pending.
+[Bond valuation record 01](financial/valuations-bonds/01-schedule-and-holder-cashflows.md#accepted-decision-for-checked-bond-schedules-and-holder-cash).
+The checked bond settlement, quote carry and clocks package was accepted on 2026-11-14.
+Runtime, market, model and host qualification remain pending.
+[Bond valuation record 02](financial/valuations-bonds/02-settlement-and-clocks.md#accepted-decision-for-checked-bond-settlement-quote-carry-and-clocks).
+The checked bond PV selection and fractional recovery of par package was accepted on 2026-11-14.
+Runtime, market, model and host qualification remain pending.
+[Bond valuation record 03](financial/valuations-bonds/03-pv-models.md#accepted-decision-for-checked-bond-pv-selection-and-fractional-recovery-of-par).
+The checked rates-only bond tree and exercise package was accepted on 2026-11-14.
+Runtime, fit, convergence, market and host qualification remain pending.
+[Bond valuation record 04](financial/valuations-bonds/04-rates-tree-exercise.md#accepted-decision-for-checked-bond-rates-trees-and-exercise).
+The checked issue-basis return floor package was accepted on 2026-11-14.
+Runtime, contract, path replay and host qualification remain pending.
+[Bond valuation record 05](financial/valuations-bonds/05-return-floors.md#accepted-decision-for-checked-issue-basis-return-floors).
+The checked joint bond payoff and recovery replay package was accepted on 2026-11-14.
+Runtime, stochastic calibration, market, risk and host qualification remain pending.
+[Bond valuation record 06](financial/valuations-bonds/06-joint-coupon-replay.md#accepted-decision-for-checked-joint-bond-payoff-and-recovery-replay).
+The checked joint bond exercise policy and make-whole package was accepted on 2026-11-14.
+Runtime, economic fit, pricing, risk and host qualification remain pending.
+[Bond valuation record 07](financial/valuations-bonds/07-lsmc-policy.md#accepted-decision-for-checked-joint-bond-exercise-policy-and-make-whole).
+The checked structural bond simulation and outputs package was accepted on 2026-11-14.
+Runtime, stochastic convergence, market and host qualification remain pending.
+[Bond valuation record 08](financial/valuations-bonds/08-merton-simulation.md#accepted-decision-for-checked-structural-bond-simulation-and-outputs).
+The checked cash-equivalent structural calibration package was accepted on 2026-11-14.
+Runtime, stochastic fit, market, risk and host qualification remain pending.
+[Bond valuation record 09](financial/valuations-bonds/09-merton-calibration.md#accepted-decision-for-checked-cash-equivalent-structural-calibration).
+The checked settlement yield and price inversion package was accepted on 2026-11-14.
+Runtime, market-specific quote, risk and host qualification remain pending.
+[Bond valuation record 10](financial/valuations-bonds/10-quoted-yield.md#accepted-decision-for-checked-settlement-yield-and-price-inversion).
+The checked bond spreads and price inversion package was accepted on 2026-11-14.
+Runtime, market, workout, risk and host qualification remain pending.
+[Bond valuation record 12](financial/valuations-bonds/12-spread-quotes.md#accepted-decision-for-checked-bond-spreads-and-price-inversion).
+The checked bond asset-swap package was accepted on 2026-11-14.
+Market, runtime, workout and host qualification remain pending.
+[Bond valuation record 13](financial/valuations-bonds/13-asset-swaps.md#accepted-decision-for-checked-bond-asset-swaps-and-price-inversion).
+The checked quoted-yield bond risk package, including unscaled published convexity, was accepted on 2026-11-14.
+Market, runtime, workout and host qualification remain pending.
+[Bond valuation record 14](financial/valuations-bonds/14-yield-risk.md#accepted-decision-for-checked-quoted-yield-bond-risk).
+The checked curve DV01, key-rate and effective bond risk package was accepted on 2026-11-14.
+Market, model, runtime and host qualification remain pending.
+[Bond valuation record 15](financial/valuations-bonds/15-curve-risk.md#accepted-decision-for-checked-bond-curve-and-effective-risk).
+The checked bond CS01 and spread duration package was accepted on 2026-11-14.
+Market replay, model, runtime and host qualification remain pending.
+[Bond valuation record 16](financial/valuations-bonds/16-spread-credit-risk.md#accepted-decision-for-checked-bond-spread-and-credit-risk).
+The checked bond recovery and jump-to-default package was accepted on 2026-11-14.
+Legal-claim, market replay, model, runtime and host qualification remain pending.
+[Bond valuation record 17](financial/valuations-bonds/17-default-risk.md#accepted-decision-for-checked-bond-recovery-and-jump-to-default).
+The checked bond embedded-option package and currency `embedded_option_vega` were accepted on 2026-11-14.
+Model, market, runtime and host qualification remain pending.
+[Bond valuation record 18](financial/valuations-bonds/18-embedded-option-risk.md#accepted-decision-for-checked-bond-embedded-option-value-and-vega).
+The checked carry and repayment-life package, including retired-par WAL weights, was accepted on 2026-11-14.
+Product, market, runtime and host qualification remain pending.
+[Bond valuation record 19](financial/valuations-bonds/19-carry-and-life.md#accepted-decision-for-checked-bond-carry-and-repayment-life).
+The checked bond issue-to-exit package, including signed-net MOIC and the complete issuer-call minimum, was accepted on 2026-11-14.
+Contractual path, historical coverage, runtime and host qualification remain pending.
+[Bond valuation record 20](financial/valuations-bonds/20-lifetime-returns.md#accepted-decision-for-checked-bond-issue-to-exit-returns).
 Other unadopted choices retain their stated Proposed or Draft status. Acceptance does not certify
 observed implementations.
 Numerical suites were not rerun in the original documentation audits.

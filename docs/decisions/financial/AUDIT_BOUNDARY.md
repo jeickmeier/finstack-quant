@@ -678,6 +678,347 @@ timing, maturity and partial settlement, and clean versus actual upfront.
 Runtime, dated market, calibration and host qualification remain pending.
 [Credit record 18](models-and-valuations-credit/18-tranche-projection.md#accepted-decision-for-checked-tranche-cashflows-and-settlement).
 
+The nineteenth credit and liquidity package was accepted on 2026-11-13.
+Independent examples cover correlation boundaries, credit and rate stencils,
+recovery bases, economic default risk and asymmetric allowances. Runtime,
+replay, dated market and host qualification remain pending.
+[Credit record 19](models-and-valuations-credit/19-tranche-risk.md#accepted-decision-for-checked-tranche-risk-and-default-scenarios).
+
+The twentieth credit and liquidity package was accepted on 2026-11-13.
+Independent examples cover holder PV, hurdle ties, face-value ratios,
+exact decimal gain, repurchase prices, fees and gross leverage. Runtime
+and host qualification remain pending.
+[Credit record 20](models-and-valuations-credit/20-liability-management.md#accepted-decision-for-checked-exchange-and-liability-management-arithmetic).
+
+The first shared valuation framework package was accepted on 2026-11-13.
+Independent examples cover composite dispatch, raw risk precision, duplicate
+input keys, active volatility source selection and metric identity.
+Runtime, replay and host qualification remain pending.
+[Valuation framework record 01](valuations-framework/pricing-lifecycle.md#accepted-decision-for-checked-valuation-dispatch-and-lifecycle).
+
+The second shared valuation framework package was accepted on 2026-11-13.
+Independent examples cover volatility-clock conversion, Hull–White knot
+precision, dated GBM carry and exact seed transport. Runtime, fit replay and
+host qualification remain pending.
+[Valuation framework record 02](valuations-framework/model-resolution.md#accepted-decision-for-checked-valuation-model-inputs-and-controls).
+
+The third shared valuation framework package was accepted on 2026-11-13.
+Independent examples cover reference changes, clearing cash, Black and Normal
+pricing, dated lattice discounting and false Gamma stability. Runtime, venue
+settlement, lattice accuracy and host qualification remain pending.
+[Valuation framework record 03](valuations-framework/listed-products.md#accepted-decision-for-checked-listed-futures-and-options).
+
+The fourth shared valuation framework package was accepted on 2026-11-13.
+Independent examples cover full and clipped quote periods, holiday weights,
+same-day publication changes, cutoff derivatives and numerical cancellation.
+Runtime, dated fixing and host qualification remain pending.
+[Valuation framework record 04](valuations-framework/overnight-projection.md#accepted-decision-for-checked-overnight-projection-and-quote-risk).
+
+The fifth shared valuation framework package was accepted on 2026-11-13.
+Independent examples cover exact dates, source interpolation, local hazard,
+variance retention, recovery and floating coupon normalization. Runtime,
+product-price, risk and host qualification remain pending.
+[Valuation framework record 05](valuations-framework/rates-credit-grid.md#accepted-decision-for-checked-dated-rates-credit-valuation).
+
+The sixth shared valuation framework package was accepted on 2026-11-13.
+Independent examples cover lagged and same-day cash, term and overnight
+accrual, signed legs and spread replacement scope. Runtime, dated product
+and host qualification remain pending.
+[Valuation framework record 06](valuations-framework/trs-legs.md#accepted-decision-for-checked-trs-legs-and-par-spread).
+
+The seventh shared valuation framework package was accepted on 2026-11-13.
+Independent examples cover holiday cadence, publication counts, variance
+estimators, exact grid lookup and deferred barrier monitoring. Runtime,
+product-price and host qualification remain pending.
+[Valuation framework record 07](valuations-framework/observation-grids.md#accepted-decision-for-checked-observation-schedules-and-monitoring-grids).
+
+The eighth shared valuation framework package was accepted on 2026-11-13.
+Independent examples cover dependency order, key and reporting collisions,
+sparse results, unit normalization and signed FX aggregation. Runtime,
+reporting and host qualification remain pending.
+[Valuation framework record 08](valuations-framework/metric-orchestration.md#accepted-decision-for-checked-metric-orchestration-and-reporting).
+
+The ninth shared valuation framework package was accepted on 2026-11-13.
+Independent examples cover represented stencils, direct and quote DV01,
+nonlinear bucket sums and volatility shock direction. Runtime,
+calibration-replay and host qualification remain pending.
+[Valuation framework record 09](valuations-framework/finite-difference-rates.md#accepted-decision-for-checked-finite-differences-and-rate-risk).
+
+The tenth shared valuation framework package was accepted on 2026-11-13.
+Independent examples cover the quote, hazard, recovery and settlement bases.
+Runtime, calibration-replay and host qualification remain pending.
+[Valuation framework record 10](valuations-framework/credit-sensitivities.md#accepted-decision-for-checked-credit-sensitivities).
+
+The eleventh shared valuation framework package was accepted on 2026-11-13.
+Independent examples cover represented stencils, quote scales, FX direction,
+sparse bucket reconciliation and distinct theta bases. Runtime, financial
+accuracy and host qualification remain pending.
+[Valuation framework record 11](valuations-framework/option-sensitivities.md#accepted-decision-for-checked-option-and-fx-sensitivities).
+
+The twelfth shared valuation framework package was accepted on 2026-11-13.
+Independent examples cover represented stencils, quote replay, relative spot
+units and attribution. Runtime, calibration-replay, financial accuracy and
+host qualification remain pending.
+[Valuation framework record 12](valuations-framework/cross-factor-risk.md#accepted-decision-for-checked-cross-factor-risk).
+
+The thirteenth shared valuation framework package was accepted on 2026-11-14.
+Independent examples cover cash cuts, dated conditioning, carry, funding
+and quote breakevens. Runtime, product and host qualification remain pending.
+[Valuation framework record 13](valuations-framework/carry-theta-breakeven.md#accepted-decision-for-checked-horizon-theta-carry-and-breakeven).
+
+The fourteenth shared valuation framework package was accepted on 2026-11-14.
+Independent examples cover tail estimators, scenario FX, aggregation and
+represented Taylor stencils. Runtime, replay, financial accuracy and host
+qualification remain pending.
+[Valuation framework record 14](valuations-framework/historical-risk.md#accepted-decision-for-checked-historical-scenario-risk).
+
+The fifteenth shared valuation framework package was accepted on 2026-11-14.
+Independent examples cover settlement, term projection, accrual, credit
+probability and reconciliation. Runtime, product and host qualification
+remain pending.
+[Valuation framework record 15](valuations-framework/cashflow-export.md#accepted-decision-for-checked-cashflow-valuation-and-export).
+
+The sixteenth shared valuation framework package was accepted on 2026-11-14.
+Bounded checks cover embedded metadata, exact selection, dated applicability
+and selected financial examples. Full row, runtime, replay and host
+qualification remain pending.
+[Valuation framework record 16](valuations-framework/convention-selection.md#accepted-decision-for-checked-convention-selection-and-dated-sources).
+
+The seventeenth shared valuation framework package was accepted on 2026-11-14.
+Bounded checks cover lag geometry, release eligibility, issuer references and
+effective rates. Runtime, calibration, product and host qualification remain pending.
+[Valuation framework record 17](valuations-framework/inflation-references.md#accepted-decision-for-checked-inflation-references-and-information-dates).
+
+The eighteenth shared valuation framework package was accepted on 2026-11-14.
+Bounded checks cover shock definitions, tenor allocation and netting identity.
+Runtime, quote replay, margin reporting and host qualification remain pending.
+[Valuation framework record 18](valuations-framework/margin-bridge.md#accepted-decision-for-checked-margin-repricing-and-identity).
+
+The nineteenth shared valuation framework package was accepted on 2026-11-14.
+Bounded checks cover leg dates and signs, issuer lockout, convertible triggers,
+quanto orientation, credit scale, PIK allocation and estimator arithmetic.
+Runtime, product, calibration and host qualification remain pending.
+[Valuation framework record 19](valuations-framework/shared-contract-controls.md#accepted-decision-for-checked-shared-contract-and-stochastic-controls).
+
+The twentieth shared valuation framework package was accepted on 2026-11-14,
+completing adoption of the 20 detailed records. Isolated Rust compiler and
+execution probes cover current derive behavior and proposed evaluation order.
+Product, workspace and host qualification remain pending.
+[Valuation framework record 20](valuations-framework/builder-validation.md#accepted-decision-for-checked-generated-financial-builders).
+
+The first rates valuation package was accepted on 2026-11-14.
+Bounded checks cover date resolution, positive simple growth, signed cash,
+holder and trade cuts and quote inversion. Runtime, calibration and host
+qualification remain pending.
+[Rates valuation record 01](valuations-rates/01-deposits.md#accepted-decision-for-checked-deposit-cashflows-and-quote-inversion).
+
+The second rates valuation package was accepted on 2026-11-14.
+Bounded checks cover benchmark dates, fixing selection, upfront settlement
+and direct risk. Runtime, calibration, reporting and host qualification remain pending.
+[Rates valuation record 02](valuations-rates/02-fra.md#accepted-decision-for-checked-fra-fixing-settlement-and-risk).
+
+The third rates valuation package was accepted on 2026-11-14.
+Bounded checks cover term and overnight coupons, settlement cuts, par and
+direct risk. Runtime, calibration, margin and host qualification remain pending.
+[Rates valuation record 03](valuations-rates/03-interest-rate-swaps.md#accepted-decision-for-checked-interest-rate-swap-cashflows-and-risk).
+
+The fourth rates valuation package was accepted on 2026-11-14.
+Bounded checks cover leg discounting, contractual spread weights, positive
+and zero spread coefficients, absolute and incremental quotes, and direct risk.
+Runtime, calibration and host qualification remain pending.
+[Rates valuation record 04](valuations-rates/04-basis-swaps.md#accepted-decision-for-checked-basis-swap-cashflows-and-par-spreads).
+
+The fifth rates valuation package was accepted on 2026-11-14.
+Bounded checks cover payoff and premium, quote families, Hull–White term
+scaling and overnight covariance. Runtime, model, calibration and host
+qualification remain pending.
+[Rates valuation record 05](valuations-rates/05-cap-floor-pricing.md#accepted-decision-for-checked-cap-and-floor-optionlet-pricing).
+
+The sixth rates valuation package was accepted on 2026-11-14.
+Bounded arithmetic checks cover repeated cutoff quote derivatives,
+discount risk, signed holder theta and gross premium inversion limits.
+Runtime, model, calibration and host qualification remain pending.
+[Rates valuation record 06](valuations-rates/06-cap-floor-risk.md#accepted-decision-for-checked-cap-and-floor-risk-and-implied-volatility).
+
+The seventh rates valuation package was accepted on 2026-11-14.
+Bounded checks cover forward cashflows, dated settlement annuity and cash,
+quote Greeks, discount risk, clock conversion and inverse bounds.
+Runtime, model, calibration and host qualification remain pending.
+[Rates valuation record 07](valuations-rates/07-european-swaptions.md#accepted-decision-for-checked-european-swaption-pricing-and-risk).
+
+The eighth rates valuation package was accepted on 2026-11-14.
+Bounded checks cover exact coupon timing, tree actions and exercise mass,
+joint discounting, a bond-option reference, held-out policy and raw risk.
+Runtime, numerical, calibration and host qualification remain pending.
+[Rates valuation record 08](valuations-rates/08-hull-white-swaptions.md#accepted-decision-for-checked-hull-white-swaption-exercise-and-risk).
+
+The ninth rates valuation package was accepted on 2026-11-14.
+Bounded checks cover support and retained loadings, terminal discounting,
+a one-forward price reference, sparse exercise and paired risk arithmetic.
+Runtime, numerical, calibration and host qualification remain pending.
+[Rates valuation record 09](valuations-rates/09-lmm-bermudans.md#accepted-decision-for-checked-lmm-bermudan-pricing-and-risk).
+
+The tenth rates valuation package was accepted on 2026-11-14.
+Bounded checks cover weighted observation blocks, early term fixing,
+Gaussian covariance, clearing variation and separate option risk axes.
+Runtime, numerical, calibration and host qualification remain pending.
+[Rates valuation record 10](valuations-rates/10-rate-futures.md#accepted-decision-for-checked-rate-futures-and-futures-option-risk).
+
+The eleventh rates valuation package was accepted on 2026-11-14.
+Bounded checks cover the reference forward, signed payment delay and
+stubs, payment eligibility, local collar coherence and full mixed risk.
+Runtime, model and host qualification remain pending.
+[Rates valuation record 11](valuations-rates/11-cms-convexity.md#accepted-decision-for-checked-cms-convexity-pricing-and-risk).
+
+The twelfth rates valuation package was accepted on 2026-11-14.
+Bounded checks cover quote geometry, support sensitivity, payment parity
+and weighted coupons. Runtime, model, market and host qualification remain pending.
+[Rates valuation record 12](valuations-rates/12-cms-replication.md#accepted-decision-for-checked-cms-smile-replication-and-risk).
+
+The thirteenth rates valuation package was accepted on 2026-11-14.
+Bounded checks cover lag and index basis, leap stubs, periodic coupon cash,
+par and CPI risk. Runtime, calibration and host qualification remain pending.
+[Rates valuation record 13](valuations-rates/13-inflation-swaps.md#accepted-decision-for-checked-inflation-swap-cashflows-and-risk).
+
+The fourteenth rates valuation package was accepted on 2026-11-14.
+Independent arithmetic covers stub and known payoffs, publication expiry,
+ratio parity, Normal vega and CPI growth risk. Runtime, market and host
+qualification remain pending.
+[Rates valuation record 14](valuations-rates/14-inflation-options.md#accepted-decision-for-checked-inflation-option-cashflows-expiry-and-risk).
+
+The fifteenth rates valuation package was accepted on 2026-11-14.
+Independent arithmetic covers overnight settlement and negative interest,
+haircut coverage, and the funding and discount reprices. Runtime, market,
+margin and host qualification remain pending.
+[Rates valuation record 15](valuations-rates/15-repo.md#accepted-decision-for-checked-repo-cashflows-collateral-and-risk).
+
+The sixteenth rates valuation package was accepted on 2026-11-14.
+Independent arithmetic covers principal resets, dated FX conversion,
+cashflow and covariance differences, spread and directed risk. Runtime,
+market, calibration and host qualification remain pending.
+[Rates valuation record 16](valuations-rates/16-cross-currency-swaps.md#accepted-decision-for-checked-cross-currency-swap-cashflows-fx-resets-and-risk).
+
+The seventeenth rates valuation package was accepted on 2026-11-14.
+Independent arithmetic covers known and reduced payoffs, the zero-strike
+exchange law, a fixed-order integration discrepancy and independent
+convergence. Runtime, market and host qualification remain pending.
+[Rates valuation record 17](valuations-rates/17-cms-spread.md#accepted-decision-for-checked-cms-spread-cashflows-model-and-risk).
+
+The first bond valuation package was accepted on 2026-11-14.
+Independent examples cover delayed cash, PIK and principal phases,
+and buyer and holder entitlement. Runtime, market and host
+qualification remain pending.
+[Bond valuation record 01](valuations-bonds/01-schedule-and-holder-cashflows.md#accepted-decision-for-checked-bond-schedules-and-holder-cash).
+
+The second bond valuation package was accepted on 2026-11-14.
+Independent examples cover settlement eligibility, detached and
+intervening claims, signed accrued and quote carry, and yield and model
+time. Runtime, market, model and host qualification remain pending.
+[Bond valuation record 02](valuations-bonds/02-settlement-and-clocks.md#accepted-decision-for-checked-bond-settlement-quote-carry-and-clocks).
+
+The third bond valuation package was accepted on 2026-11-14.
+Independent examples cover quote marks, signed spread discounting,
+fractional recovery, repayment lags and local hazard limits. Runtime,
+market, model and host qualification remain pending.
+[Bond valuation record 03](valuations-bonds/03-pv-models.md#accepted-decision-for-checked-bond-pv-selection-and-fractional-recovery-of-par).
+
+The fourth bond valuation package was accepted on 2026-11-14.
+Independent examples cover exact dated nodes, cash ordering, make-whole
+accrued, call thresholds and nodewise OAS. Runtime, fit, convergence,
+market and host qualification remain pending.
+[Bond valuation record 04](valuations-bonds/04-rates-tree-exercise.md#accepted-decision-for-checked-bond-rates-trees-and-exercise).
+
+The fifth bond valuation package was accepted on 2026-11-14.
+Independent examples cover MOIC and XIRR thresholds, actual cash dates,
+exercise-phase eligibility, payable accrued and optional par terms.
+Runtime, contract, path replay and host qualification remain pending.
+[Bond valuation record 05](valuations-bonds/05-return-floors.md#accepted-decision-for-checked-issue-basis-return-floors).
+
+The sixth bond valuation package was accepted on 2026-11-14.
+Independent examples cover normalized index gross, overnight blocks,
+cash/PIK and entitlement, lagged repayment exposure and affine rollback.
+Runtime, stochastic calibration, market, risk and host qualification remain pending.
+[Bond valuation record 06](valuations-bonds/06-joint-coupon-replay.md#accepted-decision-for-checked-joint-bond-payoff-and-recovery-replay).
+
+The seventh bond valuation package was accepted on 2026-11-14.
+Independent examples cover decision-time continuation, conditioning
+before a strike floor, independent-group counts and pricing uncertainty.
+Runtime, economic fit, pricing, risk and host qualification remain pending.
+[Bond valuation record 07](valuations-bonds/07-lsmc-policy.md#accepted-decision-for-checked-joint-bond-exercise-policy-and-make-whole).
+
+The eighth bond valuation package was accepted on 2026-11-14.
+Independent examples cover terminal and bridge default, recovery timing,
+PIK phases, paired estimation, fractional loss tails and signed spreads.
+Runtime, stochastic convergence, market and host qualification remain pending.
+[Bond valuation record 08](valuations-bonds/08-merton-simulation.md#accepted-decision-for-checked-structural-bond-simulation-and-outputs).
+
+The ninth bond valuation package was accepted on 2026-11-14.
+Independent examples cover accrued and claim carry, consistent curve
+basis, discontinuous trial prices, non-identification and independent
+cash validation. Runtime, stochastic fit, market, risk and host
+qualification remain pending.
+[Bond valuation record 09](valuations-bonds/09-merton-calibration.md#accepted-decision-for-checked-cash-equivalent-structural-calibration).
+
+The tenth bond valuation package was accepted on 2026-11-14.
+Independent examples cover final-period formulas, detached and
+co-dated cash, inverse uniqueness and the Japanese simple-yield clock.
+Runtime, market-specific quote, risk and host qualification remain pending.
+[Bond valuation record 10](valuations-bonds/10-quoted-yield.md#accepted-decision-for-checked-settlement-yield-and-price-inversion).
+
+Bond valuation record 12 was accepted on 2026-11-14. Independent
+examples cover the native discount clock, projected floating cash,
+benchmark path consistency, buyer-claim carry and discontinuous OAS.
+Runtime, market, workout, risk and host qualification remain pending.
+[Bond valuation record 12](valuations-bonds/12-spread-quotes.md#accepted-decision-for-checked-bond-spreads-and-price-inversion).
+
+Bond valuation record 13 was accepted on 2026-11-14. Independent
+arithmetic covers par and proceeds cash, ex-coupon accrued and carry,
+dated floating projection and singular inverses. Runtime, market,
+workout and host qualification remain pending.
+[Bond valuation record 13](valuations-bonds/13-asset-swaps.md#accepted-decision-for-checked-bond-asset-swaps-and-price-inversion).
+
+Bond valuation record 14 was accepted on 2026-11-14. Exact arithmetic
+and high-precision difference checks cover the quoted-yield factor laws,
+with dedicated immediate-cash, detached-anchor and signed-strip examples.
+Runtime, market, workout and host qualification remain pending.
+[Bond valuation record 14](valuations-bonds/14-yield-risk.md#accepted-decision-for-checked-quoted-yield-bond-risk).
+
+Bond valuation record 15 was accepted on 2026-11-14. Independent
+arithmetic compares valuation and settlement anchors, parallel and
+bucketed shocks, uneven stencils, exercise switches and paired groups.
+Runtime, model, market and host qualification remain pending.
+[Bond valuation record 15](valuations-bonds/15-curve-risk.md#accepted-decision-for-checked-bond-curve-and-effective-risk).
+
+Bond valuation record 16 was accepted on 2026-11-14. Independent checks
+cover discrete par-CDS replay, exact quote buckets, periodic forward Z,
+signed continuous Z and the same-pair spread-duration normalization.
+Market replay, model, runtime and host qualification remain pending.
+[Bond valuation record 16](valuations-bonds/16-spread-credit-risk.md#accepted-decision-for-checked-bond-spread-and-credit-risk).
+
+Bond valuation record 17 was accepted on 2026-11-14. Independent checks
+cover recovery-mode sign reversal, a full one-sided move, repayment phase,
+surviving claims, the holder quote bridge and zero-par contingent cash.
+Legal-claim, market replay, model, runtime and host qualification remain pending.
+[Bond valuation record 17](valuations-bonds/17-default-risk.md#accepted-decision-for-checked-bond-recovery-and-jump-to-default).
+
+Bond valuation record 18 was accepted on 2026-11-14. Independent
+checks cover interacting rights, full sigma moves and paired pricing
+statistics in the elected currency units. Model, market, runtime
+and host qualification remain pending.
+[Bond valuation record 18](valuations-bonds/18-embedded-option-risk.md#accepted-decision-for-checked-bond-embedded-option-value-and-vega).
+
+Bond valuation record 19 was accepted on 2026-11-14. Independent
+checks cover the holder bridge, explicit funding, exact Simple and
+Street closing prices, and repayment-date WAL with retired-par weights.
+Product, market, runtime and host qualification remain pending.
+[Bond valuation record 19](valuations-bonds/19-carry-and-life.md#accepted-decision-for-checked-bond-carry-and-repayment-life).
+
+Bond valuation record 20 was accepted on 2026-11-14. Independent
+checks cover signed returns, distinct minimizing exit paths, the
+ACT/365F leap-year rate, failed XIRR admission and retained exit cash.
+Historical coverage, contractual path, runtime and host qualification remain pending.
+[Bond valuation record 20](valuations-bonds/20-lifetime-returns.md#accepted-decision-for-checked-bond-issue-to-exit-returns).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

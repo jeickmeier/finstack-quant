@@ -9,15 +9,16 @@ description: >
   standard and correct; to certify a pipeline before trusting its output; or
   to get findings plus recommended fixes for a multi-stage quant process.
   Prefer this over a broad review when the request is sequential walkthrough
-  and per-step correctness, not a general code review.
+  and per-step correctness, not a general code review. Report only Blocker
+  and High-severity findings.
 ---
 
 # Stepwise Quant Audit
 
-Decompose a quant finance process into ordered steps. For each step, state what
+Decompose a quant finance process into ordered steps. For each step, assess what
 it does, cite the industry standard or desk convention it should satisfy, judge
 whether the implementation matches, and recommend a concrete fix when it does
-not.
+not. Audit every step, but report only Blocker and High-severity findings.
 
 This is an evidence-based audit, not a test-writing exercise and not a generic
 code review. Prefer standards, formulas, conventions, and existing evidence in
@@ -27,7 +28,7 @@ cannot be certified from inspection and citations alone.
 ## Relationship to sibling skills
 
 - Use **this skill** when the user wants a sequential walkthrough with a
-  verdict per stage.
+  verdict per stage in the analysis and only material findings in the report.
 - Use `finstack-quant-finance-review` for broader pricing/risk/convention
   reviews, library assessments, or defect hunts that are not step-ordered.
 - Use `finstack-senior-code-review` for style, simplicity, and over-engineering.
@@ -87,11 +88,12 @@ Typical step grains:
 - Risk bump or Greek aggregation
 - Output units, signs, and reporting conventions
 
-Write the step map first (numbered). Later findings refer to these step IDs.
+Build the numbered step map first in the working analysis. Reported findings
+refer to these step IDs; do not print the full map.
 
 ### 3. Audit each step
 
-For every step, produce:
+For every step, assess the following in the working analysis:
 
 1. **Intent** — what this step claims to accomplish
 2. **Standard** — the industry rule, formula, or desk convention it should
@@ -133,9 +135,16 @@ Many production bugs live between steps, not inside them.
 
 ### 5. Report findings and fixes
 
-Lead with failures. Recommended fixes should be actionable (what to change,
-where, and why the standard requires it). Do not implement code changes unless
-the user asks.
+Report only Blocker and High-severity findings, ordered by severity. Keep
+passing steps, conditional passes, lower-severity observations, and immaterial
+uncertainty out of the report, including summaries, questions, and appendices.
+Do not promote a lower-severity concern just to include it. Report Uncertain
+only when evidence supports a plausible Blocker or High impact, and state the
+missing evidence without presenting the risk as a confirmed defect.
+
+Fold material cross-step issues into the finding for the owning step.
+Recommended fixes should be actionable (what to change, where, and why the
+standard requires it). Do not implement code changes unless the user asks.
 
 ## Verdict guide
 
@@ -145,12 +154,14 @@ the user asks.
 | **Fail** | Evidence contradicts the standard, or a required convention is missing/wrong |
 | **Uncertain** | Standard is ambiguous, evidence is incomplete, or behavior depends on undocumented policy |
 
-Severity for Fail / material Uncertain:
+Reportable severity for Fail / material Uncertain:
 
 - **Blocker** — wrong price, P&L, risk, or economics if left as-is
-- **Major** — convention or numerical issue that can misstate results in common cases
-- **Moderate** — nonstandard practice that is defensible only with explicit docs/policy
-- **Minor** — clarity, naming, or documentation gap that does not change numbers
+- **High** — convention or numerical issue that can materially misstate results in common cases
+
+Omit lower-severity concerns, such as defensible nonstandard practices needing
+documentation or clarity, naming, and documentation gaps that do not change
+numbers.
 
 ## Output format
 
@@ -158,42 +169,27 @@ ALWAYS use this structure:
 
 ```markdown
 ## Subject
-One paragraph: what was walked through, asset class, and boundary.
-
-## Step Map
-1. ...
-2. ...
-3. ...
-
-## Step Audits
-
-### Step 1 — <name>
-- **Intent:** ...
-- **Standard:** ... (citation)
-- **Evidence:** `path/to/file.rs:lines` — ...
-- **Verdict:** Pass | Fail | Uncertain
-- **Severity:** Blocker | Major | Moderate | Minor | n/a
-- **Fix:** ... (or "None")
-
-### Step 2 — <name>
-...
-
-## Cross-Step Contracts
-Bullets for unit/sign/date/curve handoff issues, or "No material handoff issues found."
+One sentence: what was audited, asset class, boundary, and any scope limitations.
 
 ## Findings
-Ordered by severity. Each item: step ID, location, issue, impact, recommended fix.
+Only Blocker and High findings, ordered by severity.
 
-## Open Questions
-Assumptions or missing evidence that block a Pass.
-
-## Brief Summary
-Overall trustworthiness of the pipeline and residual risk. Keep short.
+### [Blocker | High] Step <ID> — <issue>
+- **Standard:** ... (citation)
+- **Evidence:** `path/to/file.rs:lines` — ...
+- **Verdict:** Fail | Uncertain
+- **Impact:** ... (include affected downstream steps when relevant)
+- **Fix:** ... (include any question or missing evidence needed to resolve this finding)
 ```
 
+If no findings meet the threshold, keep Subject and Findings and state:
+"No Blocker or High-severity findings identified within the audited scope."
+Do not list suppressed observations or imply that this certifies the entire
+pipeline.
+
 See `references/examples.md` for two condensed worked audits (a bond pricing
-Fail and a DV01 Uncertain) that calibrate the expected judgment level and
-output shape.
+Fail and a suppressed DV01 uncertainty) that calibrate the reporting threshold
+and output shape.
 
 ## Reference map
 
@@ -204,8 +200,8 @@ skill directory.
 - `references/step-map-templates.md` — canonical step decompositions per
   process type, with the standards that usually decide each step's verdict.
   Open this when building the step map.
-- `references/examples.md` — worked example audits showing Pass/Fail/Uncertain
-  calibration and the output format in use.
+- `references/examples.md` — worked example audits showing reportable findings,
+  suppressed lower-severity observations, and the output format in use.
 
 ### Market standards
 - `../finstack-quant-finance-review/market-standards/rates-standards.md`
@@ -236,4 +232,4 @@ skill directory.
 - Recommend fixes that restore industry-standard behavior; avoid speculative
   refactors that do not change financial correctness.
 - Keep the walkthrough honest about scope: if you only audited the floating
-  leg, say so in Subject and Brief Summary.
+  leg, say so in Subject.

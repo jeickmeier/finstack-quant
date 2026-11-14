@@ -47,9 +47,10 @@ inventing a credit curve or substituting interest-rate risk.
 ## Implementation notes and references
 
 The vanilla-bond implementation and settlement-anchored regression use
-z-spread repricing. The observed option-bearing OAS branch is not an approved
-exception to this decision. Acceptance does not establish enforcement across
-every bond model. Its scope reconciliation is tracked in the
+z-spread repricing. The [accepted BONDS-16 scope](16-spread-credit-risk.md#accepted-decision-for-checked-bond-spread-and-credit-risk)
+requires a qualified fixed Z cash path for a supported option-bearing bond
+and removes the implicit OAS and parallel-as-bucket substitutes. Runtime
+reconciliation and independent qualification are tracked in the
 [central follow-up register](../../FOLLOW_UPS.md#reconciliation-items).
 
 - [Existing project convention](../../../../AGENTS.md).

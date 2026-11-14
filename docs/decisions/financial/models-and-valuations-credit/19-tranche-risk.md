@@ -1,12 +1,12 @@
 # MODELS-AND-VALUATIONS-CREDIT-19: Tranche spread, quote, rate, correlation, recovery and default risk
 
-- Decision status: **Draft — full package proposed for review on 2026-11-13**.
-- Implementation status: Proposed target. The observed behavior appears below.
+- Decision status: **Accepted — complete checked tranche risk and default scenarios package, 2026-11-13**.
+- Implementation status: Accepted target. The observed behavior appears below.
 - Validation status: Source and primary references inspected. Independent arithmetic examples executed. Production repricing, replay, market benchmarks and host parity remain open.
 - Audit date: 2026-11-05.
 - Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Proposed decision for checked tranche risk and default scenarios
+## Accepted decision for checked tranche risk and default scenarios
 
 1. **Use the accepted tranche valuation for every experiment.**
    Resolve the [CREDIT-17](17-tranche-loss-distribution.md#accepted-decision-for-checked-finite-pool-tranche-losses)
@@ -350,8 +350,8 @@ cash-recovery risk must target actual pool/member cash inputs and preserve the
 separate historical-state assumption, rather than bump an unused common field
 or rewrite observed history. Record 19 was accepted on **2026-11-08**, with reconciliation/qualification
 pending. Its acceptance does not adopt this
-record's proposed named default, quote replay, recovery, rate or
-credit-risk experiments.
+record's named default, quote replay, recovery, rate or credit-risk
+experiments, accepted separately above.
 
 ## Follow-up tracking
 

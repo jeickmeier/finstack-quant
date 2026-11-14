@@ -757,6 +757,314 @@ The eighteenth credit and liquidity package was accepted on 2026-11-13
 for explicit tranche schedules and settlement, daily protection and premium,
 confirmed cash through maturity, residual quotes and one valuation trace.
 [Credit record 18](models-and-valuations-credit/18-tranche-projection.md#accepted-decision-for-checked-tranche-cashflows-and-settlement).
+The nineteenth credit and liquidity package was accepted on 2026-11-13
+for selected-model tranche risk, exact quote and rate replay, explicit
+correlation and recovery stencils, and named economic default scenarios.
+[Credit record 19](models-and-valuations-credit/19-tranche-risk.md#accepted-decision-for-checked-tranche-risk-and-default-scenarios).
+The twentieth credit and liquidity package was accepted on 2026-11-13
+for exact holder PV, explicit tender hurdle, typed issuer effects and
+isolated gross leverage. All 20 detailed credit and liquidity records
+are accepted.
+[Credit record 20](models-and-valuations-credit/20-liability-management.md#accepted-decision-for-checked-exchange-and-liability-management-arithmetic).
+
+The first shared valuation framework package was accepted on 2026-11-13
+for exact dispatch, validated ingress, effective dates, raw and Money
+pricing, active market bindings, metric ownership and composite valuation.
+[Valuation framework record 01](valuations-framework/pricing-lifecycle.md#accepted-decision-for-checked-valuation-dispatch-and-lifecycle).
+The second shared valuation framework package was accepted on 2026-11-13
+for exact volatility and parameter sources, dated carry, and explicit
+simulation, lattice and quote controls.
+[Valuation framework record 02](valuations-framework/model-resolution.md#accepted-decision-for-checked-valuation-model-inputs-and-controls).
+The third shared valuation framework package was accepted on 2026-11-13
+for qualified listed contract terms, marks and settlement references, option
+margining, dated American delivery, authoritative exercise and native risk.
+[Valuation framework record 03](valuations-framework/listed-products.md#accepted-decision-for-checked-listed-futures-and-options).
+The fourth shared valuation framework package was accepted on 2026-11-13
+for overnight quote periods and block weights, publication-aware selection,
+native growth, product cash, distinct quote derivatives and fixing exports.
+[Valuation framework record 04](valuations-framework/overnight-projection.md#accepted-decision-for-checked-overnight-projection-and-quote-risk).
+The fifth shared valuation framework package was accepted on 2026-11-13
+for exact dates, native source clocks, local hazard, explicit joint model
+controls, interval recovery and eligible floating parent folds.
+[Valuation framework record 05](valuations-framework/rates-credit-grid.md#accepted-decision-for-checked-dated-rates-credit-valuation).
+The sixth shared valuation framework package was accepted on 2026-11-13
+for fixed-notional TRS terms, actual payment dates, publication-qualified
+financing, spread accrual and par on one basis, and faithful cash exports.
+[Valuation framework record 06](valuations-framework/trs-legs.md#accepted-decision-for-checked-trs-legs-and-par-spread).
+The seventh shared valuation framework package was accepted on 2026-11-13
+for contractual variance observations and explicit annualization, qualified
+estimator samples, explicit barrier monitoring and exact event binding.
+[Valuation framework record 07](valuations-framework/observation-grids.md#accepted-decision-for-checked-observation-schedules-and-monitoring-grids).
+The eighth shared valuation framework package was accepted on 2026-11-13
+for metric producers and dependencies, scoped caches, exact attribution,
+lossless reporting and compatible aggregation.
+[Valuation framework record 08](valuations-framework/metric-orchestration.md#accepted-decision-for-checked-metric-orchestration-and-reporting).
+The ninth shared valuation framework package was accepted on 2026-11-13
+for explicit controls, represented stencils, typed sources, direct and
+quote-replayed DV01, and exact key-rate buckets.
+[Valuation framework record 09](valuations-framework/finite-difference-rates.md#accepted-decision-for-checked-finite-differences-and-rate-risk).
+
+The tenth shared valuation framework package was accepted on 2026-11-13 for
+exact quote and intensity risk, settlement z-spread, disjoint cash bands,
+explicit recovery experiments and owner rate components.
+[Valuation framework record 10](valuations-framework/credit-sensitivities.md#accepted-decision-for-checked-credit-sensitivities).
+
+The eleventh shared valuation framework package was accepted on 2026-11-13
+for selected-model Greeks, actual shock widths, native volatility risk and
+sparse vega buckets, fixed directional FX01 and distinct theta bases.
+[Valuation framework record 11](valuations-framework/option-sensitivities.md#accepted-decision-for-checked-option-and-fx-sensitivities).
+
+The twelfth shared valuation framework package was accepted on 2026-11-13
+for exact factor directions, represented mixed stencils, fixed-center
+corner credit replay and matched attribution.
+[Valuation framework record 12](valuations-framework/cross-factor-risk.md#accepted-decision-for-checked-cross-factor-risk).
+
+The thirteenth shared valuation framework package was accepted on 2026-11-14
+for explicit holder cash and valuation cuts, separate theta and carry bases,
+funding and optional yield partition, and exact horizon breakeven targets.
+[Valuation framework record 13](valuations-framework/carry-theta-breakeven.md#accepted-decision-for-checked-horizon-theta-carry-and-breakeven).
+
+The fourteenth shared valuation framework package was accepted on 2026-11-14
+for explicit history and typed scenarios, matched repricing and Taylor,
+and signed R-7 VaR and fractional empirical expected shortfall.
+[Valuation framework record 14](valuations-framework/historical-risk.md#accepted-decision-for-checked-historical-scenario-risk).
+
+The fifteenth shared valuation framework package was accepted on 2026-11-14
+for qualified schedule cash and term observations, product-owned PV
+attribution, checked reconciliation and faithful ladders and traces.
+[Valuation framework record 15](valuations-framework/cashflow-export.md#accepted-decision-for-checked-cashflow-valuation-and-export).
+
+The sixteenth shared valuation framework package was accepted on 2026-11-14
+for exact typed dated convention selection, scoped family terms, explicit
+contract choices and qualified editions through construction and replay.
+[Valuation framework record 16](valuations-framework/convention-selection.md#accepted-decision-for-checked-convention-selection-and-dated-sources).
+
+The seventeenth shared valuation framework package was accepted on 2026-11-14
+for explicit inflation references, separate knowledge dates and fixing vintages,
+qualified projection, issuer rules, and a checked discount-factor inverse.
+[Valuation framework record 17](valuations-framework/inflation-references.md#accepted-decision-for-checked-inflation-references-and-information-dates).
+
+The eighteenth shared valuation framework package was accepted on 2026-11-14
+for prepared repricing, complete signed risk on exact factors and vertices,
+explicit credit attribution, and qualified netting scope.
+[Valuation framework record 18](valuations-framework/margin-bridge.md#accepted-decision-for-checked-margin-repricing-and-identity).
+
+The nineteenth shared valuation framework package was accepted on 2026-11-14
+for checked contractual terms and defaults, dated exercise and PIK selection,
+ordered quanto binding, explicit stochastic controls and complete results.
+[Valuation framework record 19](valuations-framework/shared-contract-controls.md#accepted-decision-for-checked-shared-contract-and-stochastic-controls).
+
+The twentieth shared valuation framework package was accepted on 2026-11-14
+for strict builder declarations, lazy defaults, one structural validator and
+aligned restore, completing adoption of the 20 detailed framework records.
+[Valuation framework record 20](valuations-framework/builder-validation.md#accepted-decision-for-checked-generated-financial-builders).
+
+The first rates valuation package was accepted on 2026-11-14 for
+resolved deposit dates, checked simple interest, separate holder and
+trade cuts, dated factors, inception quote inversion and qualified risk.
+[Rates valuation record 01](valuations-rates/01-deposits.md#accepted-decision-for-checked-deposit-cashflows-and-quote-inversion).
+
+The second rates valuation package was accepted on 2026-11-14 for
+exact FRA benchmark dates, publication-qualified fixing, checked upfront
+settlement, explicit payment cuts and distinct direct and replay risk.
+[Rates valuation record 02](valuations-rates/02-fra.md#accepted-decision-for-checked-fra-fixing-settlement-and-risk).
+
+The third rates valuation package was accepted on 2026-11-14 for
+resolved interest-rate swap schedules, term and direct-growth overnight
+cash, eligible payments and par, distinct risk and qualified margin repricing.
+[Rates valuation record 03](valuations-rates/03-interest-rate-swaps.md#accepted-decision-for-checked-interest-rate-swap-cashflows-and-risk).
+
+The fourth rates valuation package was accepted on 2026-11-14 for
+resolved basis swap legs, qualified source roles, eligible term and
+overnight cash, replacement and incremental spread, and distinct rate risk.
+[Rates valuation record 04](valuations-rates/04-basis-swaps.md#accepted-decision-for-checked-basis-swap-cashflows-and-par-spreads).
+
+The fifth rates valuation package was accepted on 2026-11-14 for
+resolved cap and floor optionlets, exact quote and payment bases, the
+Hull–White term law and the qualified overnight approximation.
+[Rates valuation record 05](valuations-rates/05-cap-floor-pricing.md#accepted-decision-for-checked-cap-and-floor-optionlet-pricing).
+
+The sixth rates valuation package was accepted on 2026-11-14 for local
+quote Greeks, declared Hull–White risks, exact active curve roles, holder
+horizon theta and standalone gross optionlet premium inversion.
+[Rates valuation record 06](valuations-rates/06-cap-floor-risk.md#accepted-decision-for-checked-cap-and-floor-risk-and-implied-volatility).
+
+The seventh rates valuation package was accepted on 2026-11-14 for the
+checked European swaption forward, settlement elections, live quote law
+and expiry handoff, and distinct risk and gross premium inversion.
+[Rates valuation record 07](valuations-rates/07-european-swaptions.md#accepted-decision-for-checked-european-swaption-pricing-and-risk).
+
+The eighth rates valuation package was accepted on 2026-11-14 for exact
+Hull–White swaption exercise cash, checked tree and exercise statistics,
+joint Gaussian discounting, held-out policy pricing and named risk.
+[Rates valuation record 08](valuations-rates/08-hull-white-swaptions.md#accepted-decision-for-checked-hull-white-swaption-exercise-and-risk).
+
+The ninth rates valuation package was accepted on 2026-11-14 for exact
+physical co-terminal LMM terms, explicit model inputs, terminal-measure
+pricing, held-out exercise policies and paired curve risk.
+[Rates valuation record 09](valuations-rates/09-lmm-bermudans.md#accepted-decision-for-checked-lmm-bermudan-pricing-and-risk).
+
+The tenth rates valuation package was accepted on 2026-11-14 for
+resolved rate futures terms and benchmark projection, explicit convexity,
+official clearing and cash treatment, and separate futures option risk bases.
+[Rates valuation record 10](valuations-rates/10-rate-futures.md#accepted-decision-for-checked-rate-futures-and-futures-option-risk).
+
+The eleventh rates valuation package was accepted on 2026-11-14 for the
+CMS reference swap and fixing basis, dated first-order convexity, checked
+coupon and collar PV, and selected-method risk and cashflow reporting.
+[Rates valuation record 11](valuations-rates/11-cms-convexity.md#accepted-decision-for-checked-cms-convexity-pricing-and-risk).
+
+The twelfth rates valuation package was accepted on 2026-11-14 for exact
+CMS smile binding, explicit finite support and price chords, common payment
+normalization, and selected-method risk and cashflow reporting.
+[Rates valuation record 12](valuations-rates/12-cms-replication.md#accepted-decision-for-checked-cms-smile-replication-and-risk).
+
+The thirteenth rates valuation package was accepted on 2026-11-14. It
+specifies CPI references and first contractual CPI, actual payment cuts,
+zero-coupon and periodic payoff laws, verified par quotes, typed CPI and
+nominal risk, and consistent calibration and cashflow reporting.
+[Rates valuation record 13](valuations-rates/13-inflation-swaps.md#accepted-decision-for-checked-inflation-swap-cashflows-and-risk).
+
+The fourteenth rates valuation package was accepted on 2026-11-14. It
+specifies actual period payoffs and CPI knowledge cuts, live forward
+qualification, explicit quote expiry and model, and one optionlet ledger
+for price, cash export and typed risk.
+[Rates valuation record 14](valuations-rates/14-inflation-options.md#accepted-decision-for-checked-inflation-option-cashflows-expiry-and-risk).
+
+The fifteenth rates valuation package was accepted on 2026-11-14. It
+specifies a final contractual repo rate, fixed or overnight settlement,
+cash entitlement and rounding, same-currency collateral diagnostics,
+separate funding and discount risk, and agreement-qualified margin.
+[Rates valuation record 15](valuations-rates/15-repo.md#accepted-decision-for-checked-repo-cashflows-collateral-and-risk).
+
+The sixteenth rates valuation package was accepted on 2026-11-14. It
+specifies cross-currency leg and principal terms, actual reset dates,
+coherent collateral and cash FX, the spread quote basis and directed
+risk with one prepared native cash ledger.
+[Rates valuation record 16](valuations-rates/16-cross-currency-swaps.md#accepted-decision-for-checked-cross-currency-swap-cashflows-fx-resets-and-risk).
+
+The seventeenth rates valuation package was accepted on 2026-11-14. It
+specifies the standalone CMS spread payoff, separate benchmarks,
+conditional lognormal model, exact limits, bounded integration, and
+selected-model cash export and rate risk. All 17 detailed rates records
+are accepted.
+[Rates valuation record 17](valuations-rates/17-cms-spread.md#accepted-decision-for-checked-cms-spread-cashflows-model-and-risk).
+
+The first bond valuation package was accepted on 2026-11-14. It
+specifies one generated or supplied cashflow source, explicit terms,
+separate cash and principal dates, claim-level entitlement and the
+selected valuation model's cash and metric basis.
+[Bond valuation record 01](valuations-bonds/01-schedule-and-holder-cashflows.md#accepted-decision-for-checked-bond-schedules-and-holder-cash).
+
+The second bond valuation package was accepted on 2026-11-14. It
+specifies eligible settlement, coupon-parent accrued, the separate
+financing and security roles in clean/dirty carry, model-owned
+contingent valuation, and independent yield and dated model clocks.
+[Bond valuation record 02](valuations-bonds/02-settlement-and-clocks.md#accepted-decision-for-checked-bond-settlement-quote-carry-and-clocks).
+
+The third bond valuation package was accepted on 2026-11-14. It
+specifies model selection, settlement-quote marks, signed security
+discounting, spread conventions and prompt fractional recovery of
+covered par on local hazard windows.
+[Bond valuation record 03](valuations-bonds/03-pv-models.md#accepted-decision-for-checked-bond-pv-selection-and-fractional-recovery-of-par).
+
+The fourth bond valuation package was accepted on 2026-11-14. It
+specifies explicit rates-only lattice and fit controls, exact dated
+exercise and cash, one deterministic-reference make-whole call law,
+and checked nodewise OAS and reporting.
+[Bond valuation record 04](valuations-bonds/04-rates-tree-exercise.md#accepted-decision-for-checked-bond-rates-trees-and-exercise).
+
+The fifth bond valuation package was accepted on 2026-11-14. It
+specifies explicit issue-basis MOIC or fixed ACT/365F XIRR protection
+on authorized early calls, qualified paid-through history, and one
+dirty-strike law for deterministic and pathwise exercise.
+[Bond valuation record 05](valuations-bonds/05-return-floors.md#accepted-decision-for-checked-issue-basis-return-floors).
+
+The sixth bond valuation package was accepted on 2026-11-14. It
+specifies exact dated joint payoff replay, publication-aware index
+gross projection, parent cash/PIK and exercise phases, separate
+recoverable par and checked interval recovery and continuation.
+[Bond valuation record 06](valuations-bonds/06-joint-coupon-replay.md#accepted-decision-for-checked-joint-bond-payoff-and-recovery-replay).
+
+The seventh bond valuation package was accepted on 2026-11-14. It
+specifies the conditional make-whole benchmark, fixed continuation
+regression, non-anticipating stopping, separate simulation stages and
+the uncertainty of pricing with frozen policies.
+[Bond valuation record 07](valuations-bonds/07-lsmc-policy.md#accepted-decision-for-checked-joint-bond-exercise-policy-and-make-whole).
+
+The eighth bond valuation package was accepted on 2026-11-14. It
+specifies structural default and detecting-node recovery, exact dated
+coupon and PIK replay, checked simulation, signed benchmark losses
+and a verified effective-spread calculation.
+[Bond valuation record 08](valuations-bonds/08-merton-simulation.md#accepted-decision-for-checked-structural-bond-simulation-and-outputs).
+
+The ninth bond valuation package was accepted on 2026-11-14. It
+specifies a qualified cash-equivalent settlement target, one prepared
+dated basis, a bounded price-residual search and independent cash
+validation before contractual repricing.
+[Bond valuation record 09](valuations-bonds/09-merton-calibration.md#accepted-decision-for-checked-cash-equivalent-structural-calibration).
+
+The tenth bond valuation package was accepted on 2026-11-14. It
+specifies explicit settlement yield conventions, contractual quote
+coordinates, qualified named market profiles and price-residual
+checks for returned yields.
+[Bond valuation record 10](valuations-bonds/10-quoted-yield.md#accepted-decision-for-checked-settlement-yield-and-price-inversion).
+
+The bond spread package was accepted on 2026-11-14. It specifies
+settlement-native Z-spread and curve discount margin, separate swap
+and government benchmarks, selected-model buyer-claim OAS and checked
+price residuals. Workout-dependent calculations require a qualified
+workout basis.
+[Bond valuation record 12](valuations-bonds/12-spread-quotes.md#accepted-decision-for-checked-bond-spreads-and-price-inversion).
+
+The bond asset-swap package was accepted on 2026-11-14. It specifies
+face-notional par and dirty-notional proceeds structures, a matched
+settlement buyer claim, explicit floating-leg and source roles, and checked
+spread and price conversions. It adopts the corresponding published
+metric meanings and quote-input reconciliation.
+[Bond valuation record 13](valuations-bonds/13-asset-swaps.md#accepted-decision-for-checked-bond-asset-swaps-and-price-inversion).
+
+The quoted-yield bond risk package was accepted on 2026-11-14. It uses
+one fixed settlement path and exact yield-law derivatives, retains the
+signed currency tangent for yield DV01 and adopts unscaled bond yield
+convexity `P″/P` as the published value.
+[Bond valuation record 14](valuations-bonds/14-yield-risk.md#accepted-decision-for-checked-quoted-yield-bond-risk).
+
+The curve and effective bond risk package was accepted on 2026-11-14.
+It fixes the holder PV origin, quote-center and direct rate-source rules,
+the signed parallel and triangular risk definitions, and distinct
+unscaled effective measures with paired model replay where applicable.
+[Bond valuation record 15](valuations-bonds/15-curve-risk.md#accepted-decision-for-checked-bond-curve-and-effective-risk).
+
+The bond CS01 and spread duration package was accepted on 2026-11-14.
+It distinguishes exact par-CDS replay on holder PV from the instrument's
+forward one-bp settlement Z price change and normalizes spread duration
+on that same Z basis.
+[Bond valuation record 16](valuations-bonds/16-spread-credit-risk.md#accepted-decision-for-checked-bond-spread-and-credit-risk).
+
+The bond recovery and jump-to-default package was accepted on 2026-11-14.
+It specifies explicit frozen-intensity and quote-preserving Recovery01 on
+raw holder PV and prompt fractional recovery on covered par at the actual
+event phase, net of the value of terminated holder rights.
+[Bond valuation record 17](valuations-bonds/17-default-risk.md#accepted-decision-for-checked-bond-recovery-and-jump-to-default).
+
+The bond embedded-option package was accepted on 2026-11-14. It
+specifies matched live and disabled holder claims, qualified fixed OAS,
+explicit native-sigma stencils and paired pricing. It adopts the
+`embedded_option_vega` key in signed native currency per `+.01` model sigma.
+[Bond valuation record 18](valuations-bonds/18-embedded-option-risk.md#accepted-decision-for-checked-bond-embedded-option-value-and-vega).
+
+The bond carry and repayment-life package was accepted on 2026-11-14.
+It specifies explicit phase-matched holder carry, elected funding and
+optional exact fixed-yield repricing, and weights bond WAL by retired
+par on actual repayment dates under ACT/365F.
+[Bond valuation record 19](valuations-bonds/19-carry-and-life.md#accepted-decision-for-checked-bond-carry-and-repayment-life).
+
+The issue-to-exit return package was accepted on 2026-11-14. It
+specifies explicit original investment, covered signed cash, net MOIC,
+canonical ACT/365F XIRR and complete issuer-call minima with exact cash
+phases and no skipped failed candidates.
+[Bond valuation record 20](valuations-bonds/20-lifetime-returns.md#accepted-decision-for-checked-bond-issue-to-exit-returns).
 
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the

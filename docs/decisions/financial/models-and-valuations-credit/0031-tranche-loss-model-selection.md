@@ -62,7 +62,7 @@ migration are outside scope.
 | Conditional distributions, factor representations and generic quadrature | [Copula kernels](09-copula-kernels.md) |
 | Finite-pool dispatch, realized-state erosion, smoothing, resource/accuracy controls and loss repairs | [Tranche loss distribution](17-tranche-loss-distribution.md) |
 | Premium and protection timing, realized settlement and the native valuation trace | [Accepted tranche projection](18-tranche-projection.md#accepted-decision-for-checked-tranche-cashflows-and-settlement) |
-| Quote/payoff risk, copula propagation and issuer-recovery limitations | [Tranche risk](19-tranche-risk.md) |
+| Quote and payoff risk, selected-model propagation and named default scenarios | [Accepted tranche risk](19-tranche-risk.md#accepted-decision-for-checked-tranche-risk-and-default-scenarios) |
 | Stored correlation interpolation, shocks and shape diagnostics | [Base-correlation representation](../core-market/base-correlation.md) |
 | Fixed-maturity correlation fitting and single-tranche tail-parameter fitting | [Base-correlation calibration](../calibration-targets/15-base-correlation.md) and [Student-t calibration](../calibration-targets/16-student-t.md) |
 

@@ -235,9 +235,10 @@ unpaid-interest-balance, swap or reporting conventions. No runtime changes here.
     existing host exclusion; update actual Python/WASM method/spec operations,
     schemas/stubs/declarations/examples/parity without new host state classes.
     Reconcile the separate valuations overnight engine's actual source/identity/
-    publication boundaries in the same coherent implementation work. Its Draft
-    endpoint snapping, full-coupon lockout, discount fallback, sensitivities and
-    product/model decisions are not adopted by sharing an enum or this record.
+    publication boundaries in the same coherent implementation work. Its
+    [separately accepted overnight package](../valuations-framework/overnight-projection.md#accepted-decision-for-checked-overnight-projection-and-quote-risk)
+    owns valuation sensitivities and product/model admission. Its observed
+    endpoint snapping, full-coupon lockout and discount fallback are not targets.
     Actual product boundary construction may differ explicitly; no hidden
     caller-dependent compounding or claim that the two engines are interchangeable.
 

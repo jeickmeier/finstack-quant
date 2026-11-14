@@ -1,8 +1,9 @@
 # Worked Example Audits
 
 Two condensed examples showing the expected output shape and judgment level.
-Real audits will have more steps; the point here is calibration — what a Pass,
-Fail, and Uncertain look like, and how findings tie back to step IDs.
+Audit all steps internally, but report only Blocker and High findings. Passing
+steps and lower-severity uncertainty are omitted, not promoted to meet the
+reporting threshold.
 
 ## Example 1 — Bond dirty price walkthrough (Fail found)
 
@@ -26,103 +27,72 @@ Expected audit (abridged):
 ```markdown
 ## Subject
 Walkthrough of `dirty_price` for a fixed-coupon bond: settlement, accrual,
-cashflow selection, discounting, and price assembly. Fixed income, single
-function boundary.
+cashflow selection, discounting, and price assembly within one function.
 
-## Step Map
-1. Settlement date determination
-2. Accrued interest
-3. Cashflow selection
-4. Discounting
-5. Dirty price assembly
+## Findings
 
-## Step Audits
-
-### Step 1 — Settlement date determination
-- **Intent:** Derive settlement from trade date.
+### [High] Step 1 — Missing settlement lag
 - **Standard:** Corporate/govvy bonds settle T+1 or T+2 on the relevant
   calendar (fixed-income-standards.md, settlement section).
 - **Evidence:** `pricer.rs:2` — `let settle = trade_date;` uses trade date
   directly, no lag, no calendar.
 - **Verdict:** Fail
-- **Severity:** Major
+- **Impact:** Accrual and cashflow cutoff shift by the settlement lag; a coupon
+  between trade and settlement can be included despite not belonging to the
+  buyer.
 - **Fix:** Compute `settle = calendar.advance(trade_date, lag)` with the lag
-  from bond reference data; thread it through accrual and cashflow selection.
+  and calendar confirmed from bond reference data; thread it through accrual,
+  cashflow selection, and discounting. Fix Steps 1 and 4 together.
 
-### Step 2 — Accrued interest
-- **Intent:** Accrue coupon from last coupon date to settlement.
-- **Standard:** Day count per bond terms from previous coupon to settlement.
-- **Evidence:** `pricer.rs:3` — correct helper, but receives the wrong
-  `settle` from Step 1.
-- **Verdict:** Pass (conditional on Step 1 fix)
-- **Severity:** n/a
-- **Fix:** None beyond Step 1.
-
-### Step 4 — Discounting
-- **Intent:** Discount each cashflow to the pricing anchor.
+### [High] Step 4 — Wrong discount anchor
 - **Standard:** Bond PV is discounted to the settlement date; discounting to
   trade date misstates price by the lag's carry.
 - **Evidence:** `pricer.rs:7` — `curve.df(trade_date, cf.date)` anchors on
   trade date.
 - **Verdict:** Fail
-- **Severity:** Major
+- **Impact:** Settlement prices systematically include the wrong carry over
+  the lag, biasing trade valuation and P&L.
 - **Fix:** Anchor discounting at `settle`: `curve.df(settle, cf.date)`.
-
-## Cross-Step Contracts
-- Step 1 → Steps 2/3/4: a single settlement date must be computed once and
-  reused; currently the wrong date propagates consistently, which will make
-  the two Step-1/Step-4 fixes look like a price jump — change both together.
-
-## Findings
-1. [Major, Step 1, pricer.rs:2] No settlement lag; accrual, cashflow cutoff,
-   and discount anchor all shift by 1–2 days. Fix: calendar-aware settlement.
-2. [Major, Step 4, pricer.rs:7] Discounting anchored at trade date instead of
-   settlement. Fix: anchor at settlement.
-
-## Open Questions
-- Which settlement lag and calendar apply (T+1 UST vs T+2 corporate)? Not in
-  the bond struct — needs reference data confirmation.
-
-## Brief Summary
-Structure is standard (dirty = PV + accrued) but both date anchors are wrong.
-Prices are biased by short-end carry over the settlement lag. Fix Steps 1 and
-4 together and re-verify against a golden price.
 ```
 
 Judgment notes:
 
-- Step 2 shows a *conditional Pass*: the step's own logic is right, the input
-  is wrong. Attribute the defect to the step that owns it, not every step it
-  contaminates.
-- The cross-step section warns that fixing one anchor without the other
-  produces a confusing intermediate state — that is exactly the kind of
-  between-steps insight this section exists for.
+- The internal step map is settlement, accrued interest, cashflow selection,
+  discounting, and price assembly; only reportable steps appear in the output.
+- Step 2 is a *conditional Pass*: its own logic is right, but its input is
+  wrong. Omit it from the report and attribute the defect to Step 1.
+- Fold the cross-step dependency and reference-data question into the relevant
+  finding rather than adding separate sections.
 
-## Example 2 — DV01 bump path (Uncertain done right)
+## Example 2 — DV01 bump path (lower-severity uncertainty omitted)
 
 Situation: a `dv01` function bumps the zero curve +1bp and reprices, one-sided.
+The missing policy documentation creates uncertainty, but there is no evidence
+of a material mismatch with downstream consumers or another reportable defect.
+
+Internal assessment:
+
+- Both quote-bump-and-rebootstrap and zero-curve bumps are used in practice;
+  the choice matters for bucketed risk (algorithm-standards.md, risk section).
+- `position_risk.rs:88-95` bumps zero rates directly without documenting the
+  policy. The numbers are internally consistent.
+- Missing documentation alone does not establish Blocker or High impact.
+  Suppress the observation rather than promoting it or adding an open question.
+
+Expected output:
 
 ```markdown
-### Step 3 — Bump specification
-- **Intent:** Apply a 1bp parallel shift to produce rate risk.
-- **Standard:** Two desk-standard approaches exist: bump raw quotes and
-  re-bootstrap (matches hedge instruments) or bump the zero curve (faster,
-  smoother). Both are used in practice; the choice must be documented because
-  bucketed risk differs between them
-  (algorithm-standards.md, risk section).
-- **Evidence:** `position_risk.rs:88-95` — bumps zero rates directly; no doc
-  comment stating the policy.
-- **Verdict:** Uncertain
-- **Severity:** Moderate
-- **Fix:** Document the zero-bump policy in the rustdoc and metric key docs,
-  or switch to quote-bump-and-rebootstrap if hedge-consistent bucketed risk
-  is required. Confirm which one downstream consumers assume.
+## Subject
+Audit of the zero-curve DV01 bump path in `dv01`, limited to bump specification
+and repricing.
+
+## Findings
+No Blocker or High-severity findings identified within the audited scope.
 ```
 
 Judgment notes:
 
-- Uncertain is the honest verdict when two legitimate desk practices exist and
-  the code does not say which it implements. The fix is documentation plus a
-  question to the owner — not an assumed rewrite.
-- Severity is Moderate, not Blocker: numbers are internally consistent, but a
-  consumer expecting quote-space risk would misuse them.
+- An Uncertain verdict is reportable only when evidence supports a plausible
+  Blocker or High impact, such as a demonstrated mismatch with the risk
+  convention required by downstream hedging.
+- No reportable findings does not certify the entire risk pipeline.
