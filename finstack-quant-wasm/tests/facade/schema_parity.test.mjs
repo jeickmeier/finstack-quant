@@ -26,6 +26,7 @@ const GOLDEN = new URL('./schema_parity.golden.json', import.meta.url);
 
 /** Facade namespace path (`""` is the workspace registry) -> artifact exercised. */
 const REGISTRIES = {
+  analytics: 'correlation_result.schema.json',
   core: 'period_plan.schema.json',
   attribution: 'attribution.schema.json',
   calibration: 'calibration.schema.json',

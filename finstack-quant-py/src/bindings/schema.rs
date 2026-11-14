@@ -1,9 +1,9 @@
 //! Python bindings for `finstack_quant::schema`, the whole-workspace registry.
 //!
-//! The ten per-domain `finstack_quant.<domain>.schema` namespaces each list
+//! The eleven per-domain `finstack_quant.<domain>.schema` namespaces each list
 //! only their own crate's contracts, which means a caller wanting to advertise
 //! every contract has to already know the domain list. This namespace is the
-//! one that does not: it merges all ten registries and labels every row with
+//! one that does not: it merges all eleven registries and labels every row with
 //! the domain that owns it.
 
 use pyo3::prelude::*;
@@ -12,7 +12,7 @@ use pyo3::types::{PyList, PyModule};
 use crate::errors::core_to_py;
 
 /// Docstring for the `finstack_quant.schema` Python namespace.
-const MODULE_DOC: &str = r#"Every JSON Schema the workspace publishes, across all ten domains.
+const MODULE_DOC: &str = r#"Every JSON Schema the workspace publishes, across all eleven domains.
 
 The per-domain namespaces (``finstack_quant.valuations.schema`` and friends)
 list one crate each. This namespace merges all of them, so a service exposing
@@ -29,10 +29,10 @@ Examples
 >>> index["schema_index_version"]
 1
 >>> sorted({row["domain"] for row in index["artifacts"]})[:3]
-['attribution', 'calibration', 'cashflows']
+['analytics', 'attribution', 'calibration']
 "#;
 
-/// List every JSON Schema the workspace publishes, across all ten domains.
+/// List every JSON Schema the workspace publishes, across all eleven domains.
 ///
 /// Returns
 /// -------

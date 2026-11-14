@@ -352,6 +352,183 @@ same-day entitlement through maturity and wipeout. Price and export use
 the same signed native cash and payment dates.
 [Accepted tranche cashflows and settlement](docs/decisions/financial/models-and-valuations-credit/18-tranche-projection.md#accepted-decision-for-checked-tranche-cashflows-and-settlement).
 
+Tranche risk uses the selected raw valuation and exact active bindings.
+Keep coupon, quote, rate, correlation and recovery bases explicit and carry
+pricing allowances through the selected stencils. Named default scenarios
+report gross cash and economic jump-to-default separately.
+[Accepted tranche risk and default scenarios](docs/decisions/financial/models-and-valuations-credit/19-tranche-risk.md#accepted-decision-for-checked-tranche-risk-and-default-scenarios).
+
+Liability-management comparisons use exact currency-bearing amounts,
+one holder position and valuation date, and an explicit minimum gain.
+Keep break-even holdout PV, face-value ratios, and typed issuer transaction
+effects distinct. Gross leverage requires explicit issuer debt and EBITDA.
+[Accepted exchange and liability-management arithmetic](docs/decisions/financial/models-and-valuations-credit/20-liability-management.md#accepted-decision-for-checked-exchange-and-liability-management-arithmetic).
+
+Valuation resolves one registered model and effective close after validating
+the complete request. Comparable raw reprices retain their economic basis
+and native currency. Apply mark adjustments once, carry actual source
+bindings and keep metrics and composite child values on their admitted bases.
+[Accepted valuation dispatch and lifecycle](docs/decisions/financial/valuations-framework/pricing-lifecycle.md#accepted-decision-for-checked-valuation-dispatch-and-lifecycle).
+
+Valuation model inputs bind an exact source, unit, clock and parameter block.
+Use dated relative factors for GBM carry. Simulations retain explicit controls,
+exact seed identity and actual work. Apply each tree and quote control on its
+selected model and contractual basis.
+[Accepted valuation model inputs and controls](docs/decisions/financial/valuations-framework/model-resolution.md#accepted-decision-for-checked-valuation-model-inputs-and-controls).
+
+Listed valuation binds exact contract terms and clearing phase. Use qualified
+marks and references, separate option quote from clearing cash, and resolve
+exercise or assignment explicitly. A delivered future has its own reference
+and ownership. Pricing, dated settlement, export and risk use the same state.
+[Accepted listed futures and options](docs/decisions/financial/valuations-framework/listed-products.md#accepted-decision-for-checked-listed-futures-and-options).
+
+Overnight coupons separate the full index quote interval from its accrual
+weight. Select published or projected quotes on the explicit information
+phase. Preserve native growth, contractual cash and quote risk separately;
+repeated cutoff quotes retain distinct factors and one quote identity.
+[Accepted overnight projection and quote risk](docs/decisions/financial/valuations-framework/overnight-projection.md#accepted-decision-for-checked-overnight-projection-and-quote-risk).
+
+Joint rates-credit valuation uses exact dated nodes, each curve's native
+clock and directly integrated local hazard. Bind recovery and eligible
+floating coupons to their actual events and carry one prepared basis into
+pricing, OAS and risk.
+[Accepted dated rates-credit valuation](docs/decisions/financial/valuations-framework/rates-credit-grid.md#accepted-decision-for-checked-dated-rates-credit-valuation).
+
+TRS valuation uses one prepared payment basis for signed leg PVs, financing
+annuity and par spread. Preserve known but unpaid cash and include only the
+spread weight of amounts the replacement quote can change.
+[Accepted TRS legs and par spread](docs/decisions/financial/valuations-framework/trs-legs.md#accepted-decision-for-checked-trs-legs-and-par-spread).
+
+Variance sampling uses contractual dates, explicit annualization and qualified
+complete samples. Barrier monitoring uses explicit dates and history, and maps
+each eligible event to its exact model node.
+[Accepted observation schedules and monitoring grids](docs/decisions/financial/valuations-framework/observation-grids.md#accepted-decision-for-checked-observation-schedules-and-monitoring-grids).
+
+Metrics use one authorized producer per qualified identity and a cache scoped
+to the prepared valuation. Preserve complete coordinates and financial basis
+in reports, and aggregate only admitted compatible contributions.
+[Accepted metric orchestration and reporting](docs/decisions/financial/valuations-framework/metric-orchestration.md#accepted-decision-for-checked-metric-orchestration-and-reporting).
+
+Rate risk binds every required active source, uses comparable reprices and
+reports the actual stencil and applied shock. Keep direct zero-rate shifts,
+quote recalibration and the three DV01 aggregation modes distinct.
+[Accepted finite differences and rate risk](docs/decisions/financial/valuations-framework/finite-difference-rates.md#accepted-decision-for-checked-finite-differences-and-rate-risk).
+
+Credit risk binds the registered experiment to exact active inputs and one
+settlement or valuation amount basis. Keep quote CS01, direct intensity
+hazard01, settlement z-spread and the two recovery experiments distinct.
+[Accepted shared credit sensitivities](docs/decisions/financial/valuations-framework/credit-sensitivities.md#accepted-decision-for-checked-credit-sensitivities).
+
+Option sensitivities use the admitted lifecycle, selected pricer and actual
+risk factors. Preserve represented widths and paired stochastic draws, native
+quote units, sparse vega nodes, fixed directional FX01 and separate time bases.
+[Accepted option and FX sensitivities](docs/decisions/financial/valuations-framework/option-sensitivities.md#accepted-decision-for-checked-option-and-fx-sensitivities).
+
+Cross-factor risk binds two exact directions and uses comparable corner
+reprices. Replay fixed center credit quotes against each staged corner.
+Report the actual stencil and pair attribution only with matching moves.
+[Accepted shared cross-factor risk](docs/decisions/financial/valuations-framework/cross-factor-risk.md#accepted-decision-for-checked-cross-factor-risk).
+
+Dated theta and carry use explicit cuts, qualified observations and
+matching holder PV and cash. Keep funding explicit. Solve breakeven on
+the exact selected target and the prepared carry horizon.
+[Accepted horizon theta, carry and breakeven](docs/decisions/financial/valuations-framework/carry-theta-breakeven.md#accepted-decision-for-checked-horizon-theta-carry-and-breakeven).
+
+Historical risk applies complete typed observed moves at the unchanged
+valuation cut. Aggregate aligned reporting-currency P&Ls before the signed
+R-7 VaR and fractional empirical expected shortfall reductions.
+[Accepted historical scenario risk](docs/decisions/financial/valuations-framework/historical-risk.md#accepted-decision-for-checked-historical-scenario-risk).
+
+Cashflow PV and export use the entitled settlement cash and actual dated
+source bindings. Keep contractual events and model PV attribution separate.
+Require complete model-owned decomposition and matched reconciliation.
+[Accepted cashflow valuation and export](docs/decisions/financial/valuations-framework/cashflow-export.md#accepted-decision-for-checked-cashflow-valuation-and-export).
+
+Convention selection uses an exact typed key, qualified frozen edition and
+the applicable contract or rule date. Use explicit terms or a qualified named
+template; retain resolved terms and authorities through construction and replay.
+[Accepted convention selection and dated sources](docs/decisions/financial/valuations-framework/convention-selection.md#accepted-decision-for-checked-convention-selection-and-dated-sources).
+
+Inflation references use the selected contractual anchors and fixing vintage.
+Resolve actual or projected levels at a separate knowledge cutoff. Keep the
+contractual denominator and option expiry on their stated product bases.
+[Accepted inflation references and information dates](docs/decisions/financial/valuations-framework/inflation-references.md#accepted-decision-for-checked-inflation-references-and-information-dates).
+
+Margin repricing uses one prepared valuation basis and complete signed amounts
+at exact qualified factors and vertices. Preserve credit attribution, currency
+and scoped bilateral or cleared identity through aggregation and export.
+[Accepted margin repricing and identity](docs/decisions/financial/valuations-framework/margin-bridge.md#accepted-decision-for-checked-margin-repricing-and-identity).
+
+Shared contract state uses checked explicit terms or a qualified selected
+profile. Preserve schedule dates, exercise observation state, quote orientation
+and dated PIK allocation. Stochastic runs use explicit controls and report
+independent estimators, trajectories and completed measure availability.
+[Accepted shared contract and stochastic controls](docs/decisions/financial/valuations-framework/shared-contract-controls.md#accepted-decision-for-checked-shared-contract-and-stochastic-controls).
+
+Generated builders check required fields before resolving omitted defaults.
+Apply one structural validation route and preserve the same omission and
+admission rules at construction, restore and host boundaries.
+[Accepted generated financial builders](docs/decisions/financial/valuations-framework/builder-validation.md#accepted-decision-for-checked-generated-financial-builders).
+
+Deposit cash and quote inversion use one resolved period, positive contractual
+accrual and positive simple growth. Preserve signed interest, separate holder
+and trade cash cuts and the actual dated discount factors for inception par.
+[Accepted deposit cashflows and quote inversion](docs/decisions/financial/valuations-rates/01-deposits.md#accepted-decision-for-checked-deposit-cashflows-and-quote-inversion).
+
+Upfront FRA settlement uses the eligible benchmark observation or qualified
+forecast, explicit payment cut and strictly positive settlement denominator.
+Preserve active risk roles and the distinction between direct risk and quote replay.
+[Accepted FRA fixing, settlement and risk](docs/decisions/financial/valuations-rates/02-fra.md#accepted-decision-for-checked-fra-fixing-settlement-and-risk).
+
+Interest-rate swaps use explicit resolved leg terms, qualified observations
+and actual eligible payments. Apply the selected overnight growth and
+outside spread and solve par on the same cash cut. Preserve exact active
+roles across direct, calibration replay and margin repricing.
+[Accepted interest-rate swap cashflows and risk](docs/decisions/financial/valuations-rates/03-interest-rate-swaps.md#accepted-decision-for-checked-interest-rate-swap-cashflows-and-risk).
+
+Basis swaps value the primary receive leg and reference pay leg on one
+eligible cash cut with qualified source roles. The replacement spread
+changes the primary leg and uses its contractual spread weight.
+[Accepted basis swap cashflows and par spreads](docs/decisions/financial/valuations-rates/04-basis-swaps.md#accepted-decision-for-checked-basis-swap-cashflows-and-par-spreads).
+
+Cap and floor optionlets use resolved terms, exact fixing and payment
+eligibility, and qualified model and quote bases. Keep the Hull–White
+term payment measure and overnight approximation distinct. Subtract
+eligible dated premiums once.
+[Accepted cap and floor optionlet pricing](docs/decisions/financial/valuations-rates/05-cap-floor-pricing.md#accepted-decision-for-checked-cap-and-floor-optionlet-pricing).
+
+Cap and floor risk preserves the exact observation, quote, curve and model
+sigma axes. Use signed holder cash across explicit theta cuts and invert
+only an eligible single optionlet's gross PV with paired cash residual gates.
+[Accepted cap and floor risk and implied volatility](docs/decisions/financial/valuations-rates/06-cap-floor-risk.md#accepted-decision-for-checked-cap-and-floor-risk-and-implied-volatility).
+
+European swaptions use the resolved IRS forward, explicitly supported
+settlement and quote bases, and authoritative exercise and delivery.
+Preserve annuity dependence in forward Greeks and the gross premium basis
+in standalone quote inversion.
+[Accepted European swaption pricing and risk](docs/decisions/financial/valuations-rates/07-european-swaptions.md#accepted-decision-for-checked-european-swaption-pricing-and-risk).
+
+Hull–White swaptions preserve contractual exercise and deliverable terms.
+Tree statistics use the pricing rollback's decisions. LSMC uses joint
+rate and bank discount paths and a policy frozen before held-out pricing.
+[Accepted Hull–White swaption exercise and risk](docs/decisions/financial/valuations-rates/08-hull-white-swaptions.md#accepted-decision-for-checked-hull-white-swaption-exercise-and-risk).
+
+LMM Bermudans use exact physical co-terminal delivery, explicitly bound
+curve and model inputs, terminal-bond units and a frozen held-out exercise
+policy. Direct curve risk holds displacement and economic loadings fixed.
+[Accepted LMM Bermudan pricing and risk](docs/decisions/financial/valuations-rates/09-lmm-bermudans.md#accepted-decision-for-checked-lmm-bermudan-pricing-and-risk).
+
+Rate futures preserve the exact benchmark, publication and clearing cuts.
+Live marks, qualified model risk and unpaid cash have distinct bases.
+Futures option point mapping and dated discount risk are separate measures.
+[Accepted rate futures and futures option risk](docs/decisions/financial/valuations-rates/10-rate-futures.md#accepted-decision-for-checked-rate-futures-and-futures-option-risk).
+
+CMS pricing preserves the exact published benchmark and actual reference
+swap, with separate contractual CMS and funding payment grids. The dated
+adjusted-forward approximation has its own stated model, risk and cashflow
+basis; a different selected method cannot silently reuse it.
+[Accepted CMS convexity pricing and risk](docs/decisions/financial/valuations-rates/11-cms-convexity.md#accepted-decision-for-checked-cms-convexity-pricing-and-risk).
+
 Construct and restore private validated state atomically; preserve complete model
 values/order/identity/source in snapshots and distinguish lossy presentation tables.
 Metric weighting/missing-factor policy, empirical PD/transition/recovery/WARF,

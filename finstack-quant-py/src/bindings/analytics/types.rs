@@ -416,6 +416,12 @@ impl PyMultiFactorResult {
             self.inner.alpha, self.inner.r_squared, self.inner.adjusted_r_squared
         )
     }
+
+    #[doc = pydoc!("finstack_quant.analytics._types", "MultiFactorResult._repr_html_")]
+    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
+        let frame = self.to_dataframe(py, None).ok()?;
+        frame.call_method0("_repr_html_").ok()?.extract().ok()
+    }
 }
 
 #[doc = pydoc!("finstack_quant.analytics._types", "DrawdownEpisode")]
@@ -708,6 +714,41 @@ impl PyCorrelationResult {
     fn end_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.end_date)
     }
+
+    #[doc = pydoc!("finstack_quant.analytics._types", "CorrelationResult.to_dataframe")]
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let tickers = &self.inner.tickers;
+        if self.inner.matrix.len() != tickers.len() {
+            return Err(crate::errors::value_error(format!(
+                "correlation matrix has {} rows for {} tickers",
+                self.inner.matrix.len(),
+                tickers.len()
+            )));
+        }
+        let data = PyDict::new(py);
+        for (j, ticker) in tickers.iter().enumerate() {
+            let column: Vec<f64> = self
+                .inner
+                .matrix
+                .iter()
+                .map(|row| {
+                    row.get(j).copied().ok_or_else(|| {
+                        crate::errors::value_error("correlation matrix row shorter than tickers")
+                    })
+                })
+                .collect::<PyResult<_>>()?;
+            data.set_item(ticker, PyArray1::from_vec(py, column))?;
+        }
+        let index = pyo3::types::PyList::new(py, tickers)?;
+        dict_to_dataframe(py, &data, Some(index.into_any()))
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "CorrelationResult(tickers={:?}, n_obs={}, start_date={}, end_date={})",
+            self.inner.tickers, self.inner.n_obs, self.inner.start_date, self.inner.end_date
+        )
+    }
 }
 
 wire_methods!(
@@ -825,4 +866,11 @@ wire_methods!(
     CorrelationResult,
     "CorrelationResult",
     module = "finstack_quant.analytics._types"
+);
+impl_repr_html_via_dataframe!(
+    PyCorrelationResult,
+    pydoc!(
+        "finstack_quant.analytics._types",
+        "CorrelationResult._repr_html_"
+    )
 );

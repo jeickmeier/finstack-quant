@@ -1236,6 +1236,22 @@ class MultiFactorResult:
         ...
 
     def __repr__(self) -> str: ...
+    def _repr_html_(self) -> str | None:
+        """
+        HTML table for Jupyter, rendered from :meth:`to_dataframe`.
+
+        Returns
+        -------
+        str or None
+            pandas HTML markup, or ``None`` when the frame cannot be built
+            (IPython then falls back to ``__repr__``).
+
+        Notes
+        -----
+        This method does not raise; failures degrade to ``None``.
+        """
+        ...
+
     def __reduce__(self) -> tuple[Any, tuple[str]]:
         """Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
 
@@ -2254,6 +2270,43 @@ class CorrelationResult:
         ------
         ValueError
             If serialization of stored state fails.
+        """
+        ...
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        Export the correlation matrix as a square ``pandas.DataFrame`` indexed and columned by :attr:`tickers`.
+
+        Row and column labels follow panel column order, preserving the
+        common-sample symmetric Pearson coefficients as ``float64`` columns.
+
+        Returns
+        -------
+        pd.DataFrame
+            Square ``DataFrame`` with index and columns equal to :attr:`tickers`.
+
+        Raises
+        ------
+        ValueError
+            If the stored matrix dimensions are inconsistent with :attr:`tickers`
+            or the result cannot be represented as a pandas object.
+        """
+        ...
+
+    def __repr__(self) -> str: ...
+    def _repr_html_(self) -> str | None:
+        """
+        HTML table for Jupyter, rendered from :meth:`to_dataframe`.
+
+        Returns
+        -------
+        str or None
+            pandas HTML markup, or ``None`` when the frame cannot be built
+            (IPython then falls back to ``__repr__``).
+
+        Notes
+        -----
+        This method does not raise; failures degrade to ``None``.
         """
         ...
 

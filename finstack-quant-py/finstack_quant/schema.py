@@ -1,4 +1,4 @@
-"""Every JSON Schema the workspace publishes, merged across all ten domains.
+"""Every JSON Schema the workspace publishes, merged across all eleven domains.
 
 Re-exports the compiled registry functions. Symbol documentation lives in
 ``schema.pyi``.

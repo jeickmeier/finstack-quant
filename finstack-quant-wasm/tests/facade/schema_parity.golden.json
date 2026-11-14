@@ -1,6 +1,177 @@
 {
   "invalid_payload": "{\"not_a_field\": 1}",
   "registries": {
+    "analytics": {
+      "selector": "correlation_result.schema.json",
+      "index": {
+        "schema_index_version": 1,
+        "artifacts": [
+          {
+            "path": "schemas/analytics/1/beta_result.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/beta_result.schema.json",
+            "type_name": "BetaResult",
+            "kind": "output",
+            "bytes": 3066
+          },
+          {
+            "path": "schemas/analytics/1/cagr_day_count.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/cagr_day_count.schema.json",
+            "type_name": "CagrDayCount",
+            "kind": "component",
+            "bytes": 17009
+          },
+          {
+            "path": "schemas/analytics/1/correlation_result.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/correlation_result.schema.json",
+            "type_name": "CorrelationResult",
+            "kind": "output",
+            "bytes": 1516
+          },
+          {
+            "path": "schemas/analytics/1/dated_series.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/dated_series.schema.json",
+            "type_name": "DatedSeries",
+            "kind": "component",
+            "bytes": 3605
+          },
+          {
+            "path": "schemas/analytics/1/drawdown_episode.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/drawdown_episode.schema.json",
+            "type_name": "DrawdownEpisode",
+            "kind": "component",
+            "bytes": 1494
+          },
+          {
+            "path": "schemas/analytics/1/greeks_result.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/greeks_result.schema.json",
+            "type_name": "GreeksResult",
+            "kind": "output",
+            "bytes": 2746
+          },
+          {
+            "path": "schemas/analytics/1/lookback_returns.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/lookback_returns.schema.json",
+            "type_name": "LookbackReturns",
+            "kind": "component",
+            "bytes": 5889
+          },
+          {
+            "path": "schemas/analytics/1/lookback_sample.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/lookback_sample.schema.json",
+            "type_name": "LookbackSample",
+            "kind": "component",
+            "bytes": 1242
+          },
+          {
+            "path": "schemas/analytics/1/multi_factor_result.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/multi_factor_result.schema.json",
+            "type_name": "MultiFactorResult",
+            "kind": "output",
+            "bytes": 4510
+          },
+          {
+            "path": "schemas/analytics/1/performance.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/performance.schema.json",
+            "type_name": "Performance",
+            "kind": "input",
+            "bytes": 3722
+          },
+          {
+            "path": "schemas/analytics/1/performance_panel.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/performance_panel.schema.json",
+            "type_name": "PerformancePanel",
+            "kind": "input",
+            "bytes": 3721
+          },
+          {
+            "path": "schemas/analytics/1/period_stats.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/period_stats.schema.json",
+            "type_name": "PeriodStats",
+            "kind": "output",
+            "bytes": 4607
+          },
+          {
+            "path": "schemas/analytics/1/periodic_return.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/periodic_return.schema.json",
+            "type_name": "PeriodicReturn",
+            "kind": "component",
+            "bytes": 826
+          },
+          {
+            "path": "schemas/analytics/1/return_kind.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/return_kind.schema.json",
+            "type_name": "ReturnKind",
+            "kind": "component",
+            "bytes": 1360
+          },
+          {
+            "path": "schemas/analytics/1/rolling_greeks.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/rolling_greeks.schema.json",
+            "type_name": "RollingGreeks",
+            "kind": "component",
+            "bytes": 2032
+          }
+        ]
+      },
+      "canonical": {
+        "id": "https://finstack_quant.dev/schemas/analytics/1/correlation_result.schema.json",
+        "title": "CorrelationResult",
+        "keys": [
+          "$defs",
+          "$id",
+          "$schema",
+          "additionalProperties",
+          "description",
+          "properties",
+          "required",
+          "title",
+          "type"
+        ],
+        "definitions": ["DateWire"]
+      },
+      "llm": {
+        "id": "https://finstack_quant.dev/schemas/analytics/1/correlation_result.schema.json",
+        "title": "CorrelationResult",
+        "keys": [
+          "$defs",
+          "$id",
+          "$schema",
+          "additionalProperties",
+          "description",
+          "properties",
+          "required",
+          "title",
+          "type"
+        ],
+        "definitions": ["DateWire"]
+      },
+      "report": [
+        {
+          "message": "Additional properties are not allowed ('not_a_field' was unexpected)",
+          "pointer": ""
+        },
+        {
+          "message": "\"tickers\" is a required property",
+          "pointer": ""
+        },
+        {
+          "message": "\"matrix\" is a required property",
+          "pointer": ""
+        },
+        {
+          "message": "\"n_obs\" is a required property",
+          "pointer": ""
+        },
+        {
+          "message": "\"start_date\" is a required property",
+          "pointer": ""
+        },
+        {
+          "message": "\"end_date\" is a required property",
+          "pointer": ""
+        }
+      ]
+    },
     "core": {
       "selector": "period_plan.schema.json",
       "index": {
@@ -3839,6 +4010,126 @@
         "schema_index_version": 1,
         "artifacts": [
           {
+            "domain": "analytics",
+            "path": "schemas/analytics/1/beta_result.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/beta_result.schema.json",
+            "type_name": "BetaResult",
+            "kind": "output",
+            "bytes": 3066
+          },
+          {
+            "domain": "analytics",
+            "path": "schemas/analytics/1/cagr_day_count.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/cagr_day_count.schema.json",
+            "type_name": "CagrDayCount",
+            "kind": "component",
+            "bytes": 17009
+          },
+          {
+            "domain": "analytics",
+            "path": "schemas/analytics/1/correlation_result.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/correlation_result.schema.json",
+            "type_name": "CorrelationResult",
+            "kind": "output",
+            "bytes": 1516
+          },
+          {
+            "domain": "analytics",
+            "path": "schemas/analytics/1/dated_series.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/dated_series.schema.json",
+            "type_name": "DatedSeries",
+            "kind": "component",
+            "bytes": 3605
+          },
+          {
+            "domain": "analytics",
+            "path": "schemas/analytics/1/drawdown_episode.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/drawdown_episode.schema.json",
+            "type_name": "DrawdownEpisode",
+            "kind": "component",
+            "bytes": 1494
+          },
+          {
+            "domain": "analytics",
+            "path": "schemas/analytics/1/greeks_result.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/greeks_result.schema.json",
+            "type_name": "GreeksResult",
+            "kind": "output",
+            "bytes": 2746
+          },
+          {
+            "domain": "analytics",
+            "path": "schemas/analytics/1/lookback_returns.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/lookback_returns.schema.json",
+            "type_name": "LookbackReturns",
+            "kind": "component",
+            "bytes": 5889
+          },
+          {
+            "domain": "analytics",
+            "path": "schemas/analytics/1/lookback_sample.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/lookback_sample.schema.json",
+            "type_name": "LookbackSample",
+            "kind": "component",
+            "bytes": 1242
+          },
+          {
+            "domain": "analytics",
+            "path": "schemas/analytics/1/multi_factor_result.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/multi_factor_result.schema.json",
+            "type_name": "MultiFactorResult",
+            "kind": "output",
+            "bytes": 4510
+          },
+          {
+            "domain": "analytics",
+            "path": "schemas/analytics/1/performance.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/performance.schema.json",
+            "type_name": "Performance",
+            "kind": "input",
+            "bytes": 3722
+          },
+          {
+            "domain": "analytics",
+            "path": "schemas/analytics/1/performance_panel.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/performance_panel.schema.json",
+            "type_name": "PerformancePanel",
+            "kind": "input",
+            "bytes": 3721
+          },
+          {
+            "domain": "analytics",
+            "path": "schemas/analytics/1/period_stats.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/period_stats.schema.json",
+            "type_name": "PeriodStats",
+            "kind": "output",
+            "bytes": 4607
+          },
+          {
+            "domain": "analytics",
+            "path": "schemas/analytics/1/periodic_return.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/periodic_return.schema.json",
+            "type_name": "PeriodicReturn",
+            "kind": "component",
+            "bytes": 826
+          },
+          {
+            "domain": "analytics",
+            "path": "schemas/analytics/1/return_kind.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/return_kind.schema.json",
+            "type_name": "ReturnKind",
+            "kind": "component",
+            "bytes": 1360
+          },
+          {
+            "domain": "analytics",
+            "path": "schemas/analytics/1/rolling_greeks.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/analytics/1/rolling_greeks.schema.json",
+            "type_name": "RollingGreeks",
+            "kind": "component",
+            "bytes": 2032
+          },
+          {
             "domain": "attribution",
             "path": "schemas/attribution/1/attribution.schema.json",
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
@@ -6244,6 +6535,7 @@
     }
   },
   "domains": [
+    "analytics",
     "attribution",
     "calibration",
     "cashflows",

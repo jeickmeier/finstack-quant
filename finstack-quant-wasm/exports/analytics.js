@@ -1,4 +1,5 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
+import { schema } from './analytics/schema.js';
 
 // Rust `lookback_returns` and `period_stats` take an optional FiscalConfig.
 // wasm-bindgen cannot borrow an optional handle, so the None and Some(config)
@@ -98,6 +99,7 @@ export const analytics = {
   multiFactorGreeks: wasm.multiFactorGreeks,
   validateSummary: wasm.validateSummary,
   maxDrawdown: wasm.maxDrawdown,
+  schema,
   sharpe: wasm.sharpe,
   sortino: wasm.sortino,
   volatility: wasm.volatility,

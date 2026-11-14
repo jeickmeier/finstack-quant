@@ -1826,7 +1826,54 @@ class Performance:
         """
         ...
 
-    # -- DataFrame export --
+    # -- DataFrame / TableEnvelope export --
+
+    def summary(self, risk_free_rate: float, mar: float, omega_threshold: float, confidence: float) -> dict[str, Any]:
+        """
+        Compute the fixed 22-metric summary table as a canonical ``TableEnvelope`` mapping.
+
+        Parameters
+        ----------
+        risk_free_rate : float
+            Explicit annual-effective decimal cash rate, finite and greater than -1; geometric per-observation conversion uses the declared frequency where required.
+        mar : float
+            Explicit finite minimum acceptable decimal return per observation; this is not an annual rate.
+        omega_threshold : float
+            Explicit finite decimal per-observation Omega hurdle, independent of MAR.
+        confidence : float
+            Explicit finite decimal tail confidence strictly between 0.5 and 1; the lower-tail probability is 1 - confidence.
+
+        Returns
+        -------
+        dict[str, Any]
+            Column-oriented ``TableEnvelope`` dictionary with ``row_count``, ``columns`` (``ticker`` followed by the 22 fixed metrics using canonical ``"nan"``, ``"inf"``, and ``"-inf"`` wire sentinels for non-finite values), and ``metadata`` carrying the explicit inputs, unit conventions, and own/paired sample provenance. Accepted directly by :func:`validate_summary`.
+
+        Raises
+        ------
+        AnalyticsError
+            If benchmark/frequency context is absent, cash is invalid, MAR/Omega is nonfinite, or confidence is outside the open interval (0.5, 1).
+        RuntimeError
+            If a required numerical calculation or requested finite result cannot be represented.
+        ValueError
+            If the validated table envelope cannot be serialized to a Python mapping.
+
+        Examples
+        --------
+        >>> from finstack_quant.analytics import Performance, PerformancePanel, validate_summary
+        >>> panel = PerformancePanel(
+        ...     dates=["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"],
+        ...     series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
+        ...     kind="returns",
+        ...     ticker_names=["FUND", "BENCH"],
+        ...     frequency="daily",
+        ...     benchmark_ticker="BENCH",
+        ... )
+        >>> perf = Performance.from_panel(panel)
+        >>> report = perf.summary(0.0, 0.0, 0.0, 0.95)
+        >>> validate_summary(report) is None
+        True
+        """
+        ...
 
     def to_dataframe(
         self, risk_free_rate: float, mar: float, omega_threshold: float, confidence: float

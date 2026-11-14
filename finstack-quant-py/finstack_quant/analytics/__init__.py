@@ -40,6 +40,7 @@ DatedSeries = _analytics.DatedSeries
 constrained_least_squares = _analytics.constrained_least_squares
 max_drawdown = _analytics.max_drawdown
 multi_factor_greeks = _analytics.multi_factor_greeks
+schema = _analytics.schema
 sharpe = _analytics.sharpe
 sortino = _analytics.sortino
 volatility = _analytics.volatility
@@ -62,6 +63,7 @@ __all__: list[str] = [
     "constrained_least_squares",
     "max_drawdown",
     "multi_factor_greeks",
+    "schema",
     "sharpe",
     "sortino",
     "validate_summary",

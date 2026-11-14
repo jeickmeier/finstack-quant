@@ -23,6 +23,7 @@ import pytest
 
 import finstack_quant
 from finstack_quant import (
+    analytics,
     attribution,
     calibration,
     cashflows,
@@ -39,6 +40,7 @@ GOLDEN = Path(__file__).parents[2] / "finstack-quant-wasm/tests/facade/schema_pa
 
 # Facade namespace path -> (Python schema module, selector of the artifact exercised).
 REGISTRIES: dict[str, tuple[Any, str]] = {
+    "analytics": (analytics.schema, "correlation_result.schema.json"),
     "core": (core.schema, "period_plan.schema.json"),
     "attribution": (attribution.schema, "attribution.schema.json"),
     "calibration": (calibration.schema, "calibration.schema.json"),

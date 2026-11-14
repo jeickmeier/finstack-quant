@@ -13,6 +13,7 @@ from types import ModuleType
 
 import pytest
 
+from finstack_quant.analytics import schema as analytics_schema
 from finstack_quant.attribution import schema as attribution_schema
 from finstack_quant.calibration import schema as calibration_schema
 from finstack_quant.cashflows import schema as cashflows_schema
@@ -28,6 +29,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # Every crate that owns a schema registry exposes the same three functions.
 NAMESPACES = [
+    analytics_schema,
     attribution_schema,
     calibration_schema,
     cashflows_schema,
@@ -127,9 +129,9 @@ def test_instrument_catalogue_is_cheap_to_list() -> None:
 
 
 def test_every_registry_crate_publishes_the_same_surface() -> None:
-    # Ten crates own a registry; an eleventh added later must show up here rather
-    # than silently shipping without the discovery surface.
-    assert len(NAMESPACES) == 10
+    # Eleven crates own a registry; a twelfth added later must show up here
+    # rather than silently shipping without the discovery surface.
+    assert len(NAMESPACES) == 11
     for namespace in NAMESPACES:
         # Namespaces that predate the registry also keep their named accessors,
         # so the trio is a floor rather than the whole surface.
@@ -138,9 +140,10 @@ def test_every_registry_crate_publishes_the_same_surface() -> None:
 
 # Crate directory (and artifact family, where a crate publishes several) behind
 # each Python namespace. The models crate also publishes a `schemas/models`
-# family that has no Python namespace yet; like the analytics, covenants and
+# family that has no Python namespace yet; like the covenants and
 # statements-analytics registries it is tracked as binding work.
 NAMESPACE_CORPUS = {
+    analytics_schema: ("analytics", "schemas/"),
     attribution_schema: ("attribution", "schemas/"),
     calibration_schema: ("calibration", "schemas/"),
     cashflows_schema: ("cashflows", "schemas/"),

@@ -35,6 +35,7 @@ use std::collections::BTreeMap;
 /// apart without parsing paths.
 fn domain_registries() -> Vec<(&'static str, &'static [SchemaArtifact])> {
     vec![
+        ("analytics", finstack_quant_analytics::schema::ARTIFACTS),
         ("core", finstack_quant_core::schema::ARTIFACTS),
         ("attribution", finstack_quant_attribution::schema::ARTIFACTS),
         (
@@ -210,9 +211,9 @@ pub fn find(selector: &str) -> Result<&'static SchemaArtifact> {
     finstack_quant_core::schema::find_schema_artifact(artifacts(), selector)
 }
 
-/// List every schema the workspace publishes, across all ten domains.
+/// List every schema the workspace publishes, across all eleven domains.
 ///
-/// One call replaces nine per-crate `index()` calls, which is what a service
+/// One call replaces per-crate `index()` calls, which is what a service
 /// wrapping this library needs in order to advertise its contracts without
 /// hard-coding the domain list.
 ///
@@ -475,7 +476,7 @@ mod tests {
 
     #[test]
     #[ignore = "slow: covered by mise run rust-test --slow"]
-    fn index_covers_all_ten_domains() {
+    fn index_covers_all_eleven_domains() {
         let index = index().expect("index");
         let rows = index["artifacts"].as_array().expect("rows");
         let domains: std::collections::BTreeSet<&str> = rows
@@ -486,6 +487,7 @@ mod tests {
         assert_eq!(
             domains,
             [
+                "analytics",
                 "attribution",
                 "calibration",
                 "cashflows",
@@ -507,6 +509,7 @@ mod tests {
         assert_eq!(
             domains(),
             [
+                "analytics",
                 "attribution",
                 "calibration",
                 "cashflows",

@@ -1,5 +1,5 @@
 """
-Every JSON Schema the workspace publishes, across all ten domains.
+Every JSON Schema the workspace publishes, across all eleven domains.
 
 The per-domain namespaces (``finstack_quant.valuations.schema`` and friends)
 list one crate each. This namespace merges all of them, so a service exposing
@@ -16,7 +16,7 @@ Examples
 >>> index["schema_index_version"]
 1
 >>> sorted({row["domain"] for row in index["artifacts"]})[:3]
-['attribution', 'calibration', 'cashflows']
+['analytics', 'attribution', 'calibration']
 
 """
 
@@ -31,7 +31,7 @@ __all__ = [
 
 def index() -> str:
     """
-    List every JSON Schema the workspace publishes, across all ten domains.
+    List every JSON Schema the workspace publishes, across all eleven domains.
 
     Returns
     -------

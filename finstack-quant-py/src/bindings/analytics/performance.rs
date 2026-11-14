@@ -1042,7 +1042,29 @@ impl PyPerformance {
         })
     }
 
-    // -- DataFrame export --
+    // -- DataFrame / TableEnvelope export --
+
+    #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.summary")]
+    #[pyo3(signature = (risk_free_rate, mar, omega_threshold, confidence))]
+    fn summary<'py>(
+        &self,
+        py: Python<'py>,
+        risk_free_rate: f64,
+        mar: f64,
+        omega_threshold: f64,
+        confidence: f64,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        // The 22-metric table is assembled in Rust (`Performance::summary`),
+        // so summary(), to_dataframe(), and WASM read the same rows; release
+        // the GIL for the O(22 * n * m) walk.
+        let table = py
+            .detach(|| {
+                self.inner
+                    .summary(risk_free_rate, mar, omega_threshold, confidence)
+            })
+            .map_err(analytics_to_py)?;
+        crate::bindings::pandas_utils::serde_to_py(py, &table)
+    }
 
     #[doc = pydoc!("finstack_quant.analytics._performance", "Performance.to_dataframe")]
     #[pyo3(signature = (risk_free_rate, mar, omega_threshold, confidence))]

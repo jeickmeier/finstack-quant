@@ -54,6 +54,7 @@ from finstack_quant.analytics._performance import (
     volatility as volatility,
     validate_summary as validate_summary,
 )
+from finstack_quant.analytics import schema as schema
 from finstack_quant.analytics._regression import constrained_least_squares as constrained_least_squares
 
 __all__ = [
@@ -73,6 +74,7 @@ __all__ = [
     "constrained_least_squares",
     "max_drawdown",
     "multi_factor_greeks",
+    "schema",
     "sharpe",
     "sortino",
     "volatility",

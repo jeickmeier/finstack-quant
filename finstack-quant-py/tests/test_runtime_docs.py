@@ -87,6 +87,7 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
         "Performance",
         "PeriodStats",
         "BetaResult",
+        "CorrelationResult",
         "GreeksResult",
         "RollingGreeks",
         "MultiFactorResult",
@@ -145,6 +146,7 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
     "finstack_quant.valuations": None,
     "finstack_quant.valuations.instruments": None,
     # `schema_registry_functions!` documents index/get/validate from each stub.
+    "finstack_quant.analytics.schema": _SCHEMA_REGISTRY,
     "finstack_quant.attribution.schema": _SCHEMA_REGISTRY,
     "finstack_quant.calibration.schema": _SCHEMA_REGISTRY,
     "finstack_quant.cashflows": None,

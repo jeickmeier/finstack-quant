@@ -21,7 +21,7 @@ import sys
 
 import pytest
 
-from finstack_quant.analytics import AnalyticsError, constrained_least_squares
+from finstack_quant.analytics import AnalyticsError, constrained_least_squares, multi_factor_greeks
 from finstack_quant.core.market_data import DiscountCurve
 from finstack_quant.portfolio import (
     PortfolioError,
@@ -630,6 +630,48 @@ def test_constrained_least_squares_rejects_dimension_mismatch() -> None:
     x = [0.0, 1.0, 1.0, 0.0, 0.0, 1.0]
     with pytest.raises(AnalyticsError, match=r"(?i)dimension"):
         constrained_least_squares(x, 2, [0.05, 0.02, 0.01], [0.6, 0.4])
+
+
+def test_constrained_least_squares_preserves_active_constraint_with_zero_loading() -> None:
+    """Active constraint refinement and underflow check preserve exact zero loadings."""
+    f_subnormal = constrained_least_squares(
+        [1.0, 1e-320, 1.0, 2e-320, 1.0, 3e-320],
+        2,
+        [1e-320, 4e-320, 2e-320],
+        [1.0, 0.0, 0.0],
+    )
+    assert f_subnormal[0] == 0.0
+    assert f_subnormal[1] == pytest.approx(1.0, abs=1e-12)
+
+    f_large = constrained_least_squares(
+        [1e308, 1.0, 1e308, 2.0, 1e308, 3.0],
+        2,
+        [0.01, 0.04, 0.02],
+        [1.0, 0.0, 0.0],
+    )
+    assert f_large[0] == 0.0
+    assert f_large[1] == pytest.approx(0.01, abs=1e-14)
+
+
+def test_multi_factor_greeks_accepts_noisy_subnormal_zero_intercept_and_rejects_underflow() -> None:
+    """Noisy overdetermined subnormal OLS succeeds while genuine underflow fails closed."""
+    fit = multi_factor_greeks(
+        [2e-320, 1e-320, 2e-320, 5e-320],
+        [[1e-320, 2e-320, 3e-320, 4e-320]],
+        1.0,
+        "excess",
+    )
+    assert fit.alpha == 0.0
+    assert fit.betas[0] == pytest.approx(1.0, abs=1e-12)
+    assert fit.r_squared == pytest.approx(5.0 / 9.0, abs=1e-12)
+
+    with pytest.raises(RuntimeError, match=r"(?i)underflowed"):
+        constrained_least_squares(
+            [1e-305, 0.0, 1e-305, 0.0, 0.0, 1e308],
+            2,
+            [1e-305, 3e-305, 1e-320],
+            [1.0, 0.0, 0.0],
+        )
 
 
 # End-to-end: constrained_least_squares feeding factor_brinson_attribution

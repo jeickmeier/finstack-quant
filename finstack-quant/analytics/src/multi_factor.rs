@@ -792,6 +792,18 @@ mod tests {
     }
 
     #[test]
+    fn noisy_subnormal_observations_retain_zero_alpha_and_unit_beta() {
+        let x = [1e-320, 2e-320, 3e-320, 4e-320];
+        let y = [2e-320, 1e-320, 2e-320, 5e-320];
+        let fit = multi_factor_greeks(&y, &[&x], 1.0, ReturnKind::Excess)
+            .expect("overdetermined noisy subnormal regression should preserve exact zero alpha");
+        assert_eq!(fit.alpha, 0.0);
+        assert!((fit.betas[0] - 1.0).abs() < 1e-12);
+        assert!((fit.r_squared - 5.0 / 9.0).abs() < 1e-12);
+        assert!(fit.residual_vol.is_finite());
+    }
+
+    #[test]
     fn large_residual_variance_preserves_zero_fit_and_finite_risk() {
         let fit = multi_factor_greeks(
             &[3e200, 1e200, 3e200, 1e200, 3e200],

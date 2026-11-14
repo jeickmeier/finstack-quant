@@ -6,6 +6,8 @@
 use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::{Error, InputError, NonFiniteKind};
 use nalgebra::DMatrix;
+use num_rational::BigRational;
+use num_traits::Zero;
 
 const ACCEPTANCE_TOLERANCE: f64 = 1e-12;
 
@@ -70,6 +72,13 @@ impl Scaled {
     fn neg(self) -> Self {
         Self {
             significand: -self.significand,
+            ..self
+        }
+    }
+
+    fn abs(self) -> Self {
+        Self {
+            significand: self.significand.abs(),
             ..self
         }
     }
@@ -149,6 +158,12 @@ fn common_values(groups: &[&[Scaled]]) -> Vec<Vec<f64>> {
         .iter()
         .map(|g| g.iter().map(|v| v.at_exponent(exponent)).collect())
         .collect()
+}
+
+struct ConstraintStep<'a> {
+    weights: &'a [f64],
+    unit: &'a [f64],
+    h_norm: Scaled,
 }
 
 /// One column-normalized bounded decomposition, reusable for every target.
@@ -329,6 +344,7 @@ impl NormalizedSvd {
         &self,
         target: &[Scaled],
         mut coefficients: Vec<f64>,
+        constraint: Option<&ConstraintStep<'_>>,
     ) -> finstack_quant_core::Result<Vec<f64>> {
         for _ in 0..2 {
             let fitted = self.fitted(&coefficients);
@@ -340,8 +356,21 @@ impl NormalizedSvd {
             if residual.iter().all(|v| v.significand.abs() <= 0.0) {
                 break;
             }
-            let coordinates = self.refined_coordinates(&residual);
+            let mut coordinates = self.refined_coordinates(&residual);
+            if let Some(step) = constraint {
+                let step_y0 = self.projected_values(&coordinates);
+                let (_, step_delta) = equality(step.weights, &residual, &step_y0);
+                let step_mag = step_delta.div(step.h_norm);
+                coordinates = coordinates
+                    .iter()
+                    .zip(step.unit)
+                    .map(|(&a, &u)| scaled_sum([a, Scaled::new(u).mul(step_mag)]))
+                    .collect();
+            }
             let (correction, _) = self.coefficients(&coordinates)?;
+            if correction.iter().all(|&c| c.abs() <= 0.0) {
+                break;
+            }
             for (value, change) in coefficients.iter_mut().zip(correction) {
                 *value = scaled_sum([Scaled::new(*value), Scaled::new(change)]).value()?;
             }
@@ -352,22 +381,154 @@ impl NormalizedSvd {
     fn check_underflow(
         &self,
         underflowed: bool,
-        target: &[Scaled],
+        returns: &[f64],
+        coefficients: &[f64],
         fitted: &[Scaled],
+        active_weights: Option<&[f64]>,
     ) -> finstack_quant_core::Result<()> {
         // A coefficient that is mathematically zero can acquire a tiny SVD
-        // rounding residue. Full column rank plus an exact original-data
-        // fit certifies the rounded vector as the unique zero-loss solution.
-        // Otherwise a collapsed requested coefficient remains unresolved.
-        if underflowed
-            && target
-                .iter()
-                .zip(fitted)
-                .any(|(&r, &y)| scaled_sum([r, y.neg()]).significand.abs() > 0.0)
-        {
-            return Err(calculation("requested finite coefficient underflowed"));
+        // rounding residue even on noisy overdetermined or active equality
+        // fits. Full column rank plus per-column KKT stationarity in the
+        // original design certifies that no nonzero loading collapsed.
+        if !underflowed {
+            return Ok(());
+        }
+        let residual: Vec<Scaled> = returns
+            .iter()
+            .zip(fitted)
+            .map(|(&r, &y)| scaled_sum([Scaled::new(r), y.neg()]))
+            .collect();
+        if residual.iter().all(|v| v.significand.abs() <= 0.0) {
+            return Ok(());
+        }
+        let p = self.original_design.ncols();
+        let mut grad = Vec::with_capacity(p);
+        let mut fit_scale = Vec::with_capacity(p);
+        for j in 0..p {
+            let column = self.original_design.column(j);
+            let s = Scaled::new(self.scales[j].0);
+            let v = Scaled::new(self.scales[j].1);
+            grad.push(scaled_dot(column.as_slice(), &residual).div(s).div(v));
+            let gross = scaled_sum(
+                column
+                    .iter()
+                    .zip(fitted)
+                    .map(|(&x, &y)| Scaled::new(x.abs()).mul(y.abs())),
+            );
+            fit_scale.push(gross.div(s).div(v));
+        }
+        let stationarity: Vec<(Scaled, Scaled)> = if let Some(weights) = active_weights {
+            let holdings: Vec<Scaled> = weights.iter().copied().map(Scaled::new).collect();
+            let b: Vec<Scaled> = (0..p)
+                .map(|j| {
+                    let column = self.original_design.column(j);
+                    scaled_dot(column.as_slice(), &holdings)
+                        .div(Scaled::new(self.scales[j].0))
+                        .div(Scaled::new(self.scales[j].1))
+                })
+                .collect();
+            let b_norm_sq = scaled_sum(b.iter().map(|&v| v.mul(v)));
+            if b_norm_sq.significand.abs() <= 0.0 {
+                return Err(calculation("nonzero holdings projection is unresolved"));
+            }
+            let b_dot_grad = scaled_sum(b.iter().zip(&grad).map(|(&bj, &gj)| bj.mul(gj)));
+            let lambda = b_dot_grad.div(b_norm_sq);
+            grad.into_iter()
+                .zip(fit_scale)
+                .zip(b)
+                .map(|((gj, sj), bj)| {
+                    let lagrange = lambda.mul(bj);
+                    (
+                        scaled_sum([gj, lagrange.neg()]),
+                        scaled_sum([sj, lagrange.abs()]),
+                    )
+                })
+                .collect()
+        } else {
+            grad.into_iter().zip(fit_scale).collect()
+        };
+        for (j, (k_j, scale_j)) in stationarity.into_iter().enumerate() {
+            if scale_j.significand.abs() <= 0.0 {
+                if k_j.significand.abs() > 0.0
+                    && !self.exact_column_stationary(j, returns, coefficients, active_weights)?
+                {
+                    return Err(calculation("requested finite coefficient underflowed"));
+                }
+            } else {
+                let pair = common_values(&[&[k_j.abs()], &[scale_j]]);
+                if pair[0][0] > ACCEPTANCE_TOLERANCE * pair[1][0] {
+                    return Err(calculation("requested finite coefficient underflowed"));
+                }
+            }
         }
         Ok(())
+    }
+
+    fn exact_column_stationary(
+        &self,
+        column_idx: usize,
+        returns: &[f64],
+        coefficients: &[f64],
+        active_weights: Option<&[f64]>,
+    ) -> finstack_quant_core::Result<bool> {
+        let nrows = self.original_design.nrows();
+        let ncols = self.original_design.ncols();
+        let coeff_q: Vec<BigRational> = coefficients
+            .iter()
+            .map(|&c| crate::exact::rational(c))
+            .collect::<finstack_quant_core::Result<_>>()?;
+        let mut residual_q = Vec::with_capacity(nrows);
+        for (i, &ret) in returns.iter().enumerate().take(nrows) {
+            let mut err = crate::exact::rational(ret)?;
+            for (m, cm) in coeff_q.iter().enumerate() {
+                let x_q = crate::exact::rational(self.original_design[(i, m)])?;
+                err -= &x_q * cm;
+            }
+            residual_q.push(err);
+        }
+        let col_grad = |col: usize| -> finstack_quant_core::Result<BigRational> {
+            let mut sum = BigRational::zero();
+            for (i, err) in residual_q.iter().enumerate() {
+                let x_q = crate::exact::rational(self.original_design[(i, col)])?;
+                sum += &x_q * err;
+            }
+            Ok(sum)
+        };
+        let grad_j = col_grad(column_idx)?;
+        let Some(weights) = active_weights else {
+            return Ok(grad_j.is_zero());
+        };
+        let weights_q: Vec<BigRational> = weights
+            .iter()
+            .map(|&w| crate::exact::rational(w))
+            .collect::<finstack_quant_core::Result<_>>()?;
+        if ncols == 1 {
+            let mut hold_err = BigRational::zero();
+            for (w, err) in weights_q.iter().zip(&residual_q) {
+                hold_err += w * err;
+            }
+            return Ok(hold_err.is_zero());
+        }
+        let col_hold = |col: usize| -> finstack_quant_core::Result<BigRational> {
+            let mut sum = BigRational::zero();
+            for (i, w) in weights_q.iter().enumerate() {
+                let x_q = crate::exact::rational(self.original_design[(i, col)])?;
+                sum += &x_q * w;
+            }
+            Ok(sum)
+        };
+        let hold_j = col_hold(column_idx)?;
+        for m in 0..ncols {
+            if m == column_idx {
+                continue;
+            }
+            let hold_m = col_hold(m)?;
+            let grad_m = col_grad(m)?;
+            if &grad_j * &hold_m != &grad_m * &hold_j {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     fn fitted(&self, coefficients: &[f64]) -> Vec<Scaled> {
@@ -430,12 +591,18 @@ pub(crate) fn normalized_svd_fit(
         let coordinates = model.refined_coordinates(&target);
         let (solution, underflowed) = model.coefficients(&coordinates)?;
         let solution = if underflowed {
-            model.refine_rounded_coefficients(&target, solution)?
+            model.refine_rounded_coefficients(&target, solution, None)?
         } else {
             solution
         };
         let actual_fitted = model.fitted(&solution);
-        model.check_underflow(underflowed, &target, &actual_fitted)?;
+        model.check_underflow(
+            underflowed,
+            column.as_slice(),
+            &solution,
+            &actual_fitted,
+            None,
+        )?;
         model.check_ols(&target, &actual_fitted)?;
         let scale = column.iter().map(|v| v.abs()).fold(0.0, f64::max);
         let scale = if scale <= 0.0 { 1.0 } else { scale };
@@ -542,7 +709,7 @@ pub fn constrained_least_squares(
     let normalized = common_values(&[&direction]);
     let direction_norm = norm(&normalized[0]);
     let mut corrected = coordinates.clone();
-    let mut unit_direction = None;
+    let mut active_constraint: Option<(Vec<f64>, Scaled)> = None;
     if !satisfied {
         // Exact compensated X'w detects a genuinely orthogonal holdings
         // vector without turning a merely small projection into infeasibility.
@@ -570,16 +737,24 @@ pub fn constrained_least_squares(
             .zip(&unit)
             .map(|(&a, &u)| scaled_sum([a, Scaled::new(u).mul(magnitude)]))
             .collect();
-        unit_direction = Some(unit);
+        active_constraint = Some((unit, h_norm));
     }
     let (coefficients, underflowed) = model.coefficients(&corrected)?;
+    let constraint_step = active_constraint
+        .as_ref()
+        .map(|(unit, h_norm)| ConstraintStep {
+            weights,
+            unit,
+            h_norm: *h_norm,
+        });
     let coefficients = if underflowed {
-        model.refine_rounded_coefficients(&target, coefficients)?
+        model.refine_rounded_coefficients(&target, coefficients, constraint_step.as_ref())?
     } else {
         coefficients
     };
     let fitted = model.fitted(&coefficients);
-    model.check_underflow(underflowed, &target, &fitted)?;
+    let active_weights = active_constraint.as_ref().map(|_| weights);
+    model.check_underflow(underflowed, returns, &coefficients, &fitted, active_weights)?;
     if !equality(weights, &target, &fitted).0 {
         return Err(calculation(
             "final coefficients fail weighted-gross equality",
@@ -591,7 +766,7 @@ pub fn constrained_least_squares(
         .zip(&common[2])
         .map(|(&y, &base)| y - base)
         .collect();
-    let check = if let Some(unit) = unit_direction {
+    let check = if let Some((unit, _)) = active_constraint {
         let change_scaled: Vec<Scaled> = change.iter().copied().map(Scaled::new).collect();
         let coordinates = model.projection_coordinates(&change_scaled);
         let coordinates: Vec<f64> = coordinates
@@ -679,6 +854,92 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn overdetermined_noisy_ols_retains_zero_loading_across_extreme_scales() {
+        use nalgebra::DMatrix;
+        let x = [1e-320, 2e-320, 3e-320, 4e-320];
+        let design = DMatrix::from_fn(4, 2, |i, j| if j == 0 { 1.0 } else { x[i] });
+        let target = DMatrix::from_column_slice(4, 1, &[2e-320, 1e-320, 2e-320, 5e-320]);
+        let fit = super::normalized_svd_fit(design, &target).unwrap();
+        assert_eq!(fit.coefficients[(0, 0)], 0.0);
+        assert!((fit.coefficients[(1, 0)] - 1.0).abs() < 1e-12);
+
+        let large_design = DMatrix::from_row_slice(3, 2, &[1.0, 1e308, 1.0, -1e308, 1.0, 0.0]);
+        let ordinary_target = DMatrix::from_column_slice(3, 1, &[1.1, 1.1, 0.8]);
+        let large_fit = super::normalized_svd_fit(large_design, &ordinary_target).unwrap();
+        assert!((large_fit.coefficients[(0, 0)] - 1.0).abs() < 1e-12);
+        assert_eq!(large_fit.coefficients[(1, 0)], 0.0);
+    }
+
+    #[test]
+    fn active_constraint_with_zero_loading_preserves_equality() {
+        let f_subnormal = constrained_least_squares(
+            &[1.0, 1e-320, 1.0, 2e-320, 1.0, 3e-320],
+            2,
+            &[1e-320, 4e-320, 2e-320],
+            &[1.0, 0.0, 0.0],
+        )
+        .unwrap();
+        assert_eq!(f_subnormal[0], 0.0);
+        assert!((f_subnormal[1] - 1.0).abs() < 1e-12);
+
+        let f_large = constrained_least_squares(
+            &[1e308, 1.0, 1e308, 2.0, 1e308, 3.0],
+            2,
+            &[0.01, 0.04, 0.02],
+            &[1.0, 0.0, 0.0],
+        )
+        .unwrap();
+        assert_eq!(f_large[0], 0.0);
+        assert!((f_large[1] - 0.01).abs() < 1e-14);
+        assert!((1e308 * f_large[0] + f_large[1] - 0.01).abs() < 1e-14);
+
+        let f_unit = constrained_least_squares(
+            &[1e308, 1.0, 1e308, 2.0, 1e308, 3.0],
+            2,
+            &[1.0, 4.0, 2.0],
+            &[1.0, 0.0, 0.0],
+        )
+        .unwrap();
+        assert!((1e308 * f_unit[0]).abs() < 1e-12);
+        assert!((f_unit[1] - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn decoupled_and_cancelled_genuine_underflow_still_fail_closed() {
+        use nalgebra::DMatrix;
+        let err_decoupled = super::normalized_svd_fit(
+            DMatrix::from_row_slice(2, 2, &[1.0, 0.0, 0.0, 1e308]),
+            &DMatrix::from_column_slice(2, 1, &[1.0, 1e-320]),
+        )
+        .err()
+        .expect("decoupled subnormal loading on 1e308 column must fail closed");
+        assert!(
+            err_decoupled.to_string().contains("underflowed"),
+            "{err_decoupled}"
+        );
+
+        let err_cancelled = super::normalized_svd_fit(
+            DMatrix::from_element(3, 1, 1e308),
+            &DMatrix::from_column_slice(3, 1, &[1.0, -1.0, 1e-320]),
+        )
+        .err()
+        .expect("residual surviving 1e308 cancellation must fail closed");
+        assert!(
+            err_cancelled.to_string().contains("underflowed"),
+            "{err_cancelled}"
+        );
+
+        let err_cls = constrained_least_squares(
+            &[1e-305, 0.0, 1e-305, 0.0, 0.0, 1e308],
+            2,
+            &[1e-305, 3e-305, 1e-320],
+            &[1.0, 0.0, 0.0],
+        )
+        .unwrap_err();
+        assert!(err_cls.to_string().contains("underflowed"), "{err_cls}");
     }
 
     #[test]

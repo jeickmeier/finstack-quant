@@ -105,6 +105,12 @@ macro_rules! schema_registry {
 }
 
 schema_registry!(
+    finstack_quant_analytics::schema::ARTIFACTS,
+    analytics_schema_index = "analyticsSchemaIndex",
+    analytics_schema_get = "analyticsSchemaGet",
+    analytics_schema_validate = "analyticsSchemaValidate"
+);
+schema_registry!(
     finstack_quant_core::schema::ARTIFACTS,
     core_schema_index = "coreSchemaIndex",
     core_schema_get = "coreSchemaGet",

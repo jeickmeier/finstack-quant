@@ -136,3 +136,65 @@ def test_restored_summary_retains_nan_sentinels_and_validates_provenance() -> No
     table["metadata"]["benchmark"] = "MISSING"
     with pytest.raises(AnalyticsError):
         validate_summary(table)
+
+
+def test_performance_summary_produces_validatable_table_envelope_with_nonfinite_sentinels() -> None:
+    from finstack_quant.analytics import PerformancePanel, validate_summary
+
+    panel = PerformancePanel(
+        dates=[date(2025, 1, 1), date(2025, 1, 2), date(2025, 1, 3), date(2025, 1, 4)],
+        series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
+        kind="returns",
+        ticker_names=["FUND", "BENCH"],
+        frequency="daily",
+        benchmark_ticker="BENCH",
+    )
+    perf = Performance.from_panel(panel)
+    report = perf.summary(0.0, 0.0, 0.0, 0.95)
+
+    assert validate_summary(report) is None
+    assert validate_summary(json.dumps(report, allow_nan=False)) is None
+    assert report["row_count"] == 2
+    assert report["metadata"]["kind"] == "analytics_summary"
+
+    df = perf.to_dataframe(0.0, 0.0, 0.0, 0.95)
+    by_col = {col["name"]: col["data"] for col in report["columns"]}
+    assert by_col["ticker"]["values"] == ["FUND", "BENCH"]
+    # Bench self-tracking metrics yield exact zero/NaN; wire format retains canonical sentinels.
+    assert by_col["information_ratio"]["values"][1] == "nan"
+    assert math.isnan(df.loc["BENCH", "information_ratio"])
+    assert by_col["cagr"]["values"][0] == pytest.approx(df.loc["FUND", "cagr"])
+
+
+def test_correlation_and_multi_factor_result_wrappers() -> None:
+    from finstack_quant.analytics import CorrelationResult, MultiFactorResult, PerformancePanel
+
+    panel = PerformancePanel(
+        dates=[date(2025, 1, 1), date(2025, 1, 2), date(2025, 1, 3), date(2025, 1, 4)],
+        series=[[0.10, -0.20, 0.05], [0.02, -0.03, 0.01]],
+        kind="returns",
+        ticker_names=["FUND", "BENCH"],
+        frequency="daily",
+        benchmark_ticker="BENCH",
+    )
+    perf = Performance.from_panel(panel)
+
+    corr = perf.correlation_matrix()
+    assert isinstance(corr, CorrelationResult)
+    corr_df = corr.to_dataframe()
+    assert list(corr_df.index) == ["FUND", "BENCH"]
+    assert list(corr_df.columns) == ["FUND", "BENCH"]
+    assert corr_df.loc["FUND", "FUND"] == pytest.approx(1.0)
+    assert corr_df.loc["FUND", "BENCH"] == pytest.approx(corr.matrix[0][1])
+    assert corr_df.loc["BENCH", "FUND"] == pytest.approx(corr.matrix[1][0])
+    assert "CorrelationResult(" in repr(corr)
+    corr_html = corr._repr_html_()
+    assert corr_html is not None
+    assert "<table" in corr_html
+
+    mf = perf.multi_factor_greeks(0, [[0.02, -0.03, 0.01]], 0.0)
+    assert isinstance(mf, MultiFactorResult)
+    mf_html = mf._repr_html_()
+    assert mf_html is not None
+    assert "<table" in mf_html
+    assert "factor_0" in mf_html

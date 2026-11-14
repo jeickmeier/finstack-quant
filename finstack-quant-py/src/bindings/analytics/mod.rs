@@ -10,6 +10,7 @@
 
 mod performance;
 mod regression;
+mod schema;
 mod types;
 
 use pyo3::prelude::*;
@@ -30,6 +31,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     types::register(py, &m)?;
     performance::register(py, &m)?;
     regression::register(py, &m)?;
+    schema::register(py, &m)?;
 
     let all = PyList::new(
         py,
@@ -50,6 +52,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "constrained_least_squares",
             "max_drawdown",
             "multi_factor_greeks",
+            "schema",
             "sharpe",
             "sortino",
             "validate_summary",

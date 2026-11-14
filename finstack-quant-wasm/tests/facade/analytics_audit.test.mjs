@@ -260,3 +260,44 @@ test('beta confidence intervals use the actual sample degrees of freedom', () =>
   assert.ok(Math.abs(critical - 2.0210753903062733) < 1e-9, `df=40: critical value ${critical}`);
   perf.free();
 });
+
+test('constrained and multi-factor regressions preserve zero loadings under extreme scaling', () => {
+  const fSubnormal = analytics.constrainedLeastSquares(
+    [1, 1e-320, 1, 2e-320, 1, 3e-320],
+    2,
+    [1e-320, 4e-320, 2e-320],
+    [1, 0, 0]
+  );
+  assert.equal(fSubnormal[0], 0);
+  close(fSubnormal[1], 1);
+
+  const fLarge = analytics.constrainedLeastSquares(
+    [1e308, 1, 1e308, 2, 1e308, 3],
+    2,
+    [0.01, 0.04, 0.02],
+    [1, 0, 0]
+  );
+  assert.equal(fLarge[0], 0);
+  close(fLarge[1], 0.01);
+
+  const fit = analytics.multiFactorGreeks(
+    [2e-320, 1e-320, 2e-320, 5e-320],
+    [[1e-320, 2e-320, 3e-320, 4e-320]],
+    1,
+    'excess'
+  );
+  assert.equal(fit.alpha, 0);
+  close(fit.betas[0], 1);
+  close(fit.r_squared, 5 / 9);
+
+  assert.throws(
+    () =>
+      analytics.constrainedLeastSquares(
+        [1e-305, 0, 1e-305, 0, 0, 1e308],
+        2,
+        [1e-305, 3e-305, 1e-320],
+        [1, 0, 0]
+      ),
+    /underflowed/
+  );
+});

@@ -6,6 +6,7 @@
       "constrainedLeastSquares",
       "maxDrawdown",
       "multiFactorGreeks",
+      "schema",
       "sharpe",
       "sortino",
       "validateSummary",
@@ -101,6 +102,19 @@
     "kind": "function"
   },
   "analytics.maxDrawdown": {
+    "kind": "function"
+  },
+  "analytics.schema": {
+    "kind": "namespace",
+    "keys": ["get", "index", "validate"]
+  },
+  "analytics.schema.index": {
+    "kind": "function"
+  },
+  "analytics.schema.get": {
+    "kind": "function"
+  },
+  "analytics.schema.validate": {
     "kind": "function"
   },
   "analytics.sharpe": {
