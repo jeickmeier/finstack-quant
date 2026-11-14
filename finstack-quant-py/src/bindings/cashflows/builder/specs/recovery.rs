@@ -68,8 +68,10 @@ impl PyRecoveryModelSpec {
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.recovery", "RecoveryModelSpec.recovery_rate")]
     #[pyo3(text_signature = "(self, seasoning_months)")]
-    fn recovery_rate(&self, seasoning_months: u32) -> f64 {
-        self.inner.recovery_rate(seasoning_months)
+    fn recovery_rate(&self, seasoning_months: u32) -> PyResult<f64> {
+        self.inner
+            .recovery_rate(seasoning_months)
+            .map_err(core_to_py)
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.builder._specs.recovery", "RecoveryModelSpec.validate")]

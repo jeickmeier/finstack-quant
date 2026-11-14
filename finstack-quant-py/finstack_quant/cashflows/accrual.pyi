@@ -36,6 +36,7 @@ import datetime
 from typing import Any
 
 from finstack_quant.cashflows.builder import CashFlowSchedule
+from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import Tenor
 from finstack_quant.core.money import Money
 
@@ -102,11 +103,12 @@ class AccrualMethod:
 
 class ExCouponRule:
     """
-    Coupon record-date convention applied to coupon flows.
+    Coupon ex-coupon date convention applied to coupon flows.
 
-    Settlement on the record date retains the coupon. Settlement strictly
-    after it and before payment trades ex-coupon: the seller keeps the coupon
-    and accrued interest is the rebate of the remaining accrual period.
+    Settlement strictly before the ex-coupon date retains the coupon.
+    Settlement on or after it and strictly before payment trades ex-coupon: the
+    seller keeps the coupon and accrued interest is the rebate of the remaining
+    accrual period.
 
     Examples
     --------
@@ -115,9 +117,9 @@ class ExCouponRule:
     >>> rule = ExCouponRule(days_before_coupon=7)
     >>> rule.ex_date(datetime.date(2025, 7, 15))
     datetime.date(2025, 7, 8)
-    >>> rule.is_ex_coupon(datetime.date(2025, 7, 15), datetime.date(2025, 7, 8))
+    >>> rule.is_ex_coupon(datetime.date(2025, 7, 15), datetime.date(2025, 7, 7))
     False
-    >>> rule.is_ex_coupon(datetime.date(2025, 7, 15), datetime.date(2025, 7, 9))
+    >>> rule.is_ex_coupon(datetime.date(2025, 7, 15), datetime.date(2025, 7, 8))
     True
     """
 
@@ -189,7 +191,7 @@ class ExCouponRule:
 
     def ex_date(self, payment_date: datetime.date | str) -> datetime.date:
         """
-        Compute the coupon record date for a coupon paid on *payment_date*.
+        Compute the ex-coupon date for a coupon paid on *payment_date*.
 
         Parameters
         ----------
@@ -199,14 +201,15 @@ class ExCouponRule:
         Returns
         -------
         datetime.date
-            Record date; settlement on this date retains the coupon. Settlement
-            strictly after it and before *payment_date* trades ex-coupon.
+            First ex-coupon settlement date; settlement strictly before this
+            date retains the coupon, and settlement on or after it and strictly
+            before *payment_date* trades ex-coupon.
 
         Raises
         ------
         ValueError
             If ``days_before_coupon`` exceeds 366, the date cannot be parsed,
-            or the record date is outside the supported date range.
+            or the ex-coupon date is outside the supported date range.
         KeyError
             If the configured calendar id cannot be resolved.
         """
@@ -219,20 +222,21 @@ class ExCouponRule:
         Parameters
         ----------
         payment_date : datetime.date
-            Coupon payment date used to calculate its record date.
+            Coupon payment date used to calculate its ex-coupon date.
         settlement_date : datetime.date
             Ownership-transfer date; convert trade dates to settlement first.
 
         Returns
         -------
         bool
-            True strictly after the record date and before payment; False on
-            the record date, when the buyer retains the coupon.
+            True on or after the ex-coupon date and strictly before payment;
+            False strictly before the ex-coupon date, when the buyer retains
+            the coupon.
 
         Raises
         ------
         ValueError
-            If either date is invalid, the offset exceeds 366, or the record
+            If either date is invalid, the offset exceeds 366, or the ex-coupon
             date is outside the supported date range.
         KeyError
             If the configured calendar identifier cannot be resolved.
@@ -325,7 +329,7 @@ class AccrualConfig:
         self,
         method: AccrualMethod | None = None,
         ex_coupon: ExCouponRule | None = None,
-        include_pik: bool = True,
+        include_pik: bool = False,
         frequency: Tenor | str | None = None,
     ) -> None:
         """
@@ -341,7 +345,7 @@ class AccrualConfig:
             convention.
         include_pik : bool
             Whether to include PIK interest in the accrued amount, default
-            ``True``.
+            ``False``.
         frequency : Tenor or str, optional
             Coupon frequency, required only when the schedule uses ACT/ACT
             ISMA day count.
@@ -538,7 +542,7 @@ class AccrualIndex:
             flows.
         config : AccrualConfig, optional
             Accrual method and ex-coupon configuration bound into the index
-            (default linear, PIK included). Build a separate index to
+            (default linear, PIK excluded). Build a separate index to
             accrue under a different config.
 
         Returns
@@ -572,6 +576,39 @@ class AccrualIndex:
         """
         ...
 
+    def get_currency(self) -> Currency:
+        """
+        Return the currency of accrued interest returned by :meth:`accrued_at`.
+
+        Returns
+        -------
+        Currency
+            Currency of the indexed coupon flows (falling back to the
+            schedule's notional currency when no matching coupon flows exist).
+
+        Notes
+        -----
+        This accessor does not raise.
+
+        Examples
+        --------
+        >>> import datetime
+        >>> from decimal import Decimal
+        >>> from finstack_quant.cashflows.accrual import AccrualIndex
+        >>> from finstack_quant.cashflows.builder import CashFlowSchedule, FixedCouponSpec, ScheduleParams
+        >>> from finstack_quant.core.money import Money
+        >>> schedule = (
+        ...     CashFlowSchedule
+        ...     .builder()
+        ...     .principal(Money(1_000_000.0, "USD"), datetime.date(2025, 1, 15), datetime.date(2026, 1, 15))
+        ...     .fixed_cf(FixedCouponSpec(rate=Decimal("0.05"), schedule=ScheduleParams.semiannual_30360()))
+        ...     .build(None)
+        ... )
+        >>> str(AccrualIndex.build(schedule).get_currency())
+        'USD'
+        """
+        ...
+
     def accrued_at(self, as_of: datetime.date | str) -> Money:
         """
         Accrued interest as of *as_of* using the prebuilt periods.
@@ -585,8 +622,9 @@ class AccrualIndex:
         Returns
         -------
         Money
-            Accrued interest in the schedule's notional currency; negative
-            inside an active ex-coupon window.
+            Accrued interest in the indexed coupon currency (falling back to
+            the schedule's notional currency when no matching coupon flows
+            exist); negative inside an active ex-coupon window.
 
         Raises
         ------
@@ -617,13 +655,14 @@ def accrued_interest_amount(
         until payment (exclusive), subject to ex-coupon entitlement.
     config : AccrualConfig, optional
         Accrual method and ex-coupon configuration (default linear, PIK
-        included).
+        excluded).
 
     Returns
     -------
     Money
-        Accrued interest in the schedule's notional currency; negative
-        inside an active ex-coupon window.
+        Accrued interest in the indexed coupon currency (falling back to the
+        schedule's notional currency when no matching coupon flows exist);
+        negative inside an active ex-coupon window.
 
     Raises
     ------

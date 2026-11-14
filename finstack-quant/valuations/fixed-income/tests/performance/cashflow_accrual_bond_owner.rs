@@ -45,8 +45,11 @@ fn actual_windowed_bond_record() -> Value {
         .get_discount(&bond.discount_curve_id)
         .expect("discount");
     let claims: Vec<_> = dates.iter().enumerate().map(|(ordinal, &date)| {
-        let ai = index.accrued_at(date).expect("selector-date accrued claim");
-        let expected_ai = support::expected_linear(&schedule, date, true);
+        let ai = index
+            .accrued_at(date)
+            .expect("selector-date accrued claim")
+            .amount();
+        let expected_ai = support::expected_linear(&schedule, date, cfg.include_pik);
         support::close(ai, expected_ai, support::AI_BOUND_USD);
         let time = discount.day_count().year_fraction(as_of, date, DayCountContext::default()).expect("exercise time");
         json!({

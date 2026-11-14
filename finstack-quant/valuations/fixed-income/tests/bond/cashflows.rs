@@ -318,13 +318,28 @@ fn test_pik_cashflows() {
     assert_eq!(settlements.len(), 2, "PIK is not settlement cash");
     assert_eq!(settlements[0].1.amount(), -1000.0);
     assert!(settlements[1].1.amount() > 1000.0);
-    assert!(
+    assert_eq!(
         finstack_quant_cashflows::accrual::accrued_interest_amount(
             &schedule,
             date!(2025 - 04 - 01),
             &finstack_quant_cashflows::accrual::AccrualConfig::default(),
         )
         .unwrap()
+        .amount(),
+        0.0,
+        "default accrual excludes PIK"
+    );
+    assert!(
+        finstack_quant_cashflows::accrual::accrued_interest_amount(
+            &schedule,
+            date!(2025 - 04 - 01),
+            &finstack_quant_cashflows::accrual::AccrualConfig {
+                include_pik: true,
+                ..Default::default()
+            },
+        )
+        .unwrap()
+        .amount()
             > 0.0
     );
 }

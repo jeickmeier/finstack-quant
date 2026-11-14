@@ -54,40 +54,54 @@ pub const SDA_PEAK_CDR: f64 = 0.006;
 /// Annual CPR of the PSA benchmark curve at a loan age, scaled by speed.
 ///
 /// 100% PSA ramps linearly from 0.2% CPR at month 1 to 6% at month 30 and
-/// stays flat afterwards: `CPR = speed × 6% × min(age, 30) / 30`.
+/// stays flat afterwards: `CPR = min(1.0, speed × 6% × min(age, 30) / 30)`.
 ///
 /// # Arguments
 ///
-/// * `speed_multiplier` - PSA speed as a multiple of the benchmark (`1.0` =
-///   100% PSA, `1.5` = 150% PSA). Not validated here; callers that accept
-///   user input check it is finite and non-negative.
-/// * `seasoning_months` - Loan age in months; month 0 gives 0% CPR.
+/// * `speed_multiplier` - Non-negative, finite PSA speed as a multiple of the
+///   benchmark (`1.0` = 100% PSA, `1.5` = 150% PSA).
+/// * `seasoning_months` - Loan age in months (`>= 1`).
 ///
 /// # Returns
 ///
-/// Annual CPR as a decimal. It exceeds 1.0 for speeds above ~16.7× at the
-/// plateau; callers decide whether to reject or clamp.
+/// Annual CPR as a decimal in `[0, 1]`, capped at `1.0` for high PSA speeds.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` if `speed_multiplier` is non-finite or
+/// negative, or if `seasoning_months == 0`.
 ///
 /// # Examples
 ///
 /// ```
 /// use finstack_quant_cashflows::builder::psa_cpr;
 ///
-/// assert!((psa_cpr(1.0, 15) - 0.03).abs() < 1e-15);
-/// assert!((psa_cpr(1.5, 60) - 0.09).abs() < 1e-15);
+/// assert!((psa_cpr(1.0, 15)? - 0.03).abs() < 1e-15);
+/// assert!((psa_cpr(1.5, 60)? - 0.09).abs() < 1e-15);
+/// assert_eq!(psa_cpr(20.0, 30)?, 1.0);
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 ///
 /// # References
 ///
 /// - `docs/REFERENCES.md#tuckman-serrat-fixed-income`
-#[must_use]
-pub fn psa_cpr(speed_multiplier: f64, seasoning_months: u32) -> f64 {
+pub fn psa_cpr(speed_multiplier: f64, seasoning_months: u32) -> finstack_quant_core::Result<f64> {
+    if !speed_multiplier.is_finite() || speed_multiplier < 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "PSA speed_multiplier ({speed_multiplier}) must be finite and non-negative"
+        )));
+    }
+    if seasoning_months == 0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "seasoning_months must be >= 1".to_string(),
+        ));
+    }
     let base = if seasoning_months <= PSA_RAMP_MONTHS {
-        (seasoning_months as f64 / PSA_RAMP_MONTHS as f64) * PSA_TERMINAL_CPR
+        (f64::from(seasoning_months) / f64::from(PSA_RAMP_MONTHS)) * PSA_TERMINAL_CPR
     } else {
         PSA_TERMINAL_CPR
     };
-    base * speed_multiplier
+    Ok((base * speed_multiplier).min(1.0))
 }
 
 /// Convert a monthly conditional prepayment or default rate to its annual rate.
@@ -143,15 +157,14 @@ fn check_unit_interval(name: &str, value: f64) -> finstack_quant_core::Result<()
 ///
 /// `SMM_t = speed / (1 − speed · (t − 1))`, `t ≥ 1`
 ///
-/// Month 0 is treated as month 1. Once the original balance is exhausted
-/// (`1 − speed·(t − 1) ≤ speed`) the whole remaining balance prepays and
-/// the result is capped at 1.0.
+/// Once the original balance is exhausted (`1 − speed·(t − 1) ≤ speed`) the
+/// whole remaining balance prepays and the result is capped at 1.0.
 ///
 /// # Arguments
 ///
 /// * `speed` - Monthly prepayment as a decimal fraction of the original
 ///   balance (`0.015` = 1.5% ABS), in `[0, 1]`.
-/// * `month` - Seasoning month of the prepayment, counted from origination.
+/// * `month` - Seasoning month of the prepayment, counted from origination (`>= 1`).
 ///
 /// # Returns
 ///
@@ -159,7 +172,8 @@ fn check_unit_interval(name: &str, value: f64) -> finstack_quant_core::Result<()
 ///
 /// # Errors
 ///
-/// Returns `Error::Validation` if `speed` is non-finite or outside `[0, 1]`.
+/// Returns `Error::Validation` if `speed` is non-finite or outside `[0, 1]`, or
+/// if `month == 0`.
 ///
 /// # Examples
 ///
@@ -169,6 +183,7 @@ fn check_unit_interval(name: &str, value: f64) -> finstack_quant_core::Result<()
 /// assert!((abs_to_smm(0.015, 1)? - 0.015).abs() < 1e-15);
 /// // Month 36: 0.015 / (1 − 0.015 × 35) = 3.158%
 /// assert!((abs_to_smm(0.015, 36)? - 0.015 / 0.475).abs() < 1e-15);
+/// assert!(abs_to_smm(0.015, 0).is_err());
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 ///
@@ -178,10 +193,15 @@ fn check_unit_interval(name: &str, value: f64) -> finstack_quant_core::Result<()
 ///   auto-loan ABS prepayment conventions.
 pub fn abs_to_smm(speed: f64, month: u32) -> finstack_quant_core::Result<f64> {
     check_unit_interval("abs speed", speed)?;
+    if month == 0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "month must be >= 1".to_string(),
+        ));
+    }
     if speed == 0.0 {
         return Ok(0.0);
     }
-    let elapsed = f64::from(month.max(1) - 1);
+    let elapsed = f64::from(month - 1);
     let remaining = 1.0 - speed * elapsed;
     if remaining <= speed * (1.0 + 1e-9) {
         return Ok(1.0);
@@ -194,16 +214,23 @@ mod tests {
     use super::*;
 
     /// 100% PSA: 0.2% CPR per month of age up to 6% at month 30, flat after;
-    /// speeds scale linearly (150% PSA at month 20 = 1.5 × 4% = 6%).
+    /// speeds scale linearly and cap at 1.0 above 16.67x.
     #[test]
     fn psa_cpr_matches_the_benchmark_ramp() {
-        for month in 0..=30_u32 {
-            assert!((psa_cpr(1.0, month) - 0.002 * f64::from(month)).abs() < 1e-15);
+        assert!(psa_cpr(1.0, 0).is_err());
+        assert!(psa_cpr(-0.1, 1).is_err());
+        assert!(psa_cpr(f64::NAN, 1).is_err());
+        for month in 1..=30_u32 {
+            assert!(
+                (psa_cpr(1.0, month).expect("valid month") - 0.002 * f64::from(month)).abs()
+                    < 1e-15
+            );
         }
-        assert_eq!(psa_cpr(1.0, 31), 0.06);
-        assert_eq!(psa_cpr(1.0, 360), 0.06);
-        assert!((psa_cpr(1.5, 20) - 0.06).abs() < 1e-15);
-        assert_eq!(psa_cpr(0.0, 45), 0.0);
+        assert_eq!(psa_cpr(1.0, 31).expect("valid"), 0.06);
+        assert_eq!(psa_cpr(1.0, 360).expect("valid"), 0.06);
+        assert!((psa_cpr(1.5, 20).expect("valid") - 0.06).abs() < 1e-15);
+        assert_eq!(psa_cpr(0.0, 45).expect("valid"), 0.0);
+        assert_eq!(psa_cpr(20.0, 30).expect("high PSA caps at 1.0"), 1.0);
     }
 
     #[test]
@@ -263,44 +290,5 @@ mod tests {
                 );
             }
         }
-    }
-}
-
-/// Convert annual conditional mortality to monthly mortality after clamping.
-///
-/// Projection loops can use this for shocked or interpolated CPR/CDR values.
-///
-/// # Arguments
-///
-/// * `annual` - Annual conditional prepayment or default rate as a decimal.
-///   Values below zero (including negative infinity) clamp to zero; values above
-///   one (including positive infinity) clamp to one. NaN remains NaN.
-///
-/// # Returns
-///
-/// Monthly mortality in `[0, 1]`, or NaN when the input is NaN.
-#[inline]
-#[must_use]
-pub fn annual_to_monthly_clamped(annual: f64) -> f64 {
-    annual_to_monthly(annual.clamp(0.0, 1.0)).unwrap_or(f64::NAN)
-}
-
-#[cfg(test)]
-mod clamped_tests {
-    use super::*;
-
-    #[test]
-    fn clamped_conversions_stay_on_the_unit_branch() {
-        assert_eq!(annual_to_monthly_clamped(0.0), 0.0);
-        assert_eq!(annual_to_monthly_clamped(-0.0).to_bits(), 0.0_f64.to_bits());
-        assert_eq!(annual_to_monthly_clamped(f64::NEG_INFINITY), 0.0);
-        assert_eq!(annual_to_monthly_clamped(f64::INFINITY), 1.0);
-        assert!(annual_to_monthly_clamped(f64::NAN).is_nan());
-        assert!((annual_to_monthly_clamped(1.5) - 1.0).abs() < 1e-12);
-        assert!(annual_to_monthly_clamped(-0.2) == 0.0);
-        assert!(
-            (annual_to_monthly_clamped(0.02) - annual_to_monthly(0.02).expect("valid CDR")).abs()
-                < 1e-15
-        );
     }
 }

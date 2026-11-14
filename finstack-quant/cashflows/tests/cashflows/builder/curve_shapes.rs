@@ -13,7 +13,7 @@ fn abs_speed_follows_the_fabozzi_convention() {
     let spec = PrepaymentModelSpec::abs(0.015);
 
     assert!((spec.smm(1).unwrap() - 0.015).abs() < TOL);
-    assert_eq!(spec.smm(0).unwrap(), spec.smm(1).unwrap());
+    assert!(spec.smm(0).is_err());
     // Month 36: 1.5% / (1 − 1.5% × 35) = 3.158%.
     assert!((spec.smm(36).unwrap() - 0.015 / 0.475).abs() < TOL);
     assert!((abs_to_smm(0.015, 36).unwrap() - 0.015 / 0.475).abs() < TOL);
@@ -55,7 +55,7 @@ fn abs_speed_prepays_the_original_balance_evenly() {
 #[test]
 fn vector_curves_hold_the_last_value() {
     let prepay = PrepaymentModelSpec::vector(vec![0.02, 0.04]);
-    assert_eq!(prepay.smm(0).unwrap(), annual_to_monthly(0.02).unwrap());
+    assert!(prepay.smm(0).is_err());
     assert_eq!(prepay.smm(1).unwrap(), annual_to_monthly(0.02).unwrap());
     assert_eq!(prepay.smm(2).unwrap(), annual_to_monthly(0.04).unwrap());
     assert_eq!(prepay.smm(120).unwrap(), annual_to_monthly(0.04).unwrap());
@@ -117,7 +117,9 @@ fn cumulative_loss_mdr_scales_with_the_surviving_balance() {
     assert!((spec.mdr_with_survival(2, 0.5).unwrap() - 0.04).abs() < TOL);
     // The rate-only form divides by the curve's own survival (1 − 2%).
     assert!((spec.mdr(2).unwrap() - 0.02 / 0.98).abs() < TOL);
-    assert_eq!(spec.mdr_with_survival(2, 0.0).unwrap(), 0.0);
+    assert!(spec.mdr_with_survival(2, 0.0).is_err());
+    assert!(spec.mdr_with_survival(2, 0.01).is_err());
+    assert_eq!(spec.mdr_with_survival(3, 0.0).unwrap(), 0.0);
     assert!(spec.mdr_with_survival(2, -0.1).is_err());
     assert!(spec.mdr_with_survival(2, f64::NAN).is_err());
     // Rate-based curves ignore the survival fraction.
@@ -196,11 +198,16 @@ fn severity_vector_overrides_the_flat_recovery_by_month_of_default() {
     let spec = RecoveryModelSpec::with_lag(0.40, 12).with_severity_vector(vec![0.7, 0.6]);
     spec.validate().unwrap();
 
-    assert!((spec.recovery_rate(0) - 0.3).abs() < TOL);
-    assert!((spec.recovery_rate(1) - 0.3).abs() < TOL);
-    assert!((spec.recovery_rate(2) - 0.4).abs() < TOL);
-    assert!((spec.recovery_rate(60) - 0.4).abs() < TOL);
-    assert_eq!(RecoveryModelSpec::with_lag(0.40, 12).recovery_rate(7), 0.40);
+    assert!(spec.recovery_rate(0).is_err());
+    assert!((spec.recovery_rate(1).unwrap() - 0.3).abs() < TOL);
+    assert!((spec.recovery_rate(2).unwrap() - 0.4).abs() < TOL);
+    assert!((spec.recovery_rate(60).unwrap() - 0.4).abs() < TOL);
+    assert_eq!(
+        RecoveryModelSpec::with_lag(0.40, 12)
+            .recovery_rate(7)
+            .unwrap(),
+        0.40
+    );
 
     assert!(
         RecoveryModelSpec::with_lag(0.4, 1)

@@ -10,11 +10,18 @@
 //!
 //! # Summation Policy
 //!
-//! Per-currency totals (nominal and PV) are accumulated as Neumaier-compensated
-//! `f64` sums over `Money::amount()` values. No per-flow ISO-4217 rounding is
-//! applied during accumulation; the final total is constructed via `Money` from
-//! the compensated sum. Results are deterministic given sorted inputs (the
-//! public wrappers sort unsorted inputs by date before accumulating).
+//! Nominal per-currency rollups
+//! ([`aggregate_by_period`](crate::aggregation::aggregate_by_period) and
+//! [`aggregate_cashflows_checked`](crate::aggregation::aggregate_cashflows_checked))
+//! sum exact `Decimal` [`Money`](finstack_quant_core::money::Money) amounts via
+//! [`Money::checked_add`](finstack_quant_core::money::Money::checked_add),
+//! preserving cent-exact totals and failing loudly on
+//! currency mismatch or `Decimal` overflow. Present-value rollups
+//! ([`crate::builder::CashFlowSchedule::pv_by_period`]) accumulate `f64` row
+//! PVs via a Neumaier-compensated accumulator before materializing `Money`. No
+//! per-flow ISO-4217 rounding is applied during accumulation. Results are
+//! deterministic given sorted inputs (the public wrappers sort unsorted inputs
+//! by date before accumulating).
 //!
 //! # Historical-Flow PV Convention
 //!
@@ -24,7 +31,7 @@
 
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, Period, PeriodId};
+use finstack_quant_core::dates::{Date, DateExt, Period, PeriodId};
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 
@@ -238,6 +245,48 @@ fn sum_by_period<T: HasDate>(
     Ok(PeriodAggregation(out))
 }
 
+/// Accumulate nominal [`Money`] values across non-overlapping reporting periods
+/// using exact checked `Decimal` addition per currency.
+fn sum_by_period_money(
+    sorted: &[(Date, Money)],
+    periods: &[Period],
+) -> finstack_quant_core::Result<PeriodAggregation> {
+    debug_assert!(
+        sorted.windows(2).all(|w| w[0].0 <= w[1].0),
+        "sum_by_period_money requires flows to be sorted by date"
+    );
+
+    let mut out: IndexMap<PeriodId, IndexMap<Currency, Money>> =
+        IndexMap::with_capacity(periods.len());
+    let mut per_currency: IndexMap<Currency, Money> = IndexMap::new();
+    let mut flow_idx = 0;
+    let n = sorted.len();
+
+    for p in periods {
+        while flow_idx < n && sorted[flow_idx].0 < p.start {
+            flow_idx += 1;
+        }
+
+        per_currency.clear();
+        while flow_idx < n && sorted[flow_idx].0 < p.end {
+            let (_date, amount) = sorted[flow_idx];
+            let ccy = amount.currency();
+            if let Some(existing) = per_currency.get_mut(&ccy) {
+                *existing = existing.checked_add(amount)?;
+            } else {
+                per_currency.insert(ccy, amount);
+            }
+            flow_idx += 1;
+        }
+        if per_currency.is_empty() {
+            continue;
+        }
+
+        out.insert(p.id, std::mem::take(&mut per_currency));
+    }
+    Ok(PeriodAggregation(out))
+}
+
 /// Validate the aggregation period contract: sorted by start, non-overlapping,
 /// and free of duplicate `PeriodId`s.
 ///
@@ -303,14 +352,15 @@ fn validate_periods(periods: &[Period]) -> finstack_quant_core::Result<()> {
 /// # Returns
 ///
 /// Map from `PeriodId` to currency-indexed nominal cashflow sums. Periods with
-/// no cashflows are omitted from the result. Per-currency sums use
-/// Neumaier-compensated f64 accumulation (no per-flow ISO-4217 rounding).
+/// no cashflows are omitted from the result. Per-currency sums use exact
+/// checked `Decimal` addition via [`Money::checked_add`] (no per-flow ISO-4217
+/// rounding).
 ///
 /// # Errors
 ///
 /// Returns [`finstack_quant_core::Error::Validation`] if periods are unsorted,
-/// overlapping, or contain duplicate `PeriodId`s, and a conversion error when a
-/// per-currency total is non-finite or exceeds the `Decimal` range.
+/// overlapping, or contain duplicate `PeriodId`s, or a conversion/overflow
+/// error if a currency sum exceeds the representable `Decimal` range.
 ///
 /// # Examples
 ///
@@ -352,9 +402,7 @@ pub fn aggregate_by_period(
             rows.sort_by_key(|(d, _)| *d);
             std::borrow::Cow::Owned(rows)
         };
-    sum_by_period(&sorted, periods, |_, &(_d, m)| {
-        Ok((m.currency(), m.amount()))
-    })
+    sum_by_period_money(&sorted, periods)
 }
 
 use finstack_quant_core::market_data::term_structures::HazardCurve;
@@ -364,8 +412,9 @@ use finstack_quant_core::market_data::traits::Discounting;
 ///
 /// - Empty input returns `Ok(0 target)`.
 /// - All flows must match `target` currency; otherwise returns `Error::CurrencyMismatch`.
-/// - Sums `Money::amount()` values with a Neumaier-compensated f64 accumulator;
-///   no per-flow ISO-4217 rounding is applied during accumulation.
+/// - Sums [`Money`] values with exact checked `Decimal` addition via
+///   [`Money::checked_add`]; no per-flow ISO-4217 rounding is applied during
+///   accumulation.
 ///
 /// # Arguments
 ///
@@ -378,7 +427,9 @@ use finstack_quant_core::market_data::traits::Discounting;
 ///
 /// # Errors
 ///
-/// Returns `CurrencyMismatch` if any flow currency differs from `target`.
+/// Returns `CurrencyMismatch` if any flow currency differs from `target`, or an
+/// arithmetic overflow error if the cumulative `Decimal` sum exceeds the
+/// representable range.
 ///
 /// # Examples
 ///
@@ -402,17 +453,11 @@ pub fn aggregate_cashflows_checked(
     flows: &[(Date, Money)],
     target: Currency,
 ) -> finstack_quant_core::Result<Money> {
-    let mut acc = NeumaierAccumulator::default();
+    let mut total = Money::zero(target);
     for &(_d, m) in flows {
-        if m.currency() != target {
-            return Err(finstack_quant_core::Error::CurrencyMismatch {
-                expected: target,
-                actual: m.currency(),
-            });
-        }
-        acc.add(m.amount());
+        total = total.checked_add(m)?;
     }
-    Money::new(acc.total(), target)
+    Ok(total)
 }
 
 /// Calendar-year non-principal / principal / PV totals for one reporting year.
@@ -576,38 +621,133 @@ fn credit_adjusted_period_pv(cf: &CashFlow, df: f64, sp: f64, base: Date) -> f64
     cf.get_amount().amount() * df * sp
 }
 
-/// Present values of a complete cashflow stream under payment-date recovery.
+/// Partition a protection interval `(eff_start, pay_date]` along monthly steps
+/// and any interior hazard-curve knots so midpoint default-time discounting
+/// captures both rate convexity and hazard term structure.
+fn build_recovery_grid(
+    eff_start: Date,
+    pay_date: Date,
+    hazard: Option<&HazardCurve>,
+) -> finstack_quant_core::Result<Vec<Date>> {
+    let mut grid = vec![eff_start];
+    let mut month = 1_i32;
+    loop {
+        let step_date = eff_start.add_months(month)?;
+        if step_date >= pay_date {
+            break;
+        }
+        grid.push(step_date);
+        month += 1;
+    }
+    if let Some(h) = hazard {
+        let h_base = h.base_date();
+        for (k_t, _) in h.knot_points() {
+            if !k_t.is_finite() || k_t <= 0.0 {
+                continue;
+            }
+            for basis in [360.0_f64, 365.0, 365.25] {
+                let days = (k_t * basis).round();
+                if days.abs() > 4_000_000.0 {
+                    continue;
+                }
+                let offset = time::Duration::days(days as i64);
+                if let Some(d) = h_base.checked_add(offset)
+                    && eff_start < d
+                    && d < pay_date
+                {
+                    grid.push(d);
+                }
+            }
+        }
+    }
+    grid.push(pay_date);
+    grid.sort();
+    grid.dedup();
+    Ok(grid)
+}
+
+/// Integrate midpoint-discounted default-time recovery (per unit of
+/// `recovery_rate`) for one funded lot `(start, amount)` up to `pay_date`.
+fn lot_recovery_pv(
+    start: Date,
+    amount: f64,
+    pay_date: Date,
+    curve: &dyn Discounting,
+    df_as_of: f64,
+    hazard: Option<&HazardCurve>,
+    as_of: Date,
+) -> finstack_quant_core::Result<f64> {
+    let eff_start = start.max(as_of);
+    if eff_start >= pay_date || amount <= 0.0 {
+        return Ok(0.0);
+    }
+    let grid = build_recovery_grid(eff_start, pay_date, hazard)?;
+    let curve_dc = curve.day_count();
+    let curve_base = curve.base_date();
+    let curve_ctx = curve.day_count_context();
+
+    let mut q0 = survival_on_date(grid[0], hazard, as_of)?;
+    let mut t0 = curve_dc.signed_year_fraction(curve_base, grid[0], curve_ctx)?;
+    let mut acc = NeumaierAccumulator::new();
+    for &d1 in &grid[1..] {
+        let q1 = survival_on_date(d1, hazard, as_of)?;
+        let dq = default_mass(q0, q1)?;
+        let t1 = curve_dc.signed_year_fraction(curve_base, d1, curve_ctx)?;
+        if dq > 0.0 {
+            let df_mid = curve.df(0.5 * (t0 + t1));
+            if !df_mid.is_finite() || df_mid <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Invalid discount factor at midpoint before {d1}: {df_mid}"
+                )));
+            }
+            let rel_df = df_mid / df_as_of;
+            if !rel_df.is_finite() || rel_df <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Invalid relative discount factor before {d1}: {rel_df}"
+                )));
+            }
+            acc.add(amount * rel_df * dq);
+        }
+        q0 = q1;
+        t0 = t1;
+    }
+    Ok(acc.total())
+}
+
+/// Present values of a complete cashflow stream under default-time recovery.
 ///
-/// Recovery is estimated only while principal is funded, then discounted to
-/// its scheduled repayment date. Future draws and PIK capitalization establish
-/// principal on their economic balance dates. Within each currency, repayments
-/// consume funded principal in first-in, first-out order. This is an explicit
-/// allocation convention for the payment-date approximation, not a claim that
-/// recovery is actually paid at maturity. Coupons have zero recovery and no
-/// accrued-on-default term; this is not the ISDA CDS standard model.
+/// Recovery is estimated only while principal is funded, integrated over
+/// monthly steps and interior hazard-curve knots using midpoint discount
+/// factors from each row's discount curve. Future draws and PIK capitalization
+/// establish principal on their economic balance dates. Within each currency,
+/// repayments consume funded principal in first-in, first-out order. Coupons
+/// have zero recovery and no accrued-on-default term; this is not the ISDA CDS
+/// standard model.
 ///
 /// The stream must include all future funding, capitalization, and principal
 /// repayments. Opening funded principal is the remaining repayments less future
-/// increases, independently per currency. Omitted historical funding is therefore
-/// treated as already funded at `as_of`; historical cash itself has zero
-/// PV. For each funded amount `N`, recovery is `N * R * DF(T) * (S(F) - S(T))`,
-/// where `F` is its funding date, floored at the valuation date, and `T` its
-/// repayment date. A single row cannot establish this funding history.
-/// Explicit principal deltas determine face amounts independently of discounted
-/// or premium cash settlements. Once the economic principal reduction is before
-/// valuation, an unpaid settlement is a cash receivable: its cash amount is the
-/// recoverable claim, consistently for raw and normalized schedules.
-/// Capitalization paid early is paired with reductions on the same economic
-/// principal date before allocating the remaining FIFO lots, and has zero
-/// funded-principal recovery. Zero-cash balance
-/// replay rows never create another recoverable settlement claim.
+/// increases, independently per currency. Omitted historical funding is
+/// therefore treated as already funded at `as_of`; historical cash itself has
+/// zero PV. For each funded lot `N` active over `(max(F, as_of), T]`, recovery
+/// sums `N * R * D(as_of, t_mid,m) * (S(t_{m-1}) - S(t_m))` across sub-steps
+/// where `D(as_of, t) = df(t) / df(as_of)`. A single row cannot establish this
+/// funding history. Explicit principal deltas determine face amounts
+/// independently of discounted or premium cash settlements. Once the economic
+/// principal reduction is before valuation, an unpaid settlement is a cash
+/// receivable: its cash amount is the recoverable claim, consistently for raw
+/// and normalized schedules. Capitalization paid early is paired with
+/// reductions on the same economic principal date before allocating the
+/// remaining FIFO lots, and has zero funded-principal recovery. Zero-cash
+/// balance replay rows never create another recoverable settlement claim.
 ///
 /// # Arguments
 ///
 /// * `cashflows` - Complete classified cashflow stream, in any order. Principal
 ///   currency is preserved; non-cash rows have zero settlement PV.
-/// * `discount_factors` - One finite non-negative discount factor per cashflow,
-///   from the valuation date to that row's payment date in its native currency.
+/// * `discount_curves` - One discount curve reference per cashflow, used to
+///   compute relative discount factors from `as_of` to each row's payment
+///   date and midpoint default-time recovery discount factors in its native
+///   currency.
 /// * `hazard` - Optional survival curve. Probabilities are conditional on survival
 ///   at the valuation date; `None` gives risk-free cashflows and requires no recovery.
 /// * `recovery_rate` - Optional recovery rate in `[0, 1]` applied to defaulted
@@ -627,24 +767,24 @@ fn credit_adjusted_period_pv(cf: &CashFlow, df: f64, sp: f64, base: Date) -> f64
 /// recovery assumption without a hazard curve.
 pub fn credit_adjusted_cashflow_pvs(
     cashflows: &[CashFlow],
-    discount_factors: &[f64],
+    discount_curves: &[&dyn Discounting],
     hazard: Option<&HazardCurve>,
     recovery_rate: Option<f64>,
     as_of: Date,
 ) -> finstack_quant_core::Result<Vec<f64>> {
-    if cashflows.len() != discount_factors.len() {
+    if cashflows.len() != discount_curves.len() {
         return Err(finstack_quant_core::Error::Validation(
-            "cashflows and discount factors must have matching lengths".into(),
+            "cashflows and discount curves must have matching lengths".into(),
         ));
     }
     validate_recovery(cashflows, hazard, recovery_rate)?;
     let mut pvs = Vec::with_capacity(cashflows.len());
-    for (cashflow, &discount_factor) in cashflows.iter().zip(discount_factors) {
-        if !discount_factor.is_finite() || discount_factor < 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "discount factor must be finite and non-negative; got {discount_factor}"
-            )));
-        }
+    for (cashflow, &curve) in cashflows.iter().zip(discount_curves) {
+        let discount_factor = if cashflow.get_date() <= as_of {
+            1.0
+        } else {
+            curve.df_between_dates(as_of, cashflow.get_date())?
+        };
         let survival = if cashflow.get_date() <= as_of {
             1.0
         } else {
@@ -664,13 +804,25 @@ pub fn credit_adjusted_cashflow_pvs(
                 continue;
             }
             let pay_date = cashflows[index].get_date();
-            let end_sp = survival_on_date(pay_date, hazard, as_of)?;
-            let mut mass = NeumaierAccumulator::new();
-            for &(start, amount) in lots {
-                let start_sp = survival_on_date(start, hazard, as_of)?;
-                mass.add(amount * default_mass(start_sp, end_sp)?);
+            let curve = discount_curves[index];
+            let t_as_of = curve.day_count().signed_year_fraction(
+                curve.base_date(),
+                as_of,
+                curve.day_count_context(),
+            )?;
+            let df_as_of = curve.df(t_as_of);
+            if !df_as_of.is_finite() || df_as_of <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Invalid discount factor on 'from' date ({as_of}): {df_as_of}"
+                )));
             }
-            pvs[index] += recovery * discount_factors[index] * mass.total();
+            let mut row_acc = NeumaierAccumulator::new();
+            for &(start, amount) in lots {
+                row_acc.add(lot_recovery_pv(
+                    start, amount, pay_date, curve, df_as_of, hazard, as_of,
+                )?);
+            }
+            pvs[index] += recovery * row_acc.total();
         }
     }
     Ok(pvs)
@@ -1016,17 +1168,8 @@ pub(crate) fn pv_by_period(
     if sorted.is_empty() || periods.is_empty() {
         return Ok(PeriodAggregation::default());
     }
-    let discounts: Vec<f64> = sorted
-        .iter()
-        .map(|cf| {
-            if cf.get_date() <= as_of {
-                Ok(1.0)
-            } else {
-                disc.df_between_dates(as_of, cf.get_date())
-            }
-        })
-        .collect::<finstack_quant_core::Result<_>>()?;
-    let pvs = credit_adjusted_cashflow_pvs(sorted, &discounts, hazard, recovery_rate, as_of)?;
+    let curves: Vec<&dyn Discounting> = vec![disc; sorted.len()];
+    let pvs = credit_adjusted_cashflow_pvs(sorted, &curves, hazard, recovery_rate, as_of)?;
     sum_by_period(sorted, periods, |index, cf| {
         Ok((cf.get_amount().currency(), pvs[index]))
     })
@@ -1514,14 +1657,10 @@ mod credit_pv_tests {
 
     fn funded_pvs(flows: &[CashFlow], base: Date) -> Vec<f64> {
         let hazard = annual_survival(base);
-        credit_adjusted_cashflow_pvs(
-            flows,
-            &vec![1.0; flows.len()],
-            Some(&hazard),
-            Some(0.4),
-            base,
-        )
-        .expect("funded payment-date PVs")
+        let flat = FlatDiscount { base };
+        let curves: Vec<&dyn Discounting> = vec![&flat; flows.len()];
+        credit_adjusted_cashflow_pvs(flows, &curves, Some(&hazard), Some(0.4), base)
+            .expect("funded default-time PVs")
     }
 
     #[test]
@@ -1586,13 +1725,25 @@ mod credit_pv_tests {
         let settlement = -100.0 * df(1.0) * 0.8 + 40.0 * df(2.0) * 0.64 + 60.0 * df(3.0) * 0.512;
         let payment_recovery =
             0.4 * (40.0 * df(2.0) * (0.8 - 0.64) + 60.0 * df(3.0) * (0.8 - 0.512));
-        let recovery = payment_recovery;
+        let r = 0.05_f64;
+        let lambda = -0.8_f64.ln();
+        let continuous_lot = |n: f64, t_start: f64, t_end: f64| {
+            0.4 * n
+                * (lambda / (r + lambda))
+                * ((-(r + lambda) * t_start).exp() - (-(r + lambda) * t_end).exp())
+        };
+        let analytic_recovery = continuous_lot(40.0, 1.0, 2.0) + continuous_lot(60.0, 1.0, 3.0);
         let hazard = annual_survival(base);
         let pv = pv_by_period(&flows, &periods, &discount, Some(&hazard), Some(0.4), base)
             .expect("funded recovery with nonzero discount rate");
         let actual = pv[&periods[0].id][&Currency::USD].amount();
-        let expected = settlement + recovery;
-        assert!((actual - expected).abs() < 1e-10, "{actual} != {expected}");
+        let expected = settlement + analytic_recovery;
+        assert!((actual - expected).abs() < 2e-4, "{actual} != {expected}");
+        assert!(
+            actual > settlement + payment_recovery,
+            "default-time recovery ({actual}) must exceed terminal-discounted recovery ({})",
+            settlement + payment_recovery
+        );
     }
 
     #[test]

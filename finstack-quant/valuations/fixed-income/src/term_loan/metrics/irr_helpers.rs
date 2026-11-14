@@ -78,7 +78,8 @@ pub(crate) fn quoted_dirty_from_clean_px(
         schedule,
         settlement,
         &loan.accrual_config(),
-    )?;
+    )?
+    .amount();
     Money::from_model_value(
         px / 100.0 * (outstanding.amount() + pending_principal) + accrued,
         loan.currency,

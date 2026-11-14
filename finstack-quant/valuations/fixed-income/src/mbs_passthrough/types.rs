@@ -503,7 +503,7 @@ impl AgencyMbsPassthrough {
     /// Returns a validation error when the prepayment model yields an SMM that
     /// is not finite or lies outside `[0, 1]`.
     pub fn smm(&self, date: Date) -> finstack_quant_core::Result<f64> {
-        let seasoning = self.seasoning_months(date);
+        let seasoning = self.seasoning_months(date).max(1);
         let smm = self.prepayment_spec.smm(seasoning)?;
         if !smm.is_finite() || !(0.0..=1.0).contains(&smm) {
             return Err(finstack_quant_core::Error::Validation(format!(

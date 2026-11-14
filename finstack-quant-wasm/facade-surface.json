@@ -469,7 +469,7 @@
     "kind": "class",
     "constructor": false,
     "statics": ["build"],
-    "methods": ["accruedAt", "free"],
+    "methods": ["accruedAt", "free", "getCurrency"],
     "getters": []
   },
   "cashflows.CashFlowBuilder": {

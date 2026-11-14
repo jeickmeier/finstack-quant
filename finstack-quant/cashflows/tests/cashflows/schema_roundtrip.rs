@@ -202,8 +202,9 @@ fn canonical_build_spec(
 #[test]
 fn test_json_bridge_build_validate_flows_and_accrual() {
     let spec_json = fixed_schedule_build_spec().to_string();
-    let schedule_json = finstack_quant_cashflows::build_cashflow_schedule_json(&spec_json, None)
-        .expect("schedule should build from JSON");
+    let schedule_json =
+        finstack_quant_cashflows::build_cashflow_schedule_json(&spec_json, None, None)
+            .expect("schedule should build from JSON");
 
     let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
         serde_json::from_str(&schedule_json).expect("schedule JSON should deserialize");
@@ -237,14 +238,15 @@ fn test_json_bridge_build_validate_flows_and_accrual() {
         &finstack_quant_cashflows::accrual::AccrualConfig::default(),
     )
     .expect("accrued interest");
-    assert!(accrued > 0.0, "expected positive accrued interest");
+    assert!(accrued.amount() > 0.0, "expected positive accrued interest");
 }
 
 #[test]
 fn test_dated_flows_validates_the_schedule_like_its_json_twin() {
     let spec_json = fixed_schedule_build_spec().to_string();
-    let schedule_json = finstack_quant_cashflows::build_cashflow_schedule_json(&spec_json, None)
-        .expect("schedule should build from JSON");
+    let schedule_json =
+        finstack_quant_cashflows::build_cashflow_schedule_json(&spec_json, None, None)
+            .expect("schedule should build from JSON");
     let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
         serde_json::from_str(&schedule_json).expect("schedule JSON should deserialize");
     let typed = schedule.dated_flows().expect("valid schedule");
@@ -272,8 +274,9 @@ fn test_json_bridge_validates_pre_issue_principal_and_fee_flows() {
     // fees dated before the issue date; the validator must accept them while
     // still rejecting interest-bearing flows before issue.
     let spec_json = fixed_schedule_build_spec().to_string();
-    let schedule_json = finstack_quant_cashflows::build_cashflow_schedule_json(&spec_json, None)
-        .expect("schedule should build from JSON");
+    let schedule_json =
+        finstack_quant_cashflows::build_cashflow_schedule_json(&spec_json, None, None)
+            .expect("schedule should build from JSON");
 
     let mut schedule_value: serde_json::Value =
         serde_json::from_str(&schedule_json).expect("schedule JSON parses");
@@ -335,7 +338,7 @@ fn test_json_bridge_amortizing_schedule_build() {
     });
 
     let schedule_json =
-        finstack_quant_cashflows::build_cashflow_schedule_json(&spec.to_string(), None)
+        finstack_quant_cashflows::build_cashflow_schedule_json(&spec.to_string(), None, None)
             .expect("amortizing schedule should build");
     let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
         serde_json::from_str(&schedule_json).expect("schedule JSON should deserialize");
@@ -688,6 +691,7 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
     let schedule_json = finstack_quant_cashflows::build_cashflow_schedule_json(
         &spec.to_string(),
         Some(&market_json),
+        None,
     )
     .expect("seasoned floating schedule builds from JSON with fixing series");
     let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
@@ -798,7 +802,7 @@ fn canonical_coupon_and_payment_programs_build_nontrivial_schedule() {
     });
 
     let schedule_json =
-        finstack_quant_cashflows::build_cashflow_schedule_json(&spec.to_string(), None)
+        finstack_quant_cashflows::build_cashflow_schedule_json(&spec.to_string(), None, None)
             .expect("canonical programs build");
     let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
         serde_json::from_str(&schedule_json).expect("schedule deserializes");
@@ -966,7 +970,7 @@ fn every_canonical_coupon_variant_dispatches_to_the_builder() {
     for (name, coupon_program) in programs {
         let spec = canonical_build_spec(coupon_program, Vec::new());
         let schedule =
-            finstack_quant_cashflows::build_cashflow_schedule_json(&spec.to_string(), None)
+            finstack_quant_cashflows::build_cashflow_schedule_json(&spec.to_string(), None, None)
                 .unwrap_or_else(|err| panic!("build {name}: {err}"));
         let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
             serde_json::from_str(&schedule).unwrap_or_else(|err| panic!("parse {name}: {err}"));
@@ -989,8 +993,9 @@ fn canonical_payment_window_dispatches_and_overlap_errors() {
             "split": "pik"
         })],
     );
-    let schedule = finstack_quant_cashflows::build_cashflow_schedule_json(&valid.to_string(), None)
-        .expect("payment window builds");
+    let schedule =
+        finstack_quant_cashflows::build_cashflow_schedule_json(&valid.to_string(), None, None)
+            .expect("payment window builds");
     assert!(schedule.contains("\"kind\":\"pik\""));
 
     let overlapping = canonical_build_spec(
@@ -1010,9 +1015,12 @@ fn canonical_payment_window_dispatches_and_overlap_errors() {
             }),
         ],
     );
-    let error =
-        finstack_quant_cashflows::build_cashflow_schedule_json(&overlapping.to_string(), None)
-            .expect_err("overlapping payment windows fail");
+    let error = finstack_quant_cashflows::build_cashflow_schedule_json(
+        &overlapping.to_string(),
+        None,
+        None,
+    )
+    .expect_err("overlapping payment windows fail");
     assert!(error.to_string().contains("overlapping payment windows"));
 }
 

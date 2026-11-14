@@ -29,13 +29,8 @@ fn psa_smm_golden_values() {
 
     let model = PrepaymentModelSpec::psa(1.0);
 
-    // Month 0: 0% CPR → 0% SMM
-    let smm_0 = model.smm(0).unwrap();
-    assert!(
-        smm_0.abs() < RATE_TOLERANCE,
-        "PSA at month 0 should be 0% SMM, got {}",
-        smm_0
-    );
+    // Month 0 is rejected (seasoning_months must be >= 1)
+    assert!(model.smm(0).is_err());
 
     // Month 15: 3% CPR (halfway through ramp) → ~0.2536% SMM
     let smm_15 = model.smm(15).unwrap();
@@ -88,13 +83,8 @@ fn sda_mdr_golden_values() {
 
     let model = DefaultModelSpec::sda(1.0);
 
-    // Month 0: 0% CDR
-    let mdr_0 = model.mdr(0).unwrap();
-    assert!(
-        mdr_0.abs() < RATE_TOLERANCE,
-        "SDA at month 0 should be 0% MDR, got {}",
-        mdr_0
-    );
+    // Month 0 is rejected (seasoning_months must be >= 1)
+    assert!(model.mdr(0).is_err());
 
     // Month 15: 0.30% CDR (halfway to peak)
     let mdr_15 = model.mdr(15).unwrap();
@@ -450,17 +440,16 @@ fn cmbs_lockout_boundary_months() {
 // Over-Unity Multiplier Validation Tests
 
 #[test]
-fn psa_over_unity_multiplier_gives_descriptive_error() {
-    // 6% terminal CPR * 20x multiplier = 120% CPR > 100% — should produce a
-    // descriptive Validation error, not an opaque InputError.
+fn psa_over_unity_multiplier_caps_cpr_at_unit() {
+    // 6% terminal CPR * 20x multiplier caps at 100% CPR (1.0), giving 100% SMM.
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
     let spec = PrepaymentModelSpec::psa(20.0);
-    let err = spec.smm(30).expect_err("CPR above 1.0 should be rejected");
-    let msg = err.to_string();
+    spec.validate().expect("high PSA multiplier is valid");
+    let smm = spec.smm(30).expect("high PSA caps CPR at 1.0");
     assert!(
-        msg.contains("CPR") && msg.contains("exceeds 1.0"),
-        "error should describe the over-unity CPR, got: {msg}"
+        (smm - 1.0).abs() < 1e-12,
+        "expected capped SMM 1.0, got {smm}"
     );
 }
 
@@ -700,7 +689,7 @@ mod property_tests {
     proptest! {
         /// Property: PSA SMM is always non-negative for any month and multiplier >= 0
         #[test]
-        fn psa_smm_non_negative(month in 0u32..500, multiplier in 0.0f64..10.0) {
+        fn psa_smm_non_negative(month in 1u32..500, multiplier in 0.0f64..10.0) {
             use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
             let model = PrepaymentModelSpec::psa(multiplier);
@@ -713,9 +702,9 @@ mod property_tests {
             );
         }
 
-        /// Property: PSA SMM is monotonically non-decreasing in month during ramp (0-30)
+        /// Property: PSA SMM is monotonically non-decreasing in month during ramp (1-30)
         #[test]
-        fn psa_smm_monotonic_during_ramp(month1 in 0u32..30, month2 in 0u32..30) {
+        fn psa_smm_monotonic_during_ramp(month1 in 1u32..=30, month2 in 1u32..=30) {
             use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
             let model = PrepaymentModelSpec::psa(1.0);
@@ -798,7 +787,7 @@ mod property_tests {
 
         /// Property: SDA MDR is always non-negative
         #[test]
-        fn sda_mdr_non_negative(month in 0u32..500, multiplier in 0.0f64..10.0) {
+        fn sda_mdr_non_negative(month in 1u32..500, multiplier in 0.0f64..10.0) {
             use finstack_quant_cashflows::builder::DefaultModelSpec;
 
             let model = DefaultModelSpec::sda(multiplier);
@@ -830,7 +819,7 @@ mod property_tests {
 
         /// Property: Zero PSA multiplier gives zero SMM
         #[test]
-        fn psa_zero_multiplier_gives_zero(month in 0u32..500) {
+        fn psa_zero_multiplier_gives_zero(month in 1u32..500) {
             use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
             let model = PrepaymentModelSpec::psa(0.0);

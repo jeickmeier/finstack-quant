@@ -270,9 +270,13 @@ pub(super) fn queries(schedule: &CashFlowSchedule, cfg: &AccrualConfig, dates: &
         .iter()
         .enumerate()
         .map(|(ordinal, &date)| {
-            let value = index.accrued_at(date).expect("consumer accrued query");
-            let direct =
-                accrued_interest_amount(schedule, date, cfg).expect("direct accrued query");
+            let value = index
+                .accrued_at(date)
+                .expect("consumer accrued query")
+                .amount();
+            let direct = accrued_interest_amount(schedule, date, cfg)
+                .expect("direct accrued query")
+                .amount();
             let expected = expected_linear(schedule, date, cfg.include_pik);
             close(value, expected, AI_BOUND_USD);
             assert_eq!(

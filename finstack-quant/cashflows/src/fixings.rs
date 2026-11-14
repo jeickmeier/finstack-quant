@@ -94,14 +94,13 @@ pub fn materialize_fixings<'a>(
                         fixing.series_id, fixing.date
                     )));
                 }
-                if let Some(previous) = *entry {
-                    let tolerance = 1e-12 * value.abs().max(previous.abs()).max(1.0);
-                    if (previous - value).abs() > tolerance {
-                        return Err(Error::Validation(format!(
-                            "conflicting pre-roll projections for '{}' on {}: {} and {}",
-                            fixing.series_id, fixing.date, previous, value
-                        )));
-                    }
+                if let Some(previous) = *entry
+                    && !previous.total_cmp(&value).is_eq()
+                {
+                    return Err(Error::Validation(format!(
+                        "conflicting pre-roll projections for '{}' on {}: {} and {}",
+                        fixing.series_id, fixing.date, previous, value
+                    )));
                 }
                 *entry = Some(value);
             }

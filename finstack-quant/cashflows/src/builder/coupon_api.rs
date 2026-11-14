@@ -365,7 +365,7 @@ impl CashFlowBuilder {
     /// # Notes
     ///
     /// - Each split applies up to (not including) its date; periods after the
-    ///   last step default to `Cash`
+    ///   last step inherit the base coupon's payment type
     /// - Steps must be ordered by end date
     /// - Works with both fixed and floating coupons
     /// - Step dates cut the coupon horizon, so an off-cycle date moves the
@@ -377,12 +377,9 @@ impl CashFlowBuilder {
         let Some(windows) = self.step_windows("payment_split_program", &dates) else {
             return self;
         };
-        // Each step's split runs up to its date; Cash covers the rest.
-        let splits = steps
-            .iter()
-            .map(|&(_, split)| split)
-            .chain(std::iter::once(CouponType::Cash));
-        for (window, split) in windows.into_iter().zip(splits) {
+        // Each step's split runs up to its date; uncovered trailing windows
+        // inherit the base coupon's `coupon_type`.
+        for (window, &(_, split)) in windows.into_iter().zip(steps.iter()) {
             let _ = self.push_payment_program(window, split);
         }
         self

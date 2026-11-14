@@ -227,7 +227,8 @@ pub(crate) fn bond_model_schedule(bond: &Bond, as_of: Date) -> Result<BondModelS
         &schedule,
         as_of,
         &bond.accrual_config(),
-    )?;
+    )?
+    .amount();
     Ok(BondModelSchedule {
         horizon,
         maturity_years,

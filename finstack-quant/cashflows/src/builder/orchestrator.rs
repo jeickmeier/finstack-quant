@@ -36,8 +36,6 @@ pub(super) struct BuildState {
     /// (e.g., 600+ period amortizers). Converted to f64 only at API boundaries
     /// when passing to emission functions that operate in f64 space.
     pub(super) outstanding: Decimal,
-    /// Equal installment fixed from the live balance at a LinearBetween start.
-    pub(super) linear_between_installment: Option<Decimal>,
 }
 
 #[derive(Debug)]
@@ -63,33 +61,34 @@ pub(super) enum PreparedAmortization {
         fraction: Decimal,
     },
     LinearBetween {
-        start: Date,
-        end: Date,
-        count: usize,
+        boundaries: Vec<Date>,
     },
     CustomPrincipal(finstack_quant_core::FxHashMap<Date, Money>),
 }
 
 /// Apply an event's cash leg and checked economic balance movement.
+///
+/// The caller enforces non-negativity once all events sharing a date are
+/// applied so same-day draws and repayments net atomically.
 pub(super) fn apply_principal_event(
     event: &PrincipalEventSpec,
     outstanding: &mut Decimal,
     flows: &mut Vec<CashFlow>,
 ) -> finstack_quant_core::Result<()> {
     let cash = event.resolved_cash();
-    if event.delta.amount() == 0.0 && cash.amount() == 0.0 {
+    if event.delta.amount_decimal() == Decimal::ZERO && cash.amount_decimal() == Decimal::ZERO {
         return Ok(());
     }
     let flow_amount = if event.kind == CFKind::Amortization {
-        cash.amount()
+        cash.amount_decimal()
     } else {
-        -cash.amount()
+        -cash.amount_decimal()
     };
     flows.push(
         CashFlowParams::new(
             event.payment_date,
             None,
-            Money::new(flow_amount, cash.currency())?,
+            Money::from_decimal(flow_amount, cash.currency()),
             event.kind,
             0.0,
             None,
@@ -99,18 +98,12 @@ pub(super) fn apply_principal_event(
         .build()?,
     );
     *outstanding = outstanding
-        .checked_add(f64_to_decimal(event.delta.amount())?)
+        .checked_add(event.delta.amount_decimal())
         .ok_or_else(|| {
             finstack_quant_core::Error::Validation(
                 "outstanding principal exceeds the supported decimal range".into(),
             )
         })?;
-    if *outstanding < Decimal::ZERO {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "principal event on {} would make outstanding balance negative ({outstanding})",
-            event.date
-        )));
-    }
     Ok(())
 }
 
@@ -203,19 +196,29 @@ fn derive_amortization_setup(
             PreparedAmortization::CustomPrincipal(map)
         }
         AmortizationSpec::LinearTo { final_notional } => {
-            let initial = f64_to_decimal(notional.initial.amount())?;
-            let final_notional = f64_to_decimal(final_notional.amount())?;
-            let installment = ((initial - final_notional)
-                / Decimal::from(payment_dates.len() as u64))
-            .max(Decimal::ZERO);
+            if final_notional.currency() != notional.initial.currency() {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: notional.initial.currency(),
+                    actual: final_notional.currency(),
+                });
+            }
+            let initial = notional.initial.amount_decimal();
+            let final_notional = final_notional.amount_decimal();
+            if final_notional < Decimal::ZERO || final_notional > initial {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "LinearTo final_notional {final_notional} must satisfy 0 <= final_notional <= initial ({initial})"
+                )));
+            }
+            let installment =
+                (initial - final_notional) / Decimal::from(payment_dates.len() as u64);
             PreparedAmortization::LinearTo {
                 installment,
                 final_notional,
             }
         }
         AmortizationSpec::PercentOfOriginalPerPeriod { pct } => {
-            let installment = (f64_to_decimal(notional.initial.amount())? * f64_to_decimal(*pct)?)
-                .max(Decimal::ZERO);
+            let installment =
+                (notional.initial.amount_decimal() * f64_to_decimal(*pct)?).max(Decimal::ZERO);
             PreparedAmortization::OriginalPercent { installment }
         }
         AmortizationSpec::PercentOfRemainingPerPeriod { pct } => {
@@ -229,20 +232,18 @@ fn derive_amortization_setup(
                     "LinearBetween end {end} must be a coupon accrual boundary"
                 )));
             }
-            let count = payment_dates
+            let mut boundaries: Vec<Date> = payment_dates
                 .keys()
-                .filter(|date| **date > *start && **date <= *end)
-                .count();
-            if count == 0 {
+                .copied()
+                .filter(|date| *date > *start && *date <= *end)
+                .collect();
+            boundaries.sort_unstable();
+            if boundaries.is_empty() {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "LinearBetween window ({start}, {end}] contains no coupon accrual boundary"
                 )));
             }
-            PreparedAmortization::LinearBetween {
-                start: *start,
-                end: *end,
-                count,
-            }
+            PreparedAmortization::LinearBetween { boundaries }
         }
     };
 
@@ -286,7 +287,7 @@ pub(super) fn initialize_build_state(
         );
     }
 
-    let mut outstanding = f64_to_decimal(notional.initial.amount())?;
+    let mut outstanding = notional.initial.amount_decimal();
     // Preserve the opening balance and every pre-issue movement over the
     // actual accrual interval.
     let history_start = principal_events
@@ -297,14 +298,33 @@ pub(super) fn initialize_build_state(
     let mut outstanding_history = Vec::with_capacity(estimated_dates);
     outstanding_history.push((history_start, outstanding));
 
+    let mut prev_date: Option<Date> = None;
     for ev in principal_events.iter().filter(|ev| ev.date <= issue) {
-        if ev.delta.amount() != 0.0 || ev.resolved_cash().amount() != 0.0 {
+        if let Some(prev) = prev_date
+            && ev.date != prev
+            && outstanding < Decimal::ZERO
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "principal event on {prev} would make outstanding balance negative ({outstanding})"
+            )));
+        }
+        if ev.delta.amount_decimal() != Decimal::ZERO
+            || ev.resolved_cash().amount_decimal() != Decimal::ZERO
+        {
             apply_principal_event(ev, &mut outstanding, &mut flows)?;
             match outstanding_history.last_mut() {
                 Some((last_date, balance)) if *last_date == ev.date => *balance = outstanding,
                 _ => outstanding_history.push((ev.date, outstanding)),
             }
         }
+        prev_date = Some(ev.date);
+    }
+    if let Some(prev) = prev_date
+        && outstanding < Decimal::ZERO
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "principal event on {prev} would make outstanding balance negative ({outstanding})"
+        )));
     }
 
     if outstanding_history
@@ -319,7 +339,6 @@ pub(super) fn initialize_build_state(
         flows,
         outstanding_history,
         outstanding,
-        linear_between_installment: None,
     })
 }
 
@@ -488,6 +507,14 @@ impl CashFlowBuilder {
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         self.compile_plan()?.project(Some(curves), Some(as_of))
+    }
+
+    pub(crate) fn build_with_cutoff(
+        &self,
+        curves: Option<&finstack_quant_core::market_data::context::MarketContext>,
+        observation_date: Option<Date>,
+    ) -> finstack_quant_core::Result<CashFlowSchedule> {
+        self.compile_plan()?.project(curves, observation_date)
     }
 
     fn compile_plan(&self) -> finstack_quant_core::Result<CompiledCashFlowPlan> {

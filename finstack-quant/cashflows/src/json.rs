@@ -54,6 +54,13 @@ pub struct CashflowScheduleBuildSpec {
         skip_serializing_if = "PrincipalExchange::is_initial_and_final"
     )]
     pub principal_exchange: PrincipalExchange,
+    /// Optional valuation cutoff date separating realized fixings from forward projections.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
+    pub as_of: Option<Date>,
 }
 
 /// One canonical coupon-program instruction.
@@ -288,6 +295,49 @@ impl CashflowScheduleBuildSpec {
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     pub fn build(&self, market: Option<&MarketContext>) -> Result<CashFlowSchedule> {
+        self.build_as_of(market, None)
+    }
+
+    /// Build a [`CashFlowSchedule`] from this specification with an optional
+    /// valuation cutoff date.
+    ///
+    /// Resolves `as_of.or(self.as_of)` to separate realized historical fixings
+    /// from forward projections.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Optional market context providing forward curves and
+    ///   `FIXING:{forward_curve_id}` series for floating coupons.
+    /// * `as_of` - Optional cutoff date overriding `self.as_of`. Resets before
+    ///   the effective cutoff require historical fixings; on the cutoff
+    ///   published fixings take precedence over projection.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when an effective cutoff is supplied without
+    /// `market` for a floating-rate schedule, or when schedule compilation or
+    /// projection fails.
+    pub fn build_as_of(
+        &self,
+        market: Option<&MarketContext>,
+        as_of: Option<Date>,
+    ) -> Result<CashFlowSchedule> {
+        let cutoff = as_of.or(self.as_of);
+        let has_floating_leg = self.coupon_program.iter().any(|leg| {
+            matches!(
+                leg,
+                CouponLegSpec::Floating { .. }
+                    | CouponLegSpec::FloatingWindow { .. }
+                    | CouponLegSpec::FixedToFloat { .. }
+                    | CouponLegSpec::FloatingMarginProgram { .. }
+            )
+        });
+        if cutoff.is_some() && market.is_none() && has_floating_leg {
+            return Err(Error::Validation(
+                "as_of cutoff requires a MarketContext when building a floating-rate schedule"
+                    .into(),
+            ));
+        }
         let mut builder = CashFlowSchedule::builder();
         let _ = builder
             .principal(self.notional.initial, self.issue_date, self.maturity)
@@ -351,7 +401,7 @@ impl CashflowScheduleBuildSpec {
             );
         }
 
-        builder.build(market)
+        builder.build_with_cutoff(market, cutoff)
     }
 }
 
@@ -366,9 +416,12 @@ impl CashflowScheduleBuildSpec {
 /// # Arguments
 ///
 /// * `spec_json` - JSON-encoded [`CashflowScheduleBuildSpec`]. Optional
-///   `principal_exchange` is `"none"` or `"initial_and_final"` (default).
+///   `principal_exchange` is `"none"` or `"initial_and_final"` (default), and
+///   optional `as_of` sets the default observation cutoff date.
 /// * `market_json` - Optional JSON-encoded [`MarketContext`] used for floating
-///   coupon projection.
+///   coupon projection and historical fixing lookups.
+/// * `as_of` - Optional observation cutoff overriding `spec.as_of`; dates
+///   before it require realized fixings and dates after it project forwards.
 ///
 /// # Returns
 ///
@@ -407,17 +460,21 @@ impl CashflowScheduleBuildSpec {
 ///   }]
 /// }"#;
 ///
-/// let schedule_json = build_cashflow_schedule_json(spec_json, None)?;
+/// let schedule_json = build_cashflow_schedule_json(spec_json, None, None)?;
 /// assert!(schedule_json.contains("\"flows\""));
 /// assert!(schedule_json.contains("\"issue_date\":\"2024-08-31\""));
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
-pub fn build_cashflow_schedule_json(spec_json: &str, market_json: Option<&str>) -> Result<String> {
+pub fn build_cashflow_schedule_json(
+    spec_json: &str,
+    market_json: Option<&str>,
+    as_of: Option<Date>,
+) -> Result<String> {
     let spec: CashflowScheduleBuildSpec = serde_json::from_str(spec_json).map_err(|err| {
         Error::Validation(format!("invalid cashflow schedule build spec JSON: {err}"))
     })?;
     let market = parse_optional_market(market_json)?;
-    let schedule = spec.build(market.as_ref())?;
+    let schedule = spec.build_as_of(market.as_ref(), as_of)?;
     serialize_json(&schedule, "cashflow schedule")
 }
 
@@ -463,7 +520,7 @@ pub fn build_cashflow_schedule_json(spec_json: &str, market_json: Option<&str>) 
 ///   "coupon_program": []
 /// }"#;
 ///
-/// let schedule_json = build_cashflow_schedule_json(spec_json, None)?;
+/// let schedule_json = build_cashflow_schedule_json(spec_json, None, None)?;
 /// let canonical = validate_cashflow_schedule_json(&schedule_json)?;
 /// assert_eq!(serde_json::from_str::<serde_json::Value>(&canonical).unwrap()["meta"]["issue_date"], "2024-08-31");
 /// # Ok::<(), finstack_quant_core::Error>(())
@@ -509,7 +566,7 @@ pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String> {
 ///   "coupon_program": []
 /// }"#;
 ///
-/// let schedule_json = build_cashflow_schedule_json(spec_json, None)?;
+/// let schedule_json = build_cashflow_schedule_json(spec_json, None, None)?;
 /// let flows_json = dated_flows_json(&schedule_json)?;
 /// let flows: Vec<serde_json::Value> = serde_json::from_str(&flows_json).unwrap();
 /// assert!(!flows.is_empty());

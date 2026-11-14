@@ -639,8 +639,9 @@ mod tests {
     #[test]
     fn sda_curve_golden_values() {
         let spec = finstack_quant_cashflows::builder::DefaultModelSpec::sda(1.0);
+        assert!(spec.mdr(0).is_err());
         for (month, expected) in [
-            (0, 0.0),
+            (1, 0.0002),
             (15, 0.003),
             (30, 0.006),
             (45, 0.006),

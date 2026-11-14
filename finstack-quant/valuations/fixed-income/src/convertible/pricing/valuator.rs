@@ -223,7 +223,7 @@ impl ConvertibleBondValuator {
                         .take(end_step + 1)
                         .skip(start_step)
                     {
-                        let accrued = accrual.accrued_at(exercise_date)?;
+                        let accrued = accrual.accrued_at(exercise_date)?.amount();
                         let floor_price = principal_by_step[s] * call.price_pct_of_par / 100.0;
                         let call_price = if let Some((curve, spread)) = &reference_curve {
                             let mut pv_remaining = 0.0;
@@ -283,7 +283,7 @@ impl ConvertibleBondValuator {
                         .skip(start_step)
                     {
                         let dirty_put_price = principal_by_step[s] * put.price_pct_of_par / 100.0
-                            + accrual.accrued_at(exercise_date)?;
+                            + accrual.accrued_at(exercise_date)?.amount();
                         put_map
                             .entry(s)
                             .and_modify(|p| *p = p.max(dirty_put_price))

@@ -113,9 +113,13 @@ fn success_record(
     let mut total = 0.0;
     let mut reference_total = 0.0;
     for (order, &(as_of, expected)) in queries.iter().enumerate() {
-        let direct =
-            accrued_interest_amount(schedule, as_of, config).expect("direct semantic accrual");
-        let indexed = index.accrued_at(as_of).expect("indexed semantic accrual");
+        let direct = accrued_interest_amount(schedule, as_of, config)
+            .expect("direct semantic accrual")
+            .amount();
+        let indexed = index
+            .accrued_at(as_of)
+            .expect("indexed semantic accrual")
+            .amount();
         assert_eq!(
             direct.to_bits(),
             indexed.to_bits(),
@@ -386,7 +390,8 @@ fn ex_coupon_records() -> Vec<Value> {
             &lagged,
             &ex,
             &[
-                (date("2025-06-26"), 100_000.0 * 176.0 / 360.0),
+                (date("2025-06-25"), 100_000.0 * 175.0 / 360.0),
+                (date("2025-06-26"), -100_000.0 * 5.0 / 360.0),
                 (date("2025-06-27"), -100_000.0 * 4.0 / 360.0),
                 (date("2025-07-02"), 0.0),
                 (date("2025-07-03"), 0.0),
@@ -765,8 +770,9 @@ fn scalar_capture(case: fixture::Case) -> Value {
         let actual = if case.rebuild {
             accrued_interest_amount(&fixture.schedule, date, &fixture.config)
                 .expect("direct capture")
+                .amount()
         } else {
-            index.accrued_at(date).expect("indexed capture")
+            index.accrued_at(date).expect("indexed capture").amount()
         };
         fixture::close(actual, expected, fixture::SCALAR_BOUND);
         total += actual;

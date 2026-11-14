@@ -135,7 +135,8 @@ fn ex_coupon_rebates_all_principal_segments_of_the_forfeited_payment() {
             close(
                 index
                     .accrued_at(date(as_of))
-                    .expect("valid ex-coupon rebate"),
+                    .expect("valid ex-coupon rebate")
+                    .amount(),
                 expected,
             );
             close(
@@ -144,7 +145,8 @@ fn ex_coupon_rebates_all_principal_segments_of_the_forfeited_payment() {
                     date(as_of),
                     &config,
                 )
-                .expect("direct segmented rebate"),
+                .expect("direct segmented rebate")
+                .amount(),
                 expected,
             );
         }
@@ -175,7 +177,8 @@ fn ex_coupon_future_segment_keeps_the_zero_balance_prefix_in_its_window() {
             date("2025-06-25"),
             &config,
         )
-        .expect("future coupon was forfeited despite the zero-balance prefix"),
+        .expect("future coupon was forfeited despite the zero-balance prefix")
+        .amount(),
         -0.1,
     );
 }
@@ -194,7 +197,8 @@ fn schedule_act365l_accrual_preserves_the_contractual_leap_denominator() {
             date("2023-04-01"),
             &finstack_quant_cashflows::accrual::AccrualConfig::default(),
         )
-        .expect("elapsed accrual before the contractual leap day"),
+        .expect("elapsed accrual before the contractual leap day")
+        .amount(),
         100.0 * 0.12 * 31.0 / 366.0,
     );
 }

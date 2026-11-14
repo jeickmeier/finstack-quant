@@ -1,11 +1,11 @@
 //! Python bindings for `finstack_quant_cashflows::accrual`.
 
+use crate::bindings::core::currency::PyCurrency;
 use crate::bindings::pydoc::pydoc;
 use finstack_quant_cashflows::accrual::{
     AccrualConfig, AccrualIndex, AccrualMethod, ExCouponRule,
     accrued_interest_amount as rust_accrued_interest_amount,
 };
-use finstack_quant_core::money::Money;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
 
@@ -165,7 +165,7 @@ impl PyAccrualConfig {
         // `include_pik`'s runtime default tracks `AccrualConfig::default()`;
         // the static text_signature literal must be kept in sync by hand.
         signature = (method=None, ex_coupon=None, include_pik=AccrualConfig::default().include_pik, frequency=None),
-        text_signature = "(method=None, ex_coupon=None, include_pik=True, frequency=None)"
+        text_signature = "(method=None, ex_coupon=None, include_pik=False, frequency=None)"
     )]
     fn new(
         method: Option<PyRef<'_, PyAccrualMethod>>,
@@ -237,8 +237,6 @@ wire_methods!(
 pub struct PyAccrualIndex {
     /// Inner prebuilt accrual state.
     pub(crate) inner: AccrualIndex,
-    /// Currency of the indexed schedule (for repr and Money results).
-    currency: finstack_quant_core::currency::Currency,
 }
 
 #[pymethods]
@@ -256,11 +254,16 @@ impl PyAccrualIndex {
         config: Option<PyRef<'_, PyAccrualConfig>>,
     ) -> PyResult<Self> {
         let schedule = schedule.inner.clone();
-        let currency = schedule.get_notional().currency();
         let cfg = config.map_or_else(AccrualConfig::default, |c| c.inner.clone());
         py.detach(move || AccrualIndex::build(&schedule, &cfg))
-            .map(|inner| Self { inner, currency })
+            .map(|inner| Self { inner })
             .map_err(core_to_py)
+    }
+
+    #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualIndex.get_currency")]
+    #[pyo3(text_signature = "(self)")]
+    fn get_currency(&self) -> PyCurrency {
+        PyCurrency::from_inner(self.inner.get_currency())
     }
 
     #[doc = pydoc!("finstack_quant.cashflows.accrual", "AccrualIndex.accrued_at")]
@@ -268,14 +271,13 @@ impl PyAccrualIndex {
     fn accrued_at(&self, as_of: &Bound<'_, PyAny>) -> PyResult<PyMoney> {
         self.inner
             .accrued_at(py_to_date(as_of)?)
-            .and_then(|amount| Money::new(amount, self.currency))
             .map(PyMoney::from_inner)
             .map_err(core_to_py)
     }
 
     /// Python-style summary.
     fn __repr__(&self) -> String {
-        format!("AccrualIndex(currency='{}')", self.currency)
+        format!("AccrualIndex(currency='{}')", self.inner.get_currency())
     }
 }
 
@@ -293,10 +295,8 @@ fn accrued_interest_amount(
 ) -> PyResult<PyMoney> {
     let as_of = py_to_date(as_of)?;
     let schedule = schedule.inner.clone();
-    let currency = schedule.get_notional().currency();
     let cfg = config.map_or_else(AccrualConfig::default, |c| c.inner.clone());
     py.detach(move || rust_accrued_interest_amount(&schedule, as_of, &cfg))
-        .and_then(|amount| Money::new(amount, currency))
         .map(PyMoney::from_inner)
         .map_err(core_to_py)
 }

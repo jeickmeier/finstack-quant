@@ -48,12 +48,12 @@ pub(super) fn period_averaged_monthly_rate(
 ) -> Result<f64> {
     let k = months_per_period.round();
     if k <= 1.0 || (months_per_period - k).abs() > 1e-9 {
-        return rate_at(seasoning_end);
+        return rate_at(seasoning_end.max(1));
     }
     let k = k as u32;
     let mut survival = 1.0_f64;
     for m in 0..k {
-        let seasoning = seasoning_end.saturating_sub(k - 1 - m);
+        let seasoning = seasoning_end.saturating_sub(k - 1 - m).max(1);
         survival *= 1.0 - rate_at(seasoning)?.clamp(0.0, 1.0);
     }
     Ok(1.0 - survival.max(0.0).powf(1.0 / f64::from(k)))
@@ -259,7 +259,7 @@ impl PoolFlowSource for DeterministicPoolFlowSource {
                     .instrument
                     .credit_model
                     .recovery_spec
-                    .recovery_rate(request.seasoning_months),
+                    .recovery_rate(request.seasoning_months.max(1))?,
             },
             asset_rates: base.asset,
             copula_outcome: None,
@@ -376,7 +376,7 @@ impl OasPathFlowSource {
                 .instrument
                 .credit_model
                 .recovery_spec
-                .recovery_rate(request.seasoning_months),
+                .recovery_rate(request.seasoning_months.max(1))?,
         );
         shock.systematic_z = self.credit_z.unwrap_or(0.0);
         let asset = base

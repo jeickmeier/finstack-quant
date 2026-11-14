@@ -105,7 +105,10 @@ impl MetricCalculator for CprCalculator {
         let deal = context
             .instrument_as::<StructuredCredit>()?
             .resolved_for_pricing()?;
-        let age = deal.pool.seasoning_months(context.as_of, deal.closing_date);
+        let age = deal
+            .pool
+            .seasoning_months(context.as_of, deal.closing_date)
+            .max(1);
         finstack_quant_cashflows::builder::monthly_to_annual(
             deal.credit_model.prepayment_spec.smm(age)?,
         )
@@ -135,7 +138,10 @@ impl MetricCalculator for CdrCalculator {
         let deal = context
             .instrument_as::<StructuredCredit>()?
             .resolved_for_pricing()?;
-        let age = deal.pool.seasoning_months(context.as_of, deal.closing_date);
+        let age = deal
+            .pool
+            .seasoning_months(context.as_of, deal.closing_date)
+            .max(1);
         finstack_quant_cashflows::builder::monthly_to_annual(
             deal.credit_model.default_spec.mdr(age)?,
         )

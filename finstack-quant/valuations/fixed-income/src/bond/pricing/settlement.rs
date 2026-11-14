@@ -84,7 +84,8 @@ impl QuoteDateContext {
             &schedule,
             quote_date,
             &bond.accrual_config(),
-        )?;
+        )?
+        .amount();
 
         Ok(Self {
             quote_date,
@@ -352,13 +353,14 @@ mod tests {
         });
         let market = MarketContext::new();
 
-        // Trade on the record date: the trade-date view retains the coupon,
-        // but T+1 settlement falls after the record date and forfeits it.
-        let as_of = coupon_date - time::Duration::days(7);
+        // Trade on the last cum-coupon day before the inclusive ex-coupon date:
+        // the trade-date view retains the coupon, while T+1 settlement lands
+        // on `ex_date` (`coupon_date - 7 days`) and forfeits it.
+        let as_of = coupon_date - time::Duration::days(8);
         let quote_ctx = QuoteDateContext::new(&bond, &market, as_of).expect("quote ctx");
         assert!(
-            quote_ctx.quote_date > coupon_date - time::Duration::days(7),
-            "settlement must be inside the ex-window for this scenario"
+            quote_ctx.quote_date >= coupon_date - time::Duration::days(7),
+            "settlement must be on or after the inclusive ex-date for this scenario"
         );
 
         let entitled = quote_ctx

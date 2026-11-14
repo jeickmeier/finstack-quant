@@ -609,7 +609,9 @@ def test_curve_shape_constructors_match_their_rust_shapes() -> None:
         PrepaymentModelSpec.abs(1.5).validate()
     recovery = RecoveryModelSpec(0.4, 12).with_severity_vector([0.5, 0.7])
     assert recovery.severity_vector == [0.5, 0.7]
-    assert recovery.recovery_rate(0) == 0.5
+    with pytest.raises(ValueError, match="seasoning_months"):
+        recovery.recovery_rate(0)
+    assert recovery.recovery_rate(1) == 0.5
     assert recovery.recovery_rate(5) == pytest.approx(0.3)
     assert RecoveryModelSpec(0.4, 12).recovery_rate(5) == 0.4
 

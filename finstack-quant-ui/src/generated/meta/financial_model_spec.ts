@@ -3316,7 +3316,7 @@ export default [
   {
     "path": "#/$defs/d_4a383f6cb9efb2814065/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RateSpec/oneOf/1",
-    "description": "Floating index plus spread, with the canonical floor, cap, gearing and\nreset conventions of [`FloatingRateSpec`](super::FloatingRateSpec).\n\n[`RateSpec::try_rate_for_period`] resolves the fixing calendar, a reset\non the valuation date, `fallback` and `compounding` differently from the\ncashflow builder; see its doc."
+    "description": "Floating index plus spread, with the canonical floor, cap, gearing and\nreset conventions of [`FloatingRateSpec`](super::FloatingRateSpec).\n\n[`RateSpec::try_rate_for_period`] aligns `compounding` (`None` or\n`Simple`), `index_tenor` validation, and `fallback` for missing market\nsources with the cashflow builder; single-period calls still treat\n`reset_date <= as_of` as a required historical fixing and use the\nweekends-only calendar when `fixing_calendar_id` is omitted."
   },
   {
     "path": "#/$defs/d_4a383f6cb9efb2814065/oneOf/1/properties/floating",
@@ -5108,7 +5108,7 @@ export default [
   {
     "path": "#/$defs/d_7af15f20a258d1def9dd/properties/index_tenor",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatingRateSpec/properties/index_tenor",
-    "description": "Expected term-index tenor, checked against the resolved forward curve.\n\nThe named forward curve is already the term index (for example a 3M\nEURIBOR curve) and owns the quoted tenor. Projection is\n`fwd.rate(reset_date)`, not a FRA-style average over\n`[reset, reset + tenor]`. The builder only uses this field to warn at\nbuild time when it disagrees with the resolved curve's tenor by more\nthan 10%; the curve remains authoritative. Ignored for\novernight-compounded legs."
+    "description": "Expected term-index tenor, checked against the resolved forward curve.\n\nThe named forward curve is already the term index (for example a 3M\nEURIBOR curve) and owns the quoted tenor. Projection is\n`fwd.rate(reset_date)`, not a FRA-style average over\n`[reset, reset + tenor]`. The builder and\n[`RateSpec::try_rate_for_period`](crate::builder::RateSpec::try_rate_for_period)\nreject schedules when it disagrees with the resolved curve's tenor by\nmore than 10%; the curve remains authoritative. Ignored for\novernight-compounded legs."
   },
   {
     "path": "#/$defs/d_7af15f20a258d1def9dd/properties/index_tenor/anyOf/0",

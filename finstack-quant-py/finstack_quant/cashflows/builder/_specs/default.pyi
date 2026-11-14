@@ -184,7 +184,7 @@ class DefaultModelSpec:
         Parameters
         ----------
         seasoning_months : int
-            Number of months since origination.
+            Months since origination or pool start (1-indexed, ``>= 1``).
 
         Returns
         -------
@@ -195,8 +195,8 @@ class DefaultModelSpec:
         Raises
         ------
         ValueError
-            If the underlying curve parameters are invalid, such as a
-            negative SDA speed multiplier.
+            If ``seasoning_months`` is ``0`` or the underlying curve parameters
+            are invalid, such as a negative SDA speed multiplier.
         """
         ...
 
@@ -215,7 +215,7 @@ class DefaultModelSpec:
         Parameters
         ----------
         seasoning_months : int
-            Number of months since origination or pool start.
+            Months since origination or pool start (1-indexed, ``>= 1``).
         surviving_balance_fraction : float
             Current pool balance divided by the balance the curve is expressed
             against, as a finite non-negative decimal (may exceed 1.0 after
@@ -230,8 +230,8 @@ class DefaultModelSpec:
         Raises
         ------
         ValueError
-            If ``surviving_balance_fraction`` is negative or non-finite, or the
-            curve parameters are invalid.
+            If ``seasoning_months`` is ``0``, ``surviving_balance_fraction`` is
+            negative or non-finite, or the curve parameters are invalid.
 
         Examples
         --------

@@ -394,7 +394,7 @@
                 "kind": "defaulted_notional",
                 "accrual_factor": 0,
                 "principal_delta": {
-                  "amount": "-78246780.0249779",
+                  "amount": "-78246780.0249778678",
                   "currency": "USD"
                 },
                 "principal_date": "2026-01-02"

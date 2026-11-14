@@ -633,7 +633,7 @@ impl BondValuator {
                     let step = Self::nearest_step(&time_steps, exercise_time);
                     let outstanding = exercise_outstanding(exercise_date);
                     let floor_price = outstanding * (call.price_pct_of_par / 100.0);
-                    let accrued_on_call = accrual_index.accrued_at(exercise_date)?;
+                    let accrued_on_call = accrual_index.accrued_at(exercise_date)?.amount();
                     let clean_call_price = if let (Some(spec), Some(reference_curve)) =
                         (&call.make_whole, &make_whole_reference)
                     {
@@ -686,7 +686,7 @@ impl BondValuator {
                     // Use outstanding principal at exercise step, not original notional
                     let outstanding = exercise_outstanding(exercise_date);
                     let clean_put_price = outstanding * (put.price_pct_of_par / 100.0);
-                    let accrued_on_put = accrual_index.accrued_at(exercise_date)?;
+                    let accrued_on_put = accrual_index.accrued_at(exercise_date)?.amount();
                     let dirty_put_price = clean_put_price + accrued_on_put;
                     put_barriers_by_date
                         .entry(exercise_date)

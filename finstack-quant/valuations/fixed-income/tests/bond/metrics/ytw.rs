@@ -178,8 +178,9 @@ fn test_ytw_off_cycle_call_uses_dirty_street_redemption() {
 
     let all_flows = bond.dated_cashflows(&market, as_of).unwrap();
     let schedule = bond.cashflow_schedule(&market, as_of).unwrap();
-    let accrued_on_call =
-        accrued_interest_amount(&schedule, call_date, &bond.accrual_config()).unwrap();
+    let accrued_on_call = accrued_interest_amount(&schedule, call_date, &bond.accrual_config())
+        .unwrap()
+        .amount();
     let mut call_flows = all_flows
         .iter()
         .copied()

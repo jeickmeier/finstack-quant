@@ -65,10 +65,10 @@ pub enum AccrualMethod {
 /// coupon period even starts.
 const MAX_EX_COUPON_DAYS: u32 = 366;
 
-/// Coupon record-date convention applied to coupon flows.
+/// Ex-coupon rule applied to coupon flows.
 ///
-/// Settlement on the record date retains the coupon. Settlement strictly
-/// after it and before payment trades ex-coupon, as in the UK gilt convention.
+/// Settlement on or after the ex-coupon date and strictly before the coupon
+/// payment date trades ex-coupon, as in the UK gilt convention.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -85,11 +85,11 @@ pub struct ExCouponRule {
 }
 
 impl ExCouponRule {
-    /// Coupon record date for a coupon paid on `payment_date`.
+    /// Ex-coupon date for a coupon paid on `payment_date`.
     ///
-    /// Settlement on this date retains the coupon. Strictly after this date
-    /// and before payment, the seller keeps the coupon and accrued interest
-    /// is the rebate of the remaining accrual period.
+    /// Settlement on or after this date and strictly before payment trades
+    /// ex-coupon, so the seller keeps the coupon and accrued interest is the
+    /// rebate of the remaining accrual period.
     ///
     /// # Errors
     ///
@@ -137,9 +137,9 @@ impl ExCouponRule {
     /// # Arguments
     ///
     /// * `payment_date` - Coupon payment date used to calculate its record date.
-    /// * `settlement_date` - Date on which ownership transfers; the coupon is
-    ///   retained on the record date and forfeited strictly after it until
-    ///   payment, exclusive. Trade dates must first be converted to settlement.
+    /// * `settlement_date` - Date on which ownership transfers; trades ex-coupon
+    ///   when on or after the ex-coupon date and strictly before payment.
+    ///   Trade dates must first be converted to settlement.
     ///
     /// # Errors
     ///
@@ -150,8 +150,8 @@ impl ExCouponRule {
         payment_date: Date,
         settlement_date: Date,
     ) -> finstack_quant_core::Result<bool> {
-        let record_date = self.ex_date(payment_date)?;
-        Ok(record_date < settlement_date && settlement_date < payment_date)
+        let ex_date = self.ex_date(payment_date)?;
+        Ok(ex_date <= settlement_date && settlement_date < payment_date)
     }
 }
 
@@ -180,7 +180,7 @@ impl Default for AccrualConfig {
         Self {
             method: AccrualMethod::Linear,
             ex_coupon: None,
-            include_pik: true,
+            include_pik: false,
             frequency: None,
         }
     }
@@ -188,10 +188,9 @@ impl Default for AccrualConfig {
 
 /// Compute accrued interest as a scalar amount from a cashflow schedule.
 ///
-/// The returned `f64` is expressed in the same currency space as the schedule's
-/// coupon and notional amounts. Callers that need the currency can recover it
-/// from `schedule.notional.initial.currency()` or by inspecting the underlying
-/// schedule flows.
+/// Returns [`Money`] in the homogeneous currency of the selected coupon flows
+/// (falling back to `schedule.notional.initial.currency()` when no selected
+/// coupon flows exist).
 ///
 /// # Arguments
 ///
@@ -203,9 +202,9 @@ impl Default for AccrualConfig {
 ///
 /// # Returns
 ///
-/// Scalar accrued interest amount in the schedule's currency space. Returns
-/// `0.0` when the schedule has no coupon periods or the `as_of` date is
-/// outside all accrual-start-to-payment windows. When `as_of` falls inside an active
+/// Accrued interest as [`Money`] in the schedule's coupon currency. Returns zero
+/// when the schedule has no coupon periods or the `as_of` date is outside all
+/// accrual-start-to-payment windows. When `as_of` falls inside an active
 /// ex-coupon window the accrued interest is **negative** (the seller keeps
 /// the coupon; the buyer is compensated for the remaining stub).
 ///
@@ -214,6 +213,8 @@ impl Default for AccrualConfig {
 /// Returns an error if:
 ///
 /// - the schedule's outstanding-balance path cannot be constructed
+/// - selected coupon flows mix currencies or a PIK flow's principal delta
+///   disagrees in currency with the flow amount
 /// - a required day-count calculation fails
 /// - an ex-coupon calendar ID is configured but cannot be resolved
 /// - compounded accrual has a non-finite period rate or a rate at or below `-1`
@@ -225,11 +226,12 @@ impl Default for AccrualConfig {
 /// use finstack_quant_cashflows::builder::CashFlowSchedule;
 /// use finstack_quant_cashflows::accrual::{accrued_interest_amount, AccrualConfig, AccrualMethod};
 /// use finstack_quant_core::dates::Date;
+/// use finstack_quant_core::money::Money;
 ///
 /// fn accrued_as_of(
 ///     schedule: &CashFlowSchedule,
 ///     as_of: Date,
-/// ) -> finstack_quant_core::Result<f64> {
+/// ) -> finstack_quant_core::Result<Money> {
 ///     accrued_interest_amount(
 ///         schedule,
 ///         as_of,
@@ -244,7 +246,7 @@ pub fn accrued_interest_amount(
     schedule: &CashFlowSchedule,
     as_of: Date,
     cfg: &AccrualConfig,
-) -> finstack_quant_core::Result<f64> {
+) -> finstack_quant_core::Result<Money> {
     AccrualIndex::build(schedule, cfg)?.accrued_at(as_of)
 }
 
@@ -259,6 +261,8 @@ pub struct AccrualIndex {
     period_inputs: Vec<PeriodInputs>,
     /// Monotone suffix minima of whole-coupon starts, in period input order.
     suffix_min_coupon_start: Vec<Date>,
+    /// Currency of the indexed coupon flows (or schedule notional when empty).
+    currency: finstack_quant_core::currency::Currency,
     /// Configuration captured at build time; every query reuses it.
     cfg: AccrualConfig,
 }
@@ -276,24 +280,39 @@ impl AccrualIndex {
     /// # Errors
     ///
     /// Returns an error if the schedule fails validation, mixes currencies
-    /// across coupon flows, carries a non-finite accrual factor, or if the
-    /// outstanding-balance path or a day-count calculation fails.
+    /// across selected coupon flows, carries a non-finite accrual factor, or if
+    /// the outstanding-balance path or a day-count calculation fails.
     pub fn build(
         schedule: &CashFlowSchedule,
         cfg: &AccrualConfig,
     ) -> finstack_quant_core::Result<Self> {
         schedule.validate()?;
-        let expected_currency = schedule.notional.initial.currency();
+        let mut selected_currency = None;
         for flow in &schedule.flows {
-            if is_coupon_kind(flow.get_kind(), cfg.include_pik)
-                && flow.get_amount().currency() != expected_currency
-            {
-                return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: expected_currency,
-                    actual: flow.get_amount().currency(),
-                });
+            if is_coupon_kind(flow.get_kind(), cfg.include_pik) {
+                let flow_currency = flow.get_amount().currency();
+                if flow.get_kind() == CFKind::Pik
+                    && let Some(delta) = flow.get_principal_delta()
+                    && delta.currency() != flow_currency
+                {
+                    return Err(finstack_quant_core::Error::CurrencyMismatch {
+                        expected: flow_currency,
+                        actual: delta.currency(),
+                    });
+                }
+                match selected_currency {
+                    Some(expected) if flow_currency != expected => {
+                        return Err(finstack_quant_core::Error::CurrencyMismatch {
+                            expected,
+                            actual: flow_currency,
+                        });
+                    }
+                    None => selected_currency = Some(flow_currency),
+                    _ => {}
+                }
             }
         }
+        let currency = selected_currency.unwrap_or_else(|| schedule.notional.initial.currency());
 
         let periods = build_coupon_periods(schedule, cfg)?;
         let period_inputs = if periods.is_empty() {
@@ -318,8 +337,15 @@ impl AccrualIndex {
         Ok(Self {
             period_inputs,
             suffix_min_coupon_start,
+            currency,
             cfg: cfg.clone(),
         })
+    }
+
+    /// Currency of the accrued interest returned by [`Self::accrued_at`].
+    #[must_use]
+    pub const fn get_currency(&self) -> finstack_quant_core::currency::Currency {
+        self.currency
     }
 
     /// Accrued interest as of `as_of` using the prebuilt periods.
@@ -331,18 +357,18 @@ impl AccrualIndex {
     ///
     /// # Returns
     ///
-    /// Scalar accrued interest in the schedule's currency space. Negative
-    /// inside an active ex-coupon window (the seller keeps the coupon; the
-    /// buyer is compensated for the remaining stub).
+    /// Accrued interest as [`Money`] in [`Self::get_currency`]. Negative inside an
+    /// active ex-coupon window (the seller keeps the coupon; the buyer is
+    /// compensated for the remaining stub).
     ///
     /// # Errors
     ///
     /// Returns an error if a day-count calculation fails, a configured
     /// ex-coupon calendar ID cannot be resolved, a compounded period rate is
     /// non-finite or at or below `-1`, or the accrued result is non-finite.
-    pub fn accrued_at(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
+    pub fn accrued_at(&self, as_of: Date) -> finstack_quant_core::Result<Money> {
         if self.period_inputs.is_empty() {
-            return Ok(0.0);
+            return Ok(Money::zero(self.currency));
         }
 
         // Payment dates retain schedule order. Suffix minima bound future
@@ -354,7 +380,7 @@ impl AccrualIndex {
             .suffix_min_coupon_start
             .partition_point(|&start| start <= as_of);
         if first >= upper {
-            return Ok(0.0);
+            return Ok(Money::zero(self.currency));
         }
 
         let active =
@@ -369,7 +395,7 @@ impl AccrualIndex {
                 "accrual: non-finite total accrued interest {total}"
             )));
         }
-        Ok(total)
+        Money::from_model_value(total, self.currency)
     }
 }
 
@@ -410,6 +436,8 @@ struct PeriodInputs {
     payment_date: Date,
     /// Earliest actual segment sharing payment date, convention, and reference period.
     coupon_start: Date,
+    /// Latest actual segment sharing payment date, convention, and reference period.
+    coupon_end: Date,
     calendar_id: Option<String>,
     coupon_period: Option<(Date, Date)>,
     end_is_termination_date: Option<bool>,
@@ -565,17 +593,20 @@ fn build_period_inputs(
     outstanding_path: &[(Date, Money)],
 ) -> finstack_quant_core::Result<Vec<PeriodInputs>> {
     let mut result = Vec::with_capacity(periods.len());
-    let mut coupon_starts = finstack_quant_core::FxHashMap::default();
+    let mut coupon_bounds = finstack_quant_core::FxHashMap::default();
     for period in periods {
-        coupon_starts
+        coupon_bounds
             .entry((
                 period.bucket.date,
                 period.day_count,
                 period.bucket.calendar_id.as_deref(),
                 period.bucket.coupon_period,
             ))
-            .and_modify(|start: &mut Date| *start = (*start).min(period.start))
-            .or_insert(period.start);
+            .and_modify(|(start, end): &mut (Date, Date)| {
+                *start = (*start).min(period.start);
+                *end = (*end).max(period.end);
+            })
+            .or_insert((period.start, period.end));
     }
 
     for p in periods {
@@ -606,21 +637,22 @@ fn build_period_inputs(
             continue;
         }
 
+        let (coupon_start, coupon_end) = coupon_bounds
+            .get(&(
+                p.bucket.date,
+                p.day_count,
+                p.bucket.calendar_id.as_deref(),
+                p.bucket.coupon_period,
+            ))
+            .copied()
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Internal("coupon payment has no accrual bounds".into())
+            })?;
+
         result.push(PeriodInputs {
             payment_date: p.bucket.date,
-            coupon_start: coupon_starts
-                .get(&(
-                    p.bucket.date,
-                    p.day_count,
-                    p.bucket.calendar_id.as_deref(),
-                    p.bucket.coupon_period,
-                ))
-                .copied()
-                .ok_or_else(|| {
-                    finstack_quant_core::Error::Internal(
-                        "coupon payment has no accrual start".into(),
-                    )
-                })?,
+            coupon_start,
+            coupon_end,
             calendar_id: p.bucket.calendar_id.clone(),
             coupon_period,
             end_is_termination_date: p.bucket.end_is_termination_date,
@@ -686,57 +718,38 @@ fn find_active_periods_and_elapsed<'a>(
                 inputs.coupon_period,
                 inputs.end_is_termination_date,
             )?;
-            let elapsed_context = DayCountContext {
-                end_is_termination_date: inputs
-                    .end_is_termination_date
-                    .map(|termination| termination && as_of >= inputs.end),
-                ..day_count_context
-            };
             let elapsed_end = as_of.clamp(inputs.start, inputs.end);
-            let elapsed = if inputs.day_count == DayCount::Act365L {
-                // The coupon's 365/366 denominator remains fixed for partial
-                // accrual even before a future leap day or across year-end.
-                crate::builder::periods::prorated_actual_accrual(
-                    (inputs.start, inputs.end),
-                    inputs.start,
-                    elapsed_end,
-                    inputs.total_yf,
-                )?
-            } else if inputs.day_count == DayCount::ActActIsma {
-                let dc_elapsed = crate::builder::date_generation::icma_sliced_year_fraction(
-                    inputs.start,
-                    elapsed_end,
-                    elapsed_context,
-                    None,
-                    None,
-                )?
-                .max(0.0);
-                let dc_total = crate::builder::date_generation::icma_sliced_year_fraction(
-                    inputs.start,
-                    inputs.end,
-                    day_count_context,
-                    None,
-                    None,
-                )?;
-                if dc_total.is_finite() && dc_total > 0.0 {
-                    inputs.total_yf * dc_elapsed / dc_total
+            let full_period = if inputs.day_count == DayCount::Act365L {
+                if let Some((cp_start, cp_end)) = inputs.coupon_period {
+                    (
+                        inputs.coupon_start.min(cp_start),
+                        inputs.coupon_end.max(cp_end),
+                    )
                 } else {
-                    dc_elapsed
+                    (inputs.coupon_start, inputs.coupon_end)
                 }
             } else {
-                let dc_elapsed = inputs
-                    .day_count
-                    .year_fraction(inputs.start, elapsed_end, elapsed_context)?
-                    .max(0.0);
-                let dc_total =
-                    inputs
-                        .day_count
-                        .year_fraction(inputs.start, inputs.end, day_count_context)?;
-                if dc_total.is_finite() && dc_total > 0.0 {
-                    inputs.total_yf * dc_elapsed / dc_total
-                } else {
-                    dc_elapsed
-                }
+                (inputs.coupon_start, inputs.coupon_end)
+            };
+            let dc_elapsed = crate::builder::periods::contractual_accrual(
+                inputs.day_count,
+                full_period,
+                inputs.start,
+                elapsed_end,
+                day_count_context,
+            )?
+            .max(0.0);
+            let dc_total = crate::builder::periods::contractual_accrual(
+                inputs.day_count,
+                full_period,
+                inputs.start,
+                inputs.end,
+                day_count_context,
+            )?;
+            let elapsed = if dc_total.is_finite() && dc_total > 0.0 {
+                inputs.total_yf * dc_elapsed / dc_total
+            } else {
+                dc_elapsed
             };
             let elapsed = elapsed.clamp(0.0, inputs.total_yf);
 
@@ -888,7 +901,7 @@ mod tests {
         let accrued =
             accrued_interest_amount(&schedule, make_date(2025, 4, 1), &AccrualConfig::default())
                 .expect("accrued");
-        assert_eq!(accrued, 0.0);
+        assert_eq!(accrued.amount(), 0.0);
     }
 
     /// Create a minimal schedule with coupon flows for testing issue date derivation.
@@ -1071,8 +1084,8 @@ mod tests {
                     expected.add(accrue_in_period(inputs, elapsed, &cfg.method).unwrap());
                 }
                 assert_eq!(
-                    index.accrued_at(as_of).unwrap().to_bits(),
-                    expected.total().to_bits()
+                    index.accrued_at(as_of).unwrap(),
+                    Money::from_model_value(expected.total(), index.get_currency()).unwrap()
                 );
             }
         }
@@ -1087,11 +1100,11 @@ mod tests {
         assert!(index.period_inputs.is_empty());
         assert!(index.suffix_min_coupon_start.is_empty());
         assert_eq!(
-            index.accrued_at(Date::MIN).unwrap().to_bits(),
+            index.accrued_at(Date::MIN).unwrap().amount().to_bits(),
             0.0_f64.to_bits()
         );
         assert_eq!(
-            index.accrued_at(Date::MAX).unwrap().to_bits(),
+            index.accrued_at(Date::MAX).unwrap().amount().to_bits(),
             0.0_f64.to_bits()
         );
     }
@@ -1233,7 +1246,8 @@ mod tests {
         };
 
         let accrued = accrued_interest_amount(&schedule, as_of, &AccrualConfig::default())
-            .expect("both legs accrue");
+            .expect("both legs accrue")
+            .amount();
         let expected = 30_000.0 * 90.0 / 180.0 + 20_000.0 * 59.0 / 150.0;
         assert!((accrued - expected).abs() < 1e-9, "{accrued} != {expected}");
     }
@@ -1286,7 +1300,9 @@ mod tests {
 
         // Calculate accrued at April 1 (halfway through first period)
         let as_of = make_date(2025, 4, 1);
-        let accrued = accrued_interest_amount(&schedule, as_of, &AccrualConfig::default()).unwrap();
+        let accrued = accrued_interest_amount(&schedule, as_of, &AccrualConfig::default())
+            .unwrap()
+            .amount();
 
         // With explicit issue date Jan 1 and first coupon July 1:
         // - Period length: 180 days (30/360)
@@ -1330,8 +1346,9 @@ mod tests {
         let schedule = ex_coupon_test_schedule();
         let cfg = ex_coupon_cfg(7);
 
-        let accrued =
-            accrued_interest_amount(&schedule, make_date(2025, 6, 25), &cfg).expect("accrued");
+        let accrued = accrued_interest_amount(&schedule, make_date(2025, 6, 25), &cfg)
+            .expect("accrued")
+            .amount();
         let expected = -25_000.0 * 6.0 / 180.0;
         assert!(
             (accrued - expected).abs() < 1e-9,
@@ -1340,7 +1357,7 @@ mod tests {
     }
 
     #[test]
-    fn record_date_retains_coupon_and_next_settlement_rebates_interest() {
+    fn ex_date_trades_ex_coupon_and_prior_day_retains_coupon() {
         let schedule = ex_coupon_test_schedule();
         for method in [AccrualMethod::Linear, AccrualMethod::Compounded] {
             let cfg = AccrualConfig {
@@ -1351,33 +1368,43 @@ mod tests {
                 ex_coupon: None,
                 ..cfg.clone()
             };
-            let record = make_date(2025, 6, 24);
-            let actual = accrued_interest_amount(&schedule, record, &cfg).expect("record-date AI");
-            let cum = accrued_interest_amount(&schedule, record, &cum_cfg).expect("cum-coupon AI");
+            let prior = make_date(2025, 6, 23);
+            let ex_date = make_date(2025, 6, 24);
+            let actual = accrued_interest_amount(&schedule, prior, &cfg)
+                .expect("cum-coupon AI")
+                .amount();
+            let cum = accrued_interest_amount(&schedule, prior, &cum_cfg)
+                .expect("unadjusted cum-coupon AI")
+                .amount();
             assert!((actual - cum).abs() < 1e-9);
             assert!(actual > 0.0);
             assert!(
-                accrued_interest_amount(&schedule, make_date(2025, 6, 25), &cfg)
-                    .expect("next-settlement AI")
+                accrued_interest_amount(&schedule, ex_date, &cfg)
+                    .expect("ex-date AI")
+                    .amount()
                     < 0.0
             );
         }
     }
 
     #[test]
-    fn gilt_record_date_counts_business_days_and_retains_full_entitlement() {
+    fn gilt_ex_date_counts_business_days_and_trades_ex_inclusive() {
         let issue = make_date(2025, 1, 1);
         let payment = make_date(2025, 7, 1);
         let rule = ExCouponRule {
             days_before_coupon: 7,
             calendar_id: Some("gblo".into()),
         };
-        let record = rule.ex_date(payment).expect("record date");
-        assert_eq!(record, make_date(2025, 6, 20));
+        let ex_date = rule.ex_date(payment).expect("ex-coupon date");
+        assert_eq!(ex_date, make_date(2025, 6, 20));
         assert!(
             !rule
-                .is_ex_coupon(payment, record)
-                .expect("record entitlement")
+                .is_ex_coupon(payment, make_date(2025, 6, 19))
+                .expect("prior business day cum-coupon")
+        );
+        assert!(
+            rule.is_ex_coupon(payment, ex_date)
+                .expect("ex-date trades ex-coupon")
         );
         assert!(
             rule.is_ex_coupon(payment, make_date(2025, 6, 23))
@@ -1430,8 +1457,14 @@ mod tests {
             frequency: Some(Tenor::semi_annual()),
             ..Default::default()
         };
-        let actual = accrued_interest_amount(&schedule, record, &cfg).expect("AI");
-        assert!((actual - 25_000.0 * 170.0 / 181.0).abs() < 1e-9);
+        let prior = accrued_interest_amount(&schedule, make_date(2025, 6, 19), &cfg)
+            .expect("AI")
+            .amount();
+        assert!((prior - 25_000.0 * 169.0 / 181.0).abs() < 1e-9);
+        let on_ex = accrued_interest_amount(&schedule, ex_date, &cfg)
+            .expect("ex-date AI")
+            .amount();
+        assert!((on_ex - (-25_000.0 * 11.0 / 181.0)).abs() < 1e-9);
     }
 
     #[test]
@@ -1441,8 +1474,9 @@ mod tests {
         let schedule = ex_coupon_test_schedule();
         let cfg = ex_coupon_cfg(7);
 
-        let accrued =
-            accrued_interest_amount(&schedule, make_date(2025, 6, 23), &cfg).expect("accrued");
+        let accrued = accrued_interest_amount(&schedule, make_date(2025, 6, 23), &cfg)
+            .expect("accrued")
+            .amount();
         let expected = 25_000.0 * 172.0 / 180.0;
         assert!(
             (accrued - expected).abs() < 1e-9,
@@ -1457,8 +1491,9 @@ mod tests {
         let schedule = ex_coupon_test_schedule();
         let cfg = ex_coupon_cfg(7);
 
-        let accrued =
-            accrued_interest_amount(&schedule, make_date(2025, 6, 30), &cfg).expect("accrued");
+        let accrued = accrued_interest_amount(&schedule, make_date(2025, 6, 30), &cfg)
+            .expect("accrued")
+            .amount();
         let expected = -25_000.0 / 180.0;
         assert!(
             (accrued - expected).abs() < 1e-9,
@@ -1478,6 +1513,7 @@ mod tests {
             end_is_termination_date: Some(false),
             payment_date: make_date(2025, 7, 5),
             coupon_start: make_date(2025, 1, 1),
+            coupon_end: make_date(2025, 7, 5),
             start: make_date(2025, 1, 1),
             end: make_date(2025, 7, 5),
             day_count: DayCount::Thirty360,
@@ -1529,6 +1565,7 @@ mod tests {
             payment_date: make_date(2025, 7, 1),
             start: make_date(2025, 1, 1),
             coupon_start: make_date(2025, 1, 1),
+            coupon_end: make_date(2025, 7, 1),
             end: make_date(2025, 7, 1),
             day_count: DayCount::Act365F,
             notional_start: 1_000_000.0,
@@ -1584,6 +1621,7 @@ mod tests {
             payment_date: make_date(2025, 7, 1),
             start: make_date(2025, 1, 1),
             coupon_start: make_date(2025, 1, 1),
+            coupon_end: make_date(2025, 7, 1),
             end: make_date(2025, 7, 1),
             day_count: DayCount::Thirty360,
             notional_start: 1_000_000.0,
@@ -1685,6 +1723,7 @@ mod tests {
         let index = AccrualIndex {
             period_inputs: vec![inputs; 3],
             suffix_min_coupon_start: vec![coupon_start; 3],
+            currency: Currency::USD,
             cfg: AccrualConfig::default(),
         };
         let error = index
@@ -1715,7 +1754,8 @@ mod tests {
             ..Default::default()
         };
         let accrued = accrued_interest_amount(&schedule, make_date(2025, 4, 1), &cfg)
-            .expect("ICMA with frequency succeeds");
+            .expect("ICMA with frequency succeeds")
+            .amount();
         assert!(accrued > 0.0);
     }
 
@@ -1753,6 +1793,7 @@ mod tests {
             end_is_termination_date: Some(false),
             payment_date: make_date(2025, 2, 1),
             coupon_start: make_date(2025, 1, 1),
+            coupon_end: make_date(2025, 2, 1),
             start: make_date(2025, 1, 1),
             end: make_date(2025, 2, 1),
             day_count: DayCount::Act365F,

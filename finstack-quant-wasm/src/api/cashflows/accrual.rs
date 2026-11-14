@@ -8,14 +8,7 @@ use finstack_quant_cashflows::accrual::{
     AccrualConfig, AccrualIndex, ExCouponRule,
     accrued_interest_amount as rust_accrued_interest_amount,
 };
-use finstack_quant_core::currency::Currency;
-use finstack_quant_core::money::Money;
 use wasm_bindgen::prelude::*;
-
-/// Accrued interest as `Money` in the schedule currency.
-fn accrued_money(amount: f64, currency: Currency) -> Result<JsValue, JsValue> {
-    to_js_value(&Money::new(amount, currency).map_err(to_js_err)?)
-}
 
 /// Coupon record date for a coupon paid on a date.
 ///
@@ -45,10 +38,10 @@ pub fn ex_coupon_rule_ex_date(
 /// imminent coupon.
 ///
 /// @param rule - `ExCouponRule` wire object: `days_before_coupon` and an optional `calendar_id` (business days when set, calendar days otherwise).
-/// @param paymentDate - ISO-8601 coupon payment date the record date is counted back from.
+/// @param paymentDate - ISO-8601 coupon payment date the ex-coupon date is counted back from.
 /// @param settlementDate - ISO-8601 ownership-transfer (settlement) date; convert a trade date to settlement first.
-/// @returns `true` strictly after the record date and before the payment date; settlement on the record date keeps the coupon and returns `false`.
-/// @throws If `rule` is not an `ExCouponRule`, `days_before_coupon` exceeds 366, the calendar id cannot be resolved, the record date is out of range (kind `validation`), or a date is not an ISO-8601 string (kind `invalid_type` or `validation`).
+/// @returns `true` on or after the ex-coupon date and strictly before `paymentDate`; settlement strictly before the ex-coupon date keeps the coupon and returns `false`.
+/// @throws If `rule` is not an `ExCouponRule`, `days_before_coupon` exceeds 366, the calendar id cannot be resolved, the ex-coupon date is out of range (kind `validation`), or a date is not an ISO-8601 string (kind `invalid_type` or `validation`).
 #[wasm_bindgen(js_name = exCouponRuleIsExCoupon)]
 pub fn ex_coupon_rule_is_ex_coupon(
     #[wasm_bindgen(unchecked_param_type = "generated.cashflows.ExCouponRule")] rule: JsValue,
@@ -68,9 +61,9 @@ pub fn ex_coupon_rule_is_ex_coupon(
 ///
 /// @param schedule - `CashFlowSchedule` handle.
 /// @param asOf - ISO-8601 accrual snapshot date; interest accrues through accrual end and stays accrued until payment.
-/// @param config - Optional `AccrualConfig` wire object (`{ method, ex_coupon, include_pik, frequency }`); omitted means linear accrual with the Rust defaults.
-/// @returns `Money` wire object in the schedule currency; negative inside an ex-coupon window.
-/// @throws If the schedule fails validation or mixes coupon currencies, `config` is not an `AccrualConfig`, or a day-count calculation fails (kind `validation`).
+/// @param config - Optional `AccrualConfig` wire object (`{ method, ex_coupon, include_pik, frequency }`); omitted means linear accrual with the Rust defaults (`include_pik` defaults to `false`).
+/// @returns `Money` wire object in the indexed coupon currency (falling back to the schedule's notional currency when no matching coupon flows exist); negative inside an ex-coupon window.
+/// @throws If the schedule fails validation or mixes coupon currencies, `config` is not an `AccrualConfig`, a configured calendar id cannot be resolved, or a day-count calculation fails (kind `validation`).
 #[wasm_bindgen(js_name = accruedInterestAmount, unchecked_return_type = "MoneyValue")]
 pub fn accrued_interest_amount(
     schedule: &JsCashFlowSchedule,
@@ -79,9 +72,9 @@ pub fn accrued_interest_amount(
     config: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let config = js_opt_wire::<AccrualConfig>(config.as_ref(), "config")?.unwrap_or_default();
-    let amount = rust_accrued_interest_amount(&schedule.inner, js_date(&as_of, "asOf")?, &config)
+    let accrued = rust_accrued_interest_amount(&schedule.inner, js_date(&as_of, "asOf")?, &config)
         .map_err(to_js_err)?;
-    accrued_money(amount, schedule.inner.get_notional().currency())
+    to_js_value(&accrued)
 }
 
 /// Precomputed accrual state for repeated accrued-interest queries.
@@ -106,7 +99,6 @@ pub fn accrued_interest_amount(
 #[wasm_bindgen(js_name = AccrualIndex)]
 pub struct JsAccrualIndex {
     inner: AccrualIndex,
-    currency: Currency,
 }
 
 #[wasm_bindgen(js_class = AccrualIndex)]
@@ -114,9 +106,9 @@ impl JsAccrualIndex {
     /// Build reusable accrual state for a schedule.
     ///
     /// @param schedule - `CashFlowSchedule` handle with coupon, PIK and notional flows.
-    /// @param config - Optional `AccrualConfig` wire object bound into the index; omitted means linear accrual with the Rust defaults. Build another index to accrue under a different configuration.
+    /// @param config - Optional `AccrualConfig` wire object bound into the index; omitted means linear accrual with the Rust defaults (`include_pik` defaults to `false`). Build another index to accrue under a different configuration.
     /// @returns An `AccrualIndex` handle; release it with free().
-    /// @throws If the schedule fails validation or mixes coupon currencies, `config` is not an `AccrualConfig`, or the outstanding path or a day-count calculation fails (kind `validation`).
+    /// @throws If the schedule fails validation or mixes coupon currencies, `config` is not an `AccrualConfig`, a configured calendar id cannot be resolved, or the outstanding path or a day-count calculation fails (kind `validation`).
     #[wasm_bindgen]
     pub fn build(
         schedule: &JsCashFlowSchedule,
@@ -126,24 +118,32 @@ impl JsAccrualIndex {
         let config = js_opt_wire::<AccrualConfig>(config.as_ref(), "config")?.unwrap_or_default();
         Ok(JsAccrualIndex {
             inner: AccrualIndex::build(&schedule.inner, &config).map_err(to_js_err)?,
-            currency: schedule.inner.get_notional().currency(),
         })
+    }
+
+    /// Currency of the accrued interest returned by `accruedAt`.
+    ///
+    /// @returns ISO-4217 `Currency` wire code of the indexed coupon flows (or the schedule notional when empty).
+    /// @throws If the currency cannot be serialized.
+    #[wasm_bindgen(js_name = getCurrency, unchecked_return_type = "generated.core.Currency")]
+    pub fn get_currency(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.get_currency())
     }
 
     /// Accrued interest as of a date.
     ///
     /// @param asOf - ISO-8601 accrual snapshot date.
-    /// @returns `Money` wire object in the schedule currency; negative inside an ex-coupon window.
+    /// @returns `Money` wire object in the indexed coupon currency (falling back to the schedule's notional currency when no matching coupon flows exist); negative inside an ex-coupon window.
     /// @throws If `asOf` is not an ISO-8601 string (kind `invalid_type` or `validation`), a day-count calculation fails, or the ex-coupon calendar cannot be resolved (kind `validation`).
     #[wasm_bindgen(js_name = accruedAt, unchecked_return_type = "MoneyValue")]
     pub fn accrued_at(
         &self,
         #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let amount = self
+        let accrued = self
             .inner
             .accrued_at(js_date(&as_of, "asOf")?)
             .map_err(to_js_err)?;
-        accrued_money(amount, self.currency)
+        to_js_value(&accrued)
     }
 }

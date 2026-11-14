@@ -32,7 +32,6 @@ use rust_decimal::Decimal;
 
 use super::date_generation::{
     CompiledPeriod, compile_periods, generate_periods_with_adjustment, validate_accrual_grid,
-    validate_unique_payment_dates,
 };
 use super::periods::BuildPeriodsParams;
 use super::rate_helpers::FloatingRateParams;
@@ -114,7 +113,9 @@ impl DateWindow {
     }
 
     fn contains_window(self, other: DateWindow) -> bool {
-        self.start <= other.start && other.end <= self.end
+        self.start <= other.start
+            && other.end <= self.end
+            && (self.start < other.start || other.end < self.end)
     }
 }
 
@@ -201,18 +202,7 @@ pub(super) fn build_fee_schedules(
     let mut fixed_fees = Vec::new();
     for fee in fees {
         match fee {
-            FeeSpec::Fixed { date, amount } => {
-                if *date > maturity {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "fixed fee dated {} is after maturity {}; fees must be dated on or \
-                         before the instrument maturity",
-                        date, maturity
-                    )));
-                }
-                if amount.amount() != 0.0 {
-                    fixed_fees.push((*date, *amount))
-                }
-            }
+            FeeSpec::Fixed { date, amount } => fixed_fees.push((*date, *amount)),
             FeeSpec::PeriodicBp {
                 base,
                 bp,
@@ -504,7 +494,6 @@ pub(super) fn compute_coupon_schedules(
 
     let mut fixed_schedules: Vec<FixedSchedule> = Vec::new();
     let mut float_schedules: Vec<FloatSchedule> = Vec::new();
-    let mut all_window_periods = Vec::new();
 
     for w in grid.windows(2) {
         let s = w[0];
@@ -519,7 +508,6 @@ pub(super) fn compute_coupon_schedules(
         if periods.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
-        all_window_periods.extend(periods.iter().map(|entry| entry.period));
         let calendar = calendar_by_id_strict(&schedule.calendar_id)?;
 
         match &chosen_coupon.coupon {
@@ -582,8 +570,6 @@ pub(super) fn compute_coupon_schedules(
             }
         }
     }
-
-    validate_unique_payment_dates(&all_window_periods)?;
 
     Ok(CompiledSchedules {
         fixed_schedules,

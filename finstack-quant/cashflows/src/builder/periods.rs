@@ -10,7 +10,7 @@ use finstack_quant_core::dates::{
 
 use super::date_generation::{
     build_schedule_period, generate_periods_with_adjustment, icma_coupon_period,
-    icma_sliced_year_fraction, validate_accrual_grid, validate_unique_payment_dates,
+    icma_sliced_year_fraction, validate_accrual_grid,
 };
 use super::specs::{RollRule, ScheduleParams};
 use finstack_quant_core::dates::calendar_by_id_strict;
@@ -141,6 +141,16 @@ impl<'a> BuildPeriodsParams<'a> {
         if self.reset_lag_days.is_some_and(|lag| lag < 0) {
             return Err(finstack_quant_core::Error::Validation(
                 "reset_lag_days must be non-negative".into(),
+            ));
+        }
+        if matches!(self.roll_rule, RollRule::Imm)
+            && !self
+                .frequency
+                .months()
+                .is_some_and(|months| months > 0 && months % 3 == 0)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "IMM roll grids require a quarterly-multiple coupon frequency".into(),
             ));
         }
         let effective = self;
@@ -363,16 +373,36 @@ pub(crate) fn contractual_accrual(
     end: Date,
     mut context: DayCountContext<'_>,
 ) -> finstack_quant_core::Result<f64> {
+    if full_period.0 >= full_period.1 || start < full_period.0 || end < start || end > full_period.1
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "subinterval [{start}, {end}) must lie within coupon period [{}, {})",
+            full_period.0, full_period.1
+        )));
+    }
     if day_count == DayCount::Act365L {
         context.coupon_period = Some(full_period);
         day_count.year_fraction(start, end, context)
     } else if day_count == DayCount::ActActIsma {
         icma_sliced_year_fraction(start, end, context, None, None)
+    } else if day_count == DayCount::OneOne {
+        prorated_actual_accrual(full_period, start, end, 1.0)
     } else {
-        context.end_is_termination_date = context
-            .end_is_termination_date
-            .map(|terminal| terminal && end == full_period.1);
-        day_count.year_fraction(start, end, context)
+        let prefix_at = |endpoint: Date| -> finstack_quant_core::Result<f64> {
+            let ctx = DayCountContext {
+                end_is_termination_date: context
+                    .end_is_termination_date
+                    .map(|terminal| terminal && endpoint == full_period.1),
+                ..context
+            };
+            day_count.year_fraction(full_period.0, endpoint, ctx)
+        };
+        let prefix_start = prefix_at(start)?;
+        if start == end {
+            return Ok(0.0);
+        }
+        let prefix_end = prefix_at(end)?;
+        Ok((prefix_end - prefix_start).max(0.0))
     }
 }
 
@@ -402,12 +432,10 @@ fn enrich_periods(
     params: &BuildPeriodsParams<'_>,
 ) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
     let cal = calendar_by_id_strict(params.calendar_id)?;
-    let periods = periods
+    periods
         .into_iter()
         .map(|period| enrich_period(period, params, cal))
-        .collect::<finstack_quant_core::Result<Vec<_>>>()?;
-    validate_unique_payment_dates(&periods)?;
-    Ok(periods)
+        .collect::<finstack_quant_core::Result<Vec<_>>>()
 }
 
 /// Build one canonical schedule period from explicit start and end dates.
@@ -748,7 +776,7 @@ mod tests {
     }
 
     #[test]
-    fn build_periods_rejects_duplicate_adjusted_payment_dates() {
+    fn build_periods_preserves_duplicate_adjusted_payment_dates_and_rejects_collapsed_accrual() {
         let params = BuildPeriodsParams {
             start: Date::from_calendar_date(2025, Month::January, 3).expect("valid date"),
             end: Date::from_calendar_date(2025, Month::January, 6).expect("valid date"),
@@ -764,8 +792,14 @@ mod tests {
             roll_rule: crate::builder::specs::RollRule::None,
         };
 
-        let err = build_periods(params).expect_err("payment-date collision must be rejected");
-        assert!(err.to_string().contains("same payment date"));
+        let unadjusted = build_periods(params).expect("unadjusted daily periods should succeed");
+        assert_eq!(unadjusted.len(), 3);
+        assert!(unadjusted.iter().all(|p| p.payment_date == params.end));
+
+        let mut collapsed = params;
+        collapsed.adjust_accrual_dates = true;
+        let err = build_periods(collapsed).expect_err("collapsed adjusted accrual must error");
+        assert!(err.to_string().contains("collapsed period"));
     }
 
     #[test]

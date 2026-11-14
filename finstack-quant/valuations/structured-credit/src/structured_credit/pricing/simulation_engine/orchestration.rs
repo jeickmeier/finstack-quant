@@ -256,11 +256,11 @@ fn realize_principal_shortfall(state: &mut SimulationState<'_>, date: Date) -> R
     order.sort_by_key(|&i| std::cmp::Reverse(state.tranches.tranches[i].payment_priority));
     for i in order {
         let id = state.tranches.tranches[i].id.to_string();
-        let balance = state.tranche_balances[&id].amount();
-        if balance <= WRITEDOWN_DE_MINIMIS {
+        let current = state.tranche_balances[&id];
+        if current.amount() <= WRITEDOWN_DE_MINIMIS {
             continue;
         }
-        let shortfall = Money::from_model_value(balance, state.currency)?;
+        let shortfall = current;
         if let Some(res) = state.results.get_mut(&id) {
             res.writedown_flows.push((date, shortfall));
             res.total_writedown = res.total_writedown.checked_add(shortfall)?;
@@ -782,7 +782,7 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
                 instrument
                     .credit_model
                     .recovery_spec
-                    .recovery_rate(seasoning_months),
+                    .recovery_rate(seasoning_months.max(1))?,
             ) + state.recovery_queue.pending_amount(state.currency).amount()
                 + state.principal_funding_account.amount()
                 + state.reserve_balance.amount()

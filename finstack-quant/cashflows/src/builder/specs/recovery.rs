@@ -72,8 +72,9 @@ impl RecoveryModelSpec {
     /// use finstack_quant_cashflows::builder::RecoveryModelSpec;
     ///
     /// let spec = RecoveryModelSpec::with_lag(0.40, 12).with_severity_vector(vec![0.7, 0.6]);
-    /// assert!((spec.recovery_rate(1) - 0.3).abs() < 1e-15);
-    /// assert!((spec.recovery_rate(24) - 0.4).abs() < 1e-15);
+    /// assert!((spec.recovery_rate(1)? - 0.3).abs() < 1e-15);
+    /// assert!((spec.recovery_rate(24)? - 0.4).abs() < 1e-15);
+    /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     pub fn with_severity_vector(mut self, severity_vector: Vec<f64>) -> Self {
         self.severity_vector = Some(severity_vector);
@@ -85,20 +86,29 @@ impl RecoveryModelSpec {
     /// # Arguments
     ///
     /// * `seasoning_months` - Months since origination of the defaulting
-    ///   month; month 0 reads the first vector entry.
+    ///   balance (`>= 1`).
     ///
     /// # Returns
     ///
     /// `1 − severity` from `severity_vector` when present (last value held),
-    /// otherwise `rate`. Values are clamped to `[0, 1]`.
-    pub fn recovery_rate(&self, seasoning_months: u32) -> f64 {
+    /// otherwise `rate`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` if `self` fails [`Self::validate`] or if
+    /// `seasoning_months == 0`.
+    pub fn recovery_rate(&self, seasoning_months: u32) -> finstack_quant_core::Result<f64> {
+        self.validate()?;
+        if seasoning_months == 0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "seasoning_months must be >= 1".to_string(),
+            ));
+        }
         match &self.severity_vector {
-            Some(severities) if !severities.is_empty() => {
-                let severity = vector_at(severities, seasoning_months, "severity_vector")
-                    .unwrap_or(1.0 - self.rate);
-                (1.0 - severity).clamp(0.0, 1.0)
+            Some(severities) => {
+                Ok(1.0 - vector_at(severities, seasoning_months, "severity_vector")?)
             }
-            _ => self.rate.clamp(0.0, 1.0),
+            None => Ok(self.rate),
         }
     }
 

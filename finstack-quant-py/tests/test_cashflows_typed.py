@@ -1630,7 +1630,14 @@ def test_cashflow_metadata_dataframe_roundtrip() -> None:
     rebuilt = CashFlowSchedule.from_flows(
         original.to_dataframe(), original.get_notional(), original.get_day_count(), original.get_meta()
     )
-    assert json.loads(rebuilt.to_json()) == json.loads(original.to_json())
+    rebuilt_doc = json.loads(rebuilt.to_json())
+    original_doc = json.loads(original.to_json())
+    for rebuilt_flow, original_flow in zip(rebuilt_doc["flows"], original_doc["flows"], strict=True):
+        assert float(rebuilt_flow["amount"]["amount"]) == pytest.approx(
+            float(original_flow["amount"]["amount"]), rel=1e-15, abs=0.0
+        )
+        rebuilt_flow["amount"]["amount"] = original_flow["amount"]["amount"]
+    assert rebuilt_doc == original_doc
     assert accrued_interest_amount(rebuilt, "2025-05-01").amount == pytest.approx(
         accrued_interest_amount(original, "2025-05-01").amount
     )
@@ -1816,3 +1823,67 @@ class TestValidationAndLabels:
         frame = _RaggedFrame()
         with pytest.raises(ValueError, match="column 'amount' has 1 rows, expected 2"):
             CashFlowSchedule.from_flows(frame, Notional.par(1000.0, "USD"), DayCount.ACT_360)
+
+
+def test_accrual_config_defaults_and_index_currency() -> None:
+    from decimal import Decimal
+
+    from finstack_quant.cashflows.accrual import AccrualConfig, AccrualIndex, accrued_interest_amount
+    from finstack_quant.cashflows.builder import (
+        CashFlowSchedule,
+        CouponType,
+        FixedCouponSpec,
+        ScheduleParams,
+    )
+    from finstack_quant.core.currency import Currency
+    from finstack_quant.core.money import Money
+
+    assert AccrualConfig().include_pik is False
+    pik_schedule = (
+        CashFlowSchedule
+        .builder()
+        .principal(Money(1_000_000.0, "EUR"), dt.date(2025, 1, 15), dt.date(2026, 1, 15))
+        .fixed_cf(
+            FixedCouponSpec(
+                rate=Decimal("0.05"),
+                coupon_type=CouponType.PIK,
+                schedule=ScheduleParams.semiannual_30360(),
+            )
+        )
+        .build(None)
+    )
+    default_index = AccrualIndex.build(pik_schedule)
+    assert default_index.get_currency() == Currency("EUR")
+    assert default_index.accrued_at("2025-04-15") == Money(0.0, "EUR")
+    assert accrued_interest_amount(pik_schedule, "2025-04-15") == Money(0.0, "EUR")
+
+    pik_index = AccrualIndex.build(pik_schedule, AccrualConfig(include_pik=True))
+    assert pik_index.get_currency() == Currency("EUR")
+    assert pik_index.accrued_at("2025-04-15").amount > 0.0
+
+
+def test_from_flows_dataframe_preserves_exact_decimal() -> None:
+    from decimal import Decimal
+
+    pd = pytest.importorskip("pandas")
+    from finstack_quant.cashflows.builder import CashFlowSchedule, Notional
+    from finstack_quant.core.dates import DayCount
+    from finstack_quant.core.money import Money
+
+    exact = Decimal("10000000000000000.01")
+    frame = pd.DataFrame({
+        "date": [dt.date(2025, 7, 15)],
+        "amount": [exact],
+        "currency": ["USD"],
+        "kind": ["fixed"],
+        "accrual_factor": [0.5],
+    })
+    rebuilt = CashFlowSchedule.from_flows(frame, Notional.par(1000.0, "USD"), DayCount.ACT_360)
+    assert rebuilt.get_flows()[0].amount == Money.from_decimal(exact, "USD")
+
+
+def test_recovery_rate_rejects_zero_seasoning() -> None:
+    from finstack_quant.cashflows.builder import RecoveryModelSpec
+
+    with pytest.raises(ValueError, match="seasoning_months"):
+        RecoveryModelSpec(0.4, 6).recovery_rate(0)

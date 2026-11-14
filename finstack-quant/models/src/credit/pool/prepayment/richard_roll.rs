@@ -32,9 +32,9 @@
 //! - Richard, S.F., & Roll, R. (1989). "Prepayments on Fixed-Rate Mortgage-Backed Securities."
 //!   *Journal of Portfolio Management*, 15(3), 9-14. `docs/REFERENCES.md#richard-roll-1989`
 
-use super::super::expected_shocked_smm;
+use super::super::{capped_annual_to_monthly, expected_shocked_smm};
 use super::traits::StochasticPrepayment;
-use finstack_quant_cashflows::builder::{PSA_RAMP_MONTHS, annual_to_monthly_clamped};
+use finstack_quant_cashflows::builder::PSA_RAMP_MONTHS;
 
 /// Refinancing slope parameter (lambda) of the arctangent incentive response.
 const REFI_SLOPE: f64 = 20.0;
@@ -128,7 +128,7 @@ impl StochasticPrepayment for RichardRollPrepay {
         let shock = (self.factor_loading * z * self.cpr_volatility).exp();
         let shocked_cpr = (base_conditional_cpr * shock).clamp(0.0, 1.0);
 
-        annual_to_monthly_clamped(shocked_cpr)
+        capped_annual_to_monthly(shocked_cpr)
     }
 
     fn expected_smm(&self, seasoning: u32) -> f64 {

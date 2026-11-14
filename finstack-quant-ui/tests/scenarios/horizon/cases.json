@@ -103,12 +103,12 @@
             },
             "coupon_income": {
               "total": {
-                "amount": "10566.298342541439",
+                "amount": "10566.29834254144",
                 "currency": "USD"
               }
             },
             "pull_to_par": {
-              "amount": "3683.909087098789",
+              "amount": "3683.909087098788",
               "currency": "USD"
             },
             "roll_down": {

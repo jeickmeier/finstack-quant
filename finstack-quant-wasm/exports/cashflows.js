@@ -105,15 +105,16 @@ export const cashflows = {
    *
    * @param spec - `CashflowScheduleBuildSpec` wire object or JSON: notional, issue and maturity dates, coupon program, fees and principal events.
    * @param market - Optional `MarketContext` handle holding the forward curves and fixings the floating legs reference; omitted means floating coupons that need a forward curve use their fallback policy.
+   * @param asOf - Optional ISO-8601 valuation cutoff date overriding `spec.as_of`; resets before the cutoff require historical fixings.
    * @returns The built `CashFlowSchedule` handle; release it with free().
-   * @throws If `spec` does not match the build-spec schema (kind `invalid_type` or `validation`), a referenced curve or fixing is missing (kind `not_found`), or schedule construction fails (kind `validation`).
+   * @throws If `spec` does not match the build-spec schema (kind `invalid_type` or `validation`), `asOf` is not an ISO-8601 date string, a referenced curve or fixing is missing (kind `not_found`), or schedule construction fails (kind `validation`).
    *
-   * @facadeType (spec: generated.cashflows.CashflowScheduleBuildSpec | string, market?: MarketContext | null) => CashFlowSchedule
+   * @facadeType (spec: generated.cashflows.CashflowScheduleBuildSpec | string, market?: MarketContext | null, asOf?: string | null) => CashFlowSchedule
    */
-  buildCashflowSchedule: (spec, market = undefined) =>
+  buildCashflowSchedule: (spec, market = undefined, asOf = undefined) =>
     market === undefined || market === null
-      ? wasm.buildCashflowSchedule(spec)
-      : wasm.buildCashflowScheduleWithMarket(spec, market),
+      ? wasm.buildCashflowSchedule(spec, asOf)
+      : wasm.buildCashflowScheduleWithMarket(spec, market, asOf),
   buildCashflowScheduleJson: wasm.buildCashflowScheduleJson,
   calendarYearLadder: wasm.calendarYearLadder,
   datedFlows: wasm.datedFlows,

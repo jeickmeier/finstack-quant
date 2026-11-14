@@ -118,7 +118,11 @@ class ScheduleBuildOpts:
 
     def __repr__(self) -> str: ...
 
-def build_cashflow_schedule(spec: dict[str, Any] | str, market: MarketContext | str | None = None) -> CashFlowSchedule:
+def build_cashflow_schedule(
+    spec: dict[str, Any] | str,
+    market: MarketContext | str | None = None,
+    as_of: datetime.date | str | None = None,
+) -> CashFlowSchedule:
     """
     Build a typed ``CashFlowSchedule`` from a build spec (typed twin of
     :func:`build_cashflow_schedule_json`).
@@ -137,6 +141,9 @@ def build_cashflow_schedule(spec: dict[str, Any] | str, market: MarketContext | 
         observations cover it, unless an explicit fallback applies. Explicit
         fallback covers any failed coupon projection, never supplied
         historical gaps before a resolved curve's base date.
+    as_of : datetime.date or str, optional
+        Valuation cutoff date overriding ``spec["as_of"]``; resets before
+        the effective cutoff require historical fixings.
 
     Returns
     -------
@@ -146,9 +153,9 @@ def build_cashflow_schedule(spec: dict[str, Any] | str, market: MarketContext | 
     Raises
     ------
     ValueError
-        If the spec is malformed or the schedule fails validation, including
-        unsupported roll-grid/ICMA anchors, negative lags, supplied historical
-        fixing gaps, or curve/date/day-count/arithmetic failures.
+        If the spec or ``as_of`` is malformed or the schedule fails validation,
+        including unsupported roll-grid/ICMA anchors, negative lags, supplied
+        historical fixing gaps, or curve/date/day-count/arithmetic failures.
     KeyError
         If required market data is unavailable and no eligible fallback resolves it.
 
@@ -300,7 +307,11 @@ def schedule_from_classified_flows(
     """
     ...
 
-def build_cashflow_schedule_json(spec_json: str, market_json: str | None = None) -> str:
+def build_cashflow_schedule_json(
+    spec_json: str,
+    market_json: str | None = None,
+    as_of: datetime.date | str | None = None,
+) -> str:
     """
     Build a cashflow schedule from a JSON spec and return canonical schedule JSON.
 
@@ -317,6 +328,9 @@ def build_cashflow_schedule_json(spec_json: str, market_json: str | None = None)
         explicit fallback applies. Explicit fallback covers any failed coupon
         projection, never supplied historical gaps before a resolved curve's
         base date.
+    as_of : datetime.date or str, optional
+        Valuation cutoff date overriding ``as_of`` in ``spec_json``; resets
+        before the effective cutoff require historical fixings.
 
     Returns
     -------
@@ -326,9 +340,9 @@ def build_cashflow_schedule_json(spec_json: str, market_json: str | None = None)
     Raises
     ------
     ValueError
-        If ``spec_json`` (or ``market_json`` when supplied) fails schema or
-        semantic validation, including unsupported roll-grid/ICMA anchors,
-        negative lags, supplied historical fixing gaps, or
+        If ``spec_json``, ``market_json``, or ``as_of`` (when supplied) fails
+        schema or semantic validation, including unsupported roll-grid/ICMA
+        anchors, negative lags, supplied historical fixing gaps, or
         curve/date/day-count/arithmetic failures.
     KeyError
         If required market data is unavailable and no eligible fallback resolves it.

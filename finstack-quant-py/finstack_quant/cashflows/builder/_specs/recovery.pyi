@@ -123,18 +123,20 @@ class RecoveryModelSpec:
         Parameters
         ----------
         seasoning_months : int
-            Months since origination of the defaulting month, one-based:
-            months 0 and 1 read the first vector entry, and months past the
-            end hold the last one.
+            Months since origination of the defaulting balance
+            (1-indexed, ``>= 1``). Months past the vector end hold the last
+            entry.
 
         Returns
         -------
         float
-            ``1 - severity`` from the vector when present, else ``rate``,
-            clamped to ``[0, 1]``.
+            ``1 - severity`` from the vector when present, else ``rate``.
 
         Raises
         ------
+        ValueError
+            If ``seasoning_months`` is ``0`` or the recovery specification is
+            invalid.
         OverflowError
             If ``seasoning_months`` is outside the unsigned 32-bit range.
         """

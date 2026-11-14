@@ -385,14 +385,12 @@ pub(crate) struct CompiledPeriod {
 /// * `roll_rule` - Explicit roll grid distinguishing regular coupons from stubs.
 ///
 /// # Errors
-///
-/// Rejects distinct periods that adjust to the same payment date.
+/// Classify compiled periods by their unadjusted regularity.
 pub(crate) fn compile_periods(
     periods: Vec<SchedulePeriod>,
     frequency: Tenor,
     roll_rule: RollRule,
 ) -> finstack_quant_core::Result<Vec<CompiledPeriod>> {
-    validate_unique_payment_dates(&periods)?;
     Ok(periods
         .into_iter()
         .map(|period| {
@@ -417,40 +415,6 @@ fn is_regular_imm_period(start: Date, end: Date, frequency: Tenor) -> bool {
         && frequency
             .months()
             .is_some_and(|months| month_index(end) - month_index(start) == i64::from(months))
-}
-
-pub(crate) fn validate_unique_payment_dates(
-    periods: &[SchedulePeriod],
-) -> finstack_quant_core::Result<()> {
-    let mut period_map: finstack_quant_core::FxHashMap<Date, SchedulePeriod> =
-        finstack_quant_core::FxHashMap::default();
-    period_map.reserve(periods.len());
-    for period in periods {
-        if let Some(previous) = period_map.insert(period.payment_date, *period) {
-            return Err(duplicate_payment_date_error(
-                period.payment_date,
-                previous,
-                *period,
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn duplicate_payment_date_error(
-    payment_date: Date,
-    previous: SchedulePeriod,
-    period: SchedulePeriod,
-) -> finstack_quant_core::Error {
-    finstack_quant_core::Error::Validation(format!(
-        "two accrual periods adjust to the same payment date {}: [{}, {}) and [{}, {}); \
-         use a coarser frequency or a different business-day convention",
-        payment_date,
-        previous.accrual_start,
-        previous.accrual_end,
-        period.accrual_start,
-        period.accrual_end
-    ))
 }
 
 /// Test helper: generate skeletal periods with unadjusted accrual boundaries.
@@ -841,9 +805,9 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_adjusted_payment_dates_are_rejected() {
+    fn duplicate_adjusted_payment_dates_are_preserved_when_unadjusted() {
         // Daily tenor across a weekend with Following: Sat and Sun both adjust
-        // to Monday, colliding with the Sun->Mon period's payment date.
+        // to Monday, sharing a payment date while retaining distinct unadjusted accruals.
         let periods = generate_periods(
             d(2025, 1, 3), // Friday
             d(2025, 1, 6), // Monday
@@ -856,11 +820,13 @@ mod tests {
         )
         .expect("raw schedule should build");
 
-        let res = super::compile_periods(periods, Tenor::daily(), RollRule::None);
-        let err = res.expect_err("duplicate adjusted payment dates must error");
+        let compiled =
+            super::compile_periods(periods, Tenor::daily(), RollRule::None).expect("compile");
+        assert_eq!(compiled.len(), 3);
         assert!(
-            err.to_string().contains("same payment date"),
-            "error should describe the payment-date collision: {err}"
+            compiled
+                .iter()
+                .all(|entry| entry.period.payment_date == d(2025, 1, 6))
         );
     }
 

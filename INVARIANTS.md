@@ -529,6 +529,154 @@ adjusted-forward approximation has its own stated model, risk and cashflow
 basis; a different selected method cannot silently reuse it.
 [Accepted CMS convexity pricing and risk](docs/decisions/financial/valuations-rates/11-cms-convexity.md#accepted-decision-for-checked-cms-convexity-pricing-and-risk).
 
+CMS replication uses one dated strike strip, explicit positive finite
+support, nonnegative masses and one normalized payment weight for the
+selected model's mean and payoffs. Risk revalidates the same law at every
+required shock.
+[Accepted CMS smile replication and risk](docs/decisions/financial/valuations-rates/12-cms-replication.md#accepted-decision-for-checked-cms-smile-replication-and-risk).
+
+Inflation swap cash uses positive CPI references on one index basis and
+the actual payment cut. The contractual initial CPI applies to the first
+reference only. Par reprices on the same cash basis, and direct CPI growth
+and nominal discount shocks use their respective source roles.
+[Accepted inflation swap cashflows and risk](docs/decisions/financial/valuations-rates/13-inflation-swaps.md#accepted-decision-for-checked-inflation-swap-cashflows-and-risk).
+
+Inflation options preserve the contractual reference and payment cuts.
+Known CPI produces literal payoff. Live cash uses the qualified forward
+basis and the explicitly matched expiry, quote and model. Cash export
+and typed risk use the selected optionlet ledger.
+[Accepted inflation option cashflows, expiry and risk](docs/decisions/financial/valuations-rates/14-inflation-options.md#accepted-decision-for-checked-inflation-option-cashflows-expiry-and-risk).
+
+Repo uses the final contractual rate, actual settlement dates and the
+same eligible cash in valuation and reporting. Collateral coverage uses
+dated native-currency quote units. Contractual funding risk, discount
+risk and agreement-qualified margin each retain their own basis.
+[Accepted repo cashflows, collateral and risk](docs/decisions/financial/valuations-rates/15-repo.md#accepted-decision-for-checked-repo-cashflows-collateral-and-risk).
+
+Cross-currency swaps preserve the actual reset and settlement dates,
+typed native cash and principal, and one qualified collateral and
+cash FX basis. Spread quotes, directed risk and exports use the same
+prepared holder cash.
+[Accepted cross-currency swap cashflows, FX resets and risk](docs/decisions/financial/valuations-rates/16-cross-currency-swaps.md#accepted-decision-for-checked-cross-currency-swap-cashflows-fx-resets-and-risk).
+
+CMS spread options bind both benchmarks and the actual option payment.
+The selected conditional lognormal model uses separate qualified
+marginals, explicit latent correlation and checked integration.
+The admitted payoff is shared by price, cash export and rate risk.
+[Accepted CMS spread cashflows, model and risk](docs/decisions/financial/valuations-rates/17-cms-spread.md#accepted-decision-for-checked-cms-spread-cashflows-model-and-risk).
+
+A bond uses one admitted generated or supplied schedule. Cash dates,
+principal effects, and claim entitlement retain their own authority.
+Pricing and reporting preserve the selected holder and model basis.
+[Accepted bond schedules and holder cash](docs/decisions/financial/valuations-bonds/01-schedule-and-holder-cashflows.md#accepted-decision-for-checked-bond-schedules-and-holder-cash).
+
+Bond settlement uses the authorized buyer claim and financing basis.
+Accrued uses the original cash coupon parent. Yield, dates on market
+sources and ACT/365F dated models retain their own clocks.
+[Accepted bond settlement, quote carry and clocks](docs/decisions/financial/valuations-bonds/02-settlement-and-clocks.md#accepted-decision-for-checked-bond-settlement-quote-carry-and-clocks).
+
+Bond valuation preserves the selected model or qualified settlement
+quote basis. Discounting uses eligible signed security cash. The
+pre-default hazard model conditions survival locally and integrates
+prompt recovery on separately established recoverable par.
+[Accepted bond PV selection and fractional recovery of par](docs/decisions/financial/valuations-bonds/03-pv-models.md#accepted-decision-for-checked-bond-pv-selection-and-fractional-recovery-of-par).
+
+Rates-only bond trees use an explicit model and exact dated cash, state
+and exercise events. Redemption follows the holder's entitlement and
+economic principal phase. Benchmark discounting, unspread curve fit
+and nodewise OAS retain distinct authority.
+[Accepted bond rates trees and exercise](docs/decisions/financial/valuations-bonds/04-rates-tree-exercise.md#accepted-decision-for-checked-bond-rates-trees-and-exercise).
+
+Bond return floors constrain the dirty proceeds of independently
+authorized early issuer calls. The explicit issue basis, paid-through
+history and contractual exercise phase govern MOIC or fixed ACT/365F
+XIRR protection in both deterministic and pathwise exercise.
+[Accepted issue-basis return floors](docs/decisions/financial/valuations-bonds/05-return-floors.md#accepted-decision-for-checked-issue-basis-return-floors).
+
+Joint bond paths share exact dated coupon, cash and principal phases
+and publication-aware index projection. Recoverable par retires at
+the authorized repayment cash phase, with local prompt recovery and
+single survival weighting on the same applied discount basis.
+[Accepted joint bond payoff and recovery replay](docs/decisions/financial/valuations-bonds/06-joint-coupon-replay.md#accepted-decision-for-checked-joint-bond-payoff-and-recovery-replay).
+
+Joint bond exercise uses decision-time contractual strikes and frozen
+conditional continuation. A stochastic make-whole conditions raw
+benchmark PV before applying the contractual strike. Benchmark training,
+stopping training and pricing use disjoint addressed groups.
+[Accepted joint bond exercise policy and make-whole](docs/decisions/financial/valuations-bonds/07-lsmc-policy.md#accepted-decision-for-checked-joint-bond-exercise-policy-and-make-whole).
+
+Structural bond simulation keeps the asset default law, dated cash
+discount, coupon/PIK elections and covered recovery phases explicit.
+Pricing uncertainty uses independent groups. Benchmark loss and
+effective spread retain their declared cash and discount basis.
+[Accepted structural bond simulation and outputs](docs/decisions/financial/valuations-bonds/08-merton-simulation.md#accepted-decision-for-checked-structural-bond-simulation-and-outputs).
+
+Structural calibration fits one parameter against the qualified cash
+equivalent on the accepted buyer claim and dated discount basis.
+The fitted parameter passes both trial and independent cash validation
+before it is used to price the original contract.
+[Accepted cash-equivalent structural calibration](docs/decisions/financial/valuations-bonds/09-merton-calibration.md#accepted-decision-for-checked-cash-equivalent-structural-calibration).
+
+Bond yield and price conversions use one selected settlement claim,
+an explicit quote law and its contractual yield coordinates. Returned
+yields reprice that same claim within the applicable currency tolerance.
+[Accepted settlement yield and price inversion](docs/decisions/financial/valuations-bonds/10-quoted-yield.md#accepted-decision-for-checked-settlement-yield-and-price-inversion).
+
+Bond spreads retain their declared settlement cash, benchmark or
+selected-model basis. Z-spread and curve discount margin shift the
+native discount law. OAS uses the qualified buyer claim at the original
+valuation origin. Returned inverse spreads pass a price residual.
+[Accepted bond spreads and price inversion](docs/decisions/financial/valuations-bonds/12-spread-quotes.md#accepted-decision-for-checked-bond-spreads-and-price-inversion).
+
+Bond asset-swap quotes use matched settlement buyer cash and explicit
+floating and discount roles. Par adjusts face versus dirty upfront and
+pays floating on face. Proceeds pays floating on dirty and exchanges the
+difference at actual redemption. Inverses pass the same swap PV residual.
+[Accepted bond asset swaps and price inversion](docs/decisions/financial/valuations-bonds/13-asset-swaps.md#accepted-decision-for-checked-bond-asset-swaps-and-price-inversion).
+
+Bond quoted-yield duration, convexity and yield DV01 use the same fixed
+settlement claim and the exact elected yield law. Yield convexity is
+unscaled `P″/P` and yield DV01 is the signed native tangent `10⁻⁴ P′`.
+Market-curve and effective risk retain their own experiment.
+[Accepted quoted-yield bond risk](docs/decisions/financial/valuations-bonds/14-yield-risk.md#accepted-decision-for-checked-quoted-yield-bond-risk).
+
+Bond curve risk uses comparable holder PV at the original valuation
+origin, exact active rate bindings and a fixed qualified model spread
+where an observed quote anchors the experiment. Parallel and triangular
+key-rate DV01 retain their signed finite results. Effective duration and
+unscaled effective convexity use distinct keys and checked reprices.
+[Accepted bond curve and effective risk](docs/decisions/financial/valuations-bonds/15-curve-risk.md#accepted-decision-for-checked-bond-curve-and-effective-risk).
+
+Bond par-CDS CS01 replays the exact active credit quotes and reprices
+valuation-date holder PV. Qualified no-hazard CS01 uses the forward one-bp
+settlement Z price change under the instrument key. Spread duration
+normalizes that same change by the positive raw dirty center and step.
+[Accepted bond spread and credit risk](docs/decisions/financial/valuations-bonds/16-spread-credit-risk.md#accepted-decision-for-checked-bond-spread-and-credit-risk).
+
+Bond Recovery01 explicitly holds intensity or original credit observations
+fixed and uses comparable raw holder values. Immediate jump-to-default
+values prompt fractional recovery on covered par at the elected event
+phase against the raw holder PV of the rights that default terminates.
+[Accepted bond recovery and jump-to-default](docs/decisions/financial/valuations-bonds/17-default-risk.md#accepted-decision-for-checked-bond-recovery-and-jump-to-default).
+
+Bond embedded-option value compares matched holder claims with remaining
+discretionary rights enabled and disabled. The model spread and binding
+obligations are common to both. `embedded_option_vega` reports signed
+native currency per `+.01` of the elected scalar model sigma.
+[Accepted bond embedded-option value and vega](docs/decisions/financial/valuations-bonds/18-embedded-option-risk.md#accepted-decision-for-checked-bond-embedded-option-value-and-vega).
+
+Bond carry uses explicit matched holder phases and actual scenario cash
+at the two cuts. Funding and the exact yield benchmark are separately
+elected. Bond WAL weights actual repayment cash dates by exact retired
+par using ACT/365F, with absent repayment distinct from eligible day zero.
+[Accepted bond carry and repayment life](docs/decisions/financial/valuations-bonds/19-carry-and-life.md#accepted-decision-for-checked-bond-carry-and-repayment-life).
+
+Bond issue returns use one explicit original investment and a covered
+signed cash ledger. MOIC uses net receipts and XIRR uses the canonical
+ACT/365F law. Worst returns require the complete eligible issuer-call
+scenario set, with separately resolved paths and failures per measure.
+[Accepted bond issue-to-exit returns](docs/decisions/financial/valuations-bonds/20-lifetime-returns.md#accepted-decision-for-checked-bond-issue-to-exit-returns).
+
 Construct and restore private validated state atomically; preserve complete model
 values/order/identity/source in snapshots and distinguish lossy presentation tables.
 Metric weighting/missing-factor policy, empirical PD/transition/recovery/WARF,

@@ -21,7 +21,11 @@ use finstack_quant_valuations_core::metrics::{MetricContext, MetricSeed};
 
 impl CashflowScheduleSource for StructuredCredit {
     fn notional(&self) -> finstack_quant_core::Result<Option<Money>> {
-        Ok(self.pool.total_balance().ok())
+        let current_face = self.tranches.tranches.iter().try_fold(
+            Money::from((0_i64, self.tranches.currency())),
+            |acc, tranche| acc.checked_add(tranche.current_balance),
+        )?;
+        Ok(Some(current_face))
     }
 
     fn raw_cashflow_schedule(

@@ -514,14 +514,15 @@ impl InflationLinkedBond {
         schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
         as_of: Date,
     ) -> Result<f64> {
-        finstack_quant_cashflows::accrual::AccrualIndex::build(
+        Ok(finstack_quant_cashflows::accrual::AccrualIndex::build(
             schedule,
             &finstack_quant_cashflows::accrual::AccrualConfig {
                 frequency: Some(self.frequency),
                 ..Default::default()
             },
         )?
-        .accrued_at(as_of)
+        .accrued_at(as_of)?
+        .amount())
     }
 
     /// Real flows paid on or after `as_of` (earlier flows are settled).

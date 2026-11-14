@@ -3247,9 +3247,9 @@ export interface CashflowsNamespace {
    *
    * @param schedule - `CashFlowSchedule` handle.
    * @param asOf - ISO-8601 accrual snapshot date; interest accrues through accrual end and stays accrued until payment.
-   * @param config - Optional `AccrualConfig` wire object (`{ method, ex_coupon, include_pik, frequency }`); omitted means linear accrual with the Rust defaults.
-   * @returns `Money` wire object in the schedule currency; negative inside an ex-coupon window.
-   * @throws If the schedule fails validation or mixes coupon currencies, `config` is not an `AccrualConfig`, or a day-count calculation fails (kind `validation`).
+   * @param config - Optional `AccrualConfig` wire object (`{ method, ex_coupon, include_pik, frequency }`); omitted means linear accrual with the Rust defaults (`include_pik` defaults to `false`).
+   * @returns `Money` wire object in the indexed coupon currency (falling back to the schedule's notional currency when no matching coupon flows exist); negative inside an ex-coupon window.
+   * @throws If the schedule fails validation or mixes coupon currencies, `config` is not an `AccrualConfig`, a configured calendar id cannot be resolved, or a day-count calculation fails (kind `validation`).
    */
   readonly accruedInterestAmount: typeof wasm.accruedInterestAmount;
   /**
@@ -3288,10 +3288,11 @@ export interface CashflowsNamespace {
    *
    * @param spec - `CashflowScheduleBuildSpec` wire object or JSON: notional, issue and maturity dates, coupon program, fees and principal events.
    * @param market - Optional `MarketContext` handle holding the forward curves and fixings the floating legs reference; omitted means floating coupons that need a forward curve use their fallback policy.
+   * @param asOf - Optional ISO-8601 valuation cutoff date overriding `spec.as_of`; resets before the cutoff require historical fixings.
    * @returns The built `CashFlowSchedule` handle; release it with free().
-   * @throws If `spec` does not match the build-spec schema (kind `invalid_type` or `validation`), a referenced curve or fixing is missing (kind `not_found`), or schedule construction fails (kind `validation`).
+   * @throws If `spec` does not match the build-spec schema (kind `invalid_type` or `validation`), `asOf` is not an ISO-8601 date string, a referenced curve or fixing is missing (kind `not_found`), or schedule construction fails (kind `validation`).
    */
-  readonly buildCashflowSchedule: (spec: generated.cashflows.CashflowScheduleBuildSpec | string, market?: MarketContext | null) => CashFlowSchedule;
+  readonly buildCashflowSchedule: (spec: generated.cashflows.CashflowScheduleBuildSpec | string, market?: MarketContext | null, asOf?: string | null) => CashFlowSchedule;
   /**
    * Build a cashflow schedule from a JSON spec and return canonical schedule JSON.
    *
@@ -3324,8 +3325,9 @@ export interface CashflowsNamespace {
    *   index bounds. Final-period index and all-in rate adjustments are allocated
    *   uniformly over contractual accrual time when principal changes.
    * @param marketJson - Optional JSON-encoded market context for floating-rate lookups.
+   * @param asOf - Optional ISO-8601 valuation cutoff date overriding `spec.as_of`; resets before the cutoff require historical fixings.
    * @returns JSON-encoded `CashFlowSchedule`.
-   * @throws If the spec or market JSON is malformed, or schedule construction fails.
+   * @throws If the spec or market JSON is malformed, `asOf` is not an ISO-8601 date string, or schedule construction fails.
    */
   readonly buildCashflowScheduleJson: typeof wasm.buildCashflowScheduleJson;
   /**
@@ -3385,9 +3387,9 @@ export interface CashflowsNamespace {
    * Monthly default rate (MDR) of a default model at a seasoning month.
    *
    * @param spec - `DefaultModelSpec` wire object.
-   * @param seasoningMonths - Months since origination or pool start (non-negative integer).
+   * @param seasoningMonths - Months since origination or pool start (positive integer, 1-indexed).
    * @returns Monthly default rate as a decimal; a constant CDR converts as `1 - (1 - CDR)^(1/12)`.
-   * @throws If `spec` is not a `DefaultModelSpec` or its curve parameters are invalid (kind `validation`), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
+   * @throws If `spec` is not a `DefaultModelSpec`, its curve parameters are invalid or `seasoningMonths` is `0` (kind `validation`), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
    */
   readonly defaultModelSpecMdr: typeof wasm.defaultModelSpecMdr;
   /**
@@ -3399,10 +3401,10 @@ export interface CashflowsNamespace {
    * current balance reproduces the curve's defaults.
    *
    * @param spec - `DefaultModelSpec` wire object.
-   * @param seasoningMonths - Months since origination or pool start (non-negative integer).
+   * @param seasoningMonths - Months since origination or pool start (positive integer, 1-indexed).
    * @param survivingBalanceFraction - Current pool balance divided by the balance the curve is expressed against, as a finite non-negative decimal (may exceed 1.0 after par build).
    * @returns Monthly default rate as a decimal in `[0, 1]`; zero once the surviving balance is exhausted.
-   * @throws If `spec` is not a `DefaultModelSpec`, its curve parameters are invalid, or `survivingBalanceFraction` is negative or non-finite (kind `validation`); if `seasoningMonths` is not a non-negative integer or `survivingBalanceFraction` is not a number (kind `invalid_type`).
+   * @throws If `spec` is not a `DefaultModelSpec`, its curve parameters are invalid, `seasoningMonths` is `0`, or `survivingBalanceFraction` is negative or non-finite (kind `validation`); if `seasoningMonths` is not a non-negative integer or `survivingBalanceFraction` is not a number (kind `invalid_type`).
    */
   readonly defaultModelSpecMdrWithSurvival: typeof wasm.defaultModelSpecMdrWithSurvival;
   /**
@@ -3433,10 +3435,10 @@ export interface CashflowsNamespace {
    * imminent coupon.
    *
    * @param rule - `ExCouponRule` wire object: `days_before_coupon` and an optional `calendar_id` (business days when set, calendar days otherwise).
-   * @param paymentDate - ISO-8601 coupon payment date the record date is counted back from.
+   * @param paymentDate - ISO-8601 coupon payment date the ex-coupon date is counted back from.
    * @param settlementDate - ISO-8601 ownership-transfer (settlement) date; convert a trade date to settlement first.
-   * @returns `true` strictly after the record date and before the payment date; settlement on the record date keeps the coupon and returns `false`.
-   * @throws If `rule` is not an `ExCouponRule`, `days_before_coupon` exceeds 366, the calendar id cannot be resolved, the record date is out of range (kind `validation`), or a date is not an ISO-8601 string (kind `invalid_type` or `validation`).
+   * @returns `true` on or after the ex-coupon date and strictly before `paymentDate`; settlement strictly before the ex-coupon date keeps the coupon and returns `false`.
+   * @throws If `rule` is not an `ExCouponRule`, `days_before_coupon` exceeds 366, the calendar id cannot be resolved, the ex-coupon date is out of range (kind `validation`), or a date is not an ISO-8601 string (kind `invalid_type` or `validation`).
    */
   readonly exCouponRuleIsExCoupon: typeof wasm.exCouponRuleIsExCoupon;
   /**
@@ -3568,9 +3570,9 @@ export interface CashflowsNamespace {
    * Single-month mortality (SMM) of a prepayment model at a seasoning month.
    *
    * @param spec - `PrepaymentModelSpec` wire object.
-   * @param seasoningMonths - Months since origination or pool start (non-negative integer).
+   * @param seasoningMonths - Months since origination or pool start (positive integer, 1-indexed).
    * @returns Monthly prepayment rate as a decimal; a constant CPR converts as `1 - (1 - CPR)^(1/12)`.
-   * @throws If `spec` is not a `PrepaymentModelSpec` or its curve parameters are invalid (kind `validation`), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
+   * @throws If `spec` is not a `PrepaymentModelSpec`, its curve parameters are invalid or `seasoningMonths` is `0` (kind `validation`), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
    */
   readonly prepaymentModelSpecSmm: typeof wasm.prepaymentModelSpecSmm;
   /**
@@ -3584,9 +3586,9 @@ export interface CashflowsNamespace {
    * Recovery rate of a recovery model for a default in a seasoning month.
    *
    * @param spec - `RecoveryModelSpec` wire object.
-   * @param seasoningMonths - Months since origination of the defaulting balance (non-negative integer).
+   * @param seasoningMonths - Months since origination of the defaulting balance (positive integer, 1-indexed).
    * @returns Recovery as a decimal fraction of defaulted par: `1 − severity` for the month when a severity vector is set, otherwise the flat `rate`.
-   * @throws If `spec` is not a `RecoveryModelSpec`, its `rate` is outside `[0, 1]` or its severity vector is empty or out of range (kind `validation`; the spec is validated before the query, as Python validates at construction), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
+   * @throws If `spec` is not a `RecoveryModelSpec`, its `rate` is outside `[0, 1]`, its severity vector is empty or out of range, or `seasoningMonths` is `0` (kind `validation`; the spec is validated before the query, as Python validates at construction), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
    */
   readonly recoveryModelSpecRecoveryRate: typeof wasm.recoveryModelSpecRecoveryRate;
   /**

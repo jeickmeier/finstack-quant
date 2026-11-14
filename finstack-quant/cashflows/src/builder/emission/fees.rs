@@ -107,23 +107,22 @@ pub(in crate::builder) fn emit_fees_on(
                                     .to_string(),
                             ));
                         }
-                        let commitment_dec = f64_to_decimal(commitment.amount())?;
+                        let commitment_dec = commitment.amount_decimal();
                         (commitment_dec - effective_outstanding).max(Decimal::ZERO)
                     }
                 };
 
                 let yf_dec = f64_to_decimal(yf)?;
                 let fee_amt_dec = checked_fee_amount(base_amt, pf.bp, yf_dec)?;
-                let fee_amt = fee_amt_dec.as_f64();
 
                 let rate = pf.bp.as_f64() * 1e-4;
 
-                if fee_amt != 0.0 {
+                if !fee_amt_dec.is_zero() {
                     new_flows.push(
                         CashFlowParams::new(
                             period.payment_date,
                             None,
-                            Money::new(fee_amt, ccy)?,
+                            Money::from_decimal(fee_amt_dec, ccy),
                             CFKind::Fee,
                             yf,
                             Some(rate),

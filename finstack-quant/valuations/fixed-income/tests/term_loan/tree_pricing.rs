@@ -204,7 +204,8 @@ fn oas_round_trip_near_zero_at_model_price() {
         settlement,
         &loan.accrual_config(),
     )
-    .expect("accrued interest");
+    .expect("accrued interest")
+    .amount();
     let clean_pct = (pv - accrued) / outstanding * 100.0;
 
     let oas_bp = pricer
@@ -590,7 +591,8 @@ fn off_cycle_immediate_par_call_includes_accrued() {
         as_of,
         &loan.accrual_config(),
     )
-    .expect("accrued");
+    .expect("accrued")
+    .amount();
     let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
     let pv = pricer
         .price_callable(&loan, &market, as_of)

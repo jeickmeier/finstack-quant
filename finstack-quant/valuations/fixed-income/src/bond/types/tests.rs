@@ -408,25 +408,27 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
         day_before_record,
         &bond.accrual_config(),
     )
-    .expect("Accrued interest calculation should succeed before the record date");
+    .expect("Accrued interest calculation should succeed before the record date")
+    .amount();
     assert!(
         ai_before > 0.0,
         "Accrued interest should be positive before the record date"
     );
 
+    // On and after the record date, the buyer forgoes the upcoming coupon
+    // and accrued interest is the negative rebate of the remaining stub.
     let ai_record = finstack_quant_cashflows::accrual::accrued_interest_amount(
         &full_schedule,
         record_date,
         &bond.accrual_config(),
     )
-    .expect("Accrued interest calculation should succeed on the record date");
+    .expect("Accrued interest calculation should succeed on the record date")
+    .amount();
     assert!(
-        ai_record > 0.0,
-        "Settlement on the record date retains the coupon"
+        ai_record < 0.0,
+        "Settlement on the record date enters the ex-coupon window, got {ai_record}"
     );
 
-    // Strictly after the record date, the buyer forgoes the upcoming coupon
-    // and accrued interest is the negative rebate of the remaining stub.
     let schedule_ex = bond
         .full_cashflow_schedule(&ctx)
         .expect("Full schedule should build");
@@ -435,7 +437,8 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
         record_date + Duration::days(1),
         &bond.accrual_config(),
     )
-    .expect("Accrued interest calculation should succeed inside the ex-coupon window");
+    .expect("Accrued interest calculation should succeed inside the ex-coupon window")
+    .amount();
     assert!(
         ai_ex < 0.0,
         "Accrued interest in ex-coupon window should be negative, got {}",
@@ -530,25 +533,27 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
         day_before_record,
         &bond.accrual_config(),
     )
-    .expect("Accrued interest calculation should succeed before the record date");
+    .expect("Accrued interest calculation should succeed before the record date")
+    .amount();
     assert!(
         ai_before > 0.0,
         "Accrued interest should be positive before the record date for amortizing bond"
     );
 
+    // On and after the record date, the buyer forgoes the upcoming coupon
+    // and accrued interest is the negative rebate of the remaining stub.
     let ai_record = finstack_quant_cashflows::accrual::accrued_interest_amount(
         &full_schedule,
         record_date,
         &bond.accrual_config(),
     )
-    .expect("Accrued interest calculation should succeed on the record date");
+    .expect("Accrued interest calculation should succeed on the record date")
+    .amount();
     assert!(
-        ai_record > 0.0,
-        "Settlement on the record date retains the coupon"
+        ai_record < 0.0,
+        "Settlement on the record date enters the ex-coupon window for amortizing bond, got {ai_record}"
     );
 
-    // Strictly after the record date, the buyer forgoes the upcoming coupon
-    // and accrued interest is the negative rebate of the remaining stub.
     let schedule_ex = bond
         .full_cashflow_schedule(&ctx)
         .expect("Full schedule should build");
@@ -557,7 +562,8 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
         record_date + Duration::days(1),
         &bond.accrual_config(),
     )
-    .expect("Accrued interest calculation should succeed inside the ex-coupon window");
+    .expect("Accrued interest calculation should succeed inside the ex-coupon window")
+    .amount();
     assert!(
         ai_ex < 0.0,
         "Accrued interest in ex-coupon window should be negative for amortizing bond, got {}",

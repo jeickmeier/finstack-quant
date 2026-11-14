@@ -14,7 +14,7 @@
 //! - PSA (Public Securities Association). "Standard Prepayment Model", 1985.
 //! - Moody's Investors Service. "WARF®: Measuring Portfolio Credit Risk in CLOs."
 
-use finstack_quant_cashflows::builder::{annual_to_monthly_clamped, monthly_to_annual, psa_cpr};
+use finstack_quant_cashflows::builder::{annual_to_monthly, monthly_to_annual, psa_cpr};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
@@ -49,31 +49,31 @@ fn test_psa_golden_100_percent() {
 
     // Month 1: 0.2% CPR
     assert!(
-        (psa_cpr(1.0, 1) - 0.002).abs() < RATE_TOLERANCE,
+        (psa_cpr(1.0, 1).unwrap() - 0.002).abs() < RATE_TOLERANCE,
         "100% PSA month 1 should be exactly 0.2% CPR"
     );
 
     // Month 15: 3.0% CPR (halfway through ramp)
     assert!(
-        (psa_cpr(1.0, 15) - 0.03).abs() < RATE_TOLERANCE,
+        (psa_cpr(1.0, 15).unwrap() - 0.03).abs() < RATE_TOLERANCE,
         "100% PSA month 15 should be exactly 3.0% CPR"
     );
 
     // Month 30: 6.0% CPR (terminal rate)
     assert!(
-        (psa_cpr(1.0, 30) - 0.06).abs() < RATE_TOLERANCE,
+        (psa_cpr(1.0, 30).unwrap() - 0.06).abs() < RATE_TOLERANCE,
         "100% PSA month 30 should be exactly 6.0% CPR"
     );
 
     // Month 60: 6.0% CPR (flat after ramp)
     assert!(
-        (psa_cpr(1.0, 60) - 0.06).abs() < RATE_TOLERANCE,
+        (psa_cpr(1.0, 60).unwrap() - 0.06).abs() < RATE_TOLERANCE,
         "100% PSA month 60 should remain at 6.0% CPR"
     );
 
     // Month 120: 6.0% CPR (flat after ramp)
     assert!(
-        (psa_cpr(1.0, 120) - 0.06).abs() < RATE_TOLERANCE,
+        (psa_cpr(1.0, 120).unwrap() - 0.06).abs() < RATE_TOLERANCE,
         "100% PSA month 120 should remain at 6.0% CPR"
     );
 }
@@ -88,7 +88,7 @@ fn test_psa_golden_multiples() {
 
     for speed in speeds {
         let expected_cpr = speed * 0.06; // speed × 6% terminal CPR
-        let actual_cpr = psa_cpr(speed, month);
+        let actual_cpr = psa_cpr(speed, month).unwrap();
 
         assert!(
             (actual_cpr - expected_cpr).abs() < RATE_TOLERANCE,
@@ -109,7 +109,7 @@ fn test_psa_golden_smm_conversion() {
     // 6% CPR → SMM = 1 - 0.94^(1/12) = 0.51430...%
     let cpr: f64 = 0.06;
     let expected_smm = 1.0 - (1.0 - cpr).powf(1.0 / 12.0);
-    let actual_smm = annual_to_monthly_clamped(cpr);
+    let actual_smm = annual_to_monthly(cpr).unwrap();
 
     assert!(
         (actual_smm - expected_smm).abs() < RATE_TOLERANCE,
@@ -143,7 +143,7 @@ fn test_cdr_mdr_golden_conversion() {
 
     for (cdr, label) in test_cases {
         let expected_mdr = 1.0 - (1.0 - cdr).powf(1.0 / 12.0);
-        let actual_mdr = annual_to_monthly_clamped(cdr);
+        let actual_mdr = annual_to_monthly(cdr).unwrap();
 
         assert!(
             (actual_mdr - expected_mdr).abs() < RATE_TOLERANCE,
@@ -172,7 +172,7 @@ fn test_cdr_mdr_golden_2_percent() {
     // Reference: Moody's CLO methodology
 
     let cdr = 0.02;
-    let mdr = annual_to_monthly_clamped(cdr);
+    let mdr = annual_to_monthly(cdr).unwrap();
 
     // Expected: 1 - 0.98^(1/12) = 0.0016833...
     let expected = 1.0 - 0.98_f64.powf(1.0 / 12.0);

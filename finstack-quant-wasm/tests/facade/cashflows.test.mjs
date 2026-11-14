@@ -32,7 +32,7 @@ if (!existsSync(WASM_BG)) {
 
 const facade = await import('../../index.js');
 const init = facade.default;
-const { cashflows, valuations } = facade;
+const { cashflows, core, valuations } = facade;
 
 await init({ module_or_path: readFileSync(WASM_BG) });
 
@@ -614,4 +614,116 @@ test('currency arguments accept any ASCII case, as the Rust parser does', () => 
   assert.equal(cashflows.notionalPar(100, 'usd').initial.currency, 'USD');
   assert.equal(cashflows.notionalPar(100, 'Usd').initial.currency, 'USD');
   assert.throws(() => cashflows.notionalPar(100, 'us d'), /currency/);
+});
+
+test('AccrualIndex exposes getCurrency, defaults include_pik to false, and recoveryRate rejects 0', () => {
+  const pikSpec = {
+    notional: { initial: { amount: '1000000', currency: 'EUR' }, amort: 'none' },
+    issue_date: '2025-01-15',
+    maturity: '2026-01-15',
+    coupon_program: [
+      {
+        kind: 'fixed',
+        spec: {
+          coupon_type: 'pik',
+          rate: '0.05',
+          ...cashflows.scheduleParamsSemiannual30360(),
+        },
+      },
+    ],
+  };
+  const schedule = cashflows.buildCashflowSchedule(pikSpec);
+  const defaultIndex = cashflows.AccrualIndex.build(schedule);
+  const pikIndex = cashflows.AccrualIndex.build(schedule, {
+    method: 'linear',
+    ex_coupon: null,
+    include_pik: true,
+    frequency: null,
+  });
+  try {
+    assert.equal(defaultIndex.getCurrency(), 'EUR');
+    assert.deepEqual(defaultIndex.accruedAt('2025-04-15'), { amount: '0', currency: 'EUR' });
+    assert.deepEqual(cashflows.accruedInterestAmount(schedule, '2025-04-15'), {
+      amount: '0',
+      currency: 'EUR',
+    });
+    assert.equal(pikIndex.getCurrency(), 'EUR');
+    assert.ok(Number(pikIndex.accruedAt('2025-04-15').amount) > 0);
+  } finally {
+    defaultIndex.free();
+    pikIndex.free();
+    schedule.free();
+  }
+
+  assert.throws(
+    () => cashflows.recoveryModelSpecRecoveryRate({ rate: 0.4, recovery_lag: 6 }, 0),
+    (error) => error.kind === 'validation'
+  );
+});
+
+test('buildCashflowSchedule and buildCashflowScheduleJson accept asOf cutoff override', () => {
+  const marketJson = readFileSync(join(__dirname, 'golden', 'parity_market.json'), 'utf8');
+  const floatingSpec = {
+    notional: { initial: { amount: '1000000', currency: 'USD' }, amort: 'none' },
+    issue_date: '2025-01-15',
+    maturity: '2026-01-15',
+    coupon_program: [
+      {
+        kind: 'floating',
+        spec: {
+          rate_spec: {
+            forward_curve_id: 'USD-SOFR-3M',
+            spread_bp: '150',
+            reset_frequency: { count: 3, unit: 'months' },
+            reset_lag_days: 0,
+          },
+          coupon_type: 'cash',
+          frequency: { count: 3, unit: 'months' },
+          day_count: 'act_360',
+          business_day_convention: 'following',
+          calendar_id: 'weekends_only',
+          stub: 'none',
+          end_of_month: false,
+          payment_lag_days: 0,
+        },
+      },
+    ],
+  };
+
+  const market = core.MarketContext.fromJson(marketJson);
+  try {
+    assert.throws(
+      () => cashflows.buildCashflowSchedule(floatingSpec, market, '2025-02-01'),
+      /fixing|FIXING/
+    );
+    assert.throws(
+      () =>
+        cashflows.buildCashflowScheduleJson(
+          JSON.stringify(floatingSpec),
+          market.toJson(),
+          '2025-02-01'
+        ),
+      /fixing|FIXING/
+    );
+
+    market.insertSeries(new core.ScalarTimeSeries('FIXING:USD-SOFR-3M', [['2025-01-15', 0.06]]));
+    const schedule = cashflows.buildCashflowSchedule(floatingSpec, market, '2025-02-01');
+    try {
+      const viaJson = JSON.parse(
+        cashflows.buildCashflowScheduleJson(
+          JSON.stringify(floatingSpec),
+          market.toJson(),
+          '2025-02-01'
+        )
+      );
+      assert.deepEqual(JSON.parse(schedule.toJson()), viaJson);
+      const firstCoupon = schedule.getFlows().find((flow) => flow.kind === 'floating');
+      assert.ok(firstCoupon);
+      assert.ok(Math.abs(firstCoupon.rate - 0.075) < 1e-12);
+    } finally {
+      schedule.free();
+    }
+  } finally {
+    market.free();
+  }
 });

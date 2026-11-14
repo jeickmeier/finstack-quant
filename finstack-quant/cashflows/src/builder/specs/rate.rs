@@ -31,9 +31,11 @@ pub enum RateSpec {
     /// Floating index plus spread, with the canonical floor, cap, gearing and
     /// reset conventions of [`FloatingRateSpec`](super::FloatingRateSpec).
     ///
-    /// [`RateSpec::try_rate_for_period`] resolves the fixing calendar, a reset
-    /// on the valuation date, `fallback` and `compounding` differently from the
-    /// cashflow builder; see its doc.
+    /// [`RateSpec::try_rate_for_period`] aligns `compounding` (`None` or
+    /// `Simple`), `index_tenor` validation, and `fallback` for missing market
+    /// sources with the cashflow builder; single-period calls still treat
+    /// `reset_date <= as_of` as a required historical fixing and use the
+    /// weekends-only calendar when `fixing_calendar_id` is omitted.
     Floating(FloatingRateSpec),
 }
 
@@ -53,21 +55,25 @@ impl RateSpec {
     ///
     /// A floating rate whose reset date (accrual start less `reset_lag_days`
     /// business days on the fixing calendar) is on or before `as_of` reads the
-    /// fixing series; later resets project from the forward curve at the reset
-    /// date.
+    /// fixing series (consulting `fallback` when the series itself is absent);
+    /// later resets project from the forward curve at the reset date, enforcing
+    /// `index_tenor` against `ForwardCurve::tenor()` and consulting `fallback`
+    /// only when the curve is absent or does not reach `reset_date`.
     ///
     /// # Differences from the cashflow builder
     ///
-    /// This path serves loan and tranche coupons and does not follow every
-    /// [`FloatingRateSpec`] rule the builder applies:
+    /// This path serves loan and tranche coupons and keeps two intentional
+    /// single-period conventions:
     ///
     /// - With no `fixing_calendar_id`, the reset lag counts weekends-only
     ///   business days; the builder uses the coupon schedule calendar.
-    /// - A reset on `as_of` requires that day's recorded fixing; the builder
-    ///   uses it when published and otherwise projects.
-    /// - `fallback` is not consulted: a missing fixing or curve is an error.
-    /// - Any explicit `compounding`, including `Simple`, is rejected; leave it
-    ///   unset for a term-rate coupon.
+    /// - A reset on `as_of` requires that day's recorded fixing when a fixing
+    ///   series is present; the builder uses it when published and otherwise
+    ///   projects.
+    /// - Overnight compounding (`SimpleAverage` / `CompoundedInArrears` /
+    ///   `CompoundedWithObservationShift` / `CompoundedWithRateCutoff`) is
+    ///   rejected because a single-period call carries no observation schedule;
+    ///   `None` and `Simple` are both accepted.
     ///
     /// # Arguments
     ///
@@ -82,8 +88,10 @@ impl RateSpec {
     /// # Errors
     ///
     /// Returns an error if a fixed rate is not finite, `reset_lag_days` is
-    /// negative, `compounding` is set, the fixing calendar is unknown, a
-    /// required fixing is missing, or the projection fails.
+    /// negative, an overnight `compounding` method is set, `index_tenor`
+    /// disagrees with the resolved forward curve tenor by more than 10%, the
+    /// fixing calendar is unknown, a required observation in a supplied fixing
+    /// series is missing, or curve projection fails.
     pub fn try_rate_for_period(
         &self,
         accrual_start: Date,
@@ -108,12 +116,11 @@ impl RateSpec {
                         spec.reset_lag_days
                     )));
                 }
-                if spec.compounding.is_some() {
-                    return Err(finstack_quant_core::Error::Validation(
-                        "RateSpec::try_rate_for_period does not support an explicit `compounding` method; \
-                         leave it unset for a term-rate coupon"
-                            .into(),
-                    ));
+                if let Some(compounding) = spec.compounding.filter(|c| c.is_overnight()) {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "RateSpec::try_rate_for_period supports only term-rate coupons \
+                         (`compounding` unset or `Simple`); got {compounding:?}"
+                    )));
                 }
                 let params = crate::builder::FloatingRateParams::try_from(spec)?;
                 let calendar_id = spec
@@ -127,30 +134,97 @@ impl RateSpec {
                     calendar,
                 )?;
                 // Tranche coupons treat a reset on the valuation date as fixed:
-                // it needs the day's recorded fixing and is never projected.
+                // an existing fixing series must carry that day's fixing; only an
+                // absent series consults `fallback`.
                 if reset_date <= as_of {
-                    let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
+                    match finstack_quant_core::market_data::fixings::get_fixing_series(
                         market,
                         spec.forward_curve_id.as_str(),
-                    )?;
-                    let raw =
-                        finstack_quant_core::market_data::fixings::require_fixing_value_exact(
-                            Some(fixings),
-                            spec.forward_curve_id.as_str(),
-                            reset_date,
-                            as_of,
-                        )?;
-                    return Ok(crate::builder::calculate_floating_rate(raw, &params));
+                    ) {
+                        Ok(fixings) => {
+                            let raw = finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                                Some(fixings),
+                                spec.forward_curve_id.as_str(),
+                                reset_date,
+                                as_of,
+                            )?;
+                            return Ok(crate::builder::calculate_floating_rate(raw, &params));
+                        }
+                        Err(err) => {
+                            if !matches!(spec.fallback, crate::builder::FloatingRateFallback::Error)
+                            {
+                                tracing::warn!(
+                                    reset_date = %reset_date,
+                                    spread_bp = %spec.spread_bp,
+                                    fallback = ?spec.fallback,
+                                    error = %err,
+                                    "Floating fixing series unavailable, using configured fallback"
+                                );
+                            }
+                            let raw = spec.fallback.index_rate(err)?;
+                            return Ok(crate::builder::calculate_floating_rate(raw, &params));
+                        }
+                    }
                 }
-                let fwd = market.get_forward(spec.forward_curve_id.as_str())?;
-                crate::builder::project_floating_rate(
-                    reset_date,
-                    fwd.as_ref(),
-                    &params,
-                    accrual_start,
-                    accrual_end,
-                    accrual_year_fraction,
-                )
+                match market.get_forward(spec.forward_curve_id.as_str()) {
+                    Ok(fwd) => {
+                        crate::builder::pipeline::validate_index_tenor_match(
+                            spec.index_tenor,
+                            fwd.as_ref(),
+                            spec.forward_curve_id.as_str(),
+                        )?;
+                        if reset_date < fwd.base_date() {
+                            let err = finstack_quant_core::Error::Validation(format!(
+                                "floating-rate observation date {} is before the '{}' curve base date {}",
+                                reset_date,
+                                fwd.id(),
+                                fwd.base_date(),
+                            ));
+                            if !matches!(spec.fallback, crate::builder::FloatingRateFallback::Error)
+                            {
+                                tracing::warn!(
+                                    reset_date = %reset_date,
+                                    spread_bp = %spec.spread_bp,
+                                    fallback = ?spec.fallback,
+                                    error = %err,
+                                    "Floating reset precedes curve base date, using configured fallback"
+                                );
+                            }
+                            let raw = spec.fallback.index_rate(err)?;
+                            return Ok(crate::builder::calculate_floating_rate(raw, &params));
+                        }
+                        crate::builder::project_floating_rate(
+                            reset_date,
+                            fwd.as_ref(),
+                            &params,
+                            accrual_start,
+                            accrual_end,
+                            accrual_year_fraction,
+                        )
+                    }
+                    Err(err)
+                        if matches!(
+                            err,
+                            finstack_quant_core::Error::Input(
+                                finstack_quant_core::InputError::NotFound { .. }
+                                    | finstack_quant_core::InputError::MissingCurve { .. }
+                            )
+                        ) =>
+                    {
+                        if !matches!(spec.fallback, crate::builder::FloatingRateFallback::Error) {
+                            tracing::warn!(
+                                reset_date = %reset_date,
+                                spread_bp = %spec.spread_bp,
+                                fallback = ?spec.fallback,
+                                error = %err,
+                                "Forward curve unavailable, using configured fallback"
+                            );
+                        }
+                        let raw = spec.fallback.index_rate(err)?;
+                        Ok(crate::builder::calculate_floating_rate(raw, &params))
+                    }
+                    Err(err) => Err(err),
+                }
             }
         }
     }

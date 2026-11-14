@@ -108,18 +108,22 @@ accrual grid when the coupon dates must not move. `annual_actact()` is ISDA Act/
 
 ## Accrual
 
-`accrued_interest_amount(&schedule, as_of, &AccrualConfig)` returns the accrued
-amount for one date. For many dates on the same schedule, build an
-`AccrualIndex` once and call `accrued_at` repeatedly — it precomputes coupon
-periods and the outstanding-notional path.
+`accrued_interest_amount(&schedule, as_of, &AccrualConfig)` returns `Money` for
+one date in the schedule's coupon currency (defaulting to
+`schedule.notional.initial.currency()` when no selected coupon flows exist).
+For many dates on the same schedule, build an `AccrualIndex` once and call
+`accrued_at` repeatedly — it precomputes coupon periods and the
+outstanding-notional path (`get_currency()` returns its resolved currency).
 
 `AccrualMethod::Linear` (the default) is the ICMA Rule 251.1 convention.
 `AccrualMethod::Compounded` uses true exponential compounding
 (`N × expm1(f × ln1p(r))`) and should not be cited as ICMA-style; it exists for
 instruments that genuinely compound inside a coupon period. `ExCouponRule`
-counts backward to the coupon record date. Settlement on that date retains
-the coupon; settlement after it and before payment trades ex-dividend, with
-accrued interest equal to the negative rebate of the remaining stub.
+counts backward to the ex-coupon date (`ex_date`). Settlement on or after
+that date and strictly before payment trades ex-coupon, with accrued interest
+equal to the negative rebate of the remaining stub. By default,
+`AccrualConfig::default()` sets `include_pik: false` so only cash-paying
+coupon flows accrue; set `include_pik: true` when accruing PIK coupons.
 
 ## Aggregation
 
@@ -133,23 +137,28 @@ sorted and non-overlapping; the public entry points validate this and return
 | `aggregate_by_period(flows, periods)` | `IndexMap<PeriodId, IndexMap<Currency, Money>>`; unsorted input is sorted first |
 | `aggregate_cashflows_checked(flows, target)` | Single `Money`; every flow must already be in `target`, otherwise `Error::CurrencyMismatch` |
 | `calendar_year_ladder(dates, kind_labels, amounts, pvs)` | `Vec<CalendarYearLadderRow>` keyed by calendar year |
-| `credit_adjusted_cashflow_pvs(cashflows, discount_factors, hazard, recovery_rate, as_of)` | Native-currency row PVs as `Vec<f64>`, using the complete stream to identify funded principal |
+| `credit_adjusted_cashflow_pvs(cashflows, discount_curves, hazard, recovery_rate, as_of)` | Native-currency row PVs as `Vec<f64>`, using the complete stream to identify funded principal |
 
-Per-currency totals accumulate through a Neumaier-compensated `f64` sum over
-`Money::amount()`; no per-flow ISO-4217 rounding is applied during
-accumulation. PV aggregation assigns **zero PV** to flows dated on or before
-the valuation base date, while plain amount aggregation still counts them.
+Nominal per-currency totals in `aggregate_by_period` and
+`aggregate_cashflows_checked` sum exact `Decimal` amounts via
+`Money::checked_add`; `pv_by_period` accumulates `f64` present values through a
+Neumaier-compensated sum before materializing `Money`, with no per-flow ISO-4217
+rounding during accumulation. PV aggregation assigns **zero PV** to flows dated on
+or before the valuation base date, while plain amount aggregation still counts
+them.
 
-`credit_adjusted_cashflow_pvs` discounts recovery at the scheduled repayment date.
-Recovery begins only when principal is funded or PIK is capitalized; repayments
-consume funding in FIFO order, separately per currency. Explicit principal
-deltas determine recovery face amounts independently of cash settlement prices.
-After the economic principal reduction has passed, an unpaid settlement is
-valued as a cash receivable, consistently before and after schedule normalization.
+`credit_adjusted_cashflow_pvs` integrates default-time recovery along monthly
+steps and interior hazard-curve knots, weighting each interval's default mass by
+its midpoint relative discount factor on the row's discount curve. Recovery
+begins only when principal is funded or PIK is capitalized; repayments consume
+funding in FIFO order, separately per currency. Explicit principal deltas
+determine recovery face amounts independently of cash settlement prices. After
+the economic principal reduction has passed, an unpaid settlement is valued as a
+cash receivable, consistently before and after schedule normalization.
 Already-paid economic replay rows carry no recovery. A final PIK coupon paid
 before capitalization carries no funded-principal recovery before payment.
 `as_of` is the valuation date. Survival is conditional on it, flows on or
-before it have zero PV, and discount factors are supplied per row.
+before it have zero PV, and discount curves are supplied per row.
 
 ## Conventions
 
@@ -189,7 +198,7 @@ let spec_json = r#"{
   "coupon_program": []
 }"#;
 
-let schedule_json = build_cashflow_schedule_json(spec_json, None).unwrap();
+let schedule_json = build_cashflow_schedule_json(spec_json, None, None).unwrap();
 let flows_json = dated_flows_json(&schedule_json).unwrap();
 assert!(!flows_json.is_empty());
 ```

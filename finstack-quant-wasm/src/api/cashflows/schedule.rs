@@ -7,7 +7,7 @@
 
 use crate::api::core::market_context::JsMarketContext;
 use crate::utils::input::{js_f64, js_f64_seq, js_string};
-use crate::utils::wire::{js_date, js_opt_wire, js_wire};
+use crate::utils::wire::{js_date, js_opt_date, js_opt_wire, js_wire};
 use crate::utils::{date_to_iso, to_js_err, to_js_value};
 use finstack_quant_cashflows::builder::{
     CashFlowBuilder, CashFlowMeta, CashFlowSchedule, CashflowRepresentation, CouponType,
@@ -746,29 +746,33 @@ impl JsCashFlowBuilder {
 /// This export is the no-market call; the facade routes a supplied market to `buildCashflowScheduleWithMarket`.
 ///
 /// @param spec - `CashflowScheduleBuildSpec` wire object or JSON: notional, issue and maturity dates, coupon program, fees and principal events.
-/// @param market - Optional `MarketContext` handle holding the forward curves and fixings the floating legs reference; omitted means floating coupons that need a forward curve use their fallback policy.
+/// @param asOf - Optional ISO-8601 valuation cutoff date overriding `spec.as_of`; resets before the cutoff require historical fixings.
 /// @returns The built `CashFlowSchedule` handle; release it with free().
-/// @throws If `spec` does not match the build-spec schema (kind `invalid_type` or `validation`), a referenced curve or fixing is missing (kind `not_found`), or schedule construction fails (kind `validation`).
+/// @throws If `spec` does not match the build-spec schema (kind `invalid_type` or `validation`), `asOf` is not an ISO-8601 date string, a referenced curve or fixing is missing (kind `not_found`), or schedule construction fails (kind `validation`).
 #[wasm_bindgen(js_name = buildCashflowSchedule)]
 pub fn build_cashflow_schedule(
     #[wasm_bindgen(
         unchecked_param_type = "generated.cashflows.CashflowScheduleBuildSpec | string"
     )]
     spec: JsValue,
+    #[wasm_bindgen(js_name = "asOf", unchecked_optional_param_type = "string | null")]
+    as_of: Option<JsValue>,
 ) -> Result<JsCashFlowSchedule, JsValue> {
+    let as_of = js_opt_date(as_of.as_ref(), "asOf")?;
     crate::utils::input::from_js_json::<CashflowScheduleBuildSpec>(&spec, "spec")?
-        .build(None)
+        .build_as_of(None, as_of)
         .map(JsCashFlowSchedule::from_inner)
         .map_err(to_js_err)
 }
 
 /// Build a cashflow schedule from a build spec with market data; the published
-/// `buildCashflowSchedule(spec, market)` calls this.
+/// `buildCashflowSchedule(spec, market, asOf)` calls this.
 ///
 /// @param spec - `CashflowScheduleBuildSpec` wire object or JSON.
 /// @param market - `MarketContext` handle holding the forward curves and fixings the floating legs reference.
+/// @param asOf - Optional ISO-8601 valuation cutoff date overriding `spec.as_of`; resets before the cutoff require historical fixings.
 /// @returns The built `CashFlowSchedule` handle.
-/// @throws If `spec` does not match the build-spec schema, a referenced curve or fixing is missing (kind `not_found`), or schedule construction fails (kind `validation`).
+/// @throws If `spec` does not match the build-spec schema, `asOf` is not an ISO-8601 date string, a referenced curve or fixing is missing (kind `not_found`), or schedule construction fails (kind `validation`).
 #[wasm_bindgen(js_name = buildCashflowScheduleWithMarket)]
 pub fn build_cashflow_schedule_with_market(
     #[wasm_bindgen(
@@ -776,9 +780,12 @@ pub fn build_cashflow_schedule_with_market(
     )]
     spec: JsValue,
     market: &JsMarketContext,
+    #[wasm_bindgen(js_name = "asOf", unchecked_optional_param_type = "string | null")]
+    as_of: Option<JsValue>,
 ) -> Result<JsCashFlowSchedule, JsValue> {
+    let as_of = js_opt_date(as_of.as_ref(), "asOf")?;
     crate::utils::input::from_js_json::<CashflowScheduleBuildSpec>(&spec, "spec")?
-        .build(Some(market.inner()))
+        .build_as_of(Some(market.inner()), as_of)
         .map(JsCashFlowSchedule::from_inner)
         .map_err(to_js_err)
 }

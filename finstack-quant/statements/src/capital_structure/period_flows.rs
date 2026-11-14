@@ -488,7 +488,8 @@ pub fn calculate_period_flows(
     let accrued_interest = if !is_debt {
         0.0
     } else {
-        accrued_interest_amount(&full_schedule, snapshot_date, &AccrualConfig::default())? * scale
+        accrued_interest_amount(&full_schedule, snapshot_date, &AccrualConfig::default())?.amount()
+            * scale
     };
     breakdown.accrued_interest = Money::new(accrued_interest, currency)?;
 

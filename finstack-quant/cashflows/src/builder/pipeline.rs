@@ -10,8 +10,7 @@ use super::emission::{
     emit_float_coupons_on,
 };
 use super::orchestrator::{
-    AmortizationSetup, BuildState, PreparedAmortization, apply_principal_event, coupon_periods,
-    initialize_build_state,
+    AmortizationSetup, BuildState, apply_principal_event, coupon_periods, initialize_build_state,
 };
 use super::schedule::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
 use super::specs::PrincipalEventSpec;
@@ -20,7 +19,6 @@ use crate::fixings::ProjectedFixing;
 use finstack_quant_core::InputError;
 use finstack_quant_core::cashflow::{CFKind, CashFlowParams};
 use finstack_quant_core::dates::{Date, DayCount};
-use finstack_quant_core::decimal::f64_to_decimal;
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
@@ -45,23 +43,13 @@ impl CompiledCashFlowPlan {
             self.issue,
             self.notional.initial.currency(),
             &self.amort_setup,
+            Decimal::ZERO,
             state,
         )?;
         if let Some((_, balance)) = state.outstanding_history.last_mut() {
             *balance = state.outstanding;
         }
-        self.initialize_linear_between(self.issue, state);
         Ok(())
-    }
-
-    /// Fix equal installments from the balance after all start-date movements.
-    fn initialize_linear_between(&self, d: Date, state: &mut BuildState) {
-        if let PreparedAmortization::LinearBetween { start, count, .. } = &self.amort_setup.rule
-            && *start == d
-        {
-            state.linear_between_installment =
-                Some(state.outstanding / Decimal::from(*count as u64));
-        }
     }
 
     /// Process custom principal events (draws/repays) for this date.
@@ -77,15 +65,20 @@ impl CompiledCashFlowPlan {
             .take_while(|ev| ev.date == d)
         {
             apply_principal_event(ev, &mut state.outstanding, &mut state.flows)?;
-            if ev.kind == CFKind::Notional && ev.delta.amount() > 0.0 {
-                funded = funded
-                    .checked_add(f64_to_decimal(ev.delta.amount())?)
-                    .ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "funding exceeds the supported decimal range".into(),
-                        )
-                    })?;
+            let delta = ev.delta.amount_decimal();
+            if ev.kind == CFKind::Notional && delta > Decimal::ZERO {
+                funded = funded.checked_add(delta).ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "funding exceeds the supported decimal range".into(),
+                    )
+                })?;
             }
+        }
+        if state.outstanding < Decimal::ZERO {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "principal events on {d} would make outstanding balance negative ({})",
+                state.outstanding
+            )));
         }
         Ok(funded)
     }
@@ -100,7 +93,7 @@ impl CompiledCashFlowPlan {
             && state.outstanding > Decimal::ZERO
         {
             // Redemption cash is the outstanding par it extinguishes.
-            let cash = Money::new(state.outstanding.as_f64(), self.notional.initial.currency())?;
+            let cash = Money::from_decimal(state.outstanding, self.notional.initial.currency());
             state.flows.push(
                 CashFlowParams::new(
                     self.redemption_date,
@@ -128,19 +121,27 @@ impl CompiledCashFlowPlan {
     ) -> finstack_quant_core::Result<()> {
         let ccy = self.notional.initial.currency();
         let pik_to_add = emit_fixed_coupons_on(d, &self.fixed_schedules, ccy, state)?
-            + emit_float_coupons_on(d, &self.float_schedules, ccy, market, state)?;
-        if pik_to_add > 0.0 {
-            state.outstanding = state
-                .outstanding
-                .checked_add(f64_to_decimal(pik_to_add)?)
-                .ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(
-                        "outstanding principal exceeds the supported decimal range".into(),
-                    )
-                })?;
+            .checked_add(emit_float_coupons_on(
+                d,
+                &self.float_schedules,
+                ccy,
+                market,
+                state,
+            )?)
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "accumulated PIK principal exceeds the supported decimal range".into(),
+                )
+            })?;
+        if pik_to_add > rust_decimal::Decimal::ZERO {
+            state.outstanding = state.outstanding.checked_add(pik_to_add).ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "outstanding principal exceeds the supported decimal range".into(),
+                )
+            })?;
         }
         let funded = self.process_principal_events(d, state)?;
-        emit_amortization_on(d, ccy, &self.amort_setup, state)?;
+        emit_amortization_on(d, ccy, &self.amort_setup, funded, state)?;
         emit_fees_on(
             d,
             &self.periodic_fees,
@@ -149,27 +150,6 @@ impl CompiledCashFlowPlan {
             ccy,
             &mut state.flows,
         )?;
-        self.initialize_linear_between(d, state);
-        if let PreparedAmortization::LinearBetween { start, end, .. } = &self.amort_setup.rule
-            && funded > Decimal::ZERO
-            && d > *start
-            && d < *end
-        {
-            // Each later draw repays equally over its remaining dates.
-            // Add after today's payment: a same-day draw first amortizes
-            // at the next contractual boundary, never at its funding date.
-            let remaining = self
-                .amort_setup
-                .payment_dates
-                .keys()
-                .filter(|&&date| date > d && date <= *end)
-                .count();
-            if remaining > 0 {
-                *state
-                    .linear_between_installment
-                    .get_or_insert(Decimal::ZERO) += funded / Decimal::from(remaining as u64);
-            }
-        }
         self.handle_maturity(d, state)?;
 
         debug_assert!(
@@ -268,12 +248,17 @@ impl CompiledCashFlowPlan {
         // Fixed fees are emitted once, here. The final canonical sort places
         // them by date, so they need no entries in the date grid.
         for (fee_date, amount) in &self.fixed_fees {
-            if amount.amount() != 0.0 {
-                state.flows.push(
-                    CashFlowParams::new(*fee_date, None, *amount, CFKind::Fee, 0.0, None)
-                        .build()?,
-                );
-            }
+            state.flows.push(
+                CashFlowParams::new(
+                    *fee_date,
+                    None,
+                    Money::from_decimal(amount.amount_decimal(), amount.currency()),
+                    CFKind::Fee,
+                    0.0,
+                    None,
+                )
+                .build()?,
+            );
         }
 
         let (resolved_curves, resolved_fixings): (
@@ -298,10 +283,7 @@ impl CompiledCashFlowPlan {
         };
 
         for (schedule, resolved_curve) in self.float_schedules.iter().zip(&resolved_curves) {
-            let (Some(spec_tenor), Some(curve)) = (
-                schedule.spec.rate_spec.index_tenor,
-                resolved_curve.as_deref(),
-            ) else {
+            let Some(curve) = resolved_curve.as_deref() else {
                 continue;
             };
             if schedule
@@ -312,20 +294,11 @@ impl CompiledCashFlowPlan {
             {
                 continue;
             }
-            let spec_years = spec_tenor.to_years_approx();
-            let curve_years = curve.tenor();
-            if curve_years > 0.0
-                && spec_years > 0.0
-                && (spec_years - curve_years).abs() / curve_years > 0.1
-            {
-                tracing::warn!(
-                    forward_curve_id = %schedule.spec.rate_spec.forward_curve_id,
-                    spec_index_tenor_years = spec_years,
-                    curve_tenor_years = curve_years,
-                    "floating leg index_tenor disagrees with the resolved forward curve's \
-                     tenor; projection uses the curve's embedded tenor — check the curve id"
-                );
-            }
+            validate_index_tenor_match(
+                schedule.spec.rate_spec.index_tenor,
+                curve,
+                schedule.spec.rate_spec.forward_curve_id.as_str(),
+            )?;
         }
 
         self.process_issue_amortization(&mut state)?;
@@ -355,6 +328,27 @@ impl CompiledCashFlowPlan {
         schedule.validate()?;
         Ok(schedule)
     }
+}
+
+/// Reject term-index tenors that disagree with the resolved forward curve's tenor by > 10%.
+pub(crate) fn validate_index_tenor_match(
+    index_tenor: Option<finstack_quant_core::dates::Tenor>,
+    curve: &ForwardCurve,
+    forward_curve_id: &str,
+) -> finstack_quant_core::Result<()> {
+    let Some(spec_tenor) = index_tenor else {
+        return Ok(());
+    };
+    let spec_years = spec_tenor.to_years_approx();
+    let curve_years = curve.tenor();
+    if curve_years > 0.0 && spec_years > 0.0 && (spec_years - curve_years).abs() / curve_years > 0.1
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "floating leg index_tenor {spec_tenor:?} ({spec_years:.6}y) disagrees with resolved \
+             forward curve '{forward_curve_id}' tenor ({curve_years:.6}y)"
+        )));
+    }
+    Ok(())
 }
 
 /// Build the metadata and representative day count of a compiled schedule.

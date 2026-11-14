@@ -16,17 +16,18 @@ def accrued_interest(schedule_json: str, as_of: object, config_json: str | None 
     return accrued_interest_amount(CashFlowSchedule.from_json(schedule_json), as_of, config).amount
 
 
-def test_record_date_retains_coupon_until_next_settlement() -> None:
+def test_ex_coupon_date_window_is_inclusive_of_ex_date() -> None:
     rule = ExCouponRule(7, "gblo")
     payment = dt.date(2025, 7, 1)
-    record = dt.date(2025, 6, 20)
-    assert rule.ex_date(payment) == record
-    assert not rule.is_ex_coupon(payment, record)
+    ex_date = dt.date(2025, 6, 20)
+    assert rule.ex_date(payment) == ex_date
+    assert not rule.is_ex_coupon(payment, dt.date(2025, 6, 19))
+    assert rule.is_ex_coupon(payment, ex_date)
     assert rule.is_ex_coupon(payment, dt.date(2025, 6, 23))
     assert not rule.is_ex_coupon(payment, payment)
 
 
-def test_json_accrual_uses_settlement_after_record_date() -> None:
+def test_json_accrual_excludes_coupon_starting_on_ex_date() -> None:
     schedule = json.dumps({
         "flows": [
             {
@@ -59,7 +60,8 @@ def test_json_accrual_uses_settlement_after_record_date() -> None:
         "include_pik": True,
         "frequency": {"count": 6, "unit": "months"},
     })
-    assert accrued_interest(schedule, "2025-06-20", config) == pytest.approx(25_000 * 170 / 181)
+    assert accrued_interest(schedule, "2025-06-19", config) == pytest.approx(25_000 * 169 / 181)
+    assert accrued_interest(schedule, "2025-06-20", config) < 0
     assert accrued_interest(schedule, "2025-06-23", config) < 0
 
 

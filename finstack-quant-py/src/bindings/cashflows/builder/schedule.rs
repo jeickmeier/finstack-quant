@@ -245,7 +245,7 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
         }
         let mut flows = Vec::with_capacity(rows);
         for (i, date) in dates.iter().enumerate() {
-            let amount: f64 = amounts[i].extract()?;
+            let amount = super::specs::decimal_from_any(&amounts[i])?;
             let currency = extract_currency(&currencies[i])?;
             let reset = match resets.as_ref().map(|r| &r[i]) {
                 Some(r) if !is_missing(r)? => Some(py_to_date(r)?),
@@ -266,7 +266,7 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
                 ..CashFlowParams::new(
                     py_to_date(date)?,
                     reset,
-                    Money::new(amount, currency).map_err(crate::errors::core_to_py)?,
+                    Money::from_decimal(amount, currency),
                     extract_cf_kind(&kinds[i])?,
                     accrual_factor,
                     rate,

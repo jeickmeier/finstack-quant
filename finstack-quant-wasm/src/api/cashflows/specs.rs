@@ -155,9 +155,9 @@ pub fn default_model_spec_validate(
 /// Monthly default rate (MDR) of a default model at a seasoning month.
 ///
 /// @param spec - `DefaultModelSpec` wire object.
-/// @param seasoningMonths - Months since origination or pool start (non-negative integer).
+/// @param seasoningMonths - Months since origination or pool start (positive integer, 1-indexed).
 /// @returns Monthly default rate as a decimal; a constant CDR converts as `1 - (1 - CDR)^(1/12)`.
-/// @throws If `spec` is not a `DefaultModelSpec` or its curve parameters are invalid (kind `validation`), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
+/// @throws If `spec` is not a `DefaultModelSpec`, its curve parameters are invalid or `seasoningMonths` is `0` (kind `validation`), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
 #[wasm_bindgen(js_name = defaultModelSpecMdr)]
 pub fn default_model_spec_mdr(
     #[wasm_bindgen(unchecked_param_type = "generated.cashflows.DefaultModelSpec")] spec: JsValue,
@@ -176,10 +176,10 @@ pub fn default_model_spec_mdr(
 /// current balance reproduces the curve's defaults.
 ///
 /// @param spec - `DefaultModelSpec` wire object.
-/// @param seasoningMonths - Months since origination or pool start (non-negative integer).
+/// @param seasoningMonths - Months since origination or pool start (positive integer, 1-indexed).
 /// @param survivingBalanceFraction - Current pool balance divided by the balance the curve is expressed against, as a finite non-negative decimal (may exceed 1.0 after par build).
 /// @returns Monthly default rate as a decimal in `[0, 1]`; zero once the surviving balance is exhausted.
-/// @throws If `spec` is not a `DefaultModelSpec`, its curve parameters are invalid, or `survivingBalanceFraction` is negative or non-finite (kind `validation`); if `seasoningMonths` is not a non-negative integer or `survivingBalanceFraction` is not a number (kind `invalid_type`).
+/// @throws If `spec` is not a `DefaultModelSpec`, its curve parameters are invalid, `seasoningMonths` is `0`, or `survivingBalanceFraction` is negative or non-finite (kind `validation`); if `seasoningMonths` is not a non-negative integer or `survivingBalanceFraction` is not a number (kind `invalid_type`).
 #[wasm_bindgen(js_name = defaultModelSpecMdrWithSurvival)]
 pub fn default_model_spec_mdr_with_survival(
     #[wasm_bindgen(unchecked_param_type = "generated.cashflows.DefaultModelSpec")] spec: JsValue,
@@ -230,9 +230,9 @@ pub fn prepayment_model_spec_validate(
 /// Single-month mortality (SMM) of a prepayment model at a seasoning month.
 ///
 /// @param spec - `PrepaymentModelSpec` wire object.
-/// @param seasoningMonths - Months since origination or pool start (non-negative integer).
+/// @param seasoningMonths - Months since origination or pool start (positive integer, 1-indexed).
 /// @returns Monthly prepayment rate as a decimal; a constant CPR converts as `1 - (1 - CPR)^(1/12)`.
-/// @throws If `spec` is not a `PrepaymentModelSpec` or its curve parameters are invalid (kind `validation`), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
+/// @throws If `spec` is not a `PrepaymentModelSpec`, its curve parameters are invalid or `seasoningMonths` is `0` (kind `validation`), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
 #[wasm_bindgen(js_name = prepaymentModelSpecSmm)]
 pub fn prepayment_model_spec_smm(
     #[wasm_bindgen(unchecked_param_type = "generated.cashflows.PrepaymentModelSpec")] spec: JsValue,
@@ -248,9 +248,9 @@ pub fn prepayment_model_spec_smm(
 /// Recovery rate of a recovery model for a default in a seasoning month.
 ///
 /// @param spec - `RecoveryModelSpec` wire object.
-/// @param seasoningMonths - Months since origination of the defaulting balance (non-negative integer).
+/// @param seasoningMonths - Months since origination of the defaulting balance (positive integer, 1-indexed).
 /// @returns Recovery as a decimal fraction of defaulted par: `1 − severity` for the month when a severity vector is set, otherwise the flat `rate`.
-/// @throws If `spec` is not a `RecoveryModelSpec`, its `rate` is outside `[0, 1]` or its severity vector is empty or out of range (kind `validation`; the spec is validated before the query, as Python validates at construction), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
+/// @throws If `spec` is not a `RecoveryModelSpec`, its `rate` is outside `[0, 1]`, its severity vector is empty or out of range, or `seasoningMonths` is `0` (kind `validation`; the spec is validated before the query, as Python validates at construction), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
 #[wasm_bindgen(js_name = recoveryModelSpecRecoveryRate)]
 pub fn recovery_model_spec_recovery_rate(
     #[wasm_bindgen(unchecked_param_type = "generated.cashflows.RecoveryModelSpec")] spec: JsValue,
@@ -258,7 +258,8 @@ pub fn recovery_model_spec_recovery_rate(
 ) -> Result<f64, JsValue> {
     let spec = js_wire::<RecoveryModelSpec>(&spec, "spec")?;
     spec.validate().map_err(to_js_err)?;
-    Ok(spec.recovery_rate(js_uint(&seasoning_months, "seasoningMonths")?))
+    spec.recovery_rate(js_uint(&seasoning_months, "seasoningMonths")?)
+        .map_err(to_js_err)
 }
 
 /// Check a recovery model's rate and severity vector.

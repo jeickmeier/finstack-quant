@@ -486,21 +486,21 @@ fn bench_json_bridge(c: &mut Criterion) {
     let mut group = c.benchmark_group("cashflow_json_bridge");
     group.bench_function("build_5y_q", |b| {
         let spec = fixtures::five_year_fixed_json();
-        let preflight = build_cashflow_schedule_json(spec, None).unwrap();
+        let preflight = build_cashflow_schedule_json(spec, None, None).unwrap();
         let parsed: CashFlowSchedule = serde_json::from_str(&preflight).unwrap();
         checks::fixed_bullet(&parsed, fixtures::base_date(), 5, 20, true);
         drop(parsed);
         drop(preflight);
         b.iter(|| {
             black_box(
-                build_cashflow_schedule_json(black_box(spec), None)
+                build_cashflow_schedule_json(black_box(spec), None, None)
                     .expect("valid JSON schedule build"),
             )
         });
     });
     group.bench_function("validate_5y_q", |b| {
         let schedule_json =
-            build_cashflow_schedule_json(fixtures::five_year_fixed_json(), None).unwrap();
+            build_cashflow_schedule_json(fixtures::five_year_fixed_json(), None, None).unwrap();
         let canonical = validate_cashflow_schedule_json(&schedule_json).unwrap();
         assert_eq!(canonical, schedule_json);
         let parsed: CashFlowSchedule = serde_json::from_str(&canonical).unwrap();
@@ -516,7 +516,7 @@ fn bench_json_bridge(c: &mut Criterion) {
     });
     group.bench_function("dated_flows_5y_q", |b| {
         let schedule_json =
-            build_cashflow_schedule_json(fixtures::five_year_fixed_json(), None).unwrap();
+            build_cashflow_schedule_json(fixtures::five_year_fixed_json(), None, None).unwrap();
         let schedule: CashFlowSchedule = serde_json::from_str(&schedule_json).unwrap();
         checks::fixed_bullet(&schedule, fixtures::base_date(), 5, 20, true);
         let preflight = dated_flows_json(&schedule_json).unwrap();
@@ -638,14 +638,17 @@ fn bench_accrued_variants(c: &mut Criterion) {
             })
             .sum();
         checks::close(
-            accrued_interest_amount(&schedule, as_of, &cfg).unwrap(),
+            accrued_interest_amount(&schedule, as_of, &cfg)
+                .unwrap()
+                .amount(),
             expected,
             1e-7,
         );
         b.iter(|| {
             black_box(
                 accrued_interest_amount(black_box(&schedule), black_box(as_of), black_box(&cfg))
-                    .expect("valid compounded accrual"),
+                    .expect("valid compounded accrual")
+                    .amount(),
             )
         });
     });
@@ -677,7 +680,9 @@ fn bench_accrued_variants(c: &mut Criterion) {
                 ex_coupon: Some(rule),
                 ..Default::default()
             };
-            let preflight = accrued_interest_amount(&schedule, as_of, &cfg).unwrap();
+            let preflight = accrued_interest_amount(&schedule, as_of, &cfg)
+                .unwrap()
+                .amount();
             checks::close(preflight, expected, 1e-7);
             assert_eq!(preflight < 0.0, active);
             b.iter(|| {
@@ -687,7 +692,8 @@ fn bench_accrued_variants(c: &mut Criterion) {
                         black_box(as_of),
                         black_box(&cfg),
                     )
-                    .expect("valid ex-coupon accrual"),
+                    .expect("valid ex-coupon accrual")
+                    .amount(),
                 )
             });
         });

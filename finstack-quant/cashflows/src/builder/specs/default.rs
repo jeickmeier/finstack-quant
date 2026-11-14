@@ -82,7 +82,8 @@ impl DefaultModelSpec {
     ///
     /// # Arguments
     ///
-    /// * `seasoning_months` - Number of months since origination or pool start.
+    /// * `seasoning_months` - Number of months since origination or pool start
+    ///   (`>= 1`).
     ///
     /// # Returns
     ///
@@ -91,11 +92,12 @@ impl DefaultModelSpec {
     /// # Errors
     ///
     /// Returns `Error::Validation` if:
+    /// - `seasoning_months == 0`
     /// - the SDA `speed_multiplier` is non-finite (NaN/∞) or negative
     /// - the scaled annual CDR exceeds 1.0 (e.g. an over-unity multiplier)
     /// - a vector curve is empty or holds an invalid value
-    /// - cumulative-loss severity is outside `(0, 1]` or the implied defaults
-    ///   are non-finite
+    /// - cumulative-loss severity is outside `(0, 1]`, the implied defaults
+    ///   are non-finite, or the monthly default share exceeds the surviving balance
     ///
     /// Returns `Error::Validation` if the constant `cdr` is negative or
     /// non-finite.
@@ -119,20 +121,22 @@ impl DefaultModelSpec {
     ///
     /// # Arguments
     ///
-    /// * `seasoning_months` - Number of months since origination or pool start.
+    /// * `seasoning_months` - Number of months since origination or pool start
+    ///   (`>= 1`).
     /// * `surviving_balance_fraction` - Current pool balance divided by the
-    ///   balance the curve is expressed against, as a positive finite
+    ///   balance the curve is expressed against, as a non-negative finite
     ///   decimal (may exceed 1.0 after par build).
     ///
     /// # Returns
     ///
-    /// Monthly default rate as a decimal in `[0, 1]`; zero once the surviving
-    /// balance is exhausted.
+    /// Monthly default rate as a decimal in `[0, 1]`.
     ///
     /// # Errors
     ///
-    /// Returns `Error::Validation` if `surviving_balance_fraction` is not a
-    /// finite non-negative number, plus every error of [`Self::mdr`].
+    /// Returns `Error::Validation` if `seasoning_months == 0`,
+    /// `surviving_balance_fraction` is not a finite non-negative number, or
+    /// positive scheduled defaults (`> 1e-12`) exceed `surviving_balance_fraction`
+    /// (pool exhaustion breach), plus every error of [`Self::mdr`].
     pub fn mdr_with_survival(
         &self,
         seasoning_months: u32,
@@ -151,6 +155,11 @@ impl DefaultModelSpec {
         seasoning_months: u32,
         surviving_balance_fraction: Option<f64>,
     ) -> finstack_quant_core::Result<f64> {
+        if seasoning_months == 0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "seasoning_months must be >= 1".to_string(),
+            ));
+        }
         let cdr = match self {
             DefaultModelSpec::Constant { cdr } => *cdr,
             DefaultModelSpec::Sda { speed_multiplier } => {
@@ -169,12 +178,12 @@ impl DefaultModelSpec {
                 const TERMINAL_CDR: f64 = 0.0003;
 
                 let base = if seasoning_months <= PEAK_MONTH {
-                    (seasoning_months as f64 / PEAK_MONTH as f64) * PEAK_CDR
+                    (f64::from(seasoning_months) / f64::from(PEAK_MONTH)) * PEAK_CDR
                 } else if seasoning_months <= PLATEAU_END_MONTH {
                     PEAK_CDR
                 } else if seasoning_months <= TERMINAL_MONTH {
-                    let past_plateau = (seasoning_months - PLATEAU_END_MONTH) as f64;
-                    let decline_months = (TERMINAL_MONTH - PLATEAU_END_MONTH) as f64;
+                    let past_plateau = f64::from(seasoning_months - PLATEAU_END_MONTH);
+                    let decline_months = f64::from(TERMINAL_MONTH - PLATEAU_END_MONTH);
                     PEAK_CDR - (past_plateau / decline_months) * (PEAK_CDR - TERMINAL_CDR)
                 } else {
                     TERMINAL_CDR
@@ -185,15 +194,19 @@ impl DefaultModelSpec {
                 vector_at(monthly_cdr, seasoning_months, "monthly_cdr")?
             }
             DefaultModelSpec::CumulativeLoss { .. } | DefaultModelSpec::Timing { .. } => {
-                let month = seasoning_months.max(1);
-                let before = self.cumulative_default_fraction_checked(month - 1)?;
-                let after = self.cumulative_default_fraction_checked(month)?;
+                let before = self.cumulative_default_fraction_checked(seasoning_months - 1)?;
+                let after = self.cumulative_default_fraction_checked(seasoning_months)?;
                 let defaulted = (after - before).max(0.0);
                 let survival = surviving_balance_fraction.unwrap_or(1.0 - before);
-                if survival <= f64::EPSILON {
+                if defaulted <= 1e-12 {
                     return Ok(0.0);
                 }
-                return Ok((defaulted / survival).clamp(0.0, 1.0));
+                if survival <= f64::EPSILON || defaulted > survival + 1e-12 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "monthly default share ({defaulted}) exceeds surviving balance fraction ({survival}) at seasoning month {seasoning_months}"
+                    )));
+                }
+                return Ok((defaulted / survival).min(1.0));
             }
         };
 
@@ -349,9 +362,13 @@ impl DefaultModelSpec {
             }
             _ => {}
         }
-        // Month 1 and the SDA peak cover every branch of the piecewise curves.
-        self.mdr(1)?;
-        self.mdr(30)?;
+        // Month 1 and the SDA peak cover every branch of the piecewise curves;
+        // par-build cumulative-loss curves can exceed 100% intrinsic defaults
+        // and are validated against live pool survival via `mdr_with_survival`.
+        if !matches!(self, DefaultModelSpec::CumulativeLoss { .. }) {
+            self.mdr(1)?;
+            self.mdr(30)?;
+        }
         Ok(())
     }
 
@@ -530,11 +547,9 @@ mod tests {
                 .expect("valid cumulative-loss curve"),
             Some(1.4)
         );
-        assert_eq!(
-            spec.mdr_with_survival(1, 0.5)
-                .expect("positive surviving balance"),
-            1.0,
-            "monthly defaults cannot exceed available collateral"
+        assert!(
+            spec.mdr_with_survival(1, 0.5).is_err(),
+            "monthly defaults exceeding surviving balance must return a validation error"
         );
     }
 

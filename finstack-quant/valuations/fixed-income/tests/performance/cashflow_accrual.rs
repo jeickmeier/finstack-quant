@@ -148,8 +148,9 @@ fn immediate_loan_record() -> Value {
     let schedule = loan
         .raw_cashflow_schedule(&market, as_of)
         .expect("full signed schedule");
-    let accrued =
-        accrued_interest_amount(&schedule, as_of, &loan.accrual_config()).expect("cash AI");
+    let accrued = accrued_interest_amount(&schedule, as_of, &loan.accrual_config())
+        .expect("cash AI")
+        .amount();
     let independent_ai = 10_000_000.0 * 0.06 * 45.0 / 360.0;
     support::close(accrued, independent_ai, support::AI_BOUND_USD);
     let value = fi::term_loan::TermLoanTreePricer
@@ -185,10 +186,12 @@ fn pik_loan_record() -> Value {
         let dates: [Date; 2] = [date!(2025 - 07 - 01), date!(2026 - 01 - 01)];
         let cash = support::queries(&schedule, &loan.accrual_config(), &dates);
         let total = support::queries(&schedule, &total_config, &dates);
-        let midyear_cash =
-            accrued_interest_amount(&schedule, dates[0], &loan.accrual_config()).expect("cash AI");
-        let midyear_total =
-            accrued_interest_amount(&schedule, dates[0], &total_config).expect("total AI");
+        let midyear_cash = accrued_interest_amount(&schedule, dates[0], &loan.accrual_config())
+            .expect("cash AI")
+            .amount();
+        let midyear_total = accrued_interest_amount(&schedule, dates[0], &total_config)
+            .expect("total AI")
+            .amount();
         support::close(midyear_cash, 0.0, 0.0);
         support::close(midyear_total, 5.0, support::AI_BOUND_USD);
         let path = schedule

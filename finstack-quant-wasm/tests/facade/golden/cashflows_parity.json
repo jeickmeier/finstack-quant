@@ -3578,6 +3578,7 @@
       "amount": "14889.156509221946",
       "currency": "USD"
     },
+    "index_currency": "USD",
     "index": [
       {
         "amount": "0",
@@ -3608,7 +3609,7 @@
     ],
     "ex_date_calendar_days": "2025-07-08",
     "ex_date_business_days": "2025-07-03",
-    "is_ex_coupon": [false, true, false, false, true]
+    "is_ex_coupon": [false, true, true, false, false, true, true]
   },
   "aggregation": {
     "by_period": {
@@ -3988,7 +3989,7 @@
     },
     "recovery_rate": [
       [0.4, 0.4, 0.4, 0.4],
-      [0.30000000000000004, 0.30000000000000004, 0.4, 0.44999999999999996]
+      [0.30000000000000004, 0.4, 0.44999999999999996, 0.44999999999999996]
     ]
   },
   "specs.schedule_params": [

@@ -57,8 +57,8 @@ impl PrepaymentModelSpec {
     ///
     /// For the PSA curve, the annual CPR is first derived from the seasoning:
     ///
-    /// - months `1..=30`: `CPR = speed_multiplier * 0.06 * seasoning / 30`
-    /// - months `> 30`: `CPR = speed_multiplier * 0.06`
+    /// - months `1..=30`: `CPR = min(1.0, speed_multiplier * 0.06 * seasoning / 30)`
+    /// - months `> 30`: `CPR = min(1.0, speed_multiplier * 0.06)`
     ///
     /// For the CMBS lockout curve:
     ///
@@ -66,14 +66,14 @@ impl PrepaymentModelSpec {
     /// - months `> lockout_months`: `CPR = post_lockout_cpr`
     ///
     /// For the ABS curve the SMM is `speed / (1 − speed·(t − 1))` with
-    /// `t = max(seasoning, 1)`, capped at 1.0 once the original balance is
+    /// `t = seasoning >= 1`, capped at 1.0 once the original balance is
     /// exhausted. For the vector curve the annual CPR is the entry for the
-    /// seasoning month (month 0 reads the first entry, later months hold the
-    /// last one).
+    /// seasoning month (1-indexed; later months hold the last entry).
     ///
     /// # Arguments
     ///
-    /// * `seasoning_months` - Number of months since origination or pool start.
+    /// * `seasoning_months` - Number of months since origination or pool start
+    ///   (`>= 1`).
     ///
     /// # Returns
     ///
@@ -82,27 +82,25 @@ impl PrepaymentModelSpec {
     /// # Errors
     ///
     /// Returns `Error::Validation` if:
+    /// - `seasoning_months == 0`
+    /// - the constant `cpr` or `post_lockout_cpr` is non-finite or outside `[0, 1]`
     /// - the PSA `speed_multiplier` is non-finite (NaN/∞) or negative
-    /// - the scaled annual CPR exceeds 1.0 (e.g. an over-unity multiplier)
     /// - the ABS `speed` is outside `[0, 1]`
     /// - the vector curve is empty or holds a value outside `[0, 1]`
-    ///
-    /// Returns `Error::Validation` if the constant `cpr` is negative or
-    /// non-finite.
     ///
     /// # References
     ///
     /// - `docs/REFERENCES.md#tuckman-serrat-fixed-income`
     pub fn smm(&self, seasoning_months: u32) -> finstack_quant_core::Result<f64> {
+        if seasoning_months == 0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "seasoning_months must be >= 1".to_string(),
+            ));
+        }
         let cpr = match self {
             PrepaymentModelSpec::Constant { cpr } => *cpr,
             PrepaymentModelSpec::Psa { speed_multiplier } => {
-                if !speed_multiplier.is_finite() || *speed_multiplier < 0.0 {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "PSA speed_multiplier ({speed_multiplier}) must be finite and non-negative"
-                    )));
-                }
-                crate::builder::credit_rates::psa_cpr(*speed_multiplier, seasoning_months)
+                crate::builder::credit_rates::psa_cpr(*speed_multiplier, seasoning_months)?
             }
             PrepaymentModelSpec::CmbsLockout {
                 lockout_months,
@@ -123,13 +121,6 @@ impl PrepaymentModelSpec {
             }
         };
 
-        if cpr > 1.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "annual CPR ({cpr}) derived from the prepayment curve exceeds 1.0; \
-                 check the curve speed_multiplier"
-            )));
-        }
-
         use crate::builder::credit_rates::annual_to_monthly;
         annual_to_monthly(cpr)
     }
@@ -139,9 +130,9 @@ impl PrepaymentModelSpec {
     /// # Errors
     ///
     /// Returns `Error::Validation` for a constant or post-lockout CPR that is
-    /// non-finite or outside `[0, 1]`, an invalid PSA multiplier, an ABS speed
-    /// outside `[0, 1]`, or a vector curve that is empty or holds a value
-    /// outside `[0, 1]`. Post-lockout CPR is checked even during lockout.
+    /// non-finite or outside `[0, 1]`, a negative or non-finite PSA multiplier,
+    /// an ABS speed outside `[0, 1]`, or a vector curve that is empty or holds a
+    /// value outside `[0, 1]`. Post-lockout CPR is checked even during lockout.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         if let Self::Constant { cpr }
         | Self::CmbsLockout {
@@ -186,11 +177,11 @@ impl PrepaymentModelSpec {
     /// PSA curve with multiplier (1.0 = 100% PSA).
     ///
     /// The implementation uses the standard PSA ramp to a 6% annual CPR over
-    /// 30 months, then holds that terminal CPR flat.
+    /// 30 months, then holds that terminal CPR flat (capping annual CPR at
+    /// `1.0` for high multipliers).
     ///
     /// The multiplier is validated at evaluation time:
-    /// [`Self::smm`] rejects non-finite or negative multipliers and any
-    /// multiplier large enough to push the scaled annual CPR above 1.0.
+    /// [`Self::smm`] rejects non-finite or negative multipliers.
     ///
     /// # Arguments
     ///

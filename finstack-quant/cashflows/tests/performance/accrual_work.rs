@@ -242,6 +242,7 @@ fn case_record(periods: usize, shape: Shape, rebuild: bool) -> Value {
     let mut actual_visits = 0usize;
     let mut proposed_visits = 0usize;
     let mut outer_full = 0.0;
+    let mut outer_full_money = 0.0;
     let mut outer_public = 0.0;
     let mut outer_proposed = 0.0;
     let mut outer_reference = 0.0;
@@ -259,11 +260,18 @@ fn case_record(periods: usize, shape: Shape, rebuild: bool) -> Value {
         let full_value = scalar(&full, &config);
         let actual_value = scalar(&actual, &config);
         let proposed_value = scalar(&proposed, &config);
-        let public = index.accrued_at(date).unwrap();
+        let public = index.accrued_at(date).unwrap().amount();
+        let full_money = Money::new(full_value, index.get_currency())
+            .unwrap()
+            .amount();
         assert_eq!(full_value.to_bits(), actual_value.to_bits());
         assert_eq!(full_value.to_bits(), proposed_value.to_bits());
-        assert_eq!(full_value.to_bits(), public.to_bits());
-        let direct = rebuild.then(|| accrued_interest_amount(&schedule, date, &config).unwrap());
+        assert_eq!(full_money.to_bits(), public.to_bits());
+        let direct = rebuild.then(|| {
+            accrued_interest_amount(&schedule, date, &config)
+                .unwrap()
+                .amount()
+        });
         if let Some(value) = direct {
             assert_eq!(value.to_bits(), public.to_bits());
         }
@@ -275,6 +283,7 @@ fn case_record(periods: usize, shape: Shape, rebuild: bool) -> Value {
         actual_visits += actual_range.1.saturating_sub(actual_range.0);
         proposed_visits += width;
         outer_full += full_value;
+        outer_full_money += full_money;
         outer_public += public;
         outer_proposed += proposed_value;
         outer_reference += expected;
@@ -292,7 +301,7 @@ fn case_record(periods: usize, shape: Shape, rebuild: bool) -> Value {
             "independent_scalar":expected,"scalar_absolute_bound_usd":1e-7,
         }));
     }
-    assert_eq!(outer_full.to_bits(), outer_public.to_bits());
+    assert_eq!(outer_full_money.to_bits(), outer_public.to_bits());
     assert_eq!(outer_full.to_bits(), outer_proposed.to_bits());
     assert!((outer_full - outer_reference).abs() <= 1e-6);
     json!({

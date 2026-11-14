@@ -14,7 +14,12 @@ pub use default::{
 };
 pub use prepayment::{PrepaymentState, StochasticPrepaySpec, StochasticPrepayment};
 
-use finstack_quant_cashflows::builder::annual_to_monthly_clamped;
+use finstack_quant_cashflows::builder::annual_to_monthly;
+
+/// Convert shocked annual CPR/CDR to monthly mortality after clamping to `[0, 1]`.
+pub(super) fn capped_annual_to_monthly(annual: f64) -> f64 {
+    annual_to_monthly(annual.clamp(0.0, 1.0)).unwrap_or(f64::NAN)
+}
 
 /// Mean monthly prepayment after a lognormal CPR shock and the annual-rate cap.
 ///
@@ -37,14 +42,14 @@ fn expected_shocked_smm(base_cpr: f64, shock_volatility: f64) -> f64 {
     }
     let sigma = shock_volatility.abs();
     if sigma == 0.0 {
-        return annual_to_monthly_clamped(base_cpr);
+        return capped_annual_to_monthly(base_cpr);
     }
     if !base_cpr.is_finite() || !sigma.is_finite() {
         return f64::NAN;
     }
 
-    let lower_smm = annual_to_monthly_clamped(base_cpr * (-10.0 * sigma).exp());
-    let upper_smm = annual_to_monthly_clamped(base_cpr * (10.0 * sigma).exp());
+    let lower_smm = capped_annual_to_monthly(base_cpr * (-10.0 * sigma).exp());
+    let upper_smm = capped_annual_to_monthly(base_cpr * (10.0 * sigma).exp());
     if upper_smm == 0.0 || lower_smm >= upper_smm {
         return upper_smm;
     }
@@ -75,13 +80,13 @@ fn expected_shocked_smm(base_cpr: f64, shock_volatility: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{annual_to_monthly_clamped, expected_shocked_smm};
+    use super::{capped_annual_to_monthly, expected_shocked_smm};
 
     #[test]
     fn shocked_smm_expectation_preserves_deterministic_limits() {
         for base_cpr in [0.0, 0.001, 0.20, 1.0] {
             assert!(
-                (expected_shocked_smm(base_cpr, 0.0) - annual_to_monthly_clamped(base_cpr)).abs()
+                (expected_shocked_smm(base_cpr, 0.0) - capped_annual_to_monthly(base_cpr)).abs()
                     < 1e-14
             );
         }

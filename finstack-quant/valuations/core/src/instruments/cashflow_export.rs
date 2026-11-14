@@ -582,9 +582,13 @@ fn envelope_for_priced(
             }
         })
         .collect::<Result<_>>()?;
+    let row_discount_refs: Vec<&dyn Discounting> = row_discounts
+        .iter()
+        .map(|d| d.as_ref() as &dyn Discounting)
+        .collect();
     let native_pvs = credit_adjusted_cashflow_pvs(
         schedule.get_flows(),
-        &discount_factors,
+        &row_discount_refs,
         hazard_arc.as_deref(),
         recovery_rate,
         as_of_date,

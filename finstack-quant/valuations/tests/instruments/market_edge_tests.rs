@@ -372,12 +372,14 @@ mod bond_market_edge {
             as_of, // T+0: settlement = as_of
             &bond_t0.accrual_config(),
         )
-        .unwrap();
+        .unwrap()
+        .amount();
 
         // For T+2, settlement is 2 business days later (approximately as_of + 2)
         let settle_t2 = as_of.saturating_add(time::Duration::days(2));
-        let accrued_t2 =
-            accrued_interest_amount(&sched_t2, settle_t2, &bond_t2.accrual_config()).unwrap();
+        let accrued_t2 = accrued_interest_amount(&sched_t2, settle_t2, &bond_t2.accrual_config())
+            .unwrap()
+            .amount();
 
         // T+2 settlement means 2 more days of accrual
         // 6% annual / 2 = 3% semi-annual, 3% / 180 days ≈ 0.0167% per day
@@ -393,10 +395,10 @@ mod bond_market_edge {
         );
     }
 
-    /// Test coupon entitlement on the record date and the following ex window.
+    /// Test coupon entitlement before, on, and after the record date.
     ///
-    /// Settlement on the record date retains the coupon and positive accrued.
-    /// Strictly after it, accrued is the negative remaining-coupon rebate.
+    /// Settlement before the record date retains the coupon and positive accrued.
+    /// On and after the record date, accrued is the negative remaining-coupon rebate.
     #[test]
     fn test_ex_coupon_boundary_behavior() {
         let issue = date!(2025 - 01 - 01);
@@ -427,16 +429,24 @@ mod bond_market_edge {
 
         let record_date = coupon_date - time::Duration::days(7);
         let before_record = record_date - time::Duration::days(1);
-        let accrued_before = accrued_interest_amount(&schedule, before_record, &config).unwrap();
+        let accrued_before = accrued_interest_amount(&schedule, before_record, &config)
+            .unwrap()
+            .amount();
 
-        let accrued_record = accrued_interest_amount(&schedule, record_date, &config).unwrap();
+        let accrued_record = accrued_interest_amount(&schedule, record_date, &config)
+            .unwrap()
+            .amount();
 
         let after_record = record_date + time::Duration::days(1);
-        let accrued_after = accrued_interest_amount(&schedule, after_record, &config).unwrap();
+        let accrued_after = accrued_interest_amount(&schedule, after_record, &config)
+            .unwrap()
+            .amount();
 
         // 5 days before coupon = within ex-coupon window
         let within_ex = coupon_date - time::Duration::days(5);
-        let accrued_within = accrued_interest_amount(&schedule, within_ex, &config).unwrap();
+        let accrued_within = accrued_interest_amount(&schedule, within_ex, &config)
+            .unwrap()
+            .amount();
 
         // The US corporate bond pays $30 semiannually on 30/360. From Jan 1,
         // June 23/24/25/26 have 172/173/174/175 convention days of accrual.
@@ -444,7 +454,7 @@ mod bond_market_edge {
         let annual_interest = 1000.0 * 0.06;
         for (actual, expected) in [
             (accrued_before, annual_interest * 172.0 / 360.0),
-            (accrued_record, annual_interest * 173.0 / 360.0),
+            (accrued_record, annual_interest * 173.0 / 360.0 - coupon),
             (accrued_after, annual_interest * 174.0 / 360.0 - coupon),
             (accrued_within, annual_interest * 175.0 / 360.0 - coupon),
         ] {
@@ -454,8 +464,8 @@ mod bond_market_edge {
             );
         }
         assert!(
-            accrued_record > accrued_before && accrued_before > 0.0,
-            "Accrued remains positive and increases through the record date"
+            accrued_before > 0.0 && accrued_record < 0.0,
+            "Accrued is positive before the record date and enters negative rebate on the record date"
         );
 
         // The coupon is forfeited starting strictly after the record date.
@@ -507,7 +517,9 @@ mod bond_market_edge {
 
         // 2 months into the stub period
         let as_of = date!(2025 - 05 - 01);
-        let accrued = accrued_interest_amount(&schedule, as_of, &config).unwrap();
+        let accrued = accrued_interest_amount(&schedule, as_of, &config)
+            .unwrap()
+            .amount();
 
         // 2 months out of 4-month stub = 50% of stub coupon
         // Stub coupon = 3% * (4/6) = 2%
@@ -575,11 +587,13 @@ mod bond_market_edge {
 
         let accrued_30_360 =
             accrued_interest_amount(&sched_30_360, leap_day, &bond_30_360.accrual_config())
-                .unwrap();
+                .unwrap()
+                .amount();
 
         let accrued_act_365 =
             accrued_interest_amount(&sched_act_365, leap_day, &bond_act_365.accrual_config())
-                .unwrap();
+                .unwrap()
+                .amount();
 
         // Expected accrued: ~59 days out of ~180 days period, 3% semi-annual coupon = $30
         // 59/180 * $30 ≈ $9.83

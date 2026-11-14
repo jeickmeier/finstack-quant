@@ -3567,9 +3567,10 @@ export interface D_082C9Df57E6F2F432594 {
    * The named forward curve is already the term index (for example a 3M
    * EURIBOR curve) and owns the quoted tenor. Projection is
    * `fwd.rate(reset_date)`, not a FRA-style average over
-   * `[reset, reset + tenor]`. The builder only uses this field to warn at
-   * build time when it disagrees with the resolved curve's tenor by more
-   * than 10%; the curve remains authoritative. Ignored for
+   * `[reset, reset + tenor]`. The builder and
+   * [`RateSpec::try_rate_for_period`](crate::builder::RateSpec::try_rate_for_period)
+   * reject schedules when it disagrees with the resolved curve's tenor by
+   * more than 10%; the curve remains authoritative. Ignored for
    * overnight-compounded legs.
    */
   index_tenor?: Tenor1 | null;

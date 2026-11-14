@@ -461,3 +461,24 @@ def test_typed_accrual_reference_metadata_roundtrips() -> None:
     assert restored is not None
     assert restored.context.coupon_period == (datetime.date(2025, 1, 15), datetime.date(2025, 7, 15))
     assert restored.context.end_is_termination_date is True
+
+
+def test_build_cashflow_schedule_and_json_accept_as_of_cutoff() -> None:
+    from finstack_quant.core.cashflow import CFKind
+    from finstack_quant.core.market_data import MarketContext, ScalarTimeSeries
+
+    spec = json.loads(_floating_cashflow_spec())
+    spec_json = json.dumps(spec)
+    market_without_fixing = MarketContext.from_json(_floating_market_json())
+    with pytest.raises((KeyError, ValueError), match=r"fixing|FIXING"):
+        build_cashflow_schedule(spec, market_without_fixing, as_of="2025-02-01")
+    with pytest.raises((KeyError, ValueError), match=r"fixing|FIXING"):
+        build_cashflow_schedule_json(spec_json, market_without_fixing.to_json(), "2025-02-01")
+
+    market = MarketContext.from_json(_floating_market_json())
+    market.insert_series(ScalarTimeSeries("FIXING:USD-SOFR-3M", [(datetime.date(2025, 1, 15), 0.06)]))
+    typed = build_cashflow_schedule(spec, market, as_of=datetime.date(2025, 2, 1))
+    via_json = json.loads(build_cashflow_schedule_json(spec_json, market.to_json(), "2025-02-01"))
+    assert json.loads(typed.to_json()) == via_json
+    first_coupon = next(flow for flow in typed.get_flows() if flow.kind == CFKind.FLOATING)
+    assert first_coupon.rate == pytest.approx(0.075, abs=1e-12)

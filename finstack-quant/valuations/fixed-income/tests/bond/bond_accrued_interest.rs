@@ -46,7 +46,9 @@ fn test_accrued_interest_linear_default() {
     let schedule = bond
         .cashflow_schedule(&MarketContext::new(), as_of)
         .unwrap();
-    let accrued = accrued_interest_amount(&schedule, as_of, &bond.accrual_config()).unwrap();
+    let accrued = accrued_interest_amount(&schedule, as_of, &bond.accrual_config())
+        .unwrap()
+        .amount();
 
     // Expected: 3% coupon * (90/180) = 1.5% of notional = $1.50
     let expected = 1.50;
@@ -94,13 +96,17 @@ fn test_accrued_interest_compounded_vs_linear() {
         .cashflow_schedule(&MarketContext::new(), as_of)
         .unwrap();
     let accrued_linear =
-        accrued_interest_amount(&sched_linear, as_of, &bond_linear.accrual_config()).unwrap();
+        accrued_interest_amount(&sched_linear, as_of, &bond_linear.accrual_config())
+            .unwrap()
+            .amount();
 
     let sched_comp = bond_compounded
         .cashflow_schedule(&MarketContext::new(), as_of)
         .unwrap();
     let accrued_compounded =
-        accrued_interest_amount(&sched_comp, as_of, &bond_compounded.accrual_config()).unwrap();
+        accrued_interest_amount(&sched_comp, as_of, &bond_compounded.accrual_config())
+            .unwrap()
+            .amount();
 
     // Linear: 3% × (90/180) = 1.50%
     let expected_linear = 1.50;
@@ -153,7 +159,9 @@ fn test_accrued_interest_compounded_zero_coupon() {
     let schedule = bond
         .cashflow_schedule(&MarketContext::new(), as_of)
         .unwrap();
-    let accrued = accrued_interest_amount(&schedule, as_of, &bond.accrual_config()).unwrap();
+    let accrued = accrued_interest_amount(&schedule, as_of, &bond.accrual_config())
+        .unwrap()
+        .amount();
 
     assert!(
         accrued.abs() < 1e-10,
@@ -190,7 +198,9 @@ fn test_accrued_interest_ex_coupon_period() {
     let schedule = bond
         .cashflow_schedule(&MarketContext::new(), as_of)
         .unwrap();
-    let accrued = accrued_interest_amount(&schedule, as_of, &bond.accrual_config()).unwrap();
+    let accrued = accrued_interest_amount(&schedule, as_of, &bond.accrual_config())
+        .unwrap()
+        .amount();
 
     assert!(
         accrued < 0.0,
@@ -233,7 +243,9 @@ fn test_accrued_interest_just_before_ex_coupon_window_positive() {
     let schedule = bond
         .cashflow_schedule(&MarketContext::new(), as_of)
         .unwrap();
-    let accrued = accrued_interest_amount(&schedule, as_of, &bond.accrual_config()).unwrap();
+    let accrued = accrued_interest_amount(&schedule, as_of, &bond.accrual_config())
+        .unwrap()
+        .amount();
 
     assert!(
         accrued > 2.0,
@@ -259,8 +271,9 @@ fn test_accrued_interest_at_coupon_boundaries() {
     let schedule = bond
         .cashflow_schedule(&MarketContext::new(), midway)
         .unwrap();
-    let accrued_midway =
-        accrued_interest_amount(&schedule, midway, &bond.accrual_config()).unwrap();
+    let accrued_midway = accrued_interest_amount(&schedule, midway, &bond.accrual_config())
+        .unwrap()
+        .amount();
 
     // Should be positive: 2% × (90/180) = 1% of notional = $1.00
     assert!(
@@ -346,7 +359,9 @@ fn test_accrued_interest_amortizing_schedule_driven() {
     // structure. This mirrors the production path which uses
     // `Bond::full_cashflow_schedule` internally.
     let schedule = bond.cashflow_schedule(&curves, issue).unwrap();
-    let accrued = accrued_interest_amount(&schedule, as_of, &bond.accrual_config()).unwrap();
+    let accrued = accrued_interest_amount(&schedule, as_of, &bond.accrual_config())
+        .unwrap()
+        .amount();
 
     let schedule = bond
         .cashflow_schedule(&curves, issue)

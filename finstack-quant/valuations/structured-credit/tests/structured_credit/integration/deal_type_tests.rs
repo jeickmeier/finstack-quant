@@ -180,7 +180,7 @@ fn test_abs_default_assumptions() {
     assert!(
         (abs.credit_model
             .prepayment_spec
-            .smm(0)
+            .smm(1)
             .expect("monthly ABS speed")
             - 0.015)
             .abs()

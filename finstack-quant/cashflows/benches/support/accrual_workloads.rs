@@ -33,7 +33,12 @@ pub(super) fn register(c: &mut Criterion) {
                         .expect("timed accrual index");
                     let mut sum = 0.0;
                     for &date in &dates {
-                        sum += black_box(index.accrued_at(black_box(date)).expect("timed query"));
+                        sum += black_box(
+                            index
+                                .accrued_at(black_box(date))
+                                .expect("timed query")
+                                .amount(),
+                        );
                     }
                     black_box(sum)
                 });

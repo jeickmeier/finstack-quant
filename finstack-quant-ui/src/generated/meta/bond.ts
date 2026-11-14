@@ -3898,7 +3898,7 @@ export default [
   {
     "path": "#/$defs/d_afaff9b4b34177ac633e/properties/index_tenor",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/bond.schema.json#/$defs/FloatingRateSpec/properties/index_tenor",
-    "description": "Expected term-index tenor, checked against the resolved forward curve.\n\nThe named forward curve is already the term index (for example a 3M\nEURIBOR curve) and owns the quoted tenor. Projection is\n`fwd.rate(reset_date)`, not a FRA-style average over\n`[reset, reset + tenor]`. The builder only uses this field to warn at\nbuild time when it disagrees with the resolved curve's tenor by more\nthan 10%; the curve remains authoritative. Ignored for\novernight-compounded legs."
+    "description": "Expected term-index tenor, checked against the resolved forward curve.\n\nThe named forward curve is already the term index (for example a 3M\nEURIBOR curve) and owns the quoted tenor. Projection is\n`fwd.rate(reset_date)`, not a FRA-style average over\n`[reset, reset + tenor]`. The builder and\n[`RateSpec::try_rate_for_period`](crate::builder::RateSpec::try_rate_for_period)\nreject schedules when it disagrees with the resolved curve's tenor by\nmore than 10%; the curve remains authoritative. Ignored for\novernight-compounded legs."
   },
   {
     "path": "#/$defs/d_afaff9b4b34177ac633e/properties/index_tenor/anyOf/0",

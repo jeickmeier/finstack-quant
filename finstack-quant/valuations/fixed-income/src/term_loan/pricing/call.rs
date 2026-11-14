@@ -43,8 +43,8 @@ impl ExerciseClaims {
         // A PIK row is dated at its capitalization (record
         // CORE-CONVENTIONS-015 #6), so earned PIK is either already in the
         // outstanding path or still accruing in `total`, never both.
-        let cash = self.cash.accrued_at(exercise)?;
-        let total = self.total.accrued_at(exercise)?;
+        let cash = self.cash.accrued_at(exercise)?.amount();
+        let total = self.total.accrued_at(exercise)?.amount();
         Ok((principal + total - cash, cash))
     }
 }

@@ -902,12 +902,12 @@ pub fn calculate_accrued_interest(
     let settle = settlement_date(bond, as_of)?;
 
     let schedule = build_convertible_schedule(bond, market)?;
-    accrual_index(bond, &schedule)?.accrued_at(settle)
+    Ok(accrual_index(bond, &schedule)?.accrued_at(settle)?.amount())
 }
 
 /// Reusable coupon-accrual state for a convertible's schedule.
 ///
-/// Accrual is linear, includes PIK, and has no ex-coupon window; queries do
+/// Accrual is linear, excludes PIK, and has no ex-coupon window; queries do
 /// not apply settlement lag.
 pub(super) fn accrual_index(
     bond: &ConvertibleBond,
@@ -919,7 +919,7 @@ pub(super) fn accrual_index(
         &finstack_quant_cashflows::accrual::AccrualConfig {
             method: finstack_quant_cashflows::accrual::AccrualMethod::Linear,
             ex_coupon: None,
-            include_pik: true,
+            include_pik: false,
             frequency,
         },
     )

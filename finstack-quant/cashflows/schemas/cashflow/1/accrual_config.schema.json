@@ -17,7 +17,7 @@
     },
     "ExCouponRule": {
       "additionalProperties": false,
-      "description": "Coupon record-date convention applied to coupon flows.\n\nSettlement on the record date retains the coupon. Settlement strictly\nafter it and before payment trades ex-coupon, as in the UK gilt convention.",
+      "description": "Ex-coupon rule applied to coupon flows.\n\nSettlement on or after the ex-coupon date and strictly before the coupon\npayment date trades ex-coupon, as in the UK gilt convention.",
       "properties": {
         "calendar_id": {
           "anyOf": [
@@ -51,7 +51,7 @@
     {
       "ex_coupon": null,
       "frequency": null,
-      "include_pik": true,
+      "include_pik": false,
       "method": "linear"
     }
   ],

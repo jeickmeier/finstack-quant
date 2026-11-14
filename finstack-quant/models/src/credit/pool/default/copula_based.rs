@@ -20,9 +20,9 @@
 //!
 //! - Li, D. X. (2000). "On Default Correlation: A Copula Function Approach." `docs/REFERENCES.md#li-2000-gaussian-copula`
 
+use super::super::capped_annual_to_monthly;
 use super::traits::StochasticDefault;
 use crate::correlation::{Copula, CopulaSpec};
-use finstack_quant_cashflows::builder::annual_to_monthly_clamped;
 
 /// Copula-based stochastic default model.
 ///
@@ -77,7 +77,7 @@ impl CopulaBasedDefault {
             ))
         })?;
         let base_cdr = base_cdr.clamp(0.0, 1.0);
-        let base_mdr = annual_to_monthly_clamped(base_cdr);
+        let base_mdr = capped_annual_to_monthly(base_cdr);
         let default_threshold =
             copula_spec.default_threshold(base_mdr.clamp(1e-10, 1.0 - 1e-10))?;
 
@@ -103,7 +103,7 @@ impl StochasticDefault for CopulaBasedDefault {
     }
 
     fn expected_mdr(&self, _seasoning: u32) -> f64 {
-        annual_to_monthly_clamped(self.base_cdr)
+        capped_annual_to_monthly(self.base_cdr)
     }
 }
 

@@ -577,17 +577,7 @@ impl CashFlowSchedule {
     }
 
     fn validate_principal_balance(&self) -> finstack_quant_core::Result<()> {
-        let initial = self.notional.initial;
-        let epsilon = (initial.amount().abs() * 1e-8).max(1e-6);
-        for (date, balance) in self.replay_balances()? {
-            if initial.amount() >= 0.0 && balance.amount() < -epsilon {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "principal repayments exceed outstanding on {date}: {}",
-                    balance.amount()
-                )));
-            }
-        }
-
+        let _ = self.replay_balances()?;
         Ok(())
     }
 
@@ -629,16 +619,33 @@ impl CashFlowSchedule {
     pub(crate) fn normalize_public(mut self, as_of: Date) -> finstack_quant_core::Result<Self> {
         {
             let initial = self.notional.initial;
+            let non_negative_initial = initial.amount_decimal() >= rust_decimal::Decimal::ZERO;
             let mut balance = initial;
+            let mut max_scale = initial.amount().abs().max(1.0);
             let order = self
                 .balance_replay_order(|flow| flow.get_amount().currency() == initial.currency());
             let mut pending_principal = Vec::new();
+            let mut prev_pre_as_of_date: Option<Date> = None;
             for (index, balance_date) in order {
                 let flow = &mut self.flows[index];
                 let delta = flow.get_principal_delta();
                 if balance_date < as_of {
+                    if let Some(prev_date) = prev_pre_as_of_date
+                        && prev_date != balance_date
+                        && non_negative_initial
+                    {
+                        settle_rebased_balance(
+                            &mut balance,
+                            initial.currency(),
+                            max_scale,
+                            prev_date,
+                            as_of,
+                        )?;
+                    }
+                    prev_pre_as_of_date = Some(balance_date);
                     if let Some(delta) = delta {
                         balance = balance.checked_add(delta)?;
+                        max_scale = max_scale.max(balance.amount().abs());
                         // The cash can still be pending after its economic
                         // movement has entered the opening balance.
                         if flow.get_date() >= as_of {
@@ -668,6 +675,16 @@ impl CashFlowSchedule {
                         .build()?,
                     );
                 }
+            }
+            if non_negative_initial {
+                let check_date = prev_pre_as_of_date.unwrap_or(as_of);
+                settle_rebased_balance(
+                    &mut balance,
+                    initial.currency(),
+                    max_scale,
+                    check_date,
+                    as_of,
+                )?;
             }
             self.notional.initial = balance;
             self.flows.extend(pending_principal);
@@ -797,15 +814,16 @@ impl CashFlowSchedule {
     ///
     /// # Negative Balances
     ///
-    /// Replayed balances are permitted to go negative (e.g. a repayment
-    /// exceeding the tracked outstanding); a `tracing::warn!` is emitted when
-    /// the balance drops below a small negative tolerance, but no error is
-    /// raised. The builder validates over-repayment at construction time.
+    /// Replays starting from a non-negative opening notional must stay
+    /// non-negative at the close of every economic balance date (up to `1e-9`
+    /// floating-point rounding dust, which is settled to zero); over-repayments
+    /// return [`finstack_quant_core::Error::Validation`].
     ///
     /// # Errors
     ///
-    /// Returns an error on a currency mismatch between flows and notional or
-    /// decimal overflow during replay.
+    /// Returns a validation error if a non-negative notional goes negative
+    /// at the close of any balance date, or on a currency mismatch between
+    /// flows and notional or decimal overflow during replay.
     pub fn outstanding_by_date(&self) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
         self.replay_balances()
     }
@@ -913,14 +931,31 @@ impl CashFlowSchedule {
     fn replay_balances(&self) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
         let order = self.balance_replay_order(|_| true);
         let mut outstanding = self.notional.initial;
+        let mut max_scale = outstanding.amount().abs().max(1.0);
         let mut closing: Vec<(Date, Money)> = Vec::new();
         for (idx, date) in order {
             apply_flow_to_outstanding(&mut outstanding, &self.flows[idx])?;
+            max_scale = max_scale.max(outstanding.amount().abs());
             match closing.last_mut() {
                 Some((last_date, last_balance)) if *last_date == date => {
                     *last_balance = outstanding;
                 }
                 _ => closing.push((date, outstanding)),
+            }
+        }
+        if self.notional.initial.amount_decimal() >= rust_decimal::Decimal::ZERO {
+            let ccy = self.notional.initial.currency();
+            let tol = (1e-12 * max_scale).max(1e-9);
+            for (date, balance) in &mut closing {
+                if balance.amount() < -tol {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "principal repayments exceed outstanding on {date}: {}",
+                        balance.amount()
+                    )));
+                }
+                if balance.amount() < 0.0 {
+                    *balance = Money::zero(ccy);
+                }
             }
         }
         Ok(closing)
@@ -946,8 +981,11 @@ impl CashFlowSchedule {
     ///
     /// # Errors
     ///
-    /// Propagates currency mismatches or decimal overflow from balance replay.
+    /// Returns a validation error if any end-of-day replayed balance goes
+    /// negative for a non-negative initial notional, and propagates currency
+    /// mismatches or decimal overflow from balance replay.
     pub fn balances_by_flow(&self) -> finstack_quant_core::Result<Vec<(Money, Money)>> {
+        let _ = self.replay_balances()?;
         let mut outstanding = self.notional.initial;
         let mut balances = vec![(outstanding, outstanding); self.flows.len()];
         let mut path: Vec<(Date, Money)> = Vec::new();
@@ -1027,11 +1065,10 @@ fn merge_matching_option<T: Copy + PartialEq>(current: &mut Option<Option<T>>, v
     });
 }
 
-/// Outstanding principal on `date` from a balance path, floored at zero.
+/// Outstanding principal on `date` from a balance path.
 ///
 /// The balance is the last after-event balance dated on or before `date`, so
-/// an event on `date` counts, or `initial` before the first event. A replayed
-/// balance below zero (an over-repayment) reads as no principal outstanding.
+/// an event on `date` counts, or `initial` before the first event.
 ///
 /// # Arguments
 ///
@@ -1042,13 +1079,12 @@ fn merge_matching_option<T: Copy + PartialEq>(current: &mut Option<Option<T>>, v
 ///
 /// # Returns
 ///
-/// The outstanding amount in the path's currency, never negative.
+/// The raw outstanding amount in the path's currency without clamping.
 pub fn outstanding_on(path: &[(Date, Money)], date: Date, initial: f64) -> f64 {
     path.partition_point(|(event_date, _)| *event_date <= date)
         .checked_sub(1)
         .and_then(|last| path.get(last))
         .map_or(initial, |(_, balance)| balance.amount())
-        .max(0.0)
 }
 
 /// Merge multiple schedules into one deterministic composite schedule.
@@ -1137,6 +1173,29 @@ where
     )
 }
 
+/// Validate and dust-settle the rebased balance in `initial` currency during
+/// [`CashFlowSchedule::normalize_public`] at an economic date boundary or end of
+/// the pre-`as_of` prefix.
+fn settle_rebased_balance(
+    balance: &mut Money,
+    currency: finstack_quant_core::currency::Currency,
+    max_scale: f64,
+    date: Date,
+    as_of: Date,
+) -> finstack_quant_core::Result<()> {
+    let tol = (1e-12 * max_scale).max(1e-9);
+    if balance.amount() < -tol {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "principal repayments exceed rebased outstanding before {as_of} on {date}: {}",
+            balance.amount()
+        )));
+    }
+    if balance.amount() < 0.0 {
+        *balance = Money::zero(currency);
+    }
+    Ok(())
+}
+
 /// Apply one flow's explicit principal delta during *reconstruction* of the
 /// outstanding path from `notional.initial` and the finalized flow list.
 /// Only the explicit delta moves the balance; nothing is inferred from cash or
@@ -1145,19 +1204,10 @@ fn apply_flow_to_outstanding(
     outstanding: &mut Money,
     cf: &CashFlow,
 ) -> finstack_quant_core::Result<()> {
-    const NEGATIVE_BALANCE_EPSILON: f64 = 1e-9;
     if let Some(delta) = cf.get_principal_delta()
         && delta.amount() != 0.0
     {
         *outstanding = outstanding.checked_add(delta)?;
-    }
-    if outstanding.amount() < -NEGATIVE_BALANCE_EPSILON {
-        tracing::warn!(
-            date = %cf.get_date(),
-            kind = ?cf.get_kind(),
-            balance = outstanding.amount(),
-            "replayed outstanding balance went negative"
-        );
     }
     Ok(())
 }
@@ -1326,7 +1376,7 @@ mod tests {
     }
 
     #[test]
-    fn outstanding_on_reads_last_event_on_or_before_date_floored_at_zero() {
+    fn outstanding_on_reads_last_event_on_or_before_date_without_clamping() {
         let day = |d: u8| Date::from_calendar_date(2025, Month::January, d).expect("valid date");
         let usd = |amount: f64| Money::new(amount, Currency::USD).expect("valid money");
         let path = vec![(day(10), usd(60.0)), (day(20), usd(-5.0))];
@@ -1334,7 +1384,7 @@ mod tests {
         assert_eq!(outstanding_on(&path, day(5), 100.0), 100.0);
         assert_eq!(outstanding_on(&path, day(10), 100.0), 60.0);
         assert_eq!(outstanding_on(&path, day(15), 100.0), 60.0);
-        assert_eq!(outstanding_on(&path, day(20), 100.0), 0.0);
+        assert_eq!(outstanding_on(&path, day(20), 100.0), -5.0);
         assert_eq!(outstanding_on(&[], day(20), 100.0), 100.0);
     }
 
@@ -1617,21 +1667,23 @@ mod tests {
                 crate::accrual::accrued_interest_amount(
                     schedule,
                     as_of,
-                    &crate::accrual::AccrualConfig::default()
+                    &crate::accrual::AccrualConfig {
+                        include_pik: true,
+                        ..Default::default()
+                    }
                 )
-                .expect("PIK accrued"),
+                .expect("PIK accrued")
+                .amount(),
                 3.0
             );
             assert_eq!(
                 crate::accrual::accrued_interest_amount(
                     schedule,
                     as_of,
-                    &crate::accrual::AccrualConfig {
-                        include_pik: false,
-                        ..Default::default()
-                    }
+                    &crate::accrual::AccrualConfig::default()
                 )
-                .expect("cash accrued"),
+                .expect("default cash-only accrued")
+                .amount(),
                 0.0
             );
             assert_eq!(

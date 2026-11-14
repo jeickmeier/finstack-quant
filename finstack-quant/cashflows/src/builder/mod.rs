@@ -57,7 +57,7 @@ mod specs;
 
 pub use credit_rates::{
     PSA_RAMP_MONTHS, PSA_TERMINAL_CPR, SDA_PEAK_CDR, abs_to_smm, annual_to_monthly,
-    annual_to_monthly_clamped, monthly_to_annual, psa_cpr,
+    monthly_to_annual, psa_cpr,
 };
 pub use floating_replay::{
     CompiledFloatingCoupon, FloatingCouponEconomics, FloatingCouponPeriod,

@@ -20,32 +20,43 @@ use builder::schedule::{PyCashFlowMeta, PyCashFlowSchedule};
 #[doc = pydoc!("finstack_quant.cashflows", "build_cashflow_schedule_json")]
 #[pyfunction]
 #[pyo3(
-    signature = (spec_json, market_json = None),
-    text_signature = "(spec_json, market_json=None)"
+    signature = (spec_json, market_json = None, as_of = None),
+    text_signature = "(spec_json, market_json=None, as_of=None)"
 )]
 fn build_cashflow_schedule_json(
     py: Python<'_>,
     spec_json: &str,
     market_json: Option<&str>,
+    as_of: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<String> {
+    let as_of = as_of
+        .map(crate::bindings::date_utils::py_to_date)
+        .transpose()?;
     py.detach(|| {
-        finstack_quant_cashflows::build_cashflow_schedule_json(spec_json, market_json)
+        finstack_quant_cashflows::build_cashflow_schedule_json(spec_json, market_json, as_of)
             .map_err(crate::errors::core_to_py)
     })
 }
 
 #[doc = pydoc!("finstack_quant.cashflows", "build_cashflow_schedule")]
 #[pyfunction]
-#[pyo3(signature = (spec, market=None), text_signature = "(spec, market=None)")]
+#[pyo3(
+    signature = (spec, market=None, as_of=None),
+    text_signature = "(spec, market=None, as_of=None)"
+)]
 fn build_cashflow_schedule(
     py: Python<'_>,
     spec: &Bound<'_, PyAny>,
     market: Option<&Bound<'_, PyAny>>,
+    as_of: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyCashFlowSchedule> {
     let spec: CashflowScheduleBuildSpec =
         crate::bindings::module_utils::spec_from_py(py, spec, "CashflowScheduleBuildSpec")?;
     let market = crate::bindings::extract::extract_market_opt(py, market)?;
-    py.detach(move || spec.build(market.as_ref()))
+    let as_of = as_of
+        .map(crate::bindings::date_utils::py_to_date)
+        .transpose()?;
+    py.detach(move || spec.build_as_of(market.as_ref(), as_of))
         .map(PyCashFlowSchedule::from_inner)
         .map_err(crate::errors::core_to_py)
 }

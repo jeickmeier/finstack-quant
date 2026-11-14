@@ -933,35 +933,115 @@ impl<'a> SimulationState<'a> {
             }
             res.final_balance = final_balance;
 
-            for (date, amount) in &res.interest_flows {
-                if amount.amount() > 0.0 {
-                    res.detailed_flows.push(
-                        CashFlowParams::new(*date, None, *amount, CFKind::Fixed, 0.0, None)
-                            .build()?,
-                    );
+            let initial_par = self
+                .tranches
+                .tranches
+                .iter()
+                .find(|t| t.id.as_str() == tranche_id)
+                .map_or(rust_decimal::Decimal::ZERO, |t| {
+                    t.current_balance.amount_decimal()
+                });
+            let mut staged: Vec<(Date, u8, Money)> = Vec::new();
+            for &(date, amount) in &res.interest_flows {
+                if amount.amount_decimal() > rust_decimal::Decimal::ZERO {
+                    staged.push((date, 0, amount));
                 }
             }
-            for (date, amount) in &res.principal_flows {
-                if amount.amount() > 0.0 {
-                    res.detailed_flows.push({
-                        // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
-                        let cash = *amount;
-                        CashFlowParams::new(*date, None, cash, CFKind::Amortization, 0.0, None)
-                            .with_principal_delta(cash.checked_neg())
-                            .with_principal_date(*date)
-                            .build()?
-                    });
+            for (draw_tranche_id, date, amount) in &diagnostics.tranche_draws {
+                if draw_tranche_id == tranche_id
+                    && amount.amount_decimal() > rust_decimal::Decimal::ZERO
+                {
+                    staged.push((*date, 1, *amount));
                 }
             }
-            // Include write-down flows in detailed_flows so NPV and
-            // risk analytics capture the full economic picture.
-            // Write-downs represent permanent loss of notional and are
-            // classified as DefaultedNotional (negative = loss to holder).
-            for (date, amount) in &res.writedown_flows {
-                if amount.amount() > 0.0 {
-                    res.detailed_flows.push(
+            for &(date, amount) in &res.pik_flows {
+                if amount.amount_decimal() > rust_decimal::Decimal::ZERO {
+                    staged.push((date, 2, amount));
+                }
+            }
+            for &(date, amount) in &res.principal_flows {
+                if amount.amount_decimal() > rust_decimal::Decimal::ZERO {
+                    staged.push((date, 3, amount));
+                }
+            }
+            for &(date, amount) in &res.writedown_flows {
+                if amount.amount_decimal() > rust_decimal::Decimal::ZERO {
+                    staged.push((date, 4, amount));
+                }
+            }
+            staged.sort_by_key(|&(date, rank, _)| (date, rank));
+
+            let mut remaining_par = initial_par;
+            for (date, rank, amount) in staged {
+                let row = match rank {
+                    0 => {
+                        CashFlowParams::new(date, None, amount, CFKind::Fixed, 0.0, None).build()?
+                    }
+                    1 => {
+                        remaining_par = remaining_par
+                            .checked_add(amount.amount_decimal())
+                            .ok_or_else(|| {
+                                finstack_quant_core::Error::Validation(
+                                    "tranche par overflow during draw capitalization".to_string(),
+                                )
+                            })?;
                         CashFlowParams::new(
-                            *date,
+                            date,
+                            None,
+                            amount.checked_neg(),
+                            CFKind::Notional,
+                            0.0,
+                            None,
+                        )
+                        // The par change equals the drawn funding (record CORE-CONVENTIONS-015 #4).
+                        .with_principal_delta(amount)
+                        .with_principal_date(date)
+                        .build()?
+                    }
+                    2 => {
+                        remaining_par = remaining_par
+                            .checked_add(amount.amount_decimal())
+                            .ok_or_else(|| {
+                                finstack_quant_core::Error::Validation(
+                                    "tranche par overflow during PIK capitalization".to_string(),
+                                )
+                            })?;
+                        CashFlowParams::new(
+                            date,
+                            None,
+                            Money::zero(amount.currency()),
+                            CFKind::Pik,
+                            0.0,
+                            None,
+                        )
+                        .with_principal_delta(amount)
+                        .with_principal_date(date)
+                        .build()?
+                    }
+                    3 => {
+                        let par_retired = amount
+                            .amount_decimal()
+                            .min(remaining_par)
+                            .max(rust_decimal::Decimal::ZERO);
+                        remaining_par -= par_retired;
+                        // Actual cash includes equity residual and reserve sweeps above par;
+                        // explicit par reduction is bounded by remaining tranche par.
+                        CashFlowParams::new(date, None, amount, CFKind::Amortization, 0.0, None)
+                            .with_principal_delta(Money::from_decimal(
+                                -par_retired,
+                                amount.currency(),
+                            ))
+                            .with_principal_date(date)
+                            .build()?
+                    }
+                    _ => {
+                        let par_written_down = amount
+                            .amount_decimal()
+                            .min(remaining_par)
+                            .max(rust_decimal::Decimal::ZERO);
+                        remaining_par -= par_written_down;
+                        CashFlowParams::new(
+                            date,
                             None,
                             Money::zero(amount.currency()),
                             CFKind::DefaultedNotional,
@@ -970,33 +1050,16 @@ impl<'a> SimulationState<'a> {
                         )
                         // A noncash write-down: zero cash and an explicit balance decrease on its event
                         // date (record CORE-CONVENTIONS-015 #4, #6).
-                        .with_principal_delta(amount.checked_neg())
-                        .with_principal_date(*date)
-                        .build()?,
-                    );
-                }
+                        .with_principal_delta(Money::from_decimal(
+                            -par_written_down,
+                            amount.currency(),
+                        ))
+                        .with_principal_date(date)
+                        .build()?
+                    }
+                };
+                res.detailed_flows.push(row);
             }
-            for (draw_tranche_id, date, amount) in &diagnostics.tranche_draws {
-                if draw_tranche_id == tranche_id && amount.amount() > 0.0 {
-                    res.detailed_flows.push({
-                        // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
-                        let cash = amount.checked_neg();
-                        CashFlowParams::new(*date, None, cash, CFKind::Notional, 0.0, None)
-                            .with_principal_delta(cash.checked_neg())
-                            .with_principal_date(*date)
-                            .build()?
-                    });
-                }
-            }
-
-            // `detailed_flows` is assembled by category (interest, then
-            // principal, then write-downs); sort by date so downstream consumers
-            // see a single chronologically-ordered stream. Stable so flows that
-            // share a date keep their category order. NPV is unaffected (each
-            // flow carries its own date), but any consumer assuming date order —
-            // e.g. terminal residual sweeps dated at the last pay date — no
-            // longer sees them interleaved out of order.
-            res.detailed_flows.sort_by_key(|cf| cf.get_date());
         }
 
         Ok((self.results, diagnostics))

@@ -307,10 +307,11 @@ mod production_mortgage_audit {
     use time::macros::date;
 
     /// Hand calculation for a Mar 11 -> Apr 11 2026 roll (31 days) on the
-    /// generic 30-year 4% pool, which is issued Mar 1 and therefore has PSA
-    /// seasoning 0 in March (0% CPR). March's principal is level-pay
-    /// scheduled principal only, paid down at the Apr 1 boundary:
-    /// `S/B = i/((1+i)^360 - 1)` with `i = WAC/12`.
+    /// generic 30-year 4% pool, which is issued Mar 1 and is therefore in PSA
+    /// seasoning month 1 in March (`0.2%` CPR at 100% PSA). March's principal is
+    /// level-pay scheduled principal plus month-1 prepayment, paid down at the
+    /// Apr 1 boundary:
+    /// `S/B = i/((1+i)^360 - 1)` with `i = WAC/12`, `paydown = S + (100 - S) * SMM_1`.
     /// Coupon: 20 days (30/360) on 100, then 10 days on `100 - paydown`.
     /// Front accrued: Mar 1 -> Mar 11 = 10/360 of the 4% coupon.
     /// `implied = (coupon + paydown x (100 - 98)/100 - 0.5) / (98.5 + AI) x 360/31`.
@@ -322,7 +323,10 @@ mod production_mortgage_audit {
         roll.back_settlement_date = Some(date!(2026 - 04 - 11));
         let pool = create_assumed_pool(&roll.front_leg().expect("leg")).expect("pool");
         let i = pool.wac / 12.0;
-        let paydown = 100.0 * i / ((1.0 + i).powi(360) - 1.0);
+        let sched = 100.0 * i / ((1.0 + i).powi(360) - 1.0);
+        let smm = pool.prepayment_spec.smm(1).expect("month 1 SMM");
+        let prepay = (100.0 - sched) * smm;
+        let paydown = sched + prepay;
         let coupon = 0.04 * (100.0 * 20.0 + (100.0 - paydown) * 10.0) / 360.0;
         let accrued = 100.0 * 0.04 * 10.0 / 360.0;
         let expected =

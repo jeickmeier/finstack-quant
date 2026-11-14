@@ -246,10 +246,12 @@ fn callable_bond_spread_duration_uses_quote_reproducing_workout_path() {
         .cashflow_schedule(&market, as_of)
         .expect("cashflow schedule");
     let accrued_at_quote = accrued_interest_amount(&schedule, quote_date, &bond.accrual_config())
-        .expect("settlement accrued");
+        .expect("settlement accrued")
+        .amount();
     let dirty_quote = clean_quote * notional.amount() / 100.0 + accrued_at_quote;
     let accrued_at_call = accrued_interest_amount(&schedule, call_date, &bond.accrual_config())
-        .expect("call-date accrued");
+        .expect("call-date accrued")
+        .amount();
     let mut workout_flows: Vec<(Date, Money)> = bond
         .dated_cashflows(&market, as_of)
         .expect("contractual flows")

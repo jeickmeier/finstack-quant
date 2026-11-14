@@ -880,7 +880,8 @@ fn test_callable_bdt_oas_recovers_settlement_date_clean_price() {
         quote_date,
         &bond.accrual_config(),
     )
-    .expect("quote-date accrued");
+    .expect("quote-date accrued")
+    .amount();
     let quoted_clean_price_pct = (dirty_at_quote - accrued_at_quote) / notional.amount() * 100.0;
     bond.instrument_pricing_overrides
         .market_quotes
@@ -1298,7 +1299,8 @@ fn test_z_spread_solver_convergence_across_spread_regimes() {
             quote_date,
             &base_bond.accrual_config(),
         )
-        .expect("accrued at quote date");
+        .expect("accrued at quote date")
+        .amount();
         let clean_currency = dirty_target - accrued;
         let clean_px = clean_currency / notional.amount() * 100.0;
 

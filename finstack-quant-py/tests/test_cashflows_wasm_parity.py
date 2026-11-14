@@ -279,6 +279,7 @@ def _accrual() -> Any:
     return {
         "amount": wire(accrued_interest_amount(schedule, dt.date(2025, 4, 15))),
         "amount_compounded": wire(accrued_interest_amount(schedule, dt.date(2025, 4, 15), compounded)),
+        "index_currency": wire(linear.get_currency()),
         "index": [wire(linear.accrued_at(date)) for date in ("2025-01-15", "2025-04-15", "2025-07-10", "2026-12-31")],
         "index_ex_coupon": [wire(with_ex_coupon.accrued_at(date)) for date in ("2025-04-15", "2025-07-10")],
         "ex_date_calendar_days": wire(ExCouponRule(7).ex_date(payment)),
@@ -286,9 +287,11 @@ def _accrual() -> Any:
         "is_ex_coupon": [
             ExCouponRule(7, calendar).is_ex_coupon(payment, settlement)
             for settlement, calendar in (
+                ("2025-07-07", None),
                 ("2025-07-08", None),
                 ("2025-07-09", None),
                 ("2025-07-15", None),
+                ("2025-07-02", "usny"),
                 ("2025-07-03", "usny"),
                 ("2025-07-07", "usny"),
             )
@@ -438,7 +441,7 @@ def _recovery_models() -> Any:
     vector = flat.with_severity_vector([0.7, 0.6, 0.55])
     return {
         "vector": wire(vector),
-        "recovery_rate": [[model.recovery_rate(month) for month in (0, 1, 2, 12)] for model in (flat, vector)],
+        "recovery_rate": [[model.recovery_rate(month) for month in (1, 2, 3, 12)] for model in (flat, vector)],
     }
 
 

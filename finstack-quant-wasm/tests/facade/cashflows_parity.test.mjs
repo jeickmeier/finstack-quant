@@ -284,6 +284,7 @@ const cases = {
             include_pik: true,
             frequency: null,
           }),
+          index_currency: linear.getCurrency(),
           index: ['2025-01-15', '2025-04-15', '2025-07-10', '2026-12-31'].map((date) =>
             linear.accruedAt(date)
           ),
@@ -296,11 +297,13 @@ const cases = {
             { days_before_coupon: 7, calendar_id: 'usny' },
             '2025-07-15'
           ),
-          // Record date 2025-07-08 (calendar) / 2025-07-03 (USNY business days).
+          // Ex-coupon date 2025-07-08 (calendar) / 2025-07-03 (USNY business days), inclusive.
           is_ex_coupon: [
+            ['2025-07-07', null],
             ['2025-07-08', null],
             ['2025-07-09', null],
             ['2025-07-15', null],
+            ['2025-07-02', 'usny'],
             ['2025-07-03', 'usny'],
             ['2025-07-07', 'usny'],
           ].map(([settlement, calendar]) =>
@@ -477,7 +480,7 @@ const cases = {
     return {
       vector,
       recovery_rate: [flat, vector].map((model) =>
-        [0, 1, 2, 12].map((month) => cashflows.recoveryModelSpecRecoveryRate(model, month))
+        [1, 2, 3, 12].map((month) => cashflows.recoveryModelSpecRecoveryRate(model, month))
       ),
     };
   },

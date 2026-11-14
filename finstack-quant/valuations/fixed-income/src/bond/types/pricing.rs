@@ -586,9 +586,9 @@ mod tests {
             .ex_coupon_calendar_id = Some("gblo".into());
         let market = MarketContext::new();
         let payment = date!(2025 - 07 - 01);
-        let record = date!(2025 - 06 - 20);
-        let next_settlement = date!(2025 - 06 - 23);
-        for (settlement, entitled) in [(record, true), (next_settlement, false)] {
+        let last_cum_settlement = date!(2025 - 06 - 19);
+        let first_ex_settlement = date!(2025 - 06 - 20);
+        for (settlement, entitled) in [(last_cum_settlement, true), (first_ex_settlement, false)] {
             let flows = bond
                 .pricing_dated_cashflows(&market, settlement)
                 .expect("pricing flows");

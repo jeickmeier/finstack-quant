@@ -212,9 +212,11 @@ pub(super) fn validate(case: Case, fixture: &Fixture) {
     let mut expected_total = 0.0;
     for (&date, &expected) in fixture.dates.iter().zip(&fixture.expected) {
         let actual = if case.rebuild {
-            accrued_interest_amount(&fixture.schedule, date, &fixture.config).expect("direct query")
+            accrued_interest_amount(&fixture.schedule, date, &fixture.config)
+                .expect("direct query")
+                .amount()
         } else {
-            index.accrued_at(date).expect("indexed query")
+            index.accrued_at(date).expect("indexed query").amount()
         };
         close(actual, expected, SCALAR_BOUND);
         total += actual;

@@ -323,7 +323,7 @@ pub(crate) fn lower_return_floor(
             // BondValuator adds accrued interest to the exercise barrier,
             // so subtract it here to avoid paying accrued twice relative
             // to the total-return target.
-            let accrued = accrual_index.accrued_at(date)?;
+            let accrued = accrual_index.accrued_at(date)?.amount();
             let clean_required = dirty_required - accrued;
             floor_by_date.insert(date, (100.0 * clean_required / outstanding).max(100.0));
         }
@@ -692,7 +692,8 @@ mod tests {
         )
         .unwrap()
         .accrued_at(between_coupon_date)
-        .unwrap();
+        .unwrap()
+        .amount();
         assert!(accrued > 0.0, "fixture must exercise between coupons");
         assert!(
             (call.price_pct_of_par + accrued - 125.0).abs() < 1.0e-10,
@@ -729,7 +730,8 @@ mod tests {
         )
         .unwrap()
         .accrued_at(exercise_date)
-        .unwrap();
+        .unwrap()
+        .amount();
         let flows = [
             (bond.issue_date, -bond.notional.amount()),
             (exercise_date, call.price_pct_of_par + accrued),
@@ -996,7 +998,8 @@ mod tests {
                 let redemption = call.price_pct_of_par / 100.0 * v0
                     + accrual_index
                         .accrued_at(call.start)
-                        .expect("call-date accrued");
+                        .expect("call-date accrued")
+                        .amount();
                 let moic = (cash_incl + redemption) / v0;
 
                 assert!(
@@ -1053,7 +1056,8 @@ mod tests {
         // Sanity: the lowered redemption hits the target exactly (within tol).
         let accrued = accrual_index
             .accrued_at(binding_call.start)
-            .expect("call-date accrued");
+            .expect("call-date accrued")
+            .amount();
         let at_floor = binding_call.price_pct_of_par / 100.0 * v0 + accrued;
         let moic_at_floor = (cash_incl + at_floor) / v0;
         assert!(
@@ -1129,7 +1133,8 @@ mod tests {
             let redemption = call.price_pct_of_par / 100.0 * v0
                 + accrual_index
                     .accrued_at(call.start)
-                    .expect("call-date accrued");
+                    .expect("call-date accrued")
+                    .amount();
             flows.push((call.start, distribution_on_call + redemption));
 
             let realized = finstack_quant_core::cashflow::xirr(&flows)
@@ -1209,7 +1214,8 @@ mod tests {
                 let redemption = call.price_pct_of_par / 100.0 * v0
                     + accrual_index
                         .accrued_at(call.start)
-                        .expect("call-date accrued");
+                        .expect("call-date accrued")
+                        .amount();
                 let moic = (cash_incl + redemption) / v0;
 
                 assert!(

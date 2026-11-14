@@ -218,6 +218,7 @@ fn example_build_spec() -> finstack_quant_core::Result<crate::json::CashflowSche
         fees: Vec::new(),
         principal_events: Vec::new(),
         principal_exchange: Default::default(),
+        as_of: None,
     })
 }
 

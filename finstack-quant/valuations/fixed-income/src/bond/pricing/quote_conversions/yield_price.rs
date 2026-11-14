@@ -604,7 +604,7 @@ fn exercise_redemption(
 ) -> finstack_quant_core::Result<(ExitRedemption, f64)> {
     let (outstanding, replaced_redemption) =
         basis.exercise_principal_and_replaced_redemption(candidate.date, bond.maturity);
-    let accrued = basis.accrual_index.accrued_at(candidate.date)?;
+    let accrued = basis.accrual_index.accrued_at(candidate.date)?.amount();
     let floor_price = outstanding * candidate.price_pct_of_par / 100.0;
     let clean_redemption = if let Some(spec) = &candidate.make_whole {
         let reference_curve = curves.get_discount(&spec.reference_curve_id)?;

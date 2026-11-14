@@ -5786,7 +5786,7 @@
                 "kind": "defaulted_notional",
                 "accrual_factor": 0,
                 "principal_delta": {
-                  "amount": "-79137472.58946182",
+                  "amount": "-79137472.5894618048",
                   "currency": "USD"
                 },
                 "principal_date": "2026-01-02"
@@ -7668,7 +7668,7 @@
                 "kind": "defaulted_notional",
                 "accrual_factor": 0,
                 "principal_delta": {
-                  "amount": "-68485564.78428261",
+                  "amount": "-68485564.7842826121",
                   "currency": "USD"
                 },
                 "principal_date": "2024-04-01"
@@ -7711,7 +7711,7 @@
               [
                 "2024-04-01",
                 {
-                  "amount": "68485564.78428261",
+                  "amount": "68485564.7842826121",
                   "currency": "USD"
                 }
               ]
@@ -7737,7 +7737,7 @@
               "currency": "USD"
             },
             "total_writedown": {
-              "amount": "68485564.78428261",
+              "amount": "68485564.7842826121",
               "currency": "USD"
             }
           }
@@ -8839,7 +8839,7 @@
                 "kind": "defaulted_notional",
                 "accrual_factor": 0,
                 "principal_delta": {
-                  "amount": "-68942724.96547657",
+                  "amount": "-68942724.965476576",
                   "currency": "USD"
                 },
                 "principal_date": "2027-01-04"
@@ -9186,7 +9186,7 @@
               [
                 "2027-01-04",
                 {
-                  "amount": "68942724.96547657",
+                  "amount": "68942724.965476576",
                   "currency": "USD"
                 }
               ]
@@ -9212,7 +9212,7 @@
               "currency": "USD"
             },
             "total_writedown": {
-              "amount": "68942724.96547657",
+              "amount": "68942724.965476576",
               "currency": "USD"
             }
           },

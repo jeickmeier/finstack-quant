@@ -2428,7 +2428,7 @@
                   "kind": "defaulted_notional",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-3301848.0142277153",
+                    "amount": "-3301848.014227714911",
                     "currency": "USD"
                   },
                   "principal_date": "2035-01-03"
@@ -5847,7 +5847,7 @@
                   "kind": "defaulted_notional",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-37119303.59306971",
+                    "amount": "-37119303.593069696742",
                     "currency": "USD"
                   },
                   "principal_date": "2030-10-02"

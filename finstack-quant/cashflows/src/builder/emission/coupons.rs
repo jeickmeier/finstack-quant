@@ -43,19 +43,19 @@ use finstack_quant_core::decimal::f64_to_decimal;
 fn add_pik_flow_if_nonzero(
     flows: &mut Vec<CashFlow>,
     date: Date,
-    pik_amt: f64,
+    pik_amt: Decimal,
     ccy: Currency,
     rate: Option<f64>,
     accrual_factor: f64,
     accrual: CashFlowAccrual,
-) -> finstack_quant_core::Result<f64> {
-    if pik_amt < 0.0 {
+) -> finstack_quant_core::Result<Decimal> {
+    if pik_amt < Decimal::ZERO {
         return Err(finstack_quant_core::Error::Validation(format!(
             "negative PIK coupon amount {pik_amt} on {date}: de-capitalizing PIK is not \
              supported; floor the all-in rate at zero or use a cash coupon"
         )));
     }
-    if pik_amt > 0.0 {
+    if pik_amt > Decimal::ZERO {
         // The capitalized amount is an explicit balance increase
         // (record CORE-CONVENTIONS-015 #4).
         flows.push(
@@ -69,14 +69,14 @@ fn add_pik_flow_if_nonzero(
                 accrual_factor,
                 rate,
             )
-            .with_principal_delta(Money::new(pik_amt, ccy)?)
+            .with_principal_delta(Money::from_decimal(pik_amt, ccy))
             .with_principal_date(date)
             .with_accrual(accrual)
             .build()?,
         );
         Ok(pik_amt)
     } else {
-        Ok(0.0)
+        Ok(Decimal::ZERO)
     }
 }
 
@@ -115,10 +115,9 @@ fn observed_overnight_rate(
 
 /// Prevent a projection fallback from replacing incomplete supplied history.
 ///
-/// This check runs only on a failed projection, keeping successful lookups on
-/// their existing path. Missing curves and absent series can still use the
-/// explicitly configured fallback; missing observations in a supplied series
-/// cannot.
+/// Whenever a historical fixing series is supplied and a valuation cutoff is
+/// known (explicit `observation_date` or the resolved curve's base date), every
+/// strictly pre-cutoff observation must exist in that series under every fallback policy.
 fn require_supplied_historical_fixings(
     observation: &FloatingRateObservation,
     observation_date: Option<Date>,
@@ -126,10 +125,12 @@ fn require_supplied_historical_fixings(
     fixings: Option<&ScalarTimeSeries>,
     forward_curve_id: &str,
 ) -> finstack_quant_core::Result<()> {
-    let (Some(curve), Some(fixings)) = (curve, fixings) else {
+    let (Some(fixings), Some(as_of)) = (
+        fixings,
+        observation_date.or_else(|| curve.map(ForwardCurve::base_date)),
+    ) else {
         return Ok(());
     };
-    let as_of = observation_date.unwrap_or(curve.base_date());
     let require_historical =
         |date| observed_index_fixing(date, Some(fixings), forward_curve_id, as_of).map(drop);
     match observation {
@@ -138,6 +139,34 @@ fn require_supplied_historical_fixings(
             .observations()
             .iter()
             .try_for_each(|slice| require_historical(slice.observation_date)),
+    }
+}
+
+/// Identify whether a failed projection lacked an underlying market input.
+///
+/// Fallback policies (`SpreadOnly`, `FixedRate`) may recover only an absent
+/// forward curve, a pre-cutoff observation without any `FIXING:` series, or a
+/// forward observation prior to the supplied curve's base date. Computational,
+/// day-count, or curve-range failures on supplied curves propagate directly.
+fn is_absent_market_source(
+    observation: &FloatingRateObservation,
+    observation_date: Option<Date>,
+    curve: Option<&ForwardCurve>,
+    fixings: Option<&ScalarTimeSeries>,
+) -> bool {
+    let Some(curve) = curve else {
+        return true;
+    };
+    let as_of = observation_date.unwrap_or(curve.base_date());
+    let curve_base = curve.base_date();
+    let lacks_source =
+        |obs: Date| (obs < as_of && fixings.is_none()) || (obs >= as_of && obs < curve_base);
+    match observation {
+        FloatingRateObservation::Term { reset_date, .. } => lacks_source(*reset_date),
+        FloatingRateObservation::Overnight { schedule, .. } => schedule
+            .observations()
+            .iter()
+            .any(|slice| lacks_source(slice.observation_date)),
     }
 }
 
@@ -181,7 +210,7 @@ pub(crate) fn emit_fixed_coupons_on(
     fixed_schedules: &[FixedSchedule],
     ccy: Currency,
     state: &mut BuildState,
-) -> finstack_quant_core::Result<f64> {
+) -> finstack_quant_core::Result<Decimal> {
     let BuildState {
         flows: out_flows,
         outstanding_history,
@@ -189,7 +218,7 @@ pub(crate) fn emit_fixed_coupons_on(
         ..
     } = state;
     let outstanding_fallback = *outstanding_fallback;
-    let mut pik_to_add = 0.0;
+    let mut pik_to_add = Decimal::ZERO;
 
     for schedule in fixed_schedules {
         let spec = &schedule.spec;
@@ -236,14 +265,30 @@ pub(crate) fn emit_fixed_coupons_on(
                             "fixed coupon amount exceeds Decimal range".into(),
                         )
                     })?;
-                let coupon_total = coupon_total_dec.as_f64();
 
                 let (cash_fraction, pik_fraction) = spec.coupon_type.split_parts()?;
-                let cash_fraction_f64 = cash_fraction.as_f64();
-                let pik_fraction_f64 = pik_fraction.as_f64();
-
-                let cash_amt = coupon_total * cash_fraction_f64;
-                let pik_amt = coupon_total * pik_fraction_f64;
+                let cash_amt_dec = if pik_fraction.is_zero() {
+                    coupon_total_dec
+                } else if cash_fraction.is_zero() {
+                    Decimal::ZERO
+                } else {
+                    coupon_total_dec.checked_mul(cash_fraction).ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "fixed cash coupon amount exceeds Decimal range".into(),
+                        )
+                    })?
+                };
+                let pik_amt_dec = if pik_fraction.is_zero() {
+                    Decimal::ZERO
+                } else if cash_fraction.is_zero() {
+                    coupon_total_dec
+                } else {
+                    coupon_total_dec.checked_sub(cash_amt_dec).ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "fixed PIK coupon amount exceeds Decimal range".into(),
+                        )
+                    })?
+                };
 
                 let rate_f64 = spec.rate.as_f64();
                 let accrual = CashFlowAccrual::new(
@@ -261,13 +306,13 @@ pub(crate) fn emit_fixed_coupons_on(
                 )?;
 
                 // Gate on cash split, not amount sign, so negative-rate coupons emit.
-                if cash_fraction_f64 > 0.0 {
+                if cash_fraction > Decimal::ZERO {
                     let kind = if is_stub { CFKind::Stub } else { CFKind::Fixed };
                     out_flows.push(
                         CashFlowParams::new(
                             d,
                             None,
-                            Money::new(cash_amt, ccy)?,
+                            Money::from_decimal(cash_amt_dec, ccy),
                             kind,
                             yf,
                             Some(rate_f64),
@@ -283,13 +328,17 @@ pub(crate) fn emit_fixed_coupons_on(
                 let pik_added = add_pik_flow_if_nonzero(
                     out_flows,
                     period.accrual_end,
-                    pik_amt,
+                    pik_amt_dec,
                     ccy,
                     Some(rate_f64),
                     yf,
                     accrual,
                 )?;
-                pik_to_add += pik_added;
+                pik_to_add = pik_to_add.checked_add(pik_added).ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "accumulated PIK principal exceeds Decimal range".into(),
+                    )
+                })?;
             }
         }
     }
@@ -510,7 +559,7 @@ pub(crate) fn emit_float_coupons_on(
     ccy: Currency,
     market: ResolvedFloatMarket<'_>,
     state: &mut BuildState,
-) -> finstack_quant_core::Result<f64> {
+) -> finstack_quant_core::Result<Decimal> {
     let BuildState {
         flows: out_flows,
         projected_fixings,
@@ -519,7 +568,7 @@ pub(crate) fn emit_float_coupons_on(
         ..
     } = state;
     let outstanding_fallback = *outstanding_fallback;
-    let mut pik_to_add = 0.0;
+    let mut pik_to_add = Decimal::ZERO;
     for ((schedule, resolved_curve), resolved_fixing) in float_schedules
         .iter()
         .zip(market.curves)
@@ -646,6 +695,14 @@ pub(crate) fn emit_float_coupons_on(
                         *resolved_fixing,
                         spec.rate_spec.forward_curve_id.as_str(),
                     )?;
+                    if !is_absent_market_source(
+                        &observation,
+                        market.observation_date,
+                        resolved_curve.as_deref(),
+                        *resolved_fixing,
+                    ) {
+                        return Err(error);
+                    }
                     let index_rate = resolve_floating_rate_fallback(
                         error,
                         reset_date,
@@ -657,8 +714,8 @@ pub(crate) fn emit_float_coupons_on(
                     vec![(constrained_index, index_rate); segments.len()]
                 }
             };
-            let (cash_fraction, pik_fraction) = spec.coupon_type.split_parts()?;
-            let cash_fraction = cash_fraction.as_f64();
+            let (cash_fraction_dec, pik_fraction_dec) = spec.coupon_type.split_parts()?;
+            let cash_fraction = cash_fraction_dec.as_f64();
             let compiled = CompiledFloatingCoupon::compile(
                 FloatingCouponPeriod {
                     accrual_start: period.accrual_start,
@@ -679,7 +736,7 @@ pub(crate) fn emit_float_coupons_on(
                 },
                 FloatingCouponEconomics {
                     cash_fraction,
-                    pik_fraction: pik_fraction.as_f64(),
+                    pik_fraction: pik_fraction_dec.as_f64(),
                     rate_params: settlement_params,
                 },
                 observation,
@@ -696,24 +753,58 @@ pub(crate) fn emit_float_coupons_on(
                     )
                 })
                 .collect::<finstack_quant_core::Result<Vec<_>>>()?;
-            let period_pik: f64 = settlements
-                .iter()
-                .map(|settlement| settlement.pik_amount)
-                .sum();
-            if !period_pik.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "PIK coupon on {} must capitalize a finite net amount, got {period_pik}",
-                    period.accrual_end,
-                )));
+            let mut split_amounts = Vec::with_capacity(settlements.len());
+            let mut period_pik = Decimal::ZERO;
+            for settlement in &settlements {
+                if !settlement.pik_amount.is_finite() {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "PIK coupon on {} must capitalize a finite net amount, got {}",
+                        period.accrual_end, settlement.pik_amount,
+                    )));
+                }
+                let total_dec = finstack_quant_core::decimal::f64_to_decimal_model_value(
+                    settlement.total_amount,
+                )?;
+                let cash_dec = if pik_fraction_dec.is_zero() {
+                    total_dec
+                } else if cash_fraction_dec.is_zero() {
+                    Decimal::ZERO
+                } else {
+                    total_dec.checked_mul(cash_fraction_dec).ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "floating cash coupon amount exceeds the supported decimal range"
+                                .into(),
+                        )
+                    })?
+                };
+                let pik_dec = if pik_fraction_dec.is_zero() {
+                    Decimal::ZERO
+                } else if cash_fraction_dec.is_zero() {
+                    total_dec
+                } else {
+                    total_dec.checked_sub(cash_dec).ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "floating PIK coupon amount exceeds the supported decimal range".into(),
+                        )
+                    })?
+                };
+                period_pik = period_pik.checked_add(pik_dec).ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "PIK coupon net amount exceeds the supported decimal range".into(),
+                    )
+                })?;
+                split_amounts.push((cash_dec, pik_dec));
             }
-            if period_pik < 0.0 {
+            if period_pik < Decimal::ZERO {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "negative PIK coupon net amount {period_pik} on {}: de-capitalizing PIK is not \
                      supported; floor the all-in rate at zero or use a cash coupon",
                     period.accrual_end,
                 )));
             }
-            for (segment, settlement) in segments.iter().zip(settlements) {
+            for ((segment, settlement), (cash_dec, pik_dec)) in
+                segments.iter().zip(settlements).zip(split_amounts)
+            {
                 let accrual = CashFlowAccrual::new(
                     segment.start,
                     segment.end,
@@ -730,12 +821,12 @@ pub(crate) fn emit_float_coupons_on(
                         bus_basis: None,
                     },
                 )?;
-                if cash_fraction > 0.0 {
+                if !cash_fraction_dec.is_zero() {
                     out_flows.push(
                         CashFlowParams::new(
                             period.payment_date,
                             Some(reset_date),
-                            Money::from_model_value(settlement.cash_amount, ccy)?,
+                            Money::from_decimal(cash_dec, ccy),
                             CFKind::Floating,
                             segment.year_fraction,
                             Some(settlement.all_in_rate),
@@ -744,7 +835,7 @@ pub(crate) fn emit_float_coupons_on(
                         .build()?,
                     );
                 }
-                if settlement.pik_amount != 0.0 {
+                if !pik_dec.is_zero() {
                     // Signed rows allocate one non-negative contractual PIK
                     // coupon. Every row capitalizes on the same final boundary.
                     out_flows.push(
@@ -758,14 +849,18 @@ pub(crate) fn emit_float_coupons_on(
                             segment.year_fraction,
                             Some(settlement.all_in_rate),
                         )
-                        .with_principal_delta(Money::from_model_value(settlement.pik_amount, ccy)?)
+                        .with_principal_delta(Money::from_decimal(pik_dec, ccy))
                         .with_principal_date(period.accrual_end)
                         .with_accrual(accrual)
                         .build()?,
                     );
                 }
             }
-            pik_to_add += period_pik;
+            pik_to_add = pik_to_add.checked_add(period_pik).ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "accumulated PIK principal exceeds the supported decimal range".into(),
+                )
+            })?;
         }
     }
     Ok(pik_to_add)

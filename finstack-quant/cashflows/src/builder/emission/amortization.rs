@@ -4,7 +4,6 @@ use crate::builder::orchestrator::{AmortizationSetup, BuildState, PreparedAmorti
 use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowParams};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::decimal::f64_to_decimal;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 
@@ -27,7 +26,7 @@ fn emit_principal_repayment(
 
     // Amortization cash is par: the balance falls by the amount paid
     // (record CORE-CONVENTIONS-015 #4, #5).
-    let cash = Money::new(pay.as_f64(), ccy)?;
+    let cash = Money::from_decimal(pay, ccy);
     new_flows.push(
         CashFlowParams::new(payment_date, None, cash, CFKind::Amortization, 0.0, None)
             .with_principal_delta(cash.checked_neg())
@@ -45,6 +44,7 @@ pub(in crate::builder) fn emit_amortization_on(
     d: Date,
     ccy: Currency,
     setup: &AmortizationSetup,
+    funded_today: Decimal,
     state: &mut BuildState,
 ) -> finstack_quant_core::Result<()> {
     let outstanding = &mut state.outstanding;
@@ -56,14 +56,19 @@ pub(in crate::builder) fn emit_amortization_on(
             final_notional,
         } if on_boundary => {
             if is_maturity {
-                (*outstanding - *final_notional).max(Decimal::ZERO)
+                if *outstanding < *final_notional {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "LinearTo maturity balance {outstanding} on {d} is below target final_notional {final_notional}"
+                    )));
+                }
+                *outstanding - *final_notional
             } else {
-                *installment
+                (*installment).min((*outstanding - *final_notional).max(Decimal::ZERO))
             }
         }
         PreparedAmortization::StepRemaining(map) => {
             if let Some(target) = map.get(&d) {
-                let target = f64_to_decimal(target.amount())?;
+                let target = target.amount_decimal();
                 if target > *outstanding {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "StepRemaining target {target} exceeds outstanding principal {outstanding} on {d}"
@@ -78,21 +83,21 @@ pub(in crate::builder) fn emit_amortization_on(
         PreparedAmortization::RemainingPercent { fraction } if on_boundary => {
             *outstanding * *fraction
         }
-        PreparedAmortization::LinearBetween { start, end, .. }
-            if on_boundary && d > *start && d <= *end =>
-        {
-            if let Some(installment) = state.linear_between_installment {
-                if d == *end { *outstanding } else { installment }
+        PreparedAmortization::LinearBetween { boundaries } => {
+            if let Ok(idx) = boundaries.binary_search(&d) {
+                let remaining_boundaries = boundaries.len() - idx;
+                if remaining_boundaries == 1 {
+                    *outstanding
+                } else {
+                    (*outstanding - funded_today).max(Decimal::ZERO)
+                        / Decimal::from(remaining_boundaries as u64)
+                }
             } else {
                 Decimal::ZERO
             }
         }
         PreparedAmortization::CustomPrincipal(map) => {
-            let amount = map
-                .get(&d)
-                .map(|money| f64_to_decimal(money.amount()))
-                .transpose()?
-                .unwrap_or_default();
+            let amount = map.get(&d).map(Money::amount_decimal).unwrap_or_default();
             if amount > *outstanding {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "CustomPrincipal repayment {amount} exceeds outstanding principal {outstanding} on {d}"

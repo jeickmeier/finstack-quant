@@ -181,7 +181,7 @@ class PrepaymentModelSpec:
         Parameters
         ----------
         seasoning_months : int
-            Number of months since origination.
+            Months since origination or pool start (1-indexed, ``>= 1``).
 
         Returns
         -------
@@ -192,8 +192,8 @@ class PrepaymentModelSpec:
         Raises
         ------
         ValueError
-            If the underlying curve parameters are invalid, such as a
-            negative PSA speed multiplier.
+            If ``seasoning_months`` is ``0`` or the underlying curve parameters
+            are invalid, such as a negative PSA speed multiplier.
         """
         ...
 

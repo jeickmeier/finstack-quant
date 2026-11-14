@@ -6,7 +6,7 @@
 //! the PAC.
 
 use crate::cmo::types::PacCollar;
-use finstack_quant_cashflows::builder::{annual_to_monthly_clamped, psa_cpr};
+use finstack_quant_cashflows::builder::{annual_to_monthly, psa_cpr};
 use finstack_quant_valuations_fixed_income::mbs_passthrough::pricer::pool_month_step;
 
 /// Dated contractual PAC principal target, in the tranche currency's major units.
@@ -95,7 +95,7 @@ impl PacSchedule {
             wac,
             seasoning_months,
             collar.lower_speed_multiplier,
-        );
+        )?;
         // Project collateral principal at upper PSA
         let upper_principals = project_principal_stream(
             collateral_balance,
@@ -103,7 +103,7 @@ impl PacSchedule {
             wac,
             seasoning_months,
             collar.upper_speed_multiplier,
-        );
+        )?;
 
         // Collateral-derived PAC band = minimum principal at each period.
         let collateral_schedule = lower_principals
@@ -191,7 +191,7 @@ fn project_principal_stream(
     wac: f64,
     seasoning_months: u32,
     speed_multiplier: f64,
-) -> Vec<f64> {
+) -> finstack_quant_core::Result<Vec<f64>> {
     let mut remaining = initial_balance;
     let mut principals = Vec::with_capacity(wam_months as usize);
 
@@ -201,13 +201,13 @@ fn project_principal_stream(
             continue;
         }
         // Prepayment on post-scheduled balance, at the pool's actual loan age.
-        let smm = psa_to_smm(speed_multiplier, seasoning_months.saturating_add(month));
+        let smm = psa_to_smm(speed_multiplier, seasoning_months.saturating_add(month))?;
         let step = pool_month_step(remaining, wam_months - (month - 1), wac, smm, 0.0, 0.0);
         principals.push(step.scheduled_principal + step.prepayment);
         remaining = step.ending_balance;
     }
 
-    principals
+    Ok(principals)
 }
 
 /// Convert PSA speed to SMM for a given month.
@@ -216,8 +216,8 @@ fn project_principal_stream(
 /// (`finstack_quant_cashflows::builder::psa_cpr`) and the canonical CPR→SMM conversion,
 /// keeping PAC/Support projection consistent with the rest of the workspace.
 #[inline]
-fn psa_to_smm(speed_multiplier: f64, month: u32) -> f64 {
-    annual_to_monthly_clamped(psa_cpr(speed_multiplier, month))
+fn psa_to_smm(speed_multiplier: f64, month: u32) -> finstack_quant_core::Result<f64> {
+    annual_to_monthly(psa_cpr(speed_multiplier, month)?)
 }
 
 #[cfg(test)]
@@ -283,21 +283,25 @@ mod tests {
             wac,
             0,
             lower_speed_multiplier,
-        );
+        )
+        .expect("lower PSA principal stream");
         let hi = project_principal_stream(
             collateral_balance,
             wam_months,
             wac,
             0,
             upper_speed_multiplier,
-        );
+        )
+        .expect("upper PSA principal stream");
         let collateral_min: Vec<f64> = lo.iter().zip(hi.iter()).map(|(l, h)| l.min(*h)).collect();
 
         // The (incorrect) PAC-balance-derived stream, for contrast.
         let pac_lo =
-            project_principal_stream(pac_balance, wam_months, wac, 0, lower_speed_multiplier);
+            project_principal_stream(pac_balance, wam_months, wac, 0, lower_speed_multiplier)
+                .expect("lower PAC stream");
         let pac_hi =
-            project_principal_stream(pac_balance, wam_months, wac, 0, upper_speed_multiplier);
+            project_principal_stream(pac_balance, wam_months, wac, 0, upper_speed_multiplier)
+                .expect("upper PAC stream");
         let pac_balance_min: Vec<f64> = pac_lo
             .iter()
             .zip(pac_hi.iter())
@@ -379,22 +383,23 @@ mod tests {
     #[test]
     fn test_psa_to_smm() {
         // 100% PSA at month 30 should give ~0.5% SMM
-        let smm = psa_to_smm(1.0, 30);
+        let smm = psa_to_smm(1.0, 30).expect("valid PSA");
         assert!(smm > 0.004 && smm < 0.006);
 
         // 200% PSA should be about double
-        let smm_200 = psa_to_smm(2.0, 30);
+        let smm_200 = psa_to_smm(2.0, 30).expect("valid PSA");
         assert!(smm_200 > smm * 1.5);
     }
 
     #[test]
     fn test_psa_to_smm_matches_canonical_helper() {
         // PAC/Support SMM conversion must match the registry-backed canonical
-        // helper across a PSA grid, including high-speed clamping behavior.
+        // helper across a PSA grid, including high-speed capping behavior.
         for &psa in &[0.0, 0.5, 1.0, 2.0, 3.0, 18.0] {
             for &month in &[1u32, 15, 30, 60, 360] {
-                let canonical = annual_to_monthly_clamped(psa_cpr(psa, month));
-                let got = psa_to_smm(psa, month);
+                let canonical =
+                    annual_to_monthly(psa_cpr(psa, month).expect("valid PSA")).expect("valid CPR");
+                let got = psa_to_smm(psa, month).expect("valid PSA");
                 assert!(
                     (got - canonical).abs() < 1e-12,
                     "PSA→SMM drift at psa={psa}, month={month}: got {got}, canonical {canonical}"

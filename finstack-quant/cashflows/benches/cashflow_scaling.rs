@@ -319,7 +319,9 @@ fn bench_accrued_single(c: &mut Criterion) {
             let schedule = build_monthly(base, y);
             checks::fixed_bullet(&schedule, base, y, n as usize, false);
             checks::close(
-                accrued_interest_amount(&schedule, as_of, &cfg).unwrap(),
+                accrued_interest_amount(&schedule, as_of, &cfg)
+                    .unwrap()
+                    .amount(),
                 checks::linear_accrued(&schedule, as_of),
                 1e-7,
             );
@@ -330,7 +332,8 @@ fn bench_accrued_single(c: &mut Criterion) {
                         black_box(as_of),
                         black_box(&cfg),
                     )
-                    .unwrap(),
+                    .unwrap()
+                    .amount(),
                 )
             });
         });
@@ -362,9 +365,11 @@ fn bench_accrued_per_exercise_date(c: &mut Criterion) {
                 for &date in &exercise_dates {
                     let expected = checks::linear_accrued(&schedule, date);
                     let actual = if rebuild {
-                        accrued_interest_amount(&schedule, date, &cfg).unwrap()
+                        accrued_interest_amount(&schedule, date, &cfg)
+                            .unwrap()
+                            .amount()
                     } else {
-                        index.accrued_at(date).unwrap()
+                        index.accrued_at(date).unwrap().amount()
                     };
                     checks::close(actual, expected, 1e-7);
                     expected_total += expected;
@@ -382,7 +387,8 @@ fn bench_accrued_per_exercise_date(c: &mut Criterion) {
                                     black_box(date),
                                     black_box(&cfg),
                                 )
-                                .unwrap(),
+                                .unwrap()
+                                .amount(),
                             );
                         }
                         black_box(acc)
@@ -394,7 +400,7 @@ fn bench_accrued_per_exercise_date(c: &mut Criterion) {
                             AccrualIndex::build(black_box(&schedule), black_box(&cfg)).unwrap();
                         let mut acc = 0.0;
                         for &date in &exercise_dates {
-                            acc += black_box(index.accrued_at(black_box(date)).unwrap());
+                            acc += black_box(index.accrued_at(black_box(date)).unwrap().amount());
                         }
                         black_box(acc)
                     });

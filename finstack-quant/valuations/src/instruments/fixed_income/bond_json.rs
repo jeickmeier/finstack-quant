@@ -84,7 +84,7 @@ mod tests {
             }]
         })
         .to_string();
-        let schedule = finstack_quant_cashflows::build_cashflow_schedule_json(&spec, None)
+        let schedule = finstack_quant_cashflows::build_cashflow_schedule_json(&spec, None, None)
             .expect("raw schedule should build");
 
         let instrument = bond_from_cashflows_json(

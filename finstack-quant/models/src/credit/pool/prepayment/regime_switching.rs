@@ -1,8 +1,7 @@
 //! Regime-switching prepayment model.
 
-use super::super::expected_shocked_smm;
+use super::super::{capped_annual_to_monthly, expected_shocked_smm};
 use super::traits::{PrepaymentState, StochasticPrepayment};
-use finstack_quant_cashflows::builder::annual_to_monthly_clamped;
 
 /// Two-state Markov prepayment model with factor-shocked CPR.
 #[derive(Debug, Clone)]
@@ -74,7 +73,7 @@ impl RegimeSwitchingPrepay {
         }
         let z = factors.first().copied().unwrap_or(0.0);
         let shock = (self.factor_loading * z * self.cpr_volatility).exp();
-        annual_to_monthly_clamped(cpr * shock * burnout)
+        capped_annual_to_monthly(cpr * shock * burnout)
     }
 }
 
@@ -133,12 +132,11 @@ mod tests {
     #[test]
     fn expected_smm_averages_monthly_rates_instead_of_annual_cpr() {
         let model = RegimeSwitchingPrepay::new(0.04, 0.80, 0.5, 0.5, 0.4, 0.0);
-        let expected =
-            0.5 * annual_to_monthly_clamped(0.04) + 0.5 * annual_to_monthly_clamped(0.80);
+        let expected = 0.5 * capped_annual_to_monthly(0.04) + 0.5 * capped_annual_to_monthly(0.80);
         assert!((expected - 0.064455390488875).abs() < 1e-14);
         assert!((model.expected_smm(1) - expected).abs() < 1e-14);
         assert!((model.conditional_smm(1, &[0.0], 0.05, 1.0) - expected).abs() < 1e-14);
-        assert_eq!(model.expected_smm(0), annual_to_monthly_clamped(0.04));
+        assert_eq!(model.expected_smm(0), capped_annual_to_monthly(0.04));
     }
 
     #[test]
@@ -184,8 +182,8 @@ mod tests {
     fn sampled_path_retains_regime_between_months_even_without_factor_volatility() {
         let model = RegimeSwitchingPrepay::new(0.04, 0.80, 0.25, 0.10, 0.4, 0.0);
         let mut state = model.initial_state(0, 0.0);
-        let low = annual_to_monthly_clamped(0.04);
-        let high = annual_to_monthly_clamped(0.80);
+        let low = capped_annual_to_monthly(0.04);
+        let high = capped_annual_to_monthly(0.80);
         let sample = |month, state: &mut PrepaymentState, u| {
             model.sample_smm(month, &[0.0], 0.05, 1.0, state, u)
         };

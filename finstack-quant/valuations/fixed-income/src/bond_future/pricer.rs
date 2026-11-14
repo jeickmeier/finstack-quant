@@ -276,7 +276,7 @@ impl BondFuturePricer {
 
         // Forward clean price = forward dirty minus accrued at the delivery date.
         let accrued_at_delivery =
-            accrued_interest_amount(&schedule, delivery_date, &ctd_bond.accrual_config())?;
+            accrued_interest_amount(&schedule, delivery_date, &ctd_bond.accrual_config())?.amount();
         let forward_clean = forward_dirty - accrued_at_delivery;
 
         // Express as a percentage of par, then divide by the conversion factor.
@@ -962,7 +962,8 @@ mod tests {
         let schedule = bond.full_cashflow_schedule(&market).expect("schedule");
         let accrued_delivery =
             accrued_interest_amount(&schedule, delivery_date, &bond.accrual_config())
-                .expect("accrued at delivery");
+                .expect("accrued at delivery")
+                .amount();
         let forward_clean_pct = (forward_dirty - accrued_delivery) / bond.notional.amount() * 100.0;
         let expected = forward_clean_pct / cf;
 
@@ -975,7 +976,8 @@ mod tests {
         // The carry-adjusted forward must differ from the old spot-clean proxy:
         // discounting the dirty PV to a clean spot price and dividing by CF.
         let spot_accrued = accrued_interest_amount(&schedule, as_of, &bond.accrual_config())
-            .expect("accrued today");
+            .expect("accrued today")
+            .amount();
         let spot_clean_pct = (spot_dirty - spot_accrued) / bond.notional.amount() * 100.0;
         let old_proxy = spot_clean_pct / cf;
         assert!(

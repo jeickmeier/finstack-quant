@@ -47,8 +47,9 @@ use wasm_bindgen::prelude::*;
 ///   index bounds. Final-period index and all-in rate adjustments are allocated
 ///   uniformly over contractual accrual time when principal changes.
 /// @param marketJson - Optional JSON-encoded market context for floating-rate lookups.
+/// @param asOf - Optional ISO-8601 valuation cutoff date overriding `spec.as_of`; resets before the cutoff require historical fixings.
 /// @returns JSON-encoded `CashFlowSchedule`.
-/// @throws If the spec or market JSON is malformed, or schedule construction fails.
+/// @throws If the spec or market JSON is malformed, `asOf` is not an ISO-8601 date string, or schedule construction fails.
 #[wasm_bindgen(js_name = buildCashflowScheduleJson)]
 pub fn build_cashflow_schedule_json(
     #[wasm_bindgen(js_name = "specJson", unchecked_param_type = "JsonInput")] spec_json: JsValue,
@@ -57,10 +58,13 @@ pub fn build_cashflow_schedule_json(
         unchecked_optional_param_type = "JsonInput | null"
     )]
     market_json: Option<JsValue>,
+    #[wasm_bindgen(js_name = "asOf", unchecked_optional_param_type = "string | null")]
+    as_of: Option<JsValue>,
 ) -> Result<String, JsValue> {
     let spec_json: &str = &json_text(&spec_json, "specJson")?;
     let market_json = opt_json_text(market_json.as_ref(), "marketJson")?;
-    finstack_quant_cashflows::build_cashflow_schedule_json(spec_json, market_json.as_deref())
+    let as_of = crate::utils::wire::js_opt_date(as_of.as_ref(), "asOf")?;
+    finstack_quant_cashflows::build_cashflow_schedule_json(spec_json, market_json.as_deref(), as_of)
         .map_err(to_js_err)
 }
 
