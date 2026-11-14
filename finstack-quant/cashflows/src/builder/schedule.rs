@@ -551,26 +551,33 @@ impl CashFlowSchedule {
         Ok(())
     }
 
+    fn has_multiple_principal_currencies(&self) -> bool {
+        let mut principal_currency = None;
+        for flow in &self.flows {
+            let Some(delta) = flow.get_principal_delta() else {
+                continue;
+            };
+            if delta.amount_decimal().is_zero() {
+                continue;
+            }
+            if let Some(currency) = principal_currency {
+                if currency != delta.currency() {
+                    return true;
+                }
+            } else {
+                principal_currency = Some(delta.currency());
+            }
+        }
+        false
+    }
+
     /// Validate native settlement rows without imposing a scalar balance on
     /// a composite that has principal movements in multiple currencies.
     /// Single-currency principal paths retain full repayment reconciliation;
     /// a foreign coupon or fee does not exempt that path from validation.
     fn validate_native_cash(&self) -> finstack_quant_core::Result<()> {
         self.validate_structure()?;
-        let mut principal_currency = None;
-        let mut multiple_principal_currencies = false;
-        for flow in &self.flows {
-            if let Some(delta) = flow.get_principal_delta()
-                && delta.amount() != 0.0
-            {
-                if let Some(currency) = principal_currency {
-                    multiple_principal_currencies |= currency != delta.currency();
-                } else {
-                    principal_currency = Some(delta.currency());
-                }
-            }
-        }
-        if !multiple_principal_currencies {
+        if !self.has_multiple_principal_currencies() {
             self.validate_principal_balance()?;
         }
         self.validate_dates()
@@ -619,7 +626,8 @@ impl CashFlowSchedule {
     pub(crate) fn normalize_public(mut self, as_of: Date) -> finstack_quant_core::Result<Self> {
         {
             let initial = self.notional.initial;
-            let non_negative_initial = initial.amount_decimal() >= rust_decimal::Decimal::ZERO;
+            let enforce_non_negative = initial.amount_decimal() >= rust_decimal::Decimal::ZERO
+                && !self.has_multiple_principal_currencies();
             let mut balance = initial;
             let mut max_scale = initial.amount().abs().max(1.0);
             let order = self
@@ -632,7 +640,7 @@ impl CashFlowSchedule {
                 if balance_date < as_of {
                     if let Some(prev_date) = prev_pre_as_of_date
                         && prev_date != balance_date
-                        && non_negative_initial
+                        && enforce_non_negative
                     {
                         settle_rebased_balance(
                             &mut balance,
@@ -676,7 +684,7 @@ impl CashFlowSchedule {
                     );
                 }
             }
-            if non_negative_initial {
+            if enforce_non_negative {
                 let check_date = prev_pre_as_of_date.unwrap_or(as_of);
                 settle_rebased_balance(
                     &mut balance,
@@ -2464,5 +2472,84 @@ mod tests {
             .expect("yf");
         let expected = 0.5 * t_econ + 0.5 * t_mat;
         assert!((schedule.wal(issue).expect("wal") - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn normalization_allows_multi_currency_composite_pay_leg_rebase() {
+        let start = Date::from_calendar_date(2025, Month::January, 2).expect("date");
+        let as_of = Date::from_calendar_date(2025, Month::January, 3).expect("date");
+        let maturity = Date::from_calendar_date(2026, Month::January, 2).expect("date");
+
+        let notional_row = |date: Date, amount: f64, currency: Currency| {
+            let cash = Money::new(amount, currency).expect("money");
+            CashFlowParams::new(date, None, cash, CFKind::Notional, 0.0, None)
+                .with_principal_delta(cash.checked_neg())
+                .with_principal_date(date)
+                .build()
+                .expect("valid cashflow")
+        };
+
+        let eur_leg = CashFlowSchedule::from_flows(
+            vec![
+                notional_row(start, -90.0, Currency::EUR),
+                notional_row(maturity, 90.0, Currency::EUR),
+            ],
+            Notional::par(0.0, Currency::EUR).expect("notional"),
+            DayCount::Act360,
+            CashFlowMeta::default(),
+        );
+        let usd_leg = CashFlowSchedule::from_flows(
+            vec![
+                notional_row(start, 100.0, Currency::USD),
+                notional_row(maturity, -100.0, Currency::USD),
+            ],
+            Notional::par(0.0, Currency::USD).expect("notional"),
+            DayCount::Act360,
+            CashFlowMeta::default(),
+        );
+
+        let normalized = merge_cashflow_schedules(
+            [eur_leg, usd_leg],
+            Notional::par(0.0, Currency::USD).expect("notional"),
+            DayCount::Act360,
+        )
+        .normalize_public(as_of)
+        .expect("multi-currency composite pay leg should rebase");
+
+        assert_eq!(normalized.get_notional().initial.currency(), Currency::USD);
+        assert_eq!(normalized.get_notional().initial.amount(), -100.0);
+        assert_eq!(normalized.get_flows().len(), 2);
+        normalized
+            .dated_flows()
+            .expect("future maturity exchanges remain valid");
+
+        // A single-currency principal schedule with a foreign coupon must still
+        // enforce the non-negative rebased balance check.
+        let single_principal_with_fx_coupon = CashFlowSchedule::from_flows(
+            vec![
+                notional_row(start, 100.0, Currency::USD),
+                CashFlowParams::new(
+                    maturity,
+                    None,
+                    Money::from((5_i64, Currency::EUR)),
+                    CFKind::Fixed,
+                    1.0,
+                    Some(0.05),
+                )
+                .build()
+                .expect("valid coupon"),
+            ],
+            Notional::par(0.0, Currency::USD).expect("notional"),
+            DayCount::Act360,
+            CashFlowMeta::default(),
+        );
+        let err = single_principal_with_fx_coupon
+            .normalize_public(as_of)
+            .expect_err("single-currency negative rebased balance must fail");
+        assert!(
+            err.to_string()
+                .contains("principal repayments exceed rebased outstanding"),
+            "unexpected error: {err}"
+        );
     }
 }
