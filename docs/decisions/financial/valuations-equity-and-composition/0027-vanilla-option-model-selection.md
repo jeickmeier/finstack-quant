@@ -1,8 +1,8 @@
 # ADR 0027: Vanilla equity and FX option model selection
 
-**Decision status:** Equity lifecycle and baseline model selection accepted in
-records 06 and 07. Remaining FX and alternative-model choices retain their
-own record status.
+**Decision status:** Equity and FX vanilla baselines and lifecycle accepted
+in their detailed owner records. Alternative models retain their recorded
+statuses.
 
 **Implementation status:** Observed for vanilla `EquityOption` and `FxOption`
 entry points and registered alternatives; not a completeness assessment.
@@ -13,7 +13,7 @@ entry points and registered alternatives; not a completeness assessment.
 
 **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`
 
-## Accepted equity baseline and lifecycle
+## Accepted vanilla baselines and lifecycle
 
 The accepted [equity lifecycle](06-option-lifecycle.md#accepted-decision-for-checked-equity-option-exercise-and-settlement)
 resolves authoritative exercise and settlement before live pricing. The
@@ -23,6 +23,13 @@ Bermudan exercise, with explicit Leisen–Reimer or CRR construction on the
 tree route. The equity `black76` alias is retired in the accepted contract.
 Product default selection is from the admitted exercise style, with required
 controls and the qualified dividend, settlement and risk basis in the owners.
+Runtime and host reconciliation are pending.
+
+The [accepted FX vanilla package](../valuations-fx-and-exotics/fx-vanilla-delta.md#accepted-decision-for-checked-fx-vanilla-pricing-and-delta-conventions)
+selects `black76` on the qualified delivery forward for physically
+delivered European calls and puts. Use the expiry clock for variance
+and the actual delivery date for the underlying forward and quote
+discount. Resolve exercise and outstanding claims on their own dates.
 Runtime and host reconciliation are pending.
 
 This selection record covers `EquityOption` and European `FxOption`. Futures
@@ -60,7 +67,7 @@ inputs, formulas, defaults, failure branches and evidence.
 | Equity observed exercise, expiry, cash/physical delivery and lifecycle Greeks | [Exercise and settlement lifecycle](06-option-lifecycle.md) |
 | Equity baseline, dividend inputs, LR caller settings and direct Greeks | [Black/tree pricing](07-black-tree-and-direct-greeks.md) |
 | Equity selected-model sensitivity bases and explicitly elected premium inversion | [Selected-model risk and implied volatility](08-selected-risk-and-implied-vol.md#accepted-decision-for-checked-selected-model-equity-risk-and-implied-volatility) |
-| FX formulation, expiry behavior, input units and delta conventions | [FX vanilla valuation](../valuations-fx-and-exotics/fx-vanilla-delta.md) |
+| FX delivery-date formulation, authoritative exercise, input units and hedge conventions | [Accepted FX vanilla valuation](../valuations-fx-and-exotics/fx-vanilla-delta.md#accepted-decision-for-checked-fx-vanilla-pricing-and-delta-conventions) |
 | Equity PDE model keys, domains, dated payoffs, exercise and risk | [Accepted PDE adapters](09-equity-pde.md#accepted-decision-for-checked-equity-blackscholes-and-heston-pde-pricing) |
 | Equity Heston input block, dated payoff, bounded Fourier and explicit QE-M run | [Accepted Heston adapters](10-heston-adapters.md#accepted-decision-for-checked-dated-heston-fourier-and-monte-carlo-pricing) |
 | Rough-model inputs, variance strip, transform/simulation and diagnostics | [Accepted rough-volatility adapters](11-rough-volatility-adapters.md#accepted-decision-for-checked-equity-rough-volatility-adapters) |
@@ -91,9 +98,10 @@ supported price and sensitivity evidence.
 
 ## Adoption and evidence boundary
 
-Equity requires observed exercise/expiry state and values the resulting claim;
-FX uses expiry intrinsic and zero after expiry. The linked lifecycle records
-preserve this difference; this ADR does not harmonize or endorse it.
+The accepted equity and FX owners require authoritative exercise and
+expiry outcomes. Value the surviving claims on each product's delivery
+and payment basis. The original audit found the FX adapter used expiry
+intrinsic and discarded its residual after expiry.
 
 The [calibration-target catalogue](../calibration-targets/README.md) records
 existing surface-calibration methods separately. Selecting Heston or a rough

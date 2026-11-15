@@ -17,8 +17,8 @@ Quote-space smiles and absolute-strike grids remain distinct sources.
 
 [FX smile interpolation and materialization](../models-analytic/fx-delta-smiles.md#accepted-decision-for-checked-fx-delta-smiles-and-strike-materialization)
 are accepted in the owning analytic record.
-[Delivery forwards](../valuations-fx-and-exotics/fx-delivery-cip.md)
-and [option pricing and reporting deltas](../valuations-fx-and-exotics/fx-vanilla-delta.md)
+[Accepted delivery forwards](../valuations-fx-and-exotics/fx-delivery-cip.md#accepted-decision-for-checked-deliverable-fx-and-covered-interest-parity)
+and [accepted option pricing and reporting deltas](../valuations-fx-and-exotics/fx-vanilla-delta.md#accepted-decision-for-checked-fx-vanilla-pricing-and-delta-conventions)
 retain their separately stated statuses. Accepted
 [generic volatility dispatch](../models-analytic/volatility-source-interpolation.md#accepted-decision-for-explicit-volatility-source-evaluation-and-materialization)
 owns typed quote evaluation. Accepted [context lifecycle20](context-lifecycle.md)

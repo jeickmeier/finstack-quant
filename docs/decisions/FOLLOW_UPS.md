@@ -1494,6 +1494,68 @@ The dated private-fund waterfall and final clawback package was accepted on
 2026-11-14. Production allocation, agreement mapping and host qualification remain pending.
 [Equity and composition record 18](financial/valuations-equity-and-composition/18-private-fund-waterfall.md#accepted-decision-for-checked-private-fund-waterfalls-and-final-clawback).
 
+The private-fund residual value, performance and risk package was accepted on
+2026-11-14. Production valuation, administrator and host qualification remain pending.
+[Equity and composition record 19](financial/valuations-equity-and-composition/19-private-fund-valuation.md#accepted-decision-for-checked-private-fund-residual-value-performance-and-risk).
+
+The property valuation and unlevered return package was accepted on
+2026-11-14. Production pricing, appraisal qualification and host validation remain pending.
+[Equity and composition record 20](financial/valuations-equity-and-composition/20-property-valuation.md#accepted-decision-for-checked-property-valuation-and-unlevered-returns).
+
+The levered property value, payoff, coverage and risk package was accepted on
+2026-11-14. Production valuation, financing payoff, export and host
+qualification remain pending.
+[Equity and composition record 21](financial/valuations-equity-and-composition/21-levered-property.md#accepted-decision-for-checked-levered-property-value-and-financing).
+
+The basket value, expense and risk package was accepted on 2026-11-14.
+Production valuation, scenario metrics, export and host qualification
+remain pending.
+[Equity and composition record 22](financial/valuations-equity-and-composition/22-basket-nav-and-risk.md#accepted-decision-for-checked-basket-value-expenses-and-risk).
+
+The composite sizing, resolved state and rebalance date package was accepted
+on 2026-11-14. Runtime sizing, historical data and host qualification remain
+pending.
+[Equity and composition record 23](financial/valuations-equity-and-composition/23-composite-sizing.md#accepted-decision-for-checked-composite-sizing-and-rebalance-dates).
+
+The composite valuation, risk, trade and financed history package was
+accepted on 2026-11-14. Adoption is complete for all 24 equity and
+composition records. Production valuation, cash data and host
+qualification for record 24 remain pending.
+[Equity and composition record 24](financial/valuations-equity-and-composition/24-composite-valuation-history.md#accepted-decision-for-checked-composite-valuation-and-financed-history).
+
+The deliverable FX package was accepted on 2026-11-14. Runtime valuation,
+market-data, scenario, export and host qualification remain pending.
+[FX-DELIVERY-CIP](financial/valuations-fx-and-exotics/fx-delivery-cip.md#accepted-decision-for-checked-deliverable-fx-and-covered-interest-parity).
+
+The NDF fixing and settlement package was accepted on 2026-11-14.
+Implementation and qualification include the new cash-only
+`DerivativeSettlement` classification in the existing core record.
+[NDF-FIXING-SETTLEMENT](financial/valuations-fx-and-exotics/ndf-fixing-settlement.md#accepted-decision-for-checked-ndf-fixing-and-settlement).
+
+The listed FX futures and futures-option package was accepted on 2026-11-14.
+Runtime, venue clearing, delivery, exercise, risk and host qualification
+remain pending.
+[FX-LISTED-CONTRACTS](financial/valuations-fx-and-exotics/fx-listed-contracts.md#accepted-decision-for-checked-listed-fx-futures-and-futures-options).
+
+The FX vanilla pricing and delta package was accepted on 2026-11-14.
+Runtime, exercise and premium state, market-data and host qualification
+remain pending.
+[FX-VANILLA-DELTA](financial/valuations-fx-and-exotics/fx-vanilla-delta.md#accepted-decision-for-checked-fx-vanilla-pricing-and-delta-conventions).
+
+The FX digital package was accepted on 2026-11-14. Runtime, fixing data,
+settlement, option risk and host qualification remain pending.
+[FX-DIGITAL](financial/valuations-fx-and-exotics/fx-digital.md#accepted-decision-for-checked-fx-digital-pricing-and-settlement).
+
+The FX barrier package was accepted on 2026-11-14. Runtime, observation,
+rebate and delivery cash, simulation risk and host qualification remain
+pending.
+[FX-BARRIERS](financial/valuations-fx-and-exotics/fx-barriers.md#accepted-decision-for-checked-fx-barrier-monitoring-and-settlement).
+
+The FX touch package was accepted on 2026-11-14. Runtime, benchmark
+history, first passage, payout state, risk and host qualification remain
+pending.
+[FX-TOUCH](financial/valuations-fx-and-exotics/fx-touch.md#accepted-decision-for-checked-fx-touch-pricing-and-settlement).
+
 Other unadopted choices retain their stated Proposed or Draft status. Acceptance does not certify
 observed implementations.
 Numerical suites were not rerun in the original documentation audits.

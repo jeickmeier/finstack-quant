@@ -178,6 +178,7 @@ when the barrier state reduces to vanilla.
     Preserve the explicit direction, quote-currency payout and required
     history. Reject incompatible timing. Retain owner-qualified domestic
     discounting, carry and actual claim status.
+    [Accepted FX touch pricing and settlement](../valuations-fx-and-exotics/fx-touch.md#accepted-decision-for-checked-fx-touch-pricing-and-settlement).
 
 21. **Keep discrete and alternative models with their owners.** Use this
     scalar law for continuous monitoring with the selected flat coefficients.

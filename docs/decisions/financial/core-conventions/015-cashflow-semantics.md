@@ -1,9 +1,13 @@
 # CORE-CONVENTIONS-015: Cash settlement, principal balance events and accrual metadata
 
-- Decision status: **Accepted — complete cash/balance/accrual package, 2026-11-07; accrual-endpoint clarification, 2026-11-08**.
+- Decision status: **Accepted — complete cash/balance/accrual package, 2026-11-07; accrual-endpoint clarification, 2026-11-08; derivative settlement classification, 2026-11-14**.
 - Implementation status: **Reconciled 2026-11-11 (G5); independent qualification pending.** `CFKind` gains `Floating` and `ProtectionPayment` with literal predicates; amount is signed settlement cash, PIK and default write-downs carry zero cash, and every principal-like row states a paired `principal_delta`/`principal_date` (zero included) that no consumer infers from cash or kind; non-principal rows carry neither. Accrual metadata is one complete `DayCountContextState` slice with literal factors. `CashFlow` and `CashFlowAccrual` have private fields, one validated constructor each (`CashFlow::new(CashFlowParams)`, `CashFlowAccrual::new`), atomic validated updates (`with_accrual`, `with_principal`), and validated deserialization; Python and WASM construct and update through them. Cash-only views (ladders, dated flows, portfolio events, margin conversion) filter to cash-settlement kinds, and exports carry `principal_date`. Not reconciled (owner input, CASHFLOWS-001/013): the accrued-interest engine's period-bound reference fallback and accrual-config frequency, the statements residual's synthesized accrual for rows without metadata, and the LSMC calendar fill (#8); the inflation-linked bond states its indexed redemption cash as the principal delta, and LSMC keeps a premium redemption static.
 - Validation status: **Evidence inspected; independent classification/arithmetic examples passed; production qualification pending**. Documentation links/status/counts, complete 27-kind table coverage, signed cash/principal and zero-accrual examples passed. Linked Rust/host tests were located or inspected, not run; this does not certify the current implementation.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; see [scope and inventory](README.md).
+
+The `DerivativeSettlement` addition requires runtime, exhaustive
+consumer and host reconciliation. The earlier implementation and
+classification checks cover the preceding package.
 
 ## Choice, scope and rationale
 
@@ -29,6 +33,11 @@ Accrual-slice endpoint wording was clarified on **2026-11-08** with the
 metadata describes actual calculation endpoints when accrual adjustment was
 explicitly selected; nominal reference dates remain separate. The selected
 adjustment, day-count formulas and single-context limit are unchanged.
+
+The [accepted NDF settlement package](../valuations-fx-and-exotics/ndf-fixing-settlement.md#accepted-decision-for-checked-ndf-fixing-and-settlement)
+adds `DerivativeSettlement` on **2026-11-14**. The product
+owner retains settlement calculation, fixing authority and
+projected, fixed contractual or extinguished status.
 
 1. **Give `amount` one meaning: actual signed settlement cash.** For cash-capable
    kinds, Money is economic cash received by the entity/holder being valued when
@@ -56,6 +65,12 @@ adjustment, day-count formulas and single-context limit are unchanged.
    variant, so a new kind cannot silently become cash. Retire `float_reset`
    without aliases. Human kind parsing retains ASCII case/outer-trim normalization;
    wire labels are exact canonical snake_case and unknown labels fail.
+   `DerivativeSettlement` (wire `derivative_settlement`) carries signed
+   net derivative settlement cash, including the single NDF payment.
+   Keep the payment date and any qualified single-fixing metadata.
+   Reject principal delta, principal date and coupon accrual on this kind.
+   The fixed native payout in the [accepted FX digital record](../valuations-fx-and-exotics/fx-digital.md#accepted-decision-for-checked-fx-digital-pricing-and-settlement)
+   uses the same cash-only classification.
 
 3. **Keep classification separate from measured economic effects.** Rename
    `is_interest_like` to `is_coupon`, preserving precisely the four ordinary
@@ -79,6 +94,7 @@ adjustment, day-count formulas and single-context limit are unchanged.
    | RevolvingDraw | No | Yes | No | Yes |
    | Pik, DefaultedNotional | No | Yes | No | No |
    | Recovery, AccruedOnDefault, ProtectionPayment | No | No | No | Yes |
+   | DerivativeSettlement | No | No | No | Yes |
    | InitialMarginPost, InitialMarginReturn, VariationMarginReceive, VariationMarginPay, MarginInterest, CollateralSubstitutionIn, CollateralSubstitutionOut | No | No | No | Yes |
 
 4. **Require complete explicit principal effects.** Every principal-like row

@@ -1227,6 +1227,86 @@ promote, escrow and final clawback. Production allocation, fund terms
 and host qualification remain pending.
 [Equity and composition record 18](valuations-equity-and-composition/18-private-fund-waterfall.md#accepted-decision-for-checked-private-fund-waterfalls-and-final-clawback).
 
+Equity and composition record 19 was accepted on 2026-11-14. Independent
+checks cover NAV and outstanding-cash overlap, mark-based performance,
+aggregate carry and prospective shocks. Production valuation, administrator
+reconciliation, terminal replay and host qualification remain pending.
+[Equity and composition record 19](valuations-equity-and-composition/19-private-fund-valuation.md#accepted-decision-for-checked-private-fund-residual-value-performance-and-risk).
+
+Equity and composition record 20 was accepted on 2026-11-14. Independent
+checks cover annual NOI capitalization, dated asset and exit cash,
+investment return and cap-rate risk. Production pricing, appraisal and
+host qualification remain pending.
+[Equity and composition record 20](valuations-equity-and-composition/20-property-valuation.md#accepted-decision-for-checked-property-valuation-and-unlevered-returns).
+
+Equity and composition record 21 was accepted on 2026-11-14. Independent
+checks cover obligation-level payoff and equity returns, LTV, aligned
+coverage and isolated risk. Production valuation, contractual payoff,
+exports and host qualification remain pending.
+[Equity and composition record 21](valuations-equity-and-composition/21-levered-property.md#accepted-decision-for-checked-levered-property-value-and-financing).
+
+Equity and composition record 22 was accepted on 2026-11-14. Independent
+examples cover mixed-currency basket value, accrued expense, shared and
+embedded mark shocks and coefficient reallocations. Production pricing,
+scenario, export and host qualification remain pending.
+[Equity and composition record 22](valuations-equity-and-composition/22-basket-nav-and-risk.md#accepted-decision-for-checked-basket-value-expenses-and-risk).
+
+Equity and composition record 23 was accepted on 2026-11-14. Independent
+checks cover gross notional, matched metric contributions, cross-currency
+unit-P&L volatility and adjusted rebalance dates. Runtime sizing, historical
+data and host qualification remain pending.
+[Equity and composition record 23](valuations-equity-and-composition/23-composite-sizing.md#accepted-decision-for-checked-composite-sizing-and-rebalance-dates).
+
+Equity and composition record 24 was accepted on 2026-11-14. Independent
+checks cover nested FX and matched risk, small representable trade changes
+and a settled coupon and close-rebalance history. Production valuation,
+historical cash data and host qualification remain pending.
+[Equity and composition record 24](valuations-equity-and-composition/24-composite-valuation-history.md#accepted-decision-for-checked-composite-valuation-and-financed-history).
+
+The deliverable FX record was accepted on 2026-11-14. Independent
+checks cover live delivery before actual spot settlement, booked swap PV,
+same-day entitlement, directional FX01 and curve repricing. Runtime,
+market-data, cashflow export and host qualification remain pending.
+[FX-DELIVERY-CIP](valuations-fx-and-exotics/fx-delivery-cip.md#accepted-decision-for-checked-deliverable-fx-and-covered-interest-parity).
+
+The NDF fixing and settlement record and the core cash-only derivative
+settlement classification were accepted on 2026-11-14. Independent checks
+cover reciprocal cash, projection-date choice, inverse expectation and
+risk before and after fixing. Production fixing, valuation, consumer
+classification and host qualification remain pending.
+[NDF-FIXING-SETTLEMENT](valuations-fx-and-exotics/ndf-fixing-settlement.md#accepted-decision-for-checked-ndf-fixing-and-settlement).
+
+Listed FX futures and futures options were accepted on 2026-11-14.
+Independent checks cover quote scale, live and final variation, separate
+delivery value, shared option premiums and futures exercise at zero
+intrinsic. Runtime, venue clearing, delivery and host qualification
+remain pending.
+[FX-LISTED-CONTRACTS](valuations-fx-and-exotics/fx-listed-contracts.md#accepted-decision-for-checked-listed-fx-futures-and-futures-options).
+
+The FX vanilla package was accepted on 2026-11-14. Independent examples
+cover dated Black premiums and parity, hedge scaling, delta-neutral strikes
+and risk. Runtime, lifecycle and market data, and host qualification
+remain pending.
+[FX-VANILLA-DELTA](valuations-fx-and-exotics/fx-vanilla-delta.md#accepted-decision-for-checked-fx-vanilla-pricing-and-delta-conventions).
+
+FX digital pricing and settlement were accepted on 2026-11-14.
+Independent checks cover dated quote and base payout, strict
+deterministic ties and a retained native claim. Runtime, benchmark,
+settlement, risk and host qualification remain pending.
+[FX-DIGITAL](valuations-fx-and-exotics/fx-digital.md#accepted-decision-for-checked-fx-digital-pricing-and-settlement).
+
+FX barrier monitoring, settlement and pricing were accepted on 2026-11-14.
+Independent checks cover eligible observations, unpaid rebate, dated
+carry, first passage and parity with delivery-date vanilla. Runtime,
+observation data, simulation and host qualification remain pending.
+[FX-BARRIERS](valuations-fx-and-exotics/fx-barriers.md#accepted-decision-for-checked-fx-barrier-monitoring-and-settlement).
+
+FX touch pricing and settlement were accepted on 2026-11-14. Independent
+calculations cover negative-discriminant first passage, deterministic
+crossing and retained quote cash. Runtime, benchmark, risk and host
+qualification remain pending.
+[FX-TOUCH](valuations-fx-and-exotics/fx-touch.md#accepted-decision-for-checked-fx-touch-pricing-and-settlement).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

@@ -1255,6 +1255,85 @@ The dated private-fund waterfall and final clawback package was accepted on
 allocation, reachable catch-up and promote, explicit escrow and final settlement.
 [Equity and composition record 18](valuations-equity-and-composition/18-private-fund-waterfall.md#accepted-decision-for-checked-private-fund-waterfalls-and-final-clawback).
 
+The private-fund residual value, performance and risk package was accepted on
+2026-11-14. It covers the NAV or projected valuation basis, outstanding cash
+and commitments, settled LP performance and aggregate carry, and prospective
+parameter and current NAV risk.
+[Equity and composition record 19](valuations-equity-and-composition/19-private-fund-valuation.md#accepted-decision-for-checked-private-fund-residual-value-performance-and-risk).
+
+The property valuation and unlevered return package was accepted on
+2026-11-14. It covers explicit appraisal or modeled property value,
+qualified annual NOI, dated exit and operating cash, the separate
+acquisition basis and active rate risk and export.
+[Equity and composition record 20](valuations-equity-and-composition/20-property-valuation.md#accepted-decision-for-checked-property-valuation-and-unlevered-returns).
+
+The levered property value and financing package was accepted on 2026-11-14.
+It covers matched lender marks, borrower cash and obligation-level exit
+payoff, market and origination LTV, aligned operating coverage and isolated
+property and financing risk.
+[Equity and composition record 21](valuations-equity-and-composition/21-levered-property.md#accepted-decision-for-checked-levered-property-value-and-financing).
+
+The basket value, expense and risk package was accepted on 2026-11-14.
+It covers explicit lot or coefficient sizing and basket units, qualified
+marks and FX, known accrued expenses, exact source mark shocks and
+per-target weight scenarios.
+[Equity and composition record 22](valuations-equity-and-composition/22-basket-nav-and-risk.md#accepted-decision-for-checked-basket-value-expenses-and-risk).
+
+The composite sizing and rebalance date package was accepted on 2026-11-14.
+It covers fixed quantities, gross lot notional, matched metric contributions,
+settled-cash volatility, scalar expressions, frozen state and exact eligible
+dates.
+[Equity and composition record 23](valuations-equity-and-composition/23-composite-sizing.md#accepted-decision-for-checked-composite-sizing-and-rebalance-dates).
+
+The composite valuation and financed history package was accepted on 2026-11-14,
+completing adoption for all 24 equity and composition records. It covers
+matched nested FX, strict risk totals, exact proposed trade changes, settled
+cash at exact rebalance closes and a fixed-capital index with a disclosed
+modeled financing transfer.
+[Equity and composition record 24](valuations-equity-and-composition/24-composite-valuation-history.md#accepted-decision-for-checked-composite-valuation-and-financed-history).
+
+The deliverable FX package was accepted on 2026-11-14. It covers booked
+two-currency spot, forward and swap cash, fixed value dates and the
+settlement cut, cash FX with an actual spot-date bridge, quote
+diagnostics and risk and export on fixed booked terms.
+[FX-DELIVERY-CIP](valuations-fx-and-exotics/fx-delivery-cip.md#accepted-decision-for-checked-deliverable-fx-and-covered-interest-parity).
+
+The NDF fixing and settlement package was accepted on 2026-11-14.
+It covers fixed strikes, exact fixing authority, explicit pending
+projection, payment-date discounting and state-scoped risk. The existing
+core cashflow record now includes cash-only `DerivativeSettlement`.
+[NDF-FIXING-SETTLEMENT](valuations-fx-and-exotics/ndf-fixing-settlement.md#accepted-decision-for-checked-ndf-fixing-and-settlement) ·
+[CORE-CONVENTIONS-015](core-conventions/015-cashflow-semantics.md#accepted-decision-cash-settlement-principal-effects-and-accrual-metadata).
+
+The listed FX package was accepted on 2026-11-14. It covers exact series
+and quote units, observed or elected model marks, separate variation and
+delivery, shared option pricing with authoritative exercise and risk and
+cash export on the resolved claim.
+[FX-LISTED-CONTRACTS](valuations-fx-and-exotics/fx-listed-contracts.md#accepted-decision-for-checked-listed-fx-futures-and-futures-options).
+
+The FX vanilla package was accepted on 2026-11-14. It covers European
+delivery pricing on the expiry clock, authoritative exercise and premium
+cash, PV and hedge deltas, exact model boundaries and bounded IV, dated
+risk and explicit smile response.
+[FX-VANILLA-DELTA](valuations-fx-and-exotics/fx-vanilla-delta.md#accepted-decision-for-checked-fx-vanilla-pricing-and-delta-conventions).
+
+The FX digital package was accepted on 2026-11-14. It covers native
+quote or base payout, the benchmark forward and payment date, strict
+observed and deterministic triggers, fixed residual claims and dated
+risk and cashflow export.
+[FX-DIGITAL](valuations-fx-and-exotics/fx-digital.md#accepted-decision-for-checked-fx-digital-pricing-and-settlement).
+
+The FX barrier package was accepted on 2026-11-14. It covers exact
+monitoring and retained claims, total quote rebates, the qualified
+continuous analytic law, dated GBM with exact observations and paired
+market risk and cashflow export on the resolved state.
+[FX-BARRIERS](valuations-fx-and-exotics/fx-barriers.md#accepted-decision-for-checked-fx-barrier-monitoring-and-settlement).
+
+The FX touch package was accepted on 2026-11-14. It covers inclusive
+authorized touch, immediate first-passage and separately dated deferred
+payments, retained native quote claims and active-source risk.
+[FX-TOUCH](valuations-fx-and-exotics/fx-touch.md#accepted-decision-for-checked-fx-touch-pricing-and-settlement).
+
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the
 accepted perspective/sign contracts; broader margin methodology retains its
@@ -1273,7 +1352,7 @@ algorithms and broader policies retain their status in the owning catalogues.
 | Record | Decision status | Implementation status | Validation status |
 | --- | --- | --- | --- |
 | [0026: Methodology inventory and decisions](governance/0026-methodology-decisions-and-inventory.md) | Accepted policy | Source catalogues established for the declared crates; exclusions explicit | Evidence mapped; no model certification |
-| [0027: Vanilla equity and FX options](valuations-equity-and-composition/0027-vanilla-option-model-selection.md) | Draft | Entry points and registered alternatives observed | Source/test evidence inspected; numerical checks not rerun |
+| [0027: Vanilla equity and FX options](valuations-equity-and-composition/0027-vanilla-option-model-selection.md) | Equity and FX vanilla baselines and lifecycle accepted in the owners | Reconciliation pending | Detailed records retain independent examples and qualification status |
 | [0028: Callable bond model selection](valuations-bonds/0028-callable-bond-model-selection.md) | Draft | Model resolution and option-bearing paths observed | Source/test evidence inspected; numerical checks not rerun |
 | [0029: Rate-option exercise and volatility](valuations-rates/0029-rate-option-exercise-and-volatility.md) | Draft | Vanilla rate-option and Bermudan selection observed | Source/test evidence inspected; numerical checks not rerun |
 | [0030: CDS survival and integration](models-and-valuations-credit/0030-cds-survival-and-integration.md) | Accepted | Single-name CDS engine selection; detailed contract in CREDIT-12 | Independent date, integral and quote checks; runtime reconciliation pending |
