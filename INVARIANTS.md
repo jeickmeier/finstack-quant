@@ -370,6 +370,185 @@ and native currency. Apply mark adjustments once, carry actual source
 bindings and keep metrics and composite child values on their admitted bases.
 [Accepted valuation dispatch and lifecycle](docs/decisions/financial/valuations-framework/pricing-lifecycle.md#accepted-decision-for-checked-valuation-dispatch-and-lifecycle).
 
+Strict instrument ingress validates the exact version and type tag. Apply
+metric overlays in scope before full Rust pricing admission. Metric coordinates
+retain owner-declared roles. Standard Greek presentation uses the selected
+model and lifecycle. Versioned schemas and examples follow the Rust contract.
+[Accepted instrument loading, model dispatch and metrics](docs/decisions/financial/valuations-equity-and-composition/01-contract-dispatch.md#accepted-decision-for-checked-instrument-loading-model-dispatch-and-metrics).
+
+Cash equity uses explicit signed shares and one dated quote authority. Spot
+delta follows the active quote. Forward carry uses an elected model and dated
+funding. Ex-phase entitlement selects discrete dividends and actual payment
+dates determine their discount factors. Holder receivables stay separate
+from the stock mark.
+[Accepted cash-equity valuation and dividend carry](docs/decisions/financial/valuations-equity-and-composition/02-spot-and-carry.md#accepted-decision-for-checked-cash-equity-valuation-and-dividend-carry).
+
+Equity futures project carry and quanto to the exact underlying fixing.
+Fixed conversion uses the contract cash per point. Clearing uses its own
+reference, payment dates and phases. Risk follows the selected mark and
+keeps dated unpaid claims on their cash basis.
+[Accepted equity futures carry, quanto and clearing](docs/decisions/financial/valuations-equity-and-composition/03-equity-future.md#accepted-decision-for-checked-equity-futures-carry-quanto-and-clearing).
+
+Equity total-return futures use matched distribution and funding points,
+authorized reference levels and the contract’s settlement-adjusted spread
+clock. Quote risk follows the selected mark. Actual dated clearing cash
+retains its own authority and status.
+[Accepted equity total-return futures](docs/decisions/financial/valuations-equity-and-composition/04-total-return-future.md#accepted-decision-for-checked-equity-total-return-futures).
+
+Volatility-index futures use an exact live quote or qualified futures strip,
+with point delta on the selected live contract. Futures options bind exact
+model and venue terms. Exercise and clearing keep separate reference marks,
+option cash and delivered futures ownership.
+[Accepted volatility-index futures and listed futures options](docs/decisions/financial/valuations-equity-and-composition/05-vol-index-and-listed-options.md#accepted-decision-for-checked-volatility-index-futures-and-listed-futures-options).
+
+Equity options resolve authoritative exercise and settlement phases before
+live model inputs. Value signed unpaid cash and outstanding stock/strike
+rights separately. Risk, horizon and export use the actual remaining claim
+and transfer ownership once.
+[Accepted equity option exercise and settlement](docs/decisions/financial/valuations-equity-and-composition/06-option-lifecycle.md#accepted-decision-for-checked-equity-option-exercise-and-settlement).
+
+Live equity option pricing selects European Black–Scholes or an explicitly
+configured early-exercise tree. Separate fixing and payment factors. Admit
+dividend and exercise events on exact phases, and compute matched risk on
+the selected price basis.
+[Accepted live equity option pricing and Greeks](docs/decisions/financial/valuations-equity-and-composition/07-black-tree-and-direct-greeks.md#accepted-decision-for-checked-live-equity-option-pricing-and-greeks).
+
+Equity risk follows the selected price, active inputs and resolved lifecycle.
+Use checked represented shocks, an explicit horizon for theta and actual
+signed continuous yield for Dividend01. European Black–Scholes implied
+volatility uses an explicit gross premium basis and checked cash residuals.
+[Accepted selected-model equity risk and implied volatility](docs/decisions/financial/valuations-equity-and-composition/08-selected-risk-and-implied-vol.md#accepted-decision-for-checked-selected-model-equity-risk-and-implied-volatility).
+
+Equity PDEs require explicit model selection and a checked dated payoff basis.
+Use the qualified exercise set, actual prepared grid and query coordinates.
+Verify the unit premium on the admitted settlement basis before applying
+signed quantity. Qualify grid convergence and repriced risk separately.
+[Accepted equity Black–Scholes and Heston PDE pricing](docs/decisions/financial/valuations-equity-and-composition/09-equity-pde.md#accepted-decision-for-checked-equity-blackscholes-and-heston-pde-pricing).
+
+Equity Heston Fourier and QE-M bind the qualified risk-neutral parameter block,
+fixing clock and actual payoff payment. Apply the selected numerical policy.
+Preflight the complete simulation work and preserve group-level sampling
+uncertainty separately from time-step bias and risk.
+[Accepted dated Heston Fourier and Monte Carlo pricing](docs/decisions/financial/valuations-equity-and-composition/10-heston-adapters.md#accepted-decision-for-checked-dated-heston-fourier-and-monte-carlo-pricing).
+
+Equity rough-volatility pricing binds qualified model inputs and conditioning
+to the declared clock. Qualify the active variance source and align its
+breaks on the actual grid. Budget complete history work and check the
+rough Bergomi bounded-put parity reconstruction on the settlement basis.
+[Accepted equity rough-volatility adapters](docs/decisions/financial/valuations-equity-and-composition/11-rough-volatility-adapters.md#accepted-decision-for-checked-equity-rough-volatility-adapters).
+
+Autocallable and cliquet ATM term-GBM uses dated carry, native quote-clock
+variance and an exact grid through the last required live fixing. Preserve
+qualified history and contractual anchors across all risk legs. Rebuild the
+elected responsive ATM inputs and budget the full simulation and stencil.
+[Accepted ATM term-GBM and pinned equity path risk](docs/decisions/financial/valuations-equity-and-composition/12-path-gbm.md#accepted-decision-for-checked-atm-term-gbm-and-pinned-equity-path-risk).
+
+Autocallables replay qualified contractual observations with coupon and
+memory before the independent call decision. Preserve each earned dated
+leg until its settlement disposition is established. Derive horizon cash
+and the remaining claim from one holder scenario.
+[Accepted dated autocallable pricing and risk](docs/decisions/financial/valuations-equity-and-composition/13-autocallable.md#accepted-decision-for-checked-dated-autocallable-pricing-and-risk).
+
+Cliquets use the qualified strike-setting event and exact period-end fixings.
+Clip each return before accumulation and apply global bounds at completion.
+Preserve the single dated cash claim and use its actual payment clock for
+discount risk. Resolve horizon resets and settlement from explicit phases.
+[Accepted dated cliquet pricing and risk](docs/decisions/financial/valuations-equity-and-composition/14-cliquet.md#accepted-decision-for-checked-dated-cliquet-pricing-and-risk).
+
+Equity variance swaps bind contractual sample counts, publication-qualified
+observations and annualization. Forecast unfinished close returns on their
+actual interval geometry. Price the fixed dated payment once and distinguish
+remaining variance-level sensitivity from active native volatility risk.
+[Accepted equity variance swap pricing and risk](docs/decisions/financial/valuations-equity-and-composition/15-variance-swap.md#accepted-decision-for-checked-equity-variance-swap-pricing-and-risk).
+
+Equity total-return swaps preserve qualified reset levels and distinct
+price, dividend and financing cash. Bind equity carry and actual payment
+roles explicitly. Preserve earned income and use qualified spot repricing
+and the authorized agreement mark for applicable margin requests.
+[Accepted dated equity total-return swaps](docs/decisions/financial/valuations-equity-and-composition/16-equity-trs.md#accepted-decision-for-checked-dated-equity-total-return-swaps).
+
+Corporate DCF binds the authored valuation and terminal dates and actual
+forecast timing. Use qualified annual terminal cash flow, the matched
+common-equity bridge and checked dilution. Reprice WACC across both
+discounting and growth-terminal capitalization.
+[Accepted corporate DCF and dilution](docs/decisions/financial/valuations-equity-and-composition/17-corporate-dcf.md#accepted-decision-for-checked-corporate-dcf-and-dilution).
+
+Private-fund waterfalls preserve event order, scope and original dates.
+Post every LP allocation before the next dated hurdle and reconcile each
+receipt to LP cash, GP cash and escrow. Final-only clawback requires an
+explicit liquidation basis and separately identified settlement.
+[Accepted private-fund waterfalls and final clawback](docs/decisions/financial/valuations-equity-and-composition/18-private-fund-waterfall.md#accepted-decision-for-checked-private-fund-waterfalls-and-final-clawback).
+
+Private-fund residual valuation elects a qualified NAV or projected LP cash
+basis. Use settled LP cash and an authorized ending mark for reported
+performance. Preserve actual allocations through prospective waterfall
+shocks and move the current mark independently for NAV risk.
+[Accepted private-fund residual value, performance and risk](docs/decisions/financial/valuations-equity-and-composition/19-private-fund-valuation.md#accepted-decision-for-checked-private-fund-residual-value-performance-and-risk).
+
+Property valuation uses a qualified appraisal or checked modeled basis.
+Capitalize qualified annual NOI, preserve dated owner-entitled cash and
+use acquisition outlays on the separate actual investor-return basis.
+[Accepted property valuation and unlevered returns](docs/decisions/financial/valuations-equity-and-composition/20-property-valuation.md#accepted-decision-for-checked-property-valuation-and-unlevered-returns).
+
+Levered property equity subtracts matched signed lender marks. Dated
+investor returns use borrower cash and qualified contractual payoff by
+obligation and payment phase. Market and origination LTV use their own
+bases. Operating coverage aligns complete NOI and debt-service periods.
+[Accepted levered property value and financing](docs/decisions/financial/valuations-equity-and-composition/21-levered-property.md#accepted-decision-for-checked-levered-property-value-and-financing).
+
+Basket value uses qualified monetary marks and FX, explicit units and
+known accrued expenses. Shock each exact directly consumed price once.
+Report coefficient reallocations by target on their signed budget.
+[Accepted basket value, expenses and risk](docs/decisions/financial/valuations-equity-and-composition/22-basket-nav-and-risk.md#accepted-decision-for-checked-basket-value-expenses-and-risk).
+
+Composite sizing binds signed quantities to the spec, qualified leg lots
+and effective date. Match metric directions and use settled-cash P&L for
+volatility. Rebalance on exact eligible dates and hold quantities fixed
+in pricing and scenarios.
+[Accepted composite sizing and rebalance dates](docs/decisions/financial/valuations-equity-and-composition/23-composite-sizing.md#accepted-decision-for-checked-composite-sizing-and-rebalance-dates).
+
+Composite valuation and exposure reporting share the nested FX basis.
+Aggregate compatible complete risk and net exact primitive lot changes.
+History uses settled cash, exact rebalance closes and a fixed-capital
+index with the modeled financing transfer disclosed.
+[Accepted composite valuation and financed history](docs/decisions/financial/valuations-equity-and-composition/24-composite-valuation-history.md#accepted-decision-for-checked-composite-valuation-and-financed-history).
+
+Deliverable FX prices booked native amounts on fixed value dates. Bind
+cash FX or bridge actual later-value spot on matched dated currency
+curves. Keep booked cash fixed under market shocks and reconcile native
+cash exports to that value.
+[Accepted deliverable FX and covered interest parity](docs/decisions/financial/valuations-fx-and-exotics/fx-delivery-cip.md#accepted-decision-for-checked-deliverable-fx-and-covered-interest-parity).
+
+NDFs bind the exact fixing publication, benchmark value date and
+payment date. One signed cash-only derivative settlement carries no
+principal movement or coupon accrual.
+[Accepted NDF fixing and settlement](docs/decisions/financial/valuations-fx-and-exotics/ndf-fixing-settlement.md#accepted-decision-for-checked-ndf-fixing-and-settlement).
+
+Listed FX binds the exact series, quote scale and active mark. Preserve
+unpaid variation and delivery obligations separately. Exercise and
+assignment control futures delivery and risk follows the surviving claim.
+[Accepted listed FX futures and futures options](docs/decisions/financial/valuations-fx-and-exotics/fx-listed-contracts.md#accepted-decision-for-checked-listed-fx-futures-and-futures-options).
+
+FX vanilla prices actual delivery on the expiry variance clock. Resolve
+exercise and unpaid premium independently. Keep PV sensitivity, hedge
+notional and the source smile's quote convention on their own bases.
+[Accepted FX vanilla pricing and delta conventions](docs/decisions/financial/valuations-fx-and-exotics/fx-vanilla-delta.md#accepted-decision-for-checked-fx-vanilla-pricing-and-delta-conventions).
+
+FX digitals use the exact benchmark fixing and a separately dated native
+payout. Strict equality pays zero, including at exact deterministic
+equality. Retain a triggered quote or base claim through discharge.
+[Accepted FX digital pricing and settlement](docs/decisions/financial/valuations-fx-and-exotics/fx-digital.md#accepted-decision-for-checked-fx-digital-pricing-and-settlement).
+
+FX barriers use authorized eligible observations and inclusive touch.
+Resolve first hit separately from cash discharge. Admit the continuous
+analytic law on its qualified path and use dated carry for Monte Carlo.
+[Accepted FX barrier monitoring and settlement](docs/decisions/financial/valuations-fx-and-exotics/fx-barriers.md#accepted-decision-for-checked-fx-barrier-monitoring-and-settlement).
+
+FX touch cash uses inclusive authorized first passage and the contractual
+payout timing. Keep an entitled quote claim through discharge, with risk
+following its active source and dated payment.
+[Accepted FX touch pricing and settlement](docs/decisions/financial/valuations-fx-and-exotics/fx-touch.md#accepted-decision-for-checked-fx-touch-pricing-and-settlement).
+
 Valuation model inputs bind an exact source, unit, clock and parameter block.
 Use dated relative factors for GBM carry. Simulations retain explicit controls,
 exact seed identity and actual work. Apply each tree and quote control on its
@@ -717,6 +896,70 @@ price. Curve DM and annual-effective loan yield keep their own clocks
 and eligibility. Running cash cost uses covered funded balance-time.
 The effective-interest calculation requires a qualified original ledger.
 [Accepted shared loan quotes and effective interest](docs/decisions/financial/valuations-other-fixed-income/06-loan-quotes-eir.md#accepted-decision-for-checked-loan-quotes-cash-cost-and-effective-interest).
+
+Term loans preserve settled funding and OID and track gross
+nonrevolving authorization separately from outstanding par. Post
+PIK and principal in contractual phases, keep dated margin and payment
+elections on their qualified coupon parents and calculate fees on
+their own covered periods and economic bases.
+[Accepted term-loan cashflows](docs/decisions/financial/valuations-other-fixed-income/07-term-loan-cashflows.md#accepted-decision-for-checked-term-loan-cashflow-compilation).
+
+Term-loan valuation uses original-cut fixing-led claims and a separate
+settlement buyer bridge. Exact dated lattices preserve borrower
+rights and qualified recovery. OAS fits the same entitled buyer
+claim and passes a returned dirty-price residual check.
+[Accepted term-loan valuation and exercise](docs/decisions/financial/valuations-other-fixed-income/08-term-loan-pricing.md#accepted-decision-for-checked-term-loan-valuation-and-exercise).
+
+Term-loan yields use the matched buyer dirty purchase at actual
+settlement and complete authorized workout paths. Model risk holds
+the selected pricer and spread. Report CDS replay and fixed-strip Z risk
+on their own bases, and use the matched raw holder value and exact
+recoverable claim phase for economic default P&L.
+[Accepted term-loan workout yields and risk](docs/decisions/financial/valuations-other-fixed-income/09-term-loan-risk-yields.md#accepted-decision-for-checked-term-loan-workout-yields-and-risk).
+
+Revolver cashflows use covered elapsed state, exact principal and LC
+phases, independently dated cash and original coupon and fee periods.
+Modeled principal holds between explicit funding nodes and every
+qualified modeled change has its own cash leg.
+[Accepted revolver contractual cashflows](docs/decisions/financial/valuations-other-fixed-income/10-revolver-cashflows.md#accepted-decision-for-checked-revolver-contractual-cashflows).
+
+Revolver simulation uses the selected joint path and discount law,
+with claim-specific survival and phased recoverable and contingent exposure.
+Model valuation, sampling uncertainty and survival-unweighted expected
+cash schedules each retain their selected result basis.
+[Accepted revolver simulation and default valuation](docs/decisions/financial/valuations-other-fixed-income/11-revolver-monte-carlo-credit.md#accepted-decision-for-checked-revolver-simulation-and-default-valuation).
+
+Revolver quotes use authorized transferred claims and the actual
+settlement basis. Live risk starts from the selected raw holder model.
+Expected loss holds the same paths and measures the signed default PV
+effect. Standalone draw spread attribution follows qualifying discretionary
+funding and proportional retirement under the admitted coupon profile.
+[Accepted revolver quotes, exposure and risk](docs/decisions/financial/valuations-other-fixed-income/12-revolver-quotes-risk.md#accepted-decision-for-checked-revolver-quotes-exposure-and-risk).
+
+Agency MBS projection uses dated mortgage and security state, exact
+principal retirement, covered remittance dates and actual factor vintages.
+Pending distributions retain their own entitlement and never retire par
+already reflected in the opening continuing balance.
+[Accepted agency MBS projection and cash ownership](docs/decisions/financial/valuations-other-fixed-income/13-mbs-projection.md#accepted-decision-for-checked-agency-mbs-projection-and-cash-ownership).
+
+MBS rate risk and OAS use one dated monthly refinancing response.
+Rate shocks retain the authorized holding and spread law. Buyer OAS
+uses the original model origin and the sampled bank integral at actual
+payment dates, with a separate verified settlement-price residual.
+[Accepted agency MBS rate risk and OAS](docs/decisions/financial/valuations-other-fixed-income/14-mbs-risk-oas.md#accepted-decision-for-checked-agency-mbs-rate-risk-and-oas).
+
+TBA and dollar rolls use explicit contractual dates, collateral and delivery
+state. Value transferred claims and the exact invoice from the original cut.
+Report cash and security delivery together. Implied financing uses timed P&I
+and the reference pool’s surviving face. Specialness requires comparable repo.
+[Accepted TBA settlement and dollar rolls](docs/decisions/financial/valuations-other-fixed-income/15-tba-and-dollar-roll.md#accepted-decision-for-checked-tba-settlement-and-dollar-rolls).
+
+Fixed-income index TRS uses the exact contractual total-return series and
+actual payment phases. An explicitly elected carry scenario values eligible
+unresolved observations. Share financing, annuity and par rules with the TRS
+engine. Keep duration diagnostics separate from curve PV risk and require
+qualified inputs for margin. Report return and financing cash separately.
+[Accepted fixed-income index TRS](docs/decisions/financial/valuations-other-fixed-income/16-fi-index-trs.md#accepted-decision-for-checked-fixed-income-index-total-return-swaps).
 
 Construct and restore private validated state atomically; preserve complete model
 values/order/identity/source in snapshots and distinguish lossy presentation tables.
