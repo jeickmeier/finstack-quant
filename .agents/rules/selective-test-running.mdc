@@ -28,6 +28,7 @@ Add `--all-features` to `rust-lint-crate` / `rust-fix-crate` when touching featu
 ## Full-workspace tasks (final verification / CI only)
 
 - `mise run rust-lint` — full-workspace fmt check + clippy on lib/bins/tests/examples (skips benches). Run before commit or when the user asks for full lint.
+- `mise run rust-complexity` — report-only list of library functions over the cognitive-complexity threshold (15, set in `clippy.toml`); tests excluded, not part of the gate.
 - `mise run rust-test` — all crates, all integration binaries.
 - `mise run rust-bench` — all Criterion targets.
 - `mise run all` — the cross-language gate; it runs exactly what CI runs on a pull request.

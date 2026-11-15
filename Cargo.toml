@@ -108,6 +108,7 @@ arrow = { version = "57", default-features = false }
 # The cost is a codegen-bound cold build. Line tables only, for backtraces.
 opt-level = 1
 debug = "line-tables-only"
+incremental = true
 
 [profile.release]
 opt-level = 3
@@ -172,6 +173,9 @@ missing_docs = "deny"           # all public API must be documented (rustc lint,
 "new_without_default" = "deny"
 "too_many_arguments" = "deny"
 "type_complexity" = "deny"
+# `cognitive_complexity` is deliberately absent: it is report-only for library
+# code (tests excluded) via `mise run rust-complexity`, outside the gate. Its
+# threshold (15) is set in the root `clippy.toml`.
 "large_enum_variant" = "deny"
 "module_name_repetitions" = "allow"   # allow finstack_quant_valuations::valuations
 "too_many_lines" = "allow"

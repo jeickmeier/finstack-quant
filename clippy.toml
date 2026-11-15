@@ -1,0 +1,4 @@
+# Only read when `clippy::cognitive_complexity` is enabled, which today is
+# `mise run rust-complexity` (report-only, library code only). Clippy's default
+# is 25.
+cognitive-complexity-threshold = 15

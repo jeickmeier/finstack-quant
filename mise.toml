@@ -325,6 +325,15 @@ cargo clippy -p "${usage_package?}" $targets $features --keep-going -- -D warnin
 exit "$status"
 '''
 
+[tasks.rust-complexity]
+# Report-only and outside the gate. `--lib` without `--tests` compiles no
+# `cfg(test)` code, so test modules, integration tests, examples and bins are
+# never measured. `--force-warn` keeps hits as warnings and `-A warnings` hides
+# every other warning; deny-level lints still fail as they do in rust-lint.
+# Different clippy arguments make the next rust-lint re-check workspace crates.
+description = "Report library functions over the cognitive-complexity threshold (15, clippy.toml); excludes tests"
+run = "cargo clippy --workspace --lib --all-features --keep-going -- -A warnings --force-warn clippy::cognitive_complexity"
+
 [tasks.rust-fmt]
 description = "Format the workspace with cargo fmt"
 run = "cargo fmt --all"
