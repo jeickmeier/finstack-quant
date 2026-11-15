@@ -1,3 +1,9 @@
+# Parsed as text by scripts/serde_audit and never built with the repository. The
+# empty [workspace] makes this crate its own root, so tools that load every
+# Cargo.toml they find (cargo metadata, rust-analyzer, CodeQL) accept it even
+# though it sits below the repository workspace without being a member.
+[workspace]
+
 [package]
 name = "module-graph-fixture"
 version = "0.0.0"
