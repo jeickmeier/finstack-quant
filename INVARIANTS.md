@@ -549,6 +549,71 @@ payout timing. Keep an entitled quote claim through discharge, with risk
 following its active source and dated payment.
 [Accepted FX touch pricing and settlement](docs/decisions/financial/valuations-fx-and-exotics/fx-touch.md#accepted-decision-for-checked-fx-touch-pricing-and-settlement).
 
+FX variance uses exact qualified observations and explicit annualization.
+Price pending close returns on the dated smile and fixing basis. Retain
+known quote cash through its separate payment and discharge.
+[Accepted FX variance swap pricing and risk](docs/decisions/financial/valuations-fx-and-exotics/fx-variance.md#accepted-decision-for-checked-fx-variance-swap-pricing-and-risk).
+
+Quanto options use booked fixed conversion, correlation oriented to payout
+currency per asset currency, and separate fixing carry and payment discount.
+Resolve known payout cash before live markets.
+[Accepted dated quanto pricing and risk](docs/decisions/financial/valuations-fx-and-exotics/quanto-drift.md#accepted-decision-for-checked-dated-quanto-pricing-and-risk).
+
+Commodity delivery keeps the asset obligation and invoice on their own
+dates. Listed contracts use the exact series and qualified mark, apply
+clearing variation once and retain unsettled cash through discharge.
+[Accepted commodity delivery and listed contracts](docs/decisions/financial/valuations-fx-and-exotics/commodity-delivery-listed.md#accepted-decision-for-commodity-delivery-and-listed-contracts).
+
+Commodity spot options select their live model explicitly, exercise on
+authorized events and value the resulting cash or physical obligations on
+their actual dates. Model risk follows the selected pricing basis.
+[Accepted commodity spot option pricing and exercise](docs/decisions/financial/valuations-fx-and-exotics/commodity-spot-option.md#accepted-decision-for-commodity-spot-option-pricing-and-exercise).
+
+Commodity averaging swaps use exact qualified observation slots and
+explicit period quantities. Resolve publication before fixing or projecting
+and value one net cash obligation per included payment period.
+[Accepted commodity averaging swap pricing and settlement](docs/decisions/financial/valuations-fx-and-exotics/commodity-average-swap.md#accepted-decision-for-commodity-averaging-swap-pricing-and-settlement).
+
+Commodity swaptions weight the exact underlying periods by their booked
+quantities and dated discount factors. Authorized exercise transfers the
+swap once or creates a separately dated cash claim.
+[Accepted commodity swaption pricing and exercise](docs/decisions/financial/valuations-fx-and-exotics/commodity-swaption.md#accepted-decision-for-commodity-swaption-pricing-and-exercise).
+
+Commodity Asian options preserve every qualified fixing slot, select the
+model matching the booked average and value the signed claim on its actual
+payment date through discharge.
+[Accepted commodity Asian pricing and settlement](docs/decisions/financial/valuations-fx-and-exotics/commodity-asian.md#accepted-decision-for-commodity-asian-pricing-and-settlement).
+
+Commodity spread options use exact ordered leg units and sources, named
+Kirk with checked inputs, and authorized fixing cash retained through
+payment. Leg risks follow their declared native price and volatility bases.
+[Accepted commodity spread pricing and settlement](docs/decisions/financial/valuations-fx-and-exotics/commodity-spread.md#accepted-decision-for-commodity-spread-pricing-and-settlement).
+
+Asset Asian pricing shares exact qualified fixing slots and dated forwards
+across analytic and simulated models. Retain fixed cash through its actual
+payment and discharge. A fitted control uses independent pilot groups.
+[Accepted asset Asian pricing and settlement](docs/decisions/financial/valuations-fx-and-exotics/asset-asian.md#accepted-decision-for-asset-asian-pricing-and-settlement).
+
+Asset barriers qualify monitoring history and first touch separately from
+rebate entitlement and discharge. Price on the selected analytic,
+simulation or PDE basis and preserve the actual payment dates.
+[Accepted asset barrier pricing and settlement](docs/decisions/financial/valuations-fx-and-exotics/asset-barrier.md#accepted-decision-for-asset-barrier-pricing-and-settlement).
+
+Asset lookbacks use the exact monitoring window and qualified extrema. A
+floating payoff also needs the contractual terminal fixing. Retain signed
+cash through its actual payment and discharge.
+[Accepted asset lookback pricing and settlement](docs/decisions/financial/valuations-fx-and-exotics/asset-lookback.md#accepted-decision-for-asset-lookback-pricing-and-settlement).
+
+Asset range accruals keep the booked band fixed and count exact qualified
+observations on the full denominator. Value the conditional coupon on its
+actual payment basis with checked static or simulated observation weights.
+[Accepted asset range accrual pricing and settlement](docs/decisions/financial/valuations-fx-and-exotics/asset-range-accrual.md#accepted-decision-for-asset-range-accrual-pricing-and-settlement).
+
+Callable rate range accruals use dated single-curve index projection and
+actual dated branch cash. Issuer continuation uses the rate and earned
+count. Train and price on disjoint groups and refit the policy for rate risk.
+[Accepted callable rate range accrual](docs/decisions/financial/valuations-fx-and-exotics/callable-range-hw.md#accepted-decision-for-callable-rate-range-accrual).
+
 Valuation model inputs bind an exact source, unit, clock and parameter block.
 Use dated relative factors for GBM carry. Simulations retain explicit controls,
 exact seed identity and actual work. Apply each tree and quote control on its

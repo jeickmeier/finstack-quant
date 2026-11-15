@@ -137,7 +137,7 @@
     clock, pin, parameters, discount, settlement and risk.
     Matching one expiry imposes one mean constraint. Curve
     calibration and risk-premium identification stay separate.
-    [Commodity spot-option owner](../valuations-fx-and-exotics/commodity-spot-option.md).
+    [Accepted commodity spot-option decision](../valuations-fx-and-exotics/commodity-spot-option.md#accepted-decision-for-commodity-spot-option-pricing-and-exercise).
 
 11. **Reconcile existing raw and pricing routes.** Keep one
     raw `[X0,Y0]` vector and the `x`, `y` factor outputs at

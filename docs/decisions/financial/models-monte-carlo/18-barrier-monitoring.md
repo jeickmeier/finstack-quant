@@ -200,7 +200,7 @@
     the payoff callbacks Rust-only. Keep analytic, PDE, credit
     barrier and lookback algorithms with their respective owners.
     [LRM](26-likelihood-ratio-greeks.md), [capture](28-capture-and-simulation-contracts.md),
-    [asset barriers](../valuations-fx-and-exotics/asset-barrier.md),
+    [accepted asset barrier pricing and settlement](../valuations-fx-and-exotics/asset-barrier.md#accepted-decision-for-asset-barrier-pricing-and-settlement),
     [FX barriers](../valuations-fx-and-exotics/fx-barriers.md).
 
 13. **Qualify timing, price and approximation independently.** Verify

@@ -97,6 +97,7 @@
    and phase. The product owns dates, monitoring at
    valuation or expiry, rebate economics and parity
    acceptance. Keep existing pricing model keys.
+   [Accepted asset barrier pricing and settlement](../valuations-fx-and-exotics/asset-barrier.md#accepted-decision-for-asset-barrier-pricing-and-settlement).
 
 8. **Check all stage inputs and publish a complete step.** Validate
    finite admitted times and actual width, grid and vector

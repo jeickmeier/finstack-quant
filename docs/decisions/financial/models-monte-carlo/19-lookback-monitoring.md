@@ -159,7 +159,7 @@
     when it completes an eligible observation. Product owners retain
     fixing source, payment, residual-claim and scenario semantics.
     The analytic continuous price keeps its accepted separate domain.
-    [Dated asset lookback](../valuations-fx-and-exotics/asset-lookback.md),
+    [Accepted asset lookback pricing and settlement](../valuations-fx-and-exotics/asset-lookback.md#accepted-decision-for-asset-lookback-pricing-and-settlement),
     [accepted analytic lookbacks](../models-analytic/lookback-extrema.md#accepted-decision-for-continuous-lookback-premiums).
 
 11. **Reconcile capture, Greeks and existing host routes.** Keep final

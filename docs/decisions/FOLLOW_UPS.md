@@ -1556,6 +1556,68 @@ history, first passage, payout state, risk and host qualification remain
 pending.
 [FX-TOUCH](financial/valuations-fx-and-exotics/fx-touch.md#accepted-decision-for-checked-fx-touch-pricing-and-settlement).
 
+The FX variance package was accepted on 2026-11-14. Runtime, observation
+authority, smile and discrete forecast, settlement, risk and host
+qualification remain pending.
+[FX-VARIANCE](financial/valuations-fx-and-exotics/fx-variance.md#accepted-decision-for-checked-fx-variance-swap-pricing-and-risk).
+
+The quanto package was accepted on 2026-11-14. Runtime, source orientation
+and clock, fixing, settlement, risk and host qualification remain pending.
+[QUANTO-DRIFT](financial/valuations-fx-and-exotics/quanto-drift.md#accepted-decision-for-checked-dated-quanto-pricing-and-risk).
+
+The commodity delivery and listed-contract package was accepted on
+2026-11-14. Runtime, quote and fixing sources, clearing, delivery, risk
+and host qualification remain pending.
+[COMMODITY-DELIVERY-LISTED](financial/valuations-fx-and-exotics/commodity-delivery-listed.md#accepted-decision-for-commodity-delivery-and-listed-contracts).
+
+The commodity spot-option package was accepted on 2026-11-14. Runtime,
+market sources, exercise, physical settlement, model risk and host
+qualification remain pending.
+[COMMODITY-SPOT-OPTION](financial/valuations-fx-and-exotics/commodity-spot-option.md#accepted-decision-for-commodity-spot-option-pricing-and-exercise).
+
+The commodity averaging swap package was accepted on 2026-11-14. Runtime,
+market sources, fixing and payment state, price-curve risk and host
+qualification remain pending.
+[COMMODITY-AVERAGE-SWAP](financial/valuations-fx-and-exotics/commodity-average-swap.md#accepted-decision-for-commodity-averaging-swap-pricing-and-settlement).
+
+The commodity swaption package was accepted on 2026-11-14. Runtime,
+market sources, exercise, matched settlement, risk and host qualification
+remain pending.
+[COMMODITY-SWAPTION](financial/valuations-fx-and-exotics/commodity-swaption.md#accepted-decision-for-commodity-swaption-pricing-and-exercise).
+
+The commodity Asian package was accepted on 2026-11-14. Runtime, fixing
+and quote sources, approximation, settlement, risk and host qualification
+remain pending.
+[COMMODITY-ASIAN](financial/valuations-fx-and-exotics/commodity-asian.md#accepted-decision-for-commodity-asian-pricing-and-settlement).
+
+The commodity spread package was accepted on 2026-11-14. Runtime,
+source and approximation domain, fixing, settlement, risk and host
+qualification remain pending.
+[COMMODITY-SPREAD](financial/valuations-fx-and-exotics/commodity-spread.md#accepted-decision-for-commodity-spread-pricing-and-settlement).
+
+The asset Asian package was accepted on 2026-11-14. Runtime, fixing data,
+dated carry, simulation, cash, risk and host qualification remain pending.
+[ASSET-ASIAN](financial/valuations-fx-and-exotics/asset-asian.md#accepted-decision-for-asset-asian-pricing-and-settlement).
+
+The asset barrier package was accepted on 2026-11-14. Runtime, monitoring,
+dated cash, simulation, PDE, risk and host qualification remain pending.
+[ASSET-BARRIER](financial/valuations-fx-and-exotics/asset-barrier.md#accepted-decision-for-asset-barrier-pricing-and-settlement).
+
+The asset lookback package was accepted on 2026-11-15. Runtime, market
+history, continuous and discrete monitoring, settlement, risk and host
+qualification remain pending.
+[ASSET-LOOKBACK](financial/valuations-fx-and-exotics/asset-lookback.md#accepted-decision-for-asset-lookback-pricing-and-settlement).
+
+The asset range-accrual package was accepted on 2026-11-15. Runtime,
+market sources, static smile and GBM, coupon, risk and host qualification
+remain pending.
+[ASSET-RANGE-ACCRUAL](financial/valuations-fx-and-exotics/asset-range-accrual.md#accepted-decision-for-asset-range-accrual-pricing-and-settlement).
+
+The callable rate range-accrual package was accepted on 2026-11-15.
+Runtime, history, stopping policy, rate risk and host qualification
+remain pending.
+[CALLABLE-RANGE-HW](financial/valuations-fx-and-exotics/callable-range-hw.md#accepted-decision-for-callable-rate-range-accrual).
+
 Other unadopted choices retain their stated Proposed or Draft status. Acceptance does not certify
 observed implementations.
 Numerical suites were not rerun in the original documentation audits.

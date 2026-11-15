@@ -49,6 +49,7 @@
    no live-price delta. This is shared VM arithmetic. Invoice,
    deliverable basket and physical delivery economics belong to
    the product owner.
+   [Commodity delivery and listed contracts](../valuations-fx-and-exotics/commodity-delivery-listed.md#accepted-decision-for-commodity-delivery-and-listed-contracts).
 
 3. **Separate modeled option quotes, position marks and booked cash.**
    Require explicit European or American style, Black-76 or

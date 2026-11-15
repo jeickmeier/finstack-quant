@@ -131,6 +131,7 @@ Accepted on **2026-11-10** after review of all 21 decisions.
     fallback. Apply quantity once to the checked price in its native
     currency. A collapsed live model clock needs an explicit owner
     treatment and supplies no expiry or settlement fact.
+   [Accepted asset lookback pricing and settlement](../valuations-fx-and-exotics/asset-lookback.md#accepted-decision-for-asset-lookback-pricing-and-settlement).
 
 17. **Resolve completed monitoring with dated evidence.** Require the
     certified final relevant extremum. A fixed payoff needs terminal spot

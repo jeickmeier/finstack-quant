@@ -113,9 +113,9 @@ Accepted on **2026-11-10** after review of all 20 decisions.
     independently of the live FX used by sources. The requested scalar
     itself must fit. A later quantity or conversion supplies no range
     extension to this API. The existing
-    [dated product decision](../valuations-fx-and-exotics/quanto-drift.md)
-    owns how the contractual multiplier is specified. The observed
-    notional/strike fallback remains a product review item.
+    [accepted dated product decision](../valuations-fx-and-exotics/quanto-drift.md#accepted-decision-for-checked-dated-quanto-pricing-and-risk)
+    requires contractual quantity and fixed conversion and derives any
+    reference notional from those terms and strike.
 
 14. **Use the model's parity, bounds and direction checks.** In scalar
     units call minus put is D_d(F_q−K). Each premium is at least
@@ -152,8 +152,8 @@ Accepted on **2026-11-10** after review of all 20 decisions.
     Current spot and date comparisons supply no automatic settlement
     fact. Resolve a known claim before unnecessary live market queries.
     Validate the contractual payoff scale and its arithmetic through
-    payout-currency Money. Retain actual settlement and scope choices
-    for the product review.
+    payout-currency Money. The accepted dated product decision owns the
+    authorized event cut, payment terms and retained residual claim.
 
 18. **Keep this terminal law separate from other claims.** Share checked
     covariance arithmetic with the existing equity-future and

@@ -155,7 +155,7 @@
     tests and examples through the dated owner. Retain product
     ownership of settlement, rate and volatility source,
     risk repricing and reported product measures.
-    [Dated Asian product](../valuations-fx-and-exotics/asset-asian.md).
+    [Accepted asset Asian pricing and settlement](../valuations-fx-and-exotics/asset-asian.md#accepted-decision-for-asset-asian-pricing-and-settlement).
 
 12. **Qualify the financial and statistical results.** Verify
     disjoint replay, sample and physical work counts, grouped

@@ -169,7 +169,7 @@
     stochastic discounting. Preserve those contracts even
     where the terms type is shared. Other day-weighted and
     multi-period products map their economics at their owners.
-    [Asset range accrual](../valuations-fx-and-exotics/asset-range-accrual.md),
+    [Accepted asset range accrual pricing and settlement](../valuations-fx-and-exotics/asset-range-accrual.md#accepted-decision-for-asset-range-accrual-pricing-and-settlement),
     [callable rate range accrual](../valuations-fx-and-exotics/callable-range-hw.md).
 
 13. **Qualify counting, dated carry and pricing independently.**

@@ -118,7 +118,7 @@
     cash separately from rate. The product qualifies the
     resulting conditional approximation across its decision
     states.
-    [Callable range accrual owner](../valuations-fx-and-exotics/callable-range-hw.md)
+    [Accepted callable range accrual owner](../valuations-fx-and-exotics/callable-range-hw.md#accepted-decision-for-callable-rate-range-accrual)
 
 14. **Remove redundant time terms from the fixed-date fit.**
     A selected univariate short-rate polynomial uses literal

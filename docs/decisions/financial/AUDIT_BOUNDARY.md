@@ -1307,6 +1307,84 @@ crossing and retained quote cash. Runtime, benchmark, risk and host
 qualification remain pending.
 [FX-TOUCH](valuations-fx-and-exotics/fx-touch.md#accepted-decision-for-checked-fx-touch-pricing-and-settlement).
 
+FX variance swap pricing and risk were accepted on 2026-11-14.
+Independent calculations cover the flat Black strip identity, interval
+forecast, fixing eligibility, settlement and risk units. Full smile,
+runtime, data and host qualification remain pending.
+[FX-VARIANCE](valuations-fx-and-exotics/fx-variance.md#accepted-decision-for-checked-fx-variance-swap-pricing-and-risk).
+
+Dated quanto pricing and risk were accepted on 2026-11-14. Independent
+calculations cover quote orientation, the priced terminal payoff, known
+cash and sensitivity bases. Runtime, market data, risk and host
+qualification remain pending.
+[QUANTO-DRIFT](valuations-fx-and-exotics/quanto-drift.md#accepted-decision-for-checked-dated-quanto-pricing-and-risk).
+
+Commodity delivery and listed pricing were accepted on 2026-11-14.
+Independent calculations cover forward delivery and invoice PV, listed
+fixings and variation, signed-price option valuation and exercise. Runtime,
+venue clearing, delivery and host qualification remain pending.
+[COMMODITY-DELIVERY-LISTED](valuations-fx-and-exotics/commodity-delivery-listed.md#accepted-decision-for-commodity-delivery-and-listed-contracts).
+
+Commodity spot-option pricing and exercise were accepted on 2026-11-14.
+Independent calculations cover the dated Black payoff, exact tree exercise,
+pinned terminal law and residual physical claims. Runtime, model risk,
+exercise data and host qualification remain pending.
+[COMMODITY-SPOT-OPTION](valuations-fx-and-exotics/commodity-spot-option.md#accepted-decision-for-commodity-spot-option-pricing-and-exercise).
+
+Commodity averaging swap pricing and settlement were accepted on
+2026-11-14. Independent calculations cover regular and stub observations,
+fixing publication, net cash and price-pillar risk. Runtime, source,
+settlement and host qualification remain pending.
+[COMMODITY-AVERAGE-SWAP](valuations-fx-and-exotics/commodity-average-swap.md#accepted-decision-for-commodity-averaging-swap-pricing-and-settlement).
+
+Commodity swaption pricing and exercise were accepted on 2026-11-14.
+Independent calculations cover quantity weights, Black pricing and parity,
+differentiated curve risk and fixed unpaid cash. Runtime, exercise, market
+data and host qualification remain pending.
+[COMMODITY-SWAPTION](valuations-fx-and-exotics/commodity-swaption.md#accepted-decision-for-commodity-swaption-pricing-and-exercise).
+
+Commodity Asian pricing and settlement were accepted on 2026-11-14.
+Independent calculations cover geometric and arithmetic premiums, the
+arithmetic approximation, fixed cash and a source-pillar risk example.
+Runtime, sources, approximation and host qualification remain pending.
+[COMMODITY-ASIAN](valuations-fx-and-exotics/commodity-asian.md#accepted-decision-for-commodity-asian-pricing-and-settlement).
+
+Commodity spread pricing and settlement were accepted on 2026-11-14.
+Independent calculations cover the zero-strike exchange limit, nonzero
+strike approximation, dated cash and leg-smile risk. Runtime, data and
+host qualification remain pending.
+[COMMODITY-SPREAD](valuations-fx-and-exotics/commodity-spread.md#accepted-decision-for-commodity-spread-pricing-and-settlement).
+
+Asset Asian pricing and settlement were accepted on 2026-11-14.
+Independent calculations cover dated carry, exact geometric and fitted
+arithmetic prices, the pilot control and horizon cash. Runtime, market
+data, numerical and host qualification remain pending.
+[ASSET-ASIAN](valuations-fx-and-exotics/asset-asian.md#accepted-decision-for-asset-asian-pricing-and-settlement).
+
+Asset barrier pricing and settlement were accepted on 2026-11-14.
+Independent calculations cover first passage, immediate and deferred
+rebate, continuous parity and discrete PDE finite-grid sensitivity.
+Runtime, market data, numerical and host qualification remain pending.
+[ASSET-BARRIER](valuations-fx-and-exotics/asset-barrier.md#accepted-decision-for-asset-barrier-pricing-and-settlement).
+
+Asset lookback pricing and settlement were accepted on 2026-11-15.
+Independent calculations cover seasoned continuous prices, observation
+eligibility, conditional extrema and retained cash. Runtime, market data,
+numerical and host qualification remain pending.
+[ASSET-LOOKBACK](valuations-fx-and-exotics/asset-lookback.md#accepted-decision-for-asset-lookback-pricing-and-settlement).
+
+Asset range-accrual pricing and settlement were accepted on 2026-11-15.
+Independent calculations cover static collar approximation and sampled
+convexity, dated quanto marginals, fixed coupon and unpaid cash. Runtime,
+market data, numerical and host qualification remain pending.
+[ASSET-RANGE-ACCRUAL](valuations-fx-and-exotics/asset-range-accrual.md#accepted-decision-for-asset-range-accrual-pricing-and-settlement).
+
+Callable rate range-accrual pricing and settlement were accepted on
+2026-11-15. Independent checks cover count-dependent cash and exercise
+and a dated no-call Gaussian reference. Runtime, lifecycle, risk and
+host qualification remain pending.
+[CALLABLE-RANGE-HW](valuations-fx-and-exotics/callable-range-hw.md#accepted-decision-for-callable-rate-range-accrual).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

@@ -159,6 +159,7 @@ retain observation eligibility, market sources and payment conventions.
     [accepted time-grid contract](../core-numerics/time-grids.md) and preserve
     errors. The estimator, volatility selection, non-GBM pricers and path
     dynamics retain their owners.
+    [Accepted asset Asian pricing and settlement](../valuations-fx-and-exotics/asset-asian.md#accepted-decision-for-asset-asian-pricing-and-settlement).
 
 18. **Reconcile the commodity analytic paths.** Reuse the same prepared
     moment laws with each dated commodity forward, the actual independent
@@ -168,6 +169,7 @@ retain observation eligibility, market sources and payment conventions.
     laws and source selection retain their owners. Describe the actual
     averaging branch in product model-key documentation, including the
     two-moment baseline meaning of the Turnbull–Wakeman label.
+    [Accepted commodity Asian pricing and settlement](../valuations-fx-and-exotics/commodity-asian.md#accepted-decision-for-commodity-asian-pricing-and-settlement).
 
 19. **Preserve actual fixing and settlement authority.** Validate dated
     eligibility and history coverage, including required valuation-date

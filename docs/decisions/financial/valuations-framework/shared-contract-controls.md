@@ -42,7 +42,7 @@
    validates exercise versus notice, valuation cut, lifecycle and horizon,
    determines co-dated event order and payable amounts, and reports
    unsupported callable routes. See
-   [callable range accrual](../valuations-fx-and-exotics/callable-range-hw.md)
+   [accepted callable range accrual](../valuations-fx-and-exotics/callable-range-hw.md#accepted-decision-for-callable-rate-range-accrual)
    and [exercise and observation grids](observation-grids.md).
 
 4. **Represent convertible trigger and dividend terms faithfully.** Remove

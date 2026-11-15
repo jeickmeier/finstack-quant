@@ -160,7 +160,7 @@
     and model selection. A fully observed dated claim needs its
     remaining settlement treatment without a new live spot or vol
     request. [LRM record](26-likelihood-ratio-greeks.md),
-    [asset Asian product](../valuations-fx-and-exotics/asset-asian.md).
+    [accepted asset Asian pricing and settlement](../valuations-fx-and-exotics/asset-asian.md#accepted-decision-for-asset-asian-pricing-and-settlement).
 
 12. **Qualify payoff and priced routes separately.** Verify signed linear
     settlement and call/put parity, strict digital ties including atoms,

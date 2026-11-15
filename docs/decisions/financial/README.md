@@ -1334,6 +1334,72 @@ authorized touch, immediate first-passage and separately dated deferred
 payments, retained native quote claims and active-source risk.
 [FX-TOUCH](valuations-fx-and-exotics/fx-touch.md#accepted-decision-for-checked-fx-touch-pricing-and-settlement).
 
+The FX variance package was accepted on 2026-11-14. It covers qualified
+observations, explicit annualization, checked smile and dated carry for
+pending close returns, separately dated quote cash and active-source risk.
+[FX-VARIANCE](valuations-fx-and-exotics/fx-variance.md#accepted-decision-for-checked-fx-variance-swap-pricing-and-risk).
+
+The quanto package was accepted on 2026-11-14. It covers explicit fixed
+conversion, directed FX and correlation, domestic-measure carry, qualified
+dated claims and separate asset, FX, correlation and rate risk.
+[QUANTO-DRIFT](valuations-fx-and-exotics/quanto-drift.md#accepted-decision-for-checked-dated-quanto-pricing-and-risk).
+
+The commodity delivery and listed-contract package was accepted on
+2026-11-14. It covers qualified forward and listed marks, actual
+commodity and invoice obligations, clearing variation, authoritative
+exercise and active-source risk.
+[COMMODITY-DELIVERY-LISTED](valuations-fx-and-exotics/commodity-delivery-listed.md#accepted-decision-for-commodity-delivery-and-listed-contracts).
+
+The commodity spot-option package was accepted on 2026-11-14. It covers
+dated Black pricing, checked early exercise, explicit Schwartz–Smith
+simulation, outstanding cash or physical obligations and model-specific risk.
+[COMMODITY-SPOT-OPTION](valuations-fx-and-exotics/commodity-spot-option.md#accepted-decision-for-commodity-spot-option-pricing-and-exercise).
+
+The commodity averaging swap package was accepted on 2026-11-14. It
+covers booked period quantities, distinct observation and payment dates,
+publication-aware averaging, net cash, price-curve and discount risk.
+[COMMODITY-AVERAGE-SWAP](valuations-fx-and-exotics/commodity-average-swap.md#accepted-decision-for-commodity-averaging-swap-pricing-and-settlement).
+
+The commodity swaption package was accepted on 2026-11-14. It covers
+quantity-weighted annuity and forward, checked European Black pricing,
+authorized swap handoff or dated cash and distinct local and curve risk.
+[COMMODITY-SWAPTION](valuations-fx-and-exotics/commodity-swaption.md#accepted-decision-for-commodity-swaption-pricing-and-exercise).
+
+The commodity Asian package was accepted on 2026-11-14. It covers exact
+fixing slots, checked geometric and arithmetic model selection, dated
+cash and active forward, volatility and discount risk.
+[COMMODITY-ASIAN](valuations-fx-and-exotics/commodity-asian.md#accepted-decision-for-commodity-asian-pricing-and-settlement).
+
+The commodity spread package was accepted on 2026-11-14. It covers
+normalized ordered legs, qualified ATM volatility and correlation,
+checked Kirk, authorized dated cash and explicit leg and source risk.
+[COMMODITY-SPREAD](valuations-fx-and-exotics/commodity-spread.md#accepted-decision-for-commodity-spread-pricing-and-settlement).
+
+The asset Asian package was accepted on 2026-11-14. It covers exact
+qualified observations, shared dated carry, the two checked analytic
+routes, explicit GBM and QE-M, retained cash and model-specific risk.
+[ASSET-ASIAN](valuations-fx-and-exotics/asset-asian.md#accepted-decision-for-asset-asian-pricing-and-settlement).
+
+The asset barrier package was accepted on 2026-11-14. It covers authorized
+monitoring, dated option and rebate claims, selected analytic, GBM, QE-M and
+PDE routes, and state-specific risk and export.
+[ASSET-BARRIER](valuations-fx-and-exotics/asset-barrier.md#accepted-decision-for-asset-barrier-pricing-and-settlement).
+
+The asset lookback package was accepted on 2026-11-15. It covers explicit
+fixed and floating payoffs, qualified extrema, checked continuous pricing,
+exact-event GBM simulation, retained dated cash and state-specific risk.
+[ASSET-LOOKBACK](valuations-fx-and-exotics/asset-lookback.md#accepted-decision-for-asset-lookback-pricing-and-settlement).
+
+The asset range-accrual package was accepted on 2026-11-15. It covers
+the fixed contractual band, qualified exact observations, checked static
+or dated GBM pricing and quanto carry, retained coupon and active risk.
+[ASSET-RANGE-ACCRUAL](valuations-fx-and-exotics/asset-range-accrual.md#accepted-decision-for-asset-range-accrual-pricing-and-settlement).
+
+The callable rate range-accrual package was accepted on 2026-11-15.
+It covers dated single-curve Hull–White projection, actual redemption
+cash, earned-count continuation, independent policy pricing and rate risk.
+[CALLABLE-RANGE-HW](valuations-fx-and-exotics/callable-range-hw.md#accepted-decision-for-callable-rate-range-accrual).
+
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the
 accepted perspective/sign contracts; broader margin methodology retains its

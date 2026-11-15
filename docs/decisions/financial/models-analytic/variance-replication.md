@@ -197,6 +197,7 @@ and independent complete-path qualification remain open.
     the cumulative variation, carry, partial-return,
     observation and annualization rules and downstream PV
     discounting.
+   [Accepted FX variance swap pricing and risk](../valuations-fx-and-exotics/fx-variance.md#accepted-decision-for-checked-fx-variance-swap-pricing-and-risk).
 
 24. **Keep the shared model Rust-only.** Reconcile the existing
     product and typed WASM instrument paths through their
