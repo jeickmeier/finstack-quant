@@ -1558,6 +1558,16 @@ and implementation and validation evidence.
   [accepted record 21](decisions/financial/models-analytic/variance-replication.md#accepted-decision-for-checked-variance-replication-and-explicit-black-wings).
   [Cboe VIX methodology](https://cdn.cboe.com/resources/vix/VIX_Methodology.pdf)
 
+<a id="rebonato-2002-lmm-swaption-calibration"></a>
+
+### Rebonato 2002 LMM swaption calibration
+
+- Rebonato, R. *Modern Pricing of Interest-Rate Derivatives: The LIBOR
+  Market Model and Beyond*. Princeton University Press, 2002. Sections
+  10.3 and 10.5 cover approximate swap-rate volatility and co-terminal
+  European calibration. Chapter 11 covers displaced diffusion.
+  [Publisher's contents](https://api.pageplace.de/preview/DT0400.9781400829323_A25081414/preview-9781400829323_A25081414.pdf#page=10).
+
 <a id="rebonato-2004-volatility-correlation"></a>
 
 ### Rebonato 2004 Volatility And Correlation

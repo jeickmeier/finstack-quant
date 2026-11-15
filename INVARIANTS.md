@@ -990,6 +990,29 @@ payoff under the exercise-date measure. Gate weighted tails and
 missed exercise separately from the quadrature estimate and quote fit.
 [Accepted contractual Gaussian integration](docs/decisions/financial/calibration-rate-models/05-contractual-gaussian-integration.md#accepted-decision-for-checked-contractual-gaussian-swaption-integration).
 
+Free Hull–White calibration uses tolerance-scaled premium errors
+and requires two resolved local sensitivity directions. Rank only
+candidates that pass native quote repricing and output admission.
+[Accepted free Hull–White fit](docs/decisions/financial/calibration-rate-models/06-two-parameter-fit.md#accepted-decision-for-bounded-identified-two-parameter-hull-white-fitting).
+
+Fixed-κ cap and floor calibration fits one constant sigma to
+equal-weight unit-notional premium errors on an explicit qualified
+branch. Require resolved local price response, complete native
+Normal quote acceptance and admitted output before ranking.
+[Accepted fixed-κ fit](docs/decisions/financial/calibration-rate-models/07-fixed-kappa-cap-fit.md#accepted-decision-for-bounded-fixed-kappa-cap-and-floor-premium-fitting).
+
+Piecewise Hull–White fits freeze each admitted sigma and start the
+next segment at the preceding strip's last live fixing. Require a
+qualified branch, local identification and premium and native Normal
+agreement on the exact final schedule before publication.
+[Accepted sigma bootstrap](docs/decisions/financial/calibration-rate-models/08-piecewise-sigma-bootstrap.md#accepted-decision-for-live-fixing-hullwhite-sigma-bootstrapping).
+
+An LMM loading-scale fit uses the earliest eligible strictly future
+co-terminal European ATM slice, the product's explicit shift and
+two-factor profile, and a qualified unshifted Black quote on its own
+clock. Reprice the actual scale and gate its native quote before use.
+[Accepted LMM scale fit](docs/decisions/financial/calibration-rate-models/09-lmm-rebonato-calibration.md#accepted-decision-for-single-slice-lmm-loading-scale-calibration).
+
 Valuation model inputs bind an exact source, unit, clock and parameter block.
 Use dated relative factors for GBM carry. Simulations retain explicit controls,
 exact seed identity and actual work. Apply each tree and quote control on its

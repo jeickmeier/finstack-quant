@@ -2,7 +2,7 @@
 
 This inventory covers **30 assigned production Rust files**: **23 algorithm-bearing files and 7 support files**, with **18 methodology records**. Each assigned source file appears exactly once in [coverage.json](coverage.json), with its original audit SHA-256 and concrete responsibility. The scope includes private helpers, validation/defaults, dispatch, missing-data rules, reporting calculations and fallback paths, not only public entry points. Inline tests are evidence within production files; there are no separately assigned test-only or generated files.
 
-- Decision status: **15 accepted and 3 draft**.
+- Decision status: **All 18 methodology records accepted**.
 - Implementation status: **Observed** in the audit. Reconciliation and independent qualification of accepted methodology remain pending.
 - Validation status: **Evidence inspected or located, not executed**. No Rust tests, builds or clippy runs were performed for this static documentation audit.
 - Audit date: 2026-11-05.
@@ -39,6 +39,12 @@ The impairment staging and cure contract was accepted on 2026-11-15. It covers m
 The impairment policy selection contract was accepted on 2026-11-15. It covers exact immutable revisions, reporting-date and cutoff eligibility, method-level validation, named overrides and replay provenance. [Accepted impairment policy selection contract](14-ecl-policy-defaults.md#accepted-decision-for-resolved-impairment-policy-snapshots).
 
 The stage-specific impairment measurement contract was accepted on 2026-11-15. It covers performing horizons and knot-aligned buckets, explicit LGD, dated Stage 3 recovery and currency and policy provenance. [Accepted stage-specific impairment measurement contract](15-ecl-bucket-measurement.md#accepted-decision-for-stage-specific-impairment-measurement).
+
+The impairment scenario weighting contract was accepted on 2026-11-15. It covers shared verified inputs, exact weights, scenario LGD or recovery evidence, and complete aggregate coverage with per-scenario provenance. [Accepted impairment scenario weighting contract](16-ecl-scenario-weighting.md#accepted-decision-for-weighted-impairment-scenarios).
+
+The lifetime CECL forecast and reversion contract was accepted on 2026-11-15. It covers explicit historical hazard and forecast inputs, fixed-lookback reversion, survival across boundaries and direct impaired recovery evidence. [Accepted lifetime CECL forecast and reversion contract](17-cecl-forecast-reversion.md#accepted-decision-for-lifetime-cecl-forecast-and-reversion).
+
+The WARM exposure-years contract was accepted on 2026-11-15. It covers verified performing-pool eligibility, a sourced annual net loss rate, knot-aligned exposure-years and undiscounted measurement. [Accepted WARM exposure-years contract](18-cecl-warm.md#accepted-decision-for-warm-exposure-years-and-annual-loss-rates).
 
 ## Algorithm inventory
 

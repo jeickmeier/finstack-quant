@@ -2008,6 +2008,25 @@ requiring reproduction, adoption choices and missing validation are distinct.
   laws, payment covariance and checked tail and panel admission under
   the [accepted contractual payoff package](financial/calibration-rate-models/05-contractual-gaussian-integration.md#accepted-decision-for-checked-contractual-gaussian-swaption-integration).
 
+- **Free Hull–White fitting:** reconcile tolerance-scaled premium
+  errors, explicit bounded restarts and local identification under
+  the [accepted two-parameter fit](financial/calibration-rate-models/06-two-parameter-fit.md#accepted-decision-for-bounded-identified-two-parameter-hull-white-fitting).
+
+- **Fixed-κ Hull–White fitting:** reconcile the bounded scalar premium
+  objective, local price response, native Normal quote gates and
+  actual work reporting under the
+  [accepted fixed-κ fit](financial/calibration-rate-models/07-fixed-kappa-cap-fit.md#accepted-decision-for-bounded-fixed-kappa-cap-and-floor-premium-fitting).
+
+- **Piecewise Hull–White fitting:** reconcile live-fixing support,
+  per-segment branch controls and local identification, final quote
+  repricing and atomic schedule admission under the
+  [accepted sigma bootstrap](financial/calibration-rate-models/08-piecewise-sigma-bootstrap.md#accepted-decision-for-live-fixing-hullwhite-sigma-bootstrapping).
+
+- **LMM loading-scale fitting:** reconcile exact slice, grid, clock,
+  displacement and shape bindings, analytic ATM matching, final replay
+  and explicit pricing consumption under the
+  [accepted LMM scale fit](financial/calibration-rate-models/09-lmm-rebonato-calibration.md#accepted-decision-for-single-slice-lmm-loading-scale-calibration).
+
 ### Implementation reconciliation
 
 - **Related scope:** retain the option-bearing CS01/OAS reconciliation above.

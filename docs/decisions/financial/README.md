@@ -659,6 +659,26 @@ explicit LGD, dated Stage 3 recovery and currency and policy provenance.
 Implementation reconciliation and independent qualification remain pending.
 [STATEMENTS-ANALYTICS-CREDIT-15](statements-analytics-credit/15-ecl-bucket-measurement.md#accepted-decision-for-stage-specific-impairment-measurement).
 
+The Statements impairment scenario weighting contract was accepted on
+2026-11-15. It covers shared verified inputs, exact weights, scenario LGD
+or recovery evidence, and complete aggregate coverage with per-scenario
+provenance. Implementation reconciliation and independent qualification
+remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-16](statements-analytics-credit/16-ecl-scenario-weighting.md#accepted-decision-for-weighted-impairment-scenarios).
+
+The Statements lifetime CECL forecast and reversion contract was accepted
+on 2026-11-15. It covers explicit historical hazard and forecast inputs,
+fixed-lookback reversion, survival across boundaries and direct impaired
+recovery evidence. Implementation reconciliation and independent
+qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-17](statements-analytics-credit/17-cecl-forecast-reversion.md#accepted-decision-for-lifetime-cecl-forecast-and-reversion).
+
+The Statements WARM exposure-years contract was accepted on 2026-11-15. It
+covers verified performing-pool eligibility, a sourced annual net loss rate,
+knot-aligned exposure-years and undiscounted measurement.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-18](statements-analytics-credit/18-cecl-warm.md#accepted-decision-for-warm-exposure-years-and-annual-loss-rates).
+
 The [invariant-to-decision map](../INVARIANT_MAP.md) records the detailed
 cross-crate conventions covered by these decisions. Acceptance does not adopt
 drafts 0027–0032 or every observed instrument default; accepted analytics
@@ -2200,6 +2220,29 @@ The contractual Gaussian swaption package was accepted on 2026-11-15.
 It covers explicit coupon laws, signed exercise-date cash terms,
 weighted tails, bounded integration and missed-exercise checks.
 [CALIBRATION-RATE-MODELS-005](calibration-rate-models/05-contractual-gaussian-integration.md#accepted-decision-for-checked-contractual-gaussian-swaption-integration).
+
+The free two-parameter Hull–White fit was accepted on 2026-11-15.
+It covers tolerance-scaled premiums, bounded checked least squares,
+explicit deterministic starts, local identification and native
+fit acceptance before candidate ranking.
+[CALIBRATION-RATE-MODELS-006](calibration-rate-models/06-two-parameter-fit.md#accepted-decision-for-bounded-identified-two-parameter-hull-white-fitting).
+
+The fixed-κ Hull–White cap and floor fit was accepted on 2026-11-15.
+It covers raw unit-notional premiums, explicit bounded golden-section
+minimization on a qualified branch, resolved local price response,
+native Normal quote acceptance and actual fit reporting.
+[CALIBRATION-RATE-MODELS-007](calibration-rate-models/07-fixed-kappa-cap-fit.md#accepted-decision-for-bounded-fixed-kappa-cap-and-floor-premium-fitting).
+
+The piecewise Hull–White sigma bootstrap was accepted on 2026-11-15.
+It covers live-fixing support, bounded per-segment branches, local
+identification, final quote checks and atomic schedule publication.
+[CALIBRATION-RATE-MODELS-008](calibration-rate-models/08-piecewise-sigma-bootstrap.md#accepted-decision-for-live-fixing-hullwhite-sigma-bootstrapping).
+
+The single-slice LMM loading-scale fit was accepted on 2026-11-15.
+It covers exact co-terminal target selection, explicit displacement
+and shape, strict native Black lookup, checked ATM premium conversion,
+returned-scale replay and explicit fit consumption.
+[CALIBRATION-RATE-MODELS-009](calibration-rate-models/09-lmm-rebonato-calibration.md#accepted-decision-for-single-slice-lmm-loading-scale-calibration).
 
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the

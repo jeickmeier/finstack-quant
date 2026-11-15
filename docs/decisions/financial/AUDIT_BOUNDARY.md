@@ -1808,6 +1808,30 @@ by quadrature nodes. Production pricing, market references,
 restoration and host qualification remain pending.
 [CALIBRATION-RATE-MODELS-005](calibration-rate-models/05-contractual-gaussian-integration.md#accepted-decision-for-checked-contractual-gaussian-swaption-integration).
 
+Independent free Hull–White calculations cover mixed Normal and
+Black quote weighting, deterministic Halton proposals and two
+parameter pairs that price the same one-payment swaption.
+Production fitting, market references, restoration and host
+qualification remain pending.
+[CALIBRATION-RATE-MODELS-006](calibration-rate-models/06-two-parameter-fit.md#accepted-decision-for-bounded-identified-two-parameter-hull-white-fitting).
+
+The accepted fixed-κ cap and floor fit has independent delayed-payment
+premium and two-branch calculations. Production fitting, market
+references, restoration and host qualification remain pending.
+[CALIBRATION-RATE-MODELS-007](calibration-rate-models/07-fixed-kappa-cap-fit.md#accepted-decision-for-bounded-fixed-kappa-cap-and-floor-premium-fitting).
+
+The accepted piecewise Hull–White bootstrap has independent
+live-fixing variance and delayed-payment two-branch calculations.
+Production bootstrap, dated market references, restoration and host
+qualification remain pending.
+[CALIBRATION-RATE-MODELS-008](calibration-rate-models/08-piecewise-sigma-bootstrap.md#accepted-decision-for-live-fixing-hullwhite-sigma-bootstrapping).
+
+The accepted LMM loading-scale fit has independent quote-clock,
+displaced ATM premium and two-factor weight calculations. Production
+fitting, independent multi-forward comparison, restoration and host
+qualification remain pending.
+[CALIBRATION-RATE-MODELS-009](calibration-rate-models/09-lmm-rebonato-calibration.md#accepted-decision-for-single-slice-lmm-loading-scale-calibration).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

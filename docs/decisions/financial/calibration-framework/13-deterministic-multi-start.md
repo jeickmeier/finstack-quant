@@ -15,7 +15,7 @@
    half-width for each free coordinate. Remove cyclic base reuse.
    The target owns the actual free-coordinate map, proposal count
    and widths. Hull–White's effective settings remain with its
-   [rate-model fit record](../calibration-rate-models/06-two-parameter-fit.md).
+   [accepted rate-model fit record](../calibration-rate-models/06-two-parameter-fit.md#accepted-decision-for-bounded-identified-two-parameter-hull-white-fitting).
    [Halton's original construction](https://link.springer.com/article/10.1007/BF01386213).
 
 2. **Generate exactly the elected proposals in solver coordinates.**

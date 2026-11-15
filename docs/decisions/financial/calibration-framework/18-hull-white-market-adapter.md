@@ -59,9 +59,9 @@
 5. **Use effective controls for the elected mode.** Require applicable
    settings or a versioned preset. Free two-parameter fits take a
    complete seed or an elected preset. Fixed-κ fits reject unused seed
-   pairs. Piecewise fitting requires a fixed κ and an explicit sigma
-   bracket. Report the actual method, objective and work. Reprice
-   every selected quote on the final artifact and retain the signed
+   pairs. Piecewise fitting requires a fixed κ and explicit
+   per-segment branch brackets. Report the actual method, objective and
+   work. Reprice every selected quote on the final artifact and retain the signed
    implied-volatility error in its original convention. Gate its
    magnitude on the applicable native Normal or Black tolerance.
    The rate-model records own
@@ -69,6 +69,9 @@
    [Accepted calibration controls](02-controls-and-market-context.md#accepted-decision-for-calibration-controls-freshness-and-initial-market) ·
    [Accepted fit reports](14-fit-reports.md#accepted-decision-for-fit-acceptance-and-report-semantics) ·
    [Accepted rate-model entry and quote domains](../calibration-rate-models/01-curve-entry-and-quote-domains.md#accepted-decision-for-explicit-hull-white-calibration-entry-and-quote-domains) ·
+   [Accepted free two-parameter fit](../calibration-rate-models/06-two-parameter-fit.md#accepted-decision-for-bounded-identified-two-parameter-hull-white-fitting) ·
+   [Accepted fixed-κ cap and floor fit](../calibration-rate-models/07-fixed-kappa-cap-fit.md#accepted-decision-for-bounded-fixed-kappa-cap-and-floor-premium-fitting) ·
+   [Accepted piecewise sigma bootstrap](../calibration-rate-models/08-piecewise-sigma-bootstrap.md#accepted-decision-for-live-fixing-hullwhite-sigma-bootstrapping) ·
    [Rate-model calibration](../calibration-rate-models/README.md).
 
 6. **Publish a complete fitted family block.** Keep canonical family
@@ -77,8 +80,9 @@
    decimal short-rate sigma per square root model year. A dated
    piecewise schedule starts at the fit origin and retains the prior
    strips' original last eligible fixing dates as subsequent segment
-   starts. It is right-continuous with a flat final segment. Numeric
-   schedules retain their model times. Retire numeric-to-date rounding.
+   starts and the final strip's last eligible fixing as the end of
+   calibrated support. It is right-continuous with a flat final segment.
+   Numeric schedules retain their model times. Retire numeric-to-date rounding.
    Replacing one form with the other retires the old form atomically.
    Apply the same admission rules on restoration and through valuation,
    Python and WASM consumers.

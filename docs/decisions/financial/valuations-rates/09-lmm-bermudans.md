@@ -77,7 +77,7 @@
    Reconcile the explicit upstream scalar calibration helper with
    the same contractual indices, shape and displacement; it owns the
    target and fit qualification under
-   [calibration record 09](../calibration-rate-models/09-lmm-rebonato-calibration.md).
+   [accepted calibration record 09](../calibration-rate-models/09-lmm-rebonato-calibration.md#accepted-decision-for-single-slice-lmm-loading-scale-calibration).
    Other loading tensors or fitted covariance profiles require their
    own product qualification. [Denson and Joshi on displaced LMM](https://fbe.unimelb.edu.au/__data/assets/pdf_file/0011/2591831/201.pdf).
 
