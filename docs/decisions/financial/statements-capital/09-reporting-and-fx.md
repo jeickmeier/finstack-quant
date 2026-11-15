@@ -1,15 +1,21 @@
 # STATEMENTS-CAPITAL-009: Cashflow reporting, accumulation and FX boundary
 
-**Decision status:** Draft — observed implementation; adoption pending.
-**Implementation status:** Observed for the source scope and discrepancies stated below.
-**Validation status:** Evidence inspected or located, not executed; numerical qualification remains open.
+**Decision status:** Accepted for the full reporting, accumulation and FX contract (2026-11-15).
+**Implementation status:** Reconciliation pending. The audited path uses partial merges, insertion order for some period results and incomplete reporting provenance.
+**Validation status:** Existing source and regression evidence mapped. Independent qualification of native and consolidated reporting remains pending.
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; [scope and file ledger](README.md).
 
-## Choice and rationale
+## Accepted decision for capital reporting and FX
 
-Native-currency instrument breakdowns, native-currency totals and optional reporting totals are distinct. Components expose already-computed amounts; they never perform implicit FX conversion. Audit principal components explain total principal without creating additional cash. This separates reporting from allocation and preserves currency identity.
+1. Expose distinct per-instrument native values, totals grouped by native currency, and optional consolidated values in one reporting currency fixed for the run. A single native currency needs only identity aggregation in that currency. Multicurrency consolidation requires an explicit target currency.
+2. Require explicit `PeriodEnd` FX for cross-currency consolidation at the inclusive period-close date. Retain the currency pair, applied rate, date and source for each conversion. Consolidated values are unavailable when a required quote is missing. Native results remain available. [FX resolution](../core-conventions/013-fx-resolution-and-shocks.md#accepted-decision-fx-resolution-state-and-relative-shocks).
+3. Reconcile all components in each scope. Gross interest expense equals cash interest expense plus PIK. Net cash interest expense equals cash interest expense less cash interest income. Scheduled, mandatory, voluntary and sweep payments are components of principal payments. Report outstanding economic principal, pending settlements, arrears and advance reserves separately. Distinguish known zero amounts from unknown or unavailable amounts. [Interest netting](02-cashflow-classification.md#accepted-decision-for-per-instrument-coupon-netting) · [Dated principal claims](04-dated-principal.md#accepted-decision-for-dated-principal-claims).
+4. Export monetary amounts as exact decimal strings tagged with their currency. Use exact selectors for component and scope, covering instrument, native-currency total and consolidated total. Return periods chronologically in accessors and exports. Lookups use the values already computed for the selected scope.
+5. Replace all results for a period atomically, including the native and consolidated views and related provenance. Clear stale rows omitted from the replacement. Reject a conflicting reporting currency before committing.
 
-## Reporting and accumulation
+For example, EUR 40 of scheduled principal and EUR 10 of sweep principal, plus USD 20 of scheduled principal, consolidate to USD 80 at USD 1.20 per EUR. The total comprises USD 68 of scheduled principal and USD 12 of sweep principal.
+
+## Observed reporting and accumulation
 
 `CashflowBreakdown` carries positive expense/payment/receipt magnitudes, debt closing and accrued interest. `interest_expense_total = cash expense + PIK`; it does **not** subtract income. The separate net-cash helper returns cash expense minus income. Missing income resolves to a zero in the cash-expense currency. Optional `opening_balance` and four principal components can be absent in manually supplied/wire data; evaluator outputs populate them. Scheduled, mandatory, sweep and voluntary components sum to principal payment and must not be added to it again.
 
@@ -21,15 +27,15 @@ Native-currency instrument breakdowns, native-currency totals and optional repor
 
 `periods()` returns total-map insertion order when totals exist; otherwise it returns the sorted unique instrument-period union. Its blanket “ascending order” documentation is stronger than the totals branch. Long-table exports preserve map/flow order, label total rows `__total__`, and include currency on every row. Optional components are emitted only when present; schema/envelope validation is distinct from financial reconciliation.
 
-## FX conversion and established date policy
+## Observed FX conversion
 
 `convert_to_reporting` is identity for same currency. Otherwise an FX matrix is required; query it with `(source,target,on,policy)`, multiply the native amount by returned rate and build tagged reporting Money. Missing routes/rates, invalid values and amount representation failures propagate. It does not inspect original cashflow dates.
 
-The evaluator owns the aggregate conversion call and supplies the inclusive period-end snapshot after aggregating `cs.*` cash buckets. There is no default policy (resolution O9, 2026-11-11): a cross-currency conversion without `fx_policy` errors, and same-currency totals need none. The established direction is **period-close waterfall/capital-structure aggregation**; preserve that direction. Builder prose claiming `CashflowDate` uses each flow's date conflicts with this aggregated caller. A CashflowDate enum value cannot recover dates already removed by aggregation. This is documentation/API reconciliation, not a new choice between period-close and per-flow accounting.
+The evaluator owns the aggregate conversion call and supplies the inclusive period-end snapshot after aggregating `cs.*` cash buckets. Cross-currency conversion requires a supplied `fx_policy` under resolution O9 (2026-11-11). Builder prose claiming `CashflowDate` can use each payment date conflicts with the evaluator's period-level inputs.
 
 ## Limitations, alternatives and evidence
 
-These DTOs are mutable and do not enforce all cross-map consistency at construction/merge. A dedicated ledger validation boundary could reject mixed reporting currencies, unsorted totals or inconsistent component sums, while current code depends on evaluator-produced data. Sorted outputs and replace-versus-merge semantics are separate API choices. Neither table rows nor totals certify GAAP/IFRS accounting.
+The audited mutable reporting types depend on evaluator-produced data for consistent maps and component sums. Chronological ordering and atomic period replacement under the accepted contract remain pending.
 
 - **Implementation:** [reporting types/accessors](../../../../finstack-quant/statements/src/capital_structure/cashflows.rs), `flows`, `get_component`, `periods`, `set_period`, `period_snapshot`, table exporters; [FX helper](../../../../finstack-quant/statements/src/capital_structure/integration.rs); [FX builder prose](../../../../finstack-quant/statements/src/capital_structure/builder.rs); [module date contract](../../../../finstack-quant/statements/src/capital_structure/mod.rs).
 - **Cross-boundary:** evaluator orchestration/FX aggregation is documented by the statements-evaluation scope; no duplicate evaluator ownership is claimed.

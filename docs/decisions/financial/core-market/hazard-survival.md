@@ -24,10 +24,9 @@ hazard risk, recovery overrides and quote consistency; [record06](calibration-pr
 owns replay/fit provenance. CDS cashflow integration, contractual recovery,
 calibration constraints and market fit remain with
 [ADR0030](../models-and-valuations-credit/0030-cds-survival-and-integration.md),
-[hazard calibration](../calibration-targets/05-hazard-calibration.md) and product
-owners. This package does not adopt their Draft choices, credit-event eligibility,
-physical-versus-pricing measure selection, stochastic default dynamics or a
-complete CDS standard-model implementation.
+[accepted hazard calibration](../calibration-targets/05-hazard-calibration.md#accepted-decision-for-explicit-single-name-hazard-calibration-and-par-risk-qualification)
+and product owners. Credit-event eligibility, measure selection, stochastic
+default dynamics and standard-model qualification retain their own scope.
 
 ## Foundational findings
 

@@ -1,12 +1,21 @@
 # STATEMENTS-EVALUATION-013 — Result units, Money views, tables and dated flow exports
 
-Decision status: **Draft — observed implementation, adoption pending**. Implementation status: **Observed for the stated source scope**, with discrepancies identified below. Validation status: **Evidence inspected/located, not executed**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full typed results and export contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
-## Choice and data domain
+## Accepted decision for typed results and exports
+
+1. Publish finite `Scalar` values and exact currency-tagged `Money` as the authoritative typed result. Check representability when converting forecast outputs back to money. Distinguish known zero, missing observations, masked cells and other unavailable results. Apply an explicit fallback only to a missing observation at a valid node and period. Invalid arithmetic and unrepresentable money produce errors with the node, period and cause. [Formula units and currency](../statements-contracts/05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency) · [Cell precedence and availability](01-graph-precedence-and-prepared-plans.md#accepted-decision-for-dependency-graphs-cell-precedence-and-prepared-evaluation).
+2. The long table includes every exported node and canonical period. Use exact decimal text and currency for money, and retain cell status, reason and source. The wide table is an approximate numeric view for analysis and charting. Include the full period index and per-column units, with nulls for cells without a value.
+3. Use the validated result period plan for dated exports and require an explicit choice of period start or last included day. Preserve amounts, currency, sign and gaps. These dates are period anchors. Pricing requires an explicitly selected monetary flow, expected currency, declared sign convention and complete coverage of the requested periods. [Financial perspectives and boundary conversions](../conventions/0044-financial-perspectives-and-boundary-conversions.md#decision).
+4. Carry model identity, input snapshot, applicable cutoff and run identity. Preserve owning-calculation diagnostics and a distinct check-suite verdict. Apply the same result and export contract in Rust, Python and WASM. [Check-suite outcomes](../statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites) · [Wire identity and provenance](../statements-contracts/16-wire-schema-and-errors.md#accepted-decision-for-statements-wire-admission-schemas-and-errors).
+
+For example, monthly March CapEx of USD 125.01 exports as exact `125.01` on March 31 when the period close is selected. A positive outflow magnitude is negated once at the pricing boundary. A missing April observation stays visible, and pricing fails when the requested schedule requires April.
+
+## Audited data domain
 
 `StatementResult` retains raw `f64` node-period values as canonical computational output, with separate value-type metadata, monetary views, per-cell source and diagnostics. It can represent undefined results. Table and dated-schedule exports are projections of those values, not recalculations or automatic investor/issuer perspective conversions. The unit/sign boundary remains governed by the model and [financial perspective policy](../conventions/0044-financial-perspectives-and-boundary-conversions.md).
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 1. Store each numeric result and its `Value`, `Forecast`, `Formula` or `WhereMasked` source. The only numeric mode is Float64; execution metadata records counts/timing/parallel status and warnings, not the workspace-wide ResultsMeta market/rounding audit stamp. Finalization associates inferred/declared Scalar or Monetary currency types and attempts to construct Money entries only for representable finite monetary values.
 2. Nonfinite numeric results remain in the numeric map but are omitted from Money. Finite values outside Money's representable range are likewise retained numerically, omitted monetarily and produce a warning named `NonFiniteValue` despite the input being finite. The parallel Money view is therefore not guaranteed to have every numeric cell.
@@ -19,7 +28,7 @@ Decision status: **Draft — observed implementation, adoption pending**. Implem
 
 Separating numeric evaluation from monetary representation preserves undefined/scaled outputs while exposing a typed view where possible. That rationale is inferred from behavior; it does not establish that every export is appropriate for downstream pricing. Missing values, undefined values and representability failures must remain distinguishable. A caller using a raw long table or dated export must verify units and intended perspective; silently assuming that all rows have a Money counterpart is unsafe for the observed API.
 
-Strict finite-only export, rejection of unrepresentable money, typed dated cashflows and complete provenance envelopes are possible alternatives with different caller contracts. No universal rejection of NaN is proposed, because [ADR 0009](../conventions/0009-missing-and-invalid-data.md) explicitly requires per-operation treatment.
+The accepted contract requires authoritative typed results, explicit unavailable states and complete provenance. Monetary conversion, table projections and the dated pricing boundary require reconciliation. [Missing and invalid data](../conventions/0009-missing-and-invalid-data.md).
 
 ## Evidence
 

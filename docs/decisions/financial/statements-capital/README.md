@@ -1,6 +1,6 @@
 # Statement capital-structure methodologies
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** The scoped decisions below were accepted on 2026-11-15. Other choices retain the status in their owning records.
 **Implementation status:** Observed for the 19 assigned Rust files at `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; specific source/documentation discrepancies are recorded below.
 **Validation status:** Source and selected test evidence inspected or located, not executed; no numerical accuracy or accounting-compliance certification.
 **Audit date:** 2026-11-05.
@@ -8,6 +8,66 @@
 This scope covers all **19 assigned files** under `finstack-quant/statements/src/capital_structure/`: **13 algorithm files, one support facade and five dedicated test files**. [The exact source ledger](coverage.json) records each file once with its reviewed SHA-256 and links to nine algorithm records. All production bodies were inspected, including validation, helper algorithms, fallbacks and code around test markers. Inline tests are evidence inside their production owners, not separate source-count entries.
 
 The scope owns instrument construction adapters, period debt-service extraction, principal/PIK state, residual schedules, the corporate debt waterfall and its reporting helpers. It does not duplicate the underlying cashflow/instrument pricing engines or evaluator orchestration: model periods, DSL dependency evaluation, sequential/fixed-point scheduling and aggregate FX calls belong to their respective scopes. The existing **period-close capital-structure/waterfall FX direction remains in force**; conflicting CashflowDate prose is a reconciliation item.
+
+The inventory below describes the audited source. The current default waterfall
+contains only fees, interest, scheduled principal and equity. Each prepayment
+requires an explicit priority and sizing input. [Accepted prepayment decision](01-instrument-construction.md#accepted-decision-for-opt-in-waterfall-prepayments).
+
+The accepted instrument construction path attaches canonical Valuations bonds
+and swaps through `add_debt` or `addDebt`. Removal of the Statements helpers
+is pending. [Accepted instrument construction decision](01-instrument-construction.md#accepted-decision-for-explicit-bond-and-swap-construction).
+
+Coupon settlements net within each instrument and reporting period. The
+evaluator aggregates the resulting expense and income separately.
+[Accepted coupon netting decision](02-cashflow-classification.md#accepted-decision-for-per-instrument-coupon-netting).
+
+The accepted distress policy reports identified settlements separately from
+scheduled debt service. Implementation is pending.
+[Accepted distress reporting decision](02-cashflow-classification.md#accepted-decision-for-separate-distress-reporting).
+
+The complete cashflow classification contract was accepted on 2026-11-15. It
+covers period admission, native currency and source perspective, dated cash
+and principal effects, and contract-based fee and hedge classification.
+Implementation reconciliation and independent qualification remain pending.
+[Accepted cashflow classification contract](02-cashflow-classification.md#accepted-decision-for-period-admission-and-cashflow-classification).
+
+Opening principal reconciliation requires the dated schedule and stateful debt
+ledger to agree before calculating debt service for carried debt. Implementation
+is pending. [Accepted opening principal decision](03-funding-and-balances.md#accepted-decision-for-opening-principal-reconciliation).
+
+Contractual accrued interest covers cash interest earned through period close
+and due afterward. Separate arrears reporting remains pending.
+[Accepted contractual accrual decision](03-funding-and-balances.md#accepted-decision-for-contractual-accrued-cash-interest).
+
+The dated principal contract covers claims, separate economic and settlement
+balances, advance reserves, scheduled payment order and exact atomic
+reconciliation. Implementation and independent qualification remain pending.
+[Accepted dated principal decision](04-dated-principal.md#accepted-decision-for-dated-principal-claims).
+
+The residual coupon contract uses canonical terms to rebuild affected coupon
+parents, principal and fees after dated balance changes. Implementation and
+independent qualification remain pending.
+[Accepted residual coupon decision](05-residual-coupons.md#accepted-decision-for-residual-coupon-rebuilding).
+
+The waterfall contract governs available cash, priority and seniority, payment
+rounding, exact conservation and terminal Equity or retained cash.
+Implementation and independent qualification remain pending.
+[Accepted waterfall allocation decision](06-priority-allocation.md#accepted-decision-for-waterfall-cash-allocation-and-conservation).
+
+The prepayment and ECF sweep contract governs agreement elections, eligible
+facilities, dated sizing and payment caps. Implementation and independent
+qualification remain pending.
+[Accepted prepayment and ECF decision](07-prepayments-and-ecf.md#accepted-decision-for-agreement-defined-prepayments-and-ecf-sweeps).
+
+The PIK contract governs dated coupon elections, coupon-period duration,
+capitalization and separate arrears. Implementation and independent
+qualification remain pending.
+[Accepted PIK decision](08-pik-and-carry-state.md#accepted-decision-for-contractual-pik-elections-and-carried-claims).
+
+The reporting contract covers native and consolidated views, explicit
+period-close FX, exact component exports and atomic period replacement.
+Implementation and independent qualification remain pending.
+[Accepted capital reporting decision](09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
 
 | Calculation / supported instruments | Implemented method / material variants | Actual selection | Decision record | Implementation / validation | Scope limits and tracking |
 |---|---|---|---|---|---|

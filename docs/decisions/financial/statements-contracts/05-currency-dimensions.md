@@ -1,18 +1,27 @@
 # STATEMENTS-CONTRACTS-005: Formula units, unknown dimensions and capital-structure currencies
 
-**Decision status:** Draft (observed implementation; adoption pending).
+**Decision status:** Accepted for the full Statements formula units and currency contract (2026-11-15).
 
-**Implementation status:** Observed for the source responsibilities stated below; discrepancies are identified explicitly.
+**Implementation status:** Reconciliation pending. The audited path can retain unresolved units and infer a capital reporting currency from model metadata or candidate currencies.
 
-**Validation status:** Evidence inspected/located, not executed. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice README](README.md)).
+**Validation status:** Existing source and regression evidence mapped. Independent qualification of units, numerical boundaries and reporting scopes remains pending.
 
-## Choice and input domain
+**Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
+
+## Accepted decision for formula units and currency
+
+1. Resolve every input, intermediate expression, branch and control before execution. The supported dimensions are `Scalar` and `Monetary(currency)`. A declared type can resolve an empty input series. Declared formula units must agree with inference. Reject unresolved and unsupported dimensions, including monetary variance. [Runnable model validation](01-model-timeline-and-values.md#accepted-decision-for-model-timelines-values-and-readiness).
+2. Addition, subtraction, comparison and selection require matching dimensions and currencies. Comparisons return Scalar. Branch conditions require Scalar, and scalar controls use their documented units. Multiplication allows two scalars or scalar scaling of money. Division allows scalar by scalar, money by scalar and a same-currency money ratio that returns Scalar. Reject other monetary products and quotients. Compatible aggregates and level transforms preserve their input unit, including monetary standard deviation. Counts, ranks, signs, missingness indicators, percentage changes and growth rates return Scalar. Logical, modulo, cumulative product, rate annualization and nonlinear mathematical operations require Scalar. [Canonical function signatures](04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation).
+3. Express monetary values in currency-tagged major units and rates and ratios as decimals. A zero used as money must carry a currency. Use exact monetary arithmetic for contractual amounts and ledgers under the shared monetary rules. When a forecast requires floating-point calculation, make conversion at the forecast boundary explicit and check representability and rounding when returning to money. [Monetary arithmetic and conversion](../core-conventions/012-money-decimal-precision.md#accepted-decision-monetary-precision-rounding-and-currency-identity).
+4. Resolve capital references using the accepted instrument-native, native-currency total and consolidated reporting scopes. Consolidation uses the run's selected reporting currency and its explicit period-close FX policy. A required missing quote makes consolidated reporting unavailable. Formula typing and arithmetic perform no implicit FX. [Capital reporting and FX](../statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
+
+## Audited input domain
 
 Model-specific inference uses three states: Unknown, Scalar and Monetary(currency). Unknown is unresolved information, not an implicit dimensionless value. Monetary arithmetic performs no FX conversion. Explicit observations seed inference, and formula nodes are resolved iteratively.
 
 Capital-structure totals use the reporting currency; a named instrument reference uses that instrument's native notional currency. Reporting currency selection is explicit capital_structure.reporting_currency, then valid model meta.currency, then the unique currency across declared monetary nodes and instrument notionals. Zero or multiple candidates yield None.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 - Addition, subtraction, comparison and if branches require matching known dimensions. A monetary/scalar mix, including comparison with a bare numeric zero, errors. Comparison returns Scalar after compatibility validation.
 - Multiplication allows Scalar×Scalar or Scalar×Monetary in either order; Monetary×Monetary errors. Division permits Monetary/Scalar, Scalar/Scalar and same-currency Monetary/Monetary (Scalar); cross-currency and Scalar/Monetary division error.
@@ -27,7 +36,7 @@ Capital-structure totals use the reporting currency; a named instrument referenc
 
 Same-currency typing does not prove compatible scale, reporting period, accounting classification or percentage-versus-count interpretation. Registry UnitType metadata does not become a semantic type; numerical ratios and percentages are both Scalar. Unknown variance units can propagate through further operations without a squared-currency model.
 
-A richer dimensional algebra could represent currency powers and distinguish rates, percentages, amounts and quantities, at the cost of more API complexity. Requiring all published outputs to resolve would be a narrower alternative. Neither is implemented.
+The accepted contract requires resolution of supported units before execution. The audited implementation can allow unknown units to propagate.
 
 ## Evidence
 

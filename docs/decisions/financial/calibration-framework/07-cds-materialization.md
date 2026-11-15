@@ -1,11 +1,104 @@
 # CALIBRATION-FRAMEWORK-007: CDS accrual, maturity, upfront and protection roles
 
-- Decision status: **Accepted — named CDS contractual date regimes (O7), 2026-11-12**; the observed text below records the prior implementation.
-- Implementation status: **Observed for the stated source scope**; discrepancies and limits are stated below.
-- Validation status: **Evidence inspected/located, not executed**. No numerical qualification or external compliance certification is implied.
+- Decision status: **Accepted 2026-11-15 — complete single-name CDS terms, dated settlement, quote basis, hazard pillar and replay package.** The named contractual date regimes (O7) were accepted on 2026-11-12.
+- Implementation status: **Observed.** The live builder implements O7's single-name tenor and literal-date maturity rules. Reconciliation to the complete accepted package is pending.
+- Validation status: **Independent calendar, quote conversion and fit-residual checks completed.** Production pricing, calibration, external-grid, replay and host qualification remain pending.
 - Audit date: **2026-11-05**; source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (see [scope and coverage](README.md)).
 
-## Observed choice and rationale
+## Accepted decision for single-name CDS calibration and quote settlement
+
+1. **Resolve exact single-name terms and sources.** Require the reference
+   entity, currency, governing definitions, transaction type and exact
+   restructuring election from a qualified dated convention or complete
+   bespoke terms. Require positive exact notional in the contract currency,
+   the exact typed discount and issuer hazard roles, and coherent
+   source identity and currency. Require exact represented recovery
+   agreement among quote, contract, target and source, with `0 ≤ R < 1`.
+   Use the accepted `HazardRate` pricing path. Remove regional or currency
+   fallbacks and vendor-named valuation defaults.
+   [Accepted convention selection](../valuations-framework/convention-selection.md#accepted-decision-for-checked-convention-selection-and-dated-sources) ·
+   [Accepted CDS legs and quote basis](../models-and-valuations-credit/12-cds-legs.md#accepted-decision-for-checked-cds-legs-and-quote-basis).
+
+2. **Resolve accrual, modeled protection and cash settlement separately.**
+   Preserve the [accepted O7 maturity rules](#accepted-decision-named-cds-contractual-date-regimes).
+   In the qualified standard issuance profile, modeled step-in is
+   calendar `T+1`. The first accrual anchor is the latest
+   Following-adjusted quarterly coupon date on or before step-in.
+   The first regular coupon is the first such date strictly afterward.
+   Use unadjusted maturity `M` as the last covered day, `M+1` exclusive as
+   the final civil accrual boundary, and Following from `M` for final
+   payment. Keep the valuation-close cut, upfront settlement and
+   contingent default cash distinct. Default settlement is explicitly
+   contemporaneous or a positive business-day lag from the default day
+   on its own calendar. Bespoke terms supply their own schedule,
+   day-count context, dates, and settlement and protection elections
+   under the accepted CDS model.
+   [Standard contract specification](https://www.cdsmodel.com/assets/cds-model/docs/Standard%20Corporate%20CDS%20Contract%20Specification%20-%20May%2012%2C%202009.pdf).
+
+3. **Require a basis for running par.** On the protection-buyer axis,
+   let `P` be protection PV per unit notional, `c` be the observed coupon
+   in annual decimal units and `A_dirty` include the scheduled and
+   accrual-on-default annuities. Fit `N × (P − cA)`. Dirty par uses
+   `A = A_dirty`. Clean par uses `A = A_dirty − Bα`, where `B` is the
+   factor to the named quote settlement date and `α` is accrued through
+   the quote's valuation close under the resolved coupon clock.
+   When represented as dated economic cash, zero clean upfront gives
+   buyer settlement cash `−Ncα`. Use the rebate once. Require positive
+   observed par spreads in this calibration profile. Zero model-implied
+   par remains a valid pricing result. A conventional spread requires
+   a separately qualified converter.
+   [ISDA converter specification](https://www.cdsmodel.com/assets/cds-model/docs/ISDA%20Standard%20CDS%20Contract%20Converter%20Specification%20-%20Sept%204%2C%202009.pdf).
+
+4. **Admit upfront with an explicit representation.** For a fixed
+   running coupon in bp, convert it once to decimal `c = bp/10000`.
+   Enforce a fixed-coupon restriction only when the selected contract
+   requires it. At named settlement, a signed clean upfront fraction
+   `u` creates actual buyer cash `C = N × (u − cα)`. A signed
+   actual-cash fraction `q` creates `C = N × q` directly. Positive
+   cash is paid by the buyer, negative is received, and zero is valid.
+   Use one checked Money boundary for settlement. Fit dirty raw PV
+   less the eligible dated cash PV `BC` once. Require explicit
+   entitlement for same-day settlement, at factor one.
+   [ISDA fee settings](https://cdsmodel.com/fee-computations.html).
+
+5. **Prepare the literal hazard pillar and raw fit values.** Use
+   contractual maturity `M` on the target's explicit base, clock and
+   context. Require a positive finite pillar time, live protection,
+   and genuine dependence on admissible trial hazard. Keep rolled
+   payment dates and each evaluator's dated clock for cash PV.
+   An earned but unpaid coupon may retain economic PV after protection
+   expiry. Reuse the common CDS legs for signed native raw PV before
+   final PV Money conversion and divide by positive notional for the
+   hazard residual. The hazard target owns solver geometry, bounds and
+   fit acceptance.
+   [Accepted hazard calibration](../calibration-targets/05-hazard-calibration.md#accepted-decision-for-explicit-single-name-hazard-calibration-and-par-risk-qualification).
+
+6. **Freeze each prepared observation through fit and replay.** Preserve
+   exact quote identity, original form and units, resolved dates and
+   calendars, elections, cut, recovery and typed curve roles. Freeze
+   the qualified terms and nontrial inputs across reprices. Bind any
+   derived par-risk quote to its exact original observation. Reject
+   incomplete or mismatched replay. Rust owns admission, valuation and
+   restoration across Rust, Python, WASM and schemas.
+   [Accepted calibration provenance](../core-market/calibration-provenance.md#accepted-decision-lossless-construction-records-and-request-time-replay-qualification).
+
+## Independent calculation checks
+
+- A March 19, 2026 trade on a weekends-only calendar steps in and starts
+  accrual March 20. With separately selected lags, a March 20 default
+  pays March 23 and T+3 upfront settles March 24. The first regular
+  coupon pays June 22. The 1Y contractual maturity is December 20,
+  with both final exclusive accrual end and final payment on December 21.
+- For a 10 million notional, 500 bp coupon, accrued fraction 0.025,
+  dirty annuity 0.16, protection PV 0.00576125 per unit, and settlement
+  factor 0.995, clean upfront −0.10% gives signed cash −22,500 and
+  zero raw fit residual. Using the clean quote directly as a cash
+  fraction yields a residual of −12,437.50.
+- With a June 1, 2026 target base, literal June 20 maturity and rolled
+  June 23 payment in a fixture with a June 22 holiday, the ACT/365F
+  hazard pillar is `19/365` and the payment coordinate is `22/365`.
+
+## Observed choice and rationale at the audit revision
 
 CDS quote construction separates trade date, coupon accrual anchor, cash settlement and protection-effective behavior. It builds a protection-buyer instrument with the actual quote form and convention rather than collapsing upfront to a flat spread.
 
@@ -48,9 +141,12 @@ register.
    states its own frequency, stub and boundaries; no other regime is
    inferred.
 
-## Limits and alternatives
+## Evidence limits
 
-The conventional calendar and CDS pricer are dependencies, so a zero-PV quote replay is internal consistency evidence. Alternative maturity rules include direct contractual dates or bespoke nonstandard schedules; those require separate explicit contracts rather than silently bypassing rolls. A report label naming an ISDA version is not a conformance test or source pin.
+Same-kernel zero-PV replay establishes internal consistency. Qualify
+the exact convention dates and the clean upfront, accrual and
+settlement-cash outputs against dated external fixtures.
+[ISDA RFR test grids](https://www.cdsmodel.com/rfr-test-grids.html).
 
 ## Source and validation evidence
 
@@ -64,5 +160,5 @@ The conventional calendar and CDS pricer are dependencies, so a zero-PV quote re
 
 ## Follow-up tracking
 
-Implementation reconciliation, adoption questions and missing evidence are tracked in the
+Implementation reconciliation and missing evidence are tracked in the
 [calibration-framework follow-ups](../FOLLOW_UPS.md#calibration-orchestration-solvers-and-replay).

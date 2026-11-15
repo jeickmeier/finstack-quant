@@ -1,18 +1,27 @@
 # STATEMENTS-CONTRACTS-004: Formula grammar, bounded parsing and function dispatch
 
-**Decision status:** Draft (observed implementation; adoption pending).
+**Decision status:** Accepted for the full formula grammar, bounded parsing and function dispatch contract (2026-11-15).
 
-**Implementation status:** Observed for the source responsibilities stated below; discrepancies are identified explicitly.
+**Implementation status:** Reconciliation pending. The audited path accepts surplus arguments for seven functions and allows callers to bypass text-parser validation with a constructed AST.
 
-**Validation status:** Evidence inspected/located, not executed. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice README](README.md)).
+**Validation status:** Existing source and regression evidence mapped. Independent grammar, format round-trip and boundary qualification remain pending.
 
-## Choice and input domain
+**Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
+
+## Accepted decision for formula grammar, function dispatch and AST validation
+
+1. Parse the complete input with a case-sensitive grammar and finite numeric literals. Arithmetic chains associate left. Symbolic `!` binds at unary precedence. Keyword `not` binds outside a comparison. Require explicit parentheses around nested comparisons. Canonical rendering must preserve meaning and grouping when parsed again. For example, `!a>b` groups as `(!a) > b`. The expression `not a > b` groups as `not (a > b)`.
+2. Use shared identifier and namespace rules with valid nonempty dot-separated segments. Apply the reserved-name rules in authoring and formula references. The `cs` namespace uses the typed capital reporting components and selectors, including instrument, native-currency total and consolidated scopes. [Authoring and identifier rules](02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability) · [Capital reporting and selectors](../statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
+3. Use canonical function signatures across parsing, compilation, evaluation and the documented host interfaces. Each of `cumsum`, `cumprod`, `cummin`, `cummax`, `std`, `var` and `median` requires exactly one argument. Reject invalid expressions in any branch, including branches that evaluation would skip. Reject future-period reads.
+4. Limit text parsing to 64 levels of nesting and 256 charged terms. Safely preflight caller-supplied ASTs before recursive processing, including validation of their shape, finite literals and resource use. The runnable-model boundary adds closed references and supported units. [Runnable model validation](01-model-timeline-and-values.md#accepted-decision-for-model-timelines-values-and-readiness).
+
+## Audited input domain
 
 Formula text is parsed by nom into StmtExpr, then recursively lowered to the core Expr representation. This layer chooses syntax, supported functions and argument counts; the statements evaluator owns the numerical temporal/statistical implementations.
 
 Identifiers begin with an alphabetic Unicode character or underscore and continue with alphanumeric characters, underscores or dots. Capital-structure identifiers have exactly cs.component.instrument_or_total form, with alphanumeric/underscore component and alphanumeric/underscore/hyphen target. Numeric literals must be finite.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 The complete input must parse. Precedence is logical or, logical and, keyword not, one comparison, addition/subtraction, multiplication/division/modulo, then symbolic unary ! and minus and primary expressions. Arithmetic chains fold left. Parentheses and if(condition,then,else) recurse; a second unparenthesized comparison is not accepted. There is no exponentiation operator; pow is a function.
 
@@ -36,7 +45,7 @@ StmtExpr display inserts parentheses around a weaker-precedence left child and s
 
 The last table row disagrees with the one-argument DSL reference. Extra arguments are compiled and may affect dimension/dependency analysis although the numerical operation is a one-series calculation; the evaluator's precise consumption is separate. This is an observed contract discrepancy requiring reconciliation, not a newly supported multi-series variant.
 
-parse_and_compile does not establish that references exist or units agree. Manual ASTs can contain non-finite literals and unbounded depth. A single shared function-signature table could align compilation, documentation and evaluation, but adopting it would be implementation work.
+The audited `parse_and_compile` checks syntax and lowering. Model admission owns reference closure and unit resolution. Caller-built ASTs can bypass the finite-literal and resource checks in the audited parser.
 
 ## Evidence
 

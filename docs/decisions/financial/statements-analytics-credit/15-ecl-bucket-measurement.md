@@ -1,20 +1,30 @@
 # STATEMENTS-ANALYTICS-CREDIT-15: Stage-specific PD/LGD/EAD integration and impaired recovery
 
-- Decision status: **Draft — observed implementation; adoption pending**.
-- Implementation status: **Observed** for the stated source scope; discrepancies are identified below.
-- Validation status: **Evidence inspected or located, not executed**.
+- Decision status: **Accepted for the full stage-specific impairment measurement contract (2026-11-15)**.
+- Implementation status: **Reconciliation pending**.
+- Validation status: **Existing evidence mapped. Independent qualification pending**.
 - Audit date: 2026-11-05.
 - Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision for stage-specific impairment measurement
+
+1. Use a verified stage and selected impairment policy. For Stage 1, include defaults through the earlier of 12 months from the reporting date and maturity, with the full LGD associated with those defaults. Stage 2 covers the remaining life. Each performing bucket contributes unconditional default mass multiplied by effective LGD, midpoint EAD and the midpoint discount factor. A zero performing horizon gives zero allowance and zero buckets. [Impairment staging](13-ecl-staging.md#accepted-decision-for-impairment-staging-and-cure) · [Impairment policy snapshots](14-ecl-policy-defaults.md#accepted-decision-for-resolved-impairment-policy-snapshots).
+2. Set an explicit maximum bucket width. Split at known PD and EAD knots and end at the exact horizon. Use the declared annual effective interest rate and discount clock, checked arithmetic and compensated sums. Qualify the approximation independently against a reference calculation or finer grid at a stated tolerance. [Exposure and cumulative default inputs](12-ecl-exposure-and-pd.md#accepted-decision-for-exposure-and-cumulative-default-inputs) · [Numerical accumulation](../../standards/0042-numerical-accumulation-and-comparisons.md).
+3. Elect a sourced point-in-time LGD, a through-the-cycle LGD replacement or a qualified downturn adjustment applied once. Report the effective LGD and its source. [Recovery and loss given default](../models-and-valuations-credit/06-recovery-and-lgd.md).
+4. For Stage 3, measure verified carrying exposure less one explicitly dated expected recovery on the same basis. Discount the recovery once. Report the signed shortfall and its nonnegative portion as the allowance. The Stage 3 measurement requires the carrying exposure, recovery amount, recovery date and discount rate and clock. It uses these inputs without a PD lookup.
+5. Preserve currency, source and selected policy provenance and the applicable bucket or recovery terms.
+
+For example, with USD 100 of carrying exposure and an expected USD 100 recovery in one year at 10% annual effective interest, the present value of recovery is USD 90.91 and the allowance is USD 9.09.
+
+## Audited choice and rationale
 
 Performing exposures sum unconditional default mass times effective LGD, midpoint EAD and EIR discounting. Stage 3 instead measures current exposure less discounted expected recovery. The distinct impaired formula preserves recovery delay's time-value loss even when undiscounted LGD is zero.
 
-## Scope and input domain
+## Audited scope and input domain
 
 Validated Exposure, caller-supplied stage, PD source and `EclConfig`. Bucket width must be finite and >= .0001 years. Stage-3 recovery delay is finite/nonnegative. Config validation also validates staging settings, even though this function does not classify the stage.
 
-## Algorithm
+## Audited algorithm
 
 1. Select effective LGD: PointInTime uses exposure LGD and rejects TTC/downturn settings; ThroughTheCycle requires an explicit finite [0,1] `ttc_lgd` and no downturn adjuster; Downturn requires a valid models `DownturnLgd` adjuster and no TTC field, then applies that adjuster to base LGD.
 2. Stage 1 sets horizon min(1 year, remaining maturity); Stage 2 uses remaining maturity. Use `ceil(horizon/bucket_width)` buckets, with at least one even for zero maturity. Final endpoint clips to horizon; midpoint is the average of endpoints.
@@ -22,19 +32,19 @@ Validated Exposure, caller-supplied stage, PD source and `EclConfig`. Bucket wid
 4. Compute EAD at midpoint and `DF=(1+eir)^−midpoint`; bucket allowance is default mass × effective LGD × EAD × DF. Accumulate ordinary floating-point addition and store every bucket's terms. Reject non-finite final allowance.
 5. Stage 3 still validates a PD-source lookup at t=0 for current rating/NR, though future default probability is not used. Set EAD at zero and allowance `EAD0−(1−effective LGD)*EAD0*(1+eir)^−recovery_delay`. Return one bucket with marginal PD=1 and reported horizon equal to recovery delay, independent of remaining maturity; zero contractual maturity can still have an allowance.
 
-## Selection and controls
+## Audited selection and controls
 
 The caller supplies stage explicitly; staging and measurement are separable APIs. Default width is .25 years and impaired recovery delay one year. LGD selection is explicit and inconsistent combinations error. The downturn algorithm itself is owned by models credit [recovery/LGD](../models-and-valuations-credit/06-recovery-and-lgd.md).
 
-## Conventions
+## Audited conventions
 
 PD mass is unconditional from the reporting-date curve; bucket `marginal_pd` stores that unconditional increment. Annual effective EIR discounts with fractional years. Stage 1 restricts the default-event horizon, while LGD is the supplied loss fraction rather than an explicit post-default recovery schedule. Output has the caller-supplied EAD unit; currency consistency is external and not validated because Exposure and EclResult contain scalar amounts without a Currency/Money field. Results use default `ResultsMeta`.
 
-## Limitations, failure and fallback
+## Audited limitations, failure and fallback
 
 The grid does not split at PD knots or EAD schedule changes; midpoint EAD/discount is approximate. The final finite guard is not an accuracy bound. No compensation is used in summation. Exposure currency and resolved model/policy choice are not carried in a dedicated result field. Stage-3 source membership is required even though its PD is economically irrelevant. No multiple recoveries, cure cashflows or discounted cash-shortfall schedule is modeled.
 
-## Alternatives and tradeoffs
+## Audited alternatives and tradeoffs
 
 Adaptive or event-aligned integration can reduce bucket error but needs convergence controls. Direct expected cash-shortfall discounting supports richer recovery timing at a higher data cost. A stage-3 measurement without an unused PD dependency would simplify the contract but changes validation behavior.
 

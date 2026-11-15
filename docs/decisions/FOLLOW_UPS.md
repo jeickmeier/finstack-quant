@@ -1618,6 +1618,241 @@ Runtime, history, stopping policy, rate risk and host qualification
 remain pending.
 [CALLABLE-RANGE-HW](financial/valuations-fx-and-exotics/callable-range-hw.md#accepted-decision-for-callable-rate-range-accrual).
 
+The snowball and inverse-floater package was accepted on 2026-11-15.
+Runtime, seasoned state, term projection, approximation, risk and host
+qualification remain pending.
+[SNOWBALL-HW](financial/valuations-fx-and-exotics/snowball-hw.md#accepted-decision-for-snowball-and-inverse-floater-notes).
+
+The TARN target and redemption package was accepted on 2026-11-15.
+Runtime, lifecycle, stochastic redemption, risk and host qualification
+remain pending.
+[TARN-TARGET](financial/valuations-fx-and-exotics/tarn-target.md#accepted-decision-for-tarn-target-and-redemption).
+
+Structured-credit dispatch and assumptions were accepted on 2026-11-15.
+Runtime route selection, profile and schedule validation, reporting and
+host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-01](financial/valuations-structured-credit/01-dispatch-and-assumptions.md#accepted-decision-for-structured-credit-dispatch-and-assumptions).
+
+Structured-credit collateral normalization and statistics were accepted on
+2026-11-15. Runtime state, metric and report availability, tranche bands
+and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-02](financial/valuations-structured-credit/02-pool-normalization-and-statistics.md#accepted-decision-for-collateral-normalization-and-pool-statistics).
+
+Structured-credit statistical collateral projection was accepted on
+2026-11-15. Runtime exposure, payment and recovery timing, floating
+terms and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-03](financial/valuations-structured-credit/03-statistical-collateral-projection.md#accepted-decision-for-statistical-collateral-projection).
+
+Structured-credit delinquency migration and advancing were accepted on
+2026-11-15. Runtime monthly state, modifications, recovery and
+reimbursement, calibration and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-04](financial/valuations-structured-credit/04-delinquency-and-advancing.md#accepted-decision-for-delinquency-migration-and-advancing).
+
+Structured-credit NPL resolution was accepted on 2026-11-15. Runtime
+workout state, terms, dated costs and receipts, independent calibration
+and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-05](financial/valuations-structured-credit/05-npl-resolution.md#accepted-decision-for-npl-resolution-and-reperformance).
+
+Structured-credit CMBS servicing was accepted on 2026-11-15.
+Runtime balloon resolution, fee and premium curves, DSCR coverage
+and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-06](financial/valuations-structured-credit/06-cmbs-servicing.md#accepted-decision-for-cmbs-balloon-and-servicing).
+
+Structured-credit card master-trust allocation was accepted on 2026-11-15.
+Runtime monthly balances, allocation and accumulation, trigger history,
+metric units and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-07](financial/valuations-structured-credit/07-card-master-trust.md#accepted-decision-for-card-master-trust-allocation).
+
+Structured-credit contractual instrument collateral was accepted on
+2026-11-15. Runtime ledger, recovery and liquidity, dependency closure
+and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-08](financial/valuations-structured-credit/08-instrument-collateral.md#accepted-decision-for-instrument-collateral-and-liquidity).
+
+Structured-credit collateral exercise was accepted on 2026-11-15.
+Runtime dates and payoff, workout-yield and incentive scenarios,
+active dependencies and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-09](financial/valuations-structured-credit/09-collateral-exercise.md#accepted-decision-for-collateral-call-and-put-exercise).
+
+Structured-credit reinvestment, reserve and hedge cash rules were accepted
+on 2026-11-15. Runtime purchase, dated account and hedge priority,
+conservation and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-10](financial/valuations-structured-credit/10-reinvestment-reserves-and-hedges.md#accepted-decision-for-reinvestment-reserves-and-hedge-cash).
+
+Structured-credit waterfall claims and rounding were accepted on
+2026-11-15. Runtime priorities, claim and monetary reconciliation,
+contractual incentive cases and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-11](financial/valuations-structured-credit/11-waterfall-claims-and-rounding.md#accepted-decision-for-waterfall-claims-and-rounding).
+
+Structured-credit coverage and cure diversion were accepted on 2026-11-15.
+Runtime ratio claims, collateral adjustments, actual cure paths
+and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-12](financial/valuations-structured-credit/12-coverage-and-cures.md#accepted-decision-for-coverage-tests-and-cure-diversion).
+
+Structured-credit principal regimes and early amortization were accepted
+on 2026-11-15. Runtime composition, monthly history, cash routing
+and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-13](financial/valuations-structured-credit/13-principal-regimes-and-amortization.md#accepted-decision-for-principal-regimes-and-early-amortization).
+
+Structured-credit loss recognition and terminal cash were accepted on
+2026-11-15. Runtime loss booking, call funding, legal cash and discharge
+entitlements, and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-14](financial/valuations-structured-credit/14-loss-recognition-and-terminal-cash.md#accepted-decision-for-loss-recognition-and-terminal-cash).
+
+The stochastic structured-credit waterfall was accepted on 2026-11-15.
+Runtime factor, collateral, sampling and reporting reconciliation, empirical
+calibration, nonlinear convergence and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-15](financial/valuations-structured-credit/15-stochastic-waterfall.md#accepted-decision-for-stochastic-waterfall-pricing-and-estimation).
+
+Structured-credit revolver utilization and draw-spread attribution were
+accepted on 2026-11-15. Runtime funding, matched waterfall replay and
+host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-16](financial/valuations-structured-credit/16-revolver-utilization-and-option-cost.md#accepted-decision-for-revolver-utilization-and-draw-spread-attribution).
+
+Structured-credit OAS was accepted on 2026-11-15. Runtime scenario,
+entitlement, settlement, spread fitting and host reconciliation
+remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-17](financial/valuations-structured-credit/17-oas-scenarios.md#accepted-decision-for-structured-credit-oas-and-settlement-spread-fitting).
+
+Agency CMO and PAC terms were accepted on 2026-11-15. Runtime
+collateral, waterfall, settlement, risk and host reconciliation
+remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-18](financial/valuations-structured-credit/18-agency-cmo-and-pac.md#accepted-decision-for-agency-cmo-waterfalls-and-dated-pac-contracts).
+
+The borrowing-base facility package was accepted on 2026-11-15. Runtime
+live eligibility, draws, cures, fees, lender cash, risk and host
+reconciliation remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-19](financial/valuations-structured-credit/19-borrowing-base-facility.md#accepted-decision-for-borrowing-base-facilities-and-lender-cashflows).
+
+Structured-credit settlement and quote inversion were accepted on
+2026-11-15. Runtime entitlement, quote paths, inverse solvers,
+units and host reconciliation remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-20](financial/valuations-structured-credit/20-quotes-and-inverse-pricing.md#accepted-decision-for-structured-credit-settlement-quotes-and-inversion).
+
+Structured-credit risk and scenarios were accepted on 2026-11-15.
+Runtime risk basis, perturbation, threshold crossing, scenario and host
+reconciliation remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-21](financial/valuations-structured-credit/21-risk-bumps-and-scenarios.md#accepted-decision-for-structured-credit-risk-and-scenarios).
+
+Structured-credit diagnostics and reporting were accepted on 2026-11-15.
+All 22 detailed structured-credit records are accepted. Runtime ledger,
+reporting, return metrics, ratio basis and host reconciliation remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-22](financial/valuations-structured-credit/22-diagnostics-and-reporting.md#accepted-decision-for-structured-credit-diagnostics-and-reporting).
+
+Calibration envelopes and explicit authoring were accepted on 2026-11-15.
+Runtime strict admission, diagnostic boundaries, restoration, schema and
+host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-001](financial/calibration-framework/01-wire-and-authoring.md#accepted-decision-for-strict-calibration-envelopes-and-explicit-authoring).
+
+Calibration controls, freshness and initial market were accepted on
+2026-11-15. Runtime numerical policy, exact timestamp comparison,
+typed context construction and host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-002](financial/calibration-framework/02-controls-and-market-context.md#accepted-decision-for-calibration-controls-freshness-and-initial-market).
+
+Calibration dependencies, preflight and ordered execution were accepted
+on 2026-11-15. Runtime typed reads, batch and fit gates, atomic
+installation and host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-003](financial/calibration-framework/03-dependencies-and-execution.md#accepted-decision-for-calibration-dependencies-preflight-and-ordered-execution).
+
+Deposit and FRA calibration materialization was accepted on 2026-11-15.
+Runtime date, clock, pricing basis, prepared replay and host
+reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-004](financial/calibration-framework/04-deposit-fra-materialization.md#accepted-decision-for-deposit-and-fra-materialization-and-prepared-clocks).
+
+Listed rate-futures calibration was accepted on 2026-11-15.
+Runtime venue terms, benchmark projection, price residuals,
+prepared replay and host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-005](financial/calibration-framework/05-futures-materialization.md#accepted-decision-for-listed-rate-futures-calibration-and-reference-periods).
+
+Term and overnight swap calibration was accepted on 2026-11-15.
+Resolved schedules, observation reuse, final-payment pillars,
+raw residuals, exact replay and host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-006](financial/calibration-framework/06-swap-materialization.md#accepted-decision-for-term-and-overnight-swap-calibration).
+
+The full single-name CDS calibration package was accepted on 2026-11-15.
+Runtime date-role, quote-basis, hazard-clock, replay and host
+reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-007](financial/calibration-framework/07-cds-materialization.md#accepted-decision-for-single-name-cds-calibration-and-quote-settlement).
+
+Index tranche calibration was accepted on 2026-11-15.
+Runtime date roles, seasoned state, quote representation, shared
+raw residuals, exact dependencies and host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-008](financial/calibration-framework/08-tranche-materialization.md#accepted-decision-for-index-tranche-calibration-and-quote-settlement).
+
+Cross-currency swap calibration was accepted on 2026-11-15.
+Runtime FX authority, schedule and reset dates, required foreign
+support, signed raw residuals, replay and host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-009](financial/calibration-framework/09-xccy-materialization.md#accepted-decision-for-cross-currency-swap-calibration-and-fx-authority).
+
+Sequential bootstrap and final repricing were accepted on 2026-11-15.
+Runtime coordinate and identity admission, candidate checks,
+final fit coverage, diagnostics and host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-010](financial/calibration-framework/10-sequential-bootstrap.md#accepted-decision-for-sequential-bootstrap-and-final-repricing).
+
+Bounded scalar search was accepted on 2026-11-15.
+Runtime feasible brackets, exact candidate evidence, work caps,
+bootstrap and Student-t caller reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-011](financial/calibration-framework/11-scalar-root-search.md#accepted-decision-for-bounded-scalar-search-and-candidate-evidence).
+
+Weighted global calibration was accepted on 2026-11-15.
+Runtime free-coordinate maps, weighted derivatives, typed errors,
+complete final candidate gates and host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-012](financial/calibration-framework/12-weighted-global-solve.md#accepted-decision-for-weighted-global-solve-and-final-candidate-gates).
+
+Deterministic multi-start was accepted on 2026-11-15.
+Runtime proposal admission, target fit gates, ordered execution,
+all-start work and host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-013](financial/calibration-framework/13-deterministic-multi-start.md#accepted-decision-for-deterministic-multi-start-and-final-selection).
+
+Fit acceptance and reporting were accepted on 2026-11-15.
+Runtime row identity, complete ratio summaries, staged outcomes,
+work counts, restoration and host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-014](financial/calibration-framework/14-fit-reports.md#accepted-decision-for-fit-acceptance-and-report-semantics).
+
+Calibration sensitivities and conditioning were accepted on 2026-11-15.
+Runtime final-artifact probes, signed derivatives, partial availability,
+direct weighted-Jacobian conditioning and host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-015](financial/calibration-framework/15-sensitivity-diagnostics.md#accepted-decision-for-calibration-sensitivities-and-conditioning).
+
+Curve validation and publication were accepted on 2026-11-15.
+Runtime source support and economic checks, outcome reporting, atomic
+publication, replay and existing host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-016](financial/calibration-framework/16-curve-validation.md#accepted-decision-for-curve-validation-and-publication).
+
+Surface validation and publication were accepted on 2026-11-15.
+Runtime diagnostic reuse, required coverage, disposition, restoration
+and existing host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-017](financial/calibration-framework/17-surface-validation.md#accepted-decision-for-surface-validation-and-publication).
+
+The dated Hull–White adapter was accepted on 2026-11-15.
+Runtime schedule and scope admission, effective controls, complete native
+fit, atomic fitted state and host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-018](financial/calibration-framework/18-hull-white-market-adapter.md#accepted-decision-for-dated-hull-white-quote-preparation-and-publication).
+
+Exact rate quote replay and publication were accepted on 2026-11-15.
+Runtime source qualification, exact targeting, final acceptance, atomic
+installation, restoration and host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-019](financial/calibration-framework/19-rate-quote-replay.md#accepted-decision-for-exact-rate-quote-replay-and-publication).
+
+Linked single-curve OIS replay was accepted on 2026-11-15.
+Runtime shared-role qualification, exact overnight projection, final
+publication, restoration and existing host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-020](financial/calibration-framework/20-linked-ois-replay.md#accepted-decision-for-linked-single-curve-ois-replay-and-publication).
+
+Qualified hazard replay was accepted on 2026-11-15.
+Runtime source reproduction, exact spread actions, original-quote recovery,
+delivered fit admission, restoration and host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-021](financial/calibration-framework/21-hazard-quote-replay.md#accepted-decision-for-qualified-hazard-quote-replay-and-publication).
+
+Deal spread overrides and horizon hazard replay were accepted on 2026-11-15.
+Runtime exact deal selection, explicit dated requoting, bounded survival
+qualification, publication, restoration and host reconciliation remain pending.
+[CALIBRATION-FRAMEWORK-022](financial/calibration-framework/22-hazard-deal-and-horizon.md#accepted-decision-for-deal-overrides-and-horizon-hazard-replay).
+
+Recalibration cache identity and lifetime were accepted on 2026-11-15.
+Runtime owner scope, exact keys, bounded retention, failed-slot cleanup
+and production and host equivalence remain pending.
+[CALIBRATION-FRAMEWORK-023](financial/calibration-framework/23-recalibration-cache.md#accepted-decision-for-exact-request-local-recalibration-caching).
+
 Other unadopted choices retain their stated Proposed or Draft status. Acceptance does not certify
 observed implementations.
 Numerical suites were not rerun in the original documentation audits.
@@ -1689,12 +1924,89 @@ requiring reproduction, adoption choices and missing validation are distinct.
   [CORE-MARKET-02](financial/core-market/forward-projection.md#accepted-decision-explicit-index-projection-factors-and-contractual-rates).
   Continuous-zero parameter shocks and dated frozen-source conditioning are
   accepted in [CORE-MARKET-03](financial/core-market/rate-shocks.md#accepted-decision-explicit-zero-rate-shocks-and-dated-conditioning).
-  Reconcile those choices without reopening them. Agree separately owned
-  calibration selections, permitted global polishing/seed
-  adoption and fit acceptance in
-  [0032](financial/calibration-targets/0032-curve-interpolation-and-calibration.md). Distinct hazard,
-  inflation, cross-currency, SABR/SVI, HW and base-correlation calibration
-  choices remain pending, including approximate-knot acceptance.
+  Reconcile explicit interpolation, tails, solver selection and final fit
+  admission under [accepted ADR 0032](financial/calibration-targets/0032-curve-interpolation-and-calibration.md#accepted-decision-for-explicit-rate-curve-interpolation-and-calibration).
+  Apply the [accepted calibration quote contracts](financial/calibration-targets/01-quote-contracts.md#accepted-decision-for-exact-typed-calibration-quotes-and-native-units)
+  at admission and replay. Reconcile explicit clocks, role binding and
+  native tolerances under the [accepted rate preparation package](financial/calibration-targets/02-rate-preparation-and-residuals.md#accepted-decision-for-explicit-rate-preparation-and-native-fit-residuals).
+  Reconcile prefix qualification, bounded fitting and the output role under
+  [accepted discount calibration](financial/calibration-targets/03-discount-calibration.md#accepted-decision-for-explicit-discount-calibration-and-delivered-curve-fit).
+  Reconcile the declared knot grid, exact index binding and delivered fit
+  under [accepted projection calibration](financial/calibration-targets/04-forward-calibration.md#accepted-decision-for-simultaneous-calibration-of-index-projection-factors).
+  Other targets retain their own detailed grid and bound choices.
+
+- **Single-name hazard calibration:** reconcile the fixed-recovery CDS
+  fit, explicit intensity controls, delivered-market qualification and
+  original versus par-risk observations under the
+  [accepted hazard calibration package](financial/calibration-targets/05-hazard-calibration.md#accepted-decision-for-explicit-single-name-hazard-calibration-and-par-risk-qualification).
+
+- **CPI calibration:** reconcile explicit source and contractual anchors,
+  actual fixing eligibility, bounded CPI levels and native swap repricing
+  under the [accepted inflation calibration package](financial/calibration-targets/06-inflation-calibration.md#accepted-decision-for-explicit-cpi-anchors-and-delivered-inflation-calibration).
+
+- **Cross-currency calibration:** reconcile the exact collateral, spot
+  and reset roles, identified foreign discount fits and delivered-market
+  repricing under the [accepted XCCY calibration package](financial/calibration-targets/07-xccy-calibration.md#accepted-decision-for-collateral-qualified-foreign-discount-calibration).
+
+- **NS/NSS calibration:** reconcile analytic instrument pricing, named
+  parameter bounds and identification, and delivered model qualification
+  under the [accepted parametric calibration package](financial/calibration-targets/08-parametric-calibration.md#accepted-decision-for-calibration-on-the-analytic-nsnss-discount-source).
+
+- **Equity smile forward inputs:** reconcile exact quote selection,
+  explicit spot, carry and funding roles, and dated entitlement
+  under the [accepted equity calibration package](financial/calibration-targets/09-equity-forward-inputs.md#accepted-decision-for-explicit-equity-spot-carry-and-dated-smile-forwards).
+
+- **Equity surface materialization:** reconcile explicit fitted-slice
+  tails, annual sigma grids and strict delivered quote gates under the
+  [accepted materialization package](financial/calibration-targets/10-total-variance-materialization.md#accepted-decision-for-explicit-total-variance-materialization-and-delivered-surface-fit).
+
+- **Equity SABR calibration:** reconcile exact optimizer and companion
+  quote roles, checked starts, native slice acceptance and fit evidence
+  under the [accepted equity SABR package](financial/calibration-targets/11-equity-sabr.md#accepted-decision-for-fixed-beta-equity-sabr-and-native-slice-acceptance).
+
+- **Equity SVI calibration:** reconcile the seeded raw fit, native
+  quote checks, required fitted-slice density scan and delivered-grid
+  acceptance under the [accepted equity SVI package](financial/calibration-targets/12-equity-svi.md#accepted-decision-for-raw-equity-svi-and-mandatory-fitted-slice-density).
+
+- **Swaption calibration forwards:** reconcile the dated reference,
+  nominal tenor, contractual observations and construction forward
+  under the [accepted swaption forward package](financial/calibration-targets/13-swaption-forwards.md#accepted-decision-for-dated-swaption-coordinates-and-calibration-forwards).
+
+- **Swaption SABR cube:** reconcile exact smile grouping, native fit,
+  supported node construction and strict delivered-cube replay under
+  the [accepted swaption cube package](financial/calibration-targets/14-swaption-cube.md#accepted-decision-for-exact-sabr-swaption-smiles-and-strict-cube-publication).
+
+- **Base-correlation calibration:** reconcile fixed attachment,
+  bounded identified roots, dated native repricing and paired
+  publication under the [accepted base-correlation package](financial/calibration-targets/15-base-correlation.md#accepted-decision-for-identified-base-correlation-bootstrap-and-atomic-publication).
+
+- **Student-t calibration:** reconcile the fixed flat correlation,
+  bounded root and sensitivity evidence, native repricing and typed
+  scalar under the [accepted Student-t package](financial/calibration-targets/16-student-t.md#accepted-decision-for-identified-single-tranche-student-t-calibration).
+
+- **Rate and hazard calibration replay:** reconcile complete
+  canonical construction records, exact quote bindings and distinct
+  source qualification and target refit under the [accepted replay package](financial/calibration-targets/17-calibration-replay.md#accepted-decision-for-exact-rate-and-hazard-construction-and-qualified-replay).
+
+- **Hull–White calibration entry:** reconcile explicit profiles,
+  exact curve roles, quote clocks and checked fit state under the
+  [accepted entry and quote package](financial/calibration-rate-models/01-curve-entry-and-quote-domains.md#accepted-decision-for-explicit-hull-white-calibration-entry-and-quote-domains).
+
+- **Hull–White cap and floor strips:** reconcile live schedules,
+  benchmark accrual, the actual payment measure and paired premium
+  checks under the [accepted cap and floor package](financial/calibration-rate-models/02-cap-schedules-and-quote-inversion.md#accepted-decision-for-checked-cap-and-floor-strips-and-implied-normal-inversion).
+
+- **Hull–White ATM swaption targets:** reconcile the dated par basis,
+  exact synthetic grid and checked analytic quote reconstruction
+  under the [accepted ATM package](financial/calibration-rate-models/03-atm-swaption-quotes.md#accepted-decision-for-exact-atm-swaption-targets-and-native-quote-reconstruction).
+
+- **Synthetic Jamshidian pricing:** reconcile the regular signed
+  coupon profile, checked root and exercise-price gate under the
+  [accepted synthetic payoff package](financial/calibration-rate-models/04-jamshidian-decomposition.md#accepted-decision-for-checked-synthetic-jamshidian-decomposition).
+
+- **Contractual Gaussian swaption pricing:** reconcile dated coupon
+  laws, payment covariance and checked tail and panel admission under
+  the [accepted contractual payoff package](financial/calibration-rate-models/05-contractual-gaussian-integration.md#accepted-decision-for-checked-contractual-gaussian-swaption-integration).
 
 ### Implementation reconciliation
 

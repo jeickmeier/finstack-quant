@@ -210,7 +210,7 @@
     clocks, authority and cash provenance through Rust, existing
     Python/WASM routes, reports, clearing/cash exports, schemas,
     declarations and parity. Align the existing
-    [calibration builder](../calibration-framework/05-futures-materialization.md)
+    [calibration builder](../calibration-framework/05-futures-materialization.md#accepted-decision-for-listed-rate-futures-calibration-and-reference-periods)
     with resolved terms, mark units, actual reference end and
     explicit convexity election. Keep recipe construction and
     fit qualification with calibration. Independently qualify

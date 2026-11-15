@@ -20,10 +20,9 @@ A complete input bundle does not compute or qualify a pool loss distribution.
 [tranche loss](../models-and-valuations-credit/17-tranche-loss-distribution.md),
 [projection and realized state](../models-and-valuations-credit/18-tranche-projection.md),
 [credit risk](../models-and-valuations-credit/19-tranche-risk.md),
-and [base-correlation calibration](../calibration-targets/15-base-correlation.md)
-retain their remaining Draft methods. This source contract does not adopt their
-complete copula, projection, realized-event approximation, recovery model, fit
-or risk policies. Accepted [context lifecycle20](context-lifecycle.md) owns
+and [base-correlation calibration](../calibration-targets/15-base-correlation.md#accepted-decision-for-identified-base-correlation-bootstrap-and-atomic-publication)
+own their copula, projection, realized-event approximation, recovery model,
+fit and risk policies. Accepted [context lifecycle20](context-lifecycle.md) owns
 atomic dependency mutation and composite invalidation.
 
 ## Foundational findings

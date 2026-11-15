@@ -1,38 +1,47 @@
 # STATEMENTS-ANALYTICS-CREDIT-08: Negative-FCF runs and adverse-trend counters
 
-- Decision status: **Draft — observed implementation; adoption pending**.
-- Implementation status: **Observed** for the stated source scope; discrepancies are identified below.
-- Validation status: **Evidence inspected or located, not executed**.
+- Decision status: **Accepted for the full sequential credit signals contract (2026-11-15)**.
+- Implementation status: **Reconciliation pending**.
+- Validation status: **Existing evidence mapped. Independent qualification pending**.
 - Audit date: 2026-11-05.
 - Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision for negative-FCF streaks and adverse trends
+
+1. Count consecutive strictly negative observations of a named FCF series from the first eligible observation. Zero or positive FCF ends the streak. Require positive warning and error counts with warning at or below error. Trigger on equality, check the error count first and report each continuing period at the applicable severity.
+2. Count strict adverse changes between adjacent observations of a named series in an explicit direction. A flat or favorable change ends the streak. The first observation establishes the baseline. Three adverse transitions require four observations. Configure a positive trigger count and explicit severity.
+3. Use verified, unit-compatible observations on the canonical reporting cadence. Select actuals, forecasts or both. Reset at the forecast boundary unless the caller explicitly elects to carry contiguous actual history, and label the crossing when included.
+4. A missing or masked observation breaks confirmed continuity and makes a required check incomplete. The next known negative FCF observation starts a new streak. Trends require a new adjacent pair. Report the confirmed count, severity and gaps. Invalid inputs produce errors. A scope with no applicable pairs or observations is unevaluated. [Numerical comparisons and check suites](../statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
+
+For example, FCF observations of −3, −2, missing, −1 and −2 with warning count two and error count three produce warnings in the second and fifth periods. The longest confirmed streak is two observations, and a required check remains incomplete.
+
+## Audited choice and rationale
 
 Sequential counters flag sustained negative FCF or consecutive adverse node changes. They share model-order state but count different events: negative observations versus adverse transitions.
 
-## Scope and input domain
+## Audited scope and input domain
 
 FCF node and positive warning/error observation counts; trend node, increasing-is-good or decreasing-is-good direction, positive lookback transition count and chosen severity.
 
-## Algorithm
+## Audited algorithm
 
 - FCF increments a counter for each strictly negative finite value; zero, positive, missing or non-finite observations reset it. At each period compare against the error count first, then warning count, emitting findings throughout a long run. Only positivity of the configured counts is enforced, not error >= warning.
 - Trend walks adjacent periods. For increasing-is-good, a strict decline is adverse; for decreasing-is-good, a strict increase is adverse. An adverse move increments the counter, while equality, improvement or missing/non-finite comparison resets it. A current non-finite value produces a Warning and reset; a non-finite prior comparison is unavailable without the same current-period warning.
 - A lookback of three therefore requires three consecutive adverse transitions, ordinarily four observations. The first period is not evaluated as a current trend observation. On reaching the count, emit configured severity for every continuing adverse period.
 
-## Selection and controls
+## Audited selection and controls
 
 Credit-suite FCF counts default to two/four. Suite trends inspect EBITDA levels and debt levels, not derived leverage/coverage. Check result passes depend on Error severity, including the configured trend severity.
 
-## Conventions
+## Audited conventions
 
 Counts are observations/transitions, not months or years. Model order is authoritative, with no sorting or gap-duration interpretation. Missing values break a run rather than preserve a prior signal.
 
-## Limitations, failure and fallback
+## Audited limitations, failure and fallback
 
 No unit/cadence check validates adjacent comparisons. A long gap counts as one transition, and missing data can clear deterioration. FCF non-finite values themselves have no finding here; coverage depends on a separate non-finite check. An initial non-finite trend observation is not caught by this trend loop.
 
-## Alternatives and tradeoffs
+## Audited alternatives and tradeoffs
 
 Rolling-window frequency, slope/regression or elapsed-time deterioration measures capture different persistence and require more data and policy. Preserving runs across missing data avoids clearing signals but can imply unobserved continuity; explicit unknown-state counters avoid that inference.
 

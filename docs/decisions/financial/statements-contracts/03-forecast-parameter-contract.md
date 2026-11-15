@@ -1,18 +1,29 @@
 # STATEMENTS-CONTRACTS-003: Typed forecast parameters and validation staging
 
-**Decision status:** Draft (observed implementation; adoption pending).
+**Decision status:** Accepted for the full typed forecast and validation staging contract (2026-11-15).
 
-**Implementation status:** Observed for the source responsibilities stated below; discrepancies are identified explicitly.
+**Implementation status:** Reconciliation pending. The audited path stores a free-form parameter map, applies some method defaults and defers static checks.
 
-**Validation status:** Evidence inspected/located, not executed. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice README](README.md)).
+**Validation status:** Existing source and regression evidence mapped. Independent admission, forecast and cross-host seed qualification remain pending.
 
-## Choice and input domain
+**Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
+
+## Accepted decision for typed forecasts and validation staging
+
+1. Use one checked, closed, typed forecast specification across Rust, Python, WASM and JSON. Reject duplicate, unknown, null and method-inapplicable fields. Require explicit bootstrap, time-series, seasonal and fade method choices. An omitted optional lower or upper bound leaves that side unbounded. [Strict numeric wire](../core-numerics/numeric-wire-and-canonical.md#accepted-decision-strict-numeric-wire-and-canonical-content-identity).
+2. Validate all static method requirements before publishing a runnable model, including supplied history, finite values, ordered bounds, valid standard deviations and conditional method parameters. At build or load, check units, canonical period keys, required configured coverage and any selected correlation peer. Apply these checks even when explicit observations override the forecast. [Model readiness](01-model-timeline-and-values.md#accepted-decision-for-model-timelines-values-and-readiness).
+3. Specify rates, growth and reversion speeds as decimal quantities per model period. Use the method's required units for levels and absolute parameters and require the series' native currency where monetary. Interpret period counts against the model plan. At evaluation, verify the actual horizon, eligible base and history, and support for the selected execution mode. [Observation availability](02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability).
+4. Admit seeds only for stochastic methods and require exact `u64` values. Use canonical decimal strings in JSON, integers in Rust and Python, and `bigint` or wire text in JavaScript. For example, the JSON seed `"9007199254740993"` represents the exact integer `9007199254740993`.
+
+A linear fade with a `half_life` fails static validation. A geometric fade checks its eligible anchor when the forecast runs.
+
+## Audited input domain
 
 ForecastSpec persists a method plus a free-form JSON parameter map. parameters() decodes that map to a closed ForecastParameters variant; validate() performs this decoding only. Forecast mathematics and numerical/domain validation belong to the forecast/evaluation scope.
 
 The eleven methods are forward_fill, growth_pct, curve_pct, normal, log_normal, override, time_series, seasonal, mean_reverting, bootstrap and fade_to_target. Rates, growth, reversion speeds and shock distribution parameters are per model period, not automatically annualized.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 1. Select the typed parameter structure from the ForecastMethod enum.
 2. Reject every explicit null-valued top-level parameter; optional values must be omitted. Deserialize with unknown-field rejection and include the nested parameter path in a Forecast error.
@@ -27,7 +38,7 @@ Convenience constructors serialize their inputs into the parameter map and selec
 
 Structural acceptance does not prove nonnegative standard deviation, valid smoothing/reversion/correlation ranges, sufficient history, positive bootstrap-growth data, compatible min/max, valid period override keys, or a legal conditional parameter combination. These are evaluated later. Correlation controls are present on normal/log-normal/mean-reverting variants for Monte Carlo use; their presence does not mean standalone projection applies correlation.
 
-Moving all domain checks into construction could reject a model earlier but would need one canonical method validator to avoid divergent schema/build/evaluation rules. The existing shape/domain split supports persisted configuration, with the risk that an unused or hidden branch is structurally valid but economically invalid.
+The accepted contract requires common static method validation before model publication. History and horizon requirements that depend on evaluation inputs are checked at runtime.
 
 ## Evidence
 

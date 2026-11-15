@@ -1,18 +1,35 @@
 # STATEMENTS-CONTRACTS-007: Bundled earnings and margin formulas
 
-**Decision status:** Draft (observed implementation; adoption pending).
+**Decision status:** Accepted for the full bundled earnings and margin contract (2026-11-15).
 
-**Implementation status:** Observed for the source responsibilities stated below; discrepancies are identified explicitly.
+**Implementation status:** Reconciliation pending. The audited catalogue assumes ex-D&A operating expense and uses separate D&A deductions.
 
-**Validation status:** Evidence inspected/located, not executed. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice README](README.md)).
+**Validation status:** Existing source and regression evidence mapped. Independent qualification of reported-cost earnings and margin calculations remains pending.
 
-## Choice and input domain
+**Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
+
+## Accepted decision for reported-cost earnings and margins
+
+Use reported COGS and OPEX with their depreciation and amortization included. Use inputs for the same reporting period and currency. Add back only the D&A included in those expense lines, once. Expense charges are positive. Actual credits and reversals retain their negative sign. Use an explicit zero for a known zero. A missing dependency makes the affected metric unavailable. [Formula units and currency](05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency).
+
+| Metric | Accepted formula |
+|---|---|
+| Gross profit | Revenue − reported COGS |
+| Operating income | Gross profit − reported OPEX |
+| EBIT | Operating income |
+| EBITDA | EBIT + included depreciation + included amortization |
+| EBT | EBIT − statement interest expense |
+| Net income | EBT − statement tax expense |
+
+The four margins use gross profit, operating income, EBITDA and net income as numerators. The two cost ratios use reported COGS and OPEX. Divide each by same-period revenue and report a decimal ratio. The ratio is unavailable with a reason when revenue is missing, zero or negative. For positive revenue, preserve the signed numerator. For a coarser reporting period, recompute the ratio using the aggregated numerator and revenue.
+
+## Audited input domain
 
 The embedded fin namespace contains six income-statement metrics and six revenue-normalized margin/cost ratios. They are ordinary statement DSL formulas evaluated with the model's observations, units, periods and missing-data behavior.
 
-The current catalogue explicitly describes OPEX excluding depreciation and amortization and supplies D&A as separate positive expense amounts. This conflicts with the previously agreed reported-cost convention, under which D&A is already included in COGS/OPEX. The present audit records the implementation and a reconciliation requirement; it does not reopen that agreed primary convention or authorize a formula change.
+The audited catalogue explicitly describes OPEX excluding depreciation and amortization and supplies D&A as separate positive expense amounts. This differs from the accepted reported-cost convention.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 Let R be revenue, C cost of goods sold, O operating expenses, D depreciation, A amortization, I interest expense and T tax_expense.
 
@@ -45,7 +62,7 @@ An explicit ex-D&A input convention can produce internally consistent arithmetic
 
 [Embedded basic formulas](../../../../finstack-quant/statements/data/metrics/fin_basic.json), [margins](../../../../finstack-quant/statements/data/metrics/fin_margins.json), [catalogue source](../../../../finstack-quant/statements/src/registry/builtins.rs) and [registry tests](../../../../finstack-quant/statements/tests/spec/registry_tests.rs) are the evidence. Inspected tests explicitly pin the ex-D&A formula strings and a numerical example R=1000, C=400, O=300, D=50, A=30 yielding EBITDA=300 and EBIT=operating_income=220. That is a formula/regression fixture under the implemented convention, not independent approval of that convention.
 
-No current ADR asserting the prior reported-cost convention was located; no historical adoption record is invented here.
+The original audit did not locate a standalone ADR for the prior reported-cost direction.
 
 ## Follow-up tracking
 

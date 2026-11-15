@@ -182,7 +182,7 @@
    to size principal. Quote inputs, calibration clocks,
    pillar and fit acceptance belong to their owners. Coupon basis
    and derived zero-rate differences retain their own definitions.
-   [XCCY quote materialization](../calibration-framework/09-xccy-materialization.md),
+   [accepted XCCY quote materialization](../calibration-framework/09-xccy-materialization.md#accepted-decision-for-cross-currency-swap-calibration-and-fx-authority),
    [XCCY target](../calibration-targets/07-xccy-calibration.md)
    and [derived basis diagnostics](../core-market/basis-spreads.md).
 

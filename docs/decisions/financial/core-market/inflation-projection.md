@@ -24,9 +24,9 @@ pending. [Publication/reference resolution](../valuations-framework/inflation-re
 [bond indexation](../valuations-other-fixed-income/04-inflation-indexation.md),
 [inflation swaps](../valuations-rates/13-inflation-swaps.md),
 [options](../valuations-rates/14-inflation-options.md) and
-[calibration](../calibration-targets/06-inflation-calibration.md) retain their
-remaining Draft choices. This package does not adopt their pricing measures,
-convexity, denominators, publication rules, floors or solver/fit conventions.
+[accepted CPI calibration](../calibration-targets/06-inflation-calibration.md#accepted-decision-for-explicit-cpi-anchors-and-delivered-inflation-calibration)
+own the applicable pricing measures, convexity, denominators, publication
+rules, floors and solver/fit conventions.
 
 ## Foundational findings
 

@@ -1,15 +1,37 @@
 # STATEMENTS-CAPITAL-004: Dated principal claims, settlement arrears and advance reserves
 
-**Decision status:** Draft — observed implementation; adoption pending.
-**Implementation status:** Observed for the source scope and discrepancies stated below.
-**Validation status:** Evidence inspected or located, not executed; numerical qualification remains open.
+**Decision status:** Accepted for the full dated principal claims, settlement arrears and advance reserves contract (2026-11-15).
+**Implementation status:** Reconciliation pending. The current closing amount can include unsettled principal payments and aggregate input can create synthetic claims.
+**Validation status:** Existing source and regression evidence mapped. Independent contractual debt-ledger qualification remains pending.
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; [scope and file ledger](README.md).
 
-## Choice and rationale
+## Accepted decision for dated principal claims
 
-Principal allocation separates economic capacity, settlement-only claims and principal cash paid before its economic date. This prevents a late settlement reducing economic debt twice and prevents an early payment leaving the same principal available to a second sweep. Dated claims are mandatory for market-aware evaluation; aggregate-only callers use a narrower fallback.
+### Claim identity and dated inputs
 
-## Inputs and algorithm
+Require stable claim identity, the instrument and its native currency for each scheduled principal claim. Keep signed cash and the face effect distinct. Retain the contractual due date and economic effective date, plus the actual or modeled payment date and amount for each payment, including partial payments. Require dated claims for scheduled principal and remove the aggregate path that synthesizes a same-period claim.
+
+### Accepted decision for separate principal and settlement reporting
+
+When a principal reduction takes effect under the contract independently of cash settlement, reduce outstanding economic principal on the effective date. Use that outstanding amount for opening principal reconciliation. Report the outstanding cash obligation separately with its payment due date and status. Mark it pending before the due date, classify the unpaid amount as arrears when payment is missed, and discharge the cash obligation as payments are made. [Dated principal effects](../core-conventions/015-cashflow-semantics.md#accepted-decision-cash-settlement-principal-effects-and-accrual-metadata) · [Opening principal reconciliation](03-funding-and-balances.md#accepted-decision-for-opening-principal-reconciliation).
+
+For example, a \$20 principal reduction effective March 31 leaves \$80 outstanding on a \$100 instrument. The \$20 due April 15 is pending until its due date, becomes arrears if missed, and is discharged by later payment. The outstanding economic principal stays at \$80 when that payment settles the existing obligation.
+
+### Principal paid before its economic effective date
+
+Record cash on its actual or modeled payment date. Reserve the face already paid from further allocation until the contractual reduction takes effect. Report the reserve separately and reduce outstanding economic principal on the effective date.
+
+### Scheduled principal allocation
+
+Follow the configured waterfall category order. Within scheduled principal, fund senior payment classes first. Within each class, allocate pro rata by each instrument's total eligible principal claims, including arrears. Apply each instrument's allocation to its oldest due claims first.
+
+### Exact reconciliation and atomic state
+
+Reconcile cash, face and claim amounts exactly in native-currency `Money` after any authorized rounding. Detailed rounding remains a separate policy. Commit balances, dated claims, advance reserves and residual schedule state together after successful reconciliation. [Monetary precision and rounding](../core-conventions/012-money-decimal-precision.md#accepted-decision-monetary-precision-rounding-and-currency-identity) · [Numerical representation and rounding](../conventions/0020-numerical-representation-and-rounding.md).
+
+## Observed inputs and algorithm
+
+The allocation engine tracks economic capacity, settlement-only claims and principal cash paid before its economic date. Dated claims are mandatory for market-aware evaluation. Aggregate-only callers use a narrower fallback.
 
 A `PrincipalClaim` carries nonnegative native-currency amount, cash payment date and economic balance date. Current cash dates must lie in a valid half-open period. The sum of current dated claims must match contractual principal cash within `1e−6` currency units. Original dates survive carried arrears and advances.
 

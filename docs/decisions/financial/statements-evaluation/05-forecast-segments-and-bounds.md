@@ -1,12 +1,19 @@
 # STATEMENTS-EVALUATION-005 — Forecast segment anchoring, overrides and output bounds
 
-Decision status: **Draft — observed implementation, adoption pending**. Implementation status: **Observed for the stated source scope**, with discrepancies identified below. Validation status: **Evidence inspected/located, not executed**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full forecast segment, anchoring and bounds contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
-## Choice, scope and rationale
+## Accepted decision for forecast segments, anchoring and output bounds
+
+1. Use one canonical forecast suffix per node in each evaluation run or simulation path. Advance one forecast step per slot, including masked slots and slots where explicit values are published. [Cell precedence and forecast eligibility](01-graph-precedence-and-prepared-plans.md#accepted-decision-for-dependency-graphs-cell-precedence-and-prepared-evaluation).
+2. For a method that needs a base, use its selected explicit start level at the opening of the suffix. When no start level is selected, use the value in the immediately preceding slot if it is eligible, visible and unmasked. Methods that use supplied history use their own aligned history. Missing required inputs produce a typed unavailable forecast with a reason. [Forecast parameters and validation](../statements-contracts/03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging).
+3. Publish visible explicit values according to cell precedence. Keep raw forecast recurrence, phase and shocks independent of those published cells. The `Override` forecast method maintains its own period-keyed carry within its raw series. [Deterministic forecast methods](06-deterministic-forecasts-and-fades.md).
+4. Apply compatible finite ordered bounds only to published forecast outputs and record any clipping. Preserve typed unavailability and computation errors. The raw generated series remains the basis for subsequent forecast state. [Forecast units](../statements-contracts/05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency).
+
+## Audited scope and rationale
 
 A forecast generates a complete run from a prior anchor, caches it by node/period and lets explicit cells override selected outputs. This preserves elapsed forecast steps, random draws and seasonal phase across overrides. It is not a recurrence restarted from each explicitly supplied forecast value. The rule applies to all method-specific kernels in records 06–10; even a time-series method that ignores its supplied base is reached through this anchor requirement.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 1. Return an existing cached forecast cell when available. Otherwise find the current model index and the latest preceding visible actual anchor. If none exists, find the first preceding permitted explicit value that can anchor the run.
 2. Define the run from just after the anchor until the next visible actual period. Explicit forecast values inside the run do not split it. Resolve the base strictly before the first projected period: prefer a visible actual's explicit value, otherwise its evaluated history, then the latest earlier historical value. Missing usable base errors.
@@ -20,9 +27,9 @@ The node's explicit forecast specification selects the kernel; there is no fitte
 
 ## Limitations and alternatives
 
-An explicit forecast cell can be economically far from the latent trajectory while later forecast cells remain unchanged. This is an observed supported policy, not a general rule for incorporating new information. Alternatives are restart-on-override, interval-specific specifications or state-conditioned models; those would change present outputs and random stream consumption. Likewise, a clipped stochastic state process differs from output-only clipping. Output bounds do not enforce a model-state domain.
+The audited kernels generate their latent trajectory before explicit-cell selection and output clipping. The accepted contract requires separate raw state and published forecast outputs, with recorded clipping.
 
-A base is still required for methods whose supplied history determines the calculation. Correlation ordering and hidden/explicit peer configurations require the conditions in [record 08](08-correlated-shocks.md), rather than assuming every evaluated peer cell creates shocks. No out-of-sample forecast accuracy or appropriateness for a particular financial statement is established by this audit.
+The audited dispatcher requires a base even when a method uses its own supplied history. The accepted contract makes the requirement method-specific. Correlation ordering and peer configurations are tracked in [record 08](08-correlated-shocks.md).
 
 ## Evidence
 

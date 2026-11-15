@@ -1,12 +1,19 @@
 # STATEMENTS-EVALUATION-003 — Historical offsets, growth rates and reporting windows
 
-Decision status: **Draft — observed implementation, adoption pending**. Implementation status: **Observed for the stated source scope**, with discrepancies identified below. Validation status: **Evidence inspected/located, not executed**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full historical offset, growth and reporting-window contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
-## Choice and scope
+## Accepted decision for historical offsets, growth and reporting windows
+
+1. Use exact nonnegative integer offsets in the canonical model period plan for `lag` and `shift`. Zero uses the current value. Positive offsets read the historical slot from the same evaluation run and cutoff. Missing history is unavailable. Fractional offsets, future reads and invalid calendar geometry produce errors. [Prepared evaluation](01-graph-precedence-and-prepared-plans.md#accepted-decision-for-dependency-graphs-cell-precedence-and-prepared-evaluation).
+2. Apply the same offset rules to `diff` and `pct_change`, with a default of one period. Difference is current minus base and retains the input unit. Percentage change is the signed decimal `(current − base) / base`, including when the base is negative. An exact zero base is unavailable.
+3. Require an explicit exact positive integer lookback for `growth_rate`, with a strictly positive base and a nonnegative ending value. Use `(ending / base)^(1 / years) − 1`; a zero ending value yields −100%. For daily and weekly periods, calculate years using Actual/365 Fixed between the periods' final included dates. For monthly, quarterly, semiannual and annual periods, divide the lookback by the number of canonical reporting slots per year. [Dated CAGR](../conventions/0008-financial-defaults-and-cagr.md#decision).
+4. Sum only compatible additive amounts over complete windows. `ytd` uses the model's reporting year, including the retained calendar context for a fiscal plan. Monthly `qtd` uses the corresponding Gregorian or fiscal quarter. `fiscal_ytd` accepts an explicit integer start month from 1 through 12 on a Gregorian monthly plan. Fiscal plans use `ytd` with their calendar context. `ttm` uses 12 monthly, four quarterly, two semiannual or one annual reporting slot, or full calendar-day coverage of the preceding twelve months on a daily plan. Reject weekly TTM and invalid window geometry. Missing required slots or values make a valid window unavailable. [Canonical reporting windows](../core-conventions/014-fiscal-periods-ltm.md#accepted-decision-reporting-periods-fiscal-context-and-ltm-windows).
+
+## Audited scope
 
 Temporal formulas read exact model-period history; reporting aggregates use named period windows. Supported calendars include fiscal IDs with explicit model bounds. Values retain the source metric's signed units; percent changes and annualized growth return decimal ratios. These are statement transformations, not price-return valuation rules. Inspection is complete; the daily/weekly CAGR clock conflicts with an already accepted decision.
 
-## Ordered calculation
+## Audited ordered calculation
 
 1. `lag(expr,n)` requires an integer nonnegative offset; zero evaluates the current expression. Positive offsets resolve a historical `PeriodId`, returning NaN if the slot is absent. Fiscal daily offsets use actual model starts plus/minus calendar days so fiscal-year boundaries are navigated correctly. In a standalone context without model bounds, only resolvable same-year backward fiscal-day shifts fall back to PeriodId arithmetic; unavailable/out-of-range geometry returns NaN. Expressions are reevaluated in a context for the historical row, with future history excluded; typed capital references use historical snapshots.
 2. `lead` is unsupported and errors. `shift` accepts a signed integer: negative produces NaN, positive delegates to lag, zero uses current. Lag/diff/pct_change/shift integer helpers accept `abs(fract(value))<=1e-10` and then truncate toward zero; growth-rate lag instead tests distance from the rounded integer with that tolerance. Missing capital snapshots produce NaN; an existing snapshot with an invalid instrument/component remains an error.
@@ -19,7 +26,7 @@ Temporal formulas read exact model-period history; reporting aggregates use name
 
 These operations are selected explicitly in formulas. Arbitrary-expression evaluation can be more expensive than a simple column lookup but uses the same time boundary. Observation-count rolling windows are a separate choice in [record 04](04-historical-statistics-and-ewm.md). The accepted rejection of ambiguous partial TTM remains intact; a finite-only YTD must not be advertised as a complete-year measure.
 
-[ADR 0008](../conventions/0008-financial-defaults-and-cagr.md) already selects Actual/365 Fixed for an explicit dated CAGR window. The daily/weekly Actual/Actual branch therefore conflicts with that accepted contract; it is **not** a newly optional methodology vote. Frequency annualization is expressly outside that dated default's scope. Calendar-day versus business-day daily grids and 52-week TTM are explicit reporting conventions, not automatic elapsed-time equivalents. A configurable dated clock or strict-completeness YTD are possible alternatives, not implemented defaults.
+The current evaluator requires an explicit growth lookback and resolves offsets with the model calendar. Daily and weekly growth still use Actual/Actual. The current TTM handler delegates to the canonical window builder for full calendar-day coverage, weekly rejection and propagated window errors. Exact offset admission, the growth clock and complete year and quarter windows still require reconciliation. [Current time-series functions](../../../../finstack-quant/statements/src/evaluator/formula_timeseries.rs) · [Current period aggregates](../../../../finstack-quant/statements/src/evaluator/formula_aggregates.rs).
 
 ## Evidence
 

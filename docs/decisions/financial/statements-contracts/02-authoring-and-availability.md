@@ -1,16 +1,27 @@
 # STATEMENTS-CONTRACTS-002: Builder composition and observation availability
 
-**Decision status:** Draft (observed implementation; adoption pending).
+**Decision status:** Accepted for the full builder composition and observation availability contract (2026-11-15).
 
-**Implementation status:** Observed for the source responsibilities stated below; discrepancies are identified explicitly.
+**Implementation status:** Reconciliation pending. The audited path allows duplicate replacement, last-touched predicate attachment and inferred availability defaults.
 
-**Validation status:** Evidence inspected/located, not executed. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice README](README.md)).
+**Validation status:** Existing source and regression evidence mapped. Independent authoring, import and publication-replay qualification remains pending.
 
-## Choice and input domain
+**Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
+
+## Accepted decision for authoring, imports and observation availability
+
+1. Use the shared DSL identifier rules and reserved-name rules in authoring and import. Reject duplicate node definitions, observations and availability-date entries for the same node and period on creation or import. Apply changes through explicit named edits that commit atomically. Attaching a `where` clause requires a valid named target and scalar predicate.
+2. Attach a forecast to an existing named node while preserving its formula and explicit observations. Promote Value and Calculated nodes to Mixed when attaching a forecast. Create forecast-only nodes explicitly as Mixed.
+3. Require a validated explicit period plan for imports. Map columns by period label, allowing unordered, unique columns and sparse observations. Reject any column outside the plan. Check observation types and units, retaining known zero separately from a missing cell. [Model timeline and explicit values](01-model-timeline-and-values.md#accepted-decision-for-model-timelines-values-and-readiness).
+4. Point-in-time evaluation uses an identified source snapshot, explicit observation availability dates and an explicit cutoff inclusive through the end of the source day. Retain original and revised observations in separately identified snapshots so a dated evaluation can replay its information set. Keep forecast assumptions distinguishable from published observations. Use explicit full-snapshot mode to evaluate the selected snapshot without a publication cutoff.
+
+For example, a \$100 observation published on April 25 is visible at that day's cutoff. A revision to \$110 published on May 15 is visible in the revised snapshot at the May 15 cutoff. An April 25 replay uses the original snapshot and obtains \$100.
+
+## Audited authoring and availability
 
 ModelBuilder is mutable authoring state, with final validation at build. It stores nodes in insertion order and tracks the last touched node explicitly. NodeSpec carries an optional publication date for each explicit period observation. This slice owns the availability predicate; precedence and the actual evaluation cutoff are owned by the evaluator.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 - Setting periods is allowed only while the stored timeline is empty. Both explicit and parsed timelines must be nonempty. Import-column resolution uses an existing timeline or constructs the inclusive PeriodId range from the first through last supplied column, then checks every column belongs to it; interior gaps in columns become timeline slots rather than being silently discarded.
 - value/value_money/value_scalar collect period pairs into an IndexMap: repeated period IDs retain the last supplied value. Reusing a node ID through value or compute replaces the whole previous definition and logs a warning. insert_node and mixed-node finalization also replace by key. Generic values infer units later; value_scalar declares Scalar, while value_money declares the currency only if all supplied money values agree.
@@ -27,13 +38,11 @@ Reserved IDs include `period_id`, any ID containing `__cs__`, any ID starting `_
 
 Repeated periods and nodes use replacement rather than conflict rejection. Publication dates need not be at or after the reporting interval, so intentional early availability and accidental look-ahead share the same input representation. A full revision history or publication calendar is not inferred.
 
-A strict authoring mode could reject duplicate observations or unreferenceable IDs; an explicit revision mechanism could retain provenance. Neither alternative is supplied here. The current last-touched behavior makes fluent editing predictable but does not guarantee that a where clause was intended for that node.
+The audited last-touched behavior and implicit replacement remain implementation gaps under the accepted named-edit contract.
 
 ## Evidence
 
 [Builder](../../../../finstack-quant/statements/src/builder/model_builder.rs), [node availability](../../../../finstack-quant/statements/src/types/node.rs), [builder regressions](../../../../finstack-quant/statements/tests/senior_review_builder.rs), [model regressions](../../../../finstack-quant/statements/tests/finance_model_regressions.rs) and [temporal regressions](../../../../finstack-quant/statements/tests/finance_temporal_regressions.rs) are the evidence. Inline builder tests pin redefined-node targeting, forecast targeting and preservation of existing nodes when metrics are added. Rejected setter tests inspect preservation of prior state.
-
-Exclusive period-end observation visibility differs from inclusive last-day cash/balance snapshots.
 
 ## Follow-up tracking
 

@@ -18,13 +18,11 @@ contractual, model and volatility clocks distinct. This source's model horizon
 is explicitly nonnegative; it does not change signed queries under the declared
 tails of pillar-based sources.
 
-[Parametric calibration](../calibration-targets/08-parametric-calibration.md)
-owns parameter estimation, fit bounds/identification, objective, sampling,
-initialization and market suitability. An analytic curve is not a stochastic
-rate process or an automatically valid projection source for every index.
+[Accepted parametric calibration](../calibration-targets/08-parametric-calibration.md#accepted-decision-for-calibration-on-the-analytic-nsnss-discount-source)
+owns parameter estimation, fit bounds and identification, objective,
+initialization and market suitability.
 [Accepted02](forward-projection.md) retains explicit projection role selection.
-This package does not adopt the calibration target's single-curve pricing
-assumption, tau repairs or remaining Draft methodology.
+Stochastic rate process and index-model choices stay with their model owners.
 
 ## Foundational findings
 

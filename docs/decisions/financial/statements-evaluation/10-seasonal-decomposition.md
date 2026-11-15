@@ -1,12 +1,19 @@
 # STATEMENTS-EVALUATION-010 — Seasonal decomposition and phase-preserving projection
 
-Decision status: **Draft — observed implementation, adoption pending**. Implementation status: **Observed for the stated source scope**, with discrepancies identified below. Validation status: **Evidence inspected/located, not executed**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full seasonal decomposition and projection contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
-## Choice and input domain
+## Accepted decision for seasonal decomposition and projection
+
+1. Select the additive or multiplicative mode and an exact positive integer season length `m`. Use at least two complete cycles of finite, same-unit, eligible observations from consecutive canonical reporting slots. The last historical slot ends at the forecast opening. The supplied history determines trend and phase. [Forecast anchoring and inputs](05-forecast-segments-and-bounds.md#accepted-decision-for-forecast-segments-anchoring-and-output-bounds).
+2. Estimate the trend with a centered moving average. For odd `m`, give the `m` observations equal weight. For even `m`, use `m + 1` observations with half weight at each endpoint and divide the weighted sum by `m`. Extend each edge linearly using the slope between its two nearest centered trend points. Preserve the computed slope without snapping it to zero.
+3. In additive mode, take each phase's mean observation-minus-trend residual and center the resulting phase effects to an equal-phase average of zero. In multiplicative mode, require a nonzero trend with a fixed sign. Each observation must share that sign or equal exactly zero. Use nonnegative observation-to-trend ratios to calculate the phase factors, then normalize their equal-phase average to one.
+4. Grow the final trend by `(1 + g)^h` for forecast step `h`, where `g` is a finite decimal growth rate per model slot and defaults to zero. Multiplicative mode requires `g > −1`. Add the phase effect in additive mode or multiply by the phase factor in multiplicative mode. Continue phase across every canonical forecast slot, including masks and explicit published values. Use checked arithmetic and validate each raw output before applying output bounds. [Output bounds and phase preservation](05-forecast-segments-and-bounds.md#accepted-decision-for-forecast-segments-anchoring-and-output-bounds).
+
+## Audited input domain
 
 Seasonal forecasting decomposes a finite supplied history into a centered moving-average trend and additive or multiplicative phase effects. Season length m must be positive and history must include at least two complete seasons. The vector supplies its own phase and trend; unsupported season-start configuration is rejected. There is no automatic detection of frequency, season length or economic calendar.
 
-## Algorithm
+## Audited algorithm
 
 1. Estimate interior trend with a centered moving average of length m. For even m, use m+1 observations with half weight on both endpoints divided by m. Extend trend at both edges linearly using the adjacent interior trend slope; near-zero slopes are snapped to zero by the numerical tolerance.
 2. Additive mode calculates phase means of `observation-trend`, then centers phase effects so their average is zero. Multiplicative mode requires nonzero finite trend without a sign crossing between observations; calculate phase means of `observation/trend`, then divide phase factors by their mean when its absolute value exceeds the tolerance. A near-zero mean is left unnormalized.
@@ -21,7 +28,7 @@ The caller explicitly selects Seasonal, mode, season length, historical vector a
 
 Centered trend removal isolates a repeating phase pattern; that is an interpretation of the code, not evidence that these decomposition assumptions fit the user's series. Edge extrapolation, raw phase averages, the normalization threshold and default flat future trend materially affect forecasts. Negative multiplicative trend, a phase mean near zero, and ordinary summation with large offsets/cancellation are limits of the established qualification evidence.
 
-Possible alternatives include seasonal-dummy regression, STL, Holt–Winters, external seasonal indices or forecast models refitted against dates. They are not implicitly available through this method. No predictive accuracy or accounting-standard adoption is established.
+The accepted contract requires aligned history, checked edge extrapolation and explicit multiplicative sign and normalization rules. The audited behavior requires reconciliation.
 
 ## Evidence
 

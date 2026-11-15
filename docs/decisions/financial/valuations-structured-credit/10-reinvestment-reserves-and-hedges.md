@@ -1,14 +1,104 @@
 # VALUATIONS-STRUCTURED-CREDIT-10: Reinvestment, reserves and hedge cash accounts
 
-- **Decision status:** Draft — observed implementation; adoption pending agreement.
-- **Implementation status:** Observed in the owning paths below; scope: period cash accounts, collateral purchases and contractual hedge overlays.
-- **Validation status:** Evidence inspected/located, not executed. Source and selected assertions establish implemented behavior, not general numerical accuracy or market approval.
+- **Decision status:** Accepted 2026-11-15 — complete reinvestment, reserve uses and earnings, accumulation, dated hedge cash and conservation package.
+- **Implementation status:** Observed in the owning paths below. Reconciliation to the accepted contract is pending.
+- **Validation status:** Independent purchase, account conservation, hedge timing and ranked cash calculations checked. Production pricing, contract and host qualification remain pending.
 - **Audit date:** 2026-11-05.
 - **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; runtime source unchanged by this audit.
 
-## Choice and rationale
+## Accepted decision for reinvestment, reserves and hedge cash
 
-The engine treats account movements as cash uses/sources around each period's waterfall. Reinvestment changes future collateral; reserve balances provide liquidity; hedge cash is projected from actual swap contracts. Their shared concern is conservation of cash, not a common return model.
+1. **Determine the purchase budget at the authorized cut.** Apply due
+   funding, realized losses and applicable pre-purchase triggers in
+   contractual order. Earmark amounts due to named amortizing tranches
+   once. Limit purchase cash to unspent eligible scheduled principal,
+   prepayments and expressly eligible carried principal. Exclude
+   recoveries in this profile. Give required pro forma purchase tests
+   their own dated snapshot. Preserve binding purchase obligations
+   and unspent cash under their governing terms.
+   [Filed CLO investment criteria](https://www.sec.gov/Archives/edgar/data/1655050/000119312525156216/d68327dex101.htm).
+
+2. **Buy an explicit replacement cohort.** Elect no reinvestment or
+   a specified replacement cohort. Retire implicit survivor scaling.
+   Require price, settlement date, stated maturity, coupon terms,
+   credit assumptions and required eligibility data. Keep missing
+   ratings missing and apply terminal rules to the stated maturity.
+   A selected current-yield test uses annual coupon divided by the
+   price fraction. Record cash spent and acquired par separately.
+   Keep the accepted instrument-backed restriction on generic
+   reinvestment.
+   [Accepted typed collateral](08-instrument-collateral.md#accepted-decision-for-instrument-collateral-and-liquidity).
+
+3. **Bind each reserve and spread account to authorized uses.** Keep
+   draw liquidity, waterfall credit support, excess spread and principal
+   funding as distinct uses. An account explicitly shared across uses
+   has one balance and each amount can be spent once. Define targets
+   from fixed cash, a fraction of qualified dated current or original
+   par, or the maximum of selected targets. Include funding-account
+   cash in the base only by election. Size support against actual
+   eligible fees and interest and capture genuine residual interest.
+   Apply replenishment, excess release and terminal principal support
+   on their authorized dates and at their named tiers.
+   [Filed reserve-account example](https://www.sec.gov/Archives/edgar/data/1414620/000095014407009284/g09856hze424b3.htm).
+
+4. **Date reserve earnings, accumulation and release.** For an elected
+   simple ACT/360 reserve, use the qualified opening balance or expressly
+   dated slices. Route earnings once to the reserve, eligible collections
+   or a named tranche. Restore accumulation balances, capture eligible
+   principal up to the contractual cap and route overflow under the
+   deal terms. Release the funding balance once at the bullet or
+   effective acceleration. Require explicit terminal recipients
+   and priority.
+   [Accepted card accumulation](07-card-master-trust.md#accepted-decision-for-card-master-trust-allocation),
+   [Terminal cash](14-loss-recognition-and-terminal-cash.md#accepted-decision-for-loss-recognition-and-terminal-cash).
+
+5. **Carry contractual hedge cash on its date and at its rank.** Reuse
+   the single-currency IRS coupon owner. Use contractual notional or
+   an expressly elected pool or named-note balance at the accrual-
+   effective phase. Preserve fixed accrual slices and scale only
+   qualified coupon cash. Net only under an authorized agreement at
+   the same date, currency and a compatible phase. Route the receipts
+   and payables at their designated accounts and ranks. Keep authorized
+   unpaid and qualified termination claims on their own dates.
+   [Accepted IRS coupons](../valuations-rates/03-interest-rate-swaps.md),
+   [Filed CLO hedge priorities](https://www.sec.gov/Archives/edgar/data/1379785/000137978519000025/exhbiti101-cloindenture.htm).
+
+6. **Reconcile transfers in a checked Money ledger.** Debit and credit
+   the same admitted amount. Reconcile each account and the waterfall.
+   Record any authorized rounding residual and destination. An
+   unexplained difference fails the check. Publish active dependencies
+   and the same dated balances, cash, and recipients in the existing
+   Rust-backed Python and WASM interfaces.
+
+## Independent calculations
+
+- Ordinary principal of 140, required amortization of 55 and restricted
+  principal of 15 give 70 of eligible purchase cash. Recovery of 20 is
+  separate. At 80% of par and a 6% coupon, current yield is 7.5% and
+  acquired par is 87.50. Opening par of 1,000 becomes 947.50 after
+  repayments and purchase. A 7.6% minimum current yield leaves the 70
+  unspent.
+- Opening credit reserve, spread and funding balances of 12, 4 and 15,
+  plus 50 gross collection and 0.12 reserve earnings, give 81.12 total.
+  With reserve target 6, authorized excess release of 6 to interest,
+  20 collected interest and 2 spread support cover 28 eligible interest.
+  Of 30 collected principal, capture 10 to reach funding cap 25
+  and route 20 to principal. Closing accounts 6, 2 and 25, waterfall
+  cash 28 interest and 20 principal, and 0.12 direct reserve income
+  reconcile to 81.12.
+- A hedge accrual snapshot of par 100 and signed cash factor 0.05
+  gives cash 5. A later 40 draw leaves that slice unchanged.
+  Eligible reserve of 3 against a payable of 5 leaves 2 unpaid at
+  the due phase even when a receipt of 5 arrives later in the same
+  distribution period.
+
+## Observed implementation and scope
+
+The engine treats account movements as period cash uses or sources.
+Reinvestment changes future collateral, reserves provide liquidity and
+hedge cash is projected from swap contracts. The following sections
+describe observed behavior. The accepted contract above governs
+reconciliation.
 
 ## Algorithm and controls
 
@@ -40,5 +130,5 @@ Cash conservation does not prove the assumed reinvestment prices or hedge econom
 
 ## Follow-up tracking
 
-Adoption questions, implementation reconciliation and validation work are tracked in
+Implementation reconciliation and validation work are tracked in
 the [structured-credit follow-ups](../FOLLOW_UPS.md#structured-credit).

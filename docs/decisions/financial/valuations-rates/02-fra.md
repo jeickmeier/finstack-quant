@@ -126,7 +126,7 @@
    and weighting decisions with their owners. Use the existing Python
    and WASM instrument envelopes and calibration quote surfaces, with
    matched generated schemas and fixture updates. See
-   [FRA quote materialization](../calibration-framework/04-deposit-fra-materialization.md)
+   [accepted FRA quote materialization](../calibration-framework/04-deposit-fra-materialization.md#accepted-decision-for-deposit-and-fra-materialization-and-prepared-clocks)
    and [forward calibration](../calibration-targets/04-forward-calibration.md).
 
 ## Observed behavior

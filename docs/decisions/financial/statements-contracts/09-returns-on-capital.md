@@ -1,16 +1,33 @@
-# STATEMENTS-CONTRACTS-009: Bundled period returns and reported-tax ROIC approximation
+# STATEMENTS-CONTRACTS-009: Bundled period returns on capital
 
-**Decision status:** Draft (observed implementation; adoption pending).
+**Decision status:** Accepted for the full bundled period returns contract (2026-11-15).
 
-**Implementation status:** Observed for the source responsibilities stated below; discrepancies are identified explicitly.
+**Implementation status:** Reconciliation pending. The audited catalogue uses period-end balances, separate earnings expressions and a reported-tax ROIC approximation.
 
-**Validation status:** Evidence inspected/located, not executed. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice README](README.md)).
+**Validation status:** Existing source and regression evidence mapped. Independent qualification of earnings, operating taxes and capital bases remains pending.
 
-## Choice and input domain
+**Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
+
+## Accepted decision for bundled period returns on capital
+
+Report same-period, unannualized decimal returns. Average the comparable opening and closing balances for each denominator. Use the same reporting scope and currency for earnings and the denominator. ROE and ROA use the shared reported-cost net income, including statement `tax_expense`. ROCE and ROIC use the shared reported-cost EBIT. [Reported-cost earnings](07-earnings-and-margins.md#accepted-decision-for-reported-cost-earnings-and-margins).
+
+| Metric | Accepted formula |
+|---|---|
+| ROE | Net income / average equity in the same reporting scope |
+| ROA | Net income / average total assets |
+| ROCE | EBIT / average capital employed, calculated as total assets − current liabilities at each endpoint |
+| ROIC | (EBIT − explicit operating tax expense or credit before financing effects) / average operating invested capital |
+
+Determine operating invested capital at each endpoint from explicit operating assets less non-interest-bearing operating liabilities. Include required operating cash and exclude excess cash and nonoperating assets. Align the operating capital and tax inputs with the EBIT scope and currency. Operating tax is a separate input from statement `tax_expense`. A signed operating tax credit increases the numerator.
+
+Require a positive denominator. Report unavailable with a reason when a required input is missing or the denominator is nonpositive. Preserve signed losses when the ratio is available. Recompute a return for a coarser reporting period using its earnings and opening and closing balances.
+
+## Audited input domain
 
 Four embedded fin formulas report ROE, ROA, ROIC and ROCE. They use current-period earnings and current period-end capital balances. They do not annualize earnings, average beginning/ending balances or infer a marginal tax rate. Rates are output as decimal fractions.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 With EBIT_impl = revenue − cogs − opex − depreciation − amortization and NI_impl = EBIT_impl − interest_expense − taxes:
 
@@ -29,15 +46,11 @@ ROIC approximates NOPAT by subtracting reported taxes from EBIT, rather than app
 
 Quarterly earnings divided by a period-end balance are a quarterly return measure; they are not automatically comparable with a trailing or annual return. Material within-period financing or acquisitions can make endpoint and average-capital returns differ. Negative/near-zero denominators, tax credits and losses use the generic evaluator's arithmetic rather than a finance-specific policy.
 
-The previously agreed reported-cost convention remains the primary reconciliation target. No alternative ex-D&A input convention is adopted by this record.
-
-Average invested capital, TTM earnings, operating-tax NOPAT, cash-net invested capital and a shared net-income node would be materially different formulas. They require explicit choices, not silent reinterpretation of existing node names.
+The audited endpoint balances, duplicate earnings expressions and reported-tax approximation are implementation gaps under the accepted return formulas.
 
 ## Evidence
 
 [Return catalogue](../../../../finstack-quant/statements/data/metrics/fin_returns.json), [registry tests](../../../../finstack-quant/statements/tests/spec/registry_tests.rs), [registry schema units](../../../../finstack-quant/statements/src/registry/schema.rs) and [corporate valuation reference](../../../REFERENCES.md#koller-valuation) provide implementation and contextual evidence. Tests inspect formula strings and model integration; these do not independently validate NOPAT tax treatment or denominator selection.
-
-The reported-tax approximation remains observed behavior, not an adopted operating-tax model.
 
 ## Follow-up tracking
 

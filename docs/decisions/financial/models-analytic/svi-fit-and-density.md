@@ -183,10 +183,10 @@ and independent complete-path qualification remain open.
 22. **Keep dated equity orchestration at its owner.** Reconcile the
     existing per-expiry equity SVI target with this checked model fit.
     Carry its actual solver, quote and scan outcomes in fitted-slice
-    reports. Replace the duplicate scalar density loop with the checked
-    scan when the target elects its own additional diagnostics.
-    CALIBRATION-TARGETS-009/012 own dated forwards, clocks and
-    per-expiry orchestration.
+    reports. The target elects one optimizer quote per strike, checks
+    companion quotes on the returned slice and requires the checked
+    density scan on every fitted slice. [Dated forward and clock inputs](../calibration-targets/09-equity-forward-inputs.md#accepted-decision-for-explicit-equity-spot-carry-and-dated-smile-forwards) ·
+    [Per-expiry equity SVI orchestration](../calibration-targets/12-equity-svi.md#accepted-decision-for-raw-equity-svi-and-mandatory-fitted-slice-density).
 
 23. **Keep sampled-surface acceptance separate.** Materialization
     evaluates native w at each original slice's own forward and

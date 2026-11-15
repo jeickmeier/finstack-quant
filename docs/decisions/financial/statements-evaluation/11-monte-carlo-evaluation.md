@@ -1,12 +1,20 @@
 # STATEMENTS-EVALUATION-011 — Monte Carlo paths, quantiles and breach probabilities
 
-Decision status: **Draft — observed implementation, adoption pending**. Implementation status: **Observed for the stated source scope**, with discrepancies identified below. Validation status: **Evidence inspected/located, not executed**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full Monte Carlo paths, quantiles and breach contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
-## Choice, domain and configuration
+## Accepted decision for Monte Carlo paths, quantiles and breach probabilities
+
+1. Require an exact positive path count that fits the path-ID domain, an exact seed, at least one forecast period and explicit report metrics. Check work and storage budgets and size arithmetic before allocating.
+2. Evaluate the complete model for each path with fresh state, the selected evaluation context and approved random streams. Select failures in deterministic logical order, with the earliest failing path in path order. Ordinary check suites apply at single-run finalization. [Prepared evaluation](01-graph-precedence-and-prepared-plans.md#accepted-decision-for-dependency-graphs-cell-precedence-and-prepared-evaluation) · [Versioned streams](07-stochastic-forecast-kernels.md#accepted-decision-for-stochastic-forecast-kernels-and-replay) · [Latent correlation](08-correlated-shocks.md#accepted-decision-for-latent-one-peer-correlation).
+3. Require exactly one valid typed sample per path for every requested metric and forecast period. Missing or unavailable required samples make the run incomplete, and invalid samples are execution errors. Publish statistics only for complete runs.
+4. Use R-7 for sample quantiles. An omitted percentile request selects `0.05`, `0.50` and `0.95`. Requested levels must be distinct, finite and in `[0,1]`. Store and retrieve results by exact probability key and include the result unit, currency where applicable and sample count.
+5. Path export is optional. Restoration requires a complete, unique set of path × metric × period keys with valid typed samples. For breach probability, require a typed finite upper threshold compatible with the metric. Count each path once if any forecast-period value is strictly greater than that threshold and divide by the path count. Breach probability is unavailable if path samples are absent.
+
+## Audited domain and configuration
 
 Monte Carlo repeats the complete statement evaluation, including period capital-state updates, and aggregates forecast cells across paths. Required controls are positive path count and seed; at least one forecast period must exist. Requested quantiles must be finite in `[0,1]`, are sorted and deduplicated; omitted or empty requests select 0.05, 0.50 and 0.95. Path-data export defaults off. These defaults are observed, not an adoption of a confidence-level or convergence policy.
 
-## Ordered algorithm
+## Audited ordered algorithm
 
 1. Prepare the model once. For each zero-based path create a clean evaluator/cache and derive stream ID `seed*6364136223846793005 + path_index` with wrapping integer arithmetic. Node-specific generators then use the mapping in [records 07](07-stochastic-forecast-kernels.md) and [08](08-correlated-shocks.md).
 2. Evaluate every model period, including actual history needed by formulas and capital state. Native execution uses Rayon fold/reduce; WASM is serial. If multiple paths fail, reduction retains the error from the smallest path index.
@@ -23,7 +31,7 @@ Monte Carlo does not run ordinary finalization's optional check suite or build e
 
 ## Alternatives and tradeoffs
 
-A streaming estimator could reduce memory but change exact quantiles; explicit pathwise checks or a convergence estimator would add different outputs. These are not implied implementation changes. A fixed finite sample alone does not establish moment/quantile accuracy or bound sampling error.
+The accepted contract requires explicit sample coverage and preserves exact sample quantiles. Budget validation, typed samples and complete path restoration remain reconciliation work. Independent moment, quantile and sampling-error qualification remains open.
 
 ## Evidence
 

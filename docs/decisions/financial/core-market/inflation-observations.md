@@ -19,9 +19,9 @@ Projected levels, observations and contractual base reference CPI remain distinc
 [bond indexation/floors](../valuations-other-fixed-income/04-inflation-indexation.md),
 [swaps](../valuations-rates/13-inflation-swaps.md),
 [options](../valuations-rates/14-inflation-options.md) and
-[calibration](../calibration-targets/06-inflation-calibration.md) retain their
-remaining product/model/solver choices. This package selects the source and
-reference calculation below without adopting those remaining choices.
+[accepted CPI calibration](../calibration-targets/06-inflation-calibration.md#accepted-decision-for-explicit-cpi-anchors-and-delivered-inflation-calibration)
+own the applicable product, model and solver choices. This package selects
+the observation source and shared reference calculation.
 
 ## Foundational findings
 

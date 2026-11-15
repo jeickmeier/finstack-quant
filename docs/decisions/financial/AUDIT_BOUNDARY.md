@@ -1385,6 +1385,429 @@ and a dated no-call Gaussian reference. Runtime, lifecycle, risk and
 host qualification remain pending.
 [CALLABLE-RANGE-HW](valuations-fx-and-exotics/callable-range-hw.md#accepted-decision-for-callable-rate-range-accrual).
 
+Snowball and inverse-floater pricing and settlement were accepted on
+2026-11-15. Independent checks cover seasoned coupon recursion and cash,
+Gaussian reset and payment timing, and inverse-floater optionality.
+Runtime, risk and host qualification remain pending.
+[SNOWBALL-HW](valuations-fx-and-exotics/snowball-hw.md#accepted-decision-for-snowball-and-inverse-floater-notes).
+
+TARN target and redemption were accepted on 2026-11-15. Independent
+checks cover exact threshold cash, separate fixing and payment, and
+Gaussian early redemption. Runtime, risk and host qualification
+remain pending.
+[TARN-TARGET](valuations-fx-and-exotics/tarn-target.md#accepted-decision-for-tarn-target-and-redemption).
+
+Structured-credit dispatch and assumptions were accepted on 2026-11-15.
+Independent calculations cover deterministic and stochastic tranche
+allocation, collateral-source precedence and assumption data. Production
+pricing, reporting and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-01](valuations-structured-credit/01-dispatch-and-assumptions.md#accepted-decision-for-structured-credit-dispatch-and-assumptions).
+
+Structured-credit collateral normalization and statistics were accepted on
+2026-11-15. Independent calculations cover original-par reconstruction,
+representative-pool approximation, weighted statistics, concentration and
+sequential or pari-passu structural bands. Production qualification remains
+pending.
+[VALUATIONS-STRUCTURED-CREDIT-02](valuations-structured-credit/02-pool-normalization-and-statistics.md#accepted-decision-for-collateral-normalization-and-pool-statistics).
+
+Structured-credit statistical collateral projection was accepted on
+2026-11-15. Independent calculations cover stub mortality, strict
+target amounts, cohort cash and dated fixing and floor behavior.
+Production qualification remains pending.
+[VALUATIONS-STRUCTURED-CREDIT-03](valuations-structured-credit/03-statistical-collateral-projection.md#accepted-decision-for-statistical-collateral-projection).
+
+Structured-credit delinquency migration and advancing were accepted on
+2026-11-15. Independent calculations cover monthly state conservation,
+the target-inversion discrepancy, modified cash timing and servicer
+claim balances. Production and calibration qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-04](valuations-structured-credit/04-delinquency-and-advancing.md#accepted-decision-for-delinquency-migration-and-advancing).
+
+Structured-credit NPL resolution was accepted on 2026-11-15. Independent
+checks cover resolution and receipt dates, par conservation, carrying-cost
+timing and nonlinear waterfall allocation. Production qualification remains
+pending.
+[VALUATIONS-STRUCTURED-CREDIT-05](valuations-structured-credit/05-npl-resolution.md#accepted-decision-for-npl-resolution-and-reperformance).
+
+Structured-credit CMBS servicing was accepted on 2026-11-15.
+Independent calculations cover the balloon split, workout and appraisal
+cash, yield-maintenance profiles and DSCR coverage. Production
+pricing and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-06](valuations-structured-credit/06-cmbs-servicing.md#accepted-decision-for-cmbs-balloon-and-servicing).
+
+Card master-trust allocation was accepted on 2026-11-15. Independent
+calculations cover monthly collections, post-revolving allocation,
+replenishment timing and excess-spread and charge-off bases.
+Production and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-07](valuations-structured-credit/07-card-master-trust.md#accepted-decision-for-card-master-trust-allocation).
+
+Structured-credit contractual instrument collateral was accepted on
+2026-11-15. Independent calculations cover dated liquidity,
+credit exposure and recovery, principal and cash, and floating
+reprojection. Production and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-08](valuations-structured-credit/08-instrument-collateral.md#accepted-decision-for-instrument-collateral-and-liquidity).
+
+Structured-credit collateral exercise was accepted on 2026-11-15.
+Independent calculations cover competing exercise dates, payoff,
+yield path selection and incentive thresholds. Production and host
+qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-09](valuations-structured-credit/09-collateral-exercise.md#accepted-decision-for-collateral-call-and-put-exercise).
+
+Structured-credit reinvestment, reserves and hedge cash were accepted
+on 2026-11-15. Independent calculations cover cost versus acquired par,
+qualified reserve uses, accumulation and dated hedge payment priority.
+Production and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-10](valuations-structured-credit/10-reinvestment-reserves-and-hedges.md#accepted-decision-for-reinvestment-reserves-and-hedge-cash).
+
+Structured-credit waterfall claims and rounding were accepted on
+2026-11-15. Independent calculations cover coupon and cap disposition,
+executable capped allocation and dated incentive fees.
+Production and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-11](valuations-structured-credit/11-waterfall-claims-and-rounding.md#accepted-decision-for-waterfall-claims-and-rounding).
+
+Structured-credit coverage and cure diversion were accepted on 2026-11-15.
+Independent calculations cover overlapping collateral adjustments, IC
+claims and available cash, hysteresis and funding-dependent cure sizing.
+Production and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-12](valuations-structured-credit/12-coverage-and-cures.md#accepted-decision-for-coverage-tests-and-cure-diversion).
+
+Structured-credit principal regimes and early amortization were accepted
+on 2026-11-15. Independent checks cover separate allocation and rounding,
+target OC, dated accumulation release and monthly trigger persistence.
+Production and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-13](valuations-structured-credit/13-principal-regimes-and-amortization.md#accepted-decision-for-principal-regimes-and-early-amortization).
+
+Structured-credit loss recognition and terminal cash were accepted on
+2026-11-15. Independent checks cover incremental loss allocation, funded
+cleanup eligibility and dated terminal receipts. Production and host
+qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-14](valuations-structured-credit/14-loss-recognition-and-terminal-cash.md#accepted-decision-for-loss-recognition-and-terminal-cash).
+
+The stochastic structured-credit waterfall was accepted on 2026-11-15.
+Independent checks cover factor scaling, finite-name nonlinear losses,
+draw alignment, pair-mean uncertainty, empirical tail mass and conditional
+repayment life. Production calibration, convergence and host qualification
+remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-15](valuations-structured-credit/15-stochastic-waterfall.md#accepted-decision-for-stochastic-waterfall-pricing-and-estimation).
+
+Structured-credit revolver utilization and draw-spread attribution were
+accepted on 2026-11-15. Independent checks cover zero-volatility reversion,
+funding, repayment-tag reduction and note-level PV allocation. Empirical
+calibration, production replay and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-16](valuations-structured-credit/16-revolver-utilization-and-option-cost.md#accepted-decision-for-revolver-utilization-and-draw-spread-attribution).
+
+Structured-credit OAS was accepted on 2026-11-15. Independent
+checks cover intensity modulation, future-settlement normalization,
+same-day buyer cash and spread root identification. Production
+calibration, convergence and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-17](valuations-structured-credit/17-oas-scenarios.md#accepted-decision-for-structured-credit-oas-and-settlement-spread-fitting).
+
+Agency CMO and PAC terms were accepted on 2026-11-15. Independent
+checks cover missed planned principal, endpoint-PSA limits, funded
+accretion and settlement ownership. Production deal benchmarks,
+pricing and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-18](valuations-structured-credit/18-agency-cmo-and-pac.md#accepted-decision-for-agency-cmo-waterfalls-and-dated-pac-contracts).
+
+Borrowing-base facilities were accepted on 2026-11-15. Independent
+checks cover cap order, draw headroom, cure source, dated fees and
+lender capital return. Production facility terms, pricing, risk and
+host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-19](valuations-structured-credit/19-borrowing-base-facility.md#accepted-decision-for-borrowing-base-facilities-and-lender-cashflows).
+
+Structured-credit settlement and quote inversion were accepted on
+2026-11-15. Independent checks cover delivered face, signed accrued,
+future settlement, same-day buyer cash, yield and curve spread.
+Production deal terms, pricing and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-20](valuations-structured-credit/20-quotes-and-inverse-pricing.md#accepted-decision-for-structured-credit-settlement-quotes-and-inversion).
+
+Structured-credit risk and scenarios were accepted on 2026-11-15.
+Independent checks cover curve stencils, fixed-strip spread risk,
+recovery moves, breakeven thresholds and affected collateral scope.
+Production repricing, convergence and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-21](valuations-structured-credit/21-risk-bumps-and-scenarios.md#accepted-decision-for-structured-credit-risk-and-scenarios).
+
+Structured-credit diagnostics and reporting were accepted on 2026-11-15.
+Independent checks cover signed cash and principal, carried arrears,
+repayment life, signed-net equity returns and collateral ratios.
+All 22 detailed records are accepted. Production and host qualification
+remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-22](valuations-structured-credit/22-diagnostics-and-reporting.md#accepted-decision-for-structured-credit-diagnostics-and-reporting).
+
+Calibration envelopes and authoring were accepted on 2026-11-15.
+Independent checks cover duplicate decoded names, repeated observations
+and explicit futures convexity. Production schema, admission, numerical
+and host qualification remain pending.
+[CALIBRATION-FRAMEWORK-001](calibration-framework/01-wire-and-authoring.md#accepted-decision-for-strict-calibration-envelopes-and-explicit-authoring).
+
+Calibration controls, freshness and initial market were accepted on
+2026-11-15. Independent checks cover solver coordinates versus fit
+residuals, fractional quote age and typed context collisions.
+Production calibration, market state and host qualification remain pending.
+[CALIBRATION-FRAMEWORK-002](calibration-framework/02-controls-and-market-context.md#accepted-decision-for-calibration-controls-freshness-and-initial-market).
+
+Calibration dependencies, preflight and ordered execution were accepted
+on 2026-11-15. Independent checks cover typed read identity, stale
+dependencies, first failure and atomic index updates. Production execution,
+calibration and host qualification remain pending.
+[CALIBRATION-FRAMEWORK-003](calibration-framework/03-dependencies-and-execution.md#accepted-decision-for-calibration-dependencies-preflight-and-ordered-execution).
+
+Deposit and FRA calibration materialization was accepted on 2026-11-15.
+Independent checks cover synthetic calendar and fixing dates, deposit
+trade PV and upfront FRA settlement. Production registry and host
+qualification remain pending.
+[CALIBRATION-FRAMEWORK-004](calibration-framework/04-deposit-fra-materialization.md#accepted-decision-for-deposit-and-fra-materialization-and-prepared-clocks).
+
+Listed rate-futures calibration was accepted on 2026-11-15.
+Independent checks cover Montréal COA date roles and a price, convexity
+and sizing example. Production venue data, projection, calibration and
+host qualification remain pending.
+[CALIBRATION-FRAMEWORK-005](calibration-framework/05-futures-materialization.md#accepted-decision-for-listed-rate-futures-calibration-and-reference-periods).
+
+Term and overnight swap calibration was accepted on 2026-11-15.
+Independent checks cover EOM and leg-specific payment dates,
+clipped overnight blocks, and pay-fixed PV and quote bumps.
+Production pricing, calibration, replay and host qualification remain pending.
+[CALIBRATION-FRAMEWORK-006](calibration-framework/06-swap-materialization.md#accepted-decision-for-term-and-overnight-swap-calibration).
+
+Single-name CDS calibration was accepted on 2026-11-15. Independent
+checks cover date roles, the hazard clock, accrued rebate and the
+negative-upfront residual. Production pricing, calibration,
+external-grid, replay and host qualification remain pending.
+[CALIBRATION-FRAMEWORK-007](calibration-framework/07-cds-materialization.md#accepted-decision-for-single-name-cds-calibration-and-quote-settlement).
+
+Index tranche calibration was accepted on 2026-11-15. Independent
+checks cover Dean Foods tranche erosion, separated payment dates
+and signed clean-upfront cash and residuals. Production valuation,
+calibration, term-sheet repricing, replay and host qualification remain pending.
+[CALIBRATION-FRAMEWORK-008](calibration-framework/08-tranche-materialization.md#accepted-decision-for-index-tranche-calibration-and-quote-settlement).
+
+Cross-currency swap calibration was accepted on 2026-11-15. Independent
+checks cover sizing, the valuation FX bridge, reset cash and the
+foreign-curve pillar. Production pricing, calibration, replay and
+host qualification remain pending.
+[CALIBRATION-FRAMEWORK-009](calibration-framework/09-xccy-materialization.md#accepted-decision-for-cross-currency-swap-calibration-and-fx-authority).
+
+Sequential bootstrap and final repricing were accepted on 2026-11-15.
+Independent checks cover exact coordinate spacing, candidate-specific
+root evidence and earlier-quote drift after a later PCHIP knot.
+Production bootstrap, calibration, replay and host qualification remain pending.
+[CALIBRATION-FRAMEWORK-010](calibration-framework/10-sequential-bootstrap.md#accepted-decision-for-sequential-bootstrap-and-final-repricing).
+
+Bounded scalar search was accepted on 2026-11-15. Independent
+checks cover boundary refinement and exact residual pairing. Isolated
+current-source checks reproduced false root evidence from a remote
+crossing and an infeasible gap. Production and host qualification remain pending.
+[CALIBRATION-FRAMEWORK-011](calibration-framework/11-scalar-root-search.md#accepted-decision-for-bounded-scalar-search-and-candidate-evidence).
+
+Weighted global calibration was accepted on 2026-11-15. Independent
+checks cover weighted versus unweighted selection, the transform
+derivative, incomplete outputs and stable norm arithmetic.
+Production calibration, replay and host qualification remain pending.
+[CALIBRATION-FRAMEWORK-012](calibration-framework/12-weighted-global-solve.md#accepted-decision-for-weighted-global-solve-and-final-candidate-gates).
+
+Deterministic multi-start was accepted on 2026-11-15. Independent
+checks cover Halton proposals, quote fit versus objective ranking
+and all-start work. Production calibration, replay and host
+qualification remain pending.
+[CALIBRATION-FRAMEWORK-013](calibration-framework/13-deterministic-multi-start.md#accepted-decision-for-deterministic-multi-start-and-final-selection).
+
+Fit acceptance and reporting were accepted on 2026-11-15.
+Independent checks cover identity collisions, scaled summaries and
+an isolated reproduction of the omitted highest ratio.
+Production plan, restoration, replay and host qualification remain pending.
+[CALIBRATION-FRAMEWORK-014](calibration-framework/14-fit-reports.md#accepted-decision-for-fit-acceptance-and-report-semantics).
+
+Calibration sensitivity and conditioning checks cover the represented
+stencil, final-artifact basis and weighted-Jacobian rank and condition.
+Production diagnostic pricing, restoration, replay and host qualification
+remain pending.
+[CALIBRATION-FRAMEWORK-015](calibration-framework/15-sensitivity-diagnostics.md#accepted-decision-for-calibration-sensitivities-and-conditioning).
+
+Independent curve examples check sampled versus continuous coverage,
+contractual rate basis, segment intensity caps, CPI deflation and the
+limit of base-correlation monotonicity. Production evaluators, calibration,
+replay and hosts remain to be qualified.
+[CALIBRATION-FRAMEWORK-016](calibration-framework/16-curve-validation.md#accepted-decision-for-curve-validation-and-publication).
+
+Independent surface calculations cover the missed overlap boundary,
+the Black price anchor and the limits of sampled strike constraints.
+Production diagnostic, publication, restoration and host qualification
+remain pending.
+[CALIBRATION-FRAMEWORK-017](calibration-framework/17-surface-validation.md#accepted-decision-for-surface-validation-and-publication).
+
+Independent dated Hull–White checks cover payment-date par rates,
+benchmark accrual versus coupon accrual and the effect of rounding
+numeric sigma support. Production pricing, fitting, restoration and
+hosts remain to be qualified.
+[CALIBRATION-FRAMEWORK-018](calibration-framework/18-hull-white-market-adapter.md#accepted-decision-for-dated-hull-white-quote-preparation-and-publication).
+
+Independent rate replay calculations cover exact quote selection, bp
+conversions, a missed deposit target under the ratio overlay and a
+zero-move refit under changed target dependencies. Production replay,
+publication, restoration and hosts remain to be qualified.
+[CALIBRATION-FRAMEWORK-019](calibration-framework/19-rate-quote-replay.md#accepted-decision-for-exact-rate-quote-replay-and-publication).
+
+Independent linked OIS calculations cover the contractual overnight
+accrual denominator, off-knot resampling and eligible published fixings.
+Production replay, publication, restoration and hosts remain to be qualified.
+[CALIBRATION-FRAMEWORK-020](calibration-framework/20-linked-ois-replay.md#accepted-decision-for-linked-single-curve-ois-replay-and-publication).
+
+Independent hazard replay calculations cover source-clock identity and
+the distinction between original upfront observations and derived par spreads
+in recovery. Production replay, publication, restoration and hosts remain
+to be qualified.
+[CALIBRATION-FRAMEWORK-021](calibration-framework/21-hazard-quote-replay.md#accepted-decision-for-qualified-hazard-quote-replay-and-publication).
+
+Independent deal and horizon replay calculations cover maturity versus
+payment, override-centered moves, nonadditive clocks and a gap missed by
+the sampled survival check. Production replay, publication, restoration
+and hosts remain to be qualified.
+[CALIBRATION-FRAMEWORK-022](calibration-framework/22-hazard-deal-and-horizon.md#accepted-decision-for-deal-overrides-and-horizon-hazard-replay).
+
+Independent examples check fixing and horizon policy identity.
+An isolated live-helper check covered concurrent reuse, progress on
+unrelated keys, retry and retained empty failure slots. Complete replay,
+bounded cache, concurrency and hosts remain to be qualified.
+[CALIBRATION-FRAMEWORK-023](calibration-framework/23-recalibration-cache.md#accepted-decision-for-exact-request-local-recalibration-caching).
+
+Independent rate-curve calculations cover literal tails, signed projection
+rates and a PCHIP prefix changed by a later knot. Production calibration,
+market reference, restoration and host qualification remain pending.
+[ADR 0032](calibration-targets/0032-curve-interpolation-and-calibration.md#accepted-decision-for-explicit-rate-curve-interpolation-and-calibration).
+
+Independent arithmetic checks cover futures shifts and convexity, tranche
+upfront settlement, shifted volatility domains, inflation growth and FX
+units. Production quote admission, pricing, replay and host qualification
+remain pending.
+[CALIBRATION-TARGETS-001](calibration-targets/01-quote-contracts.md#accepted-decision-for-exact-typed-calibration-quotes-and-native-units).
+
+Independent rate preparation calculations cover represented knot collisions,
+trial versus delivered bindings, contractual cash rounding and mixed-unit
+objective weights. Production calibration, replay and host qualification
+remain pending.
+[CALIBRATION-TARGETS-002](calibration-targets/02-rate-preparation-and-residuals.md#accepted-decision-for-explicit-rate-preparation-and-native-fit-residuals).
+
+Independent discount calibration calculations cover a changed prefix query,
+bounded factor representation, a mapped weighted derivative and exact output
+repricing. The alias discrepancy was traced in source. Production
+calibration, market references, restoration and host qualification remain
+pending.
+[CALIBRATION-TARGETS-003](calibration-targets/03-discount-calibration.md#accepted-decision-for-explicit-discount-calibration-and-delivered-curve-fit).
+
+Independent projection calibration calculations cover contractual versus
+source-clock accrual, unidentifiable common factor scale and a zero-shock
+refit under a changed discount factor. Production, market reference,
+restoration and host qualification remain pending.
+[CALIBRATION-TARGETS-004](calibration-targets/04-forward-calibration.md#accepted-decision-for-simultaneous-calibration-of-index-projection-factors).
+
+Independent hazard calibration calculations cover clean versus actual
+settlement, hazard above the observed hidden cap and a zero-par upfront
+fit. Production CDS calibration, market references, restoration, replay
+and host qualification remain pending.
+[CALIBRATION-TARGETS-005](calibration-targets/05-hazard-calibration.md#accepted-decision-for-explicit-single-name-hazard-calibration-and-par-risk-qualification).
+
+Independent CPI calibration checks cover contractual reference anchors,
+blended-level identification, the observed seed-bound inversion and native
+residual tolerances. An isolated Rust probe reproduced the clamp panic.
+Production calibration, dated market references, restoration and host
+qualification remain pending.
+[CALIBRATION-TARGETS-006](calibration-targets/06-inflation-calibration.md#accepted-decision-for-explicit-cpi-anchors-and-delivered-inflation-calibration).
+
+Independent cross-currency calibration checks cover the dated FX bridge,
+pending reset conversion, an unidentified foreign factor scale, factors
+above the observed cap and the dated zero-rate diagnostic. Production
+calibration, market references, restoration and hosts remain to be qualified.
+[CALIBRATION-TARGETS-007](calibration-targets/07-xccy-calibration.md#accepted-decision-for-collateral-qualified-foreign-discount-calibration).
+
+Independent NS/NSS calibration checks cover the analytic versus sampled
+factor, the observed decay repair, equal-decay identification and a native
+quote fit limit. Production calibration, dated market references, restoration
+and host qualification remain pending.
+[CALIBRATION-TARGETS-008](calibration-targets/08-parametric-calibration.md#accepted-decision-for-calibration-on-the-analytic-nsnss-discount-source).
+
+Independent checks cover equity fixing phase, delayed dividend cash,
+carry clock and matched call/put fit limits. Production calibration,
+market references, restoration and host qualification remain pending.
+[CALIBRATION-TARGETS-009](calibration-targets/09-equity-forward-inputs.md#accepted-decision-for-explicit-equity-spot-carry-and-dated-smile-forwards).
+
+Independent surface calculations cover fitted-tail and lookup behavior,
+tiny annual sigma, off-node quote repricing and fixed-moneyness calendar
+ordering. Production calibration, market references, restoration and
+host qualification remain pending.
+[CALIBRATION-TARGETS-010](calibration-targets/10-total-variance-materialization.md#accepted-decision-for-explicit-total-variance-materialization-and-delivered-surface-fit).
+
+Independent equity SABR calculations cover beta-zero Black output,
+same-strike acceptance, the observed ATM branch and the native error cap.
+Production fitting, market references, restoration and host qualification
+remain pending.
+[CALIBRATION-TARGETS-011](calibration-targets/11-equity-sabr.md#accepted-decision-for-fixed-beta-equity-sabr-and-native-slice-acceptance).
+
+Independent equity SVI calculations cover the annual volatility and
+total variance residual units, finite density scan coverage, and
+native fit on the delivered grid. Production fitting, market
+references, restoration and host qualification remain pending.
+[CALIBRATION-TARGETS-012](calibration-targets/12-equity-svi.md#accepted-decision-for-raw-equity-svi-and-mandatory-fitted-slice-density).
+
+Independent swaption-forward calculations cover nominal tenor,
+benchmark fixing selection, payment-lag effects and collisions from
+rounded expiry reconstruction. Production fitting, market references,
+restoration and host qualification remain pending.
+[CALIBRATION-TARGETS-013](calibration-targets/13-swaption-forwards.md#accepted-decision-for-dated-swaption-coordinates-and-calibration-forwards).
+
+Independent swaption SABR calculations cover the native residual cap,
+interpolation near zero nu and delivered-cube fit when an interior
+smile is omitted. Production fitting, market references, restoration
+and host qualification remain pending.
+[CALIBRATION-TARGETS-014](calibration-targets/14-swaption-cube.md#accepted-decision-for-exact-sabr-swaption-smiles-and-strict-cube-publication).
+
+Independent base-correlation calculations cover attachment sensitivity
+to later knots, the 100% detachment identity and an increasing correlation
+curve with negative implied layer loss. Production calibration, market
+references, restoration and host qualification remain pending.
+[CALIBRATION-TARGETS-015](calibration-targets/15-base-correlation.md#accepted-decision-for-identified-base-correlation-bootstrap-and-atomic-publication).
+
+Independent Student-t calculations cover a partial tranche with an
+invariant payoff across df and a comparison against operational
+pricing allowances. Production calibration, market references,
+restoration and host qualification remain pending.
+[CALIBRATION-TARGETS-016](calibration-targets/16-student-t.md#accepted-decision-for-identified-single-tranche-student-t-calibration).
+
+Independent rate and hazard replay calculations cover exact coordinate
+identity, evaluator differences between knots, futures convexity and
+the effect of original and par-risk CDS forms on recovery refits.
+Production replay, market benchmarks, restoration and host qualification
+remain pending.
+[CALIBRATION-TARGETS-017](calibration-targets/17-calibration-replay.md#accepted-decision-for-exact-rate-and-hazard-construction-and-qualified-replay).
+
+Independent Hull–White entry calculations cover model and quote
+clock separation, a native Normal premium, relative discount
+rebasing and distinct projection factors. Production fitting,
+market references, restoration and host qualification remain pending.
+[CALIBRATION-RATE-MODELS-001](calibration-rate-models/01-curve-entry-and-quote-domains.md#accepted-decision-for-explicit-hull-white-calibration-entry-and-quote-domains).
+
+Independent cap and floor calculations cover regular synthetic grids,
+separate benchmark and coupon accruals, the delayed-payment
+intrinsic-bound case and paired premium checks. Production fitting,
+market references, restoration and host qualification remain pending.
+[CALIBRATION-RATE-MODELS-002](calibration-rate-models/02-cap-schedules-and-quote-inversion.md#accepted-decision-for-checked-cap-and-floor-strips-and-implied-normal-inversion).
+
+Independent ATM swaption calculations cover actual-payment par,
+regular synthetic grid admission and Black inverse geometry near
+both premium boundaries. Production fitting, market references,
+restoration and host qualification remain pending.
+[CALIBRATION-RATE-MODELS-003](calibration-rate-models/03-atm-swaption-quotes.md#accepted-decision-for-exact-atm-swaption-targets-and-native-quote-reconstruction).
+
+Independent synthetic Jamshidian calculations cover regular negative
+coupons, agreement with direct Gaussian payoff integration, the
+exercise residual and a small positive variance case. Production pricing,
+market references, restoration and host qualification remain pending.
+[CALIBRATION-RATE-MODELS-004](calibration-rate-models/04-jamshidian-decomposition.md#accepted-decision-for-checked-synthetic-jamshidian-decomposition).
+
+Independent contractual Gaussian calculations cover delayed-payment
+covariance, weighted tail mass and a narrow exercise region missed
+by quadrature nodes. Production pricing, market references,
+restoration and host qualification remain pending.
+[CALIBRATION-RATE-MODELS-005](calibration-rate-models/05-contractual-gaussian-integration.md#accepted-decision-for-checked-contractual-gaussian-swaption-integration).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

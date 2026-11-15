@@ -19,10 +19,10 @@ Accepted [model interpolation](../models-analytic/volatility-source-interpolatio
 and [Black/normal/shifted pricing](../models-analytic/forward-normal-shifted.md)
 own their respective evaluation and pricing rules.
 [Surface diagnostics](../models-analytic/surface-arbitrage-diagnostics.md),
-[calibrated materialization](../calibration-targets/10-total-variance-materialization.md),
-[calibration acceptance](../calibration-framework/17-surface-validation.md),
-and [scenario diagnostics](../scenarios/09-volatility-surface-shocks.md) retain
-their remaining Draft choices. Accepted [context lifecycle20](context-lifecycle.md)
+[accepted equity materialization](../calibration-targets/10-total-variance-materialization.md#accepted-decision-for-explicit-total-variance-materialization-and-delivered-surface-fit),
+[calibration acceptance](../calibration-framework/17-surface-validation.md#accepted-decision-for-surface-validation-and-publication),
+and [scenario diagnostics](../scenarios/09-volatility-surface-shocks.md) own
+their respective conventions. Accepted [context lifecycle20](context-lifecycle.md)
 owns dated source conditioning and active eligibility boundaries.
 This record defines source/evaluator compatibility without adopting their full
 off-grid kernels, tails, price models, arbitrage thresholds or aging dynamics.
@@ -186,8 +186,8 @@ financial qualification remain pending; observed implementation stays separate b
    admission, total-variance mode, positive quotes or successful fit/shocks do
    not prove calendar/butterfly freedom, density positivity or model correctness.
    Do not apply a Black/Strike theorem or one tolerance scale indiscriminately
-   to Normal/Shifted/Tenor grids. Diagnostic/repair/fit-acceptance policies remain
-   separately Draft. Historical calibration reports do not automatically qualify
+   to Normal/Shifted/Tenor grids. The linked diagnostic, repair and calibration
+   records own their respective policies. Historical calibration reports do not automatically qualify
    the changed grid's current fit; replay/recalibration is a distinct request.
 
 10. **Reconcile strict state and actual producers/hosts together.** Store the

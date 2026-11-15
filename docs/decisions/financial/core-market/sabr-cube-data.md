@@ -18,8 +18,8 @@ A parameter model is different from a grid of volatility observations.
 [SABR expansions](../models-analytic/sabr-expansions.md),
 [calibration](../models-analytic/sabr-calibration.md),
 [off-grid evaluation/materialization](../models-analytic/volatility-source-interpolation.md),
-[swaption calibration publication](../calibration-targets/14-swaption-cube.md),
-[underlying forwards](../calibration-targets/13-swaption-forwards.md)
+[swaption calibration publication](../calibration-targets/14-swaption-cube.md#accepted-decision-for-exact-sabr-swaption-smiles-and-strict-cube-publication),
+[dated underlying forwards](../calibration-targets/13-swaption-forwards.md#accepted-decision-for-dated-swaption-coordinates-and-calibration-forwards)
 and [option pricing](../valuations-rates/07-european-swaptions.md) retain their
 separately stated decision statuses. This source contract does not adopt their full
 expansion, interpolation, tail, fit, settlement, smile-dynamics or aging policies.

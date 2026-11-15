@@ -22,11 +22,10 @@ provenance and replay-state design. [Record22](market-change-measurement.md)
 retains comparison aggregation/date-alignment choices. Full CDS contracts,
 recovery consistency, par/upfront conversion, solver/fit policy and independent
 market qualification remain with [ADR0030](../models-and-valuations-credit/0030-cds-survival-and-integration.md),
-[hazard calibration](../calibration-targets/05-hazard-calibration.md),
-[calibration replay](../calibration-targets/17-calibration-replay.md) and
+[accepted hazard calibration](../calibration-targets/05-hazard-calibration.md#accepted-decision-for-explicit-single-name-hazard-calibration-and-par-risk-qualification),
+[accepted calibration replay](../calibration-targets/17-calibration-replay.md#accepted-decision-for-exact-rate-and-hazard-construction-and-qualified-replay) and
 [credit sensitivity owners](../valuations-framework/README.md).
-This package does not adopt their remaining Draft calculations. Accepted
-[bond CS01 without a hazard curve](../valuations-bonds/0011-bond-cs01-without-hazard-curve.md)
+The accepted [bond CS01 without a hazard curve](../valuations-bonds/0011-bond-cs01-without-hazard-curve.md)
 retains its z-spread contract.
 
 ## Foundational findings

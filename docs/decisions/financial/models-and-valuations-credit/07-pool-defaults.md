@@ -158,7 +158,7 @@
    granularity wires, structured-credit Python and WASM payloads and
    overrides, schemas, declarations, fixtures and parity. Reject invalid
    or unsupported inputs before delivering product results.
-   [Stochastic structured-credit waterfall](../valuations-structured-credit/15-stochastic-waterfall.md),
+   [Stochastic structured-credit waterfall](../valuations-structured-credit/15-stochastic-waterfall.md#accepted-decision-for-stochastic-waterfall-pricing-and-estimation),
    [instrument collateral](../valuations-structured-credit/08-instrument-collateral.md),
    [local hazard](../core-market/hazard-survival.md), [pool correlation](08-prepayment-and-pool-correlation.md).
 

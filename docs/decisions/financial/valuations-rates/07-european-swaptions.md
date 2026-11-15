@@ -225,9 +225,9 @@
     construction and restore, raw and registered pricing, cash
     handoff, risk, the Python and WASM bindings, stubs, generated
     schemas and parity ledger. Coordinate contractual tenor, forward
-    and settlement metadata with [swaption forward calibration](../calibration-targets/13-swaption-forwards.md),
-    [cube publication](../calibration-targets/14-swaption-cube.md) and the
-    [Hull–White quote adapter](../calibration-rate-models/03-atm-swaption-quotes.md).
+    and settlement metadata with [accepted swaption forward calibration](../calibration-targets/13-swaption-forwards.md#accepted-decision-for-dated-swaption-coordinates-and-calibration-forwards),
+    [accepted cube publication](../calibration-targets/14-swaption-cube.md#accepted-decision-for-exact-sabr-swaption-smiles-and-strict-cube-publication) and the
+    [accepted Hull–White ATM quote adapter](../calibration-rate-models/03-atm-swaption-quotes.md#accepted-decision-for-exact-atm-swaption-targets-and-native-quote-reconstruction).
     Preserve the exact active dependencies, actual basis and
     unavailable/error states in reports. A placeholder cash export
     gives no evidence of settled or zero cash.

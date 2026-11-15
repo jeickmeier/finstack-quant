@@ -20,12 +20,11 @@ unqualified source a different risk operation.
 
 Calibration targets own materialization, solver/residual/fit policy and numerical
 qualification; products own contractual and model assumptions. Their detailed
-[replay record](../calibration-targets/17-calibration-replay.md),
+[accepted rate and hazard replay record](../calibration-targets/17-calibration-replay.md#accepted-decision-for-exact-rate-and-hazard-construction-and-qualified-replay),
 [framework](../calibration-framework/README.md) and
-[ADR0032](../calibration-targets/0032-curve-interpolation-and-calibration.md)
-retain their remaining Draft choices. This package requires complete capture
-and explicit acceptance of whichever supported policies were used; it does not
-select those policies, a universal fit tolerance or a historical pricing model.
+[ADR0032](../calibration-targets/0032-curve-interpolation-and-calibration.md#accepted-decision-for-explicit-rate-curve-interpolation-and-calibration)
+own the policies that a recipe must capture. Replay preserves the effective
+fit settings and the bound pricing model.
 
 ## Foundational findings
 
@@ -243,7 +242,7 @@ No recipe field selects or overrides evaluation of an already-built core curve. 
 
 ## Observed evidence
 
-Owning code: [rate recipe](../../../../finstack-quant/core/src/market_data/term_structures/rate_calibration.rs), [hazard recipe](../../../../finstack-quant/core/src/market_data/term_structures/hazard_calibration.rs), [forward wire](../../../../finstack-quant/core/src/market_data/term_structures/forward_curve/wire.rs), [hazard transforms](../../../../finstack-quant/core/src/market_data/term_structures/hazard_curve/transform.rs), and [discount metadata rebuild](../../../../finstack-quant/core/src/market_data/term_structures/discount_curve/curve.rs). Inspected `full_rate_calibration_retains_one_day_cutoff` in [forward tests](../../../../finstack-quant/core/src/market_data/term_structures/forward_curve/tests.rs) proves round-trip preservation, not calibration correctness. Inspected `hazard_recipe_invalidation_covers_synthetic_transformations` in [hazard tests](../../../../finstack-quant/core/src/market_data/term_structures/hazard_curve/tests.rs) proves invalidation behavior. Recipe unit tests are located in their owning files. [ADR 0032](../calibration-targets/0032-curve-interpolation-and-calibration.md) and [multi-curve bootstrapping](../../../REFERENCES.md#ametrano-bianchetti-2013) provide wider method context.
+Owning code: [rate recipe](../../../../finstack-quant/core/src/market_data/term_structures/rate_calibration.rs), [hazard recipe](../../../../finstack-quant/core/src/market_data/term_structures/hazard_calibration.rs), [forward wire](../../../../finstack-quant/core/src/market_data/term_structures/forward_curve/wire.rs), [hazard transforms](../../../../finstack-quant/core/src/market_data/term_structures/hazard_curve/transform.rs), and [discount metadata rebuild](../../../../finstack-quant/core/src/market_data/term_structures/discount_curve/curve.rs). Inspected `full_rate_calibration_retains_one_day_cutoff` in [forward tests](../../../../finstack-quant/core/src/market_data/term_structures/forward_curve/tests.rs) proves round-trip preservation, not calibration correctness. Inspected `hazard_recipe_invalidation_covers_synthetic_transformations` in [hazard tests](../../../../finstack-quant/core/src/market_data/term_structures/hazard_curve/tests.rs) proves invalidation behavior. Recipe unit tests are located in their owning files. [ADR 0032](../calibration-targets/0032-curve-interpolation-and-calibration.md#accepted-decision-for-explicit-rate-curve-interpolation-and-calibration) and [multi-curve bootstrapping](../../../REFERENCES.md#ametrano-bianchetti-2013) provide wider method context.
 
 ## Caller and primary-reference evidence
 

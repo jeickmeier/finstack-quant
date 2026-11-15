@@ -162,7 +162,7 @@
    risk and implied-volatility choices for [record 06](06-cap-floor-risk.md)
    and leave fit controls with the calibration owner. A term fit does
    not itself qualify the overnight approximation. See
-   [cap/floor calibration schedules](../calibration-rate-models/02-cap-schedules-and-quote-inversion.md).
+   [accepted cap and floor calibration schedules](../calibration-rate-models/02-cap-schedules-and-quote-inversion.md#accepted-decision-for-checked-cap-and-floor-strips-and-implied-normal-inversion).
 
 ## Observed behavior
 

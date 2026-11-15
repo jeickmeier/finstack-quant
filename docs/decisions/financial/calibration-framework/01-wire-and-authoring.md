@@ -1,9 +1,86 @@
 # CALIBRATION-FRAMEWORK-001: Strict envelopes and authoring defaults
 
-- Decision status: **Draft (observed implementation; adoption pending)**.
-- Implementation status: **Observed for the stated source scope**; discrepancies and limits are stated below.
-- Validation status: **Evidence inspected/located, not executed**. No numerical qualification or external compliance certification is implied.
+- Decision status: **Accepted 2026-11-15 — complete calibration envelope, authoring, restoration and publication package**.
+- Implementation status: **Observed for the stated source scope.** Reconciliation to the accepted contract is pending.
+- Validation status: **Independent wire and authoring examples checked.** Production schema, admission, numerical and host qualification remain pending.
 - Audit date: **2026-11-05**; source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (see [scope and coverage](README.md)).
+
+## Accepted decision for strict calibration envelopes and explicit authoring
+
+1. **Use one strict Rust admission path.** Require the exact
+   `finstack_quant.calibration/1` runtime marker. Use optional
+   `$schema` as editor metadata. Apply the accepted byte, depth and
+   collection limits to the complete request or result, including
+   nested `final_market` with its ancestor depth. Reject duplicate
+   decoded object names and invalid numeric representations before
+   conversion to a map. Validate the closed typed envelope and each
+   flattened `StepParams` variant. Remove the calibration depth
+   bypass.
+   [Accepted contract loading](../core-numerics/contracts-and-diagnostics.md#accepted-decision-bounded-contract-loading-validation-and-diagnostics) ·
+   [RFC 8259 object names](https://www.rfc-editor.org/rfc/rfc8259#section-4).
+
+2. **Distinguish draft diagnostics from executable admission.** A named
+   solver-free dry run can return the typed draft with findings. Strict
+   loading and execution require semantic success before a plan is usable.
+   Validate all supplied typed inputs, including unused quote payloads.
+   Require exact references and preserve quote-set order. Reject duplicate
+   quote membership within one set. Different sets may explicitly reuse
+   a quote. Preserve fatal status independently of retained diagnostics,
+   including under a zero retention cap. [Accepted record 002](02-controls-and-market-context.md#accepted-decision-for-calibration-controls-freshness-and-initial-market)
+   governs numerical policy and initial context.
+   [Accepted record 003](03-dependencies-and-execution.md#accepted-decision-for-calibration-dependencies-preflight-and-ordered-execution)
+   governs dependency ordering and execution.
+
+3. **Require one authority for each identity.** Require exact nonblank
+   plan and step IDs, quote-set bindings and author-selectable output IDs.
+   Reject `kind`, `id` and `quote_set` in a parameter map when supplied
+   separately, even if their values agree. Remove fallback IDs derived
+   from step ID and reject required nulls. Retain fixed output keys
+   defined by the target contract and resolve their exact identities
+   before execution. Preserve typed source identity, including Price
+   versus VolIndex.
+   [Accepted typed market state](../core-market/context-lifecycle.md#accepted-decision-typed-targets-and-atomic-context-lifecycle).
+
+4. **Require material financial choices at authoring.** Require explicit
+   futures convexity adjustment, including literal zero when intended,
+   option side, swaption convention, cap/floor side, hazard seniority
+   and parametric family where consumed. Use decimal rates and volatility,
+   bp CDS coupons and spreads, and upfront fractions of the stipulated
+   notional. A deliberately selected owner-approved versioned preset may
+   expand into explicit persisted values. Bootstrap, interpolation,
+   extrapolation, weights, solver controls and model parameters have
+   their own target and controls records. The observed settings below
+   retain their evidence role.
+
+5. **Validate result restoration and its declared status.** Check the
+   nested market and report through Rust. Validate identities, references,
+   units, field invariants and consistency with the outcome. Prefix nested
+   diagnostics at `/result/final_market` with escaped JSON Pointer
+   segments. A valid failed run can be restored as diagnostic evidence.
+   Successful fit and replay authority require their owner checks.
+   [Record 014](14-fit-reports.md#accepted-decision-for-fit-acceptance-and-report-semantics)
+   governs financial fit and report consistency.
+   [JSON Pointer escaping](https://www.rfc-editor.org/rfc/rfc6901#section-3).
+
+6. **Use the Rust-owned contract for schemas, examples and hashes.**
+   Follow the accepted Rust-derived offline schema publication and
+   require owner admission of final examples. Apply the same checks
+   across Rust, Python, WASM and persistence. Use the accepted canonical
+   content hash on admitted typed payloads, preserving serialized
+   metadata and array order. Keep hash version, artifact version and
+   fit status explicit.
+   [Accepted canonical wire](../core-numerics/numeric-wire-and-canonical.md#accepted-decision-strict-numeric-wire-and-canonical-content-identity) ·
+   [Accepted schema publication](../core-numerics/schema-publication.md#accepted-decision-canonical-schemas-compact-views-and-bounded-publication).
+
+## Independent calculation checks
+
+- JSON keys `"sofr"` and `"\u0073ofr"` decode to the same name.
+  Ordinary map parsing retains the second value and erases the duplicate.
+  Strict admission rejects the repeated decoded name.
+- Equal-weight observations 2% and 4% fit a constant of 3%. Repeating
+  the 2% observation changes the fit to 2.6667%.
+- Futures price 98.50 gives 1.50% at zero convexity adjustment.
+  An explicit positive 2.5 bp adjustment gives 1.475%.
 
 ## Observed choice and rationale
 
@@ -38,5 +115,5 @@ Alternatives are eager rejection of semantic errors at every entry point or a di
 
 ## Follow-up tracking
 
-Implementation reconciliation, adoption questions and missing evidence are tracked in the
+Implementation reconciliation and missing evidence are tracked in the
 [calibration-framework follow-ups](../FOLLOW_UPS.md#calibration-orchestration-solvers-and-replay).

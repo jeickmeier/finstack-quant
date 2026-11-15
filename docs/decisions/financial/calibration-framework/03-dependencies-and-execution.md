@@ -1,9 +1,94 @@
 # CALIBRATION-FRAMEWORK-003: Dependency ordering, preflight and installation
 
-- Decision status: **Draft (observed implementation; adoption pending)**.
-- Implementation status: **Observed for the stated source scope**; discrepancies and limits are stated below.
-- Validation status: **Evidence inspected/located, not executed**. No numerical qualification or external compliance certification is implied.
+- Decision status: **Accepted 2026-11-15 — complete typed dependencies, preflight, ordered execution and atomic installation package**.
+- Implementation status: **Observed for the stated source scope.** Reconciliation to the accepted contract is pending.
+- Validation status: **Independent typed-dependency, stale-read, failure-order and atomic-installation examples checked.** Production execution, calibration and host qualification remain pending.
 - Audit date: **2026-11-05**; source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (see [scope and coverage](README.md)).
+
+## Accepted decision for calibration dependencies, preflight and ordered execution
+
+1. **Bind reads and writes to typed market keys and roles.** Each read
+   identifies the storage namespace, exact ID, required kind and
+   financial role. Each output identifies its actual storage key,
+   including composite updates. A same-name scalar cannot serve a
+   discount read. Curve kinds sharing a storage slot conflict.
+   Use one Rust dependency contract for dry run, preflight,
+   scheduling, execution and replay. Keep target trial artifacts
+   private.
+   [Accepted typed context lifecycle](../core-market/context-lifecycle.md#accepted-decision-typed-targets-and-atomic-context-lifecycle).
+
+2. **Resolve the actual target inputs and record consumed quotes.**
+   XCCY binds its applicable discount and projection roles and
+   elected FX spot authority. Student-t binds the exact tranche
+   quote, index, discount and active credit inputs. Remove sole-discount
+   inference. Equity targets bind explicit spot and carry, including
+   the exact dividend schedule where used. Remove ticker-derived IDs
+   and presence-based precedence. Hull–White binds exact evaluators
+   and any expressly shared evaluator. Report exact quote IDs
+   consumed. Admit qualified mixed families and expressly selected
+   subsets and reject silent filtering.
+
+3. **Preserve authored order and explicit replacement.** Read initial
+   state or the latest admitted earlier output. Reject output
+   collisions unless authorized through an ordered same-kind
+   replacement. Validate dependent composites on the resulting
+   market. Treat base correlation and its credit-index update as
+   one atomic change. Preserve consumed input versions and replacement
+   provenance. Reject unresolved forward dependencies in authored order.
+
+4. **Run target-owned preflight before each solve.** Validate the
+   actual preceding market, selected quote set, required roles,
+   effective controls and financial context. Include Hull–White,
+   cap/floor Hull–White and parametric steps. Use the applicable
+   target rules for quote counts, currencies, entity, recovery,
+   clock, instrument eligibility and parameter domains. A static
+   dry run can report unresolved requirements. Execution resolves
+   them against the actual preceding market before solving.
+   [Accepted numerical and context policy](02-controls-and-market-context.md#accepted-decision-for-calibration-controls-freshness-and-initial-market).
+
+5. **Batch only where authored execution is preserved.** Batch
+   contiguous steps with known typed read and write sets. Workers
+   use one immutable batch-start market. End a batch before a later
+   step reads an earlier pending output or writes an overlapping
+   slot, including composite effects. An earlier reader of a later
+   replacement uses the earlier value if available. Resolve uncertain
+   dependencies before batching. Collect by authored index and select
+   the earliest failed step across preflight, solve, fit, validation,
+   report and installation.
+   [Rayon ordered search semantics](https://docs.rs/rayon/latest/rayon/iter/trait.ParallelIterator.html#method.find_first).
+
+6. **Gate complete outputs and publish a complete admitted market.**
+   Use the same gate in serial, parallel and replay paths. Check
+   solver outcome, required financial residual and post-fit checks,
+   report consistency and the complete typed output set before it
+   can serve later steps. Stage multi-output effects together.
+   Publish a calibrated market after all required steps pass.
+   Exploratory failure may retain bounded diagnostic evidence.
+   Deliberate zero-step context construction reports no fit and
+   zero work. [Record 014](14-fit-reports.md#accepted-decision-for-fit-acceptance-and-report-semantics)
+   owns detailed fit acceptance. The replay owner retains
+   source-reproduction requirements.
+   [Accepted replay qualification](../core-market/calibration-provenance.md#accepted-decision-lossless-construction-records-and-request-time-replay-qualification).
+
+7. **Report the actual stage, typed cause and work.** Preserve step
+   identity and outcome. A failed post-fit check is a validation
+   failure even when the residual passes. Reserve warnings for
+   advisory checks. Preserve authored report and trace order,
+   collision-free step and quote identities and checked aggregate
+   work. Share outcomes across Rust, Python, WASM and persisted data.
+
+## Independent calculation checks
+
+- A curve factor 0.95 values 100 at 95. With an authorized prior
+  step replacing the factor by 0.97, a subsequent read must value
+  the payment at 97 in both execution modes. A same-name scalar
+  supplies no discount-curve dependency.
+- When step A has a rejected fit and later step B raises a target
+  error, the first failure is A. The observed batch path can return
+  B before applying A's fit gate.
+- An attempted correlation change from 0.20 to 0.30 paired with an
+  index update referring to a missing hazard fails atomically.
+  The previously admitted curve and index remain in force.
 
 ## Observed choice and rationale
 
@@ -40,5 +125,5 @@ A typed dependency graph could distinguish a scalar from a curve with the same I
 
 ## Follow-up tracking
 
-Implementation reconciliation, adoption questions and missing evidence are tracked in the
+Implementation reconciliation and missing evidence are tracked in the
 [calibration-framework follow-ups](../FOLLOW_UPS.md#calibration-orchestration-solvers-and-replay).

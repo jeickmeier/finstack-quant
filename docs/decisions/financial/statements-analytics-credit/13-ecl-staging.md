@@ -1,20 +1,29 @@
 # STATEMENTS-ANALYTICS-CREDIT-13: SICR comparison, default backstops and probationary curing
 
-- Decision status: **Draft — observed implementation; adoption pending**.
-- Implementation status: **Observed** for the stated source scope; discrepancies are identified below.
-- Validation status: **Evidence inspected or located, not executed**.
+- Decision status: **Accepted for the full impairment staging and cure contract (2026-11-15)**.
+- Implementation status: **Reconciliation pending**.
+- Validation status: **Existing evidence mapped. Independent qualification pending**.
 - Audit date: 2026-11-05.
 - Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision for impairment staging and cure
+
+1. Compare current PD with initial-recognition PD conditional on survival to the reporting date. Match the remaining interval and default definition. Use separate dated curve snapshots or an explicit matched direct pair, preserving both even when rating labels match. Elect any shorter comparison horizon explicitly. [Exposure and cumulative default inputs](12-ecl-exposure-and-pd.md#accepted-decision-for-exposure-and-cumulative-default-inputs).
+2. Require an explicit policy for days past due (DPD), qualitative evidence, rating deterioration and PD thresholds. The Stage 2 DPD threshold must be below the Stage 3 threshold. DPD and notch thresholds trigger at equality. An absolute PD increase or relative PD multiple triggers only if it strictly exceeds its threshold. An exact zero origination PD makes the relative test inapplicable and leaves the absolute test applicable. Compare notches on a common declared scale. [Credit ratings](../core-conventions/019-credit-ratings.md#accepted-decision-generic-ratings-and-explicit-scorecard-scales).
+3. Give verified default or the Stage 3 DPD threshold priority. Significant increase in credit risk (SICR) supports Stage 2, subject to prior Stage 3 probation. Mark the assessment incomplete when missing required evidence could change the stage. Stage 1 requires complete applicable evidence and completion of all applicable probation.
+4. Count consecutive dated actual cure observations. A prior Stage 3 can move to Stage 2 after its non-default probation. Stage 2 can move to Stage 1 only after a separate window with complete evidence of no SICR. A gap or renewed adversity breaks the relevant streak. Report the prior stage, resulting stage, triggers and probation progress.
+
+For example, if the origination curve has `F(a) = 2%` and `F(a+h) = 5%`, its conditional PD over the remaining comparison interval is approximately 3.061%. A current PD of 6% gives an increase of about 2.939 percentage points and a ratio of 1.96×. The increase exceeds a 2-percentage-point threshold, and the relative ratio is below a 2× threshold. The absolute trigger supports Stage 2, subject to Stage 3 priority and applicable probation.
+
+## Audited choice and rationale
 
 Staging is an ordered policy waterfall: immediate default evidence first, then significant-increase triggers, then cure-state rules. Current and origination PD snapshots remain distinct, including when rating labels match. The implementation's thresholds and cure durations are configurable policy choices.
 
-## Scope and input domain
+## Audited scope and input domain
 
 Exposure maturity, DPD, qualitative/default flags, current/origination labels, previous stage and consecutive-performing-period count; staging configuration; either direct matched-window PDs or current/origination term structures plus nonnegative finite exposure age. Measurement EAD/LGD/EIR are not validated or read by staging.
 
-## Algorithm
+## Audited algorithm
 
 1. Validate nonnegative finite PD-delta thresholds and maturity. Curve staging also validates age. DPD >= Stage-3 threshold immediately returns Stage 3 with that trigger. Otherwise, enabled bankruptcy/distressed-modification/cross-default/custom default evidence returns Stage 3. These early exits precede curve PD lookups.
 2. Curve staging checks each supplied rating exists in its own source. If either exposure label is absent, skip the PD comparison; otherwise set h=min(remaining maturity,30). Origination comparison PD is `[F_orig(age+h)−F_orig(age)]/[1−F_orig(age)]`, requiring positive origination survival and monotone valid PDs; current PD is `F_current(h)`. Direct staging receives the two already matched conditional-window probabilities and validates both before entering the waterfall.
@@ -23,19 +32,19 @@ Exposure maturity, DPD, qualitative/default flags, current/origination labels, p
 5. Any SICR triggers give Stage 2, except a prior Stage 3 remains Stage 3 until its Stage-3-to-2 performing count is satisfied. This triggered transition reports `cured=false` even when Stage 3 becomes Stage 2.
 6. With no trigger, prior Stage 2 remains until its cure count then becomes Stage 1. Prior Stage 3 remains until the first count, then becomes Stage 2 until the sum of both cure counts, then Stage 1; the sum saturates on integer overflow. Successful no-trigger stage improvements set `cured=true`. The returned trigger is `NoTrigger` even when probation retains Stage 2/3.
 
-## Selection and controls
+## Audited selection and controls
 
 Default policy: absolute PD delta .01, relative multiple 2, three rating notches, DPD thresholds 30/90, both qualitative switches true, cure counts 3/12. Count units are caller observations, not fixed months. Direct current/origination PDs stay separate even when labels match.
 
-## Conventions
+## Audited conventions
 
 Absolute threshold is a probability-point decimal difference; relative threshold is a multiple of baseline PD. Rating labels are ordered best-to-worst; matching is exact. Forbearance is a SICR flag, distressed modification is default evidence. The 30-year cap applies to curve-derived SICR comparison, not Stage-2 allowance maturity.
 
-## Limitations, failure and fallback
+## Audited limitations, failure and fallback
 
 Configuration validation does not enforce DPD ordering, nonempty/unique custom scale labels or cure policy consistency; custom absolute PD threshold may exceed one although embedded policy validation is stricter. Unknown scale labels silently disable the notch test. Curve early-default paths can avoid missing/invalid PD-source detection, while direct PD staging validates supplied values before default classification. A generic `cured` flag does not uniformly mean any downward stage transition.
 
-## Alternatives and tradeoffs
+## Audited alternatives and tradeoffs
 
 Conditional matched-window comparison avoids comparing unequal origination/current horizons; full-life or one-year PD comparisons would change SICR policy. Explicit cure-transition reasons could remove ambiguity. Rejecting unknown ratings or invalid threshold ordering is stricter but changes permissive input handling.
 

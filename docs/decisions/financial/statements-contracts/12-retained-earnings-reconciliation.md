@@ -1,18 +1,27 @@
 # STATEMENTS-CONTRACTS-012: Retained earnings, dividends and signed adjustments
 
-**Decision status:** Draft (observed implementation; adoption pending).
+**Decision status:** Accepted for the full retained-earnings reconciliation contract (2026-11-15).
 
-**Implementation status:** Observed for the source responsibilities stated below; discrepancies are identified explicitly.
+**Implementation status:** Reconciliation pending. The audited check starts in the second period and can warn and pass with missing observations or invalid dividend magnitudes.
 
-**Validation status:** Evidence inspected/located, not executed. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice README](README.md)).
+**Validation status:** Existing source and regression evidence mapped. Independent qualification of opening balances, direct movements, arithmetic and coverage remains pending.
 
-## Choice and input domain
+**Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
+
+## Accepted decision for retained-earnings reconciliation
+
+1. Reconcile every model period. Use an explicit dated first opening at the first period boundary and the immediately adjacent prior close at later shared boundaries. Expected closing retained earnings equal opening retained earnings plus net income, the signed dividend effect and signed direct retained-earnings adjustments. Use the same ownership scope, compatible units and one currency where monetary.
+2. Recognize dividends in the period they affect retained earnings. Under the default `MagnitudePositive` policy, accept a nonnegative dividend and subtract it. Reject a negative magnitude. Under the explicitly selected `InflowPositive` policy, add the signed dividend. Omit a dividend or adjustment series only when it is inapplicable. Use a typed zero for known zero activity and mark a configured missing amount incomplete. [Dividend perspectives](../conventions/0044-financial-perspectives-and-boundary-conversions.md#decision).
+3. Include each distinctly sourced direct retained-earnings entry once and reject duplicate movement IDs. Reflect a restatement once, either in an already-restated opening balance or as an explicit movement. Other comprehensive income and buybacks contribute only the part recorded directly in retained earnings.
+4. Use the checked exact monetary and compensated scalar arithmetic from the balance-sheet contract. Retain signed and absolute residuals. Apply zero default tolerance, an explicit allowance for rounded or estimated balances, and the absolute override and inclusive comparison rules. The relative reference is `|opening retained earnings|` without a floor. Report a relative percentage only when that reference is nonzero and the diagnostic is representable. Missing required inputs make a comparison incomplete. Invalid inputs or required arithmetic produce an error. The check passes only when all required comparisons are complete and within tolerance. [Balance-sheet arithmetic and tolerance](10-balance-sheet-articulation.md#accepted-decision-for-balance-sheet-articulation).
+
+## Audited input domain
 
 RetainedEarningsReconciliation uses closing retained earnings, net income, optional dividends and signed adjustments. Net income and adjustments use inflow-positive semantics. Dividends default to MagnitudePositive; an explicit InflowPositive policy changes how they enter the identity.
 
-[Accepted ADR 0044](../conventions/0044-financial-perspectives-and-boundary-conversions.md) already settles the dividend magnitude default and explicitly selected signed alternative. This Draft owns the reconciliation algorithm and remaining account/input choices; its warning-only treatment of negative magnitudes is an implementation gap under that accepted contract.
+[ADR 0044](../conventions/0044-financial-perspectives-and-boundary-conversions.md) establishes the dividend magnitude default and explicitly selected signed alternative. The audited warning-only treatment of negative magnitudes is an implementation gap.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 1. Validate compatible operand units, config and optional absolute tolerance.
 2. Begin with the second model period and require date adjacency (prior.end == current.start). A gap or overlap emits Info and skips the pair.
@@ -26,15 +35,13 @@ RetainedEarningsReconciliation uses closing retained earnings, net income, optio
 
 The first period's retained earnings is an opening anchor, not reconciled. The check cannot establish that the selected adjustment nodes are legitimate changes to retained earnings. A broad label such as buybacks or AOCI in input documentation does not automatically make that account an appropriate RE adjustment.
 
-A wrong-sign magnitude dividend is warned about but still used numerically, so it can offset an unrelated difference. Warning-only handling does not enforce the accepted non-negative magnitude contract. Repeated adjustment IDs are summed repeatedly. A requirement for configured opening data and publication treatment of other advisory findings remain separate open choices.
+A wrong-sign magnitude dividend is warned about but still used numerically, so it can offset an unrelated difference. Repeated adjustment IDs are summed repeatedly. First-period opening and complete comparisons remain pending implementation.
 
 Separate retained-earnings, total-equity and other-comprehensive-income roll-forwards are meaningful alternatives with different account membership. They should not be conflated by silently broadening this identity.
 
 ## Evidence
 
 [Retained-earnings implementation](../../../../finstack-quant/statements/src/checks/builtins/retained_earnings.rs), [sign policy](../../../../finstack-quant/statements/src/checks/types.rs), [RE tests](../../../../finstack-quant/statements/tests/checks/retained_earnings_tests.rs) and [overflow/unit regressions](../../../../finstack-quant/statements/tests/finance_accounting_regressions.rs) provide formula and input-handling evidence. Tests inspect a correct roll-forward, mismatches, first-period skipping, adjustments and configured missing/non-finite optional inputs. These are accounting arithmetic fixtures, not independent entity-specific accounting-policy validation.
-
-ADR 0044 already settles the non-negative magnitude default and explicit signed alternative; those choices are not reopened.
 
 ## Follow-up tracking
 

@@ -1,14 +1,44 @@
 # Statements analytics: credit, financial checks and impairment
 
-This inventory covers **30 assigned production Rust files**: **23 algorithm-bearing files and 7 support files**, with **18 Draft methodology records**. Each assigned source file appears exactly once in [coverage.json](coverage.json), with its original audit SHA-256 and concrete responsibility. The scope includes private helpers, validation/defaults, dispatch, missing-data rules, reporting calculations and fallback paths, not only public entry points. Inline tests are evidence within production files; there are no separately assigned test-only or generated files.
+This inventory covers **30 assigned production Rust files**: **23 algorithm-bearing files and 7 support files**, with **18 methodology records**. Each assigned source file appears exactly once in [coverage.json](coverage.json), with its original audit SHA-256 and concrete responsibility. The scope includes private helpers, validation/defaults, dispatch, missing-data rules, reporting calculations and fallback paths, not only public entry points. Inline tests are evidence within production files; there are no separately assigned test-only or generated files.
 
-- Decision status: **Draft — observed implementation; adoption pending**.
-- Implementation status: **Observed** for the assigned source scope; material discrepancies and approximation choices are explicit in the records.
+- Decision status: **15 accepted and 3 draft**.
+- Implementation status: **Observed** in the audit. Reconciliation and independent qualification of accepted methodology remain pending.
 - Validation status: **Evidence inspected or located, not executed**. No Rust tests, builds or clippy runs were performed for this static documentation audit.
 - Audit date: 2026-11-05.
 - Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
 The source scope is `statements-analytics/src/analysis/checks`, `analysis/credit` and `analysis/ecl`. Its called core date/LTM, statements checks/results, models LGD/EAD and covenant-engine APIs are traced where needed to establish selection and units. Their implementation ownership remains in their own domains; in particular the covenant adapter is not a substitute for a full audit of the separate covenants crate. The embedded [ECL policy data](../../../../finstack-quant/statements-analytics/data/accounting/ecl_policy.v1.json) was inspected because it sets numerical defaults, but the 30-file count is the Rust manifest rather than external-data certification.
+
+The mapped check-suite contract was accepted on 2026-11-15. It covers full and scoped three-statement reviews, explicit credit checks and screening thresholds, preserved LBO thresholds and coverage-based gates. [Accepted mapped check-suite contract](01-suite-selection.md#accepted-decision-for-mapped-check-suites-and-coverage).
+
+The stock-flow reconciliation contract was accepted on 2026-11-15. It covers cash CapEx, net PPE, paid dividends and operating working capital, with explicit adjustments and typed comparisons. [Accepted stock-flow reconciliation contract](02-stock-flow-reconciliation.md#accepted-decision-for-stock-flow-reconciliations).
+
+The interest-reconciliation contract was accepted on 2026-11-15. It covers explicit direct recognition or advisory balance-based estimates, required coverage and typed comparisons. [Accepted interest-reconciliation contract](03-interest-reconciliation.md#accepted-decision-for-interest-reconciliation-and-estimates).
+
+The period-change screening contract was accepted on 2026-11-15. It covers signed change relative to prior magnitude, verified adjacency, explicit forecast transitions and inclusive period bounds. [Accepted period-change screening contract](04-growth-plausibility.md#accepted-decision-for-signed-period-change-relative-to-prior-magnitude).
+
+The effective-tax-rate screening contract was accepted on 2026-11-15. It covers signed recognized tax expense, a positive pretax denominator, sourced informational bounds and distinct zero-income and loss-period reasons. [Accepted effective-tax-rate screening contract](05-tax-plausibility.md#accepted-decision-for-informational-effective-tax-rates).
+
+The leverage and coverage screening contract was accepted on 2026-11-15. It covers bundled TTM metrics, named custom checks, explicit nested thresholds and per-period coverage. [Accepted leverage and coverage screening contract](06-leverage-and-coverage.md#accepted-decision-for-bundled-ttm-leverage-and-coverage-checks).
+
+The liquidity runway contract was accepted on 2026-11-15. It covers spendable cash, signed cash use, supported month conversions, immediate shortfalls and explicit threshold outcomes. [Accepted liquidity runway contract](07-liquidity-runway.md#accepted-decision-for-liquidity-runway-in-reporting-months).
+
+The sequential credit signals contract was accepted on 2026-11-15. It covers negative FCF streaks, strict adverse transitions, gap handling, forecast boundary policy and explicit thresholds. [Accepted sequential credit signals contract](08-sequential-credit-signals.md#accepted-decision-for-negative-fcf-streaks-and-adverse-trends).
+
+The capital structure summary contract was accepted on 2026-11-15. It covers period-end economic principal, native and consolidated amounts, through-rank ratios, final maturity grouping and exact currency-tagged reporting. [Accepted capital structure summary contract](09-capital-structure-summary.md#accepted-decision-for-capital-structure-summaries-and-maturity-walls).
+
+The instrument credit context contract was accepted on 2026-11-15. It covers verified instrument ratios, selected debt-service bases, dated collateral and valuation references, and observed and full-path minima. [Accepted instrument credit context contract](10-credit-context.md#accepted-decision-for-instrument-credit-ratios-and-path-coverage).
+
+The statement covenant adapter contract was accepted on 2026-11-15. It covers verified observations, exact fiscal or calendar test dates, elected forecast periods, distinct applicability results and read-only delegation. [Accepted statement covenant adapter contract](11-covenant-statement-adapter.md#accepted-decision-for-verified-statement-covenant-assessments).
+
+The exposure and cumulative default probability contract was accepted on 2026-11-15. It covers an explicit EAD basis, sourced LGD and discount assumptions, anchored schedules and cumulative PD, and interval and conditional probabilities. [Accepted exposure and cumulative default contract](12-ecl-exposure-and-pd.md#accepted-decision-for-exposure-and-cumulative-default-inputs).
+
+The impairment staging and cure contract was accepted on 2026-11-15. It covers matched conditional default comparisons, explicit triggers, default priority and separate dated probation for stage transitions. [Accepted impairment staging and cure contract](13-ecl-staging.md#accepted-decision-for-impairment-staging-and-cure).
+
+The impairment policy selection contract was accepted on 2026-11-15. It covers exact immutable revisions, reporting-date and cutoff eligibility, method-level validation, named overrides and replay provenance. [Accepted impairment policy selection contract](14-ecl-policy-defaults.md#accepted-decision-for-resolved-impairment-policy-snapshots).
+
+The stage-specific impairment measurement contract was accepted on 2026-11-15. It covers performing horizons and knot-aligned buckets, explicit LGD, dated Stage 3 recovery and currency and policy provenance. [Accepted stage-specific impairment measurement contract](15-ecl-bucket-measurement.md#accepted-decision-for-stage-specific-impairment-measurement).
 
 ## Algorithm inventory
 

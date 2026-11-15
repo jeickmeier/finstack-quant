@@ -1,9 +1,98 @@
 # CALIBRATION-FRAMEWORK-006: Term and overnight swap construction
 
-- Decision status: **Draft (observed implementation; adoption pending)**.
-- Implementation status: **Observed for the stated source scope**; discrepancies and limits are stated below.
-- Validation status: **Evidence inspected/located, not executed**. No numerical qualification or external compliance certification is implied.
+- Decision status: **Accepted 2026-11-15 — complete term and overnight swap construction, quote pillar and replay package**.
+- Implementation status: **Observed for the stated source scope.** Reconciliation to the accepted contract is pending.
+- Validation status: **Independent date, coupon, raw PV and quote-bump checks completed.** Production pricing, calibration, replay and host qualification remain pending.
 - Audit date: **2026-11-05**; source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (see [scope and coverage](README.md)).
+
+## Accepted decision for term and overnight swap calibration
+
+1. **Materialize one qualified pay-fixed swap.** Require positive exact
+   notional in the contract currency, no principal exchange, the original
+   annual Decimal fixed quote and an explicit signed annual Decimal
+   floating spread. Persist literal zero for a no-spread contract,
+   including after expansion of an elected preset. Convert the spread once
+   to fractional Decimal bp by multiplying by 10,000 in checked Decimal
+   arithmetic. Bind the exact index, qualified dated convention, and
+   typed discount and projection roles. A shared evaluator requires
+   explicit qualification for both roles.
+   [Accepted IRS contract](../valuations-rates/03-interest-rate-swaps.md#accepted-decision-for-checked-interest-rate-swap-cashflows-and-risk).
+
+2. **Resolve each leg once.** Derive spot from trade date and the qualified
+   settlement rule. Distinguish a spot-relative tenor, nominal date subject
+   to the elected roll, and exact effective date. Resolve each leg's
+   frequency, day-count references, stub, roll/EOM, accrual, payment and
+   fixing calendars, and applicable lags. Remove EOM inference from the
+   adjusted spot date and the hard-coded short-front stub. Preserve
+   nominal maturity, adjusted accrual, fixing and observation coordinates,
+   and actual payments as distinct dates. Use the accepted IRS adjustment
+   and lag order and fail on invalid or conflicting terms.
+   [Contractual schedule grids](../core-conventions/008-schedule-generation.md) ·
+   [Strata payment schedules](https://strata.opengamma.io/apidocs/com/opengamma/strata/product/swap/PaymentSchedule.html).
+
+3. **Use one exact term observation per floating coupon.** Term cash is
+   `N × A × (F + s)`, where `N` is notional, `A` is the coupon fraction,
+   `F` is the annual benchmark rate and `s` is the annual spread in decimal
+   units. Use unit gearing and no cap or floor. Project from the
+   benchmark's own full value interval and accrual. For term and overnight
+   use eligible published rates at the qualified information cut and project
+   only expressly unpublished observations through the exact active source.
+   Fail on missing required fixing or publication data, or failed projection.
+   [Accepted term observations](../cashflows/06-floating-rate-projection.md#accepted-decision-resolved-term-observations-exact-rate-controls-and-strict-failures).
+
+4. **Use the accepted overnight compounding elections.** Require
+   compounding in arrears with explicit lookback, observation shift, or
+   rate cutoff. Scope an explicit step override to eligible overnight
+   rows, validate it in preflight and freeze the effective election.
+   Reject simple compounding, arithmetic averaging and combined observation
+   offsets. Retain full benchmark quote intervals, actual partial-block
+   weights and the accepted shift/cutoff geometry. With weights `w_i`
+   and rates `r_i`, use `N × (∏(1 + r_i w_i) − 1 + sA)`. Apply spread
+   outside the compound product. Payment delay changes the cash date
+   independently of observation geometry.
+   [Accepted overnight projection](../valuations-framework/overnight-projection.md#accepted-decision-for-checked-overnight-projection-and-quote-risk) ·
+   [ARRC SOFR guide](https://www.newyorkfed.org/medialibrary/Microsites/arrc/files/2021/users-guide-to-sofr2021-update.pdf).
+
+5. **Use the latest actual payment as the prepared quote pillar.** For
+   discount and projection calibration, take the maximum payment date
+   across both resolved leg schedules. Cache this date and its positive
+   finite year fraction on the target's explicit base date, clock and
+   context. Remove the payment-delay boolean. Both leg lags apply in all
+   valuations. Feed the forward target the same prepared value intervals
+   for observations requiring projection. Check source coverage at all
+   required dates. The targets own solver knot placement, residual
+   normalization, weighting and fit acceptance.
+   [Rate preparation and residuals](../calibration-targets/02-rate-preparation-and-residuals.md).
+
+6. **Reuse the prepared swap through trial, final repricing and replay.**
+   Use the accepted IRS cash ledger and signed native raw PV, floating
+   minus fixed, at the admitted cut. Preserve contractual cash rounding
+   and evaluate dated discount factors at actual eligible payments.
+   Require genuine dependence on the candidate curve. A fully fixed
+   swap can still carry discount exposure through its eligible cash.
+   Replay matches exact quote identity and preserves authored terms,
+   resolved schedules, the publication cut, known fixings,
+   effective compounding and typed role bindings. A swap-rate bump
+   changes only the fixed quote. Fail on invalid or incomplete replay.
+   Use the same Rust admission in Python, WASM and schemas.
+   [Accepted replay provenance](../core-market/calibration-provenance.md#accepted-decision-lossless-construction-records-and-request-time-replay-qualification).
+
+## Independent calculation checks
+
+- With weekdays-only spot settlement, February 26, 2025 plus two
+  business days gives February 28. Explicit 3M EOM gives May 31 nominal
+  maturity and May 30 modified-following accrual end. A one-business-day
+  float lag gives June 2. A two-business-day fixed lag on a calendar
+  with a June 2 holiday gives June 4. The prepared pillar is June 4,
+  with ACT/365F time `98/365` from February 26.
+- For 1 million notional and a `90/360` coupon fraction, fixed 4% and
+  term 3.9% plus 10 bp give two 10,000 coupons. Dated float and fixed
+  factors 0.97 and 0.96 give raw pay-fixed PV +100.
+  A 1 bp increase in the fixed quote at the same trial curves gives +76.
+- A Saturday-to-Tuesday overnight coupon with 1 million notional uses
+  5% at `2/360` from the clipped Friday-to-Monday block and 4% at
+  `1/360` from Monday to Tuesday. With 10 bp outside spread and actual
+  coupon fraction `3/365`, cash before contractual rounding is 397.138931.
 
 ## Observed choice and rationale
 
@@ -37,5 +126,5 @@ An analytic par-swap sum would be simpler to differentiate, while shared valuati
 
 ## Follow-up tracking
 
-Implementation reconciliation, adoption questions and missing evidence are tracked in the
+Implementation reconciliation and missing evidence are tracked in the
 [calibration-framework follow-ups](../FOLLOW_UPS.md#calibration-orchestration-solvers-and-replay).

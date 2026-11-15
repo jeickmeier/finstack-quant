@@ -1,16 +1,25 @@
 # STATEMENTS-CONTRACTS-010: Balance-sheet summation, materiality and missing-input behavior
 
-**Decision status:** Draft (observed implementation; adoption pending).
+**Decision status:** Accepted for the full balance-sheet articulation contract (2026-11-15).
 
-**Implementation status:** Observed for the source responsibilities stated below; discrepancies are identified explicitly.
+**Implementation status:** Reconciliation pending. The audited check uses ordinary floating-point sums and can pass after skipping missing inputs.
 
-**Validation status:** Evidence inspected/located, not executed. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice README](README.md)).
+**Validation status:** Existing source and regression evidence mapped. Independent qualification of account membership, arithmetic, tolerance and coverage remains pending.
 
-## Choice and input domain
+**Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
+
+## Accepted decision for balance-sheet articulation
+
+1. Check assets = liabilities + equity at every model period close. Require three nonempty groups of known node IDs, with unique IDs within each group and disjoint membership across groups. All operands use compatible units, one reporting scope and one currency where monetary. The caller includes each account once using either the applicable subtotal or its components. Preserve signed balances and explicit typed zeros. [Formula units and currency](05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency).
+2. Sum monetary balances with checked exact `Money` or Decimal arithmetic and scalar balances with checked compensated sums. Retain the signed difference `assets − (liabilities + equity)` and its absolute amount. When assets are nonzero and the diagnostic is representable, report the relative percentage as `|difference| / |assets| × 100`. [Monetary arithmetic](../core-conventions/012-money-decimal-precision.md#accepted-decision-monetary-precision-rounding-and-currency-identity) · [Checked accumulation](../../standards/0042-numerical-accumulation-and-comparisons.md).
+3. Default to zero tolerance. Rounded or estimated balances can use an explicitly configured allowance of `max(absolute tolerance, relative tolerance × |assets|)`, with relative tolerance expressed as a decimal fraction. An explicit absolute override replaces both terms. A difference exactly at the allowance is within tolerance.
+4. Mark a period with any missing balance incomplete and identify the missing node IDs. Invalid inputs or invalid required arithmetic produce an error. The check passes only when every required period is complete and every absolute difference is within tolerance.
+
+## Audited input domain
 
 BalanceSheetArticulation checks the identity Assets = Liabilities + Equity for every model period using caller-selected groups of node IDs. All participating known result operands must have compatible scalar/monetary types and, for monetary values, one currency. It performs no FX conversion or account classification.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 1. Validate numeric check configuration and an optional absolute tolerance override. Compare available result type metadata with model declarations or inferred explicit-series types; reject contradictions or mixed operand units.
 2. Require each of assets_nodes, liabilities_nodes and equity_nodes to be nonempty.
@@ -26,13 +35,13 @@ Repeated or overlapping node IDs are counted repeatedly; the check does not prov
 
 A skipped period is not a demonstrated identity, even though its Warning does not fail the check. Near-zero assets report zero relative percentage, so absolute materiality and the comparison remain essential. Ordinary summation can be order-sensitive with large opposing balances; finite-intermediate checks prevent overflow from silently passing but are not an accuracy bound.
 
-Compensated sums, explicit account-set validation or a separate completeness verdict would address different risks. Their adoption is not implied here.
+The accepted contract requires checked accumulation, valid account sets and explicit completeness.
 
 ## Evidence
 
 [Balance-sheet implementation](../../../../finstack-quant/statements/src/checks/builtins/balance_sheet.rs), [input helpers](../../../../finstack-quant/statements/src/checks/helpers.rs), [balance tests](../../../../finstack-quant/statements/tests/checks/balance_sheet_tests.rs), [property tests](../../../../finstack-quant/statements/tests/checks/proptest_checks.rs) and [overflow regressions](../../../../finstack-quant/statements/tests/finance_accounting_regressions.rs) provide direct identity, edge and invariant evidence. Tests cover empty groups, misnamed/missing/non-finite operands, relative tolerance at scale and arithmetic overflow. They do not validate an external chart of accounts.
 
-A passing result does not prove that every period was checked or that the statements comply with an accounting standard.
+The audited passing status can include periods skipped for missing inputs.
 
 ## Follow-up tracking
 

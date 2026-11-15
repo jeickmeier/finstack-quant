@@ -345,7 +345,7 @@
     policy, independent option price or additive PV component.
     Structured-credit waterfalls retain their own method.
     [Empirical credit-line pricing and usage](https://arxiv.org/abs/2401.12301),
-    [structured-credit owner](../valuations-structured-credit/16-revolver-utilization-and-option-cost.md).
+    [structured-credit owner](../valuations-structured-credit/16-revolver-utilization-and-option-cost.md#accepted-decision-for-revolver-utilization-and-draw-spread-attribution).
 
 11. **Use one checked metric preparation across public results.**
     Key reusable prepared state by cuts, entitlement, quantity,

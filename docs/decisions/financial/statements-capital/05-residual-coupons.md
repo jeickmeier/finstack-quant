@@ -1,15 +1,20 @@
 # STATEMENTS-CAPITAL-005: Residual coupon rebuilding after dated balance changes
 
-**Decision status:** Draft — observed implementation; adoption pending.
-**Implementation status:** Observed for the source scope and discrepancies stated below.
-**Validation status:** Evidence inspected or located, not executed; numerical qualification remains open.
+**Decision status:** Accepted for the full residual coupon rebuilding contract (2026-11-15).
+**Implementation status:** Reconciliation pending. The audited implementation infers component rates and rewrites schedule rows.
+**Validation status:** Existing source and regression evidence mapped. Independent contractual schedule and debt-ledger qualification remain pending.
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; [scope and file ledger](README.md).
 
-## Choice and rationale
+## Accepted decision for residual coupon rebuilding
 
-After waterfall close, rebuild future coupons from dated principal changes while preserving interest already earned. Split cash/PIK coupons retain their own economic share. The method modifies the raw schedule rather than applying one multiplier to all future coupons, preserving intra-period amortization, draws, PIK compounding and arrears/advance reservations.
+1. Rebuild after an authorized dated principal change. A waterfall change posted at period close affects interest earning starting the following day. Preserve settled cash and interest already earned under the product's contractual terms.
+2. Rebuild affected original coupon parents through the canonical instrument owner using exact dated principal and the full contractual accrual and rate context. Carry locked observations and growth already earned under the original parent. Error on insufficient inputs or unsupported rebuilding. [Floating coupon replay](../cashflows/08-floating-replay.md#accepted-decision-parent-bound-replay-exact-full-settlement-and-explicit-timing-ownership) · [Schedule lifecycle](../cashflows/12-schedule-lifecycle.md#accepted-decision-validated-complete-schedules-explicit-balances-and-separate-cash-views).
+3. Apply the contractual cash/PIK split once to each rebuilt coupon amount. Retain its cash payment date and PIK capitalization date. Preserve the contractual terms through a zero balance so they remain available on an authorized redraw. [Cash and PIK coupon allocation](../cashflows/05-coupon-cash-and-pik.md#accepted-decision-parent-coupon-accrual-exact-splits-and-capitalization).
+4. Keep dated arrears and paid advance reserves tied to their original claims. Use canonical term-loan or revolver terms to rebuild affected remaining principal, maturity principal and balance-sensitive fees. Stage the rebuilt schedule and debt ledger together and commit both after validation. [Dated principal claims](04-dated-principal.md#accepted-decision-for-dated-principal-claims) · [Term-loan cashflows](../valuations-other-fixed-income/07-term-loan-cashflows.md#accepted-decision-for-checked-term-loan-cashflow-compilation) · [Revolver cashflows](../valuations-other-fixed-income/10-revolver-cashflows.md#accepted-decision-for-checked-revolver-contractual-cashflows).
 
-## Algorithm and equations
+A coupon that earns 10% annually on \$100 for an exact quarter year and on \$60 for the next exact quarter year earns \$2.50 and \$1.50. A contractual 75% cash and 25% PIK split produces \$3 of cash interest and \$1 of PIK.
+
+## Audited algorithm and equations
 
 1. Validate nonnegative new closing and schedule currency. Read original economic outstanding at inclusive `from_date` (initial fallback, or zero before issue). Let `δ=new−old`. If `abs(δ)≤1e−9`, return a clone. Otherwise insert a zero-cash PrePayment row at `from_date` with principal delta `δ`; interest feels that change from the following day, which must exist.
 2. Reserve positive claims whose economic date is after `from_date`, keyed by `(payment_date,balance_date)`. Reject wrong currency, negative claims or total reserve exceeding new principal by `1e−6`.
@@ -24,7 +29,7 @@ After waterfall close, rebuild future coupons from dated principal changes while
 
 This is a rate-inference/residual-interest method for supported schedule rows. It is not a fresh contractual model of optional bond calls, prepayment premiums, OID accretion or independently stochastic future resets. FloatReset rows preserve projected component economics from the supplied schedule. Inference assumes canonical constant-principal segments; malformed/custom accrual metadata can fail rather than produce a guessed coupon.
 
-A full instrument reconstruction could reproject all contractual details but needs an instrument-specific post-prepayment adapter. A proportional scale is simpler but would lose earned-interest protection and dated principal effects. No alternative is adopted here.
+The accepted owner-based rebuild requires contractual inputs for the affected coupon parents and related principal and fee events. The audited approach relies on rate inference from schedule rows.
 
 ## Evidence
 

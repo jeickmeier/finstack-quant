@@ -1,14 +1,95 @@
 # VALUATIONS-STRUCTURED-CREDIT-11: Waterfall claims, fee priority, PIK and integer rounding
 
-- **Decision status:** Draft — observed implementation; adoption pending agreement.
-- **Implementation status:** Observed in the owning paths below; scope: standard and custom waterfalls.
-- **Validation status:** Evidence inspected/located, not executed. Source and selected assertions establish implemented behavior, not general numerical accuracy or market approval.
+- **Decision status:** Accepted 2026-11-15 — complete waterfall priority, dated claims, shortfall and PIK, exact capped allocation, settlement and incentive package.
+- **Implementation status:** Observed in the owning paths below. Reconciliation to the accepted contract is pending.
+- **Validation status:** Independent claim, monetary quota, and dated hurdle calculations checked. Production pricing, transaction terms and host qualification remain pending.
 - **Audit date:** 2026-11-05.
 - **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; runtime source unchanged by this audit.
 
-## Choice and rationale
+## Accepted decision for waterfall claims and rounding
 
-The waterfall computes each contractual claim then distributes finite interest/principal resources by priority. Integer currency-unit pro-rata allocation preserves cash totals despite rounding. These mechanical properties support reproducibility; fee ranking, claim definitions and PIK capitalization remain financial choices.
+1. **Elect a waterfall explicitly.** Use a versioned standard template or
+   complete custom tiers. The standard profile orders leading fees, ranked
+   debt interest, junior fees and reserve replenishment, sequential
+   principal, elected carryover and incentive claims, then the named
+   residual. Require valid recipients, unique priorities and explicit
+   funding sources. Principal support and nondeferrable interest require
+   contractual authority. Reject duplicate or conflicting claims and
+   fee sources.
+   [Filed CLO priority of payments](https://www.sec.gov/Archives/edgar/data/1379785/000137978519000025/exhbiti101-cloindenture.htm).
+
+2. **Prepare one dated claim ledger.** Reuse the same claims for payment,
+   reserve support, coverage at the applicable cut and reporting.
+   Fixed charges and annual fees require their own dates, currency,
+   base and accrual or installment convention. Invalid fees error.
+   Calculate note coupon on the contractually effective balance
+   using the note's day count. A writedown after coupon entitlement
+   leaves the earned claim intact. Quote accrued has its own basis.
+
+3. **Separate unpaid coupon, PIK and cap carryover.** Record the
+   contractual shortfall disposition for every claim. Unpaid
+   nondeferrable interest remains a claim under its terms. Cash
+   deferral retains arrears. PIK creates a zero-cash principal
+   change at its effective phase. An elected net-WAC cap uses
+   qualified performing all-in WAC less the authorized fee load,
+   floored at zero. A separate non-interest-bearing carryover
+   for cap-withheld coupon requires election and its own eligible tier.
+   [Filed carryover example](https://www.sec.gov/Archives/edgar/data/1365771/000088237706002353/d532401.htm).
+
+4. **Use an explicit payment quantum and exact capped quotas.** Any
+   claim rounding requires an elected scale and mode. Floor available
+   funding and authorized caps to executable units. Preserve sub-unit
+   balances and all hard caps. For capped pro rata, solve weighted
+   final quotas with caps applied, floor the quotas once, then assign
+   remaining units by largest fractional remainder. Break ties by
+   declared recipient order. Require explicit equal weights or positive
+   participating weights. An expressly excluded zero weight stays
+   excluded.
+   [Accepted Money rounding](../core-conventions/012-money-decimal-precision.md).
+
+5. **Track every claim through its disposition.** Use the same cash
+   and cap rules in sequential and pro-rata tiers. Track principal
+   already paid so later tiers cannot retire the same par again.
+   Record due, paid and exact shortfall for every claim, including
+   after funding is exhausted. Reconcile funding, debits and credits
+   through the account ledger. Expose the same Rust validation and
+   results in the existing Python and WASM interfaces.
+   [Accepted account conservation](10-reinvestment-reserves-and-hedges.md#accepted-decision-for-reinvestment-reserves-and-hedge-cash).
+
+6. **Calculate incentive fees directly at the contractual hurdle.**
+   Carry authorized dated equity contributions and eligible distributions
+   to the current payment date at the stated ACT/365F hurdle. Require
+   complete history and a conventional contribution-then-distribution
+   pattern. Count earlier co-dated equity cash once. Pay equity the
+   first executable amount that clears any deficit, limited by remaining
+   eligible cash, and apply the manager's share to the remainder.
+   Use the same rule at ordinary and terminal distributions.
+   Missing history, unsupported sign patterns and numerical failures
+   error.
+   [Filed CLO incentive terms](https://www.sec.gov/Archives/edgar/data/1930087/000110465926005334/tm263361d1_ex10-1.htm),
+   [Accepted dated yield rules](../core-conventions/017-irr.md).
+
+## Independent calculations
+
+- Five payment units with weights 1/2/4 and caps 1/1/4 have exact
+  quotas 0.8/1/3.2 and executable amounts 1/1/3 under the accepted
+  rule. Rounding while redistributing gives 0/1/4. At a 0.01
+  quantum, 0.006 can fund no whole unit and remains in its account.
+- Face 1,000, quarter accrual and coupon 8% give uncapped interest
+  20. A 5% net-WAC cap gives current due 12.50 and withheld
+  carryover 7.50. With opening arrears 3, cash 10 and arrears-first
+  priority, pay 3 arrears and 7 current. The elected PIK is 5.50,
+  separate from 7.50 cap carryover.
+- Equity investment 100, receipt 30 after 365 days and an annual
+  hurdle of 10% leave a deficit of 88 after 730 days
+  because `100*1.10^2 - 30*1.10 = 88`. Of residual cash
+  125, a 20% manager share above the hurdle produces fee 7.40.
+
+## Observed implementation and scope
+
+The waterfall computes claims and distributes finite interest and
+principal resources by priority. The following sections describe the
+observed paths. The accepted contract above governs reconciliation.
 
 ## Algorithm and conventions
 
@@ -40,5 +121,5 @@ Hand-built golden waterfalls are not external legal-document validation.
 
 ## Follow-up tracking
 
-Adoption questions, implementation reconciliation and validation work are tracked in
+Implementation reconciliation and validation work are tracked in
 the [structured-credit follow-ups](../FOLLOW_UPS.md#structured-credit).

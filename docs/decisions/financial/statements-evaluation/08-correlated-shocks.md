@@ -1,12 +1,19 @@
 # STATEMENTS-EVALUATION-008 — Latent one-peer correlation and execution order
 
-Decision status: **Draft — observed implementation, adoption pending**. Implementation status: **Observed for the stated source scope**, with discrepancies identified below. Validation status: **Evidence inspected/located, not executed**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full latent one-peer correlation contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
-## Choice and input domain
+## Accepted decision for latent one-peer correlation
+
+1. A correlation specification names one known, distinct peer and a finite coefficient `ρ` in `[−1,1]`. Active nonzero correlation requires Monte Carlo and positive-volatility Gaussian forecast methods on both nodes. Reject active correlation in ordinary evaluation. [Stochastic forecast kernels](07-stochastic-forecast-kernels.md#accepted-decision-for-stochastic-forecast-kernels-and-replay).
+2. At exact `ρ = 0`, use the same independent stream as an uncorrelated node and add no active dependency. At `ρ = 1`, copy the peer shock exactly. At `ρ = −1`, negate it exactly. For interior nonzero coefficients, combine the peer and independent standardized shocks as `ρ × z_peer + sqrt((1 − ρ)(1 + ρ)) × z_independent`.
+3. Topologically order the active peer graph deterministically and reject cycles. Match peer shocks on the same canonical path and forecast slot. Generate needed latent shocks through masked slots and slots with explicit published values. An unavailable required peer shock makes the follower result unavailable with a reason. [Canonical forecast suffixes](05-forecast-segments-and-bounds.md#accepted-decision-for-forecast-segments-anchoring-and-output-bounds).
+4. Store the final standardized shock by run, path, node and period before applying bounds or rounding. Downstream peers in a chain use that final shock. Record the graph, coefficients and stream mapping for replay. [Versioned streams](07-stochastic-forecast-kernels.md#accepted-decision-for-stochastic-forecast-kernels-and-replay).
+
+## Audited input domain
 
 Monte Carlo correlation combines a previously generated peer's latent standardized normal shock with an independent draw. Only Normal, LogNormal and MeanReverting forecasts participate. The configuration requires both peer node and finite `rho in [-1,1]`; it does not accept a full covariance matrix. A chain of these relationships induces additional correlations, which are not separately targeted or solved.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 1. Validate the peer exists. During generation require the peer's shock cache already contains a shock for every requested forecast date. An evaluated explicit level does not, by itself, create a latent shock stream.
 2. Generate the independent normal stream with a seed formed from the configured seed **XOR** stable node hash, plus the Monte Carlo stream offset. This differs from the independent-forecast path's multiplicative/additive mixing. Consequently adding a correlation specification with `rho=0` does not preserve the original uncorrelated node's exact draws, even though its distributional construction is independent.
@@ -22,7 +29,7 @@ The coefficient describes standardized innovation correlation, not correlation o
 
 ## Alternatives and tradeoffs
 
-A peer-aware graph with cycle rejection would make required order explicit; a joint matrix factorization would support a different correlation API and PSD validation. Both are design choices requiring authorization. Current seed differences are not evidence of a biased random distribution, but they matter to scenario comparisons and replay expectations.
+The current correlated generator uses the same node seed mixer and PCG64 path generator as independent forecasts. It still looks up peer shocks even at zero correlation. Deterministic peer ordering, zero-coefficient dependency removal and exact endpoint handling remain reconciliation work. [Current correlated generator](../../../../finstack-quant/statements/src/forecast/statistical.rs) · [Independent dispatch](../../../../finstack-quant/statements/src/forecast/mod.rs).
 
 ## Evidence
 

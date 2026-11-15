@@ -193,7 +193,7 @@ from the detailed algorithm records and source counts below.
 
 | ADR | Decision status | Scope |
 | --- | --- | --- |
-| [0032](../calibration-targets/0032-curve-interpolation-and-calibration.md) | Draft | Rate-curve interpolation during calibration |
+| [0032](../calibration-targets/0032-curve-interpolation-and-calibration.md#accepted-decision-for-explicit-rate-curve-interpolation-and-calibration) | Accepted | Explicit rate-curve interpolation and calibration |
 
 ## Inventory
 

@@ -156,7 +156,7 @@
    Remove the cap/floor generic premium-override metric that first prices
    a baseline. Preserve other products' independent quote routes and
    keep aggregate cap-vol fit and stripping with
-   [calibration](../calibration-rate-models/02-cap-schedules-and-quote-inversion.md).
+   [accepted calibration strip inversion](../calibration-rate-models/02-cap-schedules-and-quote-inversion.md#accepted-decision-for-checked-cap-and-floor-strips-and-implied-normal-inversion).
 
 9. **Qualify inverse bounds, controls and the actual result in cash.** Use
    the accepted [bounded model inverse](../models-analytic/implied-volatility-solvers.md)

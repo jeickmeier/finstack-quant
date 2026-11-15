@@ -4,9 +4,39 @@ Audit date: **2026-11-05**. Source revision: 7e82fd03ad98346727769e88dd5ac5d84b5
 
 This slice inspects **36 assigned Rust files: 24 algorithm-bearing and 12 support files**. All files are accounted for exactly once in [coverage.json](coverage.json), with hashes checked against the supplied source snapshot. The four embedded metric JSON documents (22 metrics) are also inspected because their formulas are executed by the registry. No owned production behavior is deferred for later source inspection.
 
-The **16 records** are Draft (observed implementation; adoption pending). Implementation status is Observed for the stated scope. Validation status is Evidence inspected/located, not executed: selected unit/integration/property/schema fixtures were read or located, but no Rust test, lint, build, schema generation or numerical experiment was run. No runtime source, tests, fixtures or accepted financial choices were changed.
+All 16 contracts in this scope were accepted on 2026-11-15. Each owning record describes the audited implementation and tracks reconciliation and qualification separately. The original audit mapped selected unit, integration, property and schema fixtures. The model timeline, explicit value and readiness contract governs admission of runnable models. [Accepted model contract](01-model-timeline-and-values.md#accepted-decision-for-model-timelines-values-and-readiness).
 
-The previously agreed primary direction uses reported costs with D&A already included in COGS/OPEX. The embedded metrics and their tests instead encode separate D&A deductions with ex-D&A OPEX. This is recorded as a reconciliation requirement, not a new optional choice. No current ADR establishing that prior direction was located. The previously agreed partial-TTM rejection and period-close waterfall FX direction remain constraints on the separately owned evaluator/capital-structure records.
+The authoring and availability contract was also accepted on 2026-11-15. It covers named atomic edits, validated period-label imports and explicit publication snapshots and cutoffs. Implementation and independent qualification remain pending. [Accepted authoring and availability contract](02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability).
+
+The typed forecast contract was accepted on 2026-11-15. It covers explicit method choices, static and runtime validation, and exact stochastic seeds. Implementation and independent qualification remain pending. [Accepted forecast parameter contract](03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging).
+
+The formula grammar and dispatch contract was accepted on 2026-11-15. It covers canonical syntax, shared identifiers, checked signatures and bounded expression validation. Implementation and independent qualification remain pending. [Accepted formula contract](04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation).
+
+The formula units and currency contract was accepted on 2026-11-15. It covers resolved monetary and scalar dimensions, numerical boundaries and capital reporting currency scopes. Implementation and independent qualification remain pending. [Accepted units and currency contract](05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency).
+
+The metric registry and model import contract was accepted on 2026-11-15. It covers atomic registration, pinned dependency binding and atomic template import. Implementation and independent qualification remain pending. [Accepted registry contract](06-registry-and-dependencies.md#accepted-decision-for-metric-registration-and-dependencies).
+
+The bundled earnings and margin contract was accepted on 2026-11-15. It uses reported COGS and OPEX with included D&A, adds that D&A back once for EBITDA, and specifies revenue eligibility and ratio recomputation. Implementation and independent qualification remain pending. [Accepted earnings and margins contract](07-earnings-and-margins.md#accepted-decision-for-reported-cost-earnings-and-margins).
+
+The bundled leverage and coverage contract was accepted on 2026-11-15. It covers gross debt and reported-cost EBITDA, complete TTM, positive denominators and scheduled cash service on its contractual due date. Implementation and independent qualification remain pending. [Accepted leverage and coverage contract](08-leverage-and-coverage.md#accepted-decision-for-bundled-leverage-and-coverage).
+
+The bundled period returns contract was accepted on 2026-11-15. It covers shared reported-cost earnings, average comparable balances, separate operating tax and invested capital, and coarser-period recomputation. Implementation and independent qualification remain pending. [Accepted returns contract](09-returns-on-capital.md#accepted-decision-for-bundled-period-returns-on-capital).
+
+The balance-sheet articulation contract was accepted on 2026-11-15. It covers checked account membership, arithmetic, explicit tolerance and complete checks at every model close. Implementation and independent qualification remain pending. [Accepted balance-sheet contract](10-balance-sheet-articulation.md#accepted-decision-for-balance-sheet-articulation).
+
+The cash reconciliation contract was accepted on 2026-11-15. It covers an explicit first opening, adjacent closes, sourced cash adjustments, independent classified cash-flow components and complete enabled comparisons. Implementation and independent qualification remain pending. [Accepted cash reconciliation contract](11-cash-reconciliation.md#accepted-decision-for-cash-roll-forward-and-component-reconciliation).
+
+The retained-earnings reconciliation contract was accepted on 2026-11-15. It covers dated opening balances, dividend signs, sourced direct movements and complete comparisons. Implementation and independent qualification remain pending. [Accepted retained-earnings contract](12-retained-earnings-reconciliation.md#accepted-decision-for-retained-earnings-reconciliation).
+
+The data-quality contract was accepted on 2026-11-15. It covers explicit required scope, missing and unavailable values, input validity and advisory sign diagnostics. Implementation and independent qualification remain pending. [Accepted data-quality contract](13-data-quality-checks.md#accepted-decision-for-data-quality-coverage-and-validity).
+
+The numerical comparison and check-suite contract was accepted on 2026-11-15. It covers typed comparisons, unfiltered coverage verdicts, advisory filters, ordered suites and supplied-result provenance. Implementation and independent qualification remain pending. [Accepted comparison and suite contract](14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
+
+The formula-check contract was accepted on 2026-11-15. It covers explicit predicate and residual modes, period eligibility, lazy observation consumption and execution errors. Implementation and independent qualification remain pending. [Accepted formula-check contract](15-formula-checks.md#accepted-decision-for-formula-checks-and-coverage).
+
+The wire admission, schema and error contract was accepted on 2026-11-15. It covers bounded loading, exact wire values, validated model identity, canonical schemas and structured errors. Implementation and independent qualification remain pending. [Accepted wire contract](16-wire-schema-and-errors.md#accepted-decision-for-statements-wire-admission-schemas-and-errors).
+
+The audited embedded metrics and tests use separate D&A deductions with ex-D&A OPEX. The previously agreed partial-TTM rejection and period-close waterfall FX direction govern their respective evaluator and capital-structure records.
 
 ## Algorithm inventory
 

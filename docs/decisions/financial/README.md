@@ -212,6 +212,453 @@ dates in their owning sections. They complete methodology adoption for all
 [validation evidence](analytics/README.md#implementation-evidence) are recorded
 separately; other financial catalogues retain their separately stated statuses.
 
+Statements waterfall prepayments were made opt-in on 2026-11-15. The default
+stack covers fees, interest, scheduled principal and equity. Each prepayment
+requires an explicit priority and sizing input in a capital structure composed
+of term loans and revolvers. [STATEMENTS-CAPITAL-001](statements-capital/01-instrument-construction.md#accepted-decision-for-opt-in-waterfall-prepayments).
+
+Explicit bond and swap construction was accepted on 2026-11-15. Callers
+construct instruments through canonical Valuations with authored terms or a
+deliberately selected qualified dated convention, then attach them through
+`add_debt` or `addDebt`. Removal of the four Statements helpers remains
+pending. [STATEMENTS-CAPITAL-001](statements-capital/01-instrument-construction.md#accepted-decision-for-explicit-bond-and-swap-construction).
+
+Statements per-instrument coupon netting was accepted on 2026-11-15.
+Signed coupon settlements net within each instrument and reporting period.
+Expense and income are summed separately across instruments, and positive net
+expense supplies the scheduled Interest claim. [STATEMENTS-CAPITAL-002](statements-capital/02-cashflow-classification.md#accepted-decision-for-per-instrument-coupon-netting).
+
+Separate Statements distress reporting was accepted on 2026-11-15. It keeps
+identified signed distress settlements visible outside scheduled debt service
+and recognizes explicit company-liability changes on their economic dates.
+Implementation remains pending. [STATEMENTS-CAPITAL-002](statements-capital/02-cashflow-classification.md#accepted-decision-for-separate-distress-reporting).
+
+The full Statements cashflow classification contract was accepted on
+2026-11-15. It covers period admission, native currency and source perspective,
+dated cash and principal effects, and contract-based fee and hedge
+classification. Implementation reconciliation and independent qualification
+remain pending.
+[STATEMENTS-CAPITAL-002](statements-capital/02-cashflow-classification.md#accepted-decision-for-period-admission-and-cashflow-classification).
+
+Statements opening principal reconciliation was accepted on 2026-11-15. The
+canonical debt schedule and stateful ledger must agree at the same economic
+boundary and currency before calculating debt service for carried debt.
+Implementation remains pending. [STATEMENTS-CAPITAL-003](statements-capital/03-funding-and-balances.md#accepted-decision-for-opening-principal-reconciliation).
+
+Statements contractual accrued cash interest was accepted on 2026-11-15. It
+covers interest earned through period close and due afterward. Overdue arrears
+and issue-discount amortization are reported separately from this measure.
+Implementation remains pending. [STATEMENTS-CAPITAL-003](statements-capital/03-funding-and-balances.md#accepted-decision-for-contractual-accrued-cash-interest).
+
+The Statements dated principal contract was accepted on 2026-11-15. It covers
+stable dated claims, separate reporting of economic principal and unsettled
+payments, advance reserves, scheduled principal priority and exact atomic
+reconciliation. Implementation and independent qualification remain pending.
+[STATEMENTS-CAPITAL-004](statements-capital/04-dated-principal.md#accepted-decision-for-dated-principal-claims).
+
+The Statements residual coupon rebuilding contract was accepted on 2026-11-15.
+It uses canonical terms to rebuild affected coupon parents, principal and fees
+after dated balance changes while preserving earned interest, settled cash and
+dated claims. Implementation and independent qualification remain pending.
+[STATEMENTS-CAPITAL-005](statements-capital/05-residual-coupons.md#accepted-decision-for-residual-coupon-rebuilding).
+
+The Statements waterfall allocation and conservation contract was accepted on
+2026-11-15. It covers pre-debt-service cash, priority and seniority, exact or
+authorized-quantum payments, arrears, and terminal distributions or retained
+cash. Implementation and independent qualification remain pending.
+[STATEMENTS-CAPITAL-006](statements-capital/06-priority-allocation.md#accepted-decision-for-waterfall-cash-allocation-and-conservation).
+
+The Statements prepayment and ECF sweep contract was accepted on 2026-11-15.
+It covers explicit agreement terms and eligible facilities, dated sizing,
+payment limits and requested, paid and unpaid reporting. Implementation and
+independent qualification remain pending.
+[STATEMENTS-CAPITAL-007](statements-capital/07-prepayments-and-ecf.md#accepted-decision-for-agreement-defined-prepayments-and-ecf-sweeps).
+
+The Statements PIK election and carried-claims contract was accepted on
+2026-11-15. It covers contractual coupon elections, threshold and duration
+rules, dated capitalization, separate arrears and atomic replay.
+Implementation and independent qualification remain pending.
+[STATEMENTS-CAPITAL-008](statements-capital/08-pik-and-carry-state.md#accepted-decision-for-contractual-pik-elections-and-carried-claims).
+
+The Statements capital reporting and FX contract was accepted on 2026-11-15.
+It covers native and consolidated views, explicit period-close FX, component
+totals, exact chronological exports and atomic period replacement.
+Implementation and independent qualification remain pending.
+[STATEMENTS-CAPITAL-009](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
+
+The Statements model timeline, explicit value and readiness contract was
+accepted on 2026-11-15. It covers canonical reporting plans, typed observations,
+missing cells and the common validation boundary for runnable models.
+Implementation and independent qualification remain pending.
+[STATEMENTS-CONTRACTS-001](statements-contracts/01-model-timeline-and-values.md#accepted-decision-for-model-timelines-values-and-readiness).
+
+The Statements authoring, import and observation availability contract was
+accepted on 2026-11-15. It covers named atomic edits, validated period-label
+imports, dated publication snapshots and full-snapshot mode. Implementation
+and independent qualification remain pending.
+[STATEMENTS-CONTRACTS-002](statements-contracts/02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability).
+
+The Statements typed forecast and validation staging contract was accepted
+on 2026-11-15. It covers explicit method parameters, shared static checks,
+runtime history and horizon checks, and exact stochastic seeds.
+Implementation and independent qualification remain pending.
+[STATEMENTS-CONTRACTS-003](statements-contracts/03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging).
+
+The Statements formula grammar and dispatch contract was accepted on
+2026-11-15. It covers canonical syntax and rendering, shared identifiers,
+checked signatures and bounded validation of text and caller-built trees.
+Implementation and independent qualification remain pending.
+[STATEMENTS-CONTRACTS-004](statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation).
+
+The Statements formula units and currency contract was accepted on
+2026-11-15. It covers resolved dimensions, monetary and scalar operations,
+decimal scales, the forecast boundary and capital reporting currencies.
+Implementation and independent qualification remain pending.
+[STATEMENTS-CONTRACTS-005](statements-contracts/05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency).
+
+The Statements metric registry and model import contract was accepted on
+2026-11-15. It covers atomic registration, pinned formula bindings,
+historical dependencies, same-period cycle checks and atomic model import.
+Implementation and independent qualification remain pending.
+[STATEMENTS-CONTRACTS-006](statements-contracts/06-registry-and-dependencies.md#accepted-decision-for-metric-registration-and-dependencies).
+
+The Statements bundled earnings and margin contract was accepted on
+2026-11-15. It covers reported costs, the included D&A add-back, signed
+expenses, revenue eligibility and recomputed ratios at coarser periods.
+Implementation and independent qualification remain pending.
+[STATEMENTS-CONTRACTS-007](statements-contracts/07-earnings-and-margins.md#accepted-decision-for-reported-cost-earnings-and-margins).
+
+The Statements bundled leverage and coverage contract was accepted on
+2026-11-15. It covers gross debt, reported-cost EBITDA, complete TTM windows,
+positive denominators and scheduled cash service on contractual due dates.
+Implementation and independent qualification remain pending.
+[STATEMENTS-CONTRACTS-008](statements-contracts/08-leverage-and-coverage.md#accepted-decision-for-bundled-leverage-and-coverage).
+
+The Statements bundled period returns contract was accepted on 2026-11-15.
+It covers same-period earnings, average comparable capital, explicit
+operating tax and invested capital, and coarser-period recomputation.
+Implementation and independent qualification remain pending.
+[STATEMENTS-CONTRACTS-009](statements-contracts/09-returns-on-capital.md#accepted-decision-for-bundled-period-returns-on-capital).
+
+The Statements balance-sheet articulation contract was accepted on
+2026-11-15. It covers disjoint account groups, checked arithmetic,
+explicit tolerance and completeness at every model close.
+Implementation and independent qualification remain pending.
+[STATEMENTS-CONTRACTS-010](statements-contracts/10-balance-sheet-articulation.md#accepted-decision-for-balance-sheet-articulation).
+
+The Statements cash roll-forward and component reconciliation contract was
+accepted on 2026-11-15. It covers first-period opening cash, sourced adjustments,
+independent component checks and complete comparisons across periods.
+Implementation and independent qualification remain pending.
+[STATEMENTS-CONTRACTS-011](statements-contracts/11-cash-reconciliation.md#accepted-decision-for-cash-roll-forward-and-component-reconciliation).
+
+The Statements retained-earnings reconciliation contract was accepted on
+2026-11-15. It covers dated opening balances, same-scope net income, dividend
+signs, direct movements and completeness. Implementation and independent
+qualification remain pending.
+[STATEMENTS-CONTRACTS-012](statements-contracts/12-retained-earnings-reconciliation.md#accepted-decision-for-retained-earnings-reconciliation).
+
+The Statements data-quality contract was accepted on 2026-11-15. It covers
+required observation scope, missing and unavailable values, invalid inputs
+and advisory sign diagnostics. Implementation and independent qualification
+remain pending.
+[STATEMENTS-CONTRACTS-013](statements-contracts/13-data-quality-checks.md#accepted-decision-for-data-quality-coverage-and-validity).
+
+The Statements numerical comparison and check-suite contract was accepted on
+2026-11-15. It covers typed tolerances, unfiltered coverage verdicts, advisory
+filters, ordered suites and supplied-result provenance.
+Implementation and independent qualification remain pending.
+[STATEMENTS-CONTRACTS-014](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
+
+The Statements formula-check contract was accepted on 2026-11-15.
+It covers explicit modes and scope, typed residual comparisons, eligibility,
+lazy observation consumption and execution errors. Implementation and
+independent qualification remain pending.
+[STATEMENTS-CONTRACTS-015](statements-contracts/15-formula-checks.md#accepted-decision-for-formula-checks-and-coverage).
+
+The Statements wire admission, schema and error contract was accepted on
+2026-11-15. It covers bounded loading, exact wire values, validated model
+identity, canonical schemas and structured errors. Implementation and
+independent qualification remain pending.
+[STATEMENTS-CONTRACTS-016](statements-contracts/16-wire-schema-and-errors.md#accepted-decision-for-statements-wire-admission-schemas-and-errors).
+
+The Statements dependency graph, cell precedence and prepared evaluation
+contract was accepted on 2026-11-15. It covers closed dependencies, distinct
+mask states, explicit snapshots, forecast eligibility and checked plan reuse.
+Implementation and independent qualification remain pending.
+[STATEMENTS-EVALUATION-001](statements-evaluation/01-graph-precedence-and-prepared-plans.md#accepted-decision-for-dependency-graphs-cell-precedence-and-prepared-evaluation).
+
+The Statements scalar formulas and unavailable-value contract was accepted on
+2026-11-15. It covers checked arithmetic, exact comparisons, lazy Boolean
+controls, complete aggregates, rounding and explicit annualization.
+Implementation and independent qualification remain pending.
+[STATEMENTS-EVALUATION-002](statements-evaluation/02-scalar-formulas-and-undefined-values.md#accepted-decision-for-scalar-formulas-and-unavailable-values).
+
+The Statements historical offsets, growth and reporting-window contract was
+accepted on 2026-11-15. It covers exact calendar offsets, signed changes,
+Actual/365 Fixed dated growth and complete additive windows. Implementation
+and independent qualification remain pending.
+[STATEMENTS-EVALUATION-003](statements-evaluation/03-temporal-operators-and-period-windows.md#accepted-decision-for-historical-offsets-growth-and-reporting-windows).
+
+The Statements historical statistics and EWM contract was accepted on
+2026-11-15. It covers canonical slot windows, available samples, exact
+rank ties, cumulative prefixes and slot-based EWM decay.
+Implementation and independent qualification remain pending.
+[STATEMENTS-EVALUATION-004](statements-evaluation/04-historical-statistics-and-ewm.md#accepted-decision-for-historical-statistics-and-ewm).
+
+The Statements forecast segment, anchoring and bounds contract was accepted
+on 2026-11-15. It covers one forecast suffix per node and run or path,
+method-specific anchors and history, and output-only bounds.
+Implementation and independent qualification remain pending.
+[STATEMENTS-EVALUATION-005](statements-evaluation/05-forecast-segments-and-bounds.md#accepted-decision-for-forecast-segments-anchoring-and-output-bounds).
+
+The Statements deterministic forecast and fade contract was accepted on
+2026-11-15. It covers signed per-slot growth, keyed carry, stable fade
+domains and validation on empty horizons. Implementation and independent
+qualification remain pending.
+[STATEMENTS-EVALUATION-006](statements-evaluation/06-deterministic-forecasts-and-fades.md#accepted-decision-for-deterministic-forecasts-and-fades).
+
+The Statements stochastic forecast kernel contract was accepted on
+2026-11-15. It covers checked per-step kernels, unclipped lognormal
+restoration, explicit bootstrap and versioned PCG64 replay. Implementation
+and independent qualification remain pending.
+[STATEMENTS-EVALUATION-007](statements-evaluation/07-stochastic-forecast-kernels.md#accepted-decision-for-stochastic-forecast-kernels-and-replay).
+
+The Statements latent one-peer correlation contract was accepted on
+2026-11-15. It covers active Monte Carlo eligibility, exact zero and endpoint
+behavior, deterministic peer ordering and latent-shock replay.
+Implementation and independent qualification remain pending.
+[STATEMENTS-EVALUATION-008](statements-evaluation/08-correlated-shocks.md#accepted-decision-for-latent-one-peer-correlation).
+
+The Statements trend extrapolation contract was accepted on 2026-11-15.
+It covers aligned supplied history, centered linear trend, damped Holt
+and centered moving-average forecasts. Implementation and independent
+qualification remain pending.
+[STATEMENTS-EVALUATION-009](statements-evaluation/09-trend-extrapolation.md#accepted-decision-for-trend-extrapolation).
+
+The Statements seasonal decomposition and projection contract was accepted
+on 2026-11-15. It covers aligned seasonal history, centered trend estimates,
+additive and multiplicative phase effects and per-slot projection.
+Implementation and independent qualification remain pending.
+[STATEMENTS-EVALUATION-010](statements-evaluation/10-seasonal-decomposition.md#accepted-decision-for-seasonal-decomposition-and-projection).
+
+The Statements Monte Carlo path, quantile and breach contract was accepted on
+2026-11-15. It covers bounded complete paths, typed metric samples, exact R-7
+quantiles, path export and strict-upper breach probability.
+Implementation and independent qualification remain pending.
+[STATEMENTS-EVALUATION-011](statements-evaluation/11-monte-carlo-evaluation.md#accepted-decision-for-monte-carlo-paths-quantiles-and-breach-probabilities).
+
+The Statements capital-state orchestration contract was accepted on
+2026-11-15. It covers dated obligations, dependency validation, one waterfall
+allocation, native and consolidated reporting, and atomic period snapshots.
+Implementation and independent qualification remain pending.
+[STATEMENTS-EVALUATION-012](statements-evaluation/12-capital-state-orchestration.md#accepted-decision-for-capital-state-orchestration-and-period-snapshots).
+
+The Statements typed result and export contract was accepted on 2026-11-15.
+It covers exact money, distinct cell states, long and wide tables,
+dated anchors, pricing admission and replay provenance.
+Implementation and independent qualification remain pending.
+[STATEMENTS-EVALUATION-013](statements-evaluation/13-result-units-and-exports.md#accepted-decision-for-typed-results-and-exports).
+
+The Statements period rollup contract was accepted on 2026-11-15. It covers
+explicit methods, complete coarser periods, typed flow sums, closing cells,
+formula reevaluation and source provenance.
+Implementation and independent qualification remain pending.
+[STATEMENTS-EVALUATION-014](statements-evaluation/14-period-rollup.md#accepted-decision-for-period-rollup).
+
+The Statements normalization bridge contract was accepted on 2026-11-15.
+It covers ordered signed adjustments, individual caps, checked bridge
+arithmetic and separate publication of adjusted metrics.
+Implementation and independent qualification remain pending.
+[STATEMENTS-EVALUATION-015](statements-evaluation/15-normalization-adjustments.md#accepted-decision-for-normalization-bridges).
+
+The Statements corporate DCF contract was accepted on 2026-11-15. It covers
+valuation-date and statement-snapshot admission, eligible forecast cashflows,
+an explicit terminal basis, WACC, the equity bridge and pricing provenance.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-01](statements-analytics-valuation/01-corporate-dcf.md#accepted-decision-for-statements-corporate-dcf).
+
+The Statements DCF sensitivity contract was accepted on 2026-11-15.
+It covers a verified baseline, explicit independent shocks, endpoint
+availability and ranking of complete enterprise-value ranges.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-02](statements-analytics-valuation/02-dcf-sensitivity.md#accepted-decision-for-statements-dcf-sensitivity).
+
+The Statements LBO contract was accepted on 2026-11-15. It covers dated
+transaction and earnings inputs, checked sponsor funding, the exit equity
+bridge, funded and implied MOIC, and required-check coverage.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-03](statements-analytics-valuation/03-lbo.md#accepted-decision-for-statements-lbo-funding-and-returns).
+
+The Statements corporate-analysis and typed reporting contract was accepted
+on 2026-11-15. It covers explicit analysis selection, check coverage, matched
+LTV and debt-to-EV, complete TTM ratios and consistent typed report values.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-04](statements-analytics-valuation/04-analysis-reports-units.md#accepted-decision-for-corporate-analysis-and-typed-reporting).
+
+The Statements comparable-company population, multiples and statistics
+contract was accepted on 2026-11-15. It covers peer admission, matched dates
+and bases, eleven canonical metrics, coverage and matched-peer regression.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-05](statements-analytics-valuation/05-comps-population-statistics.md#accepted-decision-for-comparable-company-populations-and-statistics).
+
+The Statements comparable-company scoring contract was accepted on 2026-11-15.
+It covers explicit dimensions and directions, sample residual scores,
+composite weight coverage and fit diagnostics.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-06](statements-analytics-valuation/06-comps-scoring.md#accepted-decision-for-comparable-company-scoring).
+
+The Statements goal-seek contract was accepted on 2026-11-15. It covers a
+selected forecast assumption, explicit bounded solving, typed forward
+verification and replay evidence.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-07](statements-analytics-valuation/07-goal-seek.md#accepted-decision-for-statements-goal-seek).
+
+The Statements forecast-error contract was accepted on 2026-11-15. It
+covers as-issued forecast pairing, checked equal-weight errors, exact-zero
+denominator rules and per-metric coverage.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-08](statements-analytics-valuation/08-forecast-errors.md#accepted-decision-for-forecast-error-pairing-and-metrics).
+
+The Statements scenario inheritance and comparison contract was accepted
+on 2026-11-15. It covers validated overrides, root-to-child cell precedence,
+fresh evaluation and explicit typed baselines.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-09](statements-analytics-valuation/09-scenario-inheritance.md#accepted-decision-for-scenario-inheritance-and-comparisons).
+
+The Statements sensitivity and tornado contract was accepted on 2026-11-15.
+It covers verified baselines, distinct typed levels, bounded evaluation
+and tornado ranking by complete tested responses.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-10](statements-analytics-valuation/10-sensitivity-grids.md#accepted-decision-for-statement-sensitivity-grids-and-tornado-reports).
+
+The Statements variance and additive bridge contract was accepted on
+2026-11-15. It covers matched typed inputs, signed changes, ordered
+nonoverlapping components and coverage-aware residuals.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-11](statements-analytics-valuation/11-variance-bridges.md#accepted-decision-for-statement-variances-and-additive-bridges).
+
+The Statements dependency traversal and formula explanation contract was
+accepted on 2026-11-15. It covers validated graph relationships, original run
+provenance, time-aware operands and explicit trace completeness.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-12](statements-analytics-valuation/12-dependency-explanations.md#accepted-decision-for-dependency-traversal-and-formula-explanations).
+
+The Statements account roll-forward and articulation contract was accepted on
+2026-11-15. It covers typed movements, checked opening continuity and closing
+balances, explicitly selected articulation, and coverage-based verdicts.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-13](statements-analytics-valuation/13-corkscrew.md#accepted-decision-for-account-roll-forwards-and-articulation).
+
+The Statements credit-scorecard contract was accepted on 2026-11-15. It
+covers verified inputs and explicit scales, typed scoreable bands, weight
+coverage and complete minimum-rating gates.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-14](statements-analytics-valuation/14-credit-scorecards.md#accepted-decision-for-credit-scorecard-bands-and-coverage).
+
+The Statements roll-forward and vintage template contract was accepted on
+2026-11-15. It covers validation before node insertion, typed openings and
+movements, checked convolution and explicit cohort coverage.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-15](statements-analytics-valuation/15-recurrence-templates.md#accepted-decision-for-roll-forward-and-vintage-templates).
+
+The Statements lease projection and unlevered property statement contract was
+accepted on 2026-11-15. It covers calendar-slot lease timing, renewal and
+concession attribution, typed property cashflows and validated node insertion.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-VALUATION-16](statements-analytics-valuation/16-real-estate-templates.md#accepted-decision-for-lease-projections-and-property-statements).
+
+The Statements mapped check-suite contract was accepted on 2026-11-15. It
+covers full and scoped three-statement reviews, explicit credit checks and
+screening thresholds, preserved LBO thresholds and coverage-based gates.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-01](statements-analytics-credit/01-suite-selection.md#accepted-decision-for-mapped-check-suites-and-coverage).
+
+The Statements stock-flow reconciliation contract was accepted on 2026-11-15.
+It covers cash CapEx, net PPE, paid dividends and operating working capital,
+with explicit adjustments and typed comparisons.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-02](statements-analytics-credit/02-stock-flow-reconciliation.md#accepted-decision-for-stock-flow-reconciliations).
+
+The Statements interest-reconciliation contract was accepted on 2026-11-15.
+It covers explicit direct recognition or advisory balance-based estimates,
+required coverage and typed comparisons.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-03](statements-analytics-credit/03-interest-reconciliation.md#accepted-decision-for-interest-reconciliation-and-estimates).
+
+The Statements period-change screening contract was accepted on 2026-11-15.
+It covers signed change relative to prior magnitude, verified adjacency,
+explicit forecast transitions and inclusive period bounds.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-04](statements-analytics-credit/04-growth-plausibility.md#accepted-decision-for-signed-period-change-relative-to-prior-magnitude).
+
+The Statements effective-tax-rate screening contract was accepted on
+2026-11-15. It covers signed recognized tax expense, a positive pretax
+denominator, sourced informational bounds and explicit inapplicability.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-05](statements-analytics-credit/05-tax-plausibility.md#accepted-decision-for-informational-effective-tax-rates).
+
+The Statements leverage and coverage screening contract was accepted on
+2026-11-15. It covers bundled TTM metrics, named custom checks, explicit
+nested thresholds and per-period coverage.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-06](statements-analytics-credit/06-leverage-and-coverage.md#accepted-decision-for-bundled-ttm-leverage-and-coverage-checks).
+
+The Statements liquidity runway contract was accepted on 2026-11-15.
+It covers spendable cash, signed cash use, supported month conversions,
+immediate shortfalls and explicit threshold outcomes.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-07](statements-analytics-credit/07-liquidity-runway.md#accepted-decision-for-liquidity-runway-in-reporting-months).
+
+The Statements sequential credit signals contract was accepted on 2026-11-15.
+It covers negative FCF streaks, strict adverse transitions, gap handling,
+forecast boundary policy and explicit thresholds.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-08](statements-analytics-credit/08-sequential-credit-signals.md#accepted-decision-for-negative-fcf-streaks-and-adverse-trends).
+
+The Statements capital structure summary contract was accepted on 2026-11-15.
+It covers period-end economic principal, native and consolidated amounts,
+through-rank ratios, final maturity grouping and exact currency-tagged reporting.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-09](statements-analytics-credit/09-capital-structure-summary.md#accepted-decision-for-capital-structure-summaries-and-maturity-walls).
+
+The Statements instrument credit context contract was accepted on 2026-11-15.
+It covers verified instrument ratios, selected debt-service bases, dated
+collateral and valuation references, and observed and full-path minima.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-10](statements-analytics-credit/10-credit-context.md#accepted-decision-for-instrument-credit-ratios-and-path-coverage).
+
+The Statements covenant adapter contract was accepted on 2026-11-15. It
+covers verified observations, exact fiscal or calendar test dates, elected
+forecast periods, distinct applicability results and read-only delegation.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-11](statements-analytics-credit/11-covenant-statement-adapter.md#accepted-decision-for-verified-statement-covenant-assessments).
+
+The Statements exposure and cumulative default probability contract was
+accepted on 2026-11-15. It covers an explicit EAD basis, sourced LGD and
+discount assumptions, anchored schedules and cumulative PD, and interval
+and conditional probabilities.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-12](statements-analytics-credit/12-ecl-exposure-and-pd.md#accepted-decision-for-exposure-and-cumulative-default-inputs).
+
+The Statements impairment staging and cure contract was accepted on
+2026-11-15. It covers matched conditional default comparisons, explicit
+triggers, default priority and separate dated probation for stage transitions.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-13](statements-analytics-credit/13-ecl-staging.md#accepted-decision-for-impairment-staging-and-cure).
+
+The Statements impairment policy selection contract was accepted on
+2026-11-15. It covers exact immutable revisions, reporting-date and cutoff
+eligibility, method-level validation, named overrides and replay provenance.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-14](statements-analytics-credit/14-ecl-policy-defaults.md#accepted-decision-for-resolved-impairment-policy-snapshots).
+
+The Statements stage-specific impairment measurement contract was accepted
+on 2026-11-15. It covers performing horizons and knot-aligned buckets,
+explicit LGD, dated Stage 3 recovery and currency and policy provenance.
+Implementation reconciliation and independent qualification remain pending.
+[STATEMENTS-ANALYTICS-CREDIT-15](statements-analytics-credit/15-ecl-bucket-measurement.md#accepted-decision-for-stage-specific-impairment-measurement).
+
 The [invariant-to-decision map](../INVARIANT_MAP.md) records the detailed
 cross-crate conventions covered by these decisions. Acceptance does not adopt
 drafts 0027–0032 or every observed instrument default; accepted analytics
@@ -1400,6 +1847,360 @@ It covers dated single-curve Hull–White projection, actual redemption
 cash, earned-count continuation, independent policy pricing and rate risk.
 [CALLABLE-RANGE-HW](valuations-fx-and-exotics/callable-range-hw.md#accepted-decision-for-callable-rate-range-accrual).
 
+The snowball and inverse-floater package was accepted on 2026-11-15.
+It covers applied-coupon recursion, qualified seasoned state, dated
+multiplicative projection, actual cash dates, the explicit inverse-floater
+approximation and rate risk.
+[SNOWBALL-HW](valuations-fx-and-exotics/snowball-hw.md#accepted-decision-for-snowball-and-inverse-floater-notes).
+
+The TARN package was accepted on 2026-11-15. It covers the Decimal
+target ledger, scheduled redemption, fixed unpaid claims, dated
+Hull–White pricing and rate risk. All 22 FX, commodity and exotic
+valuation records are accepted.
+[TARN-TARGET](valuations-fx-and-exotics/tarn-target.md#accepted-decision-for-tarn-target-and-redemption).
+
+Structured-credit record 01 was accepted on 2026-11-15. It covers
+deterministic and stochastic dispatch, authoritative collateral,
+explicit assumptions and versioned profiles, contractual scheduling
+and the common resolved request.
+[VALUATIONS-STRUCTURED-CREDIT-01](valuations-structured-credit/01-dispatch-and-assumptions.md#accepted-decision-for-structured-credit-dispatch-and-assumptions).
+
+Structured-credit record 02 was accepted on 2026-11-15. It covers dated
+collateral normalization, the cut-off par bridge, weighted statistics,
+effective obligor count and structural bands from original tranche face.
+[VALUATIONS-STRUCTURED-CREDIT-02](valuations-structured-credit/02-pool-normalization-and-statistics.md#accepted-decision-for-collateral-normalization-and-pool-statistics).
+
+Structured-credit record 03 was accepted on 2026-11-15. It covers actual
+monthly exposure, dated default targets, ordered cash, cohort installments,
+qualified floating coupons and recoveries dated from default.
+[VALUATIONS-STRUCTURED-CREDIT-03](valuations-structured-credit/03-statistical-collateral-projection.md#accepted-decision-for-statistical-collateral-projection).
+
+Structured-credit record 04 was accepted on 2026-11-15. It covers
+dated monthly migration, distinct modification cohorts, borrower
+arrears, servicer claims and authorized reimbursement.
+[VALUATIONS-STRUCTURED-CREDIT-04](valuations-structured-credit/04-delinquency-and-advancing.md#accepted-decision-for-delinquency-migration-and-advancing).
+
+Structured-credit record 05 was accepted on 2026-11-15. It covers
+explicit workout dates, pending and resolved state, checked par splits,
+qualified reperformance terms, carrying costs and deterministic pricing.
+[VALUATIONS-STRUCTURED-CREDIT-05](valuations-structured-credit/05-npl-resolution.md#accepted-decision-for-npl-resolution-and-reperformance).
+
+Structured-credit record 06 was accepted on 2026-11-15. It covers
+contractual balloon resolution, dated workouts, appraisal and fee
+bases, voluntary prepayment protection and full-pool operating DSCR.
+[VALUATIONS-STRUCTURED-CREDIT-06](valuations-structured-credit/06-cmbs-servicing.md#accepted-decision-for-cmbs-balloon-and-servicing).
+
+Structured-credit record 07 was accepted on 2026-11-15. It covers
+monthly card cash and charge-offs, component-specific investor and
+seller allocation, funding and accumulation, dated triggers and metrics.
+[VALUATIONS-STRUCTURED-CREDIT-07](valuations-structured-credit/07-card-master-trust.md#accepted-decision-for-card-master-trust-allocation).
+
+Structured-credit record 08 was accepted on 2026-11-15. It covers
+typed collateral ledgers, dated eligibility, credit and recovery
+authority, authorized draw funding and active dependencies.
+[VALUATIONS-STRUCTURED-CREDIT-08](valuations-structured-credit/08-instrument-collateral.md#accepted-decision-for-instrument-collateral-and-liquidity).
+
+Structured-credit record 09 was accepted on 2026-11-15. It covers
+contractual exercise chronology and priority, actual payoff, complete
+workout yield and qualified incentive scenarios.
+[VALUATIONS-STRUCTURED-CREDIT-09](valuations-structured-credit/09-collateral-exercise.md#accepted-decision-for-collateral-call-and-put-exercise).
+
+Structured-credit record 10 was accepted on 2026-11-15. It covers
+purchase cash eligibility, explicit replacement cohorts, reserve uses
+and earnings, accumulation release, dated hedge claims and conservation.
+[VALUATIONS-STRUCTURED-CREDIT-10](valuations-structured-credit/10-reinvestment-reserves-and-hedges.md#accepted-decision-for-reinvestment-reserves-and-hedge-cash).
+
+Structured-credit record 11 was accepted on 2026-11-15. It covers
+elected waterfall priority and funding, the dated claim ledger,
+cash shortfalls and PIK, capped quotas and the dated equity hurdle.
+[VALUATIONS-STRUCTURED-CREDIT-11](valuations-structured-credit/11-waterfall-claims-and-rounding.md#accepted-decision-for-waterfall-claims-and-rounding).
+
+Structured-credit record 12 was accepted on 2026-11-15. It covers
+dated collateral and claim numerators and denominators, overlapping
+haircuts, breach state and authorized cure diversion.
+[VALUATIONS-STRUCTURED-CREDIT-12](valuations-structured-credit/12-coverage-and-cures.md#accepted-decision-for-coverage-tests-and-cure-diversion).
+
+Structured-credit record 13 was accepted on 2026-11-15. It covers
+reversible step-down, separate principal allocations, target OC,
+controlled accumulation and dated, latched early amortization.
+[VALUATIONS-STRUCTURED-CREDIT-13](valuations-structured-credit/13-principal-regimes-and-amortization.md#accepted-decision-for-principal-regimes-and-early-amortization).
+
+Structured-credit record 14 was accepted on 2026-11-15. It covers
+independent loss and note-balance policies, actual call funding, and
+authorized terminal proceeds, releases and discharge.
+[VALUATIONS-STRUCTURED-CREDIT-14](valuations-structured-credit/14-loss-recognition-and-terminal-cash.md#accepted-decision-for-loss-recognition-and-terminal-cash).
+
+Structured-credit record 15 was accepted on 2026-11-15. It covers checked
+pathwise waterfalls, explicit factors and credit granularity, stable seeded
+sampling, independent-estimator uncertainty and empirical trajectory losses.
+[VALUATIONS-STRUCTURED-CREDIT-15](valuations-structured-credit/15-stochastic-waterfall.md#accepted-decision-for-stochastic-waterfall-pricing-and-estimation).
+
+Structured-credit record 16 was accepted on 2026-11-15. It covers explicit
+spread and utilization laws, due-phase funding and outstanding draw-spread
+attribution through matched waterfall replay.
+[VALUATIONS-STRUCTURED-CREDIT-16](valuations-structured-credit/16-revolver-utilization-and-option-cost.md#accepted-decision-for-revolver-utilization-and-draw-spread-attribution).
+
+Structured-credit record 17 was accepted on 2026-11-15. It covers
+explicit OAS composition, dated rates and collateral responses,
+valuation-origin buyer settlement and a checked continuous spread fit.
+[VALUATIONS-STRUCTURED-CREDIT-17](valuations-structured-credit/17-oas-scenarios.md#accepted-decision-for-structured-credit-oas-and-settlement-spread-fitting).
+
+Structured-credit record 18 was accepted on 2026-11-15. It covers
+authoritative agency collateral, dated PAC ending balances and support
+tiers, class cashflows, buyer settlement and fixed-strip Z-spread.
+[VALUATIONS-STRUCTURED-CREDIT-18](valuations-structured-credit/18-agency-cmo-and-pac.md#accepted-decision-for-agency-cmo-waterfalls-and-dated-pac-contracts).
+
+Structured-credit record 19 was accepted on 2026-11-15. It covers dated
+eligibility and concentration, sequenced advances and cures, actual
+unused-commitment fees, lender cash and independent quote compounding.
+[VALUATIONS-STRUCTURED-CREDIT-19](valuations-structured-credit/19-borrowing-base-facility.md#accepted-decision-for-borrowing-base-facilities-and-lender-cashflows).
+
+Structured-credit record 20 was accepted on 2026-11-15. It covers
+buyer settlement and original-parent accrued, price and projection
+authority, fixed-strip yield, continuous spread and checked inversion.
+[VALUATIONS-STRUCTURED-CREDIT-20](valuations-structured-credit/20-quotes-and-inverse-pricing.md#accepted-decision-for-structured-credit-settlement-quotes-and-inversion).
+
+Structured-credit record 21 was accepted on 2026-11-15. It covers
+quote and live risk, qualified collateral perturbations, typed
+breakeven CDR, deterministic scenario grids and matched stochastic reprices.
+[VALUATIONS-STRUCTURED-CREDIT-21](valuations-structured-credit/21-risk-bumps-and-scenarios.md#accepted-decision-for-structured-credit-risk-and-scenarios).
+
+Structured-credit record 22 was accepted on 2026-11-15. It covers
+signed ledger and diagnostics, repayment life, equity returns and
+qualified collateral ratios. All 22 detailed structured-credit
+records are accepted. Runtime and host qualification remain pending.
+[VALUATIONS-STRUCTURED-CREDIT-22](valuations-structured-credit/22-diagnostics-and-reporting.md#accepted-decision-for-structured-credit-diagnostics-and-reporting).
+
+Calibration-framework record 001 was accepted on 2026-11-15. It covers
+bounded typed envelopes, explicit identities and financial choices,
+solver-free drafts, checked restoration and Rust-owned publication.
+[CALIBRATION-FRAMEWORK-001](calibration-framework/01-wire-and-authoring.md#accepted-decision-for-strict-calibration-envelopes-and-explicit-authoring).
+
+Calibration-framework record 002 was accepted on 2026-11-15. It covers
+explicit target controls, distinct acceptance gates, exact freshness,
+optional quote-side metadata and atomic initial market validation.
+[CALIBRATION-FRAMEWORK-002](calibration-framework/02-controls-and-market-context.md#accepted-decision-for-calibration-controls-freshness-and-initial-market).
+
+Calibration-framework record 003 was accepted on 2026-11-15. It covers
+typed dependencies, target preflight, authored-order execution,
+failure reporting and atomic installation.
+[CALIBRATION-FRAMEWORK-003](calibration-framework/03-dependencies-and-execution.md#accepted-decision-for-calibration-dependencies-preflight-and-ordered-execution).
+
+Calibration-framework record 004 was accepted on 2026-11-15. It covers
+dated deposit and FRA construction, exact fixing and curve roles,
+trade and projection residuals, and prepared quote replay.
+[CALIBRATION-FRAMEWORK-004](calibration-framework/04-deposit-fra-materialization.md#accepted-decision-for-deposit-and-fra-materialization-and-prepared-clocks).
+
+Calibration-framework record 005 was accepted on 2026-11-15. It covers
+listed contract identity and reference windows, benchmark observations,
+explicit convexity, quote-point and cash residuals, and prepared replay.
+[CALIBRATION-FRAMEWORK-005](calibration-framework/05-futures-materialization.md#accepted-decision-for-listed-rate-futures-calibration-and-reference-periods).
+
+Calibration-framework record 006 was accepted on 2026-11-15. It covers
+resolved IRS leg schedules, term and overnight observations, the actual
+final-payment pillar, raw residuals and prepared quote replay.
+[CALIBRATION-FRAMEWORK-006](calibration-framework/06-swap-materialization.md#accepted-decision-for-term-and-overnight-swap-calibration).
+
+Calibration-framework record 007 was fully accepted on 2026-11-15.
+It covers single-name CDS dates, clean and dirty quote forms,
+the hazard pillar and exact observation replay.
+[CALIBRATION-FRAMEWORK-007](calibration-framework/07-cds-materialization.md#accepted-decision-for-single-name-cds-calibration-and-quote-settlement).
+
+Calibration-framework record 008 was accepted on 2026-11-15.
+It covers index tranche dates, original and outstanding notionals,
+explicit upfront basis, shared raw residuals and exact provenance.
+[CALIBRATION-FRAMEWORK-008](calibration-framework/08-tranche-materialization.md#accepted-decision-for-index-tranche-calibration-and-quote-settlement).
+
+Calibration-framework record 009 was accepted on 2026-11-15.
+It covers cross-currency quote orientation, sizing and valuation FX,
+dated cash, foreign-curve support and exact replay.
+[CALIBRATION-FRAMEWORK-009](calibration-framework/09-xccy-materialization.md#accepted-decision-for-cross-currency-swap-calibration-and-fx-authority).
+
+Calibration-framework record 010 was accepted on 2026-11-15.
+It covers exact quote and knot admission, private local checks,
+complete final repricing and truthful work reporting.
+[CALIBRATION-FRAMEWORK-010](calibration-framework/10-sequential-bootstrap.md#accepted-decision-for-sequential-bootstrap-and-final-repricing).
+
+Calibration-framework record 011 was accepted on 2026-11-15.
+It covers deterministic bounded scans, typed feasibility gaps,
+Brent candidate evidence and independent financial acceptance.
+[CALIBRATION-FRAMEWORK-011](calibration-framework/11-scalar-root-search.md#accepted-decision-for-bounded-scalar-search-and-candidate-evidence).
+
+Calibration-framework record 012 was accepted on 2026-11-15.
+It covers free solver coordinates, weighted residuals and
+derivatives, and final gating before candidate ranking.
+[CALIBRATION-FRAMEWORK-012](calibration-framework/12-weighted-global-solve.md#accepted-decision-for-weighted-global-solve-and-final-candidate-gates).
+
+Calibration-framework record 013 was accepted on 2026-11-15.
+It covers exact Halton proposals, ordered execution, full fit
+gates, deterministic selection and all-start work.
+[CALIBRATION-FRAMEWORK-013](calibration-framework/13-deterministic-multi-start.md#accepted-decision-for-deterministic-multi-start-and-final-selection).
+
+Calibration-framework record 014 was accepted on 2026-11-15.
+It covers exact fit rows, native tolerances, ratio-only plan
+summaries, staged outcomes, typed work and report restoration.
+[CALIBRATION-FRAMEWORK-014](calibration-framework/14-fit-reports.md#accepted-decision-for-fit-acceptance-and-report-semantics).
+
+The complete calibration sensitivity and conditioning package was accepted
+on 2026-11-15. It covers final-artifact probes, signed derivatives, typed
+partial results, direct weighted-Jacobian conditioning and bounded work.
+[CALIBRATION-FRAMEWORK-015](calibration-framework/15-sensitivity-diagnostics.md#accepted-decision-for-calibration-sensitivities-and-conditioning).
+
+The complete curve validation and publication package was accepted
+on 2026-11-15. It covers source and pricing support, elected economic
+checks in native units, bounded coverage claims and final publication.
+[CALIBRATION-FRAMEWORK-016](calibration-framework/16-curve-validation.md#accepted-decision-for-curve-validation-and-publication).
+
+The complete surface validation and publication package was accepted
+on 2026-11-15. It covers qualified calendar overlap, anchored call
+constraints, native tolerances, required coverage and delivery policy.
+[CALIBRATION-FRAMEWORK-017](calibration-framework/17-surface-validation.md#accepted-decision-for-surface-validation-and-publication).
+
+The complete dated Hull–White calibration adapter was accepted
+on 2026-11-15. It covers contractual swaptions and term cap strips,
+native fit gates and atomic scalar or scheduled fitted parameters.
+[CALIBRATION-FRAMEWORK-018](calibration-framework/18-hull-white-market-adapter.md#accepted-decision-for-dated-hull-white-quote-preparation-and-publication).
+
+The complete rate quote replay package was accepted on 2026-11-15.
+It covers source reproduction, exact quote actions, target refit and
+atomic publication of the accepted evaluator and provenance.
+[CALIBRATION-FRAMEWORK-019](calibration-framework/19-rate-quote-replay.md#accepted-decision-for-exact-rate-quote-replay-and-publication).
+
+The complete linked single-curve OIS replay package was accepted
+on 2026-11-15. It covers explicit shared binding, one shared target
+fit, exact dated overnight projection and atomic publication.
+[CALIBRATION-FRAMEWORK-020](calibration-framework/20-linked-ois-replay.md#accepted-decision-for-linked-single-curve-ois-replay-and-publication).
+
+The complete hazard quote replay package was accepted on 2026-11-15.
+It covers original-source reproduction, exact par-risk actions, original
+observations for dependency and recovery replay, and the final fit gate.
+[CALIBRATION-FRAMEWORK-021](calibration-framework/21-hazard-quote-replay.md#accepted-decision-for-qualified-hazard-quote-replay-and-publication).
+
+The complete deal override and horizon replay package was accepted
+on 2026-11-15. It covers exact deal bindings, model-derived horizon
+quotes, a bounded dated survival gate and atomic delivery.
+[CALIBRATION-FRAMEWORK-022](calibration-framework/22-hazard-deal-and-horizon.md#accepted-decision-for-deal-overrides-and-horizon-hazard-replay).
+
+All 23 calibration framework records are accepted. The final cache
+package was accepted on 2026-11-15 and covers request/state lifetime,
+exact source and target identity, bounded retention and typed retry.
+[CALIBRATION-FRAMEWORK-023](calibration-framework/23-recalibration-cache.md#accepted-decision-for-exact-request-local-recalibration-caching).
+
+The calibration quote package was accepted on 2026-11-15. It covers
+checked admission, exact typed identities and date roles, native units,
+product domains and validated quote shifts.
+[CALIBRATION-TARGETS-001](calibration-targets/01-quote-contracts.md#accepted-decision-for-exact-typed-calibration-quotes-and-native-units).
+
+The rate preparation package was accepted on 2026-11-15. It covers
+explicit clocks, prepared quote and knot identity, isolated candidate
+bindings, native residuals and weights, and final all-quote repricing.
+[CALIBRATION-TARGETS-002](calibration-targets/02-rate-preparation-and-residuals.md#accepted-decision-for-explicit-rate-preparation-and-native-fit-residuals).
+
+The discount calibration package was accepted on 2026-11-15. It covers
+prefix-qualified bootstrap, explicit bounded simultaneous fitting,
+exact discount output binding and delivered-curve fit and validation.
+[CALIBRATION-TARGETS-003](calibration-targets/03-discount-calibration.md#accepted-decision-for-explicit-discount-calibration-and-delivered-curve-fit).
+
+The projection calibration package was accepted on 2026-11-15. It covers
+exact index binding, live native residuals, independently declared knots,
+bounded simultaneous fitting and delivered-source repricing and replay.
+[CALIBRATION-TARGETS-004](calibration-targets/04-forward-calibration.md#accepted-decision-for-simultaneous-calibration-of-index-projection-factors).
+
+The single-name hazard calibration package was accepted on 2026-11-15.
+It covers exact live CDS terms and recovery, explicit intensity fitting,
+delivered-market repricing and separate par-spread qualification.
+[CALIBRATION-TARGETS-005](calibration-targets/05-hazard-calibration.md#accepted-decision-for-explicit-single-name-hazard-calibration-and-par-risk-qualification).
+
+The CPI calibration package was accepted on 2026-11-15. It covers
+independent source and contract anchors, frozen fixing availability,
+bounded positive level fitting and delivered-market swap repricing.
+[CALIBRATION-TARGETS-006](calibration-targets/06-inflation-calibration.md#accepted-decision-for-explicit-cpi-anchors-and-delivered-inflation-calibration).
+
+The cross-currency calibration package was accepted on 2026-11-15. It
+covers collateral-qualified quote selection, dated FX authority, bounded
+foreign discount fitting and delivered-market repricing. The dated zero-rate
+difference is an explicitly requested diagnostic.
+[CALIBRATION-TARGETS-007](calibration-targets/07-xccy-calibration.md#accepted-decision-for-collateral-qualified-foreign-discount-calibration).
+
+The NS/NSS calibration package was accepted on 2026-11-15. It covers
+analytic pricing throughout the fit, named parameter bounds and
+identification, native quote gates and analytic model delivery.
+[CALIBRATION-TARGETS-008](calibration-targets/08-parametric-calibration.md#accepted-decision-for-calibration-on-the-analytic-nsnss-discount-source).
+
+The equity smile forward package was accepted on 2026-11-15. It covers
+exact European quotes, dated spot, explicit carry and funding, and dividend
+entitlement at fixing with actual payment-date discounting.
+[CALIBRATION-TARGETS-009](calibration-targets/09-equity-forward-inputs.md#accepted-decision-for-explicit-equity-spot-carry-and-dated-smile-forwards).
+
+The equity surface materialization package was accepted on 2026-11-15.
+It covers fixed-strike total variance, explicit fitted tails, exact
+delivered-grid quote fit and scoped surface diagnostics.
+[CALIBRATION-TARGETS-010](calibration-targets/10-total-variance-materialization.md#accepted-decision-for-explicit-total-variance-materialization-and-delivered-surface-fit).
+
+The equity SABR calibration package was accepted on 2026-11-15.
+It covers fixed beta, explicit Black quotes, distinct optimizer strikes,
+native slice gates and complete delivered-grid acceptance.
+[CALIBRATION-TARGETS-011](calibration-targets/11-equity-sabr.md#accepted-decision-for-fixed-beta-equity-sabr-and-native-slice-acceptance).
+
+The equity SVI calibration package was accepted on 2026-11-15.
+It covers the seeded raw fit, native slice gates, mandatory fitted-slice
+density checks and strict acceptance on the delivered grid.
+[CALIBRATION-TARGETS-012](calibration-targets/12-equity-svi.md#accepted-decision-for-raw-equity-svi-and-mandatory-fitted-slice-density).
+
+The swaption calibration forward package was accepted on 2026-11-15.
+It covers dated reference contracts, explicit expiry and tenor
+coordinates, contractual observations, cash-based par rates and
+construction-forward provenance.
+[CALIBRATION-TARGETS-013](calibration-targets/13-swaption-forwards.md#accepted-decision-for-dated-swaption-coordinates-and-calibration-forwards).
+
+The SABR swaption cube package was accepted on 2026-11-15.
+It covers exact dated smiles, explicit fit and quote controls,
+checked node construction and strict native delivered-cube replay.
+[CALIBRATION-TARGETS-014](calibration-targets/14-swaption-cube.md#accepted-decision-for-exact-sabr-swaption-smiles-and-strict-cube-publication).
+
+The base-correlation calibration package was accepted on 2026-11-15.
+It covers exact dated tranche inputs, fixed attachment, identified
+bounded roots, elected ordering, native quote gates and atomic
+publication of the curve and rebound index.
+[CALIBRATION-TARGETS-015](calibration-targets/15-base-correlation.md#accepted-decision-for-identified-base-correlation-bootstrap-and-atomic-publication).
+
+The single-tranche Student-t calibration package was accepted on 2026-11-15.
+It covers exact dated preparation, a fixed flat correlation, bounded root
+and sensitivity checks, native repricing and typed scalar publication.
+[CALIBRATION-TARGETS-016](calibration-targets/16-student-t.md#accepted-decision-for-identified-single-tranche-student-t-calibration).
+
+The rate and hazard construction and replay package was accepted on
+2026-11-15. It covers exact canonical construction records, native and
+par-risk quote bases, explicit source qualification and atomic target
+refit publication. This completes the calibration targets review.
+[CALIBRATION-TARGETS-017](calibration-targets/17-calibration-replay.md#accepted-decision-for-exact-rate-and-hazard-construction-and-qualified-replay).
+
+The Hull–White calibration entry and quote package was accepted on
+2026-11-15. It covers explicit dated and numeric profiles, fit origins
+and curve roles, native quote clocks, fit controls and complete fitted state.
+[CALIBRATION-RATE-MODELS-001](calibration-rate-models/01-curve-entry-and-quote-domains.md#accepted-decision-for-explicit-hull-white-calibration-entry-and-quote-domains).
+
+The Hull–White cap and floor strip package was accepted on 2026-11-15.
+It covers exact live strips, benchmark and payment roles, bounded
+flat Normal inversion and separate gross, time-value and native fit gates.
+[CALIBRATION-RATE-MODELS-002](calibration-rate-models/02-cap-schedules-and-quote-inversion.md#accepted-decision-for-checked-cap-and-floor-strips-and-implied-normal-inversion).
+
+The Hull–White ATM swaption target package was accepted on 2026-11-15.
+It covers exact dated and synthetic preparation, cash-based par,
+native quote clocks and checked analytic price-to-volatility inversion.
+[CALIBRATION-RATE-MODELS-003](calibration-rate-models/03-atm-swaption-quotes.md#accepted-decision-for-exact-atm-swaption-targets-and-native-quote-reconstruction).
+
+The synthetic Jamshidian pricing package was accepted on 2026-11-15.
+It covers the exact regular payoff including its negative-rate branch,
+bounded exercise solving, a root-price allowance and checked bond put
+aggregation.
+[CALIBRATION-RATE-MODELS-004](calibration-rate-models/04-jamshidian-decomposition.md#accepted-decision-for-checked-synthetic-jamshidian-decomposition).
+
+The contractual Gaussian swaption package was accepted on 2026-11-15.
+It covers explicit coupon laws, signed exercise-date cash terms,
+weighted tails, bounded integration and missed-exercise checks.
+[CALIBRATION-RATE-MODELS-005](calibration-rate-models/05-contractual-gaussian-integration.md#accepted-decision-for-checked-contractual-gaussian-swaption-integration).
+
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the
 accepted perspective/sign contracts; broader margin methodology retains its
@@ -1411,8 +2212,8 @@ convention ADRs within their stated scopes. Instrument defaults, aging models
 and product-specific cutoffs retain their own owners; implementation and
 independent qualification remain open.
 
-The governance policy and ADR 0033's scoped historical tail selection are
-accepted. The six other model-selection overviews remain Draft. Detailed
+The governance policy and the scoped selections in ADRs 0032 and 0033
+are accepted. Five other model-selection overviews remain Draft. Detailed
 algorithms and broader policies retain their status in the owning catalogues.
 
 | Record | Decision status | Implementation status | Validation status |
@@ -1423,7 +2224,7 @@ algorithms and broader policies retain their status in the owning catalogues.
 | [0029: Rate-option exercise and volatility](valuations-rates/0029-rate-option-exercise-and-volatility.md) | Draft | Vanilla rate-option and Bermudan selection observed | Source/test evidence inspected; numerical checks not rerun |
 | [0030: CDS survival and integration](models-and-valuations-credit/0030-cds-survival-and-integration.md) | Accepted | Single-name CDS engine selection; detailed contract in CREDIT-12 | Independent date, integral and quote checks; runtime reconciliation pending |
 | [0031: Tranche loss model selection](models-and-valuations-credit/0031-tranche-loss-model-selection.md) | Draft | Gaussian default and explicit copula paths observed | Source/test evidence inspected; numerical checks not rerun |
-| [0032: Curve interpolation and calibration](calibration-targets/0032-curve-interpolation-and-calibration.md) | Draft | Raw curve and calibration defaults observed | Source/test evidence inspected; numerical checks not rerun |
+| [0032: Curve interpolation and calibration](calibration-targets/0032-curve-interpolation-and-calibration.md#accepted-decision-for-explicit-rate-curve-interpolation-and-calibration) | Accepted | Explicit factor interpolation, tails, fit selection and final artifact admission | Independent factor, tail and PCHIP checks; production qualification pending |
 | [0033: Return-series VaR and ES](analytics/0033-value-at-risk-method-selection.md) | Accepted fixed historical selection | Historical scalar/summary dispatch; explicit inputs and invalid-CF errors reconciled | [Scoped implementation evidence](analytics/README.md#implementation-evidence) |
 
 Use [ADR 0026's independent statuses](governance/0026-methodology-decisions-and-inventory.md#independent-statuses)

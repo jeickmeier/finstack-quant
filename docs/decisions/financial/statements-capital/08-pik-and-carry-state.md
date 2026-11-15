@@ -1,15 +1,20 @@
 # STATEMENTS-CAPITAL-008: PIK toggles, hysteresis, carried claims and period state
 
-**Decision status:** Draft — observed implementation; adoption pending.
-**Implementation status:** Observed for the source scope and discrepancies stated below.
-**Validation status:** Evidence inspected or located, not executed; numerical qualification remains open.
+**Decision status:** Accepted for the full PIK election, arrears and carried-state contract (2026-11-15).
+**Implementation status:** Reconciliation pending. The audited path counts reporting periods, transfers interest arrears with the current coupon and capitalizes toggle PIK at period close.
+**Validation status:** Existing source and regression evidence mapped. Independent contractual election and state-replay qualification remain pending.
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; [scope and file ledger](README.md).
 
-## Choice and rationale
+## Accepted decision for contractual PIK elections and carried claims
 
-A liquidity threshold can move selected borrowing coupons from cash expense into PIK before cash allocation. A minimum number of consecutive PIK periods prevents immediate deactivation. Contractual PIK follows its schedule date; toggle-generated PIK capitalizes at period close. Separate carried maps preserve fee, interest and dated principal claim priority.
+1. Require explicit PIK authorization for the instrument and coupon. Use actual historical elections and explicitly modeled exercise for forecasts. Apply the contract's observation, notice and election effective dates.
+2. Require a finite metric and threshold in matching units. A metric below the threshold requests PIK and a metric at or above it requests base mode, subject to a contractually authorized minimum PIK duration. Count eligible contractual coupon periods, including the first elected period. Reject missing or invalid required inputs.
+3. Apply the elected rate and cash/PIK split from canonical coupon terms. Record the PIK component as zero cash and apply its principal increase once on the contractual capitalization date. Carry overdue cash interest and fees separately. Capitalize arrears only through a separately authorized dated action. Require qualified contractual payoff terms for any earned coupon affected by full payoff. [Cash and PIK coupon allocation](../cashflows/05-coupon-cash-and-pik.md#accepted-decision-parent-coupon-accrual-exact-splits-and-capitalization) · [Contractual accrued cash interest](03-funding-and-balances.md#accepted-decision-for-contractual-accrued-cash-interest).
+4. Carry state by instrument and election. Apply amendments on their authorized effective dates. Commit election state, the dated debt ledger and the rebuilt schedule atomically. Count each eligible coupon period once across retries. [Dated principal claims](04-dated-principal.md#accepted-decision-for-dated-principal-claims) · [Residual coupon rebuilding](05-residual-coupons.md#accepted-decision-for-residual-coupon-rebuilding).
 
-## Inputs and transitions
+For example, a \$10 coupon with a 40% PIK election produces \$4 of PIK and \$6 of current cash interest. With \$3 of prior cash-interest arrears, \$9 of cash interest is due and \$4 capitalizes on the contractual date.
+
+## Observed inputs and transitions
 
 `PikToggleSpec` names a liquidity node/formula, threshold in that metric's units, explicit target IDs and a `min_periods_in_pik` count (default zero). The metric must evaluate to a finite number. Initial mode is false with zero active periods. The request is `metric < threshold`, so equality requests cash mode.
 
@@ -27,14 +32,10 @@ At close add only the amount moved by the toggle to principal after the principa
 
 Arrears capitalization and full-paydown-period toggle capitalization require explicit contractual permission; the engine does not distinguish coupon entitlement from an unpaid prior claim for this decision. Supplying a different toggle spec midstream does not globally reset all stored modes. These are stateful scenario semantics, not automatic legal rights.
 
-## Alternatives and evidence
-
-Alternatives include coupon-date decisions, elapsed-time hysteresis, current-coupon-only PIK, and explicit instrument capability/rate terms. Each changes principal and cash liquidity; none is adopted here.
+## Evidence
 
 - **Implementation:** [toggle state](../../../../finstack-quant/statements/src/capital_structure/waterfall/payment_in_kind.rs); [staging and close](../../../../finstack-quant/statements/src/capital_structure/waterfall/mod.rs); [validation](../../../../finstack-quant/statements/src/capital_structure/waterfall_spec.rs), `PikToggleSpec::validate`; [persistent state](../../../../finstack-quant/statements/src/capital_structure/state.rs).
 - **Regression evidence:** inline `test_pik_hysteresis_holds_pik_active_for_min_periods`, `pik_liquidity_metric_rejects_non_finite_value`, `test_pik_coupon_never_consumes_cash_without_prepayment_priority`; [earned-accrual and dated PIK cases](../../../../finstack-quant/statements/src/capital_structure/tests/finance_waterfall_regressions.rs). Internal state/timing checks, not executed.
-
-Period-close timing remains in force unless a separately authorized change is made.
 
 ## Follow-up tracking
 

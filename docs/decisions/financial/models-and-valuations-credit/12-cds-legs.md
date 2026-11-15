@@ -328,7 +328,7 @@ Owners: [CDS kernels](../../../../finstack-quant/valuations/credit/src/cds/prici
   Current quote materialization derives both upfront spot and default
   payment lag from the convention settlement-days field. Reconcile
   those independent roles and the clean quote/actual cash distinction.
-- References: [ISDA](../../../REFERENCES.md#isda-cds-standard-model), [Bloomberg CDS model](../../../REFERENCES.md#bloomberg-cds-model) and [Hull–White CDS](../../../REFERENCES.md#hull-white-2000-cds). Quote construction and fitting have separate [materialization](../calibration-framework/07-cds-materialization.md) and [hazard-target](../calibration-targets/05-hazard-calibration.md) owners.
+- References: [ISDA](../../../REFERENCES.md#isda-cds-standard-model), [Bloomberg CDS model](../../../REFERENCES.md#bloomberg-cds-model) and [Hull–White CDS](../../../REFERENCES.md#hull-white-2000-cds). Quote construction and fitting have separate [materialization](../calibration-framework/07-cds-materialization.md#accepted-decision-for-single-name-cds-calibration-and-quote-settlement) and [hazard-target](../calibration-targets/05-hazard-calibration.md) owners.
 
 ### Independent review evidence
 

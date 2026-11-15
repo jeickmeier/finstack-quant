@@ -119,7 +119,7 @@
    exact rates, date intent and output identity. Align the stated
    `DfEndFromQuote` basis and qualify existing pricing and calibration
    fixtures. See
-   [quote materialization](../calibration-framework/04-deposit-fra-materialization.md),
+   [accepted quote materialization](../calibration-framework/04-deposit-fra-materialization.md#accepted-decision-for-deposit-and-fra-materialization-and-prepared-clocks),
    [rate residuals](../calibration-targets/02-rate-preparation-and-residuals.md)
    and [forward calibration](../calibration-targets/04-forward-calibration.md).
 

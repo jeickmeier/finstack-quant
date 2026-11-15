@@ -1,16 +1,35 @@
 # STATEMENTS-CONTRACTS-008: Bundled balance leverage and trailing-flow coverage
 
-**Decision status:** Draft (observed implementation; adoption pending).
+**Decision status:** Accepted for the full bundled leverage and coverage contract (2026-11-15).
 
-**Implementation status:** Observed for the source responsibilities stated below; discrepancies are identified explicitly.
+**Implementation status:** Reconciliation pending. The audited catalogue uses aggregate interest expense and principal-payment inputs for debt service.
 
-**Validation status:** Evidence inspected/located, not executed. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice README](README.md)).
+**Validation status:** Existing source and regression evidence mapped. Independent qualification of ratios and contractual due-date service remains pending.
 
-## Choice and input domain
+**Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
+
+## Accepted decision for bundled leverage and coverage
+
+Use period-end balance-sheet values and gross interest-bearing debt before cash offsets. Use consistent reporting scope and currency across all inputs. EBITDA follows the reported-cost earnings contract. [Reported-cost earnings](07-earnings-and-margins.md#accepted-decision-for-reported-cost-earnings-and-margins).
+
+| Metric | Accepted formula |
+|---|---|
+| Debt to equity | Period-end gross debt / period-end equity |
+| Debt to assets | Period-end gross debt / period-end assets |
+| Equity multiplier | Period-end assets / period-end equity |
+| Debt to EBITDA | Period-end gross debt / TTM EBITDA |
+| Interest coverage | TTM EBITDA / TTM statement interest expense including recognized PIK |
+| Debt-service coverage | TTM EBITDA / (TTM scheduled cash interest due + TTM scheduled principal due on borrowings) |
+
+Recognize each scheduled borrowing service amount once on its contractual due date, including missed amortization and maturity payments. Exclude arrears settlements, advance payments, prepayments and sweeps, PIK, fees, hedge flows and distress cash from scheduled cash debt service. [Dated claims and settlements](../statements-capital/04-dated-principal.md#accepted-decision-for-dated-principal-claims).
+
+Require positive denominators and complete supported TTM windows. Report unavailable with a reason for missing or invalid inputs or incomplete windows. Zero gross debt is valid. Negative EBITDA yields signed coverage when the other inputs and denominator are valid. Remove generic threshold claims from the bundled ratios. Covenant thresholds and definitions require explicit agreement-specific terms. [Reporting periods and TTM windows](../core-conventions/014-fiscal-periods-ltm.md#accepted-decision-reporting-periods-fiscal-context-and-ltm-windows).
+
+## Audited input domain
 
 Six embedded fin metrics measure balance leverage or EBITDA-based debt coverage. They combine current model balances with either current balances or trailing-twelve-month flows. The catalogue selects these formulas explicitly; its prose does not establish an approved credit policy or covenant definition.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 | Metric | Executed formula |
 |---|---|

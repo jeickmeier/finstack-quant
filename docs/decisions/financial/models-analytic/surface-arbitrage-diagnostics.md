@@ -283,7 +283,7 @@ for its own publication policy. See the
 [pricing workbench](../../../../finstack-quant-ui/registry/valuations/blocks/pricing-workbench/pricing-workbench.tsx),
 [surface badge](../../../../finstack-quant-ui/registry/models/components/surface-arbitrage-badge/surface-arbitrage-badge.tsx),
 [calibration validator](../../../../finstack-quant/calibration/src/validation/surfaces.rs)
-and [calibration validation record](../calibration-framework/17-surface-validation.md).
+and [accepted calibration publication policy](../calibration-framework/17-surface-validation.md#accepted-decision-for-surface-validation-and-publication).
 
 ## Follow-up tracking
 

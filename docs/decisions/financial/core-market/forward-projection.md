@@ -22,11 +22,11 @@ Contractual tenor, fixing/effective/maturity/payment dates, observation schedule
 fixing eligibility and coupon accrual belong to product/index/schedule owners.
 [Record03](rate-shocks.md) retains shock selection/composition and aging economics;
 [record06](calibration-provenance.md) owns replay provenance.
-[ADR 0032](../calibration-targets/0032-curve-interpolation-and-calibration.md) and
-[forward calibration](../calibration-targets/04-forward-calibration.md) retain
-market fit, quote selection and acceptance. This decision defines the source
-those owners must reconcile to; it does not approve their remaining
-Draft methodologies or stochastic index models.
+[ADR 0032](../calibration-targets/0032-curve-interpolation-and-calibration.md#accepted-decision-for-explicit-rate-curve-interpolation-and-calibration) and
+[accepted forward calibration](../calibration-targets/04-forward-calibration.md#accepted-decision-for-simultaneous-calibration-of-index-projection-factors)
+retain market fit, quote selection and acceptance. This decision defines the
+source that those owners must reconcile to. Stochastic index models retain
+their own owners.
 
 ## Foundational re-review
 

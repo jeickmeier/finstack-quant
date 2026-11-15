@@ -1,18 +1,27 @@
 # STATEMENTS-CONTRACTS-006: Metric registration, dependency discovery and namespace rewriting
 
-**Decision status:** Draft (observed implementation; adoption pending).
+**Decision status:** Accepted for the full metric registration, dependency and model import contract (2026-11-15).
 
-**Implementation status:** Observed for the source responsibilities stated below; discrepancies are identified explicitly.
+**Implementation status:** Reconciliation pending. The current builder uses the stored namespace for dotted paths. Textual qualification and registration and import gaps remain.
 
-**Validation status:** Evidence inspected/located, not executed. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice README](README.md)).
+**Validation status:** Existing source and regression evidence mapped. Independent registration, dependency and import qualification remains pending.
 
-## Choice and input domain
+**Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
+
+## Accepted decision for metric registration and dependencies
+
+1. Register each custom document and the entire built-in catalogue atomically. Validate dotted namespace paths and metric IDs against the shared grammar, reserve the `cs` namespace for capital references and require unique qualified IDs. [Formula identifiers and namespaces](04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation).
+2. Pin every formula's reference bindings at registration against staged and committed definitions. An unqualified metric reference binds in its own namespace. An exact qualified reference can bind in any namespace. Unmatched references become model requirements. Later registrations leave pinned bindings intact. Qualify node references in the AST, deriving dependencies from the formula. Treat `requires`, `unit_type` and tags as descriptive metadata.
+3. Build deterministic dependency closure, including historical references. For the value input of `lag` or `shift`, only a valid positive integer literal offset makes the dependency past-only. Offset and other control expressions still contribute dependencies. Zero and dynamic offsets keep the value dependency in the same-period graph. Reject future reads and same-period cycles.
+4. Import the requested metric and its dependency closure into the model atomically. Share an existing node that uses the same unchanged template, and reject conflicting definitions. Apply intentional overrides through an explicit named edit and the normal model revalidation boundary. [Named atomic edits](02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability) · [Runnable model validation](01-model-timeline-and-values.md#accepted-decision-for-model-timelines-values-and-readiness).
+
+## Audited input domain
 
 Registry stores reusable formulas under namespace.metric_id. Loading one JSON document is transactional: no definition is committed until all definitions and the document's dependency graph validate. Built-in loading repeats that process over four embedded files, so earlier documents survive a later document failure.
 
 Metric IDs must match ASCII letter/underscore followed by letters/digits/underscores; a name must be nonempty and the formula must parse and compile. Namespace validation only rejects the empty string. The requires list, unit_type, tags and descriptive metadata are stored but are not authoritative dependency or financial-unit validation.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 1. Reject existing or within-document duplicate qualified IDs. Parse and compile every new formula, retaining the AST.
 2. Collect all registered and staged unqualified IDs in that same namespace. Extract all AST references, including references inside lag/shift, and retain only exact names in this set.
@@ -29,7 +38,7 @@ Fully qualified references such as fin.a are not in the registry's unqualified s
 
 Namespace punctuation and names that collide with function names are not rejected here. Qualification is textual, not an AST node-reference rewrite: a metric called sum can cause sum(...) text to be rewritten as a namespaced function call. These static edge cases limit the currently established naming contract.
 
-AST-based qualification and a graph over fully qualified references would remove those ambiguities, but would change the current contract. Automatically using requires instead could drift from the executed formula; retaining one formula-derived dependency source is preferable unless explicitly changed.
+The current builder reads the stored metric namespace, and regression coverage exercises qualification within a dotted namespace. Qualification remains textual, so a function name can still collide with a metric identifier. [Current builder](../../../../finstack-quant/statements/src/builder/model_builder.rs) · [Dotted-namespace regression](../../../../finstack-quant/statements/tests/registry_dynamic.rs).
 
 ## Evidence
 

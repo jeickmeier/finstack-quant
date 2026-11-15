@@ -1,16 +1,25 @@
 # STATEMENTS-CONTRACTS-013: Missing cells, non-finite values and sign diagnostics
 
-**Decision status:** Draft (observed implementation; adoption pending).
+**Decision status:** Accepted for the full Statements data-quality contract (2026-11-15).
 
-**Implementation status:** Observed for the source responsibilities stated below; discrepancies are identified explicitly.
+**Implementation status:** Reconciliation pending. The audited checks can pass on empty coverage or warn on non-finite input.
 
-**Validation status:** Evidence inspected/located, not executed. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice README](README.md)).
+**Validation status:** Existing source and regression evidence mapped. Independent qualification of coverage, invalid inputs and sign diagnostics remains pending.
 
-## Choice and input domain
+**Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
+
+## Accepted decision for data-quality coverage and validity
+
+1. Configure the required node and period scope explicitly, selecting actuals, forecasts or both. Missing or unavailable required observations make the covered scope incomplete. Optional gaps are allowed. Report evaluated, missing and unavailable observations, and mark empty scope unevaluated.
+2. Treat an explicit typed zero as a valid observation. A result that is undefined for a documented reason is unavailable. Raw NaN, infinity or a value unrepresentable as its declared `Money` is an error, including on optional cells. [Missing and invalid data](../conventions/0009-missing-and-invalid-data.md).
+3. Select validity checks by named nodes or by explicitly selecting all modeled nodes. Reject unknown or duplicate configured IDs, off-plan cells and unresolved or contradictory units. [Model timeline and explicit values](01-model-timeline-and-values.md#accepted-decision-for-model-timelines-values-and-readiness) · [Formula units](05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency).
+4. Apply advisory sign diagnostics to finite values. Zero is valid in either sign group, and overlapping groups are invalid. Each operation owns its mandatory sign rules. [Retained-earnings dividend signs](12-retained-earnings-reconciliation.md#accepted-decision-for-retained-earnings-reconciliation).
+
+## Audited input domain
 
 Three separate checks distinguish absent observations, present non-finite values and unexpected signs. Their coverage and severities differ deliberately; no one check is a substitute for the others.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 | Check | Iteration and predicate | Finding and result |
 |---|---|---|
@@ -26,7 +35,7 @@ The separate SignConventionPolicy helper emits a Warning for a negative finite M
 
 An empty required-node list makes the missing-value check vacuous. An explicit nonexistent NonFiniteCheck node is ignored. A SignConventionCheck can pass despite missing observations, unexpected signs and non-finite values because it reports only warnings. These are observable contracts, not proof that a complete or clean dataset passed.
 
-An operation-specific gate can compose all three checks, select required periods and use report findings/coverage, but CheckSuite does not automatically add that composition. Strict missing forecasts or fatal sign violations require a different explicit policy; no silent promotion is performed.
+The audited check suite leaves composition to callers. The accepted data-quality contract specifies coverage and validity for the configured checks.
 
 ## Evidence
 

@@ -153,7 +153,7 @@
     a changed spread or link can change the utilization path.
     [Standalone revolver](../valuations-other-fixed-income/11-revolver-monte-carlo-credit.md),
     [risk and counterfactuals](../valuations-other-fixed-income/12-revolver-quotes-risk.md),
-    [structured-credit revolver](../valuations-structured-credit/16-revolver-utilization-and-option-cost.md).
+    [structured-credit revolver](../valuations-structured-credit/16-revolver-utilization-and-option-cost.md#accepted-decision-for-revolver-utilization-and-draw-spread-attribution).
 
 11. **Carry the contract through existing product surfaces.**
     Propagate the resolved model, clock, draw layout, rate role

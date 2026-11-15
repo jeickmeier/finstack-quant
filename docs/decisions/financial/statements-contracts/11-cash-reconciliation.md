@@ -1,16 +1,25 @@
 # STATEMENTS-CONTRACTS-011: Cash roll-forward and independent cash-flow components
 
-**Decision status:** Draft (observed implementation; adoption pending).
+**Decision status:** Accepted for the full cash roll-forward and component reconciliation contract (2026-11-15).
 
-**Implementation status:** Observed for the source responsibilities stated below; discrepancies are identified explicitly.
+**Implementation status:** Reconciliation pending. The audited roll-forward starts in the second period, and partial configuration or missing observations can cause skips.
 
-**Validation status:** Evidence inspected/located, not executed. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice README](README.md)).
+**Validation status:** Existing source and regression evidence mapped. Independent qualification of period boundaries, adjustments, arithmetic and coverage remains pending.
 
-## Choice and input domain
+**Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
+
+## Accepted decision for cash roll-forward and component reconciliation
+
+1. Reconcile closing cash to opening cash plus classified cash flows and separately identified FX and cash-scope adjustments. Require an explicit dated opening cash balance at the first period boundary. Each subsequent opening uses the immediately adjacent prior close at the same boundary. Use explicit sources for signed FX and cash-scope adjustments and include each adjustment once. All inputs share the same cash scope, compatible units and one currency where monetary. Cash inflows are positive and outflows are negative.
+2. Independently reconcile total classified cash flows to CFO + CFI + CFF. Configure all three component roles or omit all three. Reject partial configuration and duplicate component IDs. Evaluate each enabled identity for every model period, including the first.
+3. Use checked exact `Money` or Decimal arithmetic for monetary comparisons and checked compensated arithmetic for scalars. Retain signed and absolute residuals. Default to zero tolerance. Rounded or estimated inputs can use an explicit allowance of `max(absolute tolerance, relative tolerance × reference)`, with an absolute override replacing both terms and equality within tolerance. Use `|opening cash|` as the roll-forward reference and `|total classified cash flows|` as the component reference. These references have no floor. Report the relative residual percentage when the reference is nonzero and the diagnostic is representable. [Balance-sheet arithmetic and tolerance](10-balance-sheet-articulation.md#accepted-decision-for-balance-sheet-articulation).
+4. Mark missing required comparisons incomplete and identify the missing inputs. Invalid inputs or required arithmetic produce an error. The check passes only when every enabled comparison is complete and within tolerance.
+
+## Audited input domain
 
 CashReconciliation checks two distinct identities: Cash_t = Cash_(t−1) + TotalCF_t and, when all components are configured, TotalCF_t = CFO_t + CFI_t + CFF_t. Inputs are signed amounts with cash inflows positive; compatible units and one currency are required.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 Validate config, optional absolute tolerance and all configured input units. If exactly one or two of CFO/CFI/CFF are configured, emit a global Warning and do not run that component identity.
 
@@ -29,13 +38,11 @@ For component reconciliation, separately visit every model period, including the
 
 No opening-cash or residual-FX/restricted-cash adjustment is inferred. Any such reconciling item must already be included in TotalCF or explicitly represented by a different formula check. Repeated component IDs can double-count. A single period can fully validate components while having no roll-forward comparison.
 
-Gaps and overlaps are visible Info skips, not validation failures. The check can pass with only skips or warnings. A stronger publication gate could require a minimum number of comparisons or treat missing adjacent periods as an error; no such coverage policy is implemented here.
+In the audited path, gaps and overlaps are visible as Info skips. The audited check can pass with only skips or warnings. The accepted contract requires complete enabled comparisons.
 
 ## Evidence
 
 [Cash implementation](../../../../finstack-quant/statements/src/checks/builtins/cash_reconciliation.rs), [cash tests](../../../../finstack-quant/statements/tests/checks/cash_reconciliation_tests.rs), [accounting regressions](../../../../finstack-quant/statements/tests/finance_accounting_regressions.rs), [audit regressions](../../../../finstack-quant/statements/tests/audit_regressions.rs) and [shared tolerance](../../../../finstack-quant/statements/src/checks/types.rs) are the evidence. Tests use explicit hand-built balance/flow identities and inspect partial component configuration, non-finite data and overflow. They do not establish a universal classification of CFO/CFI/CFF.
-
-A passing check does not establish a fully reconciled cash history.
 
 ## Follow-up tracking
 

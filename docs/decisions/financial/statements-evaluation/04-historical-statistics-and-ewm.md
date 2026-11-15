@@ -1,12 +1,20 @@
 # STATEMENTS-EVALUATION-004 — Rolling, cumulative, ranked and exponentially weighted statistics
 
-Decision status: **Draft — observed implementation, adoption pending**. Implementation status: **Observed for the stated source scope**, with discrepancies identified below. Validation status: **Evidence inspected/located, not executed**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full historical statistics and EWM contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
-## Choice, domain and collection
+## Accepted decision for historical statistics and EWM
+
+1. Read canonical history through the target slot in the same evaluation run. Distinguish missing or unavailable observations from invalid inputs and execution errors. Propagate errors from evaluated observations. [Prepared evaluation](01-graph-precedence-and-prepared-plans.md#accepted-decision-for-dependency-graphs-cell-precedence-and-prepared-evaluation).
+2. A rolling window uses the last exact number of canonical slots through the target. Require an exact positive integer window and an exact integer minimum count from 1 through the window size, defaulting to the full window. Require the minimum count among available observations inside those slots. Rolling and full-history sample variance and standard deviation require at least two observations and use the `n−1` denominator.
+3. Full-history statistics use the available observations through the target and report sample count when there are gaps. Rank the available current value using exact competition ties, with ascending order as the default. Rank and quantile take a node or typed capital reference. Quantile uses R-7 interpolation with a finite level in `[0,1]`.
+4. Require a complete prefix from model start through the target for cumulative functions. An incomplete prefix is unavailable. The four cumulative and three full-history functions take exactly one argument under the canonical signatures. Use exact monetary sums and preserve currency for monetary standard deviation. Variance and cumulative product require scalar inputs. [Canonical signatures](../statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation) · [Formula units](../statements-contracts/05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency).
+5. Require finite EWM `alpha` in `(0,1]` and decay weights once per canonical slot. A missing slot ages the weights and carries the previous estimate without adding an observation. Use the squared-weight correction for variance and standard deviation by default, with an explicit Boolean toggle. Corrected variance and standard deviation are unavailable with fewer than two positive-weight observations.
+
+## Audited domain and collection
 
 Historical statistics operate on chronological values at or before the current context. Simple column collection includes present slots only; arbitrary expressions are evaluated over available historical/current periods. Current values overlay historical same-period entries. Thus an absent column slot and a present NaN are different observations. This protects lagged calculations from future data, but it does not build a uniform calendar or impute missing entries.
 
-## Algorithms and selection
+## Audited algorithms and selection
 
 - Rolling functions take the last `window` available observations, then retain finite values. Window must be positive; default `min_periods=window`, explicit zero is promoted to one, and a minimum above the window errors. Below the finite-count threshold return NaN. Sum/mean, sample variance/std (`n-1` denominator), median, min/max and count delegate to shared core statistics; singleton sample variance is undefined. No calendar-duration weighting is applied.
 - Full-history std/var/median and cumulative sum/product/min/max use finite observations. Cumulative product returns NaN and warns on overflow. Their handlers require at least one argument but use **only argument zero**; surplus expressions are neither evaluated nor rejected. This differs from fixed-arity handlers.
@@ -18,12 +26,14 @@ Historical statistics operate on chronological values at or before the current c
 
 Alpha, window and minimum count are per observed model entry, not elapsed days. A present NaN decays EWM weight, while a missing column slot omitted by collection does not. EWM is recursive normalized weighting (`adjust=False` in the cited test comments), with a separate variance bias correction. Rolling and cumulative functions drop nonfinite data without the n-ary sum's skip warning. Do not generalize one missing-data rule across all statistics.
 
-Calendar-complete windows, elapsed-time EWM, population variance and strict missing-value propagation are distinct possible choices; only described parameters are supported.
+The accepted contract uses canonical slot windows and decay, complete cumulative prefixes and explicit correction controls. The observed slot collection and numeric controls require reconciliation.
 
 ## Evidence
 
 Owning sources: [aggregates](../../../../finstack-quant/statements/src/evaluator/formula_aggregates.rs), [EWM](../../../../finstack-quant/statements/src/evaluator/formula_ewm.rs), [dispatch](../../../../finstack-quant/statements/src/evaluator/formula_dispatch.rs), [collection](../../../../finstack-quant/statements/src/evaluator/formula_helpers.rs), [core estimators](../../../../finstack-quant/core/src/math/stats.rs). Inspected inline [formula tests](../../../../finstack-quant/statements/src/evaluator/formula.rs) include independent hand-weight checks: `[1,2,3]` at alpha 0.5 has unbiased variance 1.1; `[1,NaN,3]` has mean 7/3; missing-gap variance is 10/11. They reference pandas in comments but this audit did not execute pandas or independently verify a pinned vendor version. [Market-statistics tests](../../../../finstack-quant/statements/tests/market_standards_tests.rs) locate further numerical fixtures. No tests were executed.
 
 ## Follow-up tracking
+
+The formula contract requires one argument for all seven full-history and cumulative functions. The contracts scope owns the shared compiler and evaluator reconciliation. [Accepted formula contract](../statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation) · [Contracts follow-ups](../FOLLOW_UPS.md#statements-model-formula-and-check-contracts).
 
 Outstanding decisions, implementation reconciliation and qualification work are tracked in the [scoped follow-up register](../FOLLOW_UPS.md#statements-evaluation-forecasts-and-reporting).

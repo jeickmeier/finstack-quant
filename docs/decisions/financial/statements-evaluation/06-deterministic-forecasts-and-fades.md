@@ -1,12 +1,19 @@
 # STATEMENTS-EVALUATION-006 — Deterministic growth, override curves and convergence forecasts
 
-Decision status: **Draft — observed implementation, adoption pending**. Implementation status: **Observed for the stated source scope**, with discrepancies identified below. Validation status: **Evidence inspected/located, not executed**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full deterministic forecast and fade contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
-## Choice and input domain
+## Accepted decision for deterministic forecasts and fades
+
+1. Forward fill carries the eligible base through the forecast suffix. Constant and curve growth apply the signed recurrence `x[t] = x[t−1] × (1 + r[t])` once per period. Rates are finite decimals per model period. A curve supplies one rate for every canonical forecast slot, including masked slots and slots with explicit published values. A rate of −100% yields zero. Lower rates flip the sign of a nonzero level. [Forecast suffix and anchoring](05-forecast-segments-and-bounds.md#accepted-decision-for-forecast-segments-anchoring-and-output-bounds).
+2. The `Override` method accepts unique canonical keys inside the forecast horizon. Carry each keyed value forward until the next key. Use an eligible base only for slots before the first key. If the needed base is missing, mark the leading slots unavailable.
+3. Linear fade uses a signed convex combination of base and target and returns the exact target in the final slot. Geometric fade requires nonzero same-sign endpoints. Interpolate the logarithms of their magnitudes, apply the common sign and return the exact target in the final slot. Exponential fade uses a positive finite half-life measured in model periods. The remaining gap halves each half-life.
+4. Validate static configuration even when the horizon is empty. Invalid inputs or unrepresentable outputs produce errors. Apply bounds to published outputs under the forecast segment contract. [Forecast parameters and validation](../statements-contracts/03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging) · [Output bounds](05-forecast-segments-and-bounds.md#accepted-decision-for-forecast-segments-anchoring-and-output-bounds).
+
+## Audited input domain
 
 Deterministic forecasts apply explicitly selected stepwise transformations; no parameter estimation occurs. Rates and curve entries are decimal growth per model period, fade half-life is in model periods, and levels retain the node's units. Forward fill, growth, rate curve, explicit overrides and three fade shapes are distinct supported choices. A conventional financial rationale for each caller's parameterization is not inferred from availability in the API.
 
-## Algorithms and numerical controls
+## Audited algorithms and numerical controls
 
 - Forward fill repeats the base without its own finite-base check. The result layer can therefore preserve and warn on a nonfinite base. Growth requires finite base/rate and recurs `x[t]=x[t-1]*(1+r)`; curve growth uses an exactly horizon-length finite rate vector. Every generated result must remain finite. Negative base is permitted with an advisory, and rates below -1 are not rejected; they can change sign. The warning prose suggesting sign cannot change does not hold for that allowed rate domain.
 - Override parses every supplied key to a period ID, rejects aliases identifying the same period, requires all keys inside the forecast run, and requires finite base/override values. Walk the supplied period order, replacing the carried level when an override exists and otherwise carrying the most recent level. This method's own carry behavior differs from evaluator-level explicit overrides in [record 05](05-forecast-segments-and-bounds.md).
@@ -18,7 +25,7 @@ Deterministic forecasts apply explicitly selected stepwise transformations; no p
 
 Typed forecast parameters dispatch directly to these kernels. Bounds apply afterward and do not feed back. Finite endpoint and per-step checks constrain most deterministic methods, while forward fill deliberately exposes nonfinite propagation. Zero horizon produces no forecast values and is not equivalent to a general parameter-validation endpoint.
 
-Log-space geometric interpolation could improve extreme-ratio stability, but it would need sign handling and defined endpoints; it is not the current implementation. Annual growth converted by actual period duration, continuous-time decay and override-triggered restart are different economic models.
+The audited geometric fade forms an endpoint ratio. The accepted log-magnitude path, leading override availability and complete empty-horizon validation require reconciliation.
 
 ## Evidence
 

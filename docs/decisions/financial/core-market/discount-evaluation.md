@@ -22,7 +22,7 @@ simple-rate annualization and arithmetic averages.
 [Rate shocks](rate-shocks.md) owns transformation composition and roll/stress
 economics. [Calibration provenance](calibration-provenance.md) owns recipe replay
 meaning, and [parametric discounting](parametric-discount.md) owns NS/NSS model
-formulas and admissibility. [ADR 0032](../calibration-targets/0032-curve-interpolation-and-calibration.md)
+formulas and admissibility. [ADR 0032](../calibration-targets/0032-curve-interpolation-and-calibration.md#accepted-decision-for-explicit-rate-curve-interpolation-and-calibration)
 and the calibration target retain instrument fitting and per-market selection.
 Changing the shared trait requires mechanical integration with those owners;
 it does not adopt their remaining Draft methodology.
@@ -220,7 +220,7 @@ high-precision fallback is not needed for this package.
 
 ## Observed choice and rationale
 
-`DiscountCurve` stores positive discount factors (DFs) against a year-fraction clock. Its default is MonotoneConvex interpolation and FlatForward extrapolation. This is an implemented selection, not an approved policy for every currency or market. [ADR 0032](../calibration-targets/0032-curve-interpolation-and-calibration.md) records the wider selection question. Shape preservation is a plausible rationale; the allowed negative-rate regimes must be agreed separately.
+`DiscountCurve` stores positive discount factors (DFs) against a year-fraction clock. Its default is MonotoneConvex interpolation and FlatForward extrapolation. This is an implemented selection, not an approved policy for every currency or market. [ADR 0032](../calibration-targets/0032-curve-interpolation-and-calibration.md#accepted-decision-for-explicit-rate-curve-interpolation-and-calibration) records the wider selection question. Shape preservation is a plausible rationale; the allowed negative-rate regimes must be agreed separately.
 
 ## Observed scope and input domain
 

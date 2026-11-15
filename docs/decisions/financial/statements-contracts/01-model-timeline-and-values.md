@@ -1,18 +1,29 @@
 # STATEMENTS-CONTRACTS-001: Model timeline and explicit-value invariants
 
-**Decision status:** Draft (observed implementation; adoption pending).
+**Decision status:** Accepted for the full model timeline, explicit value and readiness contract (2026-11-15).
 
-**Implementation status:** Observed for the source responsibilities stated below; discrepancies are identified explicitly.
+**Implementation status:** Reconciliation pending. The audited path can accept gaps, unresolved references and unguarded model construction.
 
-**Validation status:** Evidence inspected/located, not executed. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice README](README.md)).
+**Validation status:** Existing source and regression evidence mapped. Independent model-admission qualification remains pending.
 
-## Choice and input domain
+**Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
+
+## Accepted decision for model timelines, values and readiness
+
+1. Require a canonical, nonempty `PeriodPlan` with one reporting cadence and calendar context, contiguous half-open periods and bounds that match their period identifiers. Actuals form a prefix followed by forecasts. All-actual and all-forecast plans are valid. [Reporting periods and fiscal context](../core-conventions/014-fiscal-periods-ltm.md#accepted-decision-reporting-periods-fiscal-context-and-ltm-windows).
+2. Value nodes use explicit observations as their only value source. Calculated nodes require a formula as their value source. Mixed nodes may contain explicit observations, formulas and forecasts. Structurally validate every configured source, including sources that may be unused during evaluation. Validate node identifiers and require each node's embedded ID to match its map key. Explicit observations must name a period in the plan. An availability-date entry must match an explicit observation for that node and period.
+3. Admit finite scalar observations or native `Money` in one currency per series. Resolve a supported unit by declaration or inference and require observations to agree with it. Represent missing cells by absence, including in a typed empty series. Each consuming operation determines the observation coverage it needs. [Missing and invalid data](../conventions/0009-missing-and-invalid-data.md).
+4. Allow an incomplete draft during authoring. Use one complete guarded validation path to build or load a runnable model. Resolve references and supported types, require scalar `where` clauses, reject same-period dependency cycles and validate the capital structure. A runnable model needs at least one node or an evaluable capital structure.
+
+For example, a quarterly USD series on a canonical Q1–Q3 plan may omit its Q2 observation. Omitting Q2 from the plan or referencing a misspelled node fails runnable-model validation.
+
+## Audited input domain
 
 A financial model is an insertion-ordered map of named Value, Calculated or Mixed nodes over an explicit ordered list of half-open reporting periods. Model semantic validation establishes timeline and declared-value consistency before formula evaluation. It does not establish economic correctness or complete data coverage.
 
 Periods must be nonempty as a list, each start must precede its end, identifiers must increase strictly, and successive date intervals must not overlap. Actual periods must form a prefix before forecast periods. These requirements prevent a later actual observation becoming a forecast's historical anchor. Date gaps are permitted; this validator does not require one frequency or reconstruct dates from each PeriodId.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 1. Collect model period IDs. Reject any explicit observation outside that set. An availability-date entry must name both a model period and an explicit observation.
 2. Reject explicit values on Calculated nodes, formulas on Value nodes, and forecasts on Calculated nodes. Mixed nodes may contain all three sources.
@@ -27,7 +38,7 @@ The validation method mutates inferred types in the model. The public new constr
 
 Direct Scalar(f64) construction accepts non-finite values, and this validation stage checks series type rather than finiteness. Missing observations and unresolved formula units can remain. An empty node map is permitted. Gaps, unusual PeriodId/date combinations and unknown references therefore are not proof of a usable evaluation.
 
-A fully closed model contract could reject unknown references and unresolved dimensions at construction; that would prevent intentional incremental authoring. Conversely, preserving a partially described model needs a visible distinction between structurally accepted and evaluation-ready. These alternatives are not implemented here.
+The accepted contract checks structural completeness at build or load after incremental authoring. Reconciliation of those entry points remains pending.
 
 ## Evidence
 

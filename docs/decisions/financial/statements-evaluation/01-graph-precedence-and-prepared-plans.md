@@ -1,12 +1,19 @@
 # STATEMENTS-EVALUATION-001 — Dependency graph, cell precedence and prepared evaluation
 
-Decision status: **Draft — observed implementation, adoption pending**. Implementation status: **Observed for the stated source scope**, with discrepancies identified below. Validation status: **Evidence inspected/located, not executed**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full dependency graph, cell precedence and prepared evaluation contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
-## Choice, scope and rationale
+## Accepted decision for dependency graphs, cell precedence and prepared evaluation
+
+1. Validate every formula and mask branch against a closed, typed dependency graph. Evaluate periods chronologically and use a deterministic dependency order within each period. For a value reference in `lag` or `shift`, only a valid positive integer literal offset removes the same-period edge in favor of a past dependency. Zero and dynamic offsets retain the same-period edge, and control dependencies remain in the graph. Reject future-period reads and same-period cycles. [Runnable model validation](../statements-contracts/01-model-timeline-and-values.md#accepted-decision-for-model-timelines-values-and-readiness) · [Temporal dependency rules](../statements-contracts/06-registry-and-dependencies.md#accepted-decision-for-metric-registration-and-dependencies).
+2. Evaluate `where` before selecting a value source. A false mask gives a distinct masked cell without a numeric value. A missing mask value gives an unavailable cell with a reason. An invalid mask is an error. If the mask passes or is absent, select a visible explicit observation first, a configured forecast in forecast periods second, and a formula third. Preserve the selected source's unavailability or error.
+3. Select full-snapshot or dated-cutoff evaluation explicitly. In dated mode a published actual is visible when its known availability date is at or before the inclusive cutoff. Forecast sources are eligible only in forecast periods. Use eligible, visible and unmasked forecast inputs. Require explicit market and valuation inputs for operations that use them. [Snapshots and observation availability](../statements-contracts/02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability).
+4. Reuse a prepared plan across model edits only for payload changes in existing typed observation slots. Reprepare when the model structure, timeline, formulas or masks, units, availability, forecast configuration or capital structure change. Record provenance and cell source for each run. Apply the configured checked suite at single-run finalization. [Run provenance and check suites](../statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites) · [Wire and run identity](../statements-contracts/16-wire-schema-and-errors.md#accepted-decision-for-statements-wire-admission-schemas-and-errors).
+
+## Audited scope and rationale
 
 Statement evaluation is an ordered period-by-period execution of a current-period dependency DAG, with separate historical storage and explicit cell-source precedence. Preparation parses formulas, runs semantic analysis, resolves dependencies and infers units before execution. This separates reusable expression structure from caller-supplied numeric values; it does not establish adoption of every precedence or dependency rule. Input validation and expression-language contracts are also covered by the adjacent [statements-contracts inventory](../statements-contracts/README.md).
 
-## Algorithm and selection
+## Audited algorithm and selection
 
 1. Clone/prepare the model, cache compiled formula and `where` ASTs, and build a graph from current-period dependencies. Formula and mask dependencies are retained even for branches or cells that explicit inputs will override. Unresolved ordinary identifiers fail with nearest-name diagnostics; `cs.*` references use dedicated capital-structure lookup. An iterative depth-first traversal detects cycles and produces topological evaluation order.
 2. Lag/shift dependencies depend on the offset: a literal nonzero offset removes the first expression's current-period edge; zero or dynamic offsets retain it. Dependencies of the offset expression itself remain. Historical recurrence is therefore distinct from a simultaneous cycle. Forecast correlation peers are **not** graph edges; [record 08](08-correlated-shocks.md) describes the resulting ordering requirement.
@@ -14,7 +21,7 @@ Statement evaluation is an ordered period-by-period execution of a current-perio
 4. Availability is visible on or after its date; omitted availability uses the exclusive period end. `evaluate_with_market` supplies the as-of cutoff. Ordinary/prepared evaluation has no availability cutoff and supplies an empty market; capital structures use the first period start as the fallback as-of. Missing required market data remains an error.
 5. Numeric results, including nonfinite formula results, are stored; nonfinite values add diagnostics rather than aborting the entire evaluation. Ordinary finalization rebuilds units/Money views and runs an optional check suite. Monte Carlo follows a separate aggregation path and does not run that suite.
 
-## Prepared-plan controls and history conventions
+## Audited prepared-plan controls and history conventions
 
 The fingerprint includes period IDs/bounds/actual flags, node order/identity/type, formulas/masks/availability, forecast parameters and declared value types. Explicit numeric values are excluded so they can change between prepared evaluations; each evaluation revalidates values and exact node identity/fingerprint. The fingerprint does not hash every model field: capital-structure and metadata objects can be read live. It is a structural execution-plan check, not a complete model/provenance digest.
 
@@ -22,7 +29,7 @@ History stores `Option<f64>` columns, distinguishing absent from present NaN. Cu
 
 ## Alternatives and limitations
 
-A lazy dependency graph could avoid irrelevant branches but would change cycle/missing-name acceptance. A simultaneous solve could support algebraic cycles but is not implemented. Explicit-mask precedence, availability equality and prepared-plan mutation scope remain observed API behavior pending adoption. Do not describe a fingerprint match as proof that all financial inputs are identical. The accepted per-operation undefined-data policy in [ADR 0009](../conventions/0009-missing-and-invalid-data.md) remains applicable; storing undefined values is not a license to suppress invalid configuration errors.
+The audited fingerprint establishes structural compatibility for the fields it covers. The accepted prepared evaluation contract requires separate run provenance and reconciles mask state, availability and reusable inputs. [Missing and invalid data](../conventions/0009-missing-and-invalid-data.md).
 
 ## Evidence
 

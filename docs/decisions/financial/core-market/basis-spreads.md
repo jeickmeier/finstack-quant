@@ -17,10 +17,11 @@ and [annual decimal/bp units](../core-conventions/018-rate-units.md).
 
 Actual signed swap-basis observations, contractual leg conventions, FX spot and
 settlement, collateral/funding associations, calibration and quote risk retain
-their existing owners. [XCCY materialization](../calibration-framework/09-xccy-materialization.md)
-and [foreign discount calibration](../calibration-targets/07-xccy-calibration.md)
-remain Draft. This diagnostic does not approve those pricing/calibration models,
-infer covered-interest-parity consistency or identify a pure funding adjustment.
+their existing owners. [Accepted XCCY materialization](../calibration-framework/09-xccy-materialization.md#accepted-decision-for-cross-currency-swap-calibration-and-fx-authority)
+and [accepted foreign discount calibration](../calibration-targets/07-xccy-calibration.md#accepted-decision-for-collateral-qualified-foreign-discount-calibration)
+own pricing and calibration. The diagnostic measures the dated continuous-zero
+difference. Covered-interest-parity consistency and funding attribution have
+their own evidence requirements.
 
 ## Foundational findings
 

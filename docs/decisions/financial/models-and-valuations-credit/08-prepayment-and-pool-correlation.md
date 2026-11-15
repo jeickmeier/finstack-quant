@@ -166,8 +166,8 @@
    partial product result on invalid or failed calculations.
    [Pool default contract](07-pool-defaults.md),
    [Philox draw ownership](../models-monte-carlo/02-random-streams.md),
-   [structured-credit waterfall](../valuations-structured-credit/15-stochastic-waterfall.md),
-   [structured-credit OAS](../valuations-structured-credit/17-oas-scenarios.md).
+   [structured-credit waterfall](../valuations-structured-credit/15-stochastic-waterfall.md#accepted-decision-for-stochastic-waterfall-pricing-and-estimation),
+   [structured-credit OAS](../valuations-structured-credit/17-oas-scenarios.md#accepted-decision-for-structured-credit-oas-and-settlement-spread-fitting).
 
 ## Observed behavior
 

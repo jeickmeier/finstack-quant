@@ -614,6 +614,382 @@ actual dated branch cash. Issuer continuation uses the rate and earned
 count. Train and price on disjoint groups and refit the policy for rate risk.
 [Accepted callable rate range accrual](docs/decisions/financial/valuations-fx-and-exotics/callable-range-hw.md#accepted-decision-for-callable-rate-range-accrual).
 
+Snowballs carry the prior applied coupon and inverse floaters use explicit
+gearing. Use dated multiplicative term projection and pay each coupon on
+its own date. Forward substitution is an explicit inverse-floater approximation.
+[Accepted snowball and inverse-floater notes](docs/decisions/financial/valuations-fx-and-exotics/snowball-hw.md#accepted-decision-for-snowball-and-inverse-floater-notes).
+
+TARN targets count entitled coupon fractions of original face. An exact
+hit or overshoot fixes redemption at that coupon's payment date and
+retains earlier unpaid cash. Use dated Hull–White projection and re-evaluate
+future target crossings under rate shocks.
+[Accepted TARN target and redemption](docs/decisions/financial/valuations-fx-and-exotics/tarn-target.md#accepted-decision-for-tarn-target-and-redemption).
+
+Structured-credit discounting runs the waterfall once on projected
+collateral cashflows. Explicit stochastic pricing runs the waterfall
+per path. Resolve one collateral source, the active assumptions and
+the contractual schedule before valuation.
+[Accepted structured-credit dispatch and assumptions](docs/decisions/financial/valuations-structured-credit/01-dispatch-and-assumptions.md#accepted-decision-for-structured-credit-dispatch-and-assumptions).
+
+Structured-credit statistics use one dated collateral snapshot with explicit
+populations and missing-data rules. Reconstruct cut-off par only from a
+qualified closed runoff bridge. Derive structural loss bands from original
+tranche face and authorized loss order.
+[Accepted collateral normalization and pool statistics](docs/decisions/financial/valuations-structured-credit/02-pool-normalization-and-statistics.md#accepted-decision-for-collateral-normalization-and-pool-statistics).
+
+Statistical collateral compounds conditional mortality over actual
+monthly exposure and applies original-par targets as dated amounts.
+Apply default, scheduled principal and prepayment in order. Use one
+floating coupon contract and date recovery from the default vintage.
+[Accepted statistical collateral projection](docs/decisions/financial/valuations-structured-credit/03-statistical-collateral-projection.md#accepted-decision-for-statistical-collateral-projection).
+
+Structured-credit delinquency uses explicit monthly entry and one migration
+per qualified node. Keep modified cohorts distinct and preserve borrower
+arrears and servicer claims separately. Apply authorized reimbursement at
+receipt and retain unpaid claims through disposition.
+[Accepted delinquency migration and advancing](docs/decisions/financial/valuations-structured-credit/04-delinquency-and-advancing.md#accepted-decision-for-delinquency-migration-and-advancing).
+
+Pending NPL workouts retain outstanding par outside performing flows. Apply
+one checked par split on the booked resolution date. Retain the resumed
+cohort and dated liquidation cash separately, with only authorized same-date
+carrying costs netted.
+[Accepted NPL resolution and reperformance](docs/decisions/financial/valuations-structured-credit/05-npl-resolution.md#accepted-decision-for-npl-resolution-and-reperformance).
+
+CMBS splits surviving balloon par at contractual maturity and dates workout
+cash separately. Apply appraisal and fees to their qualified bases. Use
+the contractual prepayment event and a complete performing population
+for operating DSCR.
+[Accepted CMBS balloon and servicing](docs/decisions/financial/valuations-structured-credit/06-cmbs-servicing.md#accepted-decision-for-cmbs-balloon-and-servicing).
+
+Card trusts calculate dated monthly collections and credit losses on the
+qualified trust base. Freeze the principal numerator at the authorized
+cut and keep finance-charge and default shares live. Preserve dated
+funding, allocation and trigger state.
+[Accepted card master-trust allocation](docs/decisions/financial/valuations-structured-credit/07-card-master-trust.md#accepted-decision-for-card-master-trust-allocation).
+
+Instrument-backed collateral preserves the underlying dated ledger, uses
+one active credit and recovery authority per name, and funds draws with
+cash available at the authorized phase. Keep post-final cash on its
+qualified terminal basis.
+[Accepted instrument collateral and liquidity](docs/decisions/financial/valuations-structured-credit/08-instrument-collateral.md#accepted-decision-for-instrument-collateral-and-liquidity).
+
+Collateral exercise follows authorized dated rights and contractual
+priority. Separate exercise cash from retired par. Reuse complete
+workout-yield selection and bind incentive rates to the decision cut.
+[Accepted collateral call and put exercise](docs/decisions/financial/valuations-structured-credit/09-collateral-exercise.md#accepted-decision-for-collateral-call-and-put-exercise).
+
+Structured-credit purchases use eligible cash at the authorized cut and
+book cash and acquired par separately. Reserve uses and hedge priorities
+are explicit. Reconcile dated transfers in a checked account ledger.
+[Accepted reinvestment, reserves and hedge cash](docs/decisions/financial/valuations-structured-credit/10-reinvestment-reserves-and-hedges.md#accepted-decision-for-reinvestment-reserves-and-hedge-cash).
+
+Structured-credit waterfalls use one dated claim ledger, elected priorities
+and explicit funding. Preserve unpaid claims and separate PIK and cap
+carryover. Allocate only executable cash and apply the contractual
+equity hurdle before sharing with the manager.
+[Accepted waterfall claims and rounding](docs/decisions/financial/valuations-structured-credit/11-waterfall-claims-and-rounding.md#accepted-decision-for-waterfall-claims-and-rounding).
+
+Structured-credit coverage binds each test to its authorized snapshot,
+eligible balances and actual action tier. Size cure on the named funding
+and payment route. Keep earned interest intact and report assessment
+and post-action results separately.
+[Accepted coverage tests and cure diversion](docs/decisions/financial/valuations-structured-credit/12-coverage-and-cures.md#accepted-decision-for-coverage-tests-and-cure-diversion).
+
+Structured-credit principal regimes preserve scheduled and unscheduled
+cash separately and bind allocations to qualified dated tests. Reversible
+protections follow the test state. Permanent early amortization latches
+and releases held accumulation cash only once.
+[Accepted principal regimes and early amortization](docs/decisions/financial/valuations-structured-credit/13-principal-regimes-and-amortization.md#accepted-decision-for-principal-regimes-and-early-amortization).
+
+Structured-credit loss recognition and interim note write-down are explicit
+independent elections. Allocate incremental loss against live face. Calls
+require authorized settlement cash and retained recoveries keep their own
+dates and beneficiaries. Schedule terminal releases and discharge as
+separate authorized events.
+[Accepted loss recognition and terminal cash](docs/decisions/financial/valuations-structured-credit/14-loss-recognition-and-terminal-cash.md#accepted-decision-for-loss-recognition-and-terminal-cash).
+
+Structured-credit Monte Carlo runs the contractual waterfall on every
+trajectory. Bind explicit collateral laws, factor roles, seed and sampling
+controls to the dated run. Estimate PV uncertainty on independent units,
+and use the physical trajectory distribution for loss and repayment life.
+[Accepted stochastic waterfall](docs/decisions/financial/valuations-structured-credit/15-stochastic-waterfall.md#accepted-decision-for-stochastic-waterfall-pricing-and-estimation).
+
+Structured-credit revolvers separate latent utilization from funded par.
+Only authorized funding phases change held balances. Requested draw-spread
+attribution tracks outstanding funded draws on the reference path and
+compares signed note PVs under matched shocks and a complete waterfall.
+[Accepted revolver utilization and draw-spread attribution](docs/decisions/financial/valuations-structured-credit/16-revolver-utilization-and-option-cost.md#accepted-decision-for-revolver-utilization-and-draw-spread-attribution).
+
+Structured-credit OAS fits the entitled buyer claim from the original
+valuation origin. Fit a continuous spread from settlement on frozen
+dated scenario cash and discount products. Require a strictly
+decreasing supported objective and a checked native-currency residual.
+[Accepted structured-credit OAS](docs/decisions/financial/valuations-structured-credit/17-oas-scenarios.md#accepted-decision-for-structured-credit-oas-and-settlement-spread-fitting).
+
+Agency CMOs use one qualified pass-through collateral ledger and one common
+dated waterfall. Bind PAC tiers to immutable planned ending balances and
+authorized support. Preserve class-specific accrual and settlement rights,
+including noncash funded Z accretion and a fixed buyer strip for Z-spread.
+[Accepted agency CMO and PAC](docs/decisions/financial/valuations-structured-credit/18-agency-cmo-and-pac.md#accepted-decision-for-agency-cmo-waterfalls-and-dated-pac-contracts).
+
+Borrowing-base facilities use one dated assessment for live eligibility,
+concentration, draw headroom and cures. Post funded draws once, recompute
+eligible assets and debt, and accrue fees on actual qualified unused
+capacity. Use the signed lender ledger and independent quote compounding.
+[Accepted borrowing-base facilities](docs/decisions/financial/valuations-structured-credit/19-borrowing-base-facility.md#accepted-decision-for-borrowing-base-facilities-and-lender-cashflows).
+
+Structured-credit quotes use a dated signed buyer ledger, delivered
+denomination and original-parent accrued. Identify the contractual
+projection and price authority. Use explicit yield and spread laws
+and verify a supported inverse on the returned native-currency price.
+[Accepted structured-credit quotes](docs/decisions/financial/valuations-structured-credit/20-quotes-and-inverse-pricing.md#accepted-decision-for-structured-credit-settlement-quotes-and-inversion).
+
+Structured-credit risk uses identified buyer strips or live holder
+reprices with qualified moves and units. Report breakeven default as
+an admitted loss-threshold crossing. Deterministic scenario grids retain
+asset authority and disclose the exposures affected by each stress.
+[Accepted structured-credit risk and scenarios](docs/decisions/financial/valuations-structured-credit/21-risk-bumps-and-scenarios.md#accepted-decision-for-structured-credit-risk-and-scenarios).
+
+Structured-credit reports derive cash, principal effects, claims and
+account diagnostics from the same dated ledger. Weight repayment life
+by eligible retired par and bind equity returns to an explicit cash
+investment. Keep a measured zero distinct from unavailable results.
+[Accepted structured-credit diagnostics and reporting](docs/decisions/financial/valuations-structured-credit/22-diagnostics-and-reporting.md#accepted-decision-for-structured-credit-diagnostics-and-reporting).
+
+Calibration admits bounded typed envelopes through one Rust semantic
+gate. Financial choices and identities come from explicit authoring
+or a qualified expanded preset. A draft report and a restored fit
+result each retain their own status.
+[Accepted calibration envelopes and authoring](docs/decisions/financial/calibration-framework/01-wire-and-authoring.md#accepted-decision-for-strict-calibration-envelopes-and-explicit-authoring).
+
+Calibration binds solver controls, fit residuals and post-fit validation
+to their own coordinates and policies. Compare exact quote age against
+the caller's limit. Publish the initial market only after typed key,
+source and context validation.
+[Accepted controls, freshness and initial market](docs/decisions/financial/calibration-framework/02-controls-and-market-context.md#accepted-decision-for-calibration-controls-freshness-and-initial-market).
+
+Calibration reads exact typed dependencies in authored order. Batch
+only where readers see the same admitted inputs as serial execution.
+Apply preflight, fit and output gates before publishing the complete
+market and report failures in authored order.
+[Accepted calibration dependencies and execution](docs/decisions/financial/calibration-framework/03-dependencies-and-execution.md#accepted-decision-for-calibration-dependencies-preflight-and-ordered-execution).
+
+Deposit and FRA calibration freeze the dated convention, contract and
+benchmark periods, target clock and exact curve bindings. Price on the
+admitted trade or projection basis and reuse prepared terms for replay.
+[Accepted deposit and FRA calibration](docs/decisions/financial/calibration-framework/04-deposit-fra-materialization.md#accepted-decision-for-deposit-and-fra-materialization-and-prepared-clocks).
+
+Listed rate-futures calibration binds the exact contract and benchmark
+window, projects only unresolved observations and fits original price
+points with explicit convexity and cash scaling. Use reference end
+on the target clock and preserve the prepared terms for replay.
+[Accepted listed rate-futures calibration](docs/decisions/financial/calibration-framework/05-futures-materialization.md#accepted-decision-for-listed-rate-futures-calibration-and-reference-periods).
+
+Swap calibration uses the resolved pay-fixed IRS ledger and exact dated
+fixing, projection and discount roles. The latest actual payment across
+both legs supplies the quote pillar on the target clock. Reuse the prepared
+terms and known fixings through fit and replay.
+[Accepted term and overnight swap calibration](docs/decisions/financial/calibration-framework/06-swap-materialization.md#accepted-decision-for-term-and-overnight-swap-calibration).
+
+Single-name CDS calibration binds exact terms and curves, resolves
+accrual, protection and settlement separately, uses literal contractual
+maturity on the hazard clock, and fits the selected buyer quote basis.
+[Accepted single-name CDS calibration](docs/decisions/financial/calibration-framework/07-cds-materialization.md#accepted-decision-for-single-name-cds-calibration-and-quote-settlement).
+
+Index tranche calibration uses one dated protection-buyer contract and
+recognized pool state. Scale the upfront and shared raw residual by
+original tranche notional and freeze exact model and market bindings.
+[Accepted index tranche calibration](docs/decisions/financial/calibration-framework/08-tranche-materialization.md#accepted-decision-for-index-tranche-calibration-and-quote-settlement).
+
+Cross-currency calibration binds sizing and valuation FX to their
+actual dated roles and uses one resolved native cash ledger. Set the
+quote pillar by the latest date required on the fitted foreign curve.
+[Accepted cross-currency calibration](docs/decisions/financial/calibration-framework/09-xccy-materialization.md#accepted-decision-for-cross-currency-swap-calibration-and-fx-authority).
+
+Sequential bootstrap admits one exact quote identity and represented
+coordinate per knot. Check each private knot and reprice every consumed
+quote on the complete artifact before applying the publication gates.
+[Accepted sequential bootstrap](docs/decisions/financial/calibration-framework/10-sequential-bootstrap.md#accepted-decision-for-sequential-bootstrap-and-final-repricing).
+
+Calibration scalar search retains feasibility gaps, exact sampled
+coordinates and candidate-specific Brent evidence. Enforce work
+limits independently of the financial fit gate.
+[Accepted bounded scalar search](docs/decisions/financial/calibration-framework/11-scalar-root-search.md#accepted-decision-for-bounded-scalar-search-and-candidate-evidence).
+
+Weighted global calibration uses one checked free-coordinate map and
+consistent weighted derivatives. Apply complete final quote and output
+gates to each candidate before ranking passing weighted norms.
+[Accepted weighted global solve](docs/decisions/financial/calibration-framework/12-weighted-global-solve.md#accepted-decision-for-weighted-global-solve-and-final-candidate-gates).
+
+Multi-start calibration uses a frozen indexed Halton design in the
+elected free coordinates. Gate every returned artifact, rank only
+passing candidates, and account for work across all starts.
+[Accepted deterministic multi-start](docs/decisions/financial/calibration-framework/13-deterministic-multi-start.md#accepted-decision-for-deterministic-multi-start-and-final-selection).
+
+Calibration reports retain one signed final row per consumed quote and
+compare its error to the effective native tolerance. Use tolerance ratios
+for plan summaries and derive success from the complete admission gates.
+[Accepted fit reports](docs/decisions/financial/calibration-framework/14-fit-reports.md#accepted-decision-for-fit-acceptance-and-report-semantics).
+
+Optional calibration diagnostics use the final admitted artifact and
+represented probe distances. Preserve signed derivatives and typed
+unavailability, and measure the weighted Jacobian directly.
+[Accepted calibration sensitivities](docs/decisions/financial/calibration-framework/15-sensitivity-diagnostics.md#accepted-decision-for-calibration-sensitivities-and-conditioning).
+
+Admit each final calibrated curve with checked source validity and required
+pricing support. Elect economic checks in native units with explicit coverage.
+Only measured advisory breaches can warn.
+[Accepted curve validation](docs/decisions/financial/calibration-framework/16-curve-validation.md#accepted-decision-for-curve-validation-and-publication).
+
+Validate each delivered Black surface with the accepted Rust diagnostic.
+Use qualified carry and exact overlap for calendars, and anchored
+unit-call constraints for strike shape. Required coverage governs publication.
+[Accepted surface validation](docs/decisions/financial/calibration-framework/17-surface-validation.md#accepted-decision-for-surface-validation-and-publication).
+
+Dated Hull–White calibration preserves the actual contract and independent
+model, curve and quote clocks. Publish the complete fitted family state
+atomically and preserve original sigma support dates.
+[Accepted dated Hull–White calibration](docs/decisions/financial/calibration-framework/18-hull-white-market-adapter.md#accepted-decision-for-dated-hull-white-quote-preparation-and-publication).
+
+Rate quote replay reproduces the original fitted evaluator on its
+bound source market and applies exact quote moves on the target market.
+Publish the accepted final fit and its construction record.
+[Accepted rate quote replay](docs/decisions/financial/calibration-framework/19-rate-quote-replay.md#accepted-decision-for-exact-rate-quote-replay-and-publication).
+
+Linked OIS replay binds one fitted evaluator to both typed roles.
+Project actual overnight observations with their contractual accrual and
+publish the admitted target fit and projection binding atomically.
+[Accepted linked single-curve OIS replay](docs/decisions/financial/calibration-framework/20-linked-ois-replay.md#accepted-decision-for-linked-single-curve-ois-replay-and-publication).
+
+Hazard quote replay qualifies the original evaluator and market.
+Use the bound par-risk inputs for spread actions and original observations
+for dependency and recovery replay. Publish the admitted target fit.
+[Accepted hazard quote replay](docs/decisions/financial/calibration-framework/21-hazard-quote-replay.md#accepted-decision-for-qualified-hazard-quote-replay-and-publication).
+
+Qualify a deal spread override on its own explicit par-risk center.
+A horizon refit uses model-derived quotes at exact surviving maturities
+and passes the elected dated integrated-hazard gate before publication.
+[Accepted deal override and horizon replay](docs/decisions/financial/calibration-framework/22-hazard-deal-and-horizon.md#accepted-decision-for-deal-overrides-and-horizon-hazard-replay).
+
+Recalibration caches use exact, separate source and target keys within
+one request and one immutable market state. Bound retention, retain only
+accepted evidence and release failed slots.
+[Accepted recalibration caching](docs/decisions/financial/calibration-framework/23-recalibration-cache.md#accepted-decision-for-exact-request-local-recalibration-caching).
+
+Rate calibration elects positive factor interpolation, literal tails and
+a fit method supported by the prepared dependencies. Reprice each quote
+on the exact artifact bound for publication.
+[Accepted rate-curve interpolation and calibration](docs/decisions/financial/calibration-targets/0032-curve-interpolation-and-calibration.md#accepted-decision-for-explicit-rate-curve-interpolation-and-calibration).
+
+Calibration quotes preserve exact identity, date roles and native units.
+Validate every supplied quote and report the explicitly consumed IDs.
+[Accepted calibration quote contracts](docs/decisions/financial/calibration-targets/01-quote-contracts.md#accepted-decision-for-exact-typed-calibration-quotes-and-native-units).
+
+Freeze prepared rate contracts, curve clocks, role bindings and residual scales.
+Apply each native fit tolerance on the delivered evaluator, including for
+zero-weight quotes.
+[Accepted rate preparation and fit residuals](docs/decisions/financial/calibration-targets/02-rate-preparation-and-residuals.md#accepted-decision-for-explicit-rate-preparation-and-native-fit-residuals).
+
+Discount bootstrap requires actual prefix-independent pricing dependencies.
+Bind the fitted discount role to its output identity in every private
+evaluation and reprice that exact evaluator before publishing.
+[Accepted discount calibration](docs/decisions/financial/calibration-targets/03-discount-calibration.md#accepted-decision-for-explicit-discount-calibration-and-delivered-curve-fit).
+
+Projection calibration fits positive factors for one exact index on a
+declared grid. Require live observations that identify the free
+parameters and reprice the exact output at contractual accruals.
+[Accepted projection calibration](docs/decisions/financial/calibration-targets/04-forward-calibration.md#accepted-decision-for-simultaneous-calibration-of-index-projection-factors).
+
+Single-name hazard calibration fits live CDS buyer PV at fixed recovery
+on literal contractual maturities. Preserve original settlements and
+qualify model-derived par-spread replay on its own basis.
+[Accepted single-name hazard calibration](docs/decisions/financial/calibration-targets/05-hazard-calibration.md#accepted-decision-for-explicit-single-name-hazard-calibration-and-par-risk-qualification).
+
+CPI calibration keeps the unlagged source origin separate from
+contractual references. Freeze the fixing cutoff and reprice each
+live swap on the delivered CPI source.
+[Accepted CPI calibration](docs/decisions/financial/calibration-targets/06-inflation-calibration.md#accepted-decision-for-explicit-cpi-anchors-and-delivered-inflation-calibration).
+
+Cross-currency calibration fixes one collateral basis and separates booked
+principal sizing from valuation FX. Reprice the actual dated cash ledger
+on the delivered foreign evaluator.
+[Accepted cross-currency calibration](docs/decisions/financial/calibration-targets/07-xccy-calibration.md#accepted-decision-for-collateral-qualified-foreign-discount-calibration).
+
+NS/NSS calibration prices on the checked analytic evaluator throughout
+the fit. Require identifiable free parameters and gate the exact analytic
+model before publishing it under its discount role.
+[Accepted NS/NSS calibration](docs/decisions/financial/calibration-targets/08-parametric-calibration.md#accepted-decision-for-calibration-on-the-analytic-nsnss-discount-source).
+
+Equity smile calibration binds exact live quotes, one spot authority,
+one carry election and dated funding. Determine dividend entitlement
+at fixing and discount each retained cash right at its payment date.
+[Accepted equity smile forwards](docs/decisions/financial/calibration-targets/09-equity-forward-inputs.md#accepted-decision-for-explicit-equity-spot-carry-and-dated-smile-forwards).
+
+Materialize equity smiles at literal strikes and reprice every consumed
+quote on the delivered grid. Keep fitted-slice tails distinct from grid
+lookup and measure calendar coverage on qualified fixed moneyness.
+[Accepted surface materialization](docs/decisions/financial/calibration-targets/10-total-variance-materialization.md#accepted-decision-for-explicit-total-variance-materialization-and-delivered-surface-fit).
+
+Equity SABR uses literal fixed beta, unshifted Black and one optimizer
+quote per strike. Gate every consumed native quote before ranking
+slice candidates and again on the delivered grid.
+[Accepted equity SABR calibration](docs/decisions/financial/calibration-targets/11-equity-sabr.md#accepted-decision-for-fixed-beta-equity-sabr-and-native-slice-acceptance).
+
+Equity SVI requires a fitted-slice density scan, including on the
+analytic constant path. Reprice every consumed native quote on its
+fitted slice and on the delivered grid.
+[Accepted equity SVI calibration](docs/decisions/financial/calibration-targets/12-equity-svi.md#accepted-decision-for-raw-equity-svi-and-mandatory-fitted-slice-density).
+
+Swaption calibration binds each construction forward to an exact
+dated reference and quote-volatility clock. Compute par from eligible
+dated fixed and floating cash on qualified market sources.
+[Accepted swaption calibration forwards](docs/decisions/financial/calibration-targets/13-swaption-forwards.md#accepted-decision-for-dated-swaption-coordinates-and-calibration-forwards).
+
+Swaption SABR fits exact dated smiles and constructs the cube only
+from genuine fitted support. Apply native quote gates at the smile
+and replay every consumed quote through the delivered cube.
+[Accepted swaption SABR calibration](docs/decisions/financial/calibration-targets/14-swaption-cube.md#accepted-decision-for-exact-sabr-swaption-smiles-and-strict-cube-publication).
+
+Base-correlation calibration identifies one knot per fitted
+detachment with a fixed attachment basis. Gate each knot and
+the completed dated curve on native tranche repricing.
+[Accepted base-correlation calibration](docs/decisions/financial/calibration-targets/15-base-correlation.md#accepted-decision-for-identified-base-correlation-bootstrap-and-atomic-publication).
+
+Single-tranche Student-t calibration freezes a declared flat
+correlation and requires a resolved df response on the fitted
+branch. Reprice the actual returned df in native quote units.
+[Accepted Student-t calibration](docs/decisions/financial/calibration-targets/16-student-t.md#accepted-decision-for-identified-single-tranche-student-t-calibration).
+
+Curve replay preserves original quotes and exact prepared bindings.
+Qualify the complete source evaluator on its original market before
+admitting the refit on the selected target market.
+[Accepted rate and hazard construction and replay](docs/decisions/financial/calibration-targets/17-calibration-replay.md#accepted-decision-for-exact-rate-and-hazard-construction-and-qualified-replay).
+
+Hull–White calibration selects a dated or numeric profile explicitly.
+Bind fit origin and exact source roles, keep model and quote clocks
+distinct, and require native quote acceptance on the returned fit.
+[Accepted Hull–White calibration entry](docs/decisions/financial/calibration-rate-models/01-curve-entry-and-quote-domains.md#accepted-decision-for-explicit-hull-white-calibration-entry-and-quote-domains).
+
+Hull–White cap calibration uses one prepared live term strip for
+quote pricing, model repricing and implied Normal volatility.
+Check the returned volatility against gross PV and quote time value.
+[Accepted cap and floor calibration](docs/decisions/financial/calibration-rate-models/02-cap-schedules-and-quote-inversion.md#accepted-decision-for-checked-cap-and-floor-strips-and-implied-normal-inversion).
+
+Hull–White ATM swaption calibration uses the prepared swap's
+par forward and annuity. Reconstruct and reprice the original
+quote convention before applying the native fit gate.
+[Accepted ATM swaption calibration](docs/decisions/financial/calibration-rate-models/03-atm-swaption-quotes.md#accepted-decision-for-exact-atm-swaption-targets-and-native-quote-reconstruction).
+
+Synthetic Hull–White swaptions use the admitted regular Jamshidian
+profile. Gate the exercise residual in PV units and preserve signed
+bond put weights and positive-variance pricing.
+[Accepted synthetic Jamshidian decomposition](docs/decisions/financial/calibration-rate-models/04-jamshidian-decomposition.md#accepted-decision-for-checked-synthetic-jamshidian-decomposition).
+
+Dated Hull–White calibration integrates the prepared signed swap
+payoff under the exercise-date measure. Gate weighted tails and
+missed exercise separately from the quadrature estimate and quote fit.
+[Accepted contractual Gaussian integration](docs/decisions/financial/calibration-rate-models/05-contractual-gaussian-integration.md#accepted-decision-for-checked-contractual-gaussian-swaption-integration).
+
 Valuation model inputs bind an exact source, unit, clock and parameter block.
 Use dated relative factors for GBM carry. Simulations retain explicit controls,
 exact seed identity and actual work. Apply each tree and quote control on its

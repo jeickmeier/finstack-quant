@@ -29,7 +29,7 @@ Require at least one valid Normal cap/floor quote, finite positive fit tolerance
 
 This is an explicit public bootstrap or the engine's `volatility_mode=piecewise`; scalar remains the engine default. Multiple strikes or cap/floor sides can be used at distinct maturities, but there is one equation per newly fitted segment. Sorting accepts out-of-order inputs; “strictly increasing maturities” describes the normalized order and uniqueness rather than requiring callers to pre-sort.
 
-σ is absolute rate volatility, κ inverse years, and interval times are ACT/365F years. Coupon accruals remain contractual. Unlike scalar fitting, this path applies no aggregate-vega admission gate. Model lookup/integration is delegated to the existing piecewise HW kernel, not approximated by an average σ. Output series date conversion and persistence belong to the [engine adapter](../calibration-framework/18-hull-white-market-adapter.md).
+σ is absolute rate volatility, κ inverse years, and interval times are ACT/365F years. Coupon accruals remain contractual. Unlike scalar fitting, this path applies no aggregate-vega admission gate. Model lookup/integration is delegated to the existing piecewise HW kernel, not approximated by an average σ. Dated sigma support and persistence belong to the [engine adapter](../calibration-framework/18-hull-white-market-adapter.md#accepted-decision-for-dated-hull-white-quote-preparation-and-publication).
 
 ## Limitations, failure and alternatives
 

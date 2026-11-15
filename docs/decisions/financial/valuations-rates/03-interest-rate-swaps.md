@@ -144,7 +144,7 @@
    Reconcile the existing swaption and CMS annuity consumers on their own
    cuts. See [margin repricing](../valuations-framework/margin-bridge.md),
    [valuation lifecycle](../valuations-framework/pricing-lifecycle.md) and
-   [swap materialization](../calibration-framework/06-swap-materialization.md).
+   [accepted swap materialization](../calibration-framework/06-swap-materialization.md#accepted-decision-for-term-and-overnight-swap-calibration).
 
 ## Observed behavior
 

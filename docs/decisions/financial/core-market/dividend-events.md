@@ -17,13 +17,14 @@ and [record12's validated scalar boundary](scalar-series-and-fixings.md#accepted
 
 The [accepted cash-equity carry and entitlement package](../valuations-equity-and-composition/02-spot-and-carry.md#accepted-decision-for-checked-cash-equity-valuation-and-dividend-carry)
 selects an ex-phase entitlement rule and actual payment-date discounting.
-[Smile forward inputs](../calibration-targets/09-equity-forward-inputs.md),
+[Accepted smile forward inputs](../calibration-targets/09-equity-forward-inputs.md#accepted-decision-for-explicit-equity-spot-carry-and-dated-smile-forwards),
 [option adapters](../valuations-equity-and-composition/07-black-tree-and-direct-greeks.md),
 [lattice dividends](../models-numerical/dividends-and-lattice-exercise.md),
 [Monte Carlo jumps](../models-monte-carlo/06-cash-dividend-jumps.md) and
-[TRS](../valuations-equity-and-composition/16-equity-trs.md) retain their remaining
-Draft pricing/carry/entitlement choices. No stock-price jump, reinvestment,
-withholding, escrow, exercise or corporate-action model is adopted here.
+[TRS](../valuations-equity-and-composition/16-equity-trs.md) own their
+pricing, carry and entitlement choices. Stock-price jumps, reinvestment,
+withholding, escrow, exercise and corporate-action models retain their
+own contracts.
 
 ## Foundational findings
 

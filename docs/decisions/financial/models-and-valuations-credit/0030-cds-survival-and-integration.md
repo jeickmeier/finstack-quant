@@ -66,7 +66,7 @@ treatment, hazard calibration, and quote-risk replay are separate choices.
 | Hazard representation and conditional default probability | [Hazard survival](../core-market/hazard-survival.md) |
 | Analytic index aggregation versus informational projected cashflows | [Index valuation](14-index-valuation.md) and [index inputs](../core-market/credit-index-composition.md) |
 | Quote-space credit/rate/recovery risk and margin fallback | [CDS/index risk](13-cds-and-index-risk.md) |
-| Quote contracts and fixed-recovery hazard fitting | [CDS materialization](../calibration-framework/07-cds-materialization.md) and [hazard calibration](../calibration-targets/05-hazard-calibration.md) |
+| Quote contracts and fixed-recovery hazard fitting | [Accepted CDS materialization](../calibration-framework/07-cds-materialization.md#accepted-decision-for-single-name-cds-calibration-and-quote-settlement) and [hazard calibration](../calibration-targets/05-hazard-calibration.md) |
 
 The owners retain numerical formulas, settings, source/test/reference evidence
 and material limitations. This selection does not adopt adjacent

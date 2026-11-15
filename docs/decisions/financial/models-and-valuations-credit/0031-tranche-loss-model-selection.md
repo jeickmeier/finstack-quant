@@ -64,7 +64,7 @@ migration are outside scope.
 | Premium and protection timing, realized settlement and the native valuation trace | [Accepted tranche projection](18-tranche-projection.md#accepted-decision-for-checked-tranche-cashflows-and-settlement) |
 | Quote and payoff risk, selected-model propagation and named default scenarios | [Accepted tranche risk](19-tranche-risk.md#accepted-decision-for-checked-tranche-risk-and-default-scenarios) |
 | Stored correlation interpolation, shocks and shape diagnostics | [Base-correlation representation](../core-market/base-correlation.md) |
-| Fixed-maturity correlation fitting and single-tranche tail-parameter fitting | [Base-correlation calibration](../calibration-targets/15-base-correlation.md) and [Student-t calibration](../calibration-targets/16-student-t.md) |
+| Fixed-maturity correlation fitting and single-tranche tail-parameter fitting | [Accepted base-correlation calibration](../calibration-targets/15-base-correlation.md#accepted-decision-for-identified-base-correlation-bootstrap-and-atomic-publication) and [Accepted Student-t calibration](../calibration-targets/16-student-t.md#accepted-decision-for-identified-single-tranche-student-t-calibration) |
 
 The owners retain formulas, units, numerical settings, failure branches and
 evidence. Generic copula integration and its tranche-specific integration

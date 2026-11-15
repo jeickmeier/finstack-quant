@@ -1,12 +1,20 @@
 # STATEMENTS-EVALUATION-002 — Scalar formulas, boolean control flow and undefined values
 
-Decision status: **Draft — observed implementation, adoption pending**. Implementation status: **Observed for the stated source scope**, with discrepancies identified below. Validation status: **Evidence inspected/located, not executed**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full scalar formulas and unavailable-value contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
-## Choice, input domain and conventions
+## Accepted decision for scalar formulas and unavailable values
+
+1. Use checked scalar arithmetic. Compare scalars at their represented values and same-currency money as exact decimals. Apply tolerance only when explicitly selected. Invalid domains, division or remainder by zero, and overflow produce errors. [Formula units and currency](../statements-contracts/05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency).
+2. Require Boolean controls and evaluate `if`, `and` and `or` lazily. A required condition that is unavailable yields an unavailable result. `is_missing` is true only for absence or a documented unavailable state. `coalesce` returns the first available value, including zero, or an unavailable result if no argument is available. It propagates errors from evaluated arguments. [Formula-check evaluation](../statements-contracts/15-formula-checks.md#accepted-decision-for-formula-checks-and-coverage).
+3. Require all operands of `sum`, `mean`, `min` and `max` to be available and propagate an unavailable operand. Use checked scalar accumulation and exact monetary arithmetic for the corresponding operations. [Monetary arithmetic](../core-conventions/012-money-decimal-precision.md#accepted-decision-monetary-precision-rounding-and-currency-identity).
+4. Scalar rounding takes an exact integer precision, defaults to zero decimal places and rounds midpoint ties away from zero. Monetary rounding requires an explicit scale and rounding mode. Clamp uses compatible, ordered bounds and includes both endpoints. [Monetary rounding](../core-conventions/012-money-decimal-precision.md#accepted-decision-monetary-precision-rounding-and-currency-identity).
+5. Require an explicit positive finite annualization factor. Annualize flows by multiplication. Annualize decimal rates using an explicit simple or compound method. Simple annualization uses `rate × factor`, and compound annualization uses `(1 + rate)^factor − 1`. The compound domain includes −100% and rejects rates below it.
+
+## Audited input domain and conventions
 
 The DSL evaluates floating-point expressions with operation-specific undefined handling. Arithmetic values preserve the declared node units established by semantic analysis; decimal rates remain decimal, and no implicit sign or currency conversion occurs in these kernels. The implementation rationale is direct compositional expression evaluation. Adoption is pending for individual numerical tolerances and missing-data operations, subject to accepted [ADR 0009](../conventions/0009-missing-and-invalid-data.md).
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 - Addition, subtraction, multiplication, negation, absolute value, floor/ceiling, power, logarithms, exponential and square root use ordinary `f64` behavior. Division/remainder by exact zero return NaN and a division diagnostic when a node identity is available. Other domain failures may propagate NaN/infinity until the result layer records them.
 - Equality uses `abs(a-b) <= 1e-10`; inequality uses `> 1e-10`. This is an absolute tolerance, independent of units or value scale. Both comparisons are false for a NaN difference. Ordered comparisons use normal IEEE comparisons. `sign` preserves NaN and maps infinities to their sign.
@@ -19,7 +27,7 @@ The DSL evaluates floating-point expressions with operation-specific undefined h
 
 Function dispatch is an explicit match over the parsed function enum. Standard handlers enforce their arity; cumulative and full-history statistics have the separate surplus-argument discrepancy in [record 04](04-historical-statistics-and-ewm.md). Formula evaluation errors propagate with active-node context; `coalesce` is not an error-recovery operator. Finite-only sums and ordinary arithmetic intentionally differ, so a blanket claim that all missing inputs fail or all missing inputs are skipped would be inaccurate.
 
-Alternatives include exact equality, scale-aware comparisons, explicit nullable values, strict finite-only arithmetic and separate Boolean types. None is adopted here. The absolute equality tolerance can be economically material for scaled amounts or tiny rates; its meaning depends on the input scale. The existing source documents the min/max choice; this audit does not classify that already documented behavior as a new defect.
+The audited equality tolerance is absolute and can affect scaled amounts and small rates. The current flow annualization handler requires an explicit factor. The rate handler still selects compounding through a numeric flag. [Current dispatch](../../../../finstack-quant/statements/src/evaluator/formula_dispatch.rs).
 
 ## Evidence
 

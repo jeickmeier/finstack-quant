@@ -156,7 +156,7 @@
    owners qualify coupled draws, paths, loss and waterfall estimation. See
    [Monte Carlo estimation](../models-monte-carlo/01-engine-and-estimation.md),
    [streams and seed](../models-monte-carlo/02-random-streams.md) and
-   [stochastic waterfall](../valuations-structured-credit/15-stochastic-waterfall.md).
+   [stochastic waterfall](../valuations-structured-credit/15-stochastic-waterfall.md#accepted-decision-for-stochastic-waterfall-pricing-and-estimation).
 
 10. **Publish complete results with honest availability.** Finish the
     requested calculation before publishing, and check denominations,
@@ -176,7 +176,7 @@
     interval confidence. Reconcile Rust builders, serde, Python, WASM,
     schemas and reporting through existing routes, including dedicated
     pricing and restore entry points. See
-    [structured-credit reports](../valuations-structured-credit/22-diagnostics-and-reporting.md)
+    [structured-credit reports](../valuations-structured-credit/22-diagnostics-and-reporting.md#accepted-decision-for-structured-credit-diagnostics-and-reporting)
     and [metric reporting](metric-orchestration.md).
 
 ## Observed behavior

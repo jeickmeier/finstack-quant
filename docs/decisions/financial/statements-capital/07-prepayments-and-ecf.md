@@ -1,15 +1,19 @@
 # STATEMENTS-CAPITAL-007: Independent prepayment buckets and excess-cash-flow sweep
 
-**Decision status:** Draft — observed implementation; adoption pending.
-**Implementation status:** Observed for the source scope and discrepancies stated below.
-**Validation status:** Evidence inspected or located, not executed; numerical qualification remains open.
+**Decision status:** Accepted for the full prepayment and excess-cash-flow sweep contract (2026-11-15).
+**Implementation status:** Reconciliation pending. The audited path uses a fixed sweep formula, implicit broad eligibility and floors negative requests to zero.
+**Validation status:** Existing source and regression evidence mapped. Independent agreement and allocation qualification remain pending.
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; [scope and file ledger](README.md).
 
-## Choice and rationale
+## Accepted decision for agreement-defined prepayments and ECF sweeps
 
-Mandatory, voluntary and ECF prepayments are independently sized and execute at their configured position in the shared cash/principal stack. Earlier rungs consume capacity; later contractual or targeted payments reserve none. This preserves the configured category/class priority rather than silently privileging future scheduled amortization.
+1. Opt in separately to each at-par mandatory prepayment, voluntary prepayment and excess-cash-flow (ECF) sweep. Execute each in its configured waterfall position. Model the agreement's eligibility and select named facilities or explicitly elect all eligible facilities. Require supported payoff terms for any applicable premium or other payoff economics. [Prepayment instrument scope](01-instrument-construction.md#accepted-decision-for-opt-in-waterfall-prepayments).
+2. Elect the agreement's ECF formula and its measurement, trigger, payment and principal effective dates. Evaluate finite, signed inputs in the waterfall currency. Apply the elected fraction in `[0,1]` to positive ECF. Elect each deduction and credit explicitly. When a deduction or credit is based on paid debt service, use the current amounts actually allocated by earlier waterfall priorities. Reject missing or invalid inputs and negative mandatory or voluntary prepayment requests.
+3. Limit payment by the request, remaining cash and eligible economic principal net of reserves. Use the accepted priority, dated claim and schedule replay policies. Report requested, paid and unpaid amounts. Carry an unpaid amount as arrears only when a dated contractual obligation establishes it. [Dated principal claims](04-dated-principal.md#accepted-decision-for-dated-principal-claims) · [Residual coupon rebuilding](05-residual-coupons.md#accepted-decision-for-residual-coupon-rebuilding) · [Waterfall allocation](06-priority-allocation.md#accepted-decision-for-waterfall-cash-allocation-and-conservation).
 
-## ECF sizing and allocation
+For example, an agreement-defined cash measure of \$95 with \$35 in elected deductions yields \$60 of ECF. A 50% sweep requests \$30. With \$22 remaining in the cash pool and \$18 of eligible principal after reserves, the waterfall pays \$18 and leaves \$4 in the pool.
+
+## Observed ECF sizing and allocation
 
 For the current period evaluate finite node/formula values in the waterfall currency. Omitted tax, capital expenditure and change-in-working-capital nodes contribute zero. They are subtracted with their supplied sign; negative taxes/capex/working-capital use increases ECF. EBITDA is required. Cash interest uses an explicit override if present, else interest **actually paid by earlier priorities**, including arrears, and is floored at zero.
 
@@ -21,9 +25,9 @@ At Sweep, apply only the configured ECF amount. An optional target must exactly 
 
 Mandatory/voluntary rungs separately evaluate their sizing expressions, floor negative requests to zero, and use the same generic allocation without an ECF target. For any prepayment, budget is `max(min(requested,remaining_cash),0)`, additionally bounded by each row's remaining economic principal. Record only actual allocated cash, reduce both available cash and capacity, and increment the corresponding audit component. Requests exceeding capacity leave unused cash for later rungs/equity.
 
-## Controls, alternatives and limitations
+## Observed controls and limitations
 
-Specs reject missing/mismatched sizing-node priorities; positive ECF without Sweep fails even when another prepayment priority exists. Missing target IDs and nonfinite values fail. All prepayments are at par: premiums, penalties, legal restricted-payment tests and OID accretion are absent. Earlier principal cannot be repaid again, and no later payment can manufacture arrears against extinguished capacity.
+The corresponding priority and sizing input must be supplied together for each prepayment, including a zero-percentage ECF sweep. Missing target IDs and nonfinite values fail. All prepayments are at par without premiums, penalties, legal restricted-payment tests or OID accretion. Earlier principal cannot be repaid again, and no later payment can manufacture arrears against extinguished capacity. [Accepted prepayment selection](01-instrument-construction.md#accepted-decision-for-opt-in-waterfall-prepayments).
 
 Real credit agreements often define addbacks, thresholds, leverage step-downs, exclusions, mandatory-prepayment credits and permitted carryforwards. Those are not inferred here. They can be represented partly in supplied formulas, but the fixed deduction/order contract still applies. Alternative reserving of future debt service would change seniority and cash timing.
 

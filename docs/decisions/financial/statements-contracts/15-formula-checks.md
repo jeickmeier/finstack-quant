@@ -1,16 +1,24 @@
 # STATEMENTS-CONTRACTS-015: Formula checks, residual tolerances and insufficient-data classification
 
-**Decision status:** Draft (observed implementation; adoption pending).
+**Decision status:** Accepted for the full Statements formula-check contract (2026-11-15).
 
-**Implementation status:** Observed for the source responsibilities stated below; discrepancies are identified explicitly.
+**Implementation status:** Reconciliation pending. The audited check infers mode from tolerance and can skip an expression before it evaluates a missing-data fallback.
 
-**Validation status:** Evidence inspected/located, not executed. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice README](README.md)).
+**Validation status:** Existing source and regression evidence mapped. Independent qualification of formula modes, branch selection, coverage and errors remains pending.
 
-## Choice and input domain
+**Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
+
+## Accepted decision for formula checks and coverage
+
+1. Select the check mode and the scope of actual periods, forecast periods or both explicitly. In Predicate mode, require a Boolean formula. True passes and false records a breach at the configured severity. In Residual mode, compare a signed scalar or monetary result against typed zero. Use an absolute tolerance with matching units and, for monetary residuals, matching currency. The tolerance defaults to typed zero. A residual passes when its absolute value is at most the tolerance. Retain actual, expected, signed difference and tolerance as typed comparison details. [Numerical comparison and suite outcomes](14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
+2. Validate the full AST, including every branch, all identifiers and units, and capital reporting scopes. Evaluate using current values, history and capital state from the verified evaluation run. Consume observations lazily on the paths evaluation takes. Use explicit `coalesce` for missing-data fallback. [Formula validation](04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation) · [Capital reporting scopes](../statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
+3. An optional Boolean eligibility condition can mark a period out of scope when false. An unavailable eligibility condition or a needed observation that is missing or unavailable makes the comparison incomplete. Invalid consumed inputs, division by zero, domain errors and arithmetic overflow produce execution errors even for an advisory check. [Data-quality validity and coverage](13-data-quality-checks.md#accepted-decision-for-data-quality-coverage-and-validity).
+
+## Audited input domain
 
 FormulaCheckSpec reuses the canonical statements parser, unit inference and evaluator. It runs over every model period and supports either a numeric residual against zero (tolerance supplied) or finite numeric truthiness (no tolerance). Check severity is caller-selected; failed Warning checks remain advisory.
 
-## Algorithm and controls
+## Audited algorithm and controls
 
 1. Validate config and optional finite nonnegative tolerance. Parse the formula, reconcile all available model/result unit metadata and capital-structure currencies, infer dimensions and compile. Dimension errors are fatal; the final expression is not required to have Scalar type.
 2. Build complete model-aligned node history and period capital-structure snapshots from supplied results.
@@ -26,13 +34,11 @@ Preflight examines all syntactic direct dependencies, including coalesce alterna
 
 No formula-specific period scope, materiality calculation, result model-hash validation or proof of complete history is added here. Tolerance-bearing monetary residuals are allowed, but a monetary nonzero expression without tolerance is also accepted as truthy. Configure the intended residual/predicate deliberately.
 
-Alternative policies could defer missing handling to a lazy expression evaluator or distinguish missing-data, invalid-domain and arithmetic-overflow failures. Such choices require tests that preserve the difference between a financial failure and an unjudgeable period.
+The accepted check contract uses lazy observation consumption and distinguishes a breached check, incomplete comparison and execution error. Implementation awaits reconciliation.
 
 ## Evidence
 
 [Formula check implementation](../../../../finstack-quant/statements/src/checks/formula.rs), [dependency helper](../../../../finstack-quant/statements/src/utils/formula.rs), [formula check tests](../../../../finstack-quant/statements/tests/checks/formula_check_tests.rs) and [unit regressions](../../../../finstack-quant/statements/tests/finance_accounting_regressions.rs) are the evidence. Inspected tests cover missing current cells, non-finite inputs, lag before history, capital-structure references and division by zero over finite inputs. They demonstrate canonical-engine integration, not an independent financial model comparison.
-
-The described advisory behavior is observed implementation, not approval of its failure classification.
 
 ## Follow-up tracking
 

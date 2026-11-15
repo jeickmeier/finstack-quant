@@ -235,15 +235,22 @@ The complete 27-decision package was accepted on 2026-11-10.
     and auto shift. Pass its native quote cap and explicit fit
     controls. Keep source preparation, materialization and
     published-surface repricing with its target owner.
+   For the equity target, use the explicitly elected single optimizer
+   quote per strike. Apply required native checks for any selected
+   same-strike companion quotes before ranking starts. Preserve exact
+   target quote identities and their separate residual rows.
+   [Accepted equity SABR calibration](../calibration-targets/11-equity-sabr.md#accepted-decision-for-fixed-beta-equity-sabr-and-native-slice-acceptance).
 
 25. **Reconcile the actual swaption target.** Pass the qualified
     quote convention, actual displacement, literal beta and
     explicitly selected fit mode. Admit signed or zero shifted
     Black when effective levels qualify. Do not force beta-zero
     or pinning from a Normal tag. A selected pin uses an exact
-    observed strike at the prepared forward. Bucket failures and
-    publication belong to the target owner. Preserve separate
-    accepted model, source and off-grid contracts.
+    observed strike at the prepared forward. The target owns exact
+    smile grouping, permitted node construction, native delivered
+    replay and atomic publication. Preserve separate accepted model,
+    source and off-grid contracts.
+    [Accepted swaption SABR cube calibration](../calibration-targets/14-swaption-cube.md#accepted-decision-for-exact-sabr-swaption-smiles-and-strict-cube-publication).
 
 26. **Reconcile existing hosts and configuration.** Use the
     immutable request and controls on the direct Python/WASM
