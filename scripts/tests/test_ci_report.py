@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 from scripts import ci_report
@@ -10,6 +11,19 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     import pytest
+
+
+def test_rust_report_discovers_fresh_coverage_profile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A coverage run must not report an older uninstrumented test result."""
+    monkeypatch.setenv("CARGO_TARGET_DIR", str(tmp_path))
+    stale = tmp_path / "nextest/ci/junit.xml"
+    fresh = tmp_path / "llvm-cov-target/nextest/coverage/junit.xml"
+    for path, timestamp in [(stale, 1), (fresh, 2)]:
+        path.parent.mkdir(parents=True)
+        path.write_text("<testsuites/>", encoding="utf-8")
+        os.utime(path, (timestamp, timestamp))
+
+    assert ci_report._resolve_default_rust_junit() == fresh
 
 
 def test_build_rust_report_with_junit_and_lcov(tmp_path: Path) -> None:

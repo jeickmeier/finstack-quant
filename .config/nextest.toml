@@ -23,6 +23,17 @@ path = "junit.xml"
 store-success-output = false
 store-failure-output = true
 
+[profile.coverage]
+# Instrumentation slows the fast suite substantially. Keep its test selection,
+# but bound each instrumented test at 10 min rather than the 60 s PR budget.
+slow-timeout = { period = "60s", terminate-after = 10 }
+fail-fast = false
+
+[profile.coverage.junit]
+path = "junit.xml"
+store-success-output = false
+store-failure-output = true
+
 [profile.slow]
 # The `#[ignore]` slow suite (`--slow` on the mise rust-test* tasks): tests too
 # long for the 60 s PR-gate budget. Report SLOW at 60 s and kill at 10 min

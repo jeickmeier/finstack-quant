@@ -34,7 +34,7 @@ release practice is in [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md).
 CI does not reimplement the build. Almost every job provisions the pinned
 toolchain with `jdx/mise-action` and then runs a canonical `mise` task, so
 those jobs run exactly the commands you can run locally. The exception is the
-per-test time cap, which is CI-only; reproduce it with
+per-test profile; reproduce the fast tier with
 `NEXTEST_PROFILE=ci mise run rust-test`. The ignored slow suite (`mise run rust-test --slow`)
 runs under nextest's `slow` profile, locally and in CI, which kills a test at
 10 minutes instead of 60 s. Toolchain versions live in
@@ -77,8 +77,7 @@ fails the run on its own:
 
 The tier's budget is under 15 minutes wall clock on a warm `master` cache. The
 `ci` nextest profile (`.config/nextest.toml`) reports a test as slow at 20 s
-and kills it at 180 s, a runaway guard. The per-test budget is 60 s, and the
-cap tightens to it once the slow tests are measured on CI and moved out. A
+and kills it at 60 s. A
 test that needs more than 60 s belongs in the slow suite: mark it
 `#[ignore = "slow: <reason>"]`, and `mise run rust-test --slow` runs it, as
 does the full tier. The task sends CCM exporter output to a temporary directory
@@ -117,7 +116,10 @@ one step of `mise run all --full`:
 
 - **Rust coverage** (`rust-test --coverage`) and **Python coverage**
   (`python-test --coverage`) are CI-only; they upload `coverage/rust/lcov.info`
-  and `coverage/python/coverage.xml`.
+  and `coverage/python/coverage.xml`. Rust coverage uses nextest's `coverage`
+  profile: the same non-ignored tests as the fast tier, with a 10-minute
+  per-test cap for instrumentation overhead. The fast tier retains its
+  60-second cap; the coverage job also retains its 90-minute wall-clock limit.
 - **SonarQube** (`SonarSource/sonarqube-scan-action`) runs on `master` only,
   after both coverage jobs, so it is skipped in a release run and on a
   dispatched branch. It only scans: it imports the two coverage artifacts, runs
