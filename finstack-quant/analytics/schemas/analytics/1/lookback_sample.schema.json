@@ -10,6 +10,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Observation count and actual holding bounds for a lookback return.",
+  "examples": [
+    {
+      "holding_end": "2025-01-08",
+      "holding_start": "2025-01-01",
+      "n_obs": 7
+    }
+  ],
   "properties": {
     "holding_end": {
       "anyOf": [

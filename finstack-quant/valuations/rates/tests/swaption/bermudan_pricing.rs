@@ -835,6 +835,7 @@ fn test_registry_default_prices_with_instrument_hw1f_overrides() {
 /// mathematically. That reduction need not reproduce the former unpaired mean
 /// bit-for-bit; the allowance below is only floating-point rounding, not MC error.
 #[test]
+#[ignore = "slow: two full-default LSMC valuations exceed the 60s CI budget; covered by mise run rust-test --slow"]
 fn lsmc_default_mc_pv_unchanged() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
     let swap_end = Date::from_calendar_date(2030, Month::January, 1).expect("Valid date");

@@ -10,6 +10,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Drawdown episode with start, valley, optional recovery, and max drawdown.",
+  "examples": [
+    {
+      "duration_days": 3,
+      "end": "2025-01-05",
+      "max_drawdown": -0.0294117647059,
+      "start": "2025-01-02",
+      "valley": "2025-01-03"
+    }
+  ],
   "properties": {
     "duration_days": {
       "description": "Calendar days from peak to recovery, or last observation when open.",

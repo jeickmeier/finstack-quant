@@ -105,6 +105,83 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Lookback returns for each period horizon.",
+  "examples": [
+    {
+      "fiscal_config": {
+        "start_day": 1,
+        "start_month": 1
+      },
+      "fytd": [
+        0.06,
+        0.05
+      ],
+      "fytd_samples": [
+        {
+          "holding_end": "2025-01-08",
+          "holding_start": "2025-01-01",
+          "n_obs": 7
+        },
+        {
+          "holding_end": "2025-01-08",
+          "holding_start": "2025-01-01",
+          "n_obs": 7
+        }
+      ],
+      "mtd": [
+        0.06,
+        0.05
+      ],
+      "mtd_samples": [
+        {
+          "holding_end": "2025-01-08",
+          "holding_start": "2025-01-01",
+          "n_obs": 7
+        },
+        {
+          "holding_end": "2025-01-08",
+          "holding_start": "2025-01-01",
+          "n_obs": 7
+        }
+      ],
+      "qtd": [
+        0.06,
+        0.05
+      ],
+      "qtd_samples": [
+        {
+          "holding_end": "2025-01-08",
+          "holding_start": "2025-01-01",
+          "n_obs": 7
+        },
+        {
+          "holding_end": "2025-01-08",
+          "holding_start": "2025-01-01",
+          "n_obs": 7
+        }
+      ],
+      "ref_date": "2025-01-08",
+      "ticker_names": [
+        "FUND",
+        "BENCH"
+      ],
+      "ytd": [
+        0.06,
+        0.05
+      ],
+      "ytd_samples": [
+        {
+          "holding_end": "2025-01-08",
+          "holding_start": "2025-01-01",
+          "n_obs": 7
+        },
+        {
+          "holding_end": "2025-01-08",
+          "holding_start": "2025-01-01",
+          "n_obs": 7
+        }
+      ]
+    }
+  ],
   "properties": {
     "fiscal_config": {
       "$ref": "#/$defs/FiscalConfig",
