@@ -5,19 +5,22 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
+import pytest
+
 from scripts import ci_report
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    import pytest
 
-
-def test_rust_report_discovers_fresh_coverage_profile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("coverage_dir", ["nextest/coverage", "llvm-cov-target/nextest/coverage"])
+def test_rust_report_discovers_fresh_coverage_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, coverage_dir: str
+) -> None:
     """A coverage run must not report an older uninstrumented test result."""
     monkeypatch.setenv("CARGO_TARGET_DIR", str(tmp_path))
     stale = tmp_path / "nextest/ci/junit.xml"
-    fresh = tmp_path / "llvm-cov-target/nextest/coverage/junit.xml"
+    fresh = tmp_path / coverage_dir / "junit.xml"
     for path, timestamp in [(stale, 1), (fresh, 2)]:
         path.parent.mkdir(parents=True)
         path.write_text("<testsuites/>", encoding="utf-8")
