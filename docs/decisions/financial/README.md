@@ -2244,6 +2244,48 @@ and shape, strict native Black lookup, checked ATM premium conversion,
 returned-scale replay and explicit fit consumption.
 [CALIBRATION-RATE-MODELS-009](calibration-rate-models/09-lmm-rebonato-calibration.md#accepted-decision-for-single-slice-lmm-loading-scale-calibration).
 
+Scenario specification and composition were accepted on 2026-11-15.
+The package covers checked ingress, stable immediate-block order,
+explicit IDs and units, exact active targets and roll admission.
+[SCENARIOS-001](scenarios/01-specification-and-composition.md#accepted-decision-for-checked-scenario-specifications-and-ordered-composition).
+
+Ordered and atomic scenario execution was accepted on 2026-11-15.
+It covers preflight, serial phases and failure order, checked statement
+evaluation, atomic publication and request-local replay state.
+[SCENARIOS-002](scenarios/02-execution-and-partial-success.md#accepted-decision-for-ordered-and-atomic-scenario-execution).
+
+Scenario hierarchy expansion and overlap were accepted on 2026-11-15.
+The package covers opening selection, typed precedence, execution-stage
+binding and ordered retained or suppressed selection evidence.
+[SCENARIOS-003](scenarios/03-hierarchy-resolution.md#accepted-decision-for-typed-scenario-hierarchy-expansion-and-overlap).
+
+FX and equity scenario shocks were accepted on 2026-11-15. The
+package covers frozen directional FX pairs, scoped cross-rate
+advisories and checked scaling of exact price-qualified equity targets.
+[SCENARIOS-004](scenarios/04-fx-and-equity-shocks.md#accepted-decision-for-frozen-fx-and-checked-equity-scenario-shocks).
+
+Direct rate and CPI scenario shocks were accepted on 2026-11-15.
+The package covers exact typed sources, continuous-zero factor
+changes, original clocks and anchors, and CPI pillar growth changes.
+[SCENARIOS-005](scenarios/05-direct-rate-shocks.md#accepted-decision-for-typed-direct-rate-and-cpi-parameter-shocks).
+
+Scenario tenor matching and node delivery were accepted on 2026-11-15.
+The package covers exact source coordinates, direct evaluated factor
+shifts, explicitly identified native-pillar inverses and complete
+post-action residual checks.
+[SCENARIOS-006](scenarios/06-node-delivery-solve.md#accepted-decision-for-exact-scenario-coordinates-and-checked-node-delivery).
+
+Native hazard shocks and exact CDS scenario replay were accepted on
+2026-11-15. The package covers exact native or par-risk selection,
+bound original and staged markets, explicit replay elections and
+atomic delivery with fit evidence.
+[SCENARIOS-007](scenarios/07-hazard-quote-shocks.md#accepted-decision-for-native-hazard-shocks-and-exact-cds-scenario-replay).
+
+Commodity and volatility-index scenario shocks were accepted on
+2026-11-15. The package covers explicit percent and point units,
+source-owned level domains, and checked exact or evaluated delivery.
+[SCENARIOS-008](scenarios/08-commodity-and-vol-index.md#accepted-decision-for-typed-commodity-and-volatility-index-scenario-shocks).
+
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the
 accepted perspective/sign contracts; broader margin methodology retains its

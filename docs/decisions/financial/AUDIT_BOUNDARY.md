@@ -1832,6 +1832,46 @@ fitting, independent multi-forward comparison, restoration and host
 qualification remain pending.
 [CALIBRATION-RATE-MODELS-009](calibration-rate-models/09-lmm-rebonato-calibration.md#accepted-decision-for-single-slice-lmm-loading-scale-calibration).
 
+The accepted scenario specification and composition package has
+independent order, compounding and identity checks. Production
+execution, restoration and host qualification remain pending.
+[SCENARIOS-001](scenarios/01-specification-and-composition.md#accepted-decision-for-checked-scenario-specifications-and-ordered-composition).
+
+The accepted ordered and atomic scenario execution package has
+independent state-transition and error-order checks. Production
+execution, rollback and host qualification remain pending.
+[SCENARIOS-002](scenarios/02-execution-and-partial-success.md#accepted-decision-for-ordered-and-atomic-scenario-execution).
+
+The accepted scenario hierarchy expansion package has independent
+overlap arithmetic and JavaScript order checks. Production selection,
+rollback and host qualification remain pending.
+[SCENARIOS-003](scenarios/03-hierarchy-resolution.md#accepted-decision-for-typed-scenario-hierarchy-expansion-and-overlap).
+
+The accepted FX and equity scenario package has independent directional
+FX, cross-rate, equity compounding and multiplier boundary calculations.
+Production execution, restoration and host qualification remain pending.
+[SCENARIOS-004](scenarios/04-fx-and-equity-shocks.md#accepted-decision-for-frozen-fx-and-checked-equity-scenario-shocks).
+
+The accepted direct rate and CPI scenario package has independent
+projected term-rate, off-pillar composition and anchored CPI checks.
+Production execution, restoration and host qualification remain pending.
+[SCENARIOS-005](scenarios/05-direct-rate-shocks.md#accepted-decision-for-typed-direct-rate-and-cpi-parameter-shocks).
+
+The accepted scenario node delivery package has independent date,
+exact-width geometry and linear and log-linear delivery checks.
+Production execution, conditioning and host qualification remain pending.
+[SCENARIOS-006](scenarios/06-node-delivery-solve.md#accepted-decision-for-exact-scenario-coordinates-and-checked-node-delivery).
+
+The accepted hazard and CDS scenario package has independent native
+bucket and one-period intensity and par-spread calculations. Production
+replay, pricing, restoration and host qualification remain pending.
+[SCENARIOS-007](scenarios/07-hazard-quote-shocks.md#accepted-decision-for-native-hazard-shocks-and-exact-cds-scenario-replay).
+
+The accepted commodity and volatility-index scenario package has
+independent signed price, zero index level and interpolation checks.
+Production execution, restoration and host qualification remain pending.
+[SCENARIOS-008](scenarios/08-commodity-and-vol-index.md#accepted-decision-for-typed-commodity-and-volatility-index-scenario-shocks).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

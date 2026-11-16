@@ -1013,6 +1013,56 @@ two-factor profile, and a qualified unshifted Black quote on its own
 clock. Reprice the actual scale and gate its native quote before use.
 [Accepted LMM scale fit](docs/decisions/financial/calibration-rate-models/09-lmm-rebonato-calibration.md#accepted-decision-for-single-slice-lmm-loading-scale-calibration).
 
+Scenario composition stably orders immediate input blocks by priority,
+retains their exact action lists and binds an explicit result ID. Use
+one checked specification contract and require exact active targets.
+Admit a roll-only request only as the sole operation.
+[Accepted scenario specification and composition](docs/decisions/financial/scenarios/01-specification-and-composition.md#accepted-decision-for-checked-scenario-specifications-and-ordered-composition).
+
+Scenario execution freezes opening hierarchy membership, binds each
+active action at its execution point and preserves serial phase and
+action order. Publish market, date, inventory and statement changes
+only after every required phase and the success result pass admission.
+Use request-local recalibration caches on registered immutable states.
+[Accepted scenario execution](docs/decisions/financial/scenarios/02-execution-and-partial-success.md#accepted-decision-for-ordered-and-atomic-scenario-execution).
+
+Scenario hierarchy actions resolve once in opening placement order.
+Apply overlap per exact typed source, retaining direct actions and
+all maximum-depth ties. Bind retained targets at execution and
+preserve the selector, matched path and retention evidence.
+[Accepted scenario hierarchy expansion](docs/decisions/financial/scenarios/03-hierarchy-resolution.md#accepted-decision-for-typed-scenario-hierarchy-expansion-and-overlap).
+
+An FX scenario pairs a frozen directional shock with diagnostics
+from the same admitted result. An equity scenario binds exact
+price-qualified targets and preserves scalar type and currency
+through checked scaling, including an intentional zero.
+[Accepted FX and equity shocks](docs/decisions/financial/scenarios/04-fx-and-equity-shocks.md#accepted-decision-for-frozen-fx-and-checked-equity-scenario-shocks).
+
+Direct rate scenarios shock discount and projection continuous-zero
+parameters on the original source clock, preserving the complete
+evaluator and earlier anchors. Direct CPI scenarios shock annual
+growth on the original positive source pillars and keep the CPI anchor.
+[Accepted direct rate and CPI shocks](docs/decisions/financial/scenarios/05-direct-rate-shocks.md#accepted-decision-for-typed-direct-rate-and-cpi-parameter-shocks).
+
+Scenario node delivery resolves exact coordinates on the retained
+source clock and checks every target on the delivered evaluator.
+Use exact target-centered shapes for evaluated rate-factor moves.
+An evaluated CPI or level inverse binds its adjustable native pillars
+and requires resolved local identification.
+[Accepted scenario node delivery](docs/decisions/financial/scenarios/06-node-delivery-solve.md#accepted-decision-for-exact-scenario-coordinates-and-checked-node-delivery).
+
+Scenario credit actions distinguish native intensity parameters from
+exact CDS par-risk inputs. Qualify immutable original replay inputs,
+bind the current staged target and publish the admitted curve and fit
+evidence together. Elect horizon requoting explicitly.
+[Accepted scenario hazard and CDS actions](docs/decisions/financial/scenarios/07-hazard-quote-shocks.md#accepted-decision-for-native-hazard-shocks-and-exact-cds-scenario-replay).
+
+Commodity scenarios apply relative percentages to exact price
+sources. Volatility-index scenarios apply absolute index points.
+Keep original level-source grids and domains, and check exact
+or evaluated delivery without inferring a spot anchor.
+[Accepted commodity and volatility-index shocks](docs/decisions/financial/scenarios/08-commodity-and-vol-index.md#accepted-decision-for-typed-commodity-and-volatility-index-scenario-shocks).
+
 Valuation model inputs bind an exact source, unit, clock and parameter block.
 Use dated relative factors for GBM carry. Simulations retain explicit controls,
 exact seed identity and actual work. Apply each tree and quote control on its

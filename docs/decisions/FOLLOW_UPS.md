@@ -2027,6 +2027,46 @@ requiring reproduction, adoption choices and missing validation are distinct.
   and explicit pricing consumption under the
   [accepted LMM scale fit](financial/calibration-rate-models/09-lmm-rebonato-calibration.md#accepted-decision-for-single-slice-lmm-loading-scale-calibration).
 
+- **Scenario specification and composition:** reconcile checked shared
+  ingress, exact identities, ordered blocks, typed operation units and
+  the single-roll and roll-only gates under the
+  [accepted specification](financial/scenarios/01-specification-and-composition.md#accepted-decision-for-checked-scenario-specifications-and-ordered-composition).
+
+- **Scenario execution:** reconcile serial phases, candidate-only
+  effects, checked statement results, atomic publication and exact
+  request-local replay under the
+  [accepted execution contract](financial/scenarios/02-execution-and-partial-success.md#accepted-decision-for-ordered-and-atomic-scenario-execution).
+
+- **Scenario hierarchy expansion:** reconcile exact typed effect
+  dispatch, strict checked host ingress and retained or suppressed
+  selection evidence under the
+  [accepted hierarchy adapter](financial/scenarios/03-hierarchy-resolution.md#accepted-decision-for-typed-scenario-hierarchy-expansion-and-overlap).
+
+- **Scenario FX and equity shocks:** reconcile frozen pair diagnostics,
+  exact price-qualified targets, checked wipeout and typed effect
+  evidence under the
+  [accepted FX and equity contract](financial/scenarios/04-fx-and-equity-shocks.md#accepted-decision-for-frozen-fx-and-checked-equity-scenario-shocks).
+
+- **Scenario direct rate and CPI shocks:** reconcile typed parameter
+  dispatch, original clocks and anchors, full factor-curve composition
+  and checked inflation rebuilding under the
+  [accepted direct shock contract](financial/scenarios/05-direct-rate-shocks.md#accepted-decision-for-typed-direct-rate-and-cpi-parameter-shocks).
+
+- **Scenario node delivery:** reconcile exact coordinate resolution,
+  target-centered factor geometry, explicitly identified inverse
+  parameters and complete native residual checks under the
+  [accepted delivery contract](financial/scenarios/06-node-delivery-solve.md#accepted-decision-for-exact-scenario-coordinates-and-checked-node-delivery).
+
+- **Scenario hazard and CDS actions:** reconcile distinct native
+  intensity and exact par-risk actions, original and target market
+  bindings, explicit horizon election and checked evidence under the
+  [accepted credit shock contract](financial/scenarios/07-hazard-quote-shocks.md#accepted-decision-for-native-hazard-shocks-and-exact-cds-scenario-replay).
+
+- **Scenario commodity and volatility-index shocks:** reconcile
+  dedicated relative-percent and absolute-point operations, signed
+  price and zero-level domains, and source-preserving delivery under
+  the [accepted level shock contract](financial/scenarios/08-commodity-and-vol-index.md#accepted-decision-for-typed-commodity-and-volatility-index-scenario-shocks).
+
 ### Implementation reconciliation
 
 - **Related scope:** retain the option-bearing CS01/OAS reconciliation above.

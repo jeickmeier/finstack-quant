@@ -1,12 +1,90 @@
 # SCENARIOS-006: Tenor matching and simultaneous native-interpolant shock delivery
 
-- Decision status: **Draft — observed implementation; adoption pending.**
-- Implementation status: **Observed for the stated source scope.** Actual discrepancies and unsupported cases are distinguished below.
-- Validation status: **Evidence inspected/located, not executed.** No numerical test, build or external benchmark run is claimed.
+- Decision status: **Accepted 2026-11-15 — complete exact tenor matching and checked simultaneous node delivery package.**
+- Implementation status: **Observed.** Reconciliation to the accepted package is pending.
+- Validation status: **Independent date mapping, exact-width geometry and simultaneous linear and log-linear delivery calculations verified.** Production execution, conditioning and host qualification remain pending.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - Scope: [inventory](README.md), [source coverage](coverage.json). Shared kernels are linked as dependencies, not reassigned implementations.
 
-## Choice and rationale
+## Accepted decision for exact scenario coordinates and checked node delivery
+
+1. **Resolve exact source coordinates.** Admit an actual date, a positive
+   tenor with an explicit origin and roll convention, or a native numeric
+   coordinate where supported by the source. Resolve the tenor to its actual
+   date and map once on the retained source clock. Use the selected view's
+   reference-coordinate difference for rate factors and original source
+   time for CPI and level curves. Reject repeated resolved coordinates,
+   including collisions of distinct dates. Retire approximate-year
+   fallback, epsilon snapping and the `0Y` pseudo-tenor.
+   [Accepted tenor arithmetic](../core-conventions/007-tenor-date-arithmetic.md#accepted-decision-tenor-and-date-arithmetic-conventions) ·
+   [ACT/365F definition](https://strata.opengamma.io/apidocs/com/opengamma/strata/basics/date/DayCounts.html#ACT_365F).
+
+2. **Require an explicit delivery choice.** Exact mode selects one eligible
+   original source pillar per request and applies the owner's direct
+   parameter shock. Evaluated delivery selects coordinates within the
+   original pillar span. Reject endpoint substitution and extrapolated
+   delivery. An actual origin pillar may be eligible for a native price or
+   volatility-index level. CPI's pinned origin and the evaluated zero rate
+   at the rate-factor conditioning reference are ineligible targets.
+   [Accepted direct rate and CPI parameters](05-direct-rate-shocks.md#accepted-decision-for-typed-direct-rate-and-cpi-parameter-shocks) ·
+   [Accepted level pillars](../core-market/price-curves.md#accepted-decision-explicit-level-pillars-and-parameter-shocks).
+
+3. **Deliver evaluated rate-factor zero moves directly.** For discount
+   and projection factors, center an exact triangular adjustment on each
+   resolved target. Select its neighbors from the ordered union of native
+   source knots and target coordinates. Each shape has unit weight at its
+   center and zero weight at all other requested centers. Apply the moves
+   together through the complete factor evaluator, preserving its prior
+   shapes and original source grid. No inverse solve is needed.
+   [Accepted exact rate geometry](../core-market/rate-shocks.md#accepted-decision-explicit-zero-rate-shocks-and-dated-conditioning).
+
+4. **Elect adjustable pillars explicitly for the inverse.** For evaluated
+   CPI use original-anchor annual growth plus the requested rate change.
+   For commodity use the pre-action level scaled by the requested relative
+   change. For the volatility index use the pre-action level plus absolute
+   index points. Supply an ordered set of distinct original pillars with
+   the same count as target rows. Hold other pillars fixed. Adjust CPI
+   annual-growth parameters or native commodity and volatility-index
+   levels. Preserve the source's anchor where applicable, grid,
+   interpolation, tails and valid domain.
+   [Accepted CPI parameter shocks](../core-market/inflation-projection.md#accepted-decision-explicit-cpi-levels-and-anchored-annual-parameter-shocks) ·
+   [Hazard and CDS record 007](07-hazard-quote-shocks.md).
+
+5. **Use a bounded joint solve with a required local identification gate.**
+   Start at zero pillar changes. Use the accepted fallible
+   Levenberg–Marquardt solver with explicit parameter scales, residual
+   tolerance, step tolerance and work limit. Divide each signed residual
+   by its own finite positive tolerance in native target units. Build one
+   checked candidate per trial and evaluate all rows on it. At the
+   returned candidate require resolved full local rank of the undamped
+   scaled Jacobian under an explicit relative cutoff. A validated
+   all-zero request may return the unchanged evaluator directly.
+   [Accepted solver](../core-numerics/levenberg-marquardt.md#accepted-decision-checked-damped-least-squares-and-outcomes) ·
+   [Accepted conditioning arithmetic](../calibration-framework/15-sensitivity-diagnostics.md#accepted-decision-for-calibration-sensitivities-and-conditioning).
+
+6. **Re-evaluate every row on the exact post-action evaluator.** Include
+   exact-pillar and zero-move rows in a mixed request. Require each signed
+   native residual to pass its own tolerance. Preserve requested and
+   realized moves, selected pillars, controls and actual work. Later
+   authored actions may move the same levels again. Publish only through
+   the accepted scenario transaction and retain the per-action evidence
+   under the reporting owner.
+   [Accepted scenario execution](02-execution-and-partial-success.md#accepted-decision-for-ordered-and-atomic-scenario-execution) ·
+   [Reporting record 017](17-reports-and-replay.md).
+
+## Independent calculation checks
+
+- A one-year tenor from 2024-01-01 maps to `366/365` under ACT/365F.
+  A represented point one ULP from the left of a three-ULP interval
+  has exact linear weights `2/3` and `1/3`.
+- A linear midpoint increment of `1` admits endpoint moves `(2,0)`,
+  `(1,1)` and `(0,2)`. Simultaneous increments `1` at the quarter
+  point and `2` at the three-quarter point give `(.5,2.5)`.
+- With log-linear pillars `1` and `4`, the midpoint is `2`.
+  Fixing the right pillar and setting the left to `2.25` gives midpoint
+  `3`. Fixing the left and setting the right to `9` also gives `3`.
+
+## Observed choice and rationale at the audit revision
 
 Observed choice: a request between native pillars specifies the desired move of the curve's evaluated economic quantity at that requested time. The adapter starts from a linear split, then solves against the actual interpolator for direct curves. This differs from blindly assigning the same fraction of the requested shift to surrounding knots.
 
@@ -20,6 +98,9 @@ Observed choice: a request between native pillars specifies the desired move of 
 6. Re-evaluate every solution target and require finite values and absolute residual at most `1e-12`; otherwise error. Emit only nonzero solved pillar deltas. Discount/inflation preview applies ordered triangular bumps, forward preview adds decimal rates to visible knots, commodity preview multiplies visible levels, and vol-index preview adds absolute levels.
 
 Targets are `z+bp/10,000`, `f+bp/10,000`, implied inflation plus `bp/10,000`, commodity price times `1+pct/100`, or volatility-index level plus points. These residual quantities have different units despite sharing one absolute tolerance. The selected active pillar set and LM initialization resolve otherwise nonunique shape choices; there is no explicit smoothness/minimum-norm financial objective.
+
+The live LM callback is fallible. The live preview still skips tiny rate
+adjustments by epsilon, while the emitted list skips only literal zeros.
 
 ## Approximation boundaries, failure and alternatives
 
@@ -35,17 +116,12 @@ A pure triangular shock at the requested time or calibrated-quote bucket risk ar
 
 ## Relationship to the accepted inflation parameter boundary
 
-[CORE-MARKET-10's complete accepted package](../core-market/inflation-projection.md#accepted-decision-explicit-cpi-levels-and-anchored-annual-parameter-shocks) selects exact original
-positive source-pillar annual-growth parameters. Its direct shock is distinct
-from this record's inverse solve to force an evaluated off-pillar quantity.
-Reconcile the native inflation adapter and remove zero-time growth sentinels
-without treating inverse delivery or tolerance matching as an implicit core
-parameter operation. Record10 does not adopt this Draft solve or its objective/
-acceptance rules. Record10 was accepted on **2026-11-08**; its runtime
-reconciliation and independent qualification remain pending.
+[CORE-MARKET-10](../core-market/inflation-projection.md#accepted-decision-explicit-cpi-levels-and-anchored-annual-parameter-shocks)
+owns direct annual-growth parameter changes on original positive CPI pillars.
+This record owns the separately elected evaluated delivery and its final
+residual gates.
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#scenarios). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and validation work are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#scenarios).
