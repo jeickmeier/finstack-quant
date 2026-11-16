@@ -1,11 +1,85 @@
 # PORTFOLIO-EXECUTION-017 — VM perspective, CSA collateral terms and margin result validation
 
-- **Decision status:** Draft — observed implementation; adoption of the specific methodology remains pending. Existing accepted architectural and arithmetic requirements continue to apply.
-- **Implementation status:** Observed for the source paths identified below; discrepancies and limits are stated explicitly.
-- **Validation status:** Source and selected test evidence inspected or located; tests, builds and numerical benchmarks were not executed.
+- **Decision status:** Accepted 2026-11-16 — complete VM call scope and perspective, explicit balances, IM accounts, checked totals and result validation package.
+- **Implementation status:** Observed. Reconciliation to the accepted package is pending.
+- **Validation status:** Independent VM sign, account FX, gross outflow, exact Money and structured identity examples verified. Runtime, host and model qualification remain pending.
 - **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; exact source hashes are in [coverage.json](coverage.json).
 
-## Choice and scope
+## Accepted decision for checked portfolio VM and collateral reports
+
+1. **Calculate VM once per authorized call scope.** Apply signed holding
+   size once to each agreement-qualified mark, convert directly into the
+   agreement currency and sum in checked Money. Use the effective terms.
+   Preserve valuation, call and settlement dates. A missing agreement or
+   required mark makes the call unavailable under the accepted coverage
+   policy. Remove the negative-MTM fallback. Repo margin uses its
+   agreement-qualified route.
+   [Margin valuation](../valuations-framework/margin-bridge.md#accepted-decision-for-checked-margin-repricing-and-identity)
+   and [repo agreement rules](../valuations-rates/15-repo.md).
+
+2. **Require explicit dated collateral balances.** Current VM is signed in
+   agreement currency, positive when held and negative when posted. A
+   zero-balance run requires explicit zero. Bind the exact account, cut and
+   elected treatment of pending transfers. Use each admitted balance once
+   within its authorized scope. Apply collateral eligibility and haircuts
+   once under the owner's rules. The elected VM calculator owns threshold,
+   independent amount, minimum transfer, rounding and settlement rules.
+   [Variation margin](../margin-collateral-im/18-variation-margin.md).
+
+3. **Report VM calls from the desk's cash perspective.** Signed VM outflow
+   equals `post − collect`. A return of excess held collateral is an
+   outflow to the desk. Translate the native call once on the elected
+   reporting basis. Recognized VM and NICA for SA-CCR are separately
+   prepared balance inputs.
+   [ADR 0044 collateral components](../conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components).
+
+4. **Apply IM collateral terms once per exact one-way account.** Group
+   complete gross IM where the account terms authorize it and convert
+   each source amount directly from its calculation currency into the
+   account currency. Require explicit current collateral. Apply the
+   allocated threshold and MTA once. Preserve gross IM, required and
+   current collateral, transfer and custody status. Record whether this
+   is a posting or collecting account so transfer direction is explicit.
+   [CSA IM terms](../margin-collateral-im/17-csa-selection-and-im-terms.md).
+
+5. **Publish totals on their stated basis.** Report gross model IM,
+   signed net VM outflow and gross positive VM outflow separately.
+   Identify the combined measure as gross IM plus VM outflow. Report
+   required and segregated collateral separately from transfers and
+   preserve the posting or collecting side. Apply strict coverage by
+   default. Diagnostic mode may retain complete independent results.
+   Dependent accounts and headlines remain unavailable if required
+   coverage is incomplete.
+   [Portfolio IM and coverage](16-margin-netting-and-initial-margin.md#accepted-decision-for-checked-portfolio-netting-and-initial-margin).
+
+6. **Rebuild and verify results through one bounded Rust contract.** Use
+   exact structured identities, a deterministic scope and account order,
+   and holding order within each scope. Retain native and reporting
+   Money with directed dated FX evidence sufficient to reproduce mixed-
+   currency totals. Validate dates, terms, scope links, checked counts,
+   coverage and method-specific breakdowns. Compare derived claims in
+   checked Money with exact equality, replacing the binary64 `1e-9`
+   tolerance. Preserve exact Money and typed status through Python,
+   WASM and UI with an explicit float display conversion. Structural
+   restore checks arithmetic and relationships. Economic replay requires
+   original qualified inputs.
+   [Bounded contract loading](../core-numerics/contracts-and-diagnostics.md#accepted-decision-bounded-contract-loading-validation-and-diagnostics).
+
+## Independent calculation checks
+
+- Exposure `+100` with held collateral `+80` produces `−20` desk
+  outflow under zero threshold, MTA and rounding. Current collateral
+  `+120` produces `+20` outflow. Calls of `+30` and `−20` give net VM
+  outflow of 10 and gross positive VM outflow of 30.
+- EUR 100 gross less EUR 20 allocated threshold leaves EUR 80 required.
+  EUR 70 current gives an account increase of EUR 10. At `1.25 USD/EUR`,
+  the required balance and transfer are USD 100 and USD 12.50.
+- Exact Money distinguishes `10000000000000000.01` from
+  `10000000000000000.00`. Their binary64 projections agree. Likewise,
+  distinct structural identities `(A:B, C)` and `(A, B:C)` share the
+  same delimiter-joined display label.
+
+## Observed choice and scope at the audit revision
 
 The adapter reports initial margin and signed variation-margin calls in portfolio base currency, with a collateral-outflow total computed separately from net signed VM. It applies CSA IM account terms once to grouped gross IM, while VM is calculated per netting set. The portfolio API accepts current IM collateral by CSA but no current VM collateral input.
 
@@ -37,6 +111,5 @@ Actual current VM collateral is needed for a live incremental call; the present 
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#portfolio-execution). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#portfolio-execution).

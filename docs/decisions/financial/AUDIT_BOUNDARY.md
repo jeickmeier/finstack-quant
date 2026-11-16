@@ -1945,6 +1945,93 @@ credit-index replacement, missing change proof and FX refresh checks.
 Production equivalence and host qualification remain pending.
 [PORTFOLIO-EXECUTION-005](portfolio-execution/05-dependencies-and-selective-reuse.md#accepted-decision-for-checked-portfolio-dependencies-and-selective-repricing).
 
+The accepted portfolio materialization package has independent
+duplicate-key, pointer, digest-order and shared-artifact checks.
+Production round trips and host qualification remain pending.
+[PORTFOLIO-EXECUTION-006](portfolio-execution/06-materialization-validation.md#accepted-decision-for-checked-portfolio-materialization-and-validation).
+
+The accepted portfolio decode cache package has independent eviction,
+same-key concurrency, alias-count and timing checks. Production
+concurrency, memory behavior and host qualification remain pending.
+[PORTFOLIO-EXECUTION-007](portfolio-execution/07-artifact-cache-and-load-reporting.md#accepted-decision-for-bounded-portfolio-decode-caching-and-load-reporting).
+
+The accepted portfolio FX package has independent checks of the cash-to-spot
+bridge, matched-basis PV identity, small positive factors and deferred Money
+conversion. Production source resolution, arithmetic and host qualification
+remain pending.
+[PORTFOLIO-EXECUTION-008](portfolio-execution/08-spot-and-forward-fx.md#accepted-decision-for-checked-portfolio-nav-and-cashflow-fx).
+
+The accepted portfolio cashflow ladder package has independent signed sizing,
+cutoff, native Money, conversion and partial-coverage checks. Production
+providers, restoration and host qualification remain pending.
+[PORTFOLIO-EXECUTION-009](portfolio-execution/09-cashflow-ladders.md#accepted-decision-for-checked-portfolio-cashflow-ladders).
+
+The accepted portfolio metric package has independent normalization, frozen
+and shocked FX, intermediate range, cancellation and coverage checks.
+Production aggregation, report restoration and host qualification remain pending.
+[PORTFOLIO-EXECUTION-010](portfolio-execution/10-metric-aggregation-and-reporting.md#accepted-decision-for-checked-portfolio-metric-aggregation-and-reporting).
+
+The accepted primitive exposure package has independent signed lot, nested
+FX, net and gross Money, rounding and path identity checks. Production
+valuation, report restoration and host qualification remain pending.
+[PORTFOLIO-EXECUTION-011](portfolio-execution/11-primitive-exposures.md#accepted-decision-for-checked-portfolio-primitive-exposures).
+
+The accepted portfolio factor-shock package has independent unit, bucket,
+directional FX, bridge and magnitude-range checks. Production routing,
+pricing and host qualification remain pending.
+[PORTFOLIO-EXECUTION-012](portfolio-execution/12-factor-shocks-and-routing.md#accepted-decision-for-checked-portfolio-factor-shocks-and-routing).
+
+The accepted factor delta and profile package has independent secant,
+symmetric grid, intermediate-range and draw-alignment checks. Production
+repricing, convergence, restoration and host qualification remain pending.
+[PORTFOLIO-EXECUTION-013](portfolio-execution/13-factor-deltas-and-pnl-profiles.md#accepted-decision-for-checked-portfolio-factor-deltas-and-profiles).
+
+The accepted portfolio scenario package has independent scenario isolation,
+signed FX, Money reconciliation and failure-order checks. Production
+pricing, restoration and host qualification remain pending.
+[PORTFOLIO-EXECUTION-014](portfolio-execution/14-scenario-application-and-pnl.md#accepted-decision-for-checked-portfolio-scenario-revaluation-and-mtm).
+
+The accepted replay package has independent skipped-date, interval MTM,
+drawdown ranking, precision and availability checks. Runtime pricing,
+attribution, restoration and host qualification remain pending.
+[PORTFOLIO-EXECUTION-015](portfolio-execution/15-replay-mtm-and-drawdown.md#accepted-decision-for-checked-portfolio-replay-and-drawdown).
+
+The accepted portfolio netting and IM package has independent SIMM
+partition, calculation-currency, Schedule net-to-gross and gross proxy
+checks. Runtime, host and model qualification remain pending.
+[PORTFOLIO-EXECUTION-016](portfolio-execution/16-margin-netting-and-initial-margin.md#accepted-decision-for-checked-portfolio-netting-and-initial-margin).
+
+The accepted portfolio VM and collateral package has independent sign,
+account FX, outflow, exact Money and structured identity checks. Runtime,
+restoration and host qualification remain pending.
+[PORTFOLIO-EXECUTION-017](portfolio-execution/17-margin-collateral-and-wire.md#accepted-decision-for-checked-portfolio-vm-and-collateral-reports).
+
+The accepted strategy weight package has independent arithmetic examples
+for exact fixed-weight admission, equal quotas and inverse-volatility scale.
+Runtime, checked restoration, host and numerical-range qualification remain
+pending.
+[PORTFOLIO-ATTRIBUTION-001](portfolio-attribution/01-allocation-weights.md#accepted-decision-for-checked-strategy-allocation-weights).
+
+The accepted covariance risk-budget package has independent examples for
+negative starting contributions, covariance rescaling and convergence limits.
+Runtime, numerical-range and host qualification remain pending.
+[PORTFOLIO-ATTRIBUTION-002](portfolio-attribution/02-risk-budget-solver.md#accepted-decision-for-checked-covariance-risk-budgeting).
+
+The accepted scalar apportionment package has independent examples for
+signed midpoint rounding, exact remainder order, large unit counts, quota
+bounds and result range. Runtime and host qualification remain pending.
+[PORTFOLIO-ATTRIBUTION-003](portfolio-attribution/03-capital-apportionment.md#accepted-decision-for-exact-capital-apportionment).
+
+The accepted portfolio performance package has independent handbook Dietz,
+dated linking, terminal-loss, netting and short-window MWR checks. Runtime,
+caller, host and numerical-range qualification remain pending.
+[PORTFOLIO-ATTRIBUTION-004](portfolio-attribution/04-performance-returns.md#accepted-decision-for-checked-portfolio-performance-returns).
+
+The accepted single-period Brinson–Fachler package has independent checks
+of the published example, one-sided sectors, signed weights, exact closure
+and binary64 projection. Runtime and host qualification remain pending.
+[PORTFOLIO-ATTRIBUTION-005](portfolio-attribution/05-brinson-fachler.md#accepted-decision-for-checked-single-period-brinsonfachler-attribution).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

@@ -2134,6 +2134,91 @@ requiring reproduction, adoption choices and missing validation are distinct.
   independent reporting FX refresh under the
   [accepted reuse contract](financial/portfolio-execution/05-dependencies-and-selective-reuse.md#accepted-decision-for-checked-portfolio-dependencies-and-selective-repricing).
 
+- **Portfolio materialization:** reconcile versioned bulk and inline wire,
+  bounded admission, canonical instrument identity and complete host
+  diagnostics under the
+  [accepted materialization contract](financial/portfolio-execution/06-materialization-validation.md#accepted-decision-for-checked-portfolio-materialization-and-validation).
+
+- **Portfolio artifact caching and reporting:** reconcile bounded immutable
+  retention, synchronized admission, poison recovery and exact load
+  telemetry under the
+  [accepted cache and reporting contract](financial/portfolio-execution/07-artifact-cache-and-load-reporting.md#accepted-decision-for-bounded-portfolio-decode-caching-and-load-reporting).
+
+- **Portfolio FX:** reconcile valuation-date cash rates, qualified market
+  spot bridges, dated relative factors, exact Money and raw endpoints, and
+  host provenance under the
+  [accepted NAV and cashflow FX contract](financial/portfolio-execution/08-spot-and-forward-fx.md#accepted-decision-for-checked-portfolio-nav-and-cashflow-fx).
+
+- **Portfolio cashflow ladders:** reconcile owner schedule admission, explicit
+  settlement selection, typed whole-holding failures, checked Money nets,
+  prospective FX and exact report coverage across hosts under the
+  [accepted ladder contract](financial/portfolio-execution/09-cashflow-ladders.md#accepted-decision-for-checked-portfolio-cashflow-ladders).
+
+- **Portfolio metrics:** reconcile owner-declared compatibility, checked sizing
+  and frozen valuation FX, scoped coverage, checked reductions and provenance
+  through the existing reports and hosts under the
+  [accepted aggregation contract](financial/portfolio-execution/10-metric-aggregation-and-reporting.md#accepted-decision-for-checked-portfolio-metric-aggregation-and-reporting).
+
+- **Portfolio primitive exposures:** reconcile shared prepared valuation,
+  verified leaf paths, ordered FX, strict risk coverage, checked net and
+  gross, and bounded report admission under the
+  [accepted exposure contract](financial/portfolio-execution/11-primitive-exposures.md#accepted-decision-for-checked-portfolio-primitive-exposures).
+
+- **Portfolio factor shocks:** reconcile typed effects, explicit magnitudes,
+  native and reporting dependency proofs, assignment dispatch and host
+  provenance under the
+  [accepted shock and routing contract](financial/portfolio-execution/12-factor-shocks-and-routing.md#accepted-decision-for-checked-portfolio-factor-shocks-and-routing).
+
+- **Portfolio factor deltas and profiles:** reconcile selected raw repricing,
+  checked secants and grid P&L, stochastic coupling, ordered failure and
+  report with factor-basis provenance under the
+  [accepted delta and profile contract](financial/portfolio-execution/13-factor-deltas-and-pnl-profiles.md#accepted-decision-for-checked-portfolio-factor-deltas-and-profiles).
+
+- **Portfolio scenario revaluation and MTM:** reconcile fixed holding
+  admission, independent effective states, selective reuse, Money
+  reconciliation, batch ordering and host provenance under the
+  [accepted scenario bridge contract](financial/portfolio-execution/14-scenario-application-and-pnl.md#accepted-decision-for-checked-portfolio-scenario-revaluation-and-mtm).
+
+- **Portfolio replay:** reconcile timeline admission, independent visible
+  risk and attribution, dated coverage, interval MTM, checked drawdown
+  and host restoration under the
+  [accepted replay contract](financial/portfolio-execution/15-replay-mtm-and-drawdown.md#accepted-decision-for-checked-portfolio-replay-and-drawdown).
+
+- **Portfolio netting and initial margin:** reconcile qualified scope,
+  explicit method selection, method-owned risk and exposure inputs,
+  strict coverage, checked totals and host provenance under the
+  [accepted portfolio IM contract](financial/portfolio-execution/16-margin-netting-and-initial-margin.md#accepted-decision-for-checked-portfolio-netting-and-initial-margin).
+
+- **Portfolio VM and collateral:** reconcile explicit balances, dated
+  call scope, collateral account terms, checked Money and FX evidence,
+  coverage and exact result restoration under the
+  [accepted portfolio VM and collateral contract](financial/portfolio-execution/17-margin-collateral-and-wire.md#accepted-decision-for-checked-portfolio-vm-and-collateral-reports).
+
+- **Strategy allocation weights.** Reconcile scheme-specific inputs, exact
+  fixed fractions, aligned histories, scaled sample volatility, common share
+  authority and checked host state under the
+  [accepted strategy allocation contract](financial/portfolio-attribution/01-allocation-weights.md#accepted-decision-for-checked-strategy-allocation-weights).
+
+- **Covariance risk budgeting.** Reconcile exact budgets, covariance axis
+  validation, checked coordinate descent, final relative risk-share checks
+  and source-bound host restoration under the
+  [accepted risk-budget contract](financial/portfolio-attribution/02-risk-budget-solver.md#accepted-decision-for-checked-covariance-risk-budgeting).
+
+- **Capital apportionment.** Reconcile explicit scalar precision, nearest-even
+  total rounding, exact quota order, checked final Decimal range and host
+  result restoration under the
+  [accepted capital apportionment contract](financial/portfolio-attribution/03-capital-apportionment.md#accepted-decision-for-exact-capital-apportionment).
+
+- **Portfolio performance returns.** Reconcile dated exact-money Dietz and
+  investor-flow preparation, contiguous geometric linking, anniversary-based
+  reporting and canonical XIRR caller migration under the
+  [accepted performance returns contract](financial/portfolio-attribution/04-performance-returns.md#accepted-decision-for-checked-portfolio-performance-returns).
+
+- **Single-period Brinson–Fachler.** Reconcile dated partition inputs, exact
+  signed weight sums, one-sided sector effects, pre-projection closure and
+  source-backed restoration under the
+  [accepted single-period Brinson–Fachler contract](financial/portfolio-attribution/05-brinson-fachler.md#accepted-decision-for-checked-single-period-brinsonfachler-attribution).
+
 ### Implementation reconciliation
 
 - **Related scope:** retain the option-bearing CS01/OAS reconciliation above.

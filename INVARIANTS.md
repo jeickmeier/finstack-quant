@@ -1138,6 +1138,97 @@ immutable prior rows and authoritative change evidence. Rebuild the
 whole result and refresh reporting FX independently of native marks.
 [Accepted portfolio dependencies and selective repricing](docs/decisions/financial/portfolio-execution/05-dependencies-and-selective-reuse.md#accepted-decision-for-checked-portfolio-dependencies-and-selective-repricing).
 
+Portfolio materialization validates exact wire versions, bounded
+lossless input, canonical instrument artifacts and the complete
+holding and book state before publication.
+[Accepted portfolio materialization](docs/decisions/financial/portfolio-execution/06-materialization-validation.md#accepted-decision-for-checked-portfolio-materialization-and-validation).
+
+Portfolio decode caching retains immutable validated inputs within
+checked count and encoded-byte limits. Report admitted content,
+decode work and timing availability separately.
+[Accepted decode caching and load reporting](docs/decisions/financial/portfolio-execution/07-artifact-cache-and-load-reporting.md#accepted-decision-for-bounded-portfolio-decode-caching-and-load-reporting).
+
+Portfolio NAV uses qualified valuation-date cash FX. Prospective cash
+conversion uses dated relative discount factors on one basis. Apply the
+complete rate once and retain the actual query, quote and factor provenance.
+[Accepted portfolio NAV and cashflow FX](docs/decisions/financial/portfolio-execution/08-spot-and-forward-fx.md#accepted-decision-for-checked-portfolio-nav-and-cashflow-fx).
+
+Portfolio cashflow ladders select signed settlement Money from validated owner
+schedules at a separate payment cutoff. Derive all views from ordered holding
+outcomes, retain partial coverage and convert each admitted native bucket once.
+[Accepted portfolio cashflow ladders](docs/decisions/financial/portfolio-execution/09-cashflow-ladders.md#accepted-decision-for-checked-portfolio-cashflow-ladders).
+
+Portfolio metric totals combine owner-declared compatible linear measures.
+Use signed sizing and frozen valuation-cut FX once, and carry the actual
+financial basis and coverage into every published total and projection.
+[Accepted portfolio metric aggregation](docs/decisions/financial/portfolio-execution/10-metric-aggregation-and-reporting.md#accepted-decision-for-checked-portfolio-metric-aggregation-and-reporting).
+
+Primitive exposure reports retain every verified path from the prepared
+valuation tree. Apply the actual signed sizing and dated FX edges, then
+reduce signed net and pathwise absolute gross on the declared basis.
+[Accepted primitive exposures](docs/decisions/financial/portfolio-execution/11-primitive-exposures.md#accepted-decision-for-checked-portfolio-primitive-exposures).
+
+Portfolio factors bind explicit units and typed market actions. Route from
+actual effects, proving native pricing and reporting FX dependencies
+separately, including any valuation-date FX bridge curves.
+[Accepted factor shocks and routing](docs/decisions/financial/portfolio-execution/12-factor-shocks-and-routing.md#accepted-decision-for-checked-portfolio-factor-shocks-and-routing).
+
+Factor deltas use two qualified raw endpoints on the declared factor axis.
+P&L profiles use an explicit grid with a literal zero center. Preserve
+pricing and FX provenance, verified stochastic coupling and typed failures.
+[Accepted factor deltas and P&L profiles](docs/decisions/financial/portfolio-execution/13-factor-deltas-and-pnl-profiles.md#accepted-decision-for-checked-portfolio-factor-deltas-and-profiles).
+
+Portfolio scenarios start independently from one admitted opening state.
+Preserve holding occurrences, match qualified PV-only Money endpoints
+for MTM, and report holding reconciliation and failures in input order.
+[Accepted scenario revaluation and MTM](docs/decisions/financial/portfolio-execution/14-scenario-application-and-pnl.md#accepted-decision-for-checked-portfolio-scenario-revaluation-and-mtm).
+
+Portfolio replay preserves supplied dates and the fixed holdings. Measure
+interval MTM between surviving marks, keep attribution separate, and rank
+monetary and relative drawdowns on exact marks before display conversion.
+[Accepted replay and drawdown](docs/decisions/financial/portfolio-execution/15-replay-mtm-and-drawdown.md#accepted-decision-for-checked-portfolio-replay-and-drawdown).
+
+Portfolio initial margin requires a qualified netting scope, explicit
+method and complete applicable inputs. Keep calculation and reporting
+currencies distinct and retain method and coverage provenance.
+[Accepted portfolio netting and initial margin](docs/decisions/financial/portfolio-execution/16-margin-netting-and-initial-margin.md#accepted-decision-for-checked-portfolio-netting-and-initial-margin).
+
+Portfolio margin calls require explicit dated collateral by authorized
+scope. Preserve desk outflow and account-side semantics, and rederive
+mixed-currency totals from directed FX evidence in checked Money.
+[Accepted portfolio VM and collateral](docs/decisions/financial/portfolio-execution/17-margin-collateral-and-wire.md#accepted-decision-for-checked-portfolio-vm-and-collateral-reports).
+
+Strategy allocation preserves exact ordered sleeve IDs and uses the same
+effective shares for reporting and capital quotas. Equal has equal quotas,
+Fixed requires an exact nonnegative decimal budget of one, and InverseVolatility
+requires complete aligned histories and strictly positive unannualized sample
+volatility for every sleeve.
+[Accepted strategy allocation weights](docs/decisions/financial/portfolio-attribution/01-allocation-weights.md#accepted-decision-for-checked-strategy-allocation-weights).
+
+Covariance risk budgeting binds exact budgets and both covariance axes to
+ordered sleeve IDs. Exclude exact-zero budgets, require a positive-definite
+active block, and check relative risk-share residuals on the effective model
+weights before apportioning capital.
+[Accepted covariance risk budgeting](docs/decisions/financial/portfolio-attribution/02-risk-budget-solver.md#accepted-decision-for-checked-covariance-risk-budgeting).
+
+Scalar capital apportionment rounds the exact signed budget once at the
+explicit scale. Use the effective model shares for exact floor quotas and
+largest remainders, break ties by input order, and preserve exact signed
+conservation through the returned Decimal amounts.
+[Accepted capital apportionment](docs/decisions/financial/portfolio-attribution/03-capital-apportionment.md#accepted-decision-for-exact-capital-apportionment).
+
+Portfolio performance uses actual valuation cuts and a consistent reporting
+basis. Count end-of-day external flows once, invert their signs for the
+investor XIRR stream, and gate annualized reporting at the first calendar
+anniversary.
+[Accepted portfolio performance returns](docs/decisions/financial/portfolio-attribution/04-performance-returns.md#accepted-decision-for-checked-portfolio-performance-returns).
+
+Single-period Brinson–Fachler uses a complete dated sector partition and
+exact signed weights summing to one on each side. Portfolio-only sectors
+have interaction only and benchmark-only sectors have allocation only.
+Verify centered effects and active return before binary64 projection.
+[Accepted single-period Brinson–Fachler](docs/decisions/financial/portfolio-attribution/05-brinson-fachler.md#accepted-decision-for-checked-single-period-brinsonfachler-attribution).
+
 Valuation model inputs bind an exact source, unit, clock and parameter block.
 Use dated relative factors for GBM carry. Simulations retain explicit controls,
 exact seed identity and actual work. Apply each tree and quote control on its

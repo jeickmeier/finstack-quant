@@ -2357,6 +2357,92 @@ The package covers typed active coverage, authoritative change evidence,
 fresh valuation when needed and independent reporting FX refresh.
 [PORTFOLIO-EXECUTION-005](portfolio-execution/05-dependencies-and-selective-reuse.md#accepted-decision-for-checked-portfolio-dependencies-and-selective-repricing).
 
+Portfolio materialization and validation were accepted on 2026-11-15.
+The package covers explicit formats, bounded admission, canonical
+instrument artifacts and shared host diagnostics.
+[PORTFOLIO-EXECUTION-006](portfolio-execution/06-materialization-validation.md#accepted-decision-for-checked-portfolio-materialization-and-validation).
+
+Portfolio decode caching and load reporting were accepted on 2026-11-15.
+The package covers immutable input retention, synchronized misses,
+checked counts and explicit phase timing status.
+[PORTFOLIO-EXECUTION-007](portfolio-execution/07-artifact-cache-and-load-reporting.md#accepted-decision-for-bounded-portfolio-decode-caching-and-load-reporting).
+
+Portfolio NAV and cashflow FX were accepted on 2026-11-15. The package
+covers qualified valuation-date cash FX, matched-basis covered interest
+parity for prospective cash and separate checked Money and raw endpoints.
+[PORTFOLIO-EXECUTION-008](portfolio-execution/08-spot-and-forward-fx.md#accepted-decision-for-checked-portfolio-nav-and-cashflow-fx).
+
+Portfolio cashflow ladders were accepted on 2026-11-15. The package covers
+explicit settlement selection, signed holding sizing, whole-holding partial
+coverage, checked Money netting and prospective FX by native bucket.
+[PORTFOLIO-EXECUTION-009](portfolio-execution/09-cashflow-ladders.md#accepted-decision-for-checked-portfolio-cashflow-ladders).
+
+Portfolio metric aggregation and reporting were accepted on 2026-11-15.
+The package covers compatible linear measures, frozen FX, checked ordered
+reductions, scoped coverage and report provenance.
+[PORTFOLIO-EXECUTION-010](portfolio-execution/10-metric-aggregation-and-reporting.md#accepted-decision-for-checked-portfolio-metric-aggregation-and-reporting).
+
+Portfolio primitive exposures were accepted on 2026-11-15. The package
+covers a shared valuation tree, canonical leaf identity, ordered FX,
+strict risk coverage and checked pathwise net and gross exposure.
+[PORTFOLIO-EXECUTION-011](portfolio-execution/11-primitive-exposures.md#accepted-decision-for-checked-portfolio-primitive-exposures).
+
+Portfolio factor shocks and routing were accepted on 2026-11-15. The
+package covers exact typed targets, explicit factor magnitudes, proven
+native and reporting effects, assignment dispatch and provenance.
+[PORTFOLIO-EXECUTION-012](portfolio-execution/12-factor-shocks-and-routing.md#accepted-decision-for-checked-portfolio-factor-shocks-and-routing).
+
+Portfolio factor deltas and P&L profiles were accepted on 2026-11-15. The
+package covers qualified raw endpoints, declared factor secants, explicit
+symmetric grids, verified common draws and checked report provenance.
+[PORTFOLIO-EXECUTION-013](portfolio-execution/13-factor-deltas-and-pnl-profiles.md#accepted-decision-for-checked-portfolio-factor-deltas-and-profiles).
+
+Portfolio scenario revaluation and MTM were accepted on 2026-11-16. The
+package covers independent scenario states, fixed holding identity,
+strict PV endpoints, proven reuse, exact MTM and atomic batch ordering.
+[PORTFOLIO-EXECUTION-014](portfolio-execution/14-scenario-application-and-pnl.md#accepted-decision-for-checked-portfolio-scenario-revaluation-and-mtm).
+
+Portfolio replay and drawdown were accepted on 2026-11-16. The package
+covers fixed-book timeline admission, independent risk and attribution,
+typed coverage, interval MTM and exact-mark drawdown selection.
+[PORTFOLIO-EXECUTION-015](portfolio-execution/15-replay-mtm-and-drawdown.md#accepted-decision-for-checked-portfolio-replay-and-drawdown).
+
+Portfolio netting and initial margin were accepted on 2026-11-16. The
+package covers qualified scope, explicit method dispatch, complete
+risk and exposure inputs, and checked totals and coverage.
+[PORTFOLIO-EXECUTION-016](portfolio-execution/16-margin-netting-and-initial-margin.md#accepted-decision-for-checked-portfolio-netting-and-initial-margin).
+
+Portfolio VM, collateral accounts and report validation were accepted on
+2026-11-16. The package covers authorized call scope, explicit balances,
+desk outflow, segregated accounts and exact Money result admission.
+All 17 portfolio execution records are accepted.
+[PORTFOLIO-EXECUTION-017](portfolio-execution/17-margin-collateral-and-wire.md#accepted-decision-for-checked-portfolio-vm-and-collateral-reports).
+
+Equal, fixed and inverse-volatility strategy allocation was accepted on
+2026-11-16. The package covers exact fixed fractions, aligned observations,
+scaled sample volatility and the same shares for reporting and capital quotas.
+[PORTFOLIO-ATTRIBUTION-001](portfolio-attribution/01-allocation-weights.md#accepted-decision-for-checked-strategy-allocation-weights).
+
+The long-only covariance risk-budget solver was accepted on 2026-11-16.
+The package covers exact targets, ordered covariance, the positive-definite
+active block, bounded coordinate descent and final risk-share verification.
+[PORTFOLIO-ATTRIBUTION-002](portfolio-attribution/02-risk-budget-solver.md#accepted-decision-for-checked-covariance-risk-budgeting).
+
+Exact scalar capital apportionment was accepted on 2026-11-16. The package
+covers explicit precision, nearest-even total rounding, exact remainder
+order and exact Decimal result admission.
+[PORTFOLIO-ATTRIBUTION-003](portfolio-attribution/03-capital-apportionment.md#accepted-decision-for-exact-capital-apportionment).
+
+Portfolio performance returns were accepted on 2026-11-16. The package
+covers dated Modified Dietz, geometric linking, annualized reporting and
+investor-stream preparation for canonical XIRR.
+[PORTFOLIO-ATTRIBUTION-004](portfolio-attribution/04-performance-returns.md#accepted-decision-for-checked-portfolio-performance-returns).
+
+Single-period Brinson–Fachler attribution was accepted on 2026-11-16.
+The package covers exact dated sector partitions, the centered formula,
+one-sided sector effects and checked reconciliation before projection.
+[PORTFOLIO-ATTRIBUTION-005](portfolio-attribution/05-brinson-fachler.md#accepted-decision-for-checked-single-period-brinsonfachler-attribution).
+
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the
 accepted perspective/sign contracts; broader margin methodology retains its

@@ -1,11 +1,92 @@
 # PORTFOLIO-EXECUTION-009 — Rich cashflow extraction, partial results and date/currency netting
 
-- **Decision status:** Draft — observed implementation; adoption of the specific methodology remains pending. Existing accepted architectural and arithmetic requirements continue to apply.
-- **Implementation status:** Observed for the source paths identified below; discrepancies and limits are stated explicitly.
-- **Validation status:** Source and selected test evidence inspected or located; tests, builds and numerical benchmarks were not executed.
+- **Decision status:** Accepted 2026-11-15 — complete settlement selection, signed sizing, partial reporting, Money netting, prospective FX and report-state package.
+- **Implementation status:** Observed. Reconciliation to the accepted package is pending.
+- **Validation status:** Independent cutoff, signed sizing, ordering, partial coverage and Money arithmetic examples verified. Production extraction, restoration and host qualification remain pending.
 - **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; exact source hashes are in [coverage.json](coverage.json).
 
-## Choice and scope
+## Accepted decision for checked portfolio cashflow ladders
+
+1. **Use the owner’s validated settlement schedule.** Request each holding’s
+   schedule once at `portfolio.as_of`. Require a separate payment cutoff and
+   an explicit choice to include payments on that date. Validate the complete
+   source schedule within its declared scope before applying the shared
+   settlement selector. Preserve owner-declared `Contractual` or `Projected`
+   status even when the selected view is empty. `NoResidual` requires an
+   explicitly empty event scope declared by the owner. Unsupported schedules
+   and `Placeholder` produce typed holding failures.
+   [Schedule lifecycle](../cashflows/12-schedule-lifecycle.md#accepted-decision-validated-complete-schedules-explicit-balances-and-separate-cash-views).
+
+2. **Scale and retain selected settlement rows.** Apply the signed holding
+   multiplier once using checked Decimal Money arithmetic. Retain native
+   currency, actual payment date, typed kind, duplicates, literal zeros and
+   supplied reset, rate and accrual metadata. Include eligible derivative and
+   protection settlements. Exclude noncash PIK and write-downs by kind. The
+   source schedule owns principal effects. Order the combined rows by payment
+   date, holding order and source row order.
+   [Core cashflow semantics](../core-conventions/015-cashflow-semantics.md#accepted-decision-cash-settlement-principal-effects-and-accrual-metadata)
+   and [signed holding sizing](01-position-sizing-and-validation.md#accepted-decision-for-checked-portfolio-holdings-and-signed-sizing).
+
+3. **Keep strict extraction as the default.** Collect typed outcomes in
+   holding order. Strict extraction fails with ordered diagnostics if a
+   holding fails. Explicit partial mode omits every row of each failed holding
+   and reports holding ID, instrument identity, failure stage and cause.
+   Successful holdings with zero eligible rows count toward coverage. A
+   report with failures remains partial even with no rows. Shared request
+   errors and failures assembling the native buckets abort either mode.
+
+4. **Keep native buckets and nets in Money.** Fold each payment date, currency
+   and kind bucket in canonical event order. The requested-currency net folds
+   the date’s kind buckets in first-appearance order. Retain actual zero
+   totals and omit dates with no bucket in the requested currency. Apply the
+   current accepted Money precision rule, including permitted half-even
+   rounding below the minor unit. A failed sum aborts the derived net while
+   preserving the native report.
+   [Money precision](../core-conventions/012-money-decimal-precision.md).
+
+5. **Apply prospective FX to each already-netted native bucket.** Use the
+   report’s stored valuation date and the accepted conversion basis. Use cash
+   FX for eligible same-day cash and qualified forwards for later cash. Reject
+   selected past-dated buckets, including same-currency and zero buckets.
+   Convert each admitted bucket once and sum in alphabetic currency order by
+   date and kind. Publish nominal base Money with actual FX provenance and
+   source coverage. A required FX or sum failure aborts the conversion.
+   [Portfolio FX](08-spot-and-forward-fx.md#accepted-decision-for-checked-portfolio-nav-and-cashflow-fx).
+
+6. **Restore one versioned report from ordered holding outcomes.** Store the
+   request coordinates and one outcome per holding, with either ordered
+   typed Money rows and owner representation or a typed issue. Derive event
+   lists, buckets, counts and coverage in Rust. Apply bounded, atomic restore.
+   Reject duplicate holding IDs, invalid types or dates, inconsistent outcomes
+   and totals that fail recomputation. Retire the bare-ladder JSON path.
+
+7. **Carry coverage through Rust, Python and WASM.** Use the same Rust restore
+   and arithmetic at all published entry points. Expose exact amounts in
+   canonical outputs and tables. Use a named binary64 display conversion for
+   charts. Netting, converted exports and the tear sheet disclose partial
+   coverage and failed holdings even when no rows are present. Reconcile the
+   schema, bindings and reporting fixtures together.
+
+The ladder reports nominal settlement cash within the owner’s declared scope.
+Payment history, principal replay, probability weighting and PV reconciliation
+require their own source authority.
+[Valuation cashflow export](../valuations-framework/cashflow-export.md).
+
+## Independent calculation checks
+
+- A short holding at `−0.5` scales each duplicate payment of `120` to `−60`
+  and retains both rows. An inclusive cutoff retains eligible same-day cash
+  zero. The exclusive cutoff drops it, and noncash PIK is excluded by kind.
+- Opposite kind buckets of `9,007,199,254,740,992.01 USD` and
+  `−9,007,199,254,740,992.00 USD` net to `0.01 USD` in Money. Converting the
+  operands to binary64 before summing yields zero.
+- At a `1.20 USD/EUR` forward, a native EUR bucket netted from `130 − 30`
+  converts to `120 USD`. Adding `7 USD` of the same kind gives `127 USD`.
+  A separate kind of `−100 EUR` remains a separate `−120 USD` bucket.
+- A successful empty holding and a failed holding produce a partial report
+  with no rows. A second-row sizing failure omits the whole failed holding.
+
+## Observed choice and scope at the audit revision
 
 Portfolio cashflows aggregate each instrument's schedule representation and preserve economic event kinds. They are a ledger of returned cashflow events, not a reconstruction of portfolio PV or an unconditional claim of contractual completeness. Instrument providers may return contractual, projected or placeholder representations; each successful position records that representation and its event count.
 
@@ -33,6 +114,5 @@ A fail-fast provider loop is an alternative to the implemented collect-all diagn
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#portfolio-execution). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#portfolio-execution).

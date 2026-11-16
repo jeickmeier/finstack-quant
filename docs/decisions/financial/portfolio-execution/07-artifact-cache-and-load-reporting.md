@@ -1,11 +1,84 @@
 # PORTFOLIO-EXECUTION-007 — Bounded artifact decode cache and diagnostic timing
 
-- **Decision status:** Draft — observed implementation; adoption of the specific methodology remains pending. Existing accepted architectural and arithmetic requirements continue to apply.
-- **Implementation status:** Observed for the source paths identified below; discrepancies and limits are stated explicitly.
-- **Validation status:** Source and selected test evidence inspected or located; tests, builds and numerical benchmarks were not executed.
+- **Decision status:** Accepted 2026-11-15 — complete immutable decode cache, checked LRU, synchronized misses, exact counts and phase timing package.
+- **Implementation status:** Observed. Reconciliation to the accepted package is pending.
+- **Validation status:** Independent eviction, same-key concurrency, alias count and timing examples verified. Production concurrency, memory behavior and host qualification remain pending.
 - **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`; exact source hashes are in [coverage.json](coverage.json).
 
-## Choice and scope
+## Accepted decision for bounded portfolio decode caching and load reporting
+
+1. **Retain only caller-owned immutable decoded inputs.** Cache
+   validated instrument definitions and typed dependency declarations.
+   Key by verified `c2` digest, nested instrument contract version
+   and canonicalization version under the same decoder authority.
+   Check each bundle entry's claims on every load, including
+   hits. An omitted cache selects a per-call default.
+   Market state, PV and risk remain with their request-local owners.
+   [Materialization admission](06-materialization-validation.md#accepted-decision-for-checked-portfolio-materialization-and-validation) ·
+   [Cache ownership](../../architecture/0046-portfolio-execution-operational-contract.md#decision-and-scope).
+
+2. **Use checked LRU retention budgets.** Keep 4,096 entries and
+   64 MiB of canonical encoded envelope bytes as defaults. Charge
+   each retained content once. Evict least-recently-used entries
+   until both limits fit. Zero limits and oversized artifacts
+   bypass retention without eviction. Previously returned instruments
+   remain usable. The byte budget covers retained encoded content.
+   Heap, outstanding references and temporaries are measured separately.
+
+3. **Keep synchronized decoding for retainable misses.** Same-key
+   callers share a successful decode while resident. Retainable
+   misses for unrelated keys serialize. Bypass decodes execute
+   outside the retention lock. A failed decode preserves its typed
+   cause, leaves no entry and can be retried. Independent-key
+   concurrency requires representative measurement.
+   [Measured performance policy](../../standards/0040-measured-performance-decisions.md#decision).
+
+4. **Recover poisoning from known-good metadata.** Under exclusive
+   access discard suspect entries, LRU order and byte accounting
+   before clearing poison. Previously returned references survive.
+   Use checked retention arithmetic. Keep cumulative successful
+   decode telemetry separate and report it as unavailable on overflow.
+
+5. **Count admitted content separately from work.** Report submitted
+   artifact entries, distinct admitted contents, holdings, exact
+   input UTF-8 bytes and typed declarations counted once per unique
+   content. Count shared-cache hits and successful decodes at each
+   distinct content's first resolution in a load. Same-load aliases
+   reuse the admitted result without adding a shared-cache hit.
+
+6. **Distinguish measured, unavailable and skipped durations.** Use
+   checked monotonic elapsed time and preserve host clock resolution.
+   Equal readings give measured zero. Missing, regressing or
+   unrepresentable readings give unavailable timing. Validation-only
+   skips final construction and indexing. Artifact resolution
+   includes cache access and wait, so its elapsed time measures
+   more than decoder CPU alone. Timing never changes load admission.
+
+7. **Preserve exact reports across hosts.** Rust owns checked
+   counters, phase status and diagnostics. Use lossless integer
+   transport in Python and WASM, including full-width nanoseconds.
+   Qualify cold and warm loads against the same semantic admission.
+   Benchmark throughput separately under controlled conditions.
+   [Core count and wire rules](../core-numerics/numeric-wire-and-canonical.md#accepted-decision-strict-numeric-wire-and-canonical-content-identity).
+
+## Independent cache and timing checks
+
+- With two entries and ten bytes, contents A=4 and B=6 fill
+  capacity. Touching A makes B oldest. An eleven-byte bypass
+  leaves both in place. Loading C=5 evicts B. The cache then
+  holds A and C at nine bytes.
+- Eight concurrent requests for one retainable key in the
+  independent synchronized model give one decode and seven hits.
+  Two producer IDs for the same instrument with two holdings and
+  three typed declarations give two entries, one content, two
+  holdings and three declarations. Cold resolution gives zero
+  hits and one decode; warm gives one hit and zero decodes.
+- Clock readings of 100 and 100 ms give measured zero. Readings
+  of 100 and 100.25 ms give 250,000 ns. A regressing or
+  unrepresentable reading gives unavailable timing. An omitted
+  build in validation-only is skipped.
+
+## Observed choice and scope at the audit revision
 
 `InstrumentArtifactCache` retains immutable decoded instruments plus their extracted dependencies. It contains no market, PV, Greek or calibrated valuation state, so its reuse differs from the request-local financial-cache restriction in [ADR 0022](../../architecture/0022-portfolio-evaluation-state.md). The caller owns the cache lifetime; portfolios retain independent `Arc` references to decoded instruments after eviction.
 
@@ -35,6 +108,5 @@ This audit inspected mechanisms and tests, without measuring latency, memory or 
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#portfolio-execution). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and production qualification are tracked
+in the [scope follow-ups](../FOLLOW_UPS.md#portfolio-execution).

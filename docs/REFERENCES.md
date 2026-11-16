@@ -2830,8 +2830,17 @@ and implementation and validation evidence.
 
 ### Brinson Fachler 1985
 
-- Brinson, G. P., Hood, L. R., and Beebower, G. L. "Determinants of Portfolio
-  Performance." Foundation for Brinson-Fachler attribution.
+- Brinson, G. P., and Fachler, N. (1985). "Measuring Non-U.S. Equity Portfolio
+  Performance." *The Journal of Portfolio Management*, 11(3), 73–76. Centered
+  single-period attribution. [DOI](https://doi.org/10.3905/jpm.1985.409005).
+
+<a id="brinson-hood-beebower-1986"></a>
+
+### Brinson Hood Beebower 1986
+
+- Brinson, G. P., Hood, L. R., and Beebower, G. L. (1986). "Determinants of
+  Portfolio Performance." *Financial Analysts Journal*, 42(4), 39–44.
+  [DOI](https://doi.org/10.2469/faj.v42.n4.39).
 
 <a id="carino-1999"></a>
 
