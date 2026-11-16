@@ -361,7 +361,7 @@ fn ordinary_records() -> Vec<Value> {
     records
 }
 
-fn precedence_records() -> Vec<Value> {
+fn target_resolution_records() -> Vec<Value> {
     let mut records = Vec::new();
     for (name, has_curve, has_surface, has_price, has_series, family, spec) in [
         (
@@ -417,12 +417,16 @@ fn precedence_records() -> Vec<Value> {
         if has_series {
             base.insert_series_mut(series("SHARED"));
         }
-        let (bumped, payload) = record(
-            &format!("semantic/precedence/{name}"),
-            &base,
-            vec![generic("SHARED", spec)],
-            family,
-        );
+        let case_id = format!("semantic/precedence/{name}");
+        let bumps = vec![generic("SHARED", spec)];
+        let ambiguous_target =
+            (has_curve && (has_surface || has_price)) || (has_surface && has_price);
+        if ambiguous_target {
+            records.push(error_record(&case_id, &base, bumps, "Validation"));
+            continue;
+        }
+
+        let (bumped, payload) = record(&case_id, &base, bumps, family);
         match family {
             "curve" => assert_float(
                 bumped.get_discount("SHARED").expect("curve").df(1.0),
@@ -514,22 +518,6 @@ fn ordered_records() -> Vec<Value> {
     restored.insert_series_mut(base.get_series("SPX-CLOSE").expect("original").clone());
     assert_eq!(snapshot(&restored), snapshot(&base));
     records.push(payload);
-    let (bumped, payload) = record(
-        "semantic/surface_zero_floor",
-        &base,
-        vec![generic("EQ-VOL", additive(-0.3))],
-        "surface",
-    );
-    assert!(
-        bumped
-            .get_surface("EQ-VOL")
-            .expect("surface")
-            .vols()
-            .iter()
-            .all(|value| value.to_bits() == 0.0_f64.to_bits())
-    );
-    assert_other_content_unchanged(&base, &bumped, "surface", "EQ-VOL");
-    records.push(payload);
     let (bumped, payload) = record("semantic/empty_bumps", &base, Vec::new(), "none");
     assert_eq!(snapshot(&bumped), snapshot(&base));
     records.push(payload);
@@ -605,6 +593,12 @@ fn error_records() -> Vec<Value> {
             BumpSpec::triangular_key_rate_bp(0.25, 1.0, 2.0, 1.0),
         )],
         "Input::UnsupportedBump",
+    ));
+    records.push(error_record(
+        "semantic/errors/negative_surface_volatility",
+        &base,
+        vec![generic("EQ-VOL", additive(-0.3))],
+        "Validation",
     ));
     let overflow = base
         .clone()
@@ -744,7 +738,7 @@ fn credit_records() -> Vec<Value> {
 #[ignore = "CCM numerical export; run explicitly before matched benchmarks"]
 fn export_context_bump_reference() {
     let mut records = ordinary_records();
-    records.extend(precedence_records());
+    records.extend(target_resolution_records());
     records.extend(ordered_records());
     records.extend(error_records());
     records.extend(credit_records());

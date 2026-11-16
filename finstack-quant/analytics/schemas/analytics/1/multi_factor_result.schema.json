@@ -63,6 +63,18 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Result of a multi-factor regression.",
+  "examples": [
+    {
+      "adjusted_r_squared": -0.0844710067347,
+      "alpha": 1.25953262231,
+      "betas": [
+        0.50049568629
+      ],
+      "n_obs": 7,
+      "r_squared": 0.0962741610544,
+      "residual_vol": 0.330924349581
+    }
+  ],
   "properties": {
     "adjusted_r_squared": {
       "$ref": "#/$defs/FiniteOrNanWireFordouble",

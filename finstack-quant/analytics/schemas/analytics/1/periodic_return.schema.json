@@ -10,6 +10,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "One calendar bucket of a periodic-return series.",
+  "examples": [
+    {
+      "date": "2025-01-08",
+      "value": 0.06
+    }
+  ],
   "properties": {
     "date": {
       "$ref": "#/$defs/DateWire",

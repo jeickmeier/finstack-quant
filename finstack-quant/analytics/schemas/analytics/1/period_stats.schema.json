@@ -39,6 +39,25 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Period-level aggregate statistics.",
+  "examples": [
+    {
+      "avg_loss": -0.019560251285,
+      "avg_return": 0.0085317300283,
+      "avg_win": 0.0197685225536,
+      "best": 0.020202020202,
+      "consecutive_losses": 1,
+      "consecutive_wins": 2,
+      "cpc_index": 1.82394416111,
+      "kelly_risk_fraction": 0.431581571418,
+      "losses": 2,
+      "n_obs": 7,
+      "payoff_ratio": 1.01064767858,
+      "profit_factor": 2.52661919645,
+      "win_rate": 0.714285714286,
+      "wins": 5,
+      "worst": -0.0294117647059
+    }
+  ],
   "properties": {
     "avg_loss": {
       "$ref": "#/$defs/NonFiniteF64Wire",
