@@ -8,12 +8,15 @@ runs a diff-selected subset of the same stages (`test_slice_gate.py`).
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
 import tomllib
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github" / "workflows"
@@ -25,6 +28,48 @@ RUNNER_SETUP = {"ui-sync", "wasm-build", "wasm-build-node"}
 # compiling never overlaps ui-check; each CI job builds what it runs itself.
 LOCAL_BUILD = {"rust-build-tests"}
 MISE_RUN = re.compile(r"mise run ([a-z0-9-]+(?: --[a-z-]+)*)")
+
+
+@pytest.mark.parametrize(("coverage", "slow"), [(False, False), (True, False), (True, True)])
+def test_rust_coverage_selects_its_budget_without_changing_test_selection(
+    tmp_path: Path, coverage: bool, slow: bool
+) -> None:
+    """Coverage overrides the fast timeout profile, not the ignored-test filter."""
+    cargo = tmp_path / "cargo"
+    cargo.write_text(
+        '#!/bin/sh\nprintf "%s\\t%s\\n" "${NEXTEST_PROFILE:-default}" "$*" >> "$FQ_TEST_CARGO_CALLS"\n',
+        encoding="utf-8",
+    )
+    cargo.chmod(0o755)
+    calls = tmp_path / "calls"
+    env = {key: value for key, value in os.environ.items() if not key.startswith("usage_")}
+    env.update({
+        "PATH": f"{tmp_path}{os.pathsep}{env.get('PATH', '')}",
+        "FQ_TEST_CARGO_CALLS": str(calls),
+        "NEXTEST_PROFILE": "ci",
+        "CI": "true",
+        "usage_coverage": str(coverage).lower(),
+        "usage_slow": str(slow).lower(),
+    })
+    shell = shutil.which("sh")
+    assert shell, "a POSIX shell is required"
+    result = subprocess.run(  # noqa: S603 -- fixed repository task, with a recording Cargo stub.
+        [shell, "-eu", "-c", TASKS["rust-test"]["run"]],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    test_calls = [line.split("\t") for line in calls.read_text().splitlines() if "nextest" in line]
+    assert len(test_calls) == 1
+    profile, command = test_calls[0]
+    assert profile == ("coverage" if coverage else "ci")
+    assert command.startswith("llvm-cov nextest" if coverage else "nextest run")
+    assert "--workspace --exclude finstack-quant-py --lib --test *" in command
+    assert ("--run-ignored only" in command) == slow
+    assert ("--profile slow" in command) == slow
 
 
 def _stage_tasks(run: list[object]) -> list[str]:
