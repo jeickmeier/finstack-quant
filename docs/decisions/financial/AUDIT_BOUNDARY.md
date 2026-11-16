@@ -1872,6 +1872,79 @@ independent signed price, zero index level and interpolation checks.
 Production execution, restoration and host qualification remain pending.
 [SCENARIOS-008](scenarios/08-commodity-and-vol-index.md#accepted-decision-for-typed-commodity-and-volatility-index-scenario-shocks).
 
+The accepted scenario volatility grid package has independent
+selective scaling, range and fixed-forward-moneyness checks.
+Production execution, restoration and host qualification remain pending.
+[SCENARIOS-009](scenarios/09-volatility-surface-shocks.md#accepted-decision-for-exact-scenario-volatility-grid-shocks).
+
+The accepted scenario correlation package has independent detachment
+conversion, sector shift and matrix feasibility checks. Production
+execution, tranche pricing, restoration and host qualification remain pending.
+[SCENARIOS-010](scenarios/10-correlation-shocks.md#accepted-decision-for-checked-scenario-correlation-shocks).
+
+The accepted scenario instrument override package has independent
+mark-factor, representability, settlement Z-spread and composite
+contribution checks. Production routing, restoration and host
+qualification remain pending.
+[SCENARIOS-011](scenarios/11-instrument-overrides.md#accepted-decision-for-checked-scenario-instrument-overrides).
+
+The accepted statement-shock and rate-binding package has independent
+signed and Decimal forecast, rate conversion, operation-order and
+inclusive-cutoff calculations. Runtime mutation, evaluation, rollback
+and host qualification remain pending.
+[SCENARIOS-012](scenarios/12-statement-bindings.md#accepted-decision-for-checked-scenario-forecast-shocks-and-rate-bindings).
+
+The accepted time-roll package has independent date resolution,
+fixing eligibility, factor-ratio and local survival checks. Production
+roll, replay, restoration and host qualification remain pending.
+[SCENARIOS-013](scenarios/13-market-time-roll.md#accepted-decision-for-checked-scenario-time-rolls-and-horizon-replay).
+
+The accepted roll-carry package has independent settlement-phase,
+signed sizing and currency arithmetic examples. Production pricing,
+row isolation, restoration and host qualification remain pending.
+[SCENARIOS-014](scenarios/14-carry-aggregation.md#accepted-decision-for-checked-scenario-roll-carry-and-native-aggregation).
+
+The accepted horizon-attribution package has independent cash-aware
+return, contribution closure and annualization examples. Production
+attribution, restoration and host qualification remain pending.
+[SCENARIOS-015](scenarios/15-horizon-attribution-and-returns.md#accepted-decision-for-checked-scenario-horizon-attribution-and-returns).
+
+The accepted event-inspired template package has independent JSON
+asset-count, component-order and shock-unit checks. Production use
+on bound markets, restoration and host qualification remain pending.
+[SCENARIOS-016](scenarios/16-historical-template-parameters.md#accepted-decision-for-checked-event-inspired-stress-templates).
+
+The accepted scenario reporting and replay package has independent
+effect-count, cancellation and scoped identity checks, including the
+historical c1 fixture. Production replay, restoration and host
+qualification remain pending.
+[SCENARIOS-017](scenarios/17-reports-and-replay.md#accepted-decision-for-checked-scenario-reports-and-replay).
+
+The accepted portfolio holding package has independent signed sizing,
+exact Money and attribute comparison checks. Runtime construction,
+valuation, restoration and host qualification remain pending.
+[PORTFOLIO-EXECUTION-001](portfolio-execution/01-position-sizing-and-validation.md#accepted-decision-for-checked-portfolio-holdings-and-signed-sizing).
+
+The accepted book hierarchy and rollup package has independent
+depth, signed subtotal and Money reduction-order checks. Production
+rollup, restoration and host qualification remain pending.
+[PORTFOLIO-EXECUTION-002](portfolio-execution/02-book-hierarchy-and-rollups.md#accepted-decision-for-checked-book-hierarchy-and-nav-rollups).
+
+The accepted portfolio valuation profile package has independent menu,
+failure-policy and signed scaling checks. Production pricing, restoration
+and host qualification remain pending.
+[PORTFOLIO-EXECUTION-003](portfolio-execution/03-valuation-profiles-and-failures.md#accepted-decision-for-checked-portfolio-valuation-profiles-and-failures).
+
+The accepted portfolio execution package has independent scheduling
+boundary, error order, seed and NAV precision checks. Production execution,
+thread-count behavior and host qualification remain pending.
+[PORTFOLIO-EXECUTION-004](portfolio-execution/04-execution-order-and-reduction.md#accepted-decision-for-checked-portfolio-execution-and-nav-reduction).
+
+The accepted selective repricing package has independent typed routing,
+credit-index replacement, missing change proof and FX refresh checks.
+Production equivalence and host qualification remain pending.
+[PORTFOLIO-EXECUTION-005](portfolio-execution/05-dependencies-and-selective-reuse.md#accepted-decision-for-checked-portfolio-dependencies-and-selective-repricing).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

@@ -2067,6 +2067,73 @@ requiring reproduction, adoption choices and missing validation are distinct.
   price and zero-level domains, and source-preserving delivery under
   the [accepted level shock contract](financial/scenarios/08-commodity-and-vol-index.md#accepted-decision-for-typed-commodity-and-volatility-index-scenario-shocks).
 
+- **Scenario volatility grid shocks:** reconcile exact typed source
+  and axis binding, one admitted native-sigma replacement and
+  separately elected diagnostics under the
+  [accepted volatility grid contract](financial/scenarios/09-volatility-surface-shocks.md#accepted-decision-for-exact-scenario-volatility-grid-shocks).
+
+- **Scenario correlation shocks:** reconcile core detachment units and
+  tranche dependencies, exact structured-credit targets, matrix
+  feasibility and active prepayment/default coupling under the
+  [accepted correlation contract](financial/scenarios/10-correlation-shocks.md#accepted-decision-for-checked-scenario-correlation-shocks).
+
+- **Scenario instrument overrides:** reconcile exact selectors, supported
+  mark and bond spread routes, frozen composite identity and matching
+  headline and contribution bases under the
+  [accepted instrument override contract](financial/scenarios/11-instrument-overrides.md#accepted-decision-for-checked-scenario-instrument-overrides).
+
+- **Scenario statement shocks and rate bindings:** reconcile typed
+  forecast effects, dated factor conversion and publication of the
+  checked statement evaluation under the
+  [accepted forecast and binding contract](financial/scenarios/12-statement-bindings.md#accepted-decision-for-checked-scenario-forecast-shocks-and-rate-bindings).
+
+- **Scenario time rolls:** reconcile explicit date and calendar admission,
+  exact fixing dependencies and provenance, conditioned sources, and
+  elected horizon hazard replay under the
+  [accepted time roll contract](financial/scenarios/13-market-time-roll.md#accepted-decision-for-checked-scenario-time-rolls-and-horizon-replay).
+
+- **Scenario roll carry:** reconcile shared endpoint pricing,
+  settlement-phase cash, inventory sizing, native-currency row admission
+  and coverage under the
+  [accepted carry contract](financial/scenarios/14-carry-aggregation.md#accepted-decision-for-checked-scenario-roll-carry-and-native-aggregation).
+
+- **Scenario horizon attribution and returns:** reconcile shared checked
+  endpoint marks, method and residual admission, full contribution
+  coverage and stable ACT/365F annualization under the
+  [accepted horizon contract](financial/scenarios/15-horizon-attribution-and-returns.md#accepted-decision-for-checked-scenario-horizon-attribution-and-returns).
+
+- **Scenario stress templates:** reconcile catalogue classification and
+  validation, accepted ordered composition, explicit typed market
+  bindings and lineage under the
+  [accepted template contract](financial/scenarios/16-historical-template-parameters.md#accepted-decision-for-checked-event-inspired-stress-templates).
+
+- **Scenario application reports and replay:** reconcile exact counts,
+  delivered effects, final-state invalidation, replay identities and
+  bounded wire publication under the
+  [accepted reporting contract](financial/scenarios/17-reports-and-replay.md#accepted-decision-for-checked-scenario-reports-and-replay).
+
+- **Portfolio holdings and sizing:** reconcile exact lot and instrument
+  identity, signed scaling, shared checked edits and host admission under the
+  [accepted holdings contract](financial/portfolio-execution/01-position-sizing-and-validation.md#accepted-decision-for-checked-portfolio-holdings-and-signed-sizing).
+
+- **Portfolio book rollups:** reconcile shared graph admission, matched
+  valuation provenance, checked reduction order and unassigned coverage
+  under the [accepted book rollup contract](financial/portfolio-execution/02-book-hierarchy-and-rollups.md#accepted-decision-for-checked-book-hierarchy-and-nav-rollups).
+
+- **Portfolio valuation profiles:** reconcile explicit menus and policy,
+  qualified canonical PV, atomic metric enrichment and ordered coverage
+  under the [accepted valuation contract](financial/portfolio-execution/03-valuation-profiles-and-failures.md#accepted-decision-for-checked-portfolio-valuation-profiles-and-failures).
+
+- **Portfolio execution and NAV reduction:** reconcile checked request
+  identity, job coalescing, one-axis scheduling, logical error order,
+  checked Money NAV and qualified raw endpoints under the
+  [accepted execution contract](financial/portfolio-execution/04-execution-order-and-reduction.md#accepted-decision-for-checked-portfolio-execution-and-nav-reduction).
+
+- **Portfolio selective repricing:** reconcile typed active dependency
+  coverage, authoritative state changes, prior row compatibility and
+  independent reporting FX refresh under the
+  [accepted reuse contract](financial/portfolio-execution/05-dependencies-and-selective-reuse.md#accepted-decision-for-checked-portfolio-dependencies-and-selective-repricing).
+
 ### Implementation reconciliation
 
 - **Related scope:** retain the option-bearing CS01/OAS reconciliation above.

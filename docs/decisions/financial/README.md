@@ -2286,6 +2286,77 @@ Commodity and volatility-index scenario shocks were accepted on
 source-owned level domains, and checked exact or evaluated delivery.
 [SCENARIOS-008](scenarios/08-commodity-and-vol-index.md#accepted-decision-for-typed-commodity-and-volatility-index-scenario-shocks).
 
+Scenario volatility grid shocks were accepted on 2026-11-15.
+The package covers exact typed buckets, one checked sigma change,
+separately elected diagnostics and actual effect evidence.
+[SCENARIOS-009](scenarios/09-volatility-surface-shocks.md#accepted-decision-for-exact-scenario-volatility-grid-shocks).
+
+Scenario correlation shocks were accepted on 2026-11-15.
+The package covers exact detachment and model-parameter selection,
+whole-candidate validation and actual effect evidence.
+[SCENARIOS-010](scenarios/10-correlation-shocks.md#accepted-decision-for-checked-scenario-correlation-shocks).
+
+Scenario instrument overrides were accepted on 2026-11-15.
+The package covers exact selectors, checked mark multipliers and
+settlement Z-spread shocks, frozen composite routing and atomic effects.
+[SCENARIOS-011](scenarios/11-instrument-overrides.md#accepted-decision-for-checked-scenario-instrument-overrides).
+
+Scenario statement shocks and rate bindings were accepted on
+2026-11-15. The package covers existing typed inputs, dated
+factor conversion and atomic publication with the evaluated result.
+[SCENARIOS-012](scenarios/12-statement-bindings.md#accepted-decision-for-checked-scenario-forecast-shocks-and-rate-bindings).
+
+Scenario time rolls were accepted on 2026-11-15. The package covers
+explicit date resolution, exact fixing dependencies, retained source
+conditioning and expressly elected horizon replay.
+[SCENARIOS-013](scenarios/13-market-time-roll.md#accepted-decision-for-checked-scenario-time-rolls-and-horizon-replay).
+
+Scenario roll carry was accepted on 2026-11-15. The package covers
+shared endpoint pricing, phase-consistent settlement cash, native
+aggregation and optional measurement coverage.
+[SCENARIOS-014](scenarios/14-carry-aggregation.md#accepted-decision-for-checked-scenario-roll-carry-and-native-aggregation).
+
+Scenario horizon attribution and returns were accepted on 2026-11-15.
+The package covers one-instrument market horizons, checked attribution
+and residuals, complete contributions and ACT/365F return normalization.
+[SCENARIOS-015](scenarios/15-horizon-attribution-and-returns.md#accepted-decision-for-checked-scenario-horizon-attribution-and-returns).
+
+Event-inspired stress templates were accepted on 2026-11-15.
+The package covers fixed shock parameters, strict ordered
+composition, exact typed bindings and run lineage.
+[SCENARIOS-016](scenarios/16-historical-template-parameters.md#accepted-decision-for-checked-event-inspired-stress-templates).
+
+Scenario application reports and replay were accepted on 2026-11-15,
+completing all 17 scenario decisions. The package covers distinct
+execution counts, ordered effects, state-based invalidation, scoped
+identities and bounded restoration.
+[SCENARIOS-017](scenarios/17-reports-and-replay.md#accepted-decision-for-checked-scenario-reports-and-replay).
+
+Portfolio holding identity and signed sizing were accepted on
+2026-11-15. The package covers explicit quantities, checked scaling,
+reference validation and atomic construction and edits.
+[PORTFOLIO-EXECUTION-001](portfolio-execution/01-position-sizing-and-validation.md#accepted-decision-for-checked-portfolio-holdings-and-signed-sizing).
+
+Portfolio book hierarchy and rollups were accepted on 2026-11-15.
+The package covers bounded graph admission, matched valuations,
+deterministic Money reduction and unassigned holding coverage.
+[PORTFOLIO-EXECUTION-002](portfolio-execution/02-book-hierarchy-and-rollups.md#accepted-decision-for-checked-book-hierarchy-and-nav-rollups).
+
+Portfolio valuation profiles and failures were accepted on 2026-11-15.
+The package covers explicit metric requests, qualified canonical PV,
+atomic enrichment and typed coverage in strict and best-effort risk modes.
+[PORTFOLIO-EXECUTION-003](portfolio-execution/03-valuation-profiles-and-failures.md#accepted-decision-for-checked-portfolio-valuation-profiles-and-failures).
+
+Portfolio execution and NAV reduction were accepted on 2026-11-15.
+The package covers checked request identities, logical work and error
+order, checked Money NAV and qualified raw factor endpoints.
+[PORTFOLIO-EXECUTION-004](portfolio-execution/04-execution-order-and-reduction.md#accepted-decision-for-checked-portfolio-execution-and-nav-reduction).
+
+Portfolio dependencies and selective repricing were accepted on 2026-11-15.
+The package covers typed active coverage, authoritative change evidence,
+fresh valuation when needed and independent reporting FX refresh.
+[PORTFOLIO-EXECUTION-005](portfolio-execution/05-dependencies-and-selective-reuse.md#accepted-decision-for-checked-portfolio-dependencies-and-selective-repricing).
+
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the
 accepted perspective/sign contracts; broader margin methodology retains its

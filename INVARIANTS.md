@@ -1063,6 +1063,81 @@ Keep original level-source grids and domains, and check exact
 or evaluated delivery without inferring a spot anchor.
 [Accepted commodity and volatility-index shocks](docs/decisions/financial/scenarios/08-commodity-and-vol-index.md#accepted-decision-for-typed-commodity-and-volatility-index-scenario-shocks).
 
+Volatility scenarios bind exact typed surface and bucket coordinates,
+scale annual sigma once, and publish that admitted grid with actual
+effect evidence. Preserve source clocks and conventions. Evaluate
+financial diagnostics through their separately elected owner.
+[Accepted volatility grid shocks](docs/decisions/financial/scenarios/09-volatility-surface-shocks.md#accepted-decision-for-exact-scenario-volatility-grid-shocks).
+
+Scenario correlation shocks bind exact detachment knots or active
+structured-credit parameters. Apply the complete native delta and
+validate the whole candidate, including matrix feasibility and model
+structure, before publishing actual effect evidence.
+[Accepted correlation shocks](docs/decisions/financial/scenarios/10-correlation-shocks.md#accepted-decision-for-checked-scenario-correlation-shocks).
+
+Scenario instrument overrides bind exact selections and supported valuation
+routes. Apply signed mark factors once and bind spread moves to qualified
+settlement Z-spread experiments. Preserve frozen composition as the
+headline and its breakdown follow the same valuation tree.
+[Accepted instrument overrides](docs/decisions/financial/scenarios/11-instrument-overrides.md#accepted-decision-for-checked-scenario-instrument-overrides).
+
+Scenario statement shocks change existing typed forecast inputs. Rate
+bindings preserve accumulation over explicit dated intervals and quote
+conventions. Evaluate the active phase once and publish checked
+results and provenance with the staged inputs.
+[Accepted statement shocks and rate bindings](docs/decisions/financial/scenarios/12-statement-bindings.md#accepted-decision-for-checked-scenario-forecast-shocks-and-rate-bindings).
+
+Scenario time rolls use an explicit target date and original source clocks.
+Qualify exact fixing dependencies and hypothetical provenance, elect any
+horizon requote explicitly, and publish the admitted result atomically.
+[Accepted time rolls and horizon replay](docs/decisions/financial/scenarios/13-market-time-roll.md#accepted-decision-for-checked-scenario-time-rolls-and-horizon-replay).
+
+Scenario roll carry uses comparable signed holder marks and phase-consistent
+nominal settlement cash. Admit each row across all native currencies
+together and disclose coverage for optional carry failures.
+[Accepted roll carry and native aggregation](docs/decisions/financial/scenarios/14-carry-aggregation.md#accepted-decision-for-checked-scenario-roll-carry-and-native-aggregation).
+
+Scenario horizon attribution uses one instrument, checked endpoint marks,
+and complete qualified settlement cash. Require admissible attribution,
+include its non-overlapping buckets and residual, and normalize returns
+on positive opening capital and actual civil dates.
+[Accepted horizon attribution and returns](docs/decisions/financial/scenarios/15-horizon-attribution-and-returns.md#accepted-decision-for-checked-scenario-horizon-attribution-and-returns).
+
+Scenario stress templates are fixed event-inspired parameter sets.
+Use checked ordered composition, bind each selected role explicitly,
+and retain the exact template, component and scenario lineage.
+[Accepted event-inspired stress templates](docs/decisions/financial/scenarios/16-historical-template-parameters.md#accepted-decision-for-checked-event-inspired-stress-templates).
+
+Scenario reports distinguish authored actions, represented effects and
+final-state invalidation. Validate required artifacts before publication
+and identify replay inputs through their actual immutable authorities.
+[Accepted scenario reports and replay](docs/decisions/financial/scenarios/17-reports-and-replay.md#accepted-decision-for-checked-scenario-reports-and-replay).
+
+Portfolio holdings have exact lot identities and explicit signed sizing.
+Scale each additive amount once on its admitted basis and publish checked
+holding, reference and index changes atomically.
+[Accepted portfolio holdings and sizing](docs/decisions/financial/portfolio-execution/01-position-sizing-and-validation.md#accepted-decision-for-checked-portfolio-holdings-and-signed-sizing).
+
+Portfolio book rollups use one admitted forest and a valuation matched to
+the same holdings and reporting basis. Fold base Money in deterministic
+order and report unassigned value separately from subtree totals.
+[Accepted book hierarchy and rollups](docs/decisions/financial/portfolio-execution/02-book-hierarchy-and-rollups.md#accepted-decision-for-checked-book-hierarchy-and-nav-rollups).
+
+Portfolio valuation requires a qualified canonical mark and explicit risk
+profile. Best effort may preserve that mark after a risk-only failure
+while withholding the failed metric batch and disclosing coverage.
+[Accepted valuation profiles and failures](docs/decisions/financial/portfolio-execution/03-valuation-profiles-and-failures.md#accepted-decision-for-checked-portfolio-valuation-profiles-and-failures).
+
+Portfolio execution uses request-local immutable state and job identities,
+one parallel axis and logical error order. Reduce headline NAV directly
+in checked base Money and retain qualified raw factor endpoints.
+[Accepted execution order and NAV reduction](docs/decisions/financial/portfolio-execution/04-execution-order-and-reduction.md#accepted-decision-for-checked-portfolio-execution-and-nav-reduction).
+
+Selective portfolio repricing requires typed dependency coverage,
+immutable prior rows and authoritative change evidence. Rebuild the
+whole result and refresh reporting FX independently of native marks.
+[Accepted portfolio dependencies and selective repricing](docs/decisions/financial/portfolio-execution/05-dependencies-and-selective-reuse.md#accepted-decision-for-checked-portfolio-dependencies-and-selective-repricing).
+
 Valuation model inputs bind an exact source, unit, clock and parameter block.
 Use dated relative factors for GBM carry. Simulations retain explicit controls,
 exact seed identity and actual work. Apply each tree and quote control on its
@@ -4158,8 +4233,10 @@ assembler, calibration cache, or scheduling policy.
   Instrument-internal Monte Carlo threading remains a separate coordination
   and performance-verification concern.
 - Parallel work collects indexed results before a serial logical-order scan.
-  Position/state order, first-error selection, and Neumaier aggregation order
-  therefore remain deterministic.
+  Preserve position/state order and first-error selection. Use ordered checked
+  Money for monetary NAV and subtotals and ordered checked Neumaier for
+  binary64 reductions such as raw factor totals.
+  [Accepted portfolio reduction](docs/decisions/financial/portfolio-execution/04-execution-order-and-reduction.md#accepted-decision-for-checked-portfolio-execution-and-nav-reduction).
 - Evaluation state and caches are request-local. Do not add a global,
   thread-local, process-wide, persistent, or cross-request valuation cache.
   Immutable decoded-instrument input caches, static immutable registries, and

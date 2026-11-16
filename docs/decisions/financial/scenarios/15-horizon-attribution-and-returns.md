@@ -1,12 +1,93 @@
 # SCENARIOS-015: Horizon attribution bridge and return normalization
 
-- Decision status: **Draft — observed implementation; adoption pending.**
-- Implementation status: **Observed for the stated source scope.** Actual discrepancies and unsupported cases are distinguished below.
-- Validation status: **Evidence inspected/located, not executed.** No numerical test, build or external benchmark run is claimed.
+- Decision status: **Accepted 2026-11-15 — complete single-instrument horizon, checked attribution and return normalization package.**
+- Implementation status: **Observed.** Reconciliation to the accepted package is pending.
+- Validation status: **Independent cash-aware return, contribution reconciliation and annualization examples verified.** Production attribution, restoration and host qualification remain pending.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - Scope: [inventory](README.md), [source coverage](coverage.json). Shared kernels are linked as dependencies, not reassigned implementations.
 
-## Choice and rationale
+## Accepted decision for checked scenario horizon attribution and returns
+
+1. **Keep the horizon to one instrument and market actions.** Use
+   the same authored deal at both endpoints with product-qualified
+   lifecycle and settlement state. Admit market-only same-day shocks
+   or one optional roll. Reject active instrument mutations and
+   statement operations during preflight, including zero-valued
+   mutations. Share date and fixing preparation with record 013.
+   Distinguish an omitted roll from an admitted zero-day roll. Either
+   can produce market-shock P&L. Annualization requires a positive span.
+   [Accepted time roll](13-market-time-roll.md#accepted-decision-for-checked-scenario-time-rolls-and-horizon-replay).
+
+2. **Use one checked pair of marks and a complete settlement ledger.**
+   Price the opening and fully shocked closing states through the
+   shared executor with the elected model, options, configuration and
+   provider. Pass those exact marks and their provenance to attribution.
+   Form the headline from comparable holder marks and phase-eligible
+   settlement cash on the same scenario path. Require explicit,
+   qualified FX where the holder basis uses conversion. Complete required
+   horizon cash is distinct from the optional inventory carry outcome.
+   [Shared executor](../../architecture/0046-portfolio-execution-operational-contract.md#decision-and-scope) ·
+   [Holder basis](../valuations-framework/carry-theta-breakeven.md#accepted-decision-for-checked-horizon-theta-carry-and-breakeven).
+
+3. **Elect the method and require checked attribution.** Select
+   Parallel, Waterfall, MetricsBased or Taylor with its applicable
+   controls. Elect scheduling independently. Require valid endpoint
+   stamps, complete required cash and factor calculations, consistent
+   currency and checked Money closure. Retain genuine advisories.
+   Qualify the residual separately against the larger of an explicit
+   nonnegative native-currency amount and an explicit nonnegative
+   fraction of absolute headline P&L. Reject a failed residual check.
+   The attribution records own the factor algorithms.
+   [Attribution methodology](../attribution/README.md) ·
+   [Residual qualification](../attribution/13-target-currency-and-scaling.md).
+
+4. **Publish the complete non-overlapping contribution summary.**
+   Include cross-factor P&L, residual and the separately identified
+   reporting FX translation bucket. Mark translation inactive on the
+   native reporting basis and distinguish it from pricing FX exposure.
+   Divide applicable buckets by the same opening mark.
+   [Canonical attribution buckets](../../../../finstack-quant/attribution/src/result.rs).
+
+5. **Normalize cash-aware P&L by the positive opening mark.** Use
+   the checked Money ratio on the same-currency opening holder mark.
+   With a zero or negative opening mark, keep the monetary P&L
+   and report returns and normalized contributions as unavailable.
+   Eligible arithmetic holding returns may be below `−100%`.
+   [Money ratio](../core-conventions/012-money-decimal-precision.md).
+
+6. **Annualize on ACT/365F and classify wipeout in Money.** Require
+   positive elapsed civil days. For positive growth calculate the
+   stable annual equivalent using log and exponential-increment
+   arithmetic. Determine exact wipeout and excess loss in Money
+   before any binary64 ratio. Exact wipeout gives `−100%`.
+   Loss beyond opening capital leaves annualization unavailable.
+   Near wipeout, derive growth from the positive monetary remainder.
+   An unrepresentable annualization is a typed calculation error.
+   [Dated growth](../analytics/02-wealth-and-annualization.md#accepted-decision-wealth-means-cagr-relative-wealth-and-cash-series).
+
+7. **Use one checked Rust result across hosts.** Keep exact Money,
+   endpoint provenance, method controls and residual qualification.
+   Derive summaries from the validated underlying result on restore.
+   Unavailable derived scalars use None/null. Invalid inputs and
+   calculation failures use typed errors. Record 017 owns wire
+   representation.
+   [Reporting record 017](17-reports-and-replay.md).
+
+## Independent calculation checks
+
+- An opening mark of `100`, closing mark of `98` and
+  eligible cash of `7` yield P&L `5` and return `5%`.
+  Contributions `2, 1, −1, 2, 1` include cross-factor P&L
+  `2` and residual `1`. Together they reconcile to `5%`.
+- A `10%` gain over `366` civil days gives about
+  `9.971359%` on ACT/365F. Opening `1` and P&L
+  `−0.9999999999999999999999999999` have positive growth
+  `1e−28`. Over 36,500 days the annual equivalent is about
+  `−47.519254%` even though the displayed holding ratio rounds
+  to `−1`. An exact excess loss can also round to `−1` and
+  remains ineligible for annualization.
+
+## Observed choice and rationale at the audit revision
 
 Observed choice: construct a future shocked market through the scenario engine and delegate attribution to the shared attribution crate, then calculate returns from the resulting total P&L. The same instrument instance is used at both endpoints, so instrument-mutating scenario operations are rejected explicitly rather than silently omitted from attribution.
 
@@ -32,6 +113,5 @@ Non-strict attribution may return warning-qualified decompositions; the horizon 
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#scenarios). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and production qualification are tracked
+in the [scope follow-ups](../FOLLOW_UPS.md#scenarios).

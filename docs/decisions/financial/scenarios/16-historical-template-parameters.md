@@ -1,12 +1,89 @@
 # SCENARIOS-016: Embedded stress templates, assembly order and parameter provenance
 
-- Decision status: **Draft — observed implementation; adoption pending.**
-- Implementation status: **Observed for the stated source scope.** Actual discrepancies and unsupported cases are distinguished below.
-- Validation status: **Evidence inspected/located, not executed.** No numerical test, build or external benchmark run is claimed.
+- Decision status: **Accepted 2026-11-15 — complete event-inspired stress catalogue, ordered composition, exact bindings and template lineage package.**
+- Implementation status: **Observed.** Reconciliation to the accepted package is pending.
+- Validation status: **Independent asset counts, component order and shock-unit calculations verified.** Production application, restoration and host qualification remain pending.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - Scope: [inventory](README.md), [source coverage](coverage.json). Shared kernels are linked as dependencies, not reassigned implementations.
 
-## Choice and rationale
+## Accepted decision for checked event-inspired stress templates
+
+1. **Classify the catalogue as stylized and event-inspired.** Expose
+   that classification in discovery, built specifications and run
+   provenance. Event dates, severity and asset-class labels serve
+   discovery. Claims about observed moves, calibration probabilities
+   or supervisory use require separate qualified evidence.
+   [New York Fed SOFR launch notice](https://www.newyorkfed.org/markets/opolicy/operating_policy_180403).
+
+2. **Preserve the five authored shock sets and units.** Retain the
+   fixed GFC, COVID, 2022 rates, SVB and LTCM same-day magnitudes
+   listed below. Equity, quoted sigma and ordered FX moves are
+   relative percentages. Discount and spread moves are basis
+   points. Severity is descriptive and does not scale the moves.
+   [Shock units](01-specification-and-composition.md#accepted-decision-for-checked-scenario-specifications-and-ordered-composition).
+
+3. **Admit one strict versioned Rust catalogue.** Require exact
+   template IDs, globally unique template documents and unique
+   component IDs within each template. Declared and actual
+   component IDs and order must agree. Reject unknown fields or
+   versions and duplicate JSON keys. Keep deterministic listings
+   and independently owned builds. Cache only the immutable
+   validated catalogue or its initialization failure. Python and
+   WASM use the same Rust admission and lookup rules.
+
+4. **Assemble through the accepted composer.** Use the exact
+   registered ID for the full canonical build. Keep component
+   operations in contiguous blocks, sort by ascending priority
+   with authored order on ties, and select the minimum priority.
+   Require declared order to agree with that result and one
+   effective hierarchy policy across components. Retire the
+   independent composite priority and policy reset.
+   [Accepted ordered composition](01-specification-and-composition.md#accepted-decision-for-checked-scenario-specifications-and-ordered-composition).
+
+5. **Require exact typed bindings and qualified operations.** Bind
+   every selected role to its concrete target and required
+   quote basis or dependencies. For discount nodes require an
+   explicit tenor origin and date convention and use checked
+   evaluated delivery within the original pillar span. Keep the
+   GFC zero move at 5Y as a validated target. Elect par-CDS
+   quote replay explicitly and bind the qualified original fit
+   and actual staged discount source. FX requires exact ordered
+   pair identity and a qualified frozen quote policy.
+   [Evaluated nodes](06-node-delivery-solve.md#accepted-decision-for-exact-scenario-coordinates-and-checked-node-delivery) ·
+   [CDS replay](07-hazard-quote-shocks.md#accepted-decision-for-native-hazard-shocks-and-exact-cds-scenario-replay) ·
+   [Frozen FX shocks](04-fx-and-equity-shocks.md#accepted-decision-for-frozen-fx-and-checked-equity-scenario-shocks).
+
+6. **Use the selected operations as execution prerequisites.** A full
+   template requires each action to pass in order and publishes
+   atomically. SVB requires inventory with supported exact
+   `sector=regional_banks` matches and qualified settlement Z-spread
+   centers. Its full template falls outside market-only horizon
+   attribution. LTCM's rates component also requires an EM sovereign
+   CDS replay route. Admit explicit component selection. A custom
+   subset or edit receives its own checked scenario ID.
+   [Atomic execution](02-execution-and-partial-success.md#accepted-decision-for-ordered-and-atomic-scenario-execution) ·
+   [Instrument overrides](11-instrument-overrides.md#accepted-decision-for-checked-scenario-instrument-overrides) ·
+   [Horizon scope](15-horizon-attribution-and-returns.md#accepted-decision-for-checked-scenario-horizon-attribution-and-returns).
+
+7. **Carry template lineage into the run.** Record the schema version,
+   immutable template content identity, ordered selected components,
+   exact bindings and resulting scenario identity. Record edits when
+   claiming derivative lineage. Record 017 owns replay
+   representation and the additional required run inputs.
+   [Reporting record 017](17-reports-and-replay.md).
+
+## Independent asset and calculation checks
+
+- The five documents contain 25 components, 40 operations split
+  `9, 8, 7, 7, 9`, and priority `0–4` in each authored component
+  order. The stable accepted composer preserves this order.
+- For GFC, the parallel and node instructions request `−250`,
+  `−200`, `−150` and `−125 bp` at 2Y, 5Y, 10Y and 30Y.
+  These are requested net target moves.
+- An opening quoted sigma of `20%` becomes `60%` under
+  GFC's `+200%` action and `70%` under COVID's `+250%` action.
+
+## Observed choice and rationale at the audit revision
 
 Observed choice: provide reusable **stylized stress specifications** inspired by named events. The five embedded documents contain fixed market shocks and modern placeholder identifiers; they do not load historical time series, fit joint distributions, estimate probabilities or establish an observation window. Event names, dates and severity labels are descriptive metadata, not independently verified market facts or regulatory stress certification.
 
@@ -16,7 +93,7 @@ The compile-time load order is GFC 2008, COVID 2020, 2022 rate shock, SVB 2023 a
 
 Registration concatenates component operations in that document/metadata order: rates, credit, equity, volatility, FX. It does **not** call `ScenarioSpec::compose`, sort component priorities, or inherit component resolution/hazard policies; composite policies are defaults (`MostSpecificWins`, `SolveToPar`) and composite metadata supplies ID/name/description/priority. All present builtins use those defaults, so no present policy conflict is asserted. The registry is initialized once with `OnceLock<Result<...>>`, caching both success and initialization failure. `build` and `build_component` return exact cloned specifications; unknown IDs error. There is no runtime template fitting or automatic identifier remapping.
 
-## Embedded calculation parameters
+## Embedded parameter values and audit-era operation names
 
 Rate entries below are discount continuous-zero basis-point changes on `USD-SOFR`; listed node changes are additional ordered node operations under `Interpolate`. Credit curve entries are ParCDS bp under default solve-to-par. Equity, surface volatility and FX entries are **relative percentages**, so a +200% vol shock triples quoted vol.
 
@@ -40,6 +117,5 @@ Empirically sourced event-window shocks, covariance-consistent macro factor stre
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#scenarios). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and production qualification are tracked
+in the [scope follow-ups](../FOLLOW_UPS.md#scenarios).

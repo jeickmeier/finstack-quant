@@ -1,12 +1,98 @@
 # SCENARIOS-017: Application manifests, shock units and versioned replay envelopes
 
-- Decision status: **Draft — observed implementation; adoption pending.**
-- Implementation status: **Observed for the stated source scope.** Actual discrepancies and unsupported cases are distinguished below.
-- Validation status: **Evidence inspected/located, not executed.** No numerical test, build or external benchmark run is claimed.
+- Decision status: **Accepted 2026-11-15 — complete application reporting, invalidation, bounded restoration and replay package.**
+- Implementation status: **Observed.** Reconciliation to the accepted package is pending.
+- Validation status: **Independent effect-count, cancellation and scoped canonical identity examples verified, including the existing c1 fixture.** Production replay, restoration and host qualification remain pending.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - Scope: [inventory](README.md), [source coverage](coverage.json). Shared kernels are linked as dependencies, not reassigned implementations.
 
-## Choice and rationale
+## Accepted decision for checked scenario reports and replay
+
+1. **Give each count one meaning.** Report authored operations,
+   active actions after expansion and precedence, changed actions,
+   admitted unchanged actions and individual changed effects.
+   Retain suppressed hierarchy candidates and configured binding
+   outcomes separately. Required failures produce no completed
+   report. Optional carry may be incomplete with typed row failures
+   and explicit coverage.
+   [Accepted scenario execution](02-execution-and-partial-success.md#accepted-decision-for-ordered-and-atomic-scenario-execution) ·
+   [Carry coverage](14-carry-aggregation.md#accepted-decision-for-checked-scenario-roll-carry-and-native-aggregation).
+
+2. **Report requested and delivered effects in execution order.**
+   Retain action and phase identity, exact typed target, coordinates
+   or occurrence path, requested units and value, and actual checked
+   native before-and-after state. Retain applicable owner-qualified
+   fit, fixing, statement and residual evidence. Preserve the
+   sequence of changes, including changes that cancel in the final
+   state. Monetary P&L requires actual repricing.
+
+3. **Base invalidation on admitted opening and final state.**
+   Keep typed market namespaces, ordered FX scope, inventory
+   occurrences, statement inputs and date or shape changes. Omit
+   a canceled effect from invalidation only when the owner proves
+   the relevant states agree. Record the reason for broader
+   repricing when dependency coverage is incomplete. Invalidate
+   every FX-dependent position absent authoritative triangulation
+   paths. Distinguish native repricing from reporting-currency
+   refresh.
+   [Shared executor and reuse](../../architecture/0046-portfolio-execution-operational-contract.md#decision-and-scope).
+
+4. **Define independent artifact identities.** The versioned
+   specification identifies admitted authored instructions. The
+   application snapshot contains the admitted resulting state,
+   evaluated statements, inventory and report. The elective replay
+   manifest identifies original executable inputs. Use the accepted
+   core `c2` canonical digest with explicit schema and canonical
+   versions. Keep executable array order. Existing `c1` fixtures
+   retain their historical identity.
+   [Canonical content identity](../core-numerics/numeric-wire-and-canonical.md#accepted-decision-strict-numeric-wire-and-canonical-content-identity).
+
+5. **Capture the inputs and authorities actually used.** Embed or
+   reference immutable opening market, inventory and statement state,
+   ordered scenario and bindings, requested and effective dates and
+   information cuts, and template lineage. Retain applicable calendar
+   editions, fixing provenance, FX quotes and query coverage, original
+   calibration sources, effective model and provider settings, producing
+   build and relevant stochastic controls. Missing or mismatched required
+   evidence is a typed replay error. An admitted output snapshot remains
+   inspectable. Compare replay results under the declared guarantee and
+   owner-qualified numerical tolerances.
+   [Audit and replay policy](../../project/0025-auditable-results-and-replay.md#decision) ·
+   [Reproducibility guarantees](../../standards/0021-reproducibility-guarantees.md#decision).
+
+6. **Restore through the bounded Rust validation path.** Require exact
+   schema markers, closed shapes and lossless decoding. Reject nested
+   duplicate keys before map conversion. Apply market, instrument and
+   statement owner admission, then verify dates, counts, effect paths,
+   results and provenance agree. Preserve exact Money and distinguish
+   absent from empty inventory. Derive horizon summaries from the
+   validated underlying result.
+   [Bounded contract loading](../core-numerics/contracts-and-diagnostics.md#accepted-decision-bounded-contract-loading-validation-and-diagnostics).
+
+7. **Validate required wire artifacts before publishing success.**
+   When a call promises a serializable result, stage and check its
+   complete artifact before publication. Rust owns the financial
+   result, nullability and typed diagnostics across Python and WASM.
+   Generate schemas and host declarations from this contract.
+   [Atomic publication](02-execution-and-partial-success.md#accepted-decision-for-ordered-and-atomic-scenario-execution).
+
+## Independent calculation and identity checks
+
+- Starting with A=100 and B=80, a `+100%` action on both, a
+  `−50%` action on A and a validated zero action on B give three
+  authored and active actions, two changed actions, one unchanged
+  action and three effects. A returns to 100 and B ends at 160.
+  The three changes remain visible even when the final state of A
+  qualifies for reuse.
+- The same `+10%` authored instruction yields 110 from 100 and
+  121 from 110. Object-key reordering preserves the specification
+  digest. Different opening inputs produce different run-input
+  digests. Reordering operations changes the specification digest.
+- The existing canonical fixture matches its `c1` preimage.
+  Substituting the `c2` prefix changes the digest even with the same
+  fixture bytes.
+
+## Observed choice and rationale at the audit revision
 
 Observed choice: return enough typed change information for consumers to invalidate/reprice affected instruments, alongside a serializable applied context and ordered shock descriptions. A scenario content hash identifies its input specification; it is not a hash of all data needed to reproduce financial results.
 
@@ -36,6 +122,5 @@ A complete reproducibility bundle, effective-shock report, separate mutation and
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#scenarios). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and production qualification are tracked
+in the [scope follow-ups](../FOLLOW_UPS.md#scenarios).

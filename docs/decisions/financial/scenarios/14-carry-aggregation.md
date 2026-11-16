@@ -1,12 +1,86 @@
 # SCENARIOS-014: Realized-forward carry and per-currency failure-isolated aggregation
 
-- Decision status: **Draft — observed implementation; adoption pending.**
-- Implementation status: **Observed for the stated source scope.** Actual discrepancies and unsupported cases are distinguished below.
-- Validation status: **Evidence inspected/located, not executed.** No numerical test, build or external benchmark run is claimed.
+- Decision status: **Accepted 2026-11-15 — complete optional carry, comparable marks, settlement timing and native aggregation package.**
+- Implementation status: **Observed.** Reconciliation to the accepted package is pending.
+- Validation status: **Independent settlement-phase, signed sizing and currency arithmetic checks completed.** Production pricing, row isolation, restoration and host qualification remain pending.
 - Audit date: **2026-11-05**. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - Scope: [inventory](README.md), [source coverage](coverage.json). Shared kernels are linked as dependencies, not reassigned implementations.
 
-## Choice and rationale
+## Accepted decision for checked scenario roll carry and native aggregation
+
+1. **Elect optional carry explicitly.** An advancing roll with carry
+   elected requires supplied inventory. An explicitly empty inventory
+   produces a complete empty measurement. An admitted equal-date roll
+   produces identity evidence without pricing or cash collection.
+   Measure after the admitted roll and any elected horizon requote,
+   before subsequent scenario shocks.
+   [Accepted time roll](13-market-time-roll.md#accepted-decision-for-checked-scenario-time-rolls-and-horizon-replay).
+
+2. **Price comparable endpoints through the shared executor.** Use
+   strict PV-only pricing with distinct opening and rolled states and
+   the elected model, pricing options, configuration and provider.
+   Both signed marks use the same currency and a comparable economic
+   holder basis. Include detached unpaid claims in the closing mark
+   or an explicit bridge. Admit terminal zero only when the product
+   establishes that every cash, delivery and other claim is extinguished.
+   [Shared executor](../../architecture/0046-portfolio-execution-operational-contract.md#decision-and-scope) ·
+   [Holder valuation](../valuations-framework/carry-theta-breakeven.md#accepted-decision-for-checked-horizon-theta-carry-and-breakeven).
+
+3. **Count signed settlement cash once.** Use the complete qualified
+   ledger from the same scenario path as the closing claim. Include
+   opening-date cash when opening PV includes it and closing-date
+   cash when closing PV excludes it. Both ex-cash cuts use
+   `(open,close]`; both cum-cash cuts use `[open,close)`.
+   Resolve mixed cuts independently. Payment date and entitlement
+   govern inclusion. Identify any excluded opening acquisition by
+   event identity. PIK and write-downs remain balance events.
+   [Cash settlement and principal effects](../core-conventions/015-cashflow-semantics.md#accepted-decision-cash-settlement-principal-effects-and-accrual-metadata).
+
+4. **Measure native-currency carry at the actual inventory size.**
+   Add `PV_close−PV_open` in the mark currency and nominal signed
+   cash in its native currencies. FX conversion, funding,
+   reinvestment and annualization belong to separate elected
+   measures. Each inventory slot is one instrument at embedded
+   size, identified by slot and instrument ID. Repeated IDs remain
+   distinct. A portfolio carry result requires actual position
+   IDs and owner-qualified signed sizing applied once to both
+   marks and every cash item.
+   [Position sizing owner](../portfolio-execution/01-position-sizing-and-validation.md).
+
+5. **Commit all currency contributions for each row together.**
+   Collect indexed outcomes from the shared executor and fold them
+   serially in inventory order. Use canonical cash-event order
+   and checked Money arithmetic. If admitting a row fails in
+   any currency, discard its contributions in every currency.
+   [Money arithmetic](../core-conventions/012-money-decimal-precision.md).
+
+6. **Expose coverage and typed failures.** Distinguish skipped,
+   identity, complete and incomplete outcomes, with requested,
+   successful and failed counts. Retain row identity, endpoint
+   marks, nominal cash by currency and typed failure stage. An
+   optional carry-row error excludes the full row and leaves a
+   subtotal of admitted rows. Required roll, fixing, replay and
+   publication errors abort the scenario. Rust owns the financial
+   result across Python and WASM. Record 017 owns the wire.
+   [Atomic execution](02-execution-and-partial-success.md#accepted-decision-for-ordered-and-atomic-scenario-execution) ·
+   [Reporting record 017](17-reports-and-replay.md).
+
+## Independent calculation checks
+
+- Ex-cash marks of `100` and `95`, with settlement cash of
+  `12` at opening, `3` between cuts and `4` at closing,
+  give carry `95−100+7=2`. With cum-cash opening and
+  closing marks, the calculation is `99−112+15=2`. The
+  mixed cuts give `99−100+3=2` and `95−112+19=2`.
+- Opening USD 100, closing USD 98 and period cash of USD 3
+  and EUR 2 give carry of USD 1 and EUR 2. Separate lots
+  of `+2` and `−0.5` yield combined carry of USD 1.50
+  and EUR 3 after applying the signed scales.
+- A row adding USD 2 and EUR 0.01 to prior totals of USD 100
+  and EUR `10²⁸` loses a minor-unit digit in the EUR addition.
+  The checked row fails and both prior currency totals survive.
+
+## Observed choice and rationale at the audit revision
 
 Observed choice: the time-roll report measures realized-forward mark change plus cash received/paid over the interval. It keeps currencies separate and excludes an instrument completely if either endpoint valuation or its cashflow collection fails. This prevents a partial cashflow-only row from contaminating the total.
 
@@ -36,6 +110,5 @@ Frozen-market theta, funded/reinvested total return, position-weighted portfolio
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#scenarios). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and production qualification are tracked
+in the [scope follow-ups](../FOLLOW_UPS.md#scenarios).
