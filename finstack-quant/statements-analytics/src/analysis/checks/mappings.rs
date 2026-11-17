@@ -83,6 +83,14 @@ pub struct ThreeStatementMapping {
     /// Current-liability nodes summed into net working capital.
     #[serde(default)]
     pub current_liabilities_nodes: Vec<NodeId>,
+    /// Opening cash at the start of the model's first period. The cash
+    /// roll-forward runs only when it and `total_cf_node` are both given.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opening_cash: Option<finstack_quant_statements::checks::DatedOpening>,
+    /// Opening retained earnings at the start of the model's first period.
+    /// The retained-earnings reconciliation runs only when it is given.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opening_retained_earnings: Option<finstack_quant_statements::checks::DatedOpening>,
     /// Comparison and reporting policy of the suite. Identities are compared
     /// exactly unless a tolerance is stated here.
     #[serde(default)]

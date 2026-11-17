@@ -106,6 +106,8 @@ test('retained earnings accepts the elected inflow-positive dividend convention'
         type: 'retained_earnings_reconciliation',
         retained_earnings_node: 're',
         net_income_node: 'revenue',
+        // 1000 = 920 + 100 of income - 20 of signed dividends.
+        opening_balance: { date: '2025-01-01', value: 920 },
         dividends_node: 'div',
         dividends_sign_convention: 'inflow_positive',
       },

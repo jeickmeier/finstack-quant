@@ -21,6 +21,13 @@ fn q(quarter: u8) -> PeriodId {
     PeriodId::quarter(2025, quarter).unwrap()
 }
 
+fn opening() -> finstack_quant_statements::checks::DatedOpening {
+    finstack_quant_statements::checks::DatedOpening {
+        date: time::macros::date!(2025 - 01 - 01),
+        value: AmountOrScalar::amount(0.0, Currency::USD).unwrap(),
+    }
+}
+
 fn identities(tolerance: Option<f64>) -> Vec<Box<dyn Check>> {
     vec![
         Box::new(BalanceSheetArticulation {
@@ -32,6 +39,8 @@ fn identities(tolerance: Option<f64>) -> Vec<Box<dyn Check>> {
         Box::new(CashReconciliation {
             cash_balance_node: NodeId::new("a"),
             total_cash_flow_node: NodeId::new("b"),
+            opening_balance: opening(),
+            adjustment_nodes: vec![],
             cfo_node: None,
             cfi_node: None,
             cff_node: None,
@@ -40,6 +49,7 @@ fn identities(tolerance: Option<f64>) -> Vec<Box<dyn Check>> {
         Box::new(RetainedEarningsReconciliation {
             retained_earnings_node: NodeId::new("a"),
             net_income_node: NodeId::new("b"),
+            opening_balance: opening(),
             dividends_node: None,
             other_adjustments: vec![],
             tolerance,

@@ -98,11 +98,19 @@ export interface CheckSuiteSpecWire {
   name: string;
 }
 /**
- * Verifies that Assets = Liabilities + Equity for every period.
+ * Verifies that Assets = Liabilities + Equity at every model period close.
  *
- * All configured operands must have compatible scalar/monetary units and one
- * currency. Execution rejects incompatible units or invalid numeric tolerances;
- * it performs no FX conversion.
+ * Each group names known nodes, with no identifier repeated within a group
+ * or shared between groups: the caller includes each account once, through
+ * its subtotal or its components. All operands have compatible units and
+ * one currency; the check performs no FX conversion. Signed balances and
+ * typed zeros are used as they are.
+ *
+ * Monetary balances are summed exactly and scalar balances with compensated
+ * sums. The signed difference is `assets - (liabilities + equity)`; the
+ * relative reference of the tolerance is `|assets|`. A period with a
+ * missing balance is incomplete and names the nodes without a value; the
+ * check passes only when every period is complete and within tolerance.
  */
 export interface DC7D556Ba6Ae95916518C {
   /**
@@ -118,42 +126,50 @@ export interface DC7D556Ba6Ae95916518C {
    */
   liabilities_nodes: D_695249Af9946117B99A3[];
   /**
-   * Tolerance override; falls back to
-   * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
+   * Absolute tolerance override in the balances' units; replaces both
+   * terms of the suite's
+   * [`CheckConfig`](crate::checks::CheckConfig) allowance.
    */
   tolerance?: number | null;
   [k: string]: unknown;
 }
 /**
- * Checks that retained earnings flow correctly across periods:
- * RE(t) = RE(t−1) + NI(t) − Dividends(t) ± Adjustments(t).
+ * Reconciles retained earnings in every model period:
+ * `closing = opening + net income + dividend effect + direct adjustments`.
  *
- * Every configured balance, flow, and adjustment must use the same
- * scalar/monetary units and currency. Execution rejects incompatible units or
- * invalid numeric tolerances; it performs no FX conversion.
+ * The first opening is the explicit `opening_balance` at the first period
+ * boundary; each later opening is the close of the immediately adjacent
+ * prior period. All inputs share one ownership scope, compatible units and
+ * one currency; the check performs no FX conversion.
  *
  * # Sign convention
  *
- * * `net_income_node` carries the [`SignConventionPolicy::InflowPositive`]
- *   convention — positive values increase RE (profit), negative values
- *   decrease it (loss). No validation is emitted for NI since both signs
- *   are meaningful.
- * * `dividends_node` carries the [`SignConventionPolicy::MagnitudePositive`]
- *   convention by default — the formula subtracts dividends explicitly.
- * * `other_adjustments` carry
- *   [`SignConventionPolicy::InflowPositive`] — they are signed amounts
- *   added directly.
+ * * `net_income_node` is signed: a profit increases retained earnings and
+ *   a loss decreases it.
+ * * `dividends_node` is, by default
+ *   ([`SignConventionPolicy::MagnitudePositive`]), a non-negative magnitude
+ *   that the identity subtracts; a negative magnitude is rejected. Under
+ *   [`SignConventionPolicy::InflowPositive`] it is a signed amount the
+ *   identity adds.
+ * * `other_adjustments` are signed entries recorded directly in retained
+ *   earnings, each a distinct node included once. A restatement appears
+ *   once: in an already-restated opening balance or as one such entry.
+ *
+ * Omit a dividend or adjustment series only when it does not apply; a
+ * configured series without a value makes the period incomplete, and a
+ * known zero is a typed zero. Monetary comparisons are exact and scalar
+ * ones compensated. The relative reference of the tolerance is
+ * `|opening retained earnings|`, with no floor. The check passes only when
+ * every period is complete and within tolerance.
  */
 export interface D_671F6D76F67F4Fafb7F3 {
   /**
-   * Optional node for dividends paid.
+   * Node for dividends recognized in retained earnings in each period.
    */
   dividends_node?: D_695249Af9946117B99A3 | null;
   /**
-   * Sign convention applied to the `dividends_node` input. Defaults
-   * to [`SignConventionPolicy::MagnitudePositive`].
-   * `net_income_node` and `other_adjustments` always use
-   * `InflowPositive` by construction.
+   * Sign convention of `dividends_node`. Defaults to
+   * [`SignConventionPolicy::MagnitudePositive`].
    */
   dividends_sign_convention?: "magnitude_positive" | "inflow_positive";
   /**
@@ -197,8 +213,9 @@ export interface D_671F6D76F67F4Fafb7F3 {
    * safely share and clone IDs with minimal synchronization overhead.
    */
   net_income_node: string;
+  opening_balance: D_7E4Df57C89Fa33D75314;
   /**
-   * Additional adjustment nodes (buybacks, AOCI, etc.).
+   * Signed direct retained-earnings entries, each a distinct node.
    */
   other_adjustments?: D_695249Af9946117B99A3[];
   /**
@@ -243,21 +260,231 @@ export interface D_671F6D76F67F4Fafb7F3 {
    */
   retained_earnings_node: string;
   /**
-   * Tolerance override; falls back to
-   * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
+   * Absolute tolerance override in the balance units; replaces both terms
+   * of the suite's [`CheckConfig`](crate::checks::CheckConfig) allowance.
    */
   tolerance?: number | null;
   [k: string]: unknown;
 }
 /**
- * Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally
- * TotalCF = CFO + CFI + CFF.
+ * Opening retained earnings at the start of the model's first period.
+ */
+export interface D_7E4Df57C89Fa33D75314 {
+  /**
+   * Date of the balance: the start of the model's first period.
+   */
+  date: string;
+  /**
+   * The balance on that date, in the units and currency of the
+   * reconciled balance node. A known zero is a typed zero.
+   */
+  value: D_598048De9D4527D8B97C | number;
+}
+/**
+ * Currency-aware amount
+ */
+export interface D_598048De9D4527D8B97C {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
+}
+/**
+ * Reconciles closing cash to opening cash plus classified cash flows and
+ * separately identified adjustments, and independently reconciles total
+ * classified cash flows to CFO + CFI + CFF.
  *
- * Every configured operand must have the same scalar/monetary units and
- * currency. Execution rejects incompatible units or non-finite/negative
- * tolerances; it performs no FX conversion.
+ * The roll-forward is evaluated for every model period:
+ * `closing = opening + total cash flow + adjustments`. The first opening is
+ * the explicit `opening_balance` at the first period boundary; each later
+ * opening is the close of the immediately adjacent prior period. Cash
+ * inflows are positive and outflows negative. All inputs share one cash
+ * scope, compatible units and one currency; the check performs no FX
+ * conversion.
+ *
+ * The component identity `total cash flow = CFO + CFI + CFF` runs for every
+ * period when all three component nodes are configured, and not at all when
+ * none is; configuring only some of them is an error.
+ *
+ * Monetary comparisons are exact and scalar ones compensated. The relative
+ * reference of the tolerance is `|opening cash|` for the roll-forward and
+ * `|total cash flow|` for the components, with no floor. A comparison with
+ * a missing input is incomplete; the check passes only when every enabled
+ * comparison is complete and within tolerance.
  */
 export interface D_16C0D07694C2C99E93Aa {
+  /**
+   * Signed FX and cash-scope adjustment nodes, each included once.
+   */
+  adjustment_nodes?: D_695249Af9946117B99A3[];
   /**
    * A phantom-typed identifier that prevents mixing different kinds of IDs.
    *
@@ -300,20 +527,22 @@ export interface D_16C0D07694C2C99E93Aa {
    */
   cash_balance_node: string;
   /**
-   * Optional node for cash from financing.
+   * Node for cash from financing.
    */
   cff_node?: D_695249Af9946117B99A3 | null;
   /**
-   * Optional node for cash from investing.
+   * Node for cash from investing.
    */
   cfi_node?: D_695249Af9946117B99A3 | null;
   /**
-   * Optional node for cash from operations.
+   * Node for cash from operations; configure all three components or
+   * none.
    */
   cfo_node?: D_695249Af9946117B99A3 | null;
+  opening_balance: D_7E4Df57C89Fa33D753141;
   /**
-   * Tolerance override; falls back to
-   * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
+   * Absolute tolerance override in the cash units; replaces both terms of
+   * the suite's [`CheckConfig`](crate::checks::CheckConfig) allowance.
    */
   tolerance?: number | null;
   /**
@@ -358,6 +587,20 @@ export interface D_16C0D07694C2C99E93Aa {
    */
   total_cash_flow_node: string;
   [k: string]: unknown;
+}
+/**
+ * Opening cash at the start of the model's first period.
+ */
+export interface D_7E4Df57C89Fa33D753141 {
+  /**
+   * Date of the balance: the start of the model's first period.
+   */
+  date: string;
+  /**
+   * The balance on that date, in the units and currency of the
+   * reconciled balance node. A known zero is a typed zero.
+   */
+  value: D_598048De9D4527D8B97C | number;
 }
 /**
  * Flags required nodes that lack values in applicable periods.

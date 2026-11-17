@@ -347,19 +347,19 @@ Implementation and independent qualification remain pending.
 The Statements balance-sheet articulation contract was accepted on
 2026-11-15. It covers disjoint account groups, checked arithmetic,
 explicit tolerance and completeness at every model close.
-Implementation and independent qualification remain pending.
+It is implemented and qualified.
 [STATEMENTS-CONTRACTS-010](statements-contracts/10-balance-sheet-articulation.md#accepted-decision-for-balance-sheet-articulation).
 
 The Statements cash roll-forward and component reconciliation contract was
 accepted on 2026-11-15. It covers first-period opening cash, sourced adjustments,
 independent component checks and complete comparisons across periods.
-Implementation and independent qualification remain pending.
+It is implemented and qualified.
 [STATEMENTS-CONTRACTS-011](statements-contracts/11-cash-reconciliation.md#accepted-decision-for-cash-roll-forward-and-component-reconciliation).
 
 The Statements retained-earnings reconciliation contract was accepted on
 2026-11-15. It covers dated opening balances, same-scope net income, dividend
-signs, direct movements and completeness. Implementation and independent
-qualification remain pending.
+signs, direct movements and completeness. It is implemented and
+qualified.
 [STATEMENTS-CONTRACTS-012](statements-contracts/12-retained-earnings-reconciliation.md#accepted-decision-for-retained-earnings-reconciliation).
 
 The Statements data-quality contract was accepted on 2026-11-15. It covers

@@ -2326,7 +2326,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
             "type_name": "CheckSuiteSpec",
             "kind": "input",
-            "bytes": 22510
+            "bytes": 47914
           },
           {
             "path": "schemas/statements/1/dated_cell.schema.json",
@@ -5142,7 +5142,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
             "type_name": "CheckSuiteSpec",
             "kind": "input",
-            "bytes": 22510
+            "bytes": 47914
           },
           {
             "domain": "statements",

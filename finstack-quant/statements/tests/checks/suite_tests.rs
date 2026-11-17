@@ -128,6 +128,7 @@ fn retained_earnings_spec_tagged_serde() {
         "type": "retained_earnings_reconciliation",
         "retained_earnings_node": "re",
         "net_income_node": "ni",
+        "opening_balance": {"date": "2025-01-01", "value": 100.0},
         "dividends_node": "divs"
     }"#;
 
@@ -153,6 +154,7 @@ fn cash_reconciliation_spec_tagged_serde() {
         "type": "cash_reconciliation",
         "cash_balance_node": "cash",
         "total_cash_flow_node": "total_cf",
+        "opening_balance": {"date": "2025-01-01", "value": {"amount": "100", "currency": "USD"}},
         "cfo_node": "cfo",
         "cfi_node": "cfi",
         "cff_node": "cff"

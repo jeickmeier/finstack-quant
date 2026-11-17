@@ -11,7 +11,7 @@
         {
           "check_id": "balance_sheet_articulation",
           "severity": "error",
-          "message": "Balance sheet does not articulate in 2025Q4: assets (1150.00) != liabilities (690.00) + equity (455.00), imbalance = 5.00",
+          "message": "Balance sheet does not articulate in 2025Q4: assets (1150.00) != liabilities + equity (1145.00), difference = 5.00",
           "period": "2025Q4",
           "materiality": {
             "absolute": 5.0,
@@ -69,9 +69,16 @@
       "check_name": "Retained Earnings Reconciliation",
       "category": "accounting_identity",
       "outcome": "pass",
-      "evaluated": 3,
+      "evaluated": 4,
       "findings": [],
       "comparisons": [
+        {
+          "identity": "retained_earnings_roll_forward",
+          "period": "2025Q1",
+          "actual": 200.0,
+          "expected": 200.0,
+          "tolerance": 0.0
+        },
         {
           "identity": "retained_earnings_roll_forward",
           "period": "2025Q2",
@@ -100,9 +107,16 @@
       "check_name": "Cash Reconciliation",
       "category": "accounting_identity",
       "outcome": "pass",
-      "evaluated": 3,
+      "evaluated": 4,
       "findings": [],
       "comparisons": [
+        {
+          "identity": "cash_roll_forward",
+          "period": "2025Q1",
+          "actual": 100.0,
+          "expected": 100.0,
+          "tolerance": 0.0
+        },
         {
           "identity": "cash_roll_forward",
           "period": "2025Q2",

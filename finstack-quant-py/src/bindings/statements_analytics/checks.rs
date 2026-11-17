@@ -85,6 +85,14 @@ fn opt_node_str(value: &Option<NodeId>) -> Option<&str> {
 ///     Current-asset nodes for the working-capital check.
 /// current_liabilities_nodes : list[str]
 ///     Current-liability nodes for the working-capital check.
+/// opening_cash : dict | None
+///     Opening cash at the start of the first period, as
+///     ``{"date": "2025-01-01", "value": 80.0}`` (``value`` is a number, or
+///     ``{"amount", "currency"}`` for money). The cash roll-forward runs only
+///     when it and ``total_cf_node`` are both given.
+/// opening_retained_earnings : dict | None
+///     Opening retained earnings at the start of the first period, in the
+///     same form. The retained-earnings reconciliation runs only when given.
 /// config : CheckConfig | dict | None
 ///     Comparison and reporting policy of the suite. ``None`` compares
 ///     identities exactly; state a tolerance for floating-point models.
@@ -117,7 +125,7 @@ impl PyThreeStatementMapping {
     #[new]
     #[pyo3(
         signature = (**fields),
-        text_signature = "(*, cash_node, retained_earnings_node, net_income_node, assets_nodes, liabilities_nodes, equity_nodes, ppe_node=None, depreciation_node=None, interest_expense_node=None, tax_expense_node=None, pretax_income_node=None, cfo_node=None, cfi_node=None, cff_node=None, total_cf_node=None, capex_node=None, dividends_node=None, ppe_additions_node=None, intangible_additions_node=None, dividends_equity_node=None, debt_balance_nodes=[], cs_interest_node=None, wc_change_cf_node=None, current_assets_nodes=[], current_liabilities_nodes=[], config=None)"
+        text_signature = "(*, cash_node, retained_earnings_node, net_income_node, assets_nodes, liabilities_nodes, equity_nodes, ppe_node=None, depreciation_node=None, interest_expense_node=None, tax_expense_node=None, pretax_income_node=None, cfo_node=None, cfi_node=None, cff_node=None, total_cf_node=None, capex_node=None, dividends_node=None, ppe_additions_node=None, intangible_additions_node=None, dividends_equity_node=None, debt_balance_nodes=[], cs_interest_node=None, wc_change_cf_node=None, current_assets_nodes=[], current_liabilities_nodes=[], opening_cash=None, opening_retained_earnings=None, config=None)"
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
         let inner: ThreeStatementMapping =
@@ -283,6 +291,29 @@ impl PyThreeStatementMapping {
     #[getter]
     fn config(&self) -> crate::bindings::statements::checks::PyCheckConfig {
         crate::bindings::statements::checks::PyCheckConfig::from_inner(self.inner.config.clone())
+    }
+
+    /// Opening cash at the first period boundary, or ``None``.
+    #[getter]
+    fn opening_cash<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .opening_cash
+            .as_ref()
+            .map(|opening| crate::bindings::pandas_utils::serde_to_py(py, opening))
+            .transpose()
+    }
+
+    /// Opening retained earnings at the first period boundary, or ``None``.
+    #[getter]
+    fn opening_retained_earnings<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .opening_retained_earnings
+            .as_ref()
+            .map(|opening| crate::bindings::pandas_utils::serde_to_py(py, opening))
+            .transpose()
     }
 
     /// Every node id referenced by the mapping.

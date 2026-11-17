@@ -68,19 +68,30 @@ export default [
   {
     "path": "#/$defs/d_16c0d07694c2c99e93aa",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CashReconciliation",
-    "description": "Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally\nTotalCF = CFO + CFI + CFF.\n\nEvery configured operand must have the same scalar/monetary units and\ncurrency. Execution rejects incompatible units or non-finite/negative\ntolerances; it performs no FX conversion."
+    "description": "Reconciles closing cash to opening cash plus classified cash flows and\nseparately identified adjustments, and independently reconciles total\nclassified cash flows to CFO + CFI + CFF.\n\nThe roll-forward is evaluated for every model period:\n`closing = opening + total cash flow + adjustments`. The first opening is\nthe explicit `opening_balance` at the first period boundary; each later\nopening is the close of the immediately adjacent prior period. Cash\ninflows are positive and outflows negative. All inputs share one cash\nscope, compatible units and one currency; the check performs no FX\nconversion.\n\nThe component identity `total cash flow = CFO + CFI + CFF` runs for every\nperiod when all three component nodes are configured, and not at all when\nnone is; configuring only some of them is an error.\n\nMonetary comparisons are exact and scalar ones compensated. The relative\nreference of the tolerance is `|opening cash|` for the roll-forward and\n`|total cash flow|` for the components, with no floor. A comparison with\na missing input is incomplete; the check passes only when every enabled\ncomparison is complete and within tolerance."
+  },
+  {
+    "path": "#/$defs/d_16c0d07694c2c99e93aa/properties/adjustment_nodes",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CashReconciliation/properties/adjustment_nodes",
+    "description": "Signed FX and cash-scope adjustment nodes, each included once."
+  },
+  {
+    "path": "#/$defs/d_16c0d07694c2c99e93aa/properties/adjustment_nodes/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CashReconciliation/properties/adjustment_nodes/items",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_16c0d07694c2c99e93aa/properties/cash_balance_node",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CashReconciliation/properties/cash_balance_node",
-    "description": "Node for cash balance.",
+    "description": "Node for the closing cash balance of each period.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_16c0d07694c2c99e93aa/properties/cff_node",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CashReconciliation/properties/cff_node",
-    "description": "Optional node for cash from financing."
+    "description": "Node for cash from financing."
   },
   {
     "path": "#/$defs/d_16c0d07694c2c99e93aa/properties/cff_node/anyOf/0",
@@ -95,7 +106,7 @@ export default [
   {
     "path": "#/$defs/d_16c0d07694c2c99e93aa/properties/cfi_node",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CashReconciliation/properties/cfi_node",
-    "description": "Optional node for cash from investing."
+    "description": "Node for cash from investing."
   },
   {
     "path": "#/$defs/d_16c0d07694c2c99e93aa/properties/cfi_node/anyOf/0",
@@ -110,7 +121,7 @@ export default [
   {
     "path": "#/$defs/d_16c0d07694c2c99e93aa/properties/cfo_node",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CashReconciliation/properties/cfo_node",
-    "description": "Optional node for cash from operations."
+    "description": "Node for cash from operations; configure all three components or\nnone."
   },
   {
     "path": "#/$defs/d_16c0d07694c2c99e93aa/properties/cfo_node/anyOf/0",
@@ -123,15 +134,22 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CashReconciliation/properties/cfo_node/anyOf/1"
   },
   {
+    "path": "#/$defs/d_16c0d07694c2c99e93aa/properties/opening_balance",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CashReconciliation/properties/opening_balance",
+    "description": "Opening cash at the start of the model's first period.",
+    "ref": "#/$defs/DatedOpening",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/DatedOpening"
+  },
+  {
     "path": "#/$defs/d_16c0d07694c2c99e93aa/properties/tolerance",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CashReconciliation/properties/tolerance",
-    "description": "Tolerance override; falls back to\n[`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).",
+    "description": "Absolute tolerance override in the cash units; replaces both terms of\nthe suite's [`CheckConfig`](crate::checks::CheckConfig) allowance.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_16c0d07694c2c99e93aa/properties/total_cash_flow_node",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CashReconciliation/properties/total_cash_flow_node",
-    "description": "Node for total cash flow.",
+    "description": "Node for total classified cash flow of each period, inflows positive.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Id"
   },
@@ -221,6 +239,30 @@ export default [
     "description": "Run only on forecast periods."
   },
   {
+    "path": "#/$defs/d_3597ff04f9f2b22f4450",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/DateWire",
+    "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+    "format": "date"
+  },
+  {
+    "path": "#/$defs/d_4b696037173a5f0c74fb",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/AmountOrScalar",
+    "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
+  },
+  {
+    "path": "#/$defs/d_4b696037173a5f0c74fb/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/AmountOrScalar/anyOf/0",
+    "description": "Currency-aware amount",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_4b696037173a5f0c74fb/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/AmountOrScalar/anyOf/1",
+    "description": "Unitless scalar (ratio, percentage, count, etc.)",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_545b6f75d3fd6017c27d",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CheckCategory",
     "description": "Category that groups related checks together."
@@ -285,6 +327,25 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Id"
   },
   {
+    "path": "#/$defs/d_598048de9d4527d8b97c",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Money",
+    "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```"
+  },
+  {
+    "path": "#/$defs/d_598048de9d4527d8b97c/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Money/properties/amount",
+    "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not.",
+    "ref": "#/$defs/DecimalWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/DecimalWire"
+  },
+  {
+    "path": "#/$defs/d_598048de9d4527d8b97c/properties/currency",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Money/properties/currency",
+    "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion.",
+    "ref": "#/$defs/Currency",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency"
+  },
+  {
     "path": "#/$defs/d_5de9f28b928c01e49782",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CheckConfig",
     "description": "Configuration parameters that govern check execution.\n\nThe identity tolerance is zero unless one is stated: an identity then\nholds only when its two sides are equal. An explicit tolerance allows\n`|difference| <= max(default_tolerance, default_relative_tolerance *\n|reference|)`, where the reference is the identity owner's (total assets\nfor the balance sheet, for example); a difference equal to the allowance\nis within tolerance. A per-check absolute override replaces both terms.\n\n`materiality_threshold` and `min_severity` are reporting filters for\nadvisory findings. They never change a verdict, and they never remove an\nerror-severity finding, a coverage finding or a recorded comparison."
@@ -321,12 +382,12 @@ export default [
   {
     "path": "#/$defs/d_671f6d76f67f4fafb7f3",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/RetainedEarningsReconciliation",
-    "description": "Checks that retained earnings flow correctly across periods:\nRE(t) = RE(t−1) + NI(t) − Dividends(t) ± Adjustments(t).\n\nEvery configured balance, flow, and adjustment must use the same\nscalar/monetary units and currency. Execution rejects incompatible units or\ninvalid numeric tolerances; it performs no FX conversion.\n\n# Sign convention\n\n* `net_income_node` carries the [`SignConventionPolicy::InflowPositive`]\n  convention — positive values increase RE (profit), negative values\n  decrease it (loss). No validation is emitted for NI since both signs\n  are meaningful.\n* `dividends_node` carries the [`SignConventionPolicy::MagnitudePositive`]\n  convention by default — the formula subtracts dividends explicitly.\n* `other_adjustments` carry\n  [`SignConventionPolicy::InflowPositive`] — they are signed amounts\n  added directly."
+    "description": "Reconciles retained earnings in every model period:\n`closing = opening + net income + dividend effect + direct adjustments`.\n\nThe first opening is the explicit `opening_balance` at the first period\nboundary; each later opening is the close of the immediately adjacent\nprior period. All inputs share one ownership scope, compatible units and\none currency; the check performs no FX conversion.\n\n# Sign convention\n\n* `net_income_node` is signed: a profit increases retained earnings and\n  a loss decreases it.\n* `dividends_node` is, by default\n  ([`SignConventionPolicy::MagnitudePositive`]), a non-negative magnitude\n  that the identity subtracts; a negative magnitude is rejected. Under\n  [`SignConventionPolicy::InflowPositive`] it is a signed amount the\n  identity adds.\n* `other_adjustments` are signed entries recorded directly in retained\n  earnings, each a distinct node included once. A restatement appears\n  once: in an already-restated opening balance or as one such entry.\n\nOmit a dividend or adjustment series only when it does not apply; a\nconfigured series without a value makes the period incomplete, and a\nknown zero is a typed zero. Monetary comparisons are exact and scalar\nones compensated. The relative reference of the tolerance is\n`|opening retained earnings|`, with no floor. The check passes only when\nevery period is complete and within tolerance."
   },
   {
     "path": "#/$defs/d_671f6d76f67f4fafb7f3/properties/dividends_node",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/RetainedEarningsReconciliation/properties/dividends_node",
-    "description": "Optional node for dividends paid."
+    "description": "Node for dividends recognized in retained earnings in each period."
   },
   {
     "path": "#/$defs/d_671f6d76f67f4fafb7f3/properties/dividends_node/anyOf/0",
@@ -342,22 +403,29 @@ export default [
     "path": "#/$defs/d_671f6d76f67f4fafb7f3/properties/dividends_sign_convention",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/RetainedEarningsReconciliation/properties/dividends_sign_convention",
     "default": "magnitude_positive",
-    "description": "Sign convention applied to the `dividends_node` input. Defaults\nto [`SignConventionPolicy::MagnitudePositive`].\n`net_income_node` and `other_adjustments` always use\n`InflowPositive` by construction.",
+    "description": "Sign convention of `dividends_node`. Defaults to\n[`SignConventionPolicy::MagnitudePositive`].",
     "ref": "#/$defs/SignConventionPolicy",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/SignConventionPolicy"
   },
   {
     "path": "#/$defs/d_671f6d76f67f4fafb7f3/properties/net_income_node",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/RetainedEarningsReconciliation/properties/net_income_node",
-    "description": "Node for net income.",
+    "description": "Node for net income of each period, signed.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_671f6d76f67f4fafb7f3/properties/opening_balance",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/RetainedEarningsReconciliation/properties/opening_balance",
+    "description": "Opening retained earnings at the start of the model's first period.",
+    "ref": "#/$defs/DatedOpening",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/DatedOpening"
   },
   {
     "path": "#/$defs/d_671f6d76f67f4fafb7f3/properties/other_adjustments",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/RetainedEarningsReconciliation/properties/other_adjustments",
     "default": [],
-    "description": "Additional adjustment nodes (buybacks, AOCI, etc.)."
+    "description": "Signed direct retained-earnings entries, each a distinct node."
   },
   {
     "path": "#/$defs/d_671f6d76f67f4fafb7f3/properties/other_adjustments/items",
@@ -368,20 +436,39 @@ export default [
   {
     "path": "#/$defs/d_671f6d76f67f4fafb7f3/properties/retained_earnings_node",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/RetainedEarningsReconciliation/properties/retained_earnings_node",
-    "description": "Node for retained earnings balance.",
+    "description": "Node for the closing retained-earnings balance of each period.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_671f6d76f67f4fafb7f3/properties/tolerance",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/RetainedEarningsReconciliation/properties/tolerance",
-    "description": "Tolerance override; falls back to\n[`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).",
+    "description": "Absolute tolerance override in the balance units; replaces both terms\nof the suite's [`CheckConfig`](crate::checks::CheckConfig) allowance.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_695249af9946117b99a3",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Id",
     "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead."
+  },
+  {
+    "path": "#/$defs/d_7e4df57c89fa33d75314",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/DatedOpening",
+    "description": "An explicit opening balance at the first period boundary of a\nroll-forward identity."
+  },
+  {
+    "path": "#/$defs/d_7e4df57c89fa33d75314/properties/date",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/DatedOpening/properties/date",
+    "description": "Date of the balance: the start of the model's first period.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_7e4df57c89fa33d75314/properties/value",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/DatedOpening/properties/value",
+    "description": "The balance on that date, in the units and currency of the\nreconciled balance node. A known zero is a typed zero.",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_96026cdfba85af9b3310",
@@ -399,6 +486,977 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/SignConventionPolicy/oneOf/1",
     "const": "inflow_positive",
     "description": "The value is signed: positive = inflow / addition, negative =\noutflow / reduction."
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency",
+    "description": "ISO 4217 currency enumeration"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/0",
+    "const": "AED",
+    "description": "UAE Dirham (784)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/1",
+    "const": "AFN",
+    "description": "Afghani (971)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/10",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/10",
+    "const": "BAM",
+    "description": "Convertible Mark (977)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/100",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/100",
+    "const": "NIO",
+    "description": "Cordoba Oro (558)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/101",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/101",
+    "const": "NOK",
+    "description": "Norwegian Krone (578)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/102",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/102",
+    "const": "NPR",
+    "description": "Nepalese Rupee (524)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/103",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/103",
+    "const": "NZD",
+    "description": "New Zealand Dollar (554)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/104",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/104",
+    "const": "OMR",
+    "description": "Rial Omani (512)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/105",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/105",
+    "const": "PAB",
+    "description": "Balboa (590)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/106",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/106",
+    "const": "PEN",
+    "description": "Sol (604)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/107",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/107",
+    "const": "PGK",
+    "description": "Kina (598)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/108",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/108",
+    "const": "PHP",
+    "description": "Philippine Peso (608)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/109",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/109",
+    "const": "PKR",
+    "description": "Pakistan Rupee (586)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/11",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/11",
+    "const": "BBD",
+    "description": "Barbados Dollar (52)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/110",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/110",
+    "const": "PLN",
+    "description": "Zloty (985)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/111",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/111",
+    "const": "PYG",
+    "description": "Guarani (600)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/112",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/112",
+    "const": "QAR",
+    "description": "Qatari Rial (634)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/113",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/113",
+    "const": "RON",
+    "description": "Romanian Leu (946)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/114",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/114",
+    "const": "RSD",
+    "description": "Serbian Dinar (941)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/115",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/115",
+    "const": "RUB",
+    "description": "Russian Ruble (643)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/116",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/116",
+    "const": "RWF",
+    "description": "Rwanda Franc (646)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/117",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/117",
+    "const": "SAR",
+    "description": "Saudi Riyal (682)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/118",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/118",
+    "const": "SBD",
+    "description": "Solomon Islands Dollar (90)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/119",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/119",
+    "const": "SCR",
+    "description": "Seychelles Rupee (690)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/12",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/12",
+    "const": "BDT",
+    "description": "Taka (50)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/120",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/120",
+    "const": "SDG",
+    "description": "Sudanese Pound (938)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/121",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/121",
+    "const": "SEK",
+    "description": "Swedish Krona (752)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/122",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/122",
+    "const": "SGD",
+    "description": "Singapore Dollar (702)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/123",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/123",
+    "const": "SHP",
+    "description": "Saint Helena Pound (654)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/124",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/124",
+    "const": "SLE",
+    "description": "Leone (925)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/125",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/125",
+    "const": "SLL",
+    "description": "Leone (694)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/126",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/126",
+    "const": "SOS",
+    "description": "Somali Shilling (706)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/127",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/127",
+    "const": "SRD",
+    "description": "Surinam Dollar (968)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/128",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/128",
+    "const": "SSP",
+    "description": "South Sudanese Pound (728)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/129",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/129",
+    "const": "STN",
+    "description": "Dobra (930)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/13",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/13",
+    "const": "BGN",
+    "description": "Bulgarian Lev (975)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/130",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/130",
+    "const": "SYP",
+    "description": "Syrian Pound (760)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/131",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/131",
+    "const": "SZL",
+    "description": "Lilangeni (748)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/132",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/132",
+    "const": "THB",
+    "description": "Baht (764)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/133",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/133",
+    "const": "TJS",
+    "description": "Somoni (972)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/134",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/134",
+    "const": "TMT",
+    "description": "Turkmenistan New Manat (934)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/135",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/135",
+    "const": "TND",
+    "description": "Tunisian Dinar (788)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/136",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/136",
+    "const": "TOP",
+    "description": "Pa'anga (776)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/137",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/137",
+    "const": "TRY",
+    "description": "Turkish Lira (949)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/138",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/138",
+    "const": "TTD",
+    "description": "Trinidad and Tobago Dollar (780)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/139",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/139",
+    "const": "TWD",
+    "description": "New Taiwan Dollar (901)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/14",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/14",
+    "const": "BHD",
+    "description": "Bahraini Dinar (48)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/140",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/140",
+    "const": "TZS",
+    "description": "Tanzanian Shilling (834)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/141",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/141",
+    "const": "UAH",
+    "description": "Hryvnia (980)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/142",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/142",
+    "const": "UGX",
+    "description": "Uganda Shilling (800)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/143",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/143",
+    "const": "USD",
+    "description": "US Dollar (840)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/144",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/144",
+    "const": "UYU",
+    "description": "Peso Uruguayo (858)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/145",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/145",
+    "const": "UZS",
+    "description": "Uzbekistan Sum (860)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/146",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/146",
+    "const": "VED",
+    "description": "Bolívar Soberano (926)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/147",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/147",
+    "const": "VES",
+    "description": "Bolívar Soberano (928)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/148",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/148",
+    "const": "VND",
+    "description": "Dong (704)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/149",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/149",
+    "const": "VUV",
+    "description": "Vatu (548)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/15",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/15",
+    "const": "BIF",
+    "description": "Burundi Franc (108)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/150",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/150",
+    "const": "WST",
+    "description": "Tala (882)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/151",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/151",
+    "const": "XAF",
+    "description": "CFA Franc BEAC (950)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/152",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/152",
+    "const": "XCD",
+    "description": "East Caribbean Dollar (951)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/153",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/153",
+    "const": "XCG",
+    "description": "Caribbean Guilder (532)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/154",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/154",
+    "const": "XOF",
+    "description": "CFA Franc BCEAO (952)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/155",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/155",
+    "const": "XPF",
+    "description": "CFP Franc (953)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/156",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/156",
+    "const": "YER",
+    "description": "Yemeni Rial (886)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/157",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/157",
+    "const": "ZAR",
+    "description": "Rand (710)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/158",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/158",
+    "const": "ZMW",
+    "description": "Zambian Kwacha (967)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/159",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/159",
+    "const": "ZWG",
+    "description": "Zimbabwe Gold (924)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/16",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/16",
+    "const": "BMD",
+    "description": "Bermudian Dollar (60)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/160",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/160",
+    "const": "ZWL",
+    "description": "Zimbabwe Dollar (932)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/17",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/17",
+    "const": "BND",
+    "description": "Brunei Dollar (96)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/18",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/18",
+    "const": "BOB",
+    "description": "Boliviano (68)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/19",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/19",
+    "const": "BRL",
+    "description": "Brazilian Real (986)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/2",
+    "const": "ALL",
+    "description": "Lek (8)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/20",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/20",
+    "const": "BSD",
+    "description": "Bahamian Dollar (44)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/21",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/21",
+    "const": "BTN",
+    "description": "Ngultrum (64)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/22",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/22",
+    "const": "BWP",
+    "description": "Pula (72)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/23",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/23",
+    "const": "BYN",
+    "description": "Belarusian Ruble (933)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/24",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/24",
+    "const": "BZD",
+    "description": "Belize Dollar (84)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/25",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/25",
+    "const": "CAD",
+    "description": "Canadian Dollar (124)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/26",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/26",
+    "const": "CDF",
+    "description": "Congolese Franc (976)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/27",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/27",
+    "const": "CHF",
+    "description": "Swiss Franc (756)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/28",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/28",
+    "const": "CLF",
+    "description": "Unidad de Fomento (990)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/29",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/29",
+    "const": "CLP",
+    "description": "Chilean Peso (152)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/3",
+    "const": "AMD",
+    "description": "Armenian Dram (51)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/30",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/30",
+    "const": "CNY",
+    "description": "Yuan Renminbi (156)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/31",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/31",
+    "const": "COP",
+    "description": "Colombian Peso (170)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/32",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/32",
+    "const": "CRC",
+    "description": "Costa Rican Colon (188)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/33",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/33",
+    "const": "CUC",
+    "description": "Peso Convertible (931)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/34",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/34",
+    "const": "CUP",
+    "description": "Cuban Peso (192)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/35",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/35",
+    "const": "CVE",
+    "description": "Cabo Verde Escudo (132)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/36",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/36",
+    "const": "CZK",
+    "description": "Czech Koruna (203)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/37",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/37",
+    "const": "DJF",
+    "description": "Djibouti Franc (262)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/38",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/38",
+    "const": "DKK",
+    "description": "Danish Krone (208)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/39",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/39",
+    "const": "DOP",
+    "description": "Dominican Peso (214)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/4",
+    "const": "ANG",
+    "description": "Netherlands Antillean Guilder (532)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/40",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/40",
+    "const": "DZD",
+    "description": "Algerian Dinar (12)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/41",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/41",
+    "const": "EGP",
+    "description": "Egyptian Pound (818)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/42",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/42",
+    "const": "ERN",
+    "description": "Nakfa (232)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/43",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/43",
+    "const": "ETB",
+    "description": "Ethiopian Birr (230)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/44",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/44",
+    "const": "EUR",
+    "description": "Euro (978)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/45",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/45",
+    "const": "FJD",
+    "description": "Fiji Dollar (242)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/46",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/46",
+    "const": "FKP",
+    "description": "Falkland Islands Pound (238)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/47",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/47",
+    "const": "GBP",
+    "description": "Pound Sterling (826)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/48",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/48",
+    "const": "GEL",
+    "description": "Lari (981)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/49",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/49",
+    "const": "GHS",
+    "description": "Ghana Cedi (936)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/5",
+    "const": "AOA",
+    "description": "Kwanza (973)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/50",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/50",
+    "const": "GIP",
+    "description": "Gibraltar Pound (292)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/51",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/51",
+    "const": "GMD",
+    "description": "Dalasi (270)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/52",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/52",
+    "const": "GNF",
+    "description": "Guinean Franc (324)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/53",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/53",
+    "const": "GTQ",
+    "description": "Quetzal (320)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/54",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/54",
+    "const": "GYD",
+    "description": "Guyana Dollar (328)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/55",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/55",
+    "const": "HKD",
+    "description": "Hong Kong Dollar (344)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/56",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/56",
+    "const": "HNL",
+    "description": "Lempira (340)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/57",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/57",
+    "const": "HRK",
+    "description": "Kuna (191)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/58",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/58",
+    "const": "HTG",
+    "description": "Gourde (332)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/59",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/59",
+    "const": "HUF",
+    "description": "Forint (348)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/6",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/6",
+    "const": "ARS",
+    "description": "Argentine Peso (32)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/60",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/60",
+    "const": "IDR",
+    "description": "Rupiah (360)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/61",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/61",
+    "const": "ILS",
+    "description": "New Israeli Sheqel (376)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/62",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/62",
+    "const": "INR",
+    "description": "Indian Rupee (356)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/63",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/63",
+    "const": "IQD",
+    "description": "Iraqi Dinar (368)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/64",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/64",
+    "const": "IRR",
+    "description": "Iranian Rial (364)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/65",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/65",
+    "const": "ISK",
+    "description": "Iceland Krona (352)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/66",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/66",
+    "const": "JMD",
+    "description": "Jamaican Dollar (388)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/67",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/67",
+    "const": "JOD",
+    "description": "Jordanian Dinar (400)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/68",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/68",
+    "const": "JPY",
+    "description": "Yen (392)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/69",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/69",
+    "const": "KES",
+    "description": "Kenyan Shilling (404)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/7",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/7",
+    "const": "AUD",
+    "description": "Australian Dollar (36)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/70",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/70",
+    "const": "KGS",
+    "description": "Som (417)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/71",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/71",
+    "const": "KHR",
+    "description": "Riel (116)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/72",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/72",
+    "const": "KMF",
+    "description": "Comorian Franc (174)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/73",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/73",
+    "const": "KPW",
+    "description": "North Korean Won (408)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/74",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/74",
+    "const": "KRW",
+    "description": "Won (410)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/75",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/75",
+    "const": "KWD",
+    "description": "Kuwaiti Dinar (414)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/76",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/76",
+    "const": "KYD",
+    "description": "Cayman Islands Dollar (136)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/77",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/77",
+    "const": "KZT",
+    "description": "Tenge (398)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/78",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/78",
+    "const": "LAK",
+    "description": "Lao Kip (418)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/79",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/79",
+    "const": "LBP",
+    "description": "Lebanese Pound (422)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/8",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/8",
+    "const": "AWG",
+    "description": "Aruban Florin (533)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/80",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/80",
+    "const": "LKR",
+    "description": "Sri Lanka Rupee (144)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/81",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/81",
+    "const": "LRD",
+    "description": "Liberian Dollar (430)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/82",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/82",
+    "const": "LSL",
+    "description": "Loti (426)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/83",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/83",
+    "const": "LYD",
+    "description": "Libyan Dinar (434)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/84",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/84",
+    "const": "MAD",
+    "description": "Moroccan Dirham (504)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/85",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/85",
+    "const": "MDL",
+    "description": "Moldovan Leu (498)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/86",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/86",
+    "const": "MGA",
+    "description": "Malagasy Ariary (969)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/87",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/87",
+    "const": "MKD",
+    "description": "Denar (807)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/88",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/88",
+    "const": "MMK",
+    "description": "Kyat (104)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/89",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/89",
+    "const": "MNT",
+    "description": "Tugrik (496)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/9",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/9",
+    "const": "AZN",
+    "description": "Azerbaijan Manat (944)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/90",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/90",
+    "const": "MOP",
+    "description": "Pataca (446)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/91",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/91",
+    "const": "MRU",
+    "description": "Ouguiya (929)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/92",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/92",
+    "const": "MUR",
+    "description": "Mauritius Rupee (480)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/93",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/93",
+    "const": "MVR",
+    "description": "Rufiyaa (462)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/94",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/94",
+    "const": "MWK",
+    "description": "Malawi Kwacha (454)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/95",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/95",
+    "const": "MXN",
+    "description": "Mexican Peso (484)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/96",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/96",
+    "const": "MYR",
+    "description": "Malaysian Ringgit (458)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/97",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/97",
+    "const": "MZN",
+    "description": "Mozambique Metical (943)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/98",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/98",
+    "const": "NAD",
+    "description": "Namibia Dollar (516)"
+  },
+  {
+    "path": "#/$defs/d_ab1334cf58a671c8857c/oneOf/99",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Currency/oneOf/99",
+    "const": "NGN",
+    "description": "Naira (566)"
   },
   {
     "path": "#/$defs/d_ac9b456dde5354f033fc",
@@ -503,7 +1561,7 @@ export default [
   {
     "path": "#/$defs/d_c7d556ba6ae95916518c",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/BalanceSheetArticulation",
-    "description": "Verifies that Assets = Liabilities + Equity for every period.\n\nAll configured operands must have compatible scalar/monetary units and one\ncurrency. Execution rejects incompatible units or invalid numeric tolerances;\nit performs no FX conversion."
+    "description": "Verifies that Assets = Liabilities + Equity at every model period close.\n\nEach group names known nodes, with no identifier repeated within a group\nor shared between groups: the caller includes each account once, through\nits subtotal or its components. All operands have compatible units and\none currency; the check performs no FX conversion. Signed balances and\ntyped zeros are used as they are.\n\nMonetary balances are summed exactly and scalar balances with compensated\nsums. The signed difference is `assets - (liabilities + equity)`; the\nrelative reference of the tolerance is `|assets|`. A period with a\nmissing balance is incomplete and names the nodes without a value; the\ncheck passes only when every period is complete and within tolerance."
   },
   {
     "path": "#/$defs/d_c7d556ba6ae95916518c/properties/assets_nodes",
@@ -541,8 +1599,14 @@ export default [
   {
     "path": "#/$defs/d_c7d556ba6ae95916518c/properties/tolerance",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/BalanceSheetArticulation/properties/tolerance",
-    "description": "Tolerance override; falls back to\n[`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).",
+    "description": "Absolute tolerance override in the balances' units; replaces both\nterms of the suite's\n[`CheckConfig`](crate::checks::CheckConfig) allowance.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_e92ffd809a0a9b085dba",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/DecimalWire",
+    "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
+    "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
   },
   {
     "path": "#/properties/builtin_checks",

@@ -3,38 +3,57 @@
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
-use crate::checks::helpers::get_finite_node_value;
-use crate::checks::types::effective_tolerance;
-use crate::checks::{
-    Check, CheckCategory, CheckComparison, CheckContext, CheckFinding, CheckResult, Materiality,
-    Severity,
+use crate::checks::identity::{
+    Comparison, DatedOpening, Term, incomplete, read_cells, require_known_distinct, signed_sum,
 };
-use crate::types::NodeId;
+use crate::checks::{Check, CheckCategory, CheckContext, CheckResult};
+use crate::types::{AmountOrScalar, NodeId};
 
-/// Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally
-/// TotalCF = CFO + CFI + CFF.
+/// Reconciles closing cash to opening cash plus classified cash flows and
+/// separately identified adjustments, and independently reconciles total
+/// classified cash flows to CFO + CFI + CFF.
 ///
-/// Every configured operand must have the same scalar/monetary units and
-/// currency. Execution rejects incompatible units or non-finite/negative
-/// tolerances; it performs no FX conversion.
+/// The roll-forward is evaluated for every model period:
+/// `closing = opening + total cash flow + adjustments`. The first opening is
+/// the explicit `opening_balance` at the first period boundary; each later
+/// opening is the close of the immediately adjacent prior period. Cash
+/// inflows are positive and outflows negative. All inputs share one cash
+/// scope, compatible units and one currency; the check performs no FX
+/// conversion.
+///
+/// The component identity `total cash flow = CFO + CFI + CFF` runs for every
+/// period when all three component nodes are configured, and not at all when
+/// none is; configuring only some of them is an error.
+///
+/// Monetary comparisons are exact and scalar ones compensated. The relative
+/// reference of the tolerance is `|opening cash|` for the roll-forward and
+/// `|total cash flow|` for the components, with no floor. A comparison with
+/// a missing input is incomplete; the check passes only when every enabled
+/// comparison is complete and within tolerance.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CashReconciliation {
-    /// Node for cash balance.
+    /// Node for the closing cash balance of each period.
     pub cash_balance_node: NodeId,
-    /// Node for total cash flow.
+    /// Node for total classified cash flow of each period, inflows positive.
     pub total_cash_flow_node: NodeId,
-    /// Optional node for cash from operations.
+    /// Opening cash at the start of the model's first period.
+    pub opening_balance: DatedOpening,
+    /// Signed FX and cash-scope adjustment nodes, each included once.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub adjustment_nodes: Vec<NodeId>,
+    /// Node for cash from operations; configure all three components or
+    /// none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cfo_node: Option<NodeId>,
-    /// Optional node for cash from investing.
+    /// Node for cash from investing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cfi_node: Option<NodeId>,
-    /// Optional node for cash from financing.
+    /// Node for cash from financing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cff_node: Option<NodeId>,
-    /// Tolerance override; falls back to
-    /// [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
+    /// Absolute tolerance override in the cash units; replaces both terms of
+    /// the suite's [`CheckConfig`](crate::checks::CheckConfig) allowance.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tolerance: Option<f64>,
 }
@@ -53,296 +72,167 @@ impl Check for CashReconciliation {
     }
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
+        let components: Vec<NodeId> = [&self.cfo_node, &self.cfi_node, &self.cff_node]
+            .into_iter()
+            .flatten()
+            .cloned()
+            .collect();
+        if !components.is_empty() && components.len() < 3 {
+            return Err(crate::Error::invalid_input(format!(
+                "{}: only {} of the three CFO/CFI/CFF nodes are configured; configure all \
+                 three or none",
+                self.id(),
+                components.len()
+            )));
+        }
+        let flows = [
+            self.cash_balance_node.clone(),
+            self.total_cash_flow_node.clone(),
+        ];
+        require_known_distinct(
+            self.id(),
+            context,
+            &[
+                ("cash nodes", &flows),
+                ("adjustment_nodes", &self.adjustment_nodes),
+                ("cash-flow components", &components),
+            ],
+        )?;
         crate::checks::helpers::validate_identity_inputs(
             self.id(),
             context,
             self.tolerance,
-            [&self.cash_balance_node, &self.total_cash_flow_node]
-                .into_iter()
-                .chain(self.cfo_node.iter())
-                .chain(self.cfi_node.iter())
-                .chain(self.cff_node.iter()),
+            flows
+                .iter()
+                .chain(&self.adjustment_nodes)
+                .chain(&components),
         )?;
+        let periods = &context.model.periods;
+        if let Some(first) = periods.first()
+            && self.opening_balance.date != first.start
+        {
+            return Err(crate::Error::invalid_input(format!(
+                "{}: opening_balance is dated {} but the first period starts on {}",
+                self.id(),
+                self.opening_balance.date,
+                first.start
+            )));
+        }
+
         let mut findings = Vec::new();
         let mut comparisons = Vec::new();
-        let periods = &context.model.periods;
+        let mut evaluated = 0_usize;
 
-        // The component identity needs all three of CFO/CFI/CFF; configuring
-        // only some of them is almost certainly a suite-authoring mistake, and
-        // silently skipping the identity would hide it.
-        let configured = [&self.cfo_node, &self.cfi_node, &self.cff_node]
-            .iter()
-            .filter(|node| node.is_some())
-            .count();
-        if configured > 0 && configured < 3 {
-            findings.push(CheckFinding {
-                check_id: self.id().to_string(),
-                severity: Severity::Warning,
-                message: format!(
-                    "Cash flow component check skipped: only {configured} of the three \
-                     CFO/CFI/CFF nodes are configured. Configure all three (or none) — \
-                     the identity CFO + CFI + CFF = TotalCF cannot be evaluated partially."
-                ),
-                period: None,
-                materiality: None,
-                nodes: [&self.cfo_node, &self.cfi_node, &self.cff_node]
-                    .iter()
-                    .filter_map(|node| (*node).clone())
-                    .collect(),
-                comparison: None,
-                coverage: false,
-            });
-        }
-
-        for i in 1..periods.len() {
-            let prev_pid = &periods[i - 1].id;
-            let curr_pid = &periods[i].id;
-
-            // Roll-forward identities only hold for *adjacent* periods (half-open
-            // `[start, end)`, so `prior.end == current.start`). Skip any pair
-            // that is not adjacent — non-ascending/equal-start (interleaved
-            // annual + quarterly), a gap (a period is missing between them), or
-            // an overlap (a year-end reconciled against a quarter it already
-            // contains) — so the identity is never evaluated across the wrong
-            // span. Emit an Info finding so the skip is visible rather than
-            // silent.
-            if periods[i - 1].end != periods[i].start {
-                findings.push(CheckFinding {
-                    check_id: self.id().to_string(),
-                    severity: Severity::Info,
-                    message: format!(
-                        "Cash reconciliation skipped for {curr_pid}: it is not adjacent to prior \
-                         {prev_pid} (gap, overlap, or out-of-order); the roll-forward identity is \
-                         only evaluated for consecutive periods."
-                    ),
-                    period: Some(*curr_pid),
-                    materiality: None,
-                    nodes: vec![
-                        self.cash_balance_node.clone(),
-                        self.total_cash_flow_node.clone(),
-                    ],
-                    comparison: None,
-                    coverage: false,
-                });
-                continue;
-            }
-
-            // `get_finite_node_value`: a NaN/Inf input poisons the
-            // roll-forward (`NaN > tolerance` is false ⇒ silent pass), so it
-            // is treated exactly like a missing one.
-            let cash_prev =
-                get_finite_node_value(context.results, &self.cash_balance_node, prev_pid);
-            let cash_curr =
-                get_finite_node_value(context.results, &self.cash_balance_node, curr_pid);
-            let total_cf =
-                get_finite_node_value(context.results, &self.total_cash_flow_node, curr_pid);
-
-            let (cash_prev, cash_curr, total_cf) = match (cash_prev, cash_curr, total_cf) {
-                (Some(p), Some(c), Some(t)) => (p, c, t),
-                (p, c, t) => {
-                    let mut missing: Vec<String> = Vec::new();
-                    if p.is_none() {
-                        missing.push(format!("{} @ {prev_pid}", self.cash_balance_node));
+        for (index, period) in periods.iter().enumerate() {
+            let pid = period.id;
+            evaluated += 1;
+            // Opening cash: the explicit opening, then each adjacent close.
+            let mut missing = Vec::new();
+            let opening: Option<AmountOrScalar> = match index.checked_sub(1) {
+                None => Some(self.opening_balance.value),
+                Some(prior) if periods[prior].end == period.start => {
+                    match read_cells(
+                        self.id(),
+                        context,
+                        &[&self.cash_balance_node],
+                        &periods[prior].id,
+                    )? {
+                        Ok(values) => Some(values[0]),
+                        Err(nodes) => {
+                            missing.extend(nodes);
+                            None
+                        }
                     }
-                    if c.is_none() {
-                        missing.push(format!("{} @ {curr_pid}", self.cash_balance_node));
-                    }
-                    if t.is_none() {
-                        missing.push(format!("{} @ {curr_pid}", self.total_cash_flow_node));
-                    }
-                    findings.push(CheckFinding {
-                        check_id: self.id().to_string(),
-                        severity: Severity::Warning,
-                        message: format!(
-                            "Cash reconciliation skipped for {curr_pid}: missing or non-finite \
-                             inputs [{}]. The identity cannot be evaluated without all three \
-                             values.",
-                            missing.join(", ")
-                        ),
-                        period: Some(*curr_pid),
-                        materiality: None,
-                        nodes: vec![
-                            self.cash_balance_node.clone(),
-                            self.total_cash_flow_node.clone(),
-                        ],
-                        comparison: None,
-                        coverage: true,
-                    });
-                    continue;
+                }
+                // No adjacent prior close: this period has no opening.
+                Some(_) => {
+                    missing.push(self.cash_balance_node.clone());
+                    None
                 }
             };
-
-            let expected_cash = cash_prev + total_cf;
-            let diff = cash_curr - expected_cash;
-            let reference = cash_prev.abs().max(1.0);
-            let tolerance = effective_tolerance(&context.config, self.tolerance, reference);
-            let relative = (diff / reference).abs() * 100.0;
-            if ![expected_cash, diff, tolerance, relative]
-                .iter()
-                .all(|v| v.is_finite())
-            {
-                findings.push(crate::checks::helpers::arithmetic_failure(
-                    self.id(),
-                    *curr_pid,
-                    vec![
-                        self.cash_balance_node.clone(),
-                        self.total_cash_flow_node.clone(),
-                    ],
-                ));
-                continue;
-            }
-            let comparison = CheckComparison {
-                identity: "cash_roll_forward".to_string(),
-                period: Some(*curr_pid),
-                actual: cash_curr,
-                expected: expected_cash,
-                tolerance,
+            let operands: Vec<&NodeId> = [&self.cash_balance_node, &self.total_cash_flow_node]
+                .into_iter()
+                .chain(&self.adjustment_nodes)
+                .collect();
+            let values = match read_cells(self.id(), context, &operands, &pid)? {
+                Ok(values) => Some(values),
+                Err(nodes) => {
+                    missing.extend(nodes);
+                    None
+                }
             };
-            comparisons.push(comparison.clone());
-
-            if diff.abs() > tolerance {
-                findings.push(CheckFinding {
-                    check_id: self.id().to_string(),
-                    severity: Severity::Error,
-                    message: format!(
-                        "Cash does not reconcile in {curr_pid}: \
-                         actual ({cash_curr:.2}) != prior ({cash_prev:.2}) + \
-                         total CF ({total_cf:.2}), difference = {diff:.2}"
-                    ),
-                    period: Some(*curr_pid),
-                    materiality: Some(Materiality {
-                        absolute: diff.abs(),
-                        relative_pct: relative,
-                        reference_value: cash_prev,
-                        reference_label: "prior_cash_balance".to_string(),
-                    }),
-                    nodes: vec![
-                        self.cash_balance_node.clone(),
-                        self.total_cash_flow_node.clone(),
-                    ],
-                    comparison: Some(comparison),
-                    coverage: false,
-                });
+            let (Some(opening), Some(values)) = (opening, values) else {
+                findings.push(incomplete(self.id(), "Cash roll-forward", pid, missing));
+                continue;
+            };
+            let closing = [Term::plus(values[0])];
+            let expected: Vec<Term> = std::iter::once(Term::plus(opening))
+                .chain(values[1..].iter().copied().map(Term::plus))
+                .collect();
+            let (comparison, finding) = Comparison {
+                check_id: self.id(),
+                identity: "cash_roll_forward",
+                period: pid,
+                actual: &closing,
+                expected: &expected,
+                reference: opening.value().abs(),
+                reference_label: "opening_cash",
+                tolerance: self.tolerance,
+                nodes: operands.into_iter().cloned().collect(),
             }
+            .evaluate(context, |closing, expected, residual| {
+                format!(
+                    "Cash does not reconcile in {pid}: closing cash ({closing:.2}) != opening \
+                     cash + cash flows and adjustments ({expected:.2}), residual = {residual:.2}"
+                )
+            })?;
+            comparisons.push(comparison);
+            findings.extend(finding);
         }
 
-        for period in periods {
-            let curr_pid = &period.id;
-            let total_cf =
-                get_finite_node_value(context.results, &self.total_cash_flow_node, curr_pid);
-            // Component check: CFO + CFI + CFF = TotalCF
-            if let (Some(cfo_node), Some(cfi_node), Some(cff_node)) =
-                (&self.cfo_node, &self.cfi_node, &self.cff_node)
-            {
-                let cfo = get_finite_node_value(context.results, cfo_node, curr_pid);
-                let cfi = get_finite_node_value(context.results, cfi_node, curr_pid);
-                let cff = get_finite_node_value(context.results, cff_node, curr_pid);
-
-                // A missing or non-finite component would silently disable
-                // the identity exactly when it matters most; surface the skip.
-                if cfo.is_none() || cfi.is_none() || cff.is_none() || total_cf.is_none() {
-                    let mut missing: Vec<String> = Vec::new();
-                    if total_cf.is_none() {
-                        missing.push(self.total_cash_flow_node.to_string());
-                    }
-                    if cfo.is_none() {
-                        missing.push(cfo_node.to_string());
-                    }
-                    if cfi.is_none() {
-                        missing.push(cfi_node.to_string());
-                    }
-                    if cff.is_none() {
-                        missing.push(cff_node.to_string());
-                    }
-                    findings.push(CheckFinding {
-                        check_id: self.id().to_string(),
-                        severity: Severity::Warning,
-                        message: format!(
-                            "Cash flow component check skipped for {curr_pid}: missing or \
-                             non-finite component values [{}]. The identity \
-                             CFO + CFI + CFF = TotalCF cannot be evaluated.",
-                            missing.join(", ")
-                        ),
-                        period: Some(*curr_pid),
-                        materiality: None,
-                        nodes: vec![cfo_node.clone(), cfi_node.clone(), cff_node.clone()],
-                        comparison: None,
-                        coverage: true,
-                    });
-                }
-
-                if let (Some(cfo_val), Some(cfi_val), Some(cff_val), Some(total_cf)) =
-                    (cfo, cfi, cff, total_cf)
-                {
-                    let component_sum = cfo_val + cfi_val + cff_val;
-                    let component_diff = total_cf - component_sum;
-                    let reference = total_cf.abs().max(1.0);
-                    let component_tolerance =
-                        effective_tolerance(&context.config, self.tolerance, reference);
-                    let relative = (component_diff / reference).abs() * 100.0;
-                    if ![
-                        cfo_val + cfi_val,
-                        component_sum,
-                        component_diff,
-                        component_tolerance,
-                        relative,
-                    ]
-                    .iter()
-                    .all(|v| v.is_finite())
-                    {
-                        findings.push(crate::checks::helpers::arithmetic_failure(
+        if components.len() == 3 {
+            for period in periods {
+                let pid = period.id;
+                evaluated += 1;
+                let operands: Vec<&NodeId> = std::iter::once(&self.total_cash_flow_node)
+                    .chain(&components)
+                    .collect();
+                let values = match read_cells(self.id(), context, &operands, &pid)? {
+                    Ok(values) => values,
+                    Err(missing) => {
+                        findings.push(incomplete(
                             self.id(),
-                            *curr_pid,
-                            vec![
-                                self.total_cash_flow_node.clone(),
-                                cfo_node.clone(),
-                                cfi_node.clone(),
-                                cff_node.clone(),
-                            ],
+                            "Cash flow component reconciliation",
+                            pid,
+                            missing,
                         ));
                         continue;
                     }
-                    let comparison = CheckComparison {
-                        identity: "cash_flow_components".to_string(),
-                        period: Some(*curr_pid),
-                        actual: total_cf,
-                        expected: component_sum,
-                        tolerance: component_tolerance,
-                    };
-                    comparisons.push(comparison.clone());
-
-                    if component_diff.abs() > component_tolerance {
-                        findings.push(CheckFinding {
-                            check_id: self.id().to_string(),
-                            severity: Severity::Error,
-                            message: format!(
-                                "Cash flow components do not sum to total in {curr_pid}: \
-                                 CFO ({cfo_val:.2}) + CFI ({cfi_val:.2}) + CFF ({cff_val:.2}) \
-                                 = {component_sum:.2} != total CF ({total_cf:.2}), \
-                                 difference = {component_diff:.2}"
-                            ),
-                            period: Some(*curr_pid),
-                            materiality: Some(Materiality {
-                                absolute: component_diff.abs(),
-                                relative_pct: relative,
-                                reference_value: total_cf,
-                                reference_label: "total_cash_flow".to_string(),
-                            }),
-                            nodes: vec![
-                                self.total_cash_flow_node.clone(),
-                                cfo_node.clone(),
-                                cfi_node.clone(),
-                                cff_node.clone(),
-                            ],
-                            comparison: Some(comparison),
-                            coverage: false,
-                        });
-                    }
+                };
+                let total = [Term::plus(values[0])];
+                let parts: Vec<Term> = values[1..].iter().copied().map(Term::plus).collect();
+                let (comparison, finding) = Comparison {
+                    check_id: self.id(),
+                    identity: "cash_flow_components",
+                    period: pid,
+                    actual: &total,
+                    expected: &parts,
+                    reference: signed_sum(self.id(), &total)?.abs(),
+                    reference_label: "total_cash_flow",
+                    tolerance: self.tolerance,
+                    nodes: operands.into_iter().cloned().collect(),
                 }
+                .evaluate(context, |total, parts, residual| {
+                    format!(
+                        "Cash flow components do not sum to the total in {pid}: total \
+                         ({total:.2}) != CFO + CFI + CFF ({parts:.2}), residual = {residual:.2}"
+                    )
+                })?;
+                comparisons.push(comparison);
+                findings.extend(finding);
             }
         }
 
-        let evaluated = periods.len().saturating_sub(1);
         Ok(CheckResult::new(self, evaluated, findings, comparisons))
     }
 }

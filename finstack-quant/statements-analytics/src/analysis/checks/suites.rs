@@ -49,8 +49,10 @@ const RUNWAY_ERROR_MONTHS: f64 = 6.0;
 ///
 /// Includes:
 /// - **BalanceSheetArticulation** (always)
-/// - **RetainedEarningsReconciliation** (always)
-/// - **CashReconciliation** (if `total_cf_node` is provided)
+/// - **RetainedEarningsReconciliation** (if `opening_retained_earnings` is
+///   provided)
+/// - **CashReconciliation** (if `total_cf_node` and `opening_cash` are both
+///   provided)
 /// - **DepreciationReconciliation** (if `ppe_node`, `depreciation_node`, and
 ///   `capex_node` are all provided)
 /// - **CapexReconciliation** (if `capex_node` and at least one of
@@ -86,21 +88,29 @@ pub fn three_statement_checks(
         tolerance: None,
     });
 
-    // Retained earnings reconciliation.
-    builder = builder.add_check(RetainedEarningsReconciliation {
-        retained_earnings_node: mapping.retained_earnings_node.clone(),
-        net_income_node: mapping.net_income_node.clone(),
-        dividends_node: mapping.dividends_node.clone(),
-        other_adjustments: vec![],
-        tolerance: None,
-        dividends_sign_convention: SignConventionPolicy::default(),
-    });
+    // Retained earnings reconciliation (requires an explicit opening).
+    if let Some(opening) = mapping.opening_retained_earnings.clone() {
+        builder = builder.add_check(RetainedEarningsReconciliation {
+            retained_earnings_node: mapping.retained_earnings_node.clone(),
+            net_income_node: mapping.net_income_node.clone(),
+            opening_balance: opening,
+            dividends_node: mapping.dividends_node.clone(),
+            other_adjustments: vec![],
+            tolerance: None,
+            dividends_sign_convention: SignConventionPolicy::default(),
+        });
+    }
 
-    // Cash reconciliation (requires total_cf_node).
-    if let Some(ref total_cf_node) = mapping.total_cf_node {
+    // Cash reconciliation (requires total_cf_node and an explicit opening).
+    // CFO, CFI and CFF are passed as mapped: the check rejects a partial set.
+    if let (Some(total_cf_node), Some(opening)) =
+        (&mapping.total_cf_node, mapping.opening_cash.clone())
+    {
         builder = builder.add_check(CashReconciliation {
             cash_balance_node: mapping.cash_node.clone(),
             total_cash_flow_node: total_cf_node.clone(),
+            opening_balance: opening,
+            adjustment_nodes: vec![],
             cfo_node: mapping.cfo_node.clone(),
             cfi_node: mapping.cfi_node.clone(),
             cff_node: mapping.cff_node.clone(),

@@ -1294,3 +1294,25 @@ STATEMENTS-CONTRACTS-014. **Breaking.**
 - **Supplied results.** Results passed to a check run must be an evaluated
   run of the same model; hand-built or stale results are rejected. Rust
   `CheckSuite::run_model` takes the requested observation cutoff.
+
+### Statements checks: accounting identities reconcile every period from explicit openings
+
+STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
+
+- **Openings.** `cash_reconciliation` and `retained_earnings_reconciliation`
+  need `opening_balance: {"date", "value"}` dated at the first period start,
+  and reconcile every period including the first (they used to start in the
+  second). `ThreeStatementMapping` takes `opening_cash` and
+  `opening_retained_earnings`; without them the suite leaves that
+  roll-forward out.
+- **Cash adjustments.** `cash_reconciliation.adjustment_nodes` lists signed
+  FX and cash-scope adjustments.
+- **Rejected as configuration errors.** An unknown node, an account listed
+  twice or in two groups, only one or two of CFO/CFI/CFF, and a negative
+  dividend magnitude (select `inflow_positive` for signed dividends). These
+  used to warn and skip.
+- **Incomplete, not skipped.** A period with a missing input is a coverage
+  finding naming the nodes, and the check is `incomplete`.
+- **Arithmetic.** Money is summed exactly and scalars with compensated sums;
+  references have no floor. A sum that cannot be represented is an error
+  instead of a failed finding.

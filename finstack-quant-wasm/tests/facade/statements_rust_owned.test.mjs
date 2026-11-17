@@ -77,6 +77,11 @@ function lboModel() {
         node_type: 'value',
         values: series([300, 300, 300, 300, 200]),
       },
+      equity: {
+        node_id: 'equity',
+        node_type: 'value',
+        values: series([-200, -200, -200, -200, -80]),
+      },
     },
   };
 }
@@ -96,9 +101,9 @@ const LBO_CHECK_MAPPINGS = {
   three_statement: {
     assets_nodes: ['ebitda'],
     liabilities_nodes: ['net_debt'],
-    equity_nodes: ['ebitda'],
+    equity_nodes: ['equity'],
     cash_node: 'net_debt',
-    retained_earnings_node: 'ebitda',
+    retained_earnings_node: 'equity',
     net_income_node: 'ebitda',
   },
   credit: { debt_node: 'net_debt', ebitda_node: 'ebitda', interest_expense_node: 'ebitda' },

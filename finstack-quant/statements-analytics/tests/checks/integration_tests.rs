@@ -47,6 +47,8 @@ fn ts_mapping() -> ThreeStatementMapping {
         wc_change_cf_node: None,
         current_assets_nodes: vec![],
         current_liabilities_nodes: vec![],
+        opening_cash: Some(opening(80.0)),
+        opening_retained_earnings: Some(opening(180.0)),
         config: Default::default(),
     }
 }
@@ -345,11 +347,11 @@ fn integration_balanced_model_passes_all_checks() {
             ],
         );
         model_builder
-            // Cash reconciles: cash(t) = cash(t-1) + total_cf(t)
+            // Cash reconciles from the opening of 80: cash(t) = cash(t-1) + total_cf(t)
             .value(
                 "total_cf",
                 &[
-                    (q(1), s(0.0)),
+                    (q(1), s(20.0)),
                     (q(2), s(20.0)),
                     (q(3), s(15.0)),
                     (q(4), s(15.0)),
@@ -398,4 +400,11 @@ fn integration_balanced_model_passes_all_checks() {
         report.summary.passed > 0,
         "balanced model should have passing checks",
     );
+}
+
+fn opening(value: f64) -> finstack_quant_statements::checks::DatedOpening {
+    finstack_quant_statements::checks::DatedOpening {
+        date: time::macros::date!(2025 - 01 - 01),
+        value: finstack_quant_statements::types::AmountOrScalar::scalar(value),
+    }
 }

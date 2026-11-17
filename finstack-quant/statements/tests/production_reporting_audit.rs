@@ -97,7 +97,7 @@ fn retained_earnings_uses_signed_dividend_change() {
         builder.value(node, &values);
     }
     let model = builder.build().unwrap();
-    let suite:CheckSuiteSpec=serde_json::from_value(json!({"name":"signed", "builtin_checks":[{"type":"retained_earnings_reconciliation","retained_earnings_node":"re","net_income_node":"income","dividends_node":"div","dividends_sign_convention":"inflow_positive"}]})).unwrap();
+    let suite:CheckSuiteSpec=serde_json::from_value(json!({"name":"signed", "builtin_checks":[{"type":"retained_earnings_reconciliation","retained_earnings_node":"re","net_income_node":"income","opening_balance":{"date":"2025-01-01","value":920.0},"dividends_node":"div","dividends_sign_convention":"inflow_positive"}]})).unwrap();
     let report = suite
         .resolve()
         .unwrap()

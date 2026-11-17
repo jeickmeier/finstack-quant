@@ -245,16 +245,10 @@ def test_accounting_overflow_is_an_error_without_invalid_numbers() -> None:
         ],
         config=s.CheckConfig(materiality_threshold=1e300),
     )
-    report = json.loads(run_checks(model, suite).to_json())
-    assert report["summary"]["failed"] == 1
-    result = report["results"][0]
-    assert result["outcome"] == "fail"
-    assert len(result["comparisons"]) == 1
-    assert result["comparisons"][0]["period"] == "2025Q2"
-    finding = result["findings"][0]
-    assert finding["severity"] == "error"
-    assert finding.get("comparison") is None
-    assert finding.get("materiality") is None
+    # An unrepresentable sum is an execution error: no verdict and no
+    # non-finite number is published.
+    with pytest.raises(ValueError, match="cannot be represented"):
+        run_checks(model, suite)
 
 
 def test_bundled_earnings_use_reported_costs_and_add_da_back_once() -> None:

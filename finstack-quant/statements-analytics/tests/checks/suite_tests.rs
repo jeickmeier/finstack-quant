@@ -46,6 +46,8 @@ fn minimal_ts_mapping() -> ThreeStatementMapping {
         wc_change_cf_node: None,
         current_assets_nodes: vec![],
         current_liabilities_nodes: vec![],
+        opening_cash: Some(opening(80.0)),
+        opening_retained_earnings: Some(opening(180.0)),
         config: Default::default(),
     }
 }
@@ -77,6 +79,8 @@ fn full_ts_mapping() -> ThreeStatementMapping {
         wc_change_cf_node: None,
         current_assets_nodes: vec![],
         current_liabilities_nodes: vec![],
+        opening_cash: Some(opening(80.0)),
+        opening_retained_earnings: Some(opening(180.0)),
         config: Default::default(),
     }
 }
@@ -249,4 +253,11 @@ fn three_statement_suite_runs_against_balanced_model() {
     // BS should pass (balanced). RE may flag if 300+50 != 350.
     // The key test is that it runs without error.
     assert!(report.summary.total_checks > 0);
+}
+
+fn opening(value: f64) -> finstack_quant_statements::checks::DatedOpening {
+    finstack_quant_statements::checks::DatedOpening {
+        date: time::macros::date!(2025 - 01 - 01),
+        value: finstack_quant_statements::types::AmountOrScalar::scalar(value),
+    }
 }

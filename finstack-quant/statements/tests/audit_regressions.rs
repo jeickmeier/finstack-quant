@@ -185,7 +185,7 @@ fn every_cash_period_checks_its_components_even_without_a_prior_balance() {
         model_builder.value("cff", &[(q(2025, 1), 0.0.into())]);
         model_builder.build().unwrap()
     };
-    let spec: CheckSuiteSpec = serde_json::from_value(json!({"name":"cash","builtin_checks":[{"type":"cash_reconciliation","cash_balance_node":"cash","total_cash_flow_node":"total","cfo_node":"cfo","cfi_node":"cfi","cff_node":"cff"}]})).unwrap();
+    let spec: CheckSuiteSpec = serde_json::from_value(json!({"name":"cash","builtin_checks":[{"type":"cash_reconciliation","cash_balance_node":"cash","total_cash_flow_node":"total","opening_balance":{"date":"2025-01-01","value":0.0},"cfo_node":"cfo","cfi_node":"cfi","cff_node":"cff"}]})).unwrap();
     let result = Evaluator::new()
         .with_checks(spec.resolve().unwrap())
         .evaluate(&model)

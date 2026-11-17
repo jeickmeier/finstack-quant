@@ -326,14 +326,12 @@ test('accounting overflow fails without publishing invalid numbers', () => {
       },
     ],
   };
-  const report = statements_analytics.runChecks(input, suite);
-  assert.equal(report.summary.failed, 1);
-  const result = report.results[0];
-  assert.equal(result.outcome, 'fail');
-  assert.equal(result.comparisons.length, 2);
-  assert.equal(result.findings[0].severity, 'error');
-  assert.equal(result.findings[0].comparison ?? null, null);
-  assert.equal(result.findings[0].materiality ?? null, null);
+  // An unrepresentable sum is an execution error: no verdict and no
+  // non-finite number is published.
+  assert.throws(
+    () => statements_analytics.runChecks(input, suite),
+    (e) => /cannot be represented/.test(e.message)
+  );
 });
 
 test('bundled earnings use reported costs and add D&A back once', () => {

@@ -289,21 +289,11 @@ fn failed_and_empty_normalization_merges_preserve_the_original_report_and_values
     assert_eq!(results.check_report, original_report);
 }
 
-fn assert_arithmetic_failure(result: &finstack_quant_statements::checks::CheckResult) {
-    assert!(!result.passed());
-    assert!(result.findings.iter().any(|finding| {
-        finding.severity == Severity::Error
-            && finding.message.contains("Arithmetic overflow")
-            && finding.materiality.is_none()
-            && finding.comparison.is_none()
-    }));
-    assert!(
-        result
-            .comparisons
-            .iter()
-            .all(|c| c.actual.is_finite() && c.expected.is_finite() && c.tolerance.is_finite())
-    );
-    serde_json::to_string(result).expect("all published numbers are finite");
+fn scalar_opening(value: f64) -> finstack_quant_statements::checks::DatedOpening {
+    finstack_quant_statements::checks::DatedOpening {
+        date: time::macros::date!(2025 - 01 - 01),
+        value: finstack_quant_statements::types::AmountOrScalar::scalar(value),
+    }
 }
 
 #[test]
@@ -335,18 +325,19 @@ fn balance_sheet_arithmetic_overflow_fails_without_publishing_nonfinite_numbers(
             equity_nodes: vec!["e".into()],
             tolerance: None,
         };
-        let result = check.execute(&context).unwrap();
-        assert_arithmetic_failure(&result);
-        assert_eq!(result.comparisons.len(), 1);
-        assert_eq!(result.comparisons[0].period, Some(p2));
+        // An unrepresentable sum or tolerance is an execution error: no
+        // verdict and no non-finite number is published.
+        let error = check.execute(&context).unwrap_err();
+        assert!(
+            error.to_string().contains("cannot be represented"),
+            "{error}"
+        );
         let suite = CheckSuite::builder("overflow")
             .config(context.config.clone())
             .add_check(check)
             .build()
             .expect("unique check ids");
-        let report = suite.run(&model, &results).unwrap();
-        assert!(report.has_errors());
-        assert_eq!(report.summary.failed, 1);
+        assert!(suite.run(&model, &results).is_err());
     }
 }
 
@@ -370,20 +361,19 @@ fn cash_identities_reject_intermediate_overflow() {
     let check = CashReconciliation {
         cash_balance_node: "cash".into(),
         total_cash_flow_node: "flow".into(),
+        opening_balance: scalar_opening(1e308),
+        adjustment_nodes: Vec::new(),
         cfo_node: Some("cfo".into()),
         cfi_node: Some("cfi".into()),
         cff_node: Some("cff".into()),
         tolerance: None,
     };
-    let result = check.execute(&CheckContext::new(&model, &results)).unwrap();
-    assert_arithmetic_failure(&result);
-    assert_eq!(
-        result
-            .findings
-            .iter()
-            .filter(|f| f.severity == Severity::Error)
-            .count(),
-        2
+    let error = check
+        .execute(&CheckContext::new(&model, &results))
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("cannot be represented"),
+        "{error}"
     );
 }
 
@@ -405,12 +395,17 @@ fn retained_earnings_rejects_intermediate_overflow() {
     let check = RetainedEarningsReconciliation {
         retained_earnings_node: "re".into(),
         net_income_node: "ni".into(),
+        opening_balance: scalar_opening(1e308),
         dividends_node: Some("div".into()),
         other_adjustments: Vec::new(),
         tolerance: None,
         dividends_sign_convention: Default::default(),
     };
-    let result = check.execute(&CheckContext::new(&model, &results)).unwrap();
-    assert_arithmetic_failure(&result);
-    assert!(result.comparisons.is_empty());
+    let error = check
+        .execute(&CheckContext::new(&model, &results))
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("cannot be represented"),
+        "{error}"
+    );
 }

@@ -674,6 +674,32 @@
             "currency": "USD"
           }
         }
+      },
+      "equity": {
+        "node_id": "equity",
+        "node_type": "value",
+        "values": {
+          "2025Q1": {
+            "amount": "-200",
+            "currency": "USD"
+          },
+          "2025Q2": {
+            "amount": "-200",
+            "currency": "USD"
+          },
+          "2025Q3": {
+            "amount": "-200",
+            "currency": "USD"
+          },
+          "2025Q4": {
+            "amount": "-200",
+            "currency": "USD"
+          },
+          "2026Q1": {
+            "amount": "-80",
+            "currency": "USD"
+          }
+        }
       }
     }
   },
@@ -701,10 +727,10 @@
         "net_debt"
       ],
       "equity_nodes": [
-        "ebitda"
+        "equity"
       ],
       "cash_node": "net_debt",
-      "retained_earnings_node": "ebitda",
+      "retained_earnings_node": "equity",
       "net_income_node": "ebitda"
     },
     "credit": {

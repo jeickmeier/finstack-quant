@@ -2,9 +2,9 @@
 
 **Decision status:** Accepted for the full cash roll-forward and component reconciliation contract (2026-11-15).
 
-**Implementation status:** Reconciliation pending. The audited roll-forward starts in the second period, and partial configuration or missing observations can cause skips.
+**Implementation status:** Reconciled (2026-11-17). The roll-forward `closing = opening + total cash flow + adjustments` runs for every model period: the first from the required explicit dated opening (`opening_balance`, dated at the first period start), each later one from the adjacent prior close. Signed FX and cash-scope adjustments are explicit distinct nodes (`adjustment_nodes`). The component identity `total = CFO + CFI + CFF` runs for every period when all three components are configured; a partial or repeated set is an error. Monetary comparisons are exact and scalar ones compensated; the references are `|opening cash|` and `|total cash flow|` with no floor. A comparison with a missing input, or a period without an adjacent prior close, is incomplete. The sections after the accepted decision describe the implementation audited before reconciliation.
 
-**Validation status:** Existing source and regression evidence mapped. Independent qualification of period boundaries, adjustments, arithmetic and coverage remains pending.
+**Validation status:** Qualified by first-period reconciliation from the opening, a wrong opening with its unfloored reference, signed adjustments and a duplicated one, component failures in the first period, a partial component set, missing inputs and a missing prior close, a misdated and a wrongly typed opening, and exact monetary cash (0.10 + 0.20 = 0.30).
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
 

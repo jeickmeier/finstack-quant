@@ -1,468 +1,189 @@
-//! Tests for the surrounding crate component and its documented behavior.
-//!
+//! Retained-earnings reconciliation (STATEMENTS-CONTRACTS-012).
 #![allow(clippy::unwrap_used)]
 
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::checks::builtins::RetainedEarningsReconciliation;
-use finstack_quant_statements::checks::{Check, CheckContext};
+use finstack_quant_statements::checks::{
+    Check, CheckContext, CheckOutcome, CheckResult, DatedOpening, SignConventionPolicy,
+};
 use finstack_quant_statements::evaluator::Evaluator;
-use finstack_quant_statements::types::{AmountOrScalar, NodeId};
+use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec, NodeId};
+use time::macros::date;
 
 fn q(quarter: u8) -> PeriodId {
     PeriodId::quarter(2025, quarter).expect("valid period fixture")
 }
 
-#[test]
-fn reconciliation_passes() {
-    // RE(Q2) = RE(Q1) + NI(Q2) - Div(Q2) = 500 + 120 - 20 = 600 ✓
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.value(
-            "retained_earnings",
-            &[
-                (q(1), AmountOrScalar::scalar(500.0)),
-                (q(2), AmountOrScalar::scalar(600.0)),
-            ],
-        );
-        model_builder.value(
-            "net_income",
-            &[
-                (q(1), AmountOrScalar::scalar(100.0)),
-                (q(2), AmountOrScalar::scalar(120.0)),
-            ],
-        );
-        model_builder.value(
-            "dividends",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(20.0)),
-            ],
-        );
-        model_builder.build().unwrap()
-    };
+fn model(series: &[(&str, [Option<f64>; 2])]) -> FinancialModelSpec {
+    let mut builder = ModelBuilder::new("retained earnings");
+    builder.periods("2025Q1..Q2", None).unwrap();
+    for (node, values) in series {
+        let cells: Vec<(PeriodId, f64)> = values
+            .iter()
+            .enumerate()
+            .filter_map(|(index, value)| value.map(|v| (q(index as u8 + 1), v)))
+            .collect();
+        builder.value_scalar(*node, &cells);
+    }
+    builder.build().unwrap()
+}
 
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    let check = RetainedEarningsReconciliation {
-        retained_earnings_node: NodeId::new("retained_earnings"),
-        net_income_node: NodeId::new("net_income"),
-        dividends_node: Some(NodeId::new("dividends")),
+fn check() -> RetainedEarningsReconciliation {
+    RetainedEarningsReconciliation {
+        retained_earnings_node: NodeId::new("re"),
+        net_income_node: NodeId::new("ni"),
+        opening_balance: DatedOpening {
+            date: date!(2025 - 01 - 01),
+            value: AmountOrScalar::scalar(500.0),
+        },
+        dividends_node: Some(NodeId::new("div")),
         other_adjustments: vec![],
         tolerance: None,
-        dividends_sign_convention: Default::default(),
-    };
-
-    let ctx = CheckContext::new(&model, &results);
-    let result = check.execute(&ctx).unwrap();
-
-    assert!(result.passed());
-    assert!(result.findings.is_empty());
+        dividends_sign_convention: SignConventionPolicy::MagnitudePositive,
+    }
 }
 
-#[test]
-fn reconciliation_fails() {
-    // Expected RE(Q2) = 500 + 120 - 20 = 600, actual = 650 → diff = 50
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.value(
-            "retained_earnings",
-            &[
-                (q(1), AmountOrScalar::scalar(500.0)),
-                (q(2), AmountOrScalar::scalar(650.0)),
-            ],
-        );
-        model_builder.value(
-            "net_income",
-            &[
-                (q(1), AmountOrScalar::scalar(100.0)),
-                (q(2), AmountOrScalar::scalar(120.0)),
-            ],
-        );
-        model_builder.value(
-            "dividends",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(20.0)),
-            ],
-        );
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    let check = RetainedEarningsReconciliation {
-        retained_earnings_node: NodeId::new("retained_earnings"),
-        net_income_node: NodeId::new("net_income"),
-        dividends_node: Some(NodeId::new("dividends")),
-        other_adjustments: vec![],
-        tolerance: None,
-        dividends_sign_convention: Default::default(),
-    };
-
-    let ctx = CheckContext::new(&model, &results);
-    let result = check.execute(&ctx).unwrap();
-
-    assert!(!result.passed());
-    assert_eq!(result.findings.len(), 1);
-    assert_eq!(result.findings[0].period, Some(q(2)));
-
-    let mat = result.findings[0].materiality.as_ref().unwrap();
-    assert!((mat.absolute - 50.0).abs() < 0.01);
+fn run(
+    model: &FinancialModelSpec,
+    check: &RetainedEarningsReconciliation,
+) -> finstack_quant_statements::Result<CheckResult> {
+    let results = Evaluator::new().evaluate(model).unwrap();
+    check.execute(&CheckContext::new(model, &results))
 }
 
+/// Every period reconciles, the first from the explicit opening:
+/// 500 + 60 - 10 = 550, then 550 + 80 - 30 = 600.
 #[test]
-fn skips_first_period() {
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..Q3", None).unwrap();
-        model_builder.value(
-            "retained_earnings",
-            &[
-                (q(1), AmountOrScalar::scalar(500.0)),
-                (q(2), AmountOrScalar::scalar(600.0)),
-                (q(3), AmountOrScalar::scalar(700.0)),
-            ],
-        );
-        model_builder.value(
-            "net_income",
-            &[
-                (q(1), AmountOrScalar::scalar(100.0)),
-                (q(2), AmountOrScalar::scalar(100.0)),
-                (q(3), AmountOrScalar::scalar(100.0)),
-            ],
-        );
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    let check = RetainedEarningsReconciliation {
-        retained_earnings_node: NodeId::new("retained_earnings"),
-        net_income_node: NodeId::new("net_income"),
-        dividends_node: None,
-        other_adjustments: vec![],
-        tolerance: None,
-        dividends_sign_convention: Default::default(),
-    };
-
-    let ctx = CheckContext::new(&model, &results);
-    let result = check.execute(&ctx).unwrap();
-
-    // No finding should reference Q1 (the first period is skipped)
-    assert!(result.findings.iter().all(|f| f.period != Some(q(1))));
-}
-
-#[test]
-fn with_other_adjustments() {
-    // RE(Q2) = RE(Q1) + NI(Q2) - Div(Q2) + Adj(Q2) = 500 + 120 - 20 + 10 = 610 ✓
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.value(
-            "retained_earnings",
-            &[
-                (q(1), AmountOrScalar::scalar(500.0)),
-                (q(2), AmountOrScalar::scalar(610.0)),
-            ],
-        );
-        model_builder.value(
-            "net_income",
-            &[
-                (q(1), AmountOrScalar::scalar(100.0)),
-                (q(2), AmountOrScalar::scalar(120.0)),
-            ],
-        );
-        model_builder.value(
-            "dividends",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(20.0)),
-            ],
-        );
-        model_builder.value(
-            "aoci_adjustment",
-            &[
-                (q(1), AmountOrScalar::scalar(0.0)),
-                (q(2), AmountOrScalar::scalar(10.0)),
-            ],
-        );
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    let check = RetainedEarningsReconciliation {
-        retained_earnings_node: NodeId::new("retained_earnings"),
-        net_income_node: NodeId::new("net_income"),
-        dividends_node: Some(NodeId::new("dividends")),
-        other_adjustments: vec![NodeId::new("aoci_adjustment")],
-        tolerance: None,
-        dividends_sign_convention: Default::default(),
-    };
-
-    let ctx = CheckContext::new(&model, &results);
-    let result = check.execute(&ctx).unwrap();
-
-    assert!(result.passed());
-    assert!(result.findings.is_empty());
-}
-
-// Configured-but-missing optional inputs must warn and skip, not silently
-// coerce to zero (a misspelled dividends node otherwise reconciles against
-// the wrong identity or misattributes the error).
-
-#[test]
-fn missing_configured_dividends_node_warns_and_skips() {
-    use finstack_quant_statements::checks::Severity;
-
-    // RE moved 500 -> 550 with NI 100 because 50 of dividends were paid, but
-    // the configured dividends node name does not exist in the results.
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.value(
-            "retained_earnings",
-            &[
-                (q(1), AmountOrScalar::scalar(500.0)),
-                (q(2), AmountOrScalar::scalar(550.0)),
-            ],
-        );
-        model_builder.value(
-            "net_income",
-            &[
-                (q(1), AmountOrScalar::scalar(90.0)),
-                (q(2), AmountOrScalar::scalar(100.0)),
-            ],
-        );
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    let check = RetainedEarningsReconciliation {
-        retained_earnings_node: NodeId::new("retained_earnings"),
-        net_income_node: NodeId::new("net_income"),
-        dividends_node: Some(NodeId::new("dividendz")), // misspelled
-        other_adjustments: vec![],
-        tolerance: None,
-        dividends_sign_convention: Default::default(),
-    };
-
-    let ctx = CheckContext::new(&model, &results);
-    let result = check.execute(&ctx).unwrap();
-
-    assert!(
-        !result
-            .findings
-            .iter()
-            .any(|f| f.severity == Severity::Error),
-        "a period with an unresolvable configured input must be skipped, not judged: {:?}",
-        result.findings
+fn every_period_reconciles_from_the_explicit_opening() {
+    let model = model(&[
+        ("re", [Some(550.0), Some(600.0)]),
+        ("ni", [Some(60.0), Some(80.0)]),
+        ("div", [Some(10.0), Some(30.0)]),
+    ]);
+    let result = run(&model, &check()).unwrap();
+    assert_eq!(result.outcome, CheckOutcome::Pass);
+    assert_eq!(result.comparisons.len(), 2);
+    assert_eq!(result.comparisons[0].period, Some(q(1)));
+    assert_eq!(
+        result.comparisons[0].identity,
+        "retained_earnings_roll_forward"
     );
-    assert!(
-        result
-            .findings
-            .iter()
-            .any(|f| f.severity == Severity::Warning && f.message.contains("dividendz")),
-        "the warning should name the missing dividends node, got: {:?}",
-        result.findings
-    );
-}
-
-#[test]
-fn missing_configured_adjustment_node_warns_and_skips() {
-    use finstack_quant_statements::checks::Severity;
-
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.value(
-            "retained_earnings",
-            &[
-                (q(1), AmountOrScalar::scalar(500.0)),
-                (q(2), AmountOrScalar::scalar(600.0)),
-            ],
-        );
-        model_builder.value(
-            "net_income",
-            &[
-                (q(1), AmountOrScalar::scalar(90.0)),
-                (q(2), AmountOrScalar::scalar(100.0)),
-            ],
-        );
-        model_builder.build().unwrap()
+    // A wrong opening fails the first period; the reference is |opening|.
+    let wrong = RetainedEarningsReconciliation {
+        opening_balance: DatedOpening {
+            date: date!(2025 - 01 - 01),
+            value: AmountOrScalar::scalar(400.0),
+        },
+        ..check()
     };
-
-    let check = RetainedEarningsReconciliation {
-        retained_earnings_node: NodeId::new("retained_earnings"),
-        net_income_node: NodeId::new("net_income"),
-        dividends_node: None,
-        other_adjustments: vec![NodeId::new("aoci_adjustmentz")], // misspelled
-        tolerance: None,
-        dividends_sign_convention: Default::default(),
-    };
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-    let ctx = CheckContext::new(&model, &results);
-    let result = check.execute(&ctx).unwrap();
-
-    assert!(
-        !result
-            .findings
-            .iter()
-            .any(|f| f.severity == Severity::Error),
-        "unexpected Error findings: {:?}",
-        result.findings
-    );
-    assert!(
-        result
-            .findings
-            .iter()
-            .any(|f| f.severity == Severity::Warning && f.message.contains("aoci_adjustmentz")),
-        "the warning should name the missing adjustment node, got: {:?}",
-        result.findings
-    );
-}
-
-#[test]
-fn nan_dividends_value_warns_and_skips() {
-    use finstack_quant_statements::checks::Severity;
-
-    // A dividends node that resolves to NaN poisons the roll-forward
-    // (expected RE becomes NaN, `NaN > tolerance` is false) and the period
-    // silently passes. Non-finite configured inputs must be treated like
-    // missing ones: warn and skip.
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.value(
-            "retained_earnings",
-            &[
-                (q(1), AmountOrScalar::scalar(500.0)),
-                (q(2), AmountOrScalar::scalar(9999.0)), // blatantly broken roll-forward
-            ],
-        );
-        model_builder.value(
-            "net_income",
-            &[
-                (q(1), AmountOrScalar::scalar(90.0)),
-                (q(2), AmountOrScalar::scalar(100.0)),
-            ],
-        );
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let mut results = evaluator.evaluate(&model).unwrap();
-    results.set_cell(
-        "dividends",
-        q(2),
-        finstack_quant_statements::evaluator::ResultCell::unavailable(
-            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+    let result = run(&model, &wrong).unwrap();
+    assert_eq!(result.outcome, CheckOutcome::Fail);
+    let materiality = result.findings[0].materiality.as_ref().unwrap();
+    assert_eq!(
+        (
+            materiality.absolute,
+            materiality.reference_value,
+            materiality.relative_pct
         ),
-    );
-
-    let check = RetainedEarningsReconciliation {
-        retained_earnings_node: NodeId::new("retained_earnings"),
-        net_income_node: NodeId::new("net_income"),
-        dividends_node: Some(NodeId::new("dividends")),
-        other_adjustments: vec![],
-        tolerance: None,
-        dividends_sign_convention: Default::default(),
-    };
-
-    let ctx = CheckContext::new(&model, &results);
-    let result = check.execute(&ctx).unwrap();
-
-    assert!(
-        result
-            .findings
-            .iter()
-            .any(|f| f.severity == Severity::Warning && f.message.contains("dividends")),
-        "a NaN dividends value must warn and skip, not silently pass: {:?}",
-        result.findings
-    );
-    assert!(
-        !result
-            .findings
-            .iter()
-            .any(|f| f.severity == Severity::Error),
-        "the poisoned period must be skipped, not judged: {:?}",
-        result.findings
+        (100.0, 400.0, 25.0)
     );
 }
 
+/// A dividend magnitude is subtracted and cannot be negative; a signed
+/// dividend under the explicitly selected inflow convention is added.
 #[test]
-fn nan_core_input_warns_and_skips() {
-    use finstack_quant_statements::checks::Severity;
-
-    // A NaN retained-earnings balance must be treated as unresolvable, not
-    // compared: `NaN > tolerance` is false, which would silently pass.
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.value(
-            "retained_earnings",
-            &[
-                (q(1), AmountOrScalar::scalar(500.0)),
-                (q(2), AmountOrScalar::scalar(600.0)),
-            ],
-        );
-        model_builder.value(
-            "net_income",
-            &[
-                (q(1), AmountOrScalar::scalar(90.0)),
-                (q(2), AmountOrScalar::scalar(100.0)),
-            ],
-        );
-        model_builder.build().unwrap()
+fn dividend_signs_follow_the_selected_convention() {
+    let negative = model(&[
+        ("re", [Some(550.0), Some(600.0)]),
+        ("ni", [Some(60.0), Some(80.0)]),
+        ("div", [Some(-10.0), Some(-30.0)]),
+    ]);
+    let error = run(&negative, &check()).unwrap_err();
+    assert!(error.to_string().contains("cannot be negative"), "{error}");
+    let signed = RetainedEarningsReconciliation {
+        dividends_sign_convention: SignConventionPolicy::InflowPositive,
+        ..check()
     };
-
-    let mut evaluator = Evaluator::new();
-    let mut results = evaluator.evaluate(&model).unwrap();
-    results.set_cell(
-        "retained_earnings",
-        q(1),
-        finstack_quant_statements::evaluator::ResultCell::unavailable(
-            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
-        ),
+    assert_eq!(run(&negative, &signed).unwrap().outcome, CheckOutcome::Pass);
+    // A typed zero is a known zero dividend.
+    let none_paid = model(&[
+        ("re", [Some(560.0), Some(640.0)]),
+        ("ni", [Some(60.0), Some(80.0)]),
+        ("div", [Some(0.0), Some(0.0)]),
+    ]);
+    assert_eq!(
+        run(&none_paid, &check()).unwrap().outcome,
+        CheckOutcome::Pass
     );
+}
 
-    let check = RetainedEarningsReconciliation {
-        retained_earnings_node: NodeId::new("retained_earnings"),
-        net_income_node: NodeId::new("net_income"),
+/// Direct entries are signed, distinct and included once.
+#[test]
+fn direct_adjustments_are_signed_and_distinct() {
+    let model = model(&[
+        ("re", [Some(545.0), Some(602.0)]),
+        ("ni", [Some(60.0), Some(80.0)]),
+        ("div", [Some(10.0), Some(30.0)]),
+        ("buyback", [Some(-5.0), Some(0.0)]),
+        ("restatement", [Some(0.0), Some(7.0)]),
+    ]);
+    let adjusted = RetainedEarningsReconciliation {
+        other_adjustments: vec![NodeId::new("buyback"), NodeId::new("restatement")],
+        ..check()
+    };
+    assert_eq!(run(&model, &adjusted).unwrap().outcome, CheckOutcome::Pass);
+    assert_eq!(run(&model, &check()).unwrap().outcome, CheckOutcome::Fail);
+    let duplicated = RetainedEarningsReconciliation {
+        other_adjustments: vec![NodeId::new("buyback"), NodeId::new("buyback")],
+        ..check()
+    };
+    let error = run(&model, &duplicated).unwrap_err();
+    assert!(error.to_string().contains("appears twice"), "{error}");
+    // A movement that is also the dividend series would be counted twice.
+    let overlapping = RetainedEarningsReconciliation {
+        other_adjustments: vec![NodeId::new("div")],
+        ..check()
+    };
+    assert!(run(&model, &overlapping).is_err());
+}
+
+/// A configured series without a value makes the period incomplete; it is
+/// not read as zero.
+#[test]
+fn a_configured_missing_amount_is_incomplete() {
+    let model = model(&[
+        ("re", [Some(550.0), Some(630.0)]),
+        ("ni", [Some(60.0), Some(80.0)]),
+        ("div", [Some(10.0), None]),
+    ]);
+    let result = run(&model, &check()).unwrap();
+    assert_eq!(result.outcome, CheckOutcome::Incomplete);
+    let finding = &result.findings[0];
+    assert!(finding.coverage);
+    assert_eq!(finding.period, Some(q(2)));
+    assert_eq!(finding.nodes, [NodeId::new("div")]);
+    // An unknown node is a configuration error, not a missing amount.
+    let unknown = RetainedEarningsReconciliation {
+        dividends_node: Some(NodeId::new("no_such_node")),
+        ..check()
+    };
+    let error = run(&model, &unknown).unwrap_err();
+    assert!(
+        error.to_string().contains("not a node of the model"),
+        "{error}"
+    );
+    // Omitting an inapplicable series is fine: 500 + 60 = 560.
+    let no_dividends = RetainedEarningsReconciliation {
         dividends_node: None,
-        other_adjustments: vec![],
-        tolerance: None,
-        dividends_sign_convention: Default::default(),
+        ..check()
     };
-
-    let ctx = CheckContext::new(&model, &results);
-    let result = check.execute(&ctx).unwrap();
-
-    assert!(
-        result
-            .findings
-            .iter()
-            .any(|f| f.severity == Severity::Warning && f.message.contains("retained_earnings")),
-        "a NaN core input must warn and skip: {:?}",
-        result.findings
-    );
-    assert!(
-        !result
-            .findings
-            .iter()
-            .any(|f| f.severity == Severity::Error),
-        "the poisoned period must be skipped, not judged: {:?}",
-        result.findings
+    let model = self::model(&[
+        ("re", [Some(560.0), Some(640.0)]),
+        ("ni", [Some(60.0), Some(80.0)]),
+    ]);
+    assert_eq!(
+        run(&model, &no_dividends).unwrap().outcome,
+        CheckOutcome::Pass
     );
 }

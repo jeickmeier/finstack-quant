@@ -2,9 +2,9 @@
 
 **Decision status:** Accepted for the full retained-earnings reconciliation contract (2026-11-15).
 
-**Implementation status:** Reconciliation pending. The audited check starts in the second period and can warn and pass with missing observations or invalid dividend magnitudes.
+**Implementation status:** Reconciled (2026-11-17). Every model period is reconciled: `closing = opening + net income + dividend effect + direct entries`, the first from the required explicit dated opening (`opening_balance`) and each later one from the adjacent prior close. Under `MagnitudePositive` a non-negative dividend is subtracted and a negative magnitude is rejected; under the explicitly selected `InflowPositive` the signed dividend is added. Direct retained-earnings entries are distinct signed nodes, and a node that is also the dividend series is rejected. A configured series without a value makes the period incomplete; a typed zero is a known zero. Arithmetic, tolerance and the unfloored `|opening retained earnings|` reference follow the balance-sheet contract. The sections after the accepted decision describe the implementation audited before reconciliation.
 
-**Validation status:** Existing source and regression evidence mapped. Independent qualification of opening balances, direct movements, arithmetic and coverage remains pending.
+**Validation status:** Qualified by first-period reconciliation, a wrong opening, a negative dividend magnitude, a signed dividend under the elected convention, a typed zero, distinct signed adjustments, duplicate and overlapping movement nodes, a missing configured series and an unknown node.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
 

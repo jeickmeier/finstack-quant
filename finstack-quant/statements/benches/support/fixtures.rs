@@ -158,6 +158,11 @@ pub fn standard_check_suite() -> CheckSuite {
         .add_check(CashReconciliation {
             cash_balance_node: NodeId::new("cash"),
             total_cash_flow_node: NodeId::new("total_cf"),
+            opening_balance: finstack_quant_statements::checks::DatedOpening {
+                date: time::macros::date!(2025 - 01 - 01),
+                value: AmountOrScalar::scalar(0.0),
+            },
+            adjustment_nodes: vec![],
             cfo_node: Some(NodeId::new("cfo")),
             cfi_node: Some(NodeId::new("cfi")),
             cff_node: Some(NodeId::new("cff")),
@@ -166,6 +171,10 @@ pub fn standard_check_suite() -> CheckSuite {
         .add_check(RetainedEarningsReconciliation {
             retained_earnings_node: NodeId::new("retained_earnings"),
             net_income_node: NodeId::new("net_income"),
+            opening_balance: finstack_quant_statements::checks::DatedOpening {
+                date: time::macros::date!(2025 - 01 - 01),
+                value: AmountOrScalar::scalar(0.0),
+            },
             dividends_node: Some(NodeId::new("dividends")),
             other_adjustments: vec![],
             tolerance: Some(1.0),

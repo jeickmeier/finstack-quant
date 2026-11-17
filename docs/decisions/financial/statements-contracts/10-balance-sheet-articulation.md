@@ -2,9 +2,9 @@
 
 **Decision status:** Accepted for the full balance-sheet articulation contract (2026-11-15).
 
-**Implementation status:** Reconciliation pending. The audited check uses ordinary floating-point sums and can pass after skipping missing inputs.
+**Implementation status:** Reconciled (2026-11-17). The check runs at every model period close on three non-empty groups of known nodes, unique within a group and disjoint across groups; an unknown, repeated or shared account is a configuration error. Monetary balances are summed exactly and scalar balances with compensated sums, and the signed difference `assets − (liabilities + equity)` is one exact residual over all terms. The default tolerance is zero and a stated allowance uses `|assets|` as its reference. A period with a missing balance is incomplete and names the nodes without a value; an unrepresentable sum or tolerance is an error; the check passes only when every period is complete and within tolerance. The sections after the accepted decision describe the implementation audited before reconciliation.
 
-**Validation status:** Existing source and regression evidence mapped. Independent qualification of account membership, arithmetic, tolerance and coverage remains pending.
+**Validation status:** Qualified by a hand-built three-statement model, one unit of unexplained cash, cancelling balances of 1e16 with a difference of one, unknown, repeated and shared accounts, a missing balance, and comparisons exactly at the allowance.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
 

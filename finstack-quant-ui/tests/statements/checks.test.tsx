@@ -154,11 +154,13 @@ it("edits builtin struct fields and runs a raw three-statement mapping", async (
   const run = screen.getByRole("button", { name: "Run native checks" });
   expect(run.hasAttribute("disabled")).toBe(true);
   const mappingJson = JSON.stringify({
-    assets_nodes: ["total_assets"],
-    liabilities_nodes: ["total_liabilities"],
-    equity_nodes: ["total_equity"],
+    // Account groups name distinct nodes of the model; an unknown or
+    // repeated account is a configuration error in Rust.
+    assets_nodes: ["cash"],
+    liabilities_nodes: ["total_debt"],
+    equity_nodes: ["ebitda"],
     cash_node: "cash",
-    retained_earnings_node: "retained_earnings",
+    retained_earnings_node: "ebitda",
     net_income_node: "net_income",
   });
   await user.click(mapping);
@@ -173,11 +175,11 @@ it("edits builtin struct fields and runs a raw three-statement mapping", async (
 });
 
 const threeStatementMapping = JSON.stringify({
-  assets_nodes: ["total_assets"],
-  liabilities_nodes: ["total_liabilities"],
-  equity_nodes: ["total_equity"],
+  assets_nodes: ["cash"],
+  liabilities_nodes: ["total_debt"],
+  equity_nodes: ["ebitda"],
   cash_node: "cash",
-  retained_earnings_node: "retained_earnings",
+  retained_earnings_node: "ebitda",
   net_income_node: "net_income",
 });
 

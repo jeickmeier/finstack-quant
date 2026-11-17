@@ -875,7 +875,7 @@
     "lbo": {
       "checked": {
         "checks": {
-          "outcome": "fail",
+          "outcome": "pass",
           "results": [
             {
               "category": "accounting_identity",
@@ -884,295 +884,43 @@
               "comparisons": [
                 {
                   "actual": 100.0,
-                  "expected": 400.0,
+                  "expected": 100.0,
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q1",
                   "tolerance": 0.0
                 },
                 {
                   "actual": 100.0,
-                  "expected": 400.0,
+                  "expected": 100.0,
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q2",
                   "tolerance": 0.0
                 },
                 {
                   "actual": 100.0,
-                  "expected": 400.0,
+                  "expected": 100.0,
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q3",
                   "tolerance": 0.0
                 },
                 {
                   "actual": 100.0,
-                  "expected": 400.0,
+                  "expected": 100.0,
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q4",
                   "tolerance": 0.0
                 },
                 {
                   "actual": 120.0,
-                  "expected": 320.0,
+                  "expected": 120.0,
                   "identity": "balance_sheet_articulation",
                   "period": "2026Q1",
                   "tolerance": 0.0
                 }
               ],
               "evaluated": 5,
-              "findings": [
-                {
-                  "check_id": "balance_sheet_articulation",
-                  "comparison": {
-                    "actual": 100.0,
-                    "expected": 400.0,
-                    "identity": "balance_sheet_articulation",
-                    "period": "2025Q1",
-                    "tolerance": 0.0
-                  },
-                  "materiality": {
-                    "absolute": 300.0,
-                    "reference_label": "total_assets",
-                    "reference_value": 100.0,
-                    "relative_pct": 300.0
-                  },
-                  "message": "Balance sheet does not articulate in 2025Q1: assets (100.00) != liabilities (300.00) + equity (100.00), imbalance = -300.00",
-                  "nodes": [
-                    "ebitda",
-                    "net_debt",
-                    "ebitda"
-                  ],
-                  "period": "2025Q1",
-                  "severity": "error"
-                },
-                {
-                  "check_id": "balance_sheet_articulation",
-                  "comparison": {
-                    "actual": 100.0,
-                    "expected": 400.0,
-                    "identity": "balance_sheet_articulation",
-                    "period": "2025Q2",
-                    "tolerance": 0.0
-                  },
-                  "materiality": {
-                    "absolute": 300.0,
-                    "reference_label": "total_assets",
-                    "reference_value": 100.0,
-                    "relative_pct": 300.0
-                  },
-                  "message": "Balance sheet does not articulate in 2025Q2: assets (100.00) != liabilities (300.00) + equity (100.00), imbalance = -300.00",
-                  "nodes": [
-                    "ebitda",
-                    "net_debt",
-                    "ebitda"
-                  ],
-                  "period": "2025Q2",
-                  "severity": "error"
-                },
-                {
-                  "check_id": "balance_sheet_articulation",
-                  "comparison": {
-                    "actual": 100.0,
-                    "expected": 400.0,
-                    "identity": "balance_sheet_articulation",
-                    "period": "2025Q3",
-                    "tolerance": 0.0
-                  },
-                  "materiality": {
-                    "absolute": 300.0,
-                    "reference_label": "total_assets",
-                    "reference_value": 100.0,
-                    "relative_pct": 300.0
-                  },
-                  "message": "Balance sheet does not articulate in 2025Q3: assets (100.00) != liabilities (300.00) + equity (100.00), imbalance = -300.00",
-                  "nodes": [
-                    "ebitda",
-                    "net_debt",
-                    "ebitda"
-                  ],
-                  "period": "2025Q3",
-                  "severity": "error"
-                },
-                {
-                  "check_id": "balance_sheet_articulation",
-                  "comparison": {
-                    "actual": 100.0,
-                    "expected": 400.0,
-                    "identity": "balance_sheet_articulation",
-                    "period": "2025Q4",
-                    "tolerance": 0.0
-                  },
-                  "materiality": {
-                    "absolute": 300.0,
-                    "reference_label": "total_assets",
-                    "reference_value": 100.0,
-                    "relative_pct": 300.0
-                  },
-                  "message": "Balance sheet does not articulate in 2025Q4: assets (100.00) != liabilities (300.00) + equity (100.00), imbalance = -300.00",
-                  "nodes": [
-                    "ebitda",
-                    "net_debt",
-                    "ebitda"
-                  ],
-                  "period": "2025Q4",
-                  "severity": "error"
-                },
-                {
-                  "check_id": "balance_sheet_articulation",
-                  "comparison": {
-                    "actual": 120.0,
-                    "expected": 320.0,
-                    "identity": "balance_sheet_articulation",
-                    "period": "2026Q1",
-                    "tolerance": 0.0
-                  },
-                  "materiality": {
-                    "absolute": 200.0,
-                    "reference_label": "total_assets",
-                    "reference_value": 120.0,
-                    "relative_pct": 166.66666666666669
-                  },
-                  "message": "Balance sheet does not articulate in 2026Q1: assets (120.00) != liabilities (200.00) + equity (120.00), imbalance = -200.00",
-                  "nodes": [
-                    "ebitda",
-                    "net_debt",
-                    "ebitda"
-                  ],
-                  "period": "2026Q1",
-                  "severity": "error"
-                }
-              ],
-              "outcome": "fail"
-            },
-            {
-              "category": "accounting_identity",
-              "check_id": "retained_earnings_reconciliation",
-              "check_name": "Retained Earnings Reconciliation",
-              "comparisons": [
-                {
-                  "actual": 100.0,
-                  "expected": 200.0,
-                  "identity": "retained_earnings_roll_forward",
-                  "period": "2025Q2",
-                  "tolerance": 0.0
-                },
-                {
-                  "actual": 100.0,
-                  "expected": 200.0,
-                  "identity": "retained_earnings_roll_forward",
-                  "period": "2025Q3",
-                  "tolerance": 0.0
-                },
-                {
-                  "actual": 100.0,
-                  "expected": 200.0,
-                  "identity": "retained_earnings_roll_forward",
-                  "period": "2025Q4",
-                  "tolerance": 0.0
-                },
-                {
-                  "actual": 120.0,
-                  "expected": 220.0,
-                  "identity": "retained_earnings_roll_forward",
-                  "period": "2026Q1",
-                  "tolerance": 0.0
-                }
-              ],
-              "evaluated": 4,
-              "findings": [
-                {
-                  "check_id": "retained_earnings_reconciliation",
-                  "comparison": {
-                    "actual": 100.0,
-                    "expected": 200.0,
-                    "identity": "retained_earnings_roll_forward",
-                    "period": "2025Q2",
-                    "tolerance": 0.0
-                  },
-                  "materiality": {
-                    "absolute": 100.0,
-                    "reference_label": "prior_retained_earnings",
-                    "reference_value": 100.0,
-                    "relative_pct": 100.0
-                  },
-                  "message": "Retained earnings do not reconcile in 2025Q2: actual RE (100.00) != expected (200.00), difference = -100.00",
-                  "nodes": [
-                    "ebitda",
-                    "ebitda"
-                  ],
-                  "period": "2025Q2",
-                  "severity": "error"
-                },
-                {
-                  "check_id": "retained_earnings_reconciliation",
-                  "comparison": {
-                    "actual": 100.0,
-                    "expected": 200.0,
-                    "identity": "retained_earnings_roll_forward",
-                    "period": "2025Q3",
-                    "tolerance": 0.0
-                  },
-                  "materiality": {
-                    "absolute": 100.0,
-                    "reference_label": "prior_retained_earnings",
-                    "reference_value": 100.0,
-                    "relative_pct": 100.0
-                  },
-                  "message": "Retained earnings do not reconcile in 2025Q3: actual RE (100.00) != expected (200.00), difference = -100.00",
-                  "nodes": [
-                    "ebitda",
-                    "ebitda"
-                  ],
-                  "period": "2025Q3",
-                  "severity": "error"
-                },
-                {
-                  "check_id": "retained_earnings_reconciliation",
-                  "comparison": {
-                    "actual": 100.0,
-                    "expected": 200.0,
-                    "identity": "retained_earnings_roll_forward",
-                    "period": "2025Q4",
-                    "tolerance": 0.0
-                  },
-                  "materiality": {
-                    "absolute": 100.0,
-                    "reference_label": "prior_retained_earnings",
-                    "reference_value": 100.0,
-                    "relative_pct": 100.0
-                  },
-                  "message": "Retained earnings do not reconcile in 2025Q4: actual RE (100.00) != expected (200.00), difference = -100.00",
-                  "nodes": [
-                    "ebitda",
-                    "ebitda"
-                  ],
-                  "period": "2025Q4",
-                  "severity": "error"
-                },
-                {
-                  "check_id": "retained_earnings_reconciliation",
-                  "comparison": {
-                    "actual": 120.0,
-                    "expected": 220.0,
-                    "identity": "retained_earnings_roll_forward",
-                    "period": "2026Q1",
-                    "tolerance": 0.0
-                  },
-                  "materiality": {
-                    "absolute": 100.0,
-                    "reference_label": "prior_retained_earnings",
-                    "reference_value": 100.0,
-                    "relative_pct": 100.0
-                  },
-                  "message": "Retained earnings do not reconcile in 2026Q1: actual RE (120.00) != expected (220.00), difference = -100.00",
-                  "nodes": [
-                    "ebitda",
-                    "ebitda"
-                  ],
-                  "period": "2026Q1",
-                  "severity": "error"
-                }
-              ],
-              "outcome": "fail"
+              "findings": [],
+              "outcome": "pass"
             },
             {
               "category": "internal_consistency",
@@ -1321,12 +1069,12 @@
             }
           ],
           "summary": {
-            "errors": 9,
-            "failed": 2,
+            "errors": 0,
+            "failed": 0,
             "incomplete": 0,
             "infos": 0,
-            "passed": 8,
-            "total_checks": 10,
+            "passed": 9,
+            "total_checks": 9,
             "unevaluated": 0,
             "warnings": 5
           }
