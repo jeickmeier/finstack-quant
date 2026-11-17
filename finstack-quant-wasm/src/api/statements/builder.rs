@@ -480,9 +480,11 @@ impl JsModelBuilder {
     /// `ModelBuilder::with_builtin_metrics`). A failed call leaves the
     /// builder usable. The catalogue reads many input nodes and `build`
     /// resolves every formula reference, so the model must define all of
-    /// them; use `addMetricFromRegistry` to add a subset.
+    /// them; use `addMetricFromRegistry` to add a subset. The import is
+    /// atomic, and a node that already holds a metric's unchanged template
+    /// is shared.
     ///
-    /// @throws Error with kind `validation` if the built-in catalog cannot be loaded or the builder was consumed.
+    /// @throws Error with kind `validation` if the built-in catalog cannot be loaded, the builder was consumed, or a node with a built-in metric's name is already defined differently (import first, then `replaceNode`).
     #[wasm_bindgen(js_name = withBuiltinMetrics)]
     pub fn with_builtin_metrics(&mut self) -> Result<(), JsValue> {
         self.builder_mut()?
@@ -491,7 +493,12 @@ impl JsModelBuilder {
         Ok(())
     }
 
-    /// Add one metric and its dependencies from a registry.
+    /// Add one metric and its dependency closure from a registry.
+    ///
+    /// The import is atomic, with dependencies first. A node that already
+    /// holds the same unchanged template is shared; a node of that name with
+    /// another definition is a conflict. Override a metric with
+    /// `replaceNode` after importing it.
     ///
     /// Twin of Python `ModelBuilder.add_metric_from_registry` (Rust
     /// `ModelBuilder::add_metric_from_registry`). A failed call leaves the

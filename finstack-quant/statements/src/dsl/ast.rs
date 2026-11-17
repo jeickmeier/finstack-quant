@@ -188,6 +188,45 @@ impl StmtExpr {
         Self::Literal(value)
     }
 
+    /// The same expression with every node reference renamed by `rename`.
+    ///
+    /// Function names, literals and capital-structure references are left
+    /// untouched: only [`StmtExpr::NodeRef`] names pass through `rename`.
+    ///
+    /// # Arguments
+    ///
+    /// * `rename` - Maps a referenced node identifier to the identifier the
+    ///   returned expression should reference instead.
+    #[must_use]
+    pub fn map_node_refs(&self, rename: &mut impl FnMut(&str) -> String) -> Self {
+        match self {
+            Self::Literal(_) | Self::CsRef { .. } => self.clone(),
+            Self::NodeRef(name) => Self::NodeRef(NodeId::new(rename(name.as_str()))),
+            Self::BinOp { op, left, right } => Self::BinOp {
+                op: *op,
+                left: Box::new(left.map_node_refs(rename)),
+                right: Box::new(right.map_node_refs(rename)),
+            },
+            Self::UnaryOp { op, operand } => Self::UnaryOp {
+                op: *op,
+                operand: Box::new(operand.map_node_refs(rename)),
+            },
+            Self::Call { func, args } => Self::Call {
+                func: func.clone(),
+                args: args.iter().map(|arg| arg.map_node_refs(rename)).collect(),
+            },
+            Self::IfThenElse {
+                condition,
+                then_expr,
+                else_expr,
+            } => Self::IfThenElse {
+                condition: Box::new(condition.map_node_refs(rename)),
+                then_expr: Box::new(then_expr.map_node_refs(rename)),
+                else_expr: Box::new(else_expr.map_node_refs(rename)),
+            },
+        }
+    }
+
     /// Create a node reference.
     pub fn node_ref(name: impl Into<NodeId>) -> Self {
         Self::NodeRef(name.into())

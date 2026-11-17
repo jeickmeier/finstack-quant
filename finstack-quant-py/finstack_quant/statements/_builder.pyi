@@ -405,22 +405,32 @@ class ModelBuilder:
 
         The catalogue reads many input nodes and :meth:`build` resolves every
         formula reference, so the model must define all of them. Use
-        :meth:`add_metric_from_registry` to add a subset.
+        :meth:`add_metric_from_registry` to add a subset. The import is
+        atomic. A node that already holds a metric's unchanged template is
+        shared.
 
         Returns
         -------
         ModelBuilder
             This builder, for chaining.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If a node with a built-in metric's name is already defined
+            differently. Import the metric first and change it with
+            :meth:`replace_node`.
         """
         ...
 
     def add_metric_from_registry(self, qualified_id: str, registry: Registry) -> ModelBuilder:
         """
-        Add one metric and its dependencies from a metric registry.
+        Add one metric and its dependency closure from a metric registry.
+
+        The import is atomic, with dependencies first. A node that already
+        holds the same unchanged template is shared; a node of that name with
+        another definition is a conflict. Override a metric with
+        :meth:`replace_node` after importing it.
 
         Parameters
         ----------
@@ -437,9 +447,10 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If periods have not been configured or the builder has already been consumed.
+            If the builder has already been consumed, or a node of the
+            metric's or a dependency's name is already defined differently.
         KeyError
-            If qualified_id or one of its dependencies cannot be resolved in registry.
+            If qualified_id is not in registry.
 
         """
         ...

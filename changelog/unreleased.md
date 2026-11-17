@@ -1033,3 +1033,28 @@ exponentially weighted functions read the typed value of each calendar slot.
   `ewm_mean` keep the currency.
 - **EWM** takes its correction toggle as a Boolean, `0` or `1`; any other
   value is an error.
+
+### Statements: metric registration pins bindings; imports are atomic and reject conflicts
+
+STATEMENTS-CONTRACTS-006.
+
+- **Conflicts are rejected.** `add_metric_from_registry` and
+  `with_builtin_metrics` fail when a node with a metric's name (or a
+  dependency's) is already defined differently, and import nothing. A
+  pre-existing user node used to win silently. To override a metric, import
+  it and then call `replace_node`. A node that holds the same unchanged
+  template is shared.
+- **Bindings are pinned at registration.** An unqualified reference binds in
+  the metric's own namespace, an exact qualified reference (`other.metric`)
+  in any namespace, and anything else is a model input. A metric registered
+  later does not capture an earlier metric's reference.
+  `Registry.get_dependencies` now returns the closure across namespaces and
+  through historical references.
+- **Registration is atomic** for a document and for the whole built-in
+  catalogue: `load_builtins` adds nothing if any built-in identifier is
+  already registered.
+- **Names.** Namespaces follow the formula identifier grammar and `cs` is
+  reserved. A metric may share its name with a function (`mean`): references
+  are qualified in the parsed formula, not in its text.
+- `StoredMetric` gains `qualified_formula`, `dependencies` and
+  `requirements`.

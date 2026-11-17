@@ -454,18 +454,51 @@ impl ModelBuilder {
         })
     }
 
-    fn insert_metric_node(
-        &mut self,
-        qualified_id: &str,
-        stored_metric: &StoredMetric,
-        formula: String,
-    ) {
-        let key = NodeId::new(qualified_id);
-        let mut node = NodeSpec::new(key.clone(), NodeType::Calculated)
+    /// The model node a registered metric imports as: its pinned, qualified
+    /// formula under its qualified identifier.
+    fn metric_node(qualified_id: &str, stored_metric: &StoredMetric) -> NodeSpec {
+        let mut node = NodeSpec::new(NodeId::new(qualified_id), NodeType::Calculated)
             .with_name(stored_metric.definition.name.clone())
-            .with_formula(formula);
+            .with_formula(stored_metric.qualified_formula.clone());
         node.rollup = stored_metric.definition.rollup;
-        self.nodes.insert(key, node);
+        node
+    }
+
+    /// Import registered metrics atomically.
+    ///
+    /// A node that already holds the metric's unchanged template is shared. A
+    /// node with the same identifier and a different definition is a conflict:
+    /// nothing is imported.
+    fn import_metrics<'a>(
+        &mut self,
+        registry: &crate::registry::Registry,
+        qualified_ids: impl IntoIterator<Item = &'a str>,
+    ) -> Result<()> {
+        let mut pending = Vec::new();
+        for qualified_id in qualified_ids {
+            let node = Self::metric_node(qualified_id, registry.get(qualified_id)?);
+            // Units resolved by an earlier build are not part of the template.
+            let unchanged = |existing: &NodeSpec| {
+                let mut template = node.clone();
+                template.value_type = existing.value_type;
+                *existing == template
+            };
+            match self.nodes.get(qualified_id) {
+                Some(existing) if unchanged(existing) => {}
+                Some(_) => {
+                    return Err(Error::build(format!(
+                        "Node '{qualified_id}' is already defined differently from the registry \
+                         metric of that name; import the metric first and change it with \
+                         replace_node, or rename the node"
+                    )));
+                }
+                None => pending.push(node),
+            }
+        }
+        for node in pending {
+            self.nodes.insert(node.node_id.clone(), node);
+        }
+        Ok(())
     }
 
     /// Add a value node with explicit period values.
@@ -1016,30 +1049,14 @@ impl ModelBuilder {
     ///
     /// # Errors
     ///
-    /// Returns registry or formula errors if the built-in catalog cannot be
-    /// loaded, a built-in metric has an unresolved dependency, or dependency
-    /// formulas cannot be prepared for this builder. Existing nodes are not
-    /// overwritten when their identifiers match a built-in metric or one of
-    /// its dependencies.
+    /// Returns a registry error if the built-in catalog cannot be loaded, and
+    /// a build error if a node with a built-in metric's name is already
+    /// defined differently. A failed import leaves the builder unchanged; a
+    /// node holding the same unchanged template is shared.
     pub fn with_builtin_metrics(&mut self) -> Result<&mut Self> {
         let registry = crate::registry::Registry::with_builtins()?;
-        self.add_all_metrics_from_registry_in_place(&registry);
+        self.import_metrics(&registry, registry.all_metrics().map(|(id, _)| id))?;
         Ok(self)
-    }
-
-    /// Add every metric from a loaded registry to the model, qualifying
-    /// same-namespace references in the generated formulas.
-    fn add_all_metrics_from_registry_in_place(&mut self, registry: &crate::registry::Registry) {
-        let mut namespace_cache = IndexMap::new();
-        for (qualified_id, stored_metric) in registry.all_metrics() {
-            // A user node with a built-in metric's id wins, as documented.
-            if self.nodes.contains_key(qualified_id) {
-                continue;
-            }
-            let formula =
-                Self::qualified_metric_formula(registry, stored_metric, &mut namespace_cache);
-            self.insert_metric_node(qualified_id, stored_metric, formula);
-        }
     }
 
     /// Add a specific metric from a registry.
@@ -1073,77 +1090,36 @@ impl ModelBuilder {
     /// # }
     /// ```
     ///
-    /// Dependencies are added before the requested metric. References to
-    /// metrics in the same namespace are qualified in the generated formulas,
-    /// preventing an unqualified dependency from accidentally resolving to a
-    /// caller-defined node with the same short name. Nodes already present in
-    /// the builder take precedence and are left unchanged.
+    /// The metric and its dependency closure are imported atomically, with
+    /// dependencies first. Each node carries the formula pinned at
+    /// registration, in which references to other metrics are qualified, so
+    /// an unqualified dependency cannot resolve to a caller-defined node with
+    /// the same short name. A node that already holds the same unchanged
+    /// template is shared. A node of that name with another definition is a
+    /// conflict: override a metric with [`replace_node`](Self::replace_node)
+    /// after importing it.
     ///
     /// # Errors
     ///
-    /// Returns a registry error if `qualified_id` is not in
-    /// `namespace.metric_id` form, is unknown to `registry`, or any dependency
-    /// is unavailable. It also propagates errors while obtaining the
-    /// dependency order. A failed lookup leaves the builder unchanged.
+    /// Returns a registry error if `qualified_id` is unknown to `registry`,
+    /// and a build error if a node of the metric's or a dependency's name is
+    /// already defined differently. A failed import leaves the builder
+    /// unchanged.
     /// [`build`](Self::build) performs the final model-level validation.
     pub fn add_metric_from_registry(
         &mut self,
         qualified_id: &str,
         registry: &crate::registry::Registry,
     ) -> Result<&mut Self> {
-        let dependencies = registry.get_dependencies(qualified_id)?;
-
-        let mut namespace_cache = IndexMap::new();
-        let mut pending = Vec::new();
-        for id in dependencies
-            .into_iter()
-            .chain(std::iter::once(qualified_id.to_string()))
-        {
-            if !self.nodes.contains_key(id.as_str()) {
-                let metric = registry.get(&id)?;
-                let formula =
-                    Self::qualified_metric_formula(registry, metric, &mut namespace_cache);
-                pending.push((id, metric, formula));
-            }
-        }
-
-        for (id, metric, formula) in pending {
-            self.insert_metric_node(&id, metric, formula);
-        }
+        let closure = registry.get_dependencies(qualified_id)?;
+        self.import_metrics(
+            registry,
+            closure
+                .iter()
+                .map(String::as_str)
+                .chain(std::iter::once(qualified_id)),
+        )?;
         Ok(self)
-    }
-
-    /// A registry metric's formula with references to the other metrics of
-    /// its own namespace qualified.
-    ///
-    /// The namespace is the one the metric was registered under, not a prefix
-    /// of its qualified id: a namespace may itself contain dots (`fin.adj`).
-    fn qualified_metric_formula(
-        registry: &crate::registry::Registry,
-        metric: &StoredMetric,
-        namespace_cache: &mut IndexMap<String, IndexSet<String>>,
-    ) -> String {
-        let namespace = metric.namespace.as_str();
-        let metrics_in_namespace = namespace_cache
-            .entry(namespace.to_string())
-            .or_insert_with(|| Self::metric_ids_in_namespace(registry, namespace));
-        crate::utils::formula::qualify_identifiers(
-            &metric.definition.formula,
-            metrics_in_namespace,
-            namespace,
-        )
-    }
-
-    /// Unqualified ids of the metrics registered under `namespace`.
-    fn metric_ids_in_namespace(
-        registry: &crate::registry::Registry,
-        namespace: &str,
-    ) -> IndexSet<String> {
-        let prefix = format!("{namespace}.");
-        registry
-            .namespace(namespace)
-            .map(|(id, _)| id.strip_prefix(&prefix).unwrap_or(id).to_string())
-            .collect()
     }
 
     /// Build and validate the final financial-model specification.
@@ -1437,25 +1413,66 @@ impl MixedNodeBuilder {
 mod tests {
     use super::*;
 
+    /// STATEMENTS-CONTRACTS-006 #4: an import shares an unchanged template,
+    /// rejects a conflicting definition without importing anything, and an
+    /// intentional override is an explicit edit after the import.
     #[test]
-    fn builtin_metrics_do_not_overwrite_an_existing_node() {
+    fn metric_imports_share_templates_and_reject_conflicts() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let builder = {
-            let mut model_builder_1 = ModelBuilder::new("user-roe");
-            model_builder_1
-                .periods("2025Q1..Q1", None)
-                .expect("valid periods");
-            model_builder_1.value("fin.roe", &[(period, AmountOrScalar::scalar(0.12))]);
-            model_builder_1
-                .with_builtin_metrics()
-                .expect("built-in catalog loads");
-            model_builder_1
+        let registry = crate::registry::Registry::with_builtins().expect("catalogue");
+        let base = || {
+            let mut builder = ModelBuilder::new("imports");
+            builder.periods("2025Q1..Q1", None).expect("valid periods");
+            builder
         };
 
-        let roe = builder.nodes().get("fin.roe").expect("node kept");
-        assert_eq!(roe.node_type, NodeType::Value);
-        assert!(roe.formula_text.is_none());
-        assert!(builder.nodes().contains_key("fin.roa"));
+        // A node of the same name with another definition is a conflict, and
+        // the import is atomic: its dependency is not added either.
+        let mut conflicting = base();
+        conflicting.value("fin.gross_margin", &[(period, AmountOrScalar::scalar(0.4))]);
+        let error = conflicting
+            .add_metric_from_registry("fin.gross_margin", &registry)
+            .map(|_| ())
+            .expect_err("conflict");
+        assert!(
+            error.to_string().contains("already defined differently"),
+            "{error}"
+        );
+        assert!(!conflicting.nodes().contains_key("fin.gross_profit"));
+        assert!(conflicting.with_builtin_metrics().map(|_| ()).is_err());
+        assert_eq!(conflicting.nodes().len(), 1);
+
+        // Two imports share the unchanged template of a common dependency.
+        let mut shared = base();
+        shared
+            .add_metric_from_registry("fin.gross_margin", &registry)
+            .expect("first import");
+        let template = shared.nodes()["fin.gross_profit"].clone();
+        shared
+            .add_metric_from_registry("fin.gross_profit", &registry)
+            .expect("second import shares the node");
+        shared
+            .with_builtin_metrics()
+            .expect("catalogue shares both");
+        assert_eq!(shared.nodes()["fin.gross_profit"], template);
+
+        // An intentional override is a named edit after the import.
+        let mut overridden = base();
+        overridden
+            .add_metric_from_registry("fin.gross_profit", &registry)
+            .expect("import");
+        overridden
+            .replace_node(
+                NodeSpec::new("fin.gross_profit", NodeType::Calculated)
+                    .with_formula("revenue - cogs - freight"),
+            )
+            .expect("explicit override");
+        assert_eq!(
+            overridden.nodes()["fin.gross_profit"]
+                .formula_text
+                .as_deref(),
+            Some("revenue - cogs - freight")
+        );
     }
 
     /// STATEMENTS-CONTRACTS-002 #1: a repeated node id, a repeated period

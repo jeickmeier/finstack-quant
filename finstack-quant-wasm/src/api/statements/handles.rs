@@ -232,7 +232,8 @@ impl JsRegistry {
             .map_err(to_js_err)
     }
 
-    /// Load the built-in `fin.*` metrics into this registry.
+    /// Load the built-in `fin.*` metrics into this registry, atomically: if
+    /// any built-in identifier is already registered, nothing is added.
     ///
     /// Twin of Python `Registry.load_builtins` (Rust `Registry::load_builtins`).
     ///
@@ -307,7 +308,12 @@ impl JsRegistry {
         to_js_value(&stored.definition)
     }
 
-    /// Metrics one metric depends on, transitively.
+    /// The dependency closure of one metric, in import order.
+    ///
+    /// The closure follows the references pinned when each metric was
+    /// registered: unqualified references in the metric's own namespace,
+    /// exact qualified references in any namespace, and historical
+    /// references such as `lag`.
     ///
     /// Twin of Python `Registry.get_dependencies` (Rust
     /// `Registry::get_dependencies`).

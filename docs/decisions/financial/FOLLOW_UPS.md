@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **652 review items across 33 source scopes with open items**
+This backlog consolidates **651 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (505): implementation and verification work against an
+- **Reconciliation** (504): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (38): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -68,7 +68,7 @@ product consequences remain in their product scope.
 | [Calibration: Hull–White and LMM](#calibration-hullwhite-and-lmm) | 18 |
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
 | [Statements: capital structure](#statements-capital-structure) | 14 |
-| [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 14 |
+| [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 13 |
 | [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 13 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
@@ -1053,8 +1053,6 @@ product consequences remain in their product scope.
 - **Reconciliation — Typed forecasts and staged validation.** Implement the common typed forecast specification, explicit method controls, complete static validation and runtime checks for the eligible horizon and history. Qualify build/load, inactive configurations, units, peer compatibility and exact stochastic seed round-trips in Rust, Python, WASM and JSON. [Accepted STATEMENTS-CONTRACTS-003](statements-contracts/03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging).
 
 - **Reconciliation — Capital reference units in Statements formulas.** Resolve `cs` references through the accepted instrument-native, native-currency total and consolidated reporting scopes, and delete the unresolved unit a formula may still carry when a capital reference has no resolved currency; a required missing quote makes consolidated reporting unavailable. Qualify missing required FX across hosts. The unit rules, monetary-variance rejection, resolution of every other unit before execution and exact currency-tagged monetary results are reconciled. [Accepted STATEMENTS-CONTRACTS-005](statements-contracts/05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency) · [Capital reporting and FX](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
-
-- **Reconciliation — Metric registration, pinned dependencies and atomic model import.** Enforce atomic catalogue registration, pinned local and qualified bindings, AST-only qualification, deterministic historical closure and checked same-period dependencies. Qualify shared templates, conflicting imports and explicit overrides. The builder now uses stored namespaces and has a dotted-namespace regression. Its textual rewriter can still collide with function names. [Accepted STATEMENTS-CONTRACTS-006](statements-contracts/06-registry-and-dependencies.md#accepted-decision-for-metric-registration-and-dependencies).
 
 - **Reconciliation — Bounded Statements wire admission, schemas and errors.** Implement one loading path with exact version and numeric admission, shared limits and runnable validation before canonical content hashing. Retain separate evaluation provenance, validate canonical instrument eligibility and reconcile structured errors across hosts. Correct the empty schema fixture and ordering description, and independently qualify Rust, Python and WASM parity, boundaries and replay. [Accepted STATEMENTS-CONTRACTS-016](statements-contracts/16-wire-schema-and-errors.md#accepted-decision-for-statements-wire-admission-schemas-and-errors).
 

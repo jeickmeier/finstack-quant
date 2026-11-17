@@ -320,7 +320,7 @@ reporting scopes and exact monetary results remain pending.
 The Statements metric registry and model import contract was accepted on
 2026-11-15. It covers atomic registration, pinned formula bindings,
 historical dependencies, same-period cycle checks and atomic model import.
-Implementation and independent qualification remain pending.
+It is implemented and qualified across Rust, Python and WASM.
 [STATEMENTS-CONTRACTS-006](statements-contracts/06-registry-and-dependencies.md#accepted-decision-for-metric-registration-and-dependencies).
 
 The Statements bundled earnings and margin contract was accepted on
