@@ -44,6 +44,12 @@ pub struct EvaluationContext {
     /// Uses `Option<f64>` to distinguish between "not yet evaluated" (`None`) and "evaluated to NaN" (`Some(NaN)`).
     pub(crate) current_values: Vec<Option<f64>>,
 
+    /// State of each current-period cell, in the same column layout as
+    /// `current_values`. `None` for values set outside the evaluator's
+    /// precedence loop. This is the authoritative state; `current_values` is
+    /// its numeric view for the formula kernels.
+    pub(crate) current_cells: Vec<Option<super::cell::Cell>>,
+
     /// Evaluation layer that produced each current-period value, in the same
     /// column layout as `current_values`. `None` for values set outside the
     /// evaluator's precedence loop.
@@ -146,6 +152,7 @@ impl EvaluationContext {
             history,
             historical_capital_structure_cashflows,
             current_values: vec![None; num_nodes],
+            current_cells: vec![None; num_nodes],
             current_sources: vec![None; num_nodes],
             capital_structure_cashflows: None,
             warnings: Vec::new(),
@@ -341,6 +348,22 @@ impl EvaluationContext {
     /// Record which evaluation layer produced the current-period value of
     /// `node_id`. Unknown nodes are ignored: `set_value` has already rejected
     /// them by the time the evaluator records a source.
+    /// Store an evaluated cell and its numeric view for the current period.
+    ///
+    /// A cell without a value is stored with a `NaN` numeric view, which the
+    /// formula kernels read as "no value". No warning is recorded: the cell's
+    /// state already says why it has none.
+    pub(crate) fn set_cell(&mut self, node_id: &str, cell: super::cell::Cell) -> Result<()> {
+        let idx = *self
+            .node_to_column
+            .get(node_id)
+            .ok_or_else(|| Error::node_not_found(node_id))?;
+        self.current_values[idx] = Some(cell.numeric().unwrap_or(f64::NAN));
+        self.current_cells[idx] = Some(cell);
+        self.invalidate_sorted_cache(node_id);
+        Ok(())
+    }
+
     pub(crate) fn set_source(&mut self, node_id: &str, source: super::CellSource) {
         if let Some(idx) = self.node_to_column.get(node_id) {
             self.current_sources[*idx] = Some(source);

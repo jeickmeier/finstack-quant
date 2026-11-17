@@ -320,11 +320,22 @@ pub fn goal_seek(model: &FinancialModelSpec, spec: &GoalSeekSpec) -> Result<Goal
         })
         .unwrap_or(1.0);
 
+    // The solver writes the driver cell on every iteration. Give it an
+    // observation slot before preparing, so each iteration is a payload
+    // change in an existing slot and can reuse the plan.
+    let mut working = model.clone();
+    if let Some(node) = working.nodes.get_mut(driver_node) {
+        let amount = amount_for_node(node, initial_guess)?;
+        node.values
+            .get_or_insert_with(Default::default)
+            .entry(driver_period)
+            .or_insert(amount);
+    }
     let mut evaluator = Evaluator::new();
-    let Ok(prepared) = evaluator.prepare(model) else {
-        return Err(Error::eval("Goal seek: failed to prepare evaluator"));
-    };
-    let eval_cell = RefCell::new((evaluator, model.clone()));
+    let prepared = evaluator
+        .prepare(&working)
+        .map_err(|error| Error::eval(format!("Goal seek: failed to prepare evaluator: {error}")))?;
+    let eval_cell = RefCell::new((evaluator, working));
 
     // Counts every model evaluation, reported as `GoalSeekResult::evaluations`.
     let evaluations = Cell::new(0_usize);

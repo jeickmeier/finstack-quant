@@ -689,7 +689,7 @@ pub struct Explanation {
     /// Evaluation layer that produced `final_value` under the
     /// `Value > Forecast > Formula` precedence: `value` (the explicit value
     /// stored on the node), `forecast`, `formula`, `where_masked` (the
-    /// node's `where` clause zeroed the cell) or `missing` (no observation,
+    /// node's `where` clause masked the cell, which then has no value) or `missing` (no observation,
     /// forecast or formula; the value is NaN).
     ///
     /// Read from [`StatementResult::node_sources`]; `None` when the results

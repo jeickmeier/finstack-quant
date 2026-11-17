@@ -904,3 +904,25 @@ series (`var`, `rolling_var`, `ewm_var`) is rejected, where it used to leave
 the node's units unknown; use the standard deviation or a same-currency ratio.
 A formula that reads a `cs` reference with no resolved currency is the one
 case that may still carry unresolved units.
+
+### Statements: cells have distinct states; a masked cell is not zero
+
+STATEMENTS-EVALUATION-001. The evaluator tracks each cell as a value, a
+missing observation, a masked cell or an unavailable cell with a reason
+(`UnavailableReason`). A false `where` mask now leaves the cell without a
+value (`NaN` in the numeric view, source `where_masked`) where it was `0.0`,
+so downstream formulas no longer read a masked cell as zero. A mask that has
+no value leaves the cell unavailable. An observation hidden by the observation
+cutoff with no forecast or formula is unavailable instead of an evaluation
+error. A monetary formula or forecast result that cannot be represented as
+`Money` is an evaluation error naming the node and period; it was a warning.
+
+`lag(x, n)` / `shift(x, n)` drop the same-period dependency on `x` only for a
+positive integer literal `n`; a zero, non-integer or dynamic offset keeps it,
+which can surface a same-period cycle that was previously hidden.
+
+`evaluate_prepared` reuses a plan only for payload changes in existing
+observation slots. Adding or removing an observation slot, or changing an
+availability date, mask, forecast, formula, timeline or the capital structure,
+needs a new `prepare`. Sensitivity and goal seek re-prepare when a shock adds
+a slot.

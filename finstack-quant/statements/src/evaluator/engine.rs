@@ -1,20 +1,20 @@
 //! Main evaluator implementation.
 
 use crate::error::{Error, Result};
+use crate::evaluator::cell::{Cell, UnavailableReason};
 use crate::evaluator::context::EvaluationContext;
 use crate::evaluator::dag::{DependencyGraph, evaluate_order};
 use crate::evaluator::forecast_eval;
 use crate::evaluator::formula::evaluate_formula;
-use crate::evaluator::formula_helpers::is_truthy;
 use crate::evaluator::monte_carlo::{
     MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults, PathResult,
 };
-use crate::evaluator::precedence::{HiddenObservation, NodeValueSource, resolve_node_value};
+use crate::evaluator::precedence::{NodeValueSource, resolve_node_value};
 use crate::evaluator::results::{CellSource, EvalStats, EvalWarning, StatementResult};
 use crate::evaluator::{
     PeriodHistory, capital_structure_runtime, capital_structure_runtime::dependent_closure,
 };
-use crate::types::{FinancialModelSpec, NodeId, NodeValueType};
+use crate::types::{AmountOrScalar, FinancialModelSpec, NodeId, NodeValueType};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::expr::Expr;
 use indexmap::IndexMap;
@@ -92,6 +92,12 @@ fn formula_fingerprint(model: &FinancialModelSpec) -> u64 {
         spec.node_type.hash(&mut hasher);
         spec.formula_text.hash(&mut hasher);
         spec.where_text.hash(&mut hasher);
+        // The set of observation slots is structure; only the payload in an
+        // existing slot may differ between prepare and evaluate.
+        for period in spec.values.iter().flat_map(|values| values.keys()) {
+            period.hash(&mut hasher);
+        }
+        spec.values.is_some().hash(&mut hasher);
         for (period, date) in &spec.availability_dates {
             period.hash(&mut hasher);
             date.hash(&mut hasher);
@@ -112,6 +118,12 @@ fn formula_fingerprint(model: &FinancialModelSpec) -> u64 {
             }
         }
     }
+    model.periods.calendar.hash(&mut hasher);
+    // The capital structure has no cheap structural hash; its canonical JSON
+    // covers instruments, waterfall, reporting currency and FX policy.
+    serde_json::to_string(&model.capital_structure)
+        .unwrap_or_default()
+        .hash(&mut hasher);
     hasher.finish()
 }
 
@@ -184,6 +196,10 @@ pub struct Evaluator {
     /// Cached compiled expressions (Arc-shared across Monte Carlo path clones)
     compiled_cache: std::sync::Arc<IndexMap<NodeId, Expr>>,
 
+    /// Resolved units of the prepared model's nodes (Arc-shared like the
+    /// compiled expressions); they type each computed cell.
+    node_value_types: std::sync::Arc<IndexMap<NodeId, NodeValueType>>,
+
     /// Cached forecast results: node_id → (period_id → value)
     forecast_cache: IndexMap<NodeId, IndexMap<PeriodId, f64>>,
 
@@ -202,6 +218,7 @@ impl Evaluator {
     pub fn new() -> Self {
         Self {
             compiled_cache: std::sync::Arc::new(IndexMap::new()),
+            node_value_types: std::sync::Arc::new(IndexMap::new()),
             forecast_cache: IndexMap::new(),
             check_suite: None,
             visibility_cutoff: None,
@@ -605,17 +622,19 @@ impl Evaluator {
                 .map(|(i, node_id)| (node_id.clone(), i))
                 .collect(),
         );
+        let node_value_types: IndexMap<NodeId, NodeValueType> = validated
+            .nodes
+            .iter()
+            .map(|(id, node)| (id.clone(), node.value_type.unwrap_or(NodeValueType::Scalar)))
+            .collect();
+        self.node_value_types = std::sync::Arc::new(node_value_types.clone());
         Ok(PreparedEvaluation {
             eval_order,
             node_to_column,
             dag,
             compiled_cache: std::sync::Arc::clone(&self.compiled_cache),
             formula_fingerprint: formula_fingerprint(model),
-            node_value_types: validated
-                .nodes
-                .iter()
-                .map(|(id, node)| (id.clone(), node.value_type.unwrap_or(NodeValueType::Scalar)))
-                .collect(),
+            node_value_types,
         })
     }
 
@@ -683,6 +702,7 @@ impl Evaluator {
         // a different model sharing node ids would otherwise leak its formulas
         // into this prepared evaluation).
         self.compiled_cache = std::sync::Arc::clone(&prepared.compiled_cache);
+        self.node_value_types = std::sync::Arc::new(prepared.node_value_types.clone());
 
         // Structural guard: the prepared plan must cover exactly the model's
         // nodes. A node present in the model but absent from the plan would be
@@ -714,7 +734,8 @@ impl Evaluator {
         // plan was built from and return a well-formed but wrong result.
         if formula_fingerprint(model) != prepared.formula_fingerprint {
             return Err(Error::eval(
-                "evaluate_prepared: a formula, where clause, declared value type, period, or forecast differs from the model the \
+                "evaluate_prepared: a formula, where clause, declared value type, period, observation slot, \
+                 availability date, forecast or capital structure differs from the model the \
                  prepared plan was built for. The plan holds compiled expressions, so \
                  evaluating would silently use the old formula. Rebuild the plan with \
                  `prepare` (only node *values* may differ between prepare and evaluate).",
@@ -950,40 +971,61 @@ impl Evaluator {
                 .get_node(node_id.as_str())
                 .ok_or_else(|| Error::eval(format!("Node '{}' not found in model", node_id)))?;
 
+            // The mask is evaluated before any value source. A false mask is a
+            // masked cell with no numeric value; a mask with no value leaves
+            // the cell unavailable; an invalid mask is an error.
             if node_spec.where_text.is_some() {
                 let where_key = NodeId::new(format!("__where__{}", node_id));
                 if let Some(where_expr) = self.compiled_cache.get(&where_key) {
+                    // A comparison or logical operator that read a value-less
+                    // operand reports it through this flag; such a mask has no
+                    // value.
+                    let read_before = std::mem::replace(&mut context.non_finite_operand, false);
                     let where_result =
                         evaluate_formula(where_expr, context, Some(node_id.as_str()))?;
-                    if !is_truthy(where_result) {
-                        context.set_value(node_id.as_str(), 0.0)?;
-                        context.set_source(node_id.as_str(), CellSource::WhereMasked);
+                    let read_no_value =
+                        std::mem::replace(&mut context.non_finite_operand, read_before);
+                    let masked = if where_result.is_nan() || read_no_value {
+                        Some(Cell::Unavailable(UnavailableReason::MissingMask))
+                    } else if where_result == 0.0 {
+                        Some(Cell::Masked)
+                    } else {
+                        None
+                    };
+                    if let Some(cell) = masked {
+                        context.set_cell(node_id.as_str(), cell)?;
+                        if cell == Cell::Masked {
+                            context.set_source(node_id.as_str(), CellSource::WhereMasked);
+                        }
                         continue;
                     }
                 }
             }
-            let hidden = visibility_cutoff.and_then(|as_of| {
+            let hidden = visibility_cutoff.is_some_and(|cutoff| {
                 node_spec
                     .explicit_value_available_on(period)
-                    .filter(|available_on| *available_on > as_of)
-                    .map(|available_on| HiddenObservation {
-                        available_on,
-                        as_of,
-                    })
+                    .is_some_and(|available_on| available_on > cutoff)
             });
-            let source =
-                resolve_node_value(node_spec, period_id, is_actual && hidden.is_none(), hidden)?;
+            let source = resolve_node_value(node_spec, period_id, is_actual && !hidden, hidden)?;
             let cell_source = match source {
-                NodeValueSource::Value(_) => CellSource::Value,
-                NodeValueSource::Forecast => CellSource::Forecast,
-                NodeValueSource::Formula => CellSource::Formula,
-                NodeValueSource::Missing => CellSource::Missing,
+                NodeValueSource::Value(_) => Some(CellSource::Value),
+                NodeValueSource::Forecast => Some(CellSource::Forecast),
+                NodeValueSource::Formula => Some(CellSource::Formula),
+                NodeValueSource::Missing => Some(CellSource::Missing),
+                NodeValueSource::Hidden => None,
             };
-            let value = {
+            let value_type = self.node_value_types.get(node_id).copied();
+            let cell = {
                 let mut mc_z_wrapper: Option<&mut McZCache> = mc_z_cache.as_deref_mut();
                 match source {
-                    NodeValueSource::Value(v) => Ok(v),
-                    NodeValueSource::Missing => Ok(f64::NAN),
+                    NodeValueSource::Value(observation) => Ok(match observation {
+                        AmountOrScalar::Amount(money) => Cell::Money(money),
+                        AmountOrScalar::Scalar(value) => Cell::Scalar(value),
+                    }),
+                    NodeValueSource::Missing => Ok(Cell::Missing),
+                    NodeValueSource::Hidden => {
+                        Ok(Cell::Unavailable(UnavailableReason::HiddenByCutoff))
+                    }
                     NodeValueSource::Forecast => forecast_eval::evaluate_forecast(
                         node_spec,
                         eval,
@@ -992,12 +1034,14 @@ impl Evaluator {
                         seed_offset,
                         &mut mc_z_wrapper,
                         visibility_cutoff,
-                    ),
+                    )
+                    .and_then(|value| computed_cell(value, value_type, node_id, period_id)),
                     NodeValueSource::Formula => {
                         let expr = self.compiled_cache.get(node_id).ok_or_else(|| {
                             Error::eval(format!("No compiled formula for node '{}'", node_id))
                         })?;
                         evaluate_formula(expr, context, Some(node_id.as_str()))
+                            .and_then(|value| computed_cell(value, value_type, node_id, period_id))
                     }
                 }
             }
@@ -1011,8 +1055,17 @@ impl Evaluator {
                 e
             })?;
 
-            context.set_value(node_id.as_str(), value)?;
-            context.set_source(node_id.as_str(), cell_source);
+            if matches!(cell, Cell::Unavailable(UnavailableReason::MissingInput)) {
+                context.warnings.push(EvalWarning::NonFiniteValue {
+                    node_id: node_id.as_str().to_string(),
+                    period: *period_id,
+                    value: f64::NAN,
+                });
+            }
+            context.set_cell(node_id.as_str(), cell)?;
+            if let Some(cell_source) = cell_source {
+                context.set_source(node_id.as_str(), cell_source);
+            }
         }
 
         Ok(())
@@ -1047,6 +1100,40 @@ impl Evaluator {
         let sources = context.cell_sources();
         let (results, warnings) = context.into_results();
         Ok((results, row, warnings, sources))
+    }
+}
+
+/// Type a forecast or formula result as a cell.
+///
+/// A result with no defined value leaves the cell unavailable. A monetary
+/// node's result is converted to an exact amount here, the one boundary
+/// where a floating-point calculation returns to money.
+///
+/// # Errors
+///
+/// Returns an evaluation error naming the node, period and cause when a
+/// monetary result cannot be represented as `Money`.
+fn computed_cell(
+    value: f64,
+    value_type: Option<NodeValueType>,
+    node_id: &NodeId,
+    period_id: &PeriodId,
+) -> Result<Cell> {
+    if value.is_nan() {
+        return Ok(Cell::Unavailable(UnavailableReason::MissingInput));
+    }
+    match value_type {
+        Some(NodeValueType::Monetary { currency }) => {
+            finstack_quant_core::money::Money::from_model_value(value, currency)
+                .map(Cell::Money)
+                .map_err(|cause| {
+                    Error::eval(format!(
+                        "Node '{node_id}' in period {period_id}: result {value} cannot be \
+                         represented as {currency} money: {cause}"
+                    ))
+                })
+        }
+        Some(NodeValueType::Scalar) | None => Ok(Cell::Scalar(value)),
     }
 }
 
@@ -1096,44 +1183,55 @@ mod tests {
     use indexmap::IndexMap;
     use time::Month;
 
+    /// STATEMENTS-EVALUATION-001 #2: a false mask is a masked cell with no
+    /// numeric value, and a mask with no value leaves the cell unavailable.
+    /// Neither is a zero, here or downstream.
     #[test]
-    fn where_clause_treats_nan_as_false() {
+    fn masked_and_unmaskable_cells_have_no_value() {
+        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let model = {
-            let mut model_builder_1 = ModelBuilder::new("nan-where");
-            model_builder_1
-                .periods("2025Q1..Q1", None)
-                .expect("valid period range");
-            model_builder_1
-                .compute("guarded_metric", "42")
-                .expect("valid formula");
-            model_builder_1
-                .where_clause("guarded_metric", "0 / 0")
-                .expect("valid predicate");
-            model_builder_1.build().expect("valid model")
+            let mut builder = ModelBuilder::new("mask-states");
+            builder.periods("2025Q1..Q1", None).expect("periods");
+            builder.value_scalar("flag", &[]);
+            builder.value_scalar("off", &[(q1, 0.0)]);
+            builder.compute("unknown_mask", "42").expect("formula");
+            builder
+                .where_clause("unknown_mask", "flag > 0")
+                .expect("predicate");
+            builder.compute("masked", "42").expect("formula");
+            builder
+                .where_clause("masked", "off > 0")
+                .expect("predicate");
+            builder
+                .compute("downstream", "masked + 1")
+                .expect("formula");
+            builder.compute("kept", "42").expect("formula");
+            builder.where_clause("kept", "off == 0").expect("predicate");
+            builder.build().expect("valid model")
         };
 
-        let mut evaluator = Evaluator::new();
-        let results = evaluator
-            .evaluate(&model)
-            .expect("evaluation should succeed");
+        let results = Evaluator::new().evaluate(&model).expect("evaluation");
+        let value = |node: &str| results.get(node, &q1).expect("cell");
 
+        assert!(value("masked").is_nan(), "a masked cell is not zero");
         assert_eq!(
-            results.get(
-                "guarded_metric",
-                &PeriodId::quarter(2025, 1).expect("valid period fixture")
-            ),
-            Some(0.0)
+            results.get_source("masked", &q1),
+            Some(CellSource::WhereMasked)
         );
+        assert!(
+            value("downstream").is_nan(),
+            "a masked input is not read as zero downstream"
+        );
+        assert!(value("unknown_mask").is_nan());
+        assert_eq!(
+            results.get_source("unknown_mask", &q1),
+            None,
+            "an unavailable cell was produced by no value source"
+        );
+        assert_eq!(value("kept"), 42.0);
+        assert_eq!(results.get_source("kept", &q1), Some(CellSource::Formula));
     }
 
-    /// Reusing a prepared plan after editing a formula must fail loudly.
-    ///
-    /// `PreparedEvaluation` snapshots the compiled expressions, and the
-    /// structural guard only compared the node *set*. Editing a formula and
-    /// re-using the plan therefore kept evaluating the stale compiled
-    /// expression and returned a well-formed result built from code the model
-    /// no longer contains — the exact misuse the guard exists for, but silent
-    /// and numerically wrong instead of an error.
     #[test]
     fn evaluate_prepared_rejects_a_model_whose_formula_changed() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
@@ -1218,7 +1316,7 @@ mod tests {
             Some(CellSource::Forecast)
         );
         for quarter in 1..=3 {
-            assert_eq!(results.get("masked", &q(quarter)), Some(0.0));
+            assert!(results.get("masked", &q(quarter)).expect("cell").is_nan());
             assert_eq!(
                 results.get_source("masked", &q(quarter)),
                 Some(CellSource::WhereMasked)

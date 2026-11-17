@@ -644,9 +644,9 @@ test('named edits, snapshot identity and the observation cutoff replay a revisio
     }
   };
   assert.equal(read(original, '2025-04-25'), 100.0);
-  assert.throws(() => read(original, '2025-04-24'), /available on 2025-04-25/);
+  assert.equal(read(original, '2025-04-24'), 'nan');
   assert.equal(read(revised, '2025-05-15'), 110.0);
-  assert.throws(() => read(revised, '2025-05-14'), /available on 2025-05-15/);
+  assert.equal(read(revised, '2025-05-14'), 'nan');
   assert.equal(read(revised, 'full_snapshot'), 110.0);
 
   assert.throws(

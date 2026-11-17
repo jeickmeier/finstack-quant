@@ -1,6 +1,7 @@
 """Statement-model JSON and DataFrame boundaries preserve economic inputs."""
 
 import json
+import math
 
 import pandas as pd
 import pytest
@@ -122,11 +123,9 @@ def test_named_edits_snapshot_identity_and_observation_cutoff() -> None:
         return result.get("revenue", "2025Q1")
 
     assert read(original, "2025-04-25") == 100.0
-    with pytest.raises(ValueError, match="available on 2025-04-25"):
-        read(original, "2025-04-24")
+    assert math.isnan(read(original, "2025-04-24")), "an unpublished observation has no value"
     assert read(revised, "2025-05-15") == 110.0
-    with pytest.raises(ValueError, match="available on 2025-05-15"):
-        read(revised, "2025-05-14")
+    assert math.isnan(read(revised, "2025-05-14"))
     assert read(revised, "full_snapshot") == 110.0
 
     with pytest.raises(ValueError, match="unknown node 'absent'"):

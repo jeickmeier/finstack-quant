@@ -275,15 +275,15 @@ fn test_where_clause_masking() {
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
 
-    // Q1: revenue < 1M, bonus should be 0 (masked by where clause)
-    assert_eq!(
+    // Q1: revenue < 1M, bonus is masked: no value, not a zero
+    assert!(
         results
             .get(
                 "bonus",
                 &PeriodId::quarter(2025, 1).expect("valid period fixture")
             )
-            .unwrap(),
-        0.0
+            .unwrap()
+            .is_nan()
     );
 
     // Q2: revenue > 1M, bonus should be calculated
@@ -297,15 +297,15 @@ fn test_where_clause_masking() {
         12_000.0
     );
 
-    // Q3: revenue < 1M, bonus should be 0
-    assert_eq!(
+    // Q3: revenue < 1M, bonus is masked again
+    assert!(
         results
             .get(
                 "bonus",
                 &PeriodId::quarter(2025, 3).expect("valid period fixture")
             )
-            .unwrap(),
-        0.0
+            .unwrap()
+            .is_nan()
     );
 
     // Q4: revenue > 1M, bonus should be calculated
@@ -363,15 +363,15 @@ fn test_where_clause_with_complex_condition() {
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
 
-    // Q1: revenue > 100k but margin < 0.15 - should be 0
-    assert_eq!(
+    // Q1: revenue > 100k but margin < 0.15 - masked: no value, not a zero
+    assert!(
         results
             .get(
                 "incentive",
                 &PeriodId::quarter(2025, 1).expect("valid period fixture")
             )
-            .unwrap(),
-        0.0
+            .unwrap()
+            .is_nan()
     );
 
     // Q2: revenue > 100k AND margin > 0.15 - should be calculated

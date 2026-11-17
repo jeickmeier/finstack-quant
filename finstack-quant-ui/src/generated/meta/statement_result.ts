@@ -255,7 +255,7 @@ export default [
     "path": "#/$defs/d_2a886a29e286928aba1b/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellSource/oneOf/3",
     "const": "where_masked",
-    "description": "The node's `where` clause evaluated to false (or `NaN`) for this\nperiod, so the cell was set to `0.0` without consulting the value,\nforecast or formula."
+    "description": "The node's `where` clause evaluated to false for this period, so the\ncell is masked: it has no value (`NaN`, never a zero) and the value,\nforecast and formula were not consulted."
   },
   {
     "path": "#/$defs/d_2a886a29e286928aba1b/oneOf/4",

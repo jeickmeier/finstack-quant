@@ -2403,7 +2403,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 76293
+            "bytes": 76319
           },
           {
             "path": "schemas/statements/1/swap_conventions.schema.json",
@@ -5204,7 +5204,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 76293
+            "bytes": 76319
           },
           {
             "domain": "statements",

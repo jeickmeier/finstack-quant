@@ -9,6 +9,7 @@ payment by source.
 from __future__ import annotations
 
 import json
+import math
 
 import pandas as pd
 
@@ -51,7 +52,7 @@ def test_node_sources_report_value_formula_forecast_and_where_mask() -> None:
     assert sources["masked"] == {Q1: "where_masked", Q2: "where_masked", Q3: "where_masked"}
     assert result.get("revenue", Q1) == 100.0
     assert result.get("revenue", Q2) == 123.0
-    assert result.get("masked", Q1) == 0.0
+    assert math.isnan(result.get("masked", Q1)), "a masked cell has no value"
 
 
 def test_node_sources_cover_every_cell_and_round_trip() -> None:

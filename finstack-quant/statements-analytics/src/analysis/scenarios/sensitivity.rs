@@ -217,7 +217,20 @@ impl<'a> SensitivityAnalyzer<'a> {
                     *perturbation,
                 )?;
 
-                let results = local_evaluator.evaluate_prepared(&local_model, &prepared)?;
+                // A shock on a cell with no stored observation adds an
+                // observation slot, which is a structural change: that
+                // scenario needs its own plan.
+                let has_slot = self
+                    .model
+                    .get_node(&param.node_id)
+                    .and_then(|node| node.values.as_ref())
+                    .is_some_and(|values| values.contains_key(&param.period_id));
+                let results = if has_slot {
+                    local_evaluator.evaluate_prepared(&local_model, &prepared)?
+                } else {
+                    let local_plan = local_evaluator.prepare(&local_model)?;
+                    local_evaluator.evaluate_prepared(&local_model, &local_plan)?
+                };
 
                 let mut parameter_values = IndexMap::new();
                 parameter_values.insert(
@@ -249,6 +262,9 @@ impl<'a> SensitivityAnalyzer<'a> {
         let baseline = evaluator.evaluate_prepared(self.model, &prepared)?;
 
         let mut model_clone = self.model.clone();
+        // Every grid point sets the same cells, so one plan built once those
+        // observation slots exist serves the whole grid.
+        let mut grid_plan = None;
         let mut scenarios = Vec::with_capacity(scenario_count);
         let mut indices = vec![0usize; config.parameters.len()];
         for _ in 0..scenario_count {
@@ -268,7 +284,11 @@ impl<'a> SensitivityAnalyzer<'a> {
                 );
             }
 
-            let results = evaluator.evaluate_prepared(&model_clone, &prepared)?;
+            let plan = match &grid_plan {
+                Some(plan) => plan,
+                None => grid_plan.insert(evaluator.prepare(&model_clone)?),
+            };
+            let results = evaluator.evaluate_prepared(&model_clone, plan)?;
 
             scenarios.push(SensitivityScenario {
                 parameter_values,

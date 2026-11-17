@@ -369,7 +369,7 @@ class Explanation:
         Evaluation layer that produced the value under the
         ``Value > Forecast > Formula`` precedence: ``"value"`` (the explicit
         value stored on the node), ``"forecast"``, ``"formula"``,
-        ``"where_masked"`` (the node's ``where`` clause zeroed the cell) or
+        ``"where_masked"`` (the node's ``where`` clause masked the cell) or
         ``"missing"`` (no observation, forecast or formula; the value is NaN).
 
         This property does not raise.

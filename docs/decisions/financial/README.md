@@ -386,7 +386,8 @@ independent qualification remain pending.
 The Statements dependency graph, cell precedence and prepared evaluation
 contract was accepted on 2026-11-15. It covers closed dependencies, distinct
 mask states, explicit snapshots, forecast eligibility and checked plan reuse.
-Implementation and independent qualification remain pending.
+Cell states, dependency edges and plan reuse are implemented and qualified;
+published run provenance and finalization checks remain pending.
 [STATEMENTS-EVALUATION-001](statements-evaluation/01-graph-precedence-and-prepared-plans.md#accepted-decision-for-dependency-graphs-cell-precedence-and-prepared-evaluation).
 
 The Statements scalar formulas and unavailable-value contract was accepted on

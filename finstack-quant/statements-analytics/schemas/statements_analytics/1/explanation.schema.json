@@ -20,7 +20,7 @@
         },
         {
           "const": "where_masked",
-          "description": "The node's `where` clause evaluated to false (or `NaN`) for this\nperiod, so the cell was set to `0.0` without consulting the value,\nforecast or formula.",
+          "description": "The node's `where` clause evaluated to false for this period, so the\ncell is masked: it has no value (`NaN`, never a zero) and the value,\nforecast and formula were not consulted.",
           "type": "string"
         },
         {
@@ -247,7 +247,7 @@
           "type": "null"
         }
       ],
-      "description": "Evaluation layer that produced `final_value` under the\n`Value > Forecast > Formula` precedence: `value` (the explicit value\nstored on the node), `forecast`, `formula`, `where_masked` (the\nnode's `where` clause zeroed the cell) or `missing` (no observation,\nforecast or formula; the value is NaN).\n\nRead from [`StatementResult::node_sources`]; `None` when the results\ncarry no source for the cell (hand-built results, or results or\nexplanations serialized before sources were recorded)."
+      "description": "Evaluation layer that produced `final_value` under the\n`Value > Forecast > Formula` precedence: `value` (the explicit value\nstored on the node), `forecast`, `formula`, `where_masked` (the\nnode's `where` clause masked the cell, which then has no value) or `missing` (no observation,\nforecast or formula; the value is NaN).\n\nRead from [`StatementResult::node_sources`]; `None` when the results\ncarry no source for the cell (hand-built results, or results or\nexplanations serialized before sources were recorded)."
     }
   },
   "required": [

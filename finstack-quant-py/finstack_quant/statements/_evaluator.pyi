@@ -382,7 +382,7 @@ class StatementResult:
             Node identifier → period identifier (``"2025Q1"``) → source label:
             ``"value"`` (explicit value), ``"forecast"`` (forecast method),
             ``"formula"`` (formula), ``"where_masked"`` (the ``where`` clause
-            was false, so the cell is ``0.0``) or ``"missing"`` (no
+            was false, so the cell has no value) or ``"missing"`` (no
             observation, forecast or formula; the cell is NaN). Same keys as the evaluated
             values. Empty for a result that was not produced by an evaluator
             or was serialized before sources were recorded.

@@ -114,6 +114,7 @@ impl<'a> ModelTimeSeries for StatementsAdapter<'a> {
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let mut builder = ModelBuilder::new("borrower");
 /// builder.periods("2025Q1..Q2", None)?;
+/// builder.value_scalar("revenue", &[]);
 /// let model = builder.build()?;
 /// let results = StatementResult {
 ///     periods: Some(model.periods.clone()),

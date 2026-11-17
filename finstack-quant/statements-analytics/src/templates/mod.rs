@@ -50,7 +50,8 @@
 //! use finstack_quant_statements_analytics::templates::roll_forward::add_roll_forward;
 //!
 //! # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-//! # let values: &[(PeriodId, AmountOrScalar)] = &[];
+//! # let q1 = PeriodId::quarter(2025, 1)?;
+//! # let values: &[(PeriodId, AmountOrScalar)] = &[(q1, AmountOrScalar::scalar(10.0))];
 //! let builder = {
 //!     let mut model_builder = ModelBuilder::new("demo");
 //!     model_builder.periods("2025Q1..2025Q4", None)?;

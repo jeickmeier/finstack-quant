@@ -177,8 +177,10 @@ fn monetary_nonfinite_results_emit_one_diagnostic_per_cell() {
     }
 }
 
+/// STATEMENTS-EVALUATION-013 #1: unrepresentable money is an error naming
+/// the node, period and cause, on both evaluation paths.
 #[test]
-fn finite_money_overflow_retains_conversion_warning_in_both_paths() {
+fn unrepresentable_money_is_an_error_in_both_paths() {
     let model = {
         let mut model_builder = ModelBuilder::new("money conversion diagnostics");
         model_builder.periods("2025Q1..Q1", None).unwrap();
@@ -188,18 +190,15 @@ fn finite_money_overflow_retains_conversion_warning_in_both_paths() {
     };
     let mut evaluator = Evaluator::new();
     let plan = evaluator.prepare(&model).unwrap();
-    for result in [
-        evaluator.evaluate(&model).unwrap(),
-        evaluator.evaluate_prepared(&model, &plan).unwrap(),
+    for error in [
+        evaluator.evaluate(&model).unwrap_err(),
+        evaluator.evaluate_prepared(&model, &plan).unwrap_err(),
     ] {
-        assert_eq!(result.get("large", &quarter()), Some(1e30));
-        assert!(result.get_money("large", &quarter()).is_none());
+        let message = error.to_string();
         assert!(
-            result.meta.warnings.iter().any(|warning| matches!(warning,
-                EvalWarning::NonFiniteValue { node_id, period, value }
-                    if node_id == "large" && *period == quarter() && *value == 1e30
-            )),
-            "monetary conversion diagnostics must survive finalization"
+            message.contains("Node 'large' in period 2025Q1")
+                && message.contains("cannot be represented as USD money"),
+            "{message}"
         );
     }
 }
@@ -272,4 +271,141 @@ fn monte_carlo_reports_each_forecast_warning_once() {
     let reported = keys.len();
     keys.dedup();
     assert_eq!(keys.len(), reported, "{:?}", results.warnings);
+}
+
+/// STATEMENTS-EVALUATION-001 #1: only a positive integer literal offset makes
+/// a `lag`/`shift` value a past dependency. Zero and dynamic offsets keep the
+/// same-period edge, and the offset's own dependencies stay in the graph.
+#[test]
+fn lag_edges_follow_the_positive_integer_literal_rule() {
+    let build = |a: &str, b: &str| {
+        let mut builder = ModelBuilder::new("lag-edges");
+        builder.periods("2025Q1..Q2", None).unwrap();
+        builder.value_scalar("seed", &[(quarter(), 1.0)]);
+        builder.value_scalar("n", &[(quarter(), 1.0)]);
+        builder.compute("a", a).unwrap();
+        builder.compute("b", b).unwrap();
+        builder.build()
+    };
+
+    // A literal past offset breaks the cycle: a corkscrew.
+    for past in ["lag(b, 1) + seed", "shift(b, 2) + seed"] {
+        build(past, "a + seed").unwrap_or_else(|error| panic!("{past}: {error}"));
+    }
+    // Zero, a non-integer literal and a dynamic offset can read the current
+    // period, so the same-period cycle is rejected.
+    for same_period in ["lag(b, 0) + seed", "lag(b, 1.5) + seed", "lag(b, n) + seed"] {
+        let error = build(same_period, "a + seed").expect_err(same_period);
+        assert!(
+            error.to_string().contains("Circular dependency"),
+            "{same_period}: {error}"
+        );
+    }
+    // The offset expression is a control dependency even for a past value.
+    let error = build("lag(seed, b) + seed", "a + seed").expect_err("offset dependency");
+    assert!(error.to_string().contains("Circular dependency"), "{error}");
+}
+
+/// STATEMENTS-EVALUATION-001 #4: a prepared plan is reused only for payload
+/// changes in existing observation slots.
+#[test]
+fn prepared_plans_are_reused_only_for_payload_edits_in_existing_slots() {
+    use finstack_quant_statements::types::{CapitalStructureSpec, ModelEdit, NodeId};
+    use time::macros::date;
+
+    let q2 = PeriodId::quarter(2025, 2).unwrap();
+    let model = {
+        let mut builder = ModelBuilder::new("prepared");
+        builder.periods("2025Q1..Q2", Some("2025Q1")).unwrap();
+        builder.value_scalar("revenue", &[(quarter(), 100.0)]);
+        builder
+            .availability_dates("revenue", &[(quarter(), date!(2025 - 04 - 25))])
+            .unwrap();
+        builder.compute("double", "revenue * 2").unwrap();
+        builder.build().unwrap()
+    };
+    let mut evaluator = Evaluator::new();
+    let plan = evaluator.prepare(&model).unwrap();
+    let observation = |period, value: f64, availability_date| ModelEdit::SetObservation {
+        node_id: NodeId::new("revenue"),
+        period,
+        value: value.into(),
+        availability_date,
+    };
+
+    // A new payload in the existing slot reuses the plan.
+    let mut payload = model.clone();
+    payload
+        .apply_edits(&[observation(quarter(), 150.0, Some(date!(2025 - 04 - 25)))])
+        .unwrap();
+    let result = evaluator.evaluate_prepared(&payload, &plan).unwrap();
+    assert_eq!(result.get("double", &quarter()), Some(300.0));
+
+    let rejected = |evaluator: &mut Evaluator, changed: &FinancialModelSpec, what: &str| {
+        let error = evaluator.evaluate_prepared(changed, &plan).expect_err(what);
+        assert!(
+            error.to_string().contains("Rebuild the plan"),
+            "{what}: {error}"
+        );
+    };
+
+    let mut new_slot = model.clone();
+    new_slot.apply_edits(&[observation(q2, 1.0, None)]).unwrap();
+    rejected(&mut evaluator, &new_slot, "a new observation slot");
+
+    let mut removed_slot = model.clone();
+    removed_slot
+        .apply_edits(&[ModelEdit::RemoveObservation {
+            node_id: NodeId::new("revenue"),
+            period: quarter(),
+        }])
+        .unwrap();
+    rejected(&mut evaluator, &removed_slot, "a removed observation slot");
+
+    let mut republished = model.clone();
+    republished
+        .apply_edits(&[observation(quarter(), 100.0, Some(date!(2025 - 05 - 15)))])
+        .unwrap();
+    rejected(&mut evaluator, &republished, "a changed availability date");
+
+    let mut formula = model.clone();
+    formula
+        .apply_edits(&[ModelEdit::SetFormula {
+            node_id: NodeId::new("double"),
+            formula: "revenue * 3".into(),
+        }])
+        .unwrap();
+    rejected(&mut evaluator, &formula, "a changed formula");
+
+    let mut masked = model.clone();
+    masked
+        .apply_edits(&[ModelEdit::SetWhere {
+            node_id: NodeId::new("double"),
+            predicate: "revenue > 0".into(),
+        }])
+        .unwrap();
+    rejected(&mut evaluator, &masked, "a changed mask");
+
+    let mut forecast = model.clone();
+    forecast
+        .apply_edits(&[ModelEdit::SetForecast {
+            node_id: NodeId::new("revenue"),
+            forecast: finstack_quant_statements::types::ForecastSpec::growth(0.1),
+        }])
+        .unwrap();
+    rejected(&mut evaluator, &forecast, "a changed forecast");
+
+    let mut capital = model.clone();
+    capital.capital_structure = Some(CapitalStructureSpec {
+        debt_instruments: Vec::new(),
+        meta: Default::default(),
+        reporting_currency: Some(Currency::USD),
+        fx_policy: None,
+        waterfall: None,
+    });
+    rejected(&mut evaluator, &capital, "a changed capital structure");
+
+    let mut timeline = model.clone();
+    timeline.periods.periods[1].is_actual = true;
+    rejected(&mut evaluator, &timeline, "a changed timeline");
 }

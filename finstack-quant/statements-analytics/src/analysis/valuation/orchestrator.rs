@@ -117,6 +117,7 @@ impl CorporateAnalysisBuilder {
     /// let model = {
     ///     let mut model_builder = ModelBuilder::new("demo");
     ///     model_builder.periods("2025Q1..Q1", None)?;
+    ///     model_builder.value_scalar("revenue", &[]);
     ///     model_builder.build()?
     /// };
     /// let _builder = CorporateAnalysisBuilder::new(model);
@@ -195,6 +196,7 @@ impl CorporateAnalysisBuilder {
     /// let model = {
     ///     let mut model_builder = ModelBuilder::new("demo");
     ///     model_builder.periods("2025Q1..Q4", None)?;
+    ///     model_builder.value_scalar("revenue", &[]);
     ///     model_builder.build()?
     /// };
     /// let _builder = CorporateAnalysisBuilder::new(model)

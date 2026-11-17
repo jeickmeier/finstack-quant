@@ -127,9 +127,9 @@ pub enum CellSource {
     Forecast,
     /// The node's formula.
     Formula,
-    /// The node's `where` clause evaluated to false (or `NaN`) for this
-    /// period, so the cell was set to `0.0` without consulting the value,
-    /// forecast or formula.
+    /// The node's `where` clause evaluated to false for this period, so the
+    /// cell is masked: it has no value (`NaN`, never a zero) and the value,
+    /// forecast and formula were not consulted.
     WhereMasked,
     /// No observation, forecast or formula supplies this period: the cell is
     /// missing and its value is `NaN`. A missing cell is never a zero.

@@ -179,25 +179,17 @@ pub(crate) fn collect_identifiers_from_ast(
             collect_identifiers_from_ast(operand, identifiers, ignore_lag);
         }
         StmtExpr::Call { func, args } => {
-            // If ignoring lag, skip traversal for lag/shift functions
-            // EXCEPT when the offset is a literal 0 (which means current-period dependency)
+            // A `lag`/`shift` value is read from history only when its offset
+            // is a positive integer literal. Zero, a non-integer literal and
+            // any dynamic offset can read the current period, so the value
+            // keeps its same-period edge.
             if ignore_lag && (func == "lag" || func == "shift") {
-                // The lagged value (args[0]) is read from history, not the
-                // current period, so it is normally NOT a current-period
-                // dependency. Exceptions:
-                //   * a literal-0 offset reads args[0] in the current period;
-                //   * a dynamic (non-literal) offset could evaluate to 0, so
-                //     conservatively treat args[0] as a current-period dep.
-                match args.get(1) {
-                    Some(StmtExpr::Literal(offset)) if *offset == 0.0 => {
-                        collect_identifiers_from_ast(&args[0], identifiers, ignore_lag);
-                    }
-                    Some(StmtExpr::Literal(_)) => {}
-                    _ => {
-                        if let Some(first) = args.first() {
-                            collect_identifiers_from_ast(first, identifiers, ignore_lag);
-                        }
-                    }
+                let past_only = matches!(
+                    args.get(1),
+                    Some(StmtExpr::Literal(offset)) if *offset >= 1.0 && offset.fract() == 0.0
+                );
+                if !past_only && let Some(first) = args.first() {
+                    collect_identifiers_from_ast(first, identifiers, ignore_lag);
                 }
                 // The offset expression and any further args ARE evaluated in
                 // the current period, so they are always dependencies.

@@ -737,18 +737,22 @@ fn point_in_time_evaluation_replays_identified_snapshots() {
         read(&original, through(date!(2025 - 04 - 25))).unwrap(),
         (100.0, 125.0)
     );
-    let error = read(&original, through(date!(2025 - 04 - 24)))
-        .expect_err("the observation is not yet published");
-    assert!(
-        error.to_string().contains("available on 2025-04-25"),
-        "{error}"
-    );
+    // Before publication the cell is unavailable, not an error and not zero.
+    let (before, assumption) = read(&original, through(date!(2025 - 04 - 24))).unwrap();
+    assert!(before.is_nan(), "an unpublished observation has no value");
+    assert_eq!(assumption, 125.0);
 
     assert_eq!(
         read(&revised, through(date!(2025 - 05 - 15))).unwrap(),
         (110.0, 125.0)
     );
-    read(&revised, through(date!(2025 - 05 - 14))).expect_err("the revision is not yet published");
+    assert!(
+        read(&revised, through(date!(2025 - 05 - 14)))
+            .unwrap()
+            .0
+            .is_nan(),
+        "the revision is not yet published"
+    );
     // The April 25 replay uses the original snapshot.
     assert_eq!(
         read(&original, through(date!(2025 - 04 - 25))).unwrap().0,
