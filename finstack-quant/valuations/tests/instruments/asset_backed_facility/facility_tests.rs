@@ -67,6 +67,7 @@ fn collateral() -> AssetPool {
             2,
         );
         loan.forward_curve_id = None;
+        loan.reset_lag_days = None;
         loan.spread_bp = None;
         loan.rate = 0.08;
         loan.obligor_id = Some(format!("OBL-{i}"));

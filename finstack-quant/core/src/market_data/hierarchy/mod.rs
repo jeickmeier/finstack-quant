@@ -1,7 +1,8 @@
 //! Market data hierarchy for organizational grouping of market targets.
 //!
 //! Provides a tree structure where each node holds exact insertion-ordered child
-//! entries, key-value metadata tags, and typed [`MarketDataTarget`] associations
+//! entries, key-value metadata tags, and typed
+//! [`MarketDataTarget`](crate::market_data::bumps::MarketDataTarget) associations
 //! pointing into `MarketContext`'s flat storage.
 //!
 //! # Example

@@ -54,6 +54,7 @@ use crate::{Error, Result};
 
 /// Output scale for continuous zero-rate, forward-rate, or growth-rate shifts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RateDiffScale {
     /// Rate difference in annual decimal units (`0.0001` = 1 bp).
     Decimal,
@@ -85,6 +86,7 @@ impl fmt::Display for RateDiffScale {
 /// Always measures raw hazard intensity `λ` per source year without converting to
 /// par CDS spreads or coupling to recovery assumptions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum HazardDiffScale {
     /// Intensity difference per source year (`λ₁ - λ₀`).
     Decimal,
@@ -113,6 +115,7 @@ impl fmt::Display for HazardDiffScale {
 
 /// Output scale for exact algebraic proportional changes `(x₁ - x₀) / x₀`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ProportionalDiffScale {
     /// Unscaled decimal fraction (`(x₁ - x₀) / x₀`).
     Fraction,
@@ -141,6 +144,7 @@ impl fmt::Display for ProportionalDiffScale {
 
 /// Output scale for observed monthly CPI level differences.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ObservationDiffScale {
     /// Native CPI index-point difference `I₁ - I₀`.
     NativePoints,
@@ -150,6 +154,7 @@ pub enum ObservationDiffScale {
 
 /// Classification of a same-period monthly CPI comparison across snapshots.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ObservationChangeKind {
     /// Both qualified snapshots observed the same index level for that month.
     Unchanged,
@@ -774,7 +779,8 @@ pub fn measure_hazard_intensity_diff(
     DiffMeasurement::from_validated_rows(rows)
 }
 
-/// Request parameters for comparing projected CPI levels across two [`InflationCurve`] snapshots.
+/// Request parameters for comparing projected CPI levels across two
+/// [`InflationCurve`](crate::market_data::term_structures::InflationCurve) snapshots.
 #[derive(Debug, Clone)]
 pub struct InflationCpiDiffQuery<'a> {
     /// Inflation curve identifier in `market_t0`.
@@ -837,9 +843,11 @@ impl MeasuredDiffValue for InflationCpiDiffRow {
     }
 }
 
-/// Measure projected CPI level differences `I₁(d) - I₀(d)` directly on [`InflationCurve`]s.
+/// Measure projected CPI level differences `I₁(d) - I₀(d)` directly on
+/// [`InflationCurve`](crate::market_data::term_structures::InflationCurve)s.
 ///
-/// Fails closed if either curve is missing or invalid, without falling back to [`InflationIndex`].
+/// Fails closed if either curve is missing or invalid, without falling back to
+/// [`InflationIndex`](crate::market_data::scalars::InflationIndex).
 ///
 /// # Arguments
 /// - `query` - Projected CPI query naming source curves and strictly increasing `dates`.
@@ -1663,6 +1671,33 @@ mod tests {
     use std::sync::Arc;
     use time::macros::date;
 
+    #[test]
+    fn diff_enum_serde_uses_canonical_snake_case() {
+        assert_eq!(
+            serde_json::to_string(&RateDiffScale::BasisPoints).unwrap(),
+            r#""basis_points""#
+        );
+        assert_eq!(
+            serde_json::to_string(&HazardDiffScale::IntensityBp).unwrap(),
+            r#""intensity_bp""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ProportionalDiffScale::Percent).unwrap(),
+            r#""percent""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ObservationDiffScale::Proportional(
+                ProportionalDiffScale::Percent
+            ))
+            .unwrap(),
+            r#"{"proportional":"percent"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&ObservationChangeKind::CrossPeriod).unwrap(),
+            r#""cross_period""#
+        );
+    }
+
     #[derive(Debug)]
     struct StaticFx {
         rate: f64,
@@ -2004,7 +2039,7 @@ mod tests {
         let empty = MarketContext::new();
         let d0 = date!(2025 - 01 - 01);
         let d1 = date!(2025 - 02 - 01);
-        let same_ccy = FxQuoteDiffParams {
+        let same_currency_query = FxQuoteDiffParams {
             base: Currency::USD,
             quote: Currency::USD,
             date_t0: d0,
@@ -2013,7 +2048,7 @@ mod tests {
             policy_t1: FxConversionPolicy::PeriodEnd,
             scale: ProportionalDiffScale::Percent,
         };
-        let id_meas = measure_fx_quote_diff(&same_ccy, &empty, &empty).unwrap();
+        let id_meas = measure_fx_quote_diff(&same_currency_query, &empty, &empty).unwrap();
         assert_eq!(id_meas.diff, 0.0);
         assert_eq!(id_meas.rate_t0, 1.0);
         assert_eq!(id_meas.rate_t1, 1.0);
@@ -2023,7 +2058,7 @@ mod tests {
         let eur_usd = FxQuoteDiffParams {
             base: Currency::EUR,
             quote: Currency::USD,
-            ..same_ccy
+            ..same_currency_query
         };
         assert!(measure_fx_quote_diff(&eur_usd, &empty, &empty).is_err());
 

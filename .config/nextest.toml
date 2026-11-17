@@ -42,6 +42,12 @@ store-failure-output = true
 slow-timeout = { period = "60s", terminate-after = 10 }
 fail-fast = false
 
+[[profile.slow.overrides]]
+# This fixed-seed acceptance test evaluates four 262k-path LSMC configurations.
+# Keep its statistical sample size and give the nightly runner 15 minutes.
+filter = 'test(/bermudan_lsmc_grid_and_seed_acceptance$/)'
+slow-timeout = { period = "60s", terminate-after = 15 }
+
 [profile.slow.junit]
 path = "junit.xml"
 store-success-output = false

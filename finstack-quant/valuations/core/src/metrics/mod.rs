@@ -97,10 +97,6 @@ pub use finite_difference::{
     central_diff_by_width, central_diff_scalar_relative, replace_scalar_value,
     scalar_numeric_value, scaled_central_diff_by_width,
 };
-#[doc(hidden)]
-pub use sensitivities::cs01_direct_hazard::{
-    DirectHazardBucketedHazard01, DirectHazardParallelHazard01,
-};
 pub use sensitivities::cs01_z_spread::{
     ZSpreadBucketedCs01, ZSpreadCs01, ZSpreadCs01Inputs, ZSpreadParallelCs01, quoted_z_spread,
 };

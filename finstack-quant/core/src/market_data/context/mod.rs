@@ -311,7 +311,8 @@ impl MarketContext {
     /// * `amount` - Monetary amount to convert.
     /// * `target_currency` - Destination currency.
     /// * `as_of` - Date used for the FX rate lookup.
-    /// * `policy` - FX conversion policy (e.g. [`FxConversionPolicy::CashflowDate`] or [`FxConversionPolicy::PeriodAverage`]).
+    /// * `policy` - Point-date FX provider-selection policy, either
+    ///   [`FxConversionPolicy::CashflowDate`] or [`FxConversionPolicy::PeriodEnd`].
     ///
     /// # Errors
     ///

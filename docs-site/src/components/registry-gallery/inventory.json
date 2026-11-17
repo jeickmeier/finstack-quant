@@ -1716,7 +1716,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/tranche-analytics.json",
-      "sha256": "7501c2e3d89fea4df5dd9e8359ce76cd4e3734398aedcd53d2d30067d3a44709"
+      "sha256": "ca82c6aa327fd4b7efcf2817cbe11330fbd1257e79293e1d085b25894bb7d711"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/pool-report.json",
