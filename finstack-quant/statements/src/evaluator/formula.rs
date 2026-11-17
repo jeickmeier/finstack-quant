@@ -15,7 +15,6 @@ use crate::evaluator::formula_helpers::{
 use crate::evaluator::value::{self, At, Value};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::expr::{Expr, ExprNode, Function};
-use finstack_quant_core::math::ZERO_TOLERANCE;
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
@@ -104,7 +103,7 @@ pub(crate) fn evaluate_non_negative_integer_arg(
             format!("{func_name}() requires a finite integer argument"),
         ));
     }
-    if value.fract().abs() > ZERO_TOLERANCE {
+    if value.fract() != 0.0 {
         return Err(eval_error(
             node_id,
             format!("{func_name}() requires an integer argument"),
@@ -180,8 +179,12 @@ pub(crate) fn build_context_for_period(
         // used to re-evaluate an expression and read back a single value, so
         // skipping `set_value`'s warning bookkeeping is intentional.
         period_context.current_values = context.current_values.clone();
+        period_context.current_cells = context.current_cells.clone();
     } else if let Some(row) = context.history.row(&target_period) {
         period_context.current_values = row.to_vec();
+        if let Some(cells) = context.history.cell_row(&target_period) {
+            period_context.current_cells = cells.to_vec();
+        }
     }
 
     period_context
@@ -233,31 +236,6 @@ pub(crate) fn collect_expression_values_sorted(
     }
 
     Ok(Rc::new(values))
-}
-
-/// Evaluate only the expression observations inside a closed period range.
-///
-/// Filtering must precede evaluation: an instrument absent from an old,
-/// unrelated quarter must not invalidate its current-quarter cashflow sum.
-pub(crate) fn collect_expression_range_values(
-    expr: &Expr,
-    context: &EvaluationContext,
-    start: PeriodId,
-    end: PeriodId,
-    node_id: Option<&str>,
-) -> Result<Vec<f64>> {
-    if let ExprNode::Column(name) = &expr.node {
-        let sorted = collect_historical_values_sorted(name, context);
-        return Ok(sorted.range(start..=end).map(|(_, value)| *value).collect());
-    }
-    let periods = expression_periods(context);
-    periods
-        .range(start..=end)
-        .map(|period| {
-            let mut historical = build_context_for_period(*period, context);
-            evaluate_formula(expr, &mut historical, node_id)
-        })
-        .collect()
 }
 
 /// Returns `true` if the expression tree contains any time-series or

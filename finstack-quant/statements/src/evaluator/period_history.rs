@@ -15,6 +15,9 @@ pub struct PeriodHistory {
     node_to_column: Arc<IndexMap<NodeId, usize>>,
     period_index: IndexMap<PeriodId, usize>,
     rows: Vec<Vec<Option<f64>>>,
+    /// Typed cells of each row, aligned with `rows`. A slot is `None` when
+    /// the row was stored as floats only.
+    cells: Vec<Vec<Option<super::cell::Cell>>>,
     period_bounds: Arc<IndexMap<PeriodId, (Date, Date)>>,
     /// The model's period plan; `None` only for an empty history.
     plan: Option<Arc<PeriodPlan>>,
@@ -33,6 +36,7 @@ impl PeriodHistory {
             node_to_column,
             period_index: IndexMap::new(),
             rows: Vec::new(),
+            cells: Vec::new(),
             period_bounds: Arc::default(),
             plan: None,
         }
@@ -129,16 +133,59 @@ impl PeriodHistory {
     ///   period overwrites the previous row.
     /// * `row` - Values aligned to [`node_to_column`](Self::node_to_column).
     ///   Shorter rows are padded with `None`; extra slots are dropped.
-    pub fn push_row(&mut self, period: PeriodId, mut row: Vec<Option<f64>>) {
+    pub fn push_row(&mut self, period: PeriodId, row: Vec<Option<f64>>) {
+        self.push_typed_row(period, row, Vec::new());
+    }
+
+    /// Insert or replace the row for `period` with its typed cells.
+    ///
+    /// `cells` is aligned with `row`; a shorter vector leaves the remaining
+    /// slots float-only.
+    pub(crate) fn push_typed_row(
+        &mut self,
+        period: PeriodId,
+        mut row: Vec<Option<f64>>,
+        mut cells: Vec<Option<super::cell::Cell>>,
+    ) {
         row.resize(self.node_to_column.len(), None);
+        cells.resize(self.node_to_column.len(), None);
         if let Some(&idx) = self.period_index.get(&period) {
             if let Some(slot) = self.rows.get_mut(idx) {
                 *slot = row;
             }
+            if let Some(slot) = self.cells.get_mut(idx) {
+                *slot = cells;
+            }
         } else {
             self.period_index.insert(period, self.rows.len());
             self.rows.push(row);
+            self.cells.push(cells);
         }
+    }
+
+    /// Typed cells of the row for `period`, if present.
+    pub(crate) fn cell_row(&self, period: &PeriodId) -> Option<&[Option<super::cell::Cell>]> {
+        let idx = *self.period_index.get(period)?;
+        self.cells.get(idx).map(Vec::as_slice)
+    }
+
+    /// The typed value a formula reads for `node_id` at a past `period`:
+    /// the stored cell, or the float as an untyped number. `None` when the
+    /// slot was never evaluated.
+    pub(crate) fn get_operand(
+        &self,
+        node_id: &str,
+        period: &PeriodId,
+    ) -> Option<super::value::Value> {
+        let col = *self.node_to_column.get(node_id)?;
+        if let Some(cell) = self.cell_row(period)?.get(col).copied().flatten() {
+            return Some(super::value::Value::from_cell(cell));
+        }
+        self.row(period)?
+            .get(col)
+            .copied()
+            .flatten()
+            .map(super::value::Value::from_float)
     }
 
     /// Whether a row exists for `period`.

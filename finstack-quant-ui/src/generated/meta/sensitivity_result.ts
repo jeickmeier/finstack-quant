@@ -622,6 +622,12 @@ export default [
     "description": "The formula or forecast that supplies the cell had no defined result,\nbecause an input it needs is missing, masked or itself unavailable."
   },
   {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/3",
+    "const": "undefined_change",
+    "description": "A percentage change or growth rate has no defined value for its base:\nan exactly zero base, or for a growth rate a non-positive base or a\nnegative ending value."
+  },
+  {
     "path": "#/$defs/d_6df778c161860d725fb3",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json#/$defs/ParameterSpec",
     "description": "Parameter to vary in sensitivity analysis.\n\nThe wire form carries exactly one of `perturbations` (absolute values) or\n`pct_range` (percentage moves of `base_value`, converted on deserialization\nas by [`Self::with_percentages`]); it always serializes the absolute values."

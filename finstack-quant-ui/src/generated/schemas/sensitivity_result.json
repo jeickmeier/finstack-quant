@@ -581,6 +581,11 @@
           "const": "missing_input",
           "description": "The formula or forecast that supplies the cell had no defined result,\nbecause an input it needs is missing, masked or itself unavailable.",
           "type": "string"
+        },
+        {
+          "const": "undefined_change",
+          "description": "A percentage change or growth rate has no defined value for its base:\nan exactly zero base, or for a growth rate a non-positive base or a\nnegative ending value.",
+          "type": "string"
         }
       ]
     },

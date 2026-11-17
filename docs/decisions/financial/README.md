@@ -398,8 +398,8 @@ It is implemented and qualified across Rust, Python and WASM.
 
 The Statements historical offsets, growth and reporting-window contract was
 accepted on 2026-11-15. It covers exact calendar offsets, signed changes,
-Actual/365 Fixed dated growth and complete additive windows. Implementation
-and independent qualification remain pending.
+Actual/365 Fixed dated growth and complete additive windows. It is
+implemented and qualified across Rust, Python and WASM.
 [STATEMENTS-EVALUATION-003](statements-evaluation/03-temporal-operators-and-period-windows.md#accepted-decision-for-historical-offsets-growth-and-reporting-windows).
 
 The Statements historical statistics and EWM contract was accepted on

@@ -1876,7 +1876,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-result.json",
-      "sha256": "839b172bd5396224f3a04df0aeffe00ac021287685bf31918645f3ffcfb8bd2a"
+      "sha256": "990ef03caaf02fb38497d986b35124942ef5cc74c02b5512299d52afdfa45560"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-check-report.json",
@@ -1916,7 +1916,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity.json",
-      "sha256": "4f9cbe45e467a2605578457c528e4617fe93737fe450a2a107a0d8c83bfc9a89"
+      "sha256": "c9c8187a991e79057f181c180e0abeec5729e87600f0dce38fe7a45961b655c3"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-goal-seek-run.json",
@@ -1940,7 +1940,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo.json",
-      "sha256": "80c59b03725afa909c8353818d6550d88bfc721cb03f68bb5970d8c8a5326060"
+      "sha256": "550f9a8af4b7dccdf620dd5e0ec9c73aa592907e34d4b0456ca427d7e7995c1e"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo-breach.json",
@@ -1976,7 +1976,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/capital-structure/cases.json",
-      "sha256": "d217df347b0145240bdb392f0a79a55e1babfbbc43e94d3f48aeaf5b3ecaf99a"
+      "sha256": "d3539e3ee1b392c5d196a74e735765081239c6b48cff9a0fbbdb1689a56fbbfd"
     },
     {
       "path": "finstack-quant-ui/tests/statements/relative-value/cases.json",
@@ -1984,11 +1984,11 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/export/cases.json",
-      "sha256": "22c2868204c7f3deebd36d05b2cf833b04b69d8894d86a9e1d0b8c3edf053897"
+      "sha256": "3d7fb52ba51d1f30059a13cd10dcd2a9f4d51c69fd02784e6d62de6d3d22836d"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenant-series.json",
-      "sha256": "8a5edb3251dfcfa3154a89c1aa269a072554e38225e5ac35e745b69c5d74be05"
+      "sha256": "51d3d016972955976dc76cae6f4e53cacabb3a18e3e29e91e6e641e76adc1d64"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenants.json",
@@ -2000,7 +2000,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-breach-forecast.json",
-      "sha256": "b8623604b2f7a971e2a4e1fd3ce03c0b0557759136f0e9ea089631a4ba4209c8"
+      "sha256": "95caa63a8db4ececbab68d522d94136e0b15df11c10e3afc958a6189c7fb6fe0"
     }
   ]
 }

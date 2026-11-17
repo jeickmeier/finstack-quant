@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **654 review items across 33 source scopes with open items**
+This backlog consolidates **653 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (507): implementation and verification work against an
+- **Reconciliation** (506): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (38): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -69,7 +69,7 @@ product consequences remain in their product scope.
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
 | [Statements: capital structure](#statements-capital-structure) | 14 |
 | [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 14 |
-| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 15 |
+| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 14 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
 | [Scenarios](#scenarios) | 16 |
@@ -1092,8 +1092,6 @@ product consequences remain in their product scope.
 
 - **Reconciliation — Checked stochastic forecast kernels and replay.** Implement signed normal and mean-reverting steps, unclipped positive lognormal restoration, explicit growth or difference bootstrap with unbiased draws, zero-volatility transitions without draws, and versioned PCG64 streams. Independently qualify moments, extremes, subnormals, bootstrap indices, seed provenance and replay. [Accepted STATEMENTS-EVALUATION-007](statements-evaluation/07-stochastic-forecast-kernels.md#accepted-decision-for-stochastic-forecast-kernels-and-replay).
 
-- **Reconciliation — Exact historical offsets, growth and complete reporting windows.** Enforce canonical offset and calendar admission, the signed change and growth domains, Actual/365 Fixed dated growth and complete additive reporting windows. Qualify fiscal quarter and year boundaries, valid missing history versus invalid geometry, exact bases and independent fixed-365 leap-window cases. [Accepted STATEMENTS-EVALUATION-003](statements-evaluation/03-temporal-operators-and-period-windows.md#accepted-decision-for-historical-offsets-growth-and-reporting-windows).
-
 - **Reconciliation — Canonical historical windows, ranks, cumulative functions and EWM.** Implement exact model-slot windows, explicit sample coverage, exact rank ties, complete prefixes and slot-based decay with Boolean correction controls. Independently qualify missing observations, sample counts, R-7, monetary units and sums, and corrected EWM at weight-degeneracy boundaries. [Accepted STATEMENTS-EVALUATION-004](statements-evaluation/04-historical-statistics-and-ewm.md#accepted-decision-for-historical-statistics-and-ewm).
 
 - **Reconciliation — Canonical forecast suffix, anchoring and output bounds.** Implement one suffix per node and run/path, explicit starting levels and eligible immediate anchors by method, and aligned supplied history. Qualify missing inputs, masked and explicit slots, keyed override carry and clipping provenance while preserving raw recurrence, phase and shocks. [Accepted STATEMENTS-EVALUATION-005](statements-evaluation/05-forecast-segments-and-bounds.md#accepted-decision-for-forecast-segments-anchoring-and-output-bounds).
@@ -1104,7 +1102,7 @@ product consequences remain in their product scope.
 
 - **Reconciliation — The check suite at single-run finalization.** Apply the configured check suite at single-run finalization under the accepted comparison and suite policy, and qualify configured single-run checks. Cell states, mask handling, the lag and shift dependency rule, source precedence under a cutoff, checked plan reuse and published run provenance with each cell's status, reason and source are reconciled. [Accepted STATEMENTS-EVALUATION-001](statements-evaluation/01-graph-precedence-and-prepared-plans.md#accepted-decision-for-dependency-graphs-cell-precedence-and-prepared-evaluation) · [Check-suite policy](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
 
-- **Reconciliation — Float views of typed values inside Statements.** Typed cells and typed formula values are authoritative, but these internal consumers still read a float view in which a value that is missing, masked or unavailable is `NaN`: the history kernels (`lag`, `shift`, `diff`, `pct_change`, `growth_rate`, rolling, cumulative, period-to-date, exponentially weighted and full-history statistics, `rank`, `quantile`) and capital-structure references, whose results re-enter formulas as an untyped number that takes the units static analysis fixed; formula checks, period rollup and inline waterfall expressions (`evaluate_formula`); normalization bridges and the non-finite data-quality check (`StatementResult::float_series`); and Monte Carlo path collection (`StatementResult::path_values`). Move each to typed values and delete its view when its owning contract is reconciled. [Offsets and windows](statements-evaluation/03-temporal-operators-and-period-windows.md) · [Historical statistics](statements-evaluation/04-historical-statistics-and-ewm.md) · [Formula checks](statements-contracts/15-formula-checks.md) · [Period rollup](statements-evaluation/14-period-rollup.md) · [Waterfall allocation](statements-capital/06-priority-allocation.md) · [Normalization bridges](statements-evaluation/15-normalization-adjustments.md) · [Data-quality checks](statements-contracts/13-data-quality-checks.md) · [Monte Carlo paths](statements-evaluation/11-monte-carlo-evaluation.md) · [Capital reporting](statements-capital/09-reporting-and-fx.md).
+- **Reconciliation — Float views of typed values inside Statements.** Typed cells and typed formula values are authoritative, but these internal consumers still read a float view in which a value that is missing, masked or unavailable is `NaN`: the statistical history kernels (rolling, cumulative, exponentially weighted and full-history statistics, `rank`, `quantile`) and capital-structure references, whose results re-enter formulas as an untyped number that takes the units static analysis fixed; formula checks, period rollup and inline waterfall expressions (`evaluate_formula`); normalization bridges and the non-finite data-quality check (`StatementResult::float_series`); and Monte Carlo path collection (`StatementResult::path_values`). Move each to typed values and delete its view when its owning contract is reconciled. [Historical statistics](statements-evaluation/04-historical-statistics-and-ewm.md) · [Formula checks](statements-contracts/15-formula-checks.md) · [Period rollup](statements-evaluation/14-period-rollup.md) · [Waterfall allocation](statements-capital/06-priority-allocation.md) · [Normalization bridges](statements-evaluation/15-normalization-adjustments.md) · [Data-quality checks](statements-contracts/13-data-quality-checks.md) · [Monte Carlo paths](statements-evaluation/11-monte-carlo-evaluation.md) · [Capital reporting](statements-capital/09-reporting-and-fx.md).
 
 - **Reconciliation — Monetary rounding mode in Statements formulas.** `round(money, digits)` states its scale and rounds midpoint ties away from zero, the one mode the function has; `floor`, `ceil` and one-argument `round` reject money when the model is built. The accepted contract requires monetary rounding to state its rounding mode as well as its scale. Add the mode to the formula grammar, or accept the single documented mode. [Accepted STATEMENTS-EVALUATION-002](statements-evaluation/02-scalar-formulas-and-undefined-values.md#accepted-decision-for-scalar-formulas-and-unavailable-values) · [Monetary rounding](core-conventions/012-money-decimal-precision.md#accepted-decision-monetary-precision-rounding-and-currency-identity).
 

@@ -16,8 +16,7 @@ use crate::evaluator::formula::{
     require_min_args,
 };
 use crate::evaluator::formula_aggregates::{
-    evaluate_cumulative_function, evaluate_period_aggregate_function, evaluate_rolling_function,
-    evaluate_statistical_function,
+    evaluate_cumulative_function, evaluate_rolling_function, evaluate_statistical_function,
 };
 use crate::evaluator::value::{self, Aggregate, At, Value};
 use finstack_quant_core::expr::{BinOp, Expr, ExprNode, Function};
@@ -36,6 +35,7 @@ pub(crate) fn evaluate_function(
 ) -> Result<Value> {
     use crate::evaluator::formula_timeseries::{
         eval_diff, eval_growth_rate, eval_lag, eval_lead, eval_pct_change, eval_shift,
+        evaluate_period_aggregate_function,
     };
 
     let at = At {
@@ -45,12 +45,12 @@ pub(crate) fn evaluate_function(
     let kernel = |result: Result<f64>| result.map(Value::from_float);
     match func {
         // Time-series functions
-        Function::Lag => kernel(eval_lag(args, context, node_id)),
-        Function::Lead => kernel(eval_lead(node_id)),
-        Function::Diff => kernel(eval_diff(args, context, node_id)),
-        Function::PctChange => kernel(eval_pct_change(args, context, node_id)),
-        Function::GrowthRate => kernel(eval_growth_rate(args, context, node_id)),
-        Function::Shift => kernel(eval_shift(args, context, node_id)),
+        Function::Lag => eval_lag(args, context, node_id),
+        Function::Lead => eval_lead(node_id),
+        Function::Diff => eval_diff(args, context, node_id),
+        Function::PctChange => eval_pct_change(args, context, node_id),
+        Function::GrowthRate => eval_growth_rate(args, context, node_id),
+        Function::Shift => eval_shift(args, context, node_id),
 
         // Historical / rolling / cumulative aggregates
         Function::RollingMean
@@ -67,9 +67,9 @@ pub(crate) fn evaluate_function(
         Function::CumSum | Function::CumProd | Function::CumMin | Function::CumMax => {
             kernel(evaluate_cumulative_function(func, args, context, node_id))
         }
-        Function::Ytd | Function::Qtd | Function::FiscalYtd | Function::Ttm => kernel(
-            evaluate_period_aggregate_function(func, args, context, node_id),
-        ),
+        Function::Ytd | Function::Qtd | Function::FiscalYtd | Function::Ttm => {
+            evaluate_period_aggregate_function(func, args, context, node_id)
+        }
 
         // Exponentially-weighted statistics
         Function::EwmMean => kernel(crate::evaluator::formula_ewm::eval_ewm_mean(

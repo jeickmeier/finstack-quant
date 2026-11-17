@@ -132,9 +132,9 @@
       "covenant_id": "max_debt_to_ebitda",
       "covenant_description": "Debt/EBITDA <= 2.10x",
       "breach_date": "2025-09-30",
-      "projected_value": 1.888721960602909,
+      "projected_value": 1.8887219606029089,
       "threshold": 2.1,
-      "headroom": 0.10060859018909095,
+      "headroom": 0.10060859018909106,
       "breach_probability": 0.3075
     },
     {

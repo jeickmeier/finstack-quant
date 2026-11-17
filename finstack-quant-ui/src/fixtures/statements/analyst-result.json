@@ -1063,7 +1063,7 @@
       "2025Q3": {
         "status": "value",
         "value": {
-          "amount": "217078007.53749996",
+          "amount": "217078007.537499980125",
           "currency": "USD"
         },
         "source": "formula"
@@ -1071,7 +1071,7 @@
       "2025Q4": {
         "status": "value",
         "value": {
-          "amount": "224091810.81457496",
+          "amount": "224091810.81457495025",
           "currency": "USD"
         },
         "source": "formula"
@@ -1110,7 +1110,7 @@
       },
       "2025Q3": {
         "status": "value",
-        "value": 1.888721960602909,
+        "value": 1.8887219606029089,
         "source": "formula"
       },
       "2025Q4": {
@@ -1637,7 +1637,7 @@
       },
       "2025Q4": {
         "status": "value",
-        "value": 0.04200000000000001,
+        "value": 0.042,
         "source": "formula"
       }
     }

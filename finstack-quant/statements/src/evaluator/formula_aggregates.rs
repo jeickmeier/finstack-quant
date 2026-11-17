@@ -2,12 +2,11 @@
 //!
 use super::EvaluationContext;
 use super::formula::{
-    collect_expression_range_values, collect_expression_values_sorted,
-    collect_expression_window_values, eval_error, evaluate_non_negative_integer_arg, require_args,
+    collect_expression_values_sorted, collect_expression_window_values, eval_error,
+    evaluate_non_negative_integer_arg, require_args,
 };
 use super::results::EvalWarning;
 use crate::error::Result;
-use finstack_quant_core::dates::{PeriodId, PeriodKind};
 use finstack_quant_core::expr::{Expr, Function};
 use finstack_quant_core::math::stats::{mean, median, variance};
 use finstack_quant_core::math::{
@@ -62,26 +61,6 @@ fn collect_all_values(
 /// cumulative aggregates (`evaluate_rolling_function`,
 /// `evaluate_cumulative_function`).
 #[inline]
-fn sum_finite_or_nan(values: &[f64], node_id: Option<&str>) -> Result<f64> {
-    let filtered = retain_finite(values);
-    if filtered.is_empty() {
-        Ok(f64::NAN)
-    } else {
-        eval_sum(neumaier_sum(filtered.iter().copied()), node_id)
-    }
-}
-
-fn sum_expression_range(
-    expr: &Expr,
-    context: &EvaluationContext,
-    start: PeriodId,
-    end: PeriodId,
-    node_id: Option<&str>,
-) -> Result<f64> {
-    let values = collect_expression_range_values(expr, context, start, end, node_id)?;
-    sum_finite_or_nan(&values, node_id)
-}
-
 pub(crate) fn evaluate_rolling_function(
     func: &Function,
     args: &[Expr],
@@ -213,112 +192,6 @@ pub(crate) fn evaluate_cumulative_function(
         _ => Err(eval_error(
             node_id,
             format!("Function {:?} is not a cumulative function", func),
-        )),
-    }
-}
-
-pub(crate) fn evaluate_period_aggregate_function(
-    func: &Function,
-    args: &[Expr],
-    context: &mut EvaluationContext,
-    node_id: Option<&str>,
-) -> Result<f64> {
-    match func {
-        Function::Ytd => {
-            require_args("ytd", args, 1, node_id)?;
-            let current = context.period_id;
-            let calendar = context.history.model_plan()?.calendar;
-            let start_of_year = current.shift(1 - i32::from(current.index()), calendar)?;
-            sum_expression_range(&args[0], context, start_of_year, current, node_id)
-        }
-        Function::Qtd => {
-            require_args("qtd", args, 1, node_id)?;
-            if context.period_kind != PeriodKind::Monthly {
-                return Err(eval_error(
-                    node_id,
-                    "qtd() is only supported for monthly period models",
-                ));
-            }
-
-            let current = context.period_id;
-            let month = u32::from(current.index());
-            let quarter_start_month = ((month - 1) / 3) * 3 + 1;
-            let start = finstack_quant_core::dates::PeriodId::month(
-                current.year(),
-                quarter_start_month as u8,
-            )?;
-
-            sum_expression_range(&args[0], context, start, current, node_id)
-        }
-        Function::FiscalYtd => {
-            require_args("fiscal_ytd", args, 2, node_id)?;
-            if context.period_kind != PeriodKind::Monthly {
-                return Err(eval_error(
-                    node_id,
-                    "fiscal_ytd() is only supported for monthly period models",
-                ));
-            }
-
-            let start_month_raw = super::formula::evaluate_formula(&args[1], context, node_id)?;
-            if !start_month_raw.is_finite()
-                || start_month_raw.fract() != 0.0
-                || !(1.0..=12.0).contains(&start_month_raw)
-            {
-                return Err(eval_error(
-                    node_id,
-                    "fiscal_ytd() fiscal_start_month must be an integer between 1 and 12",
-                ));
-            }
-            let start_month = start_month_raw as u8;
-            let current = context.period_id;
-            let current_month = current.index();
-            let fiscal_start_year = if current_month >= start_month as u16 {
-                current.year()
-            } else {
-                current.year() - 1
-            };
-            let start =
-                finstack_quant_core::dates::PeriodId::month(fiscal_start_year, start_month)?;
-
-            sum_expression_range(&args[0], context, start, current, node_id)
-        }
-        Function::Ttm => {
-            require_args("ttm", args, 1, node_id)?;
-            // The window is twelve calendar months of model periods; see
-            // `ltm_window` for the daily (calendar- or business-day) rule.
-            let window = finstack_quant_core::dates::ltm_window(
-                context.period_id,
-                context.history.model_plan()?,
-            )?;
-            if !window.is_complete() {
-                return Ok(f64::NAN);
-            }
-            // Evaluate precisely the window's slots and refuse unevaluated ones.
-            let mut values = Vec::with_capacity(window.slots.len());
-            for period in window.slots {
-                let value = if period == context.period_id {
-                    super::formula::evaluate_formula(&args[0], context, node_id)?
-                } else {
-                    if !context.history.contains_key(&period)
-                        && !context
-                            .historical_capital_structure_cashflows
-                            .contains_key(&period)
-                    {
-                        return Ok(f64::NAN);
-                    }
-                    let mut historical = super::formula::build_context_for_period(period, context);
-                    super::formula::evaluate_formula(&args[0], &mut historical, node_id)?
-                };
-                if !value.is_finite() {
-                    return Ok(f64::NAN);
-                }
-                values.push(value);
-            }
-            sum_finite_or_nan(&values, node_id)
-        }
-        _ => Err(eval_error(
-            node_id,
-            format!("Function {:?} is not a period aggregate", func),
         )),
     }
 }

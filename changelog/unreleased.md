@@ -992,3 +992,24 @@ exact money, a Boolean or an unavailable value.
 - **Annualization.** `annualize_rate` takes method `0` (simple) or `1`
   (compound); any other value is an error, as is compounding a rate below
   -100%. An annualization factor must be positive and finite.
+
+### Statements: offsets, changes, growth and reporting windows are exact and typed
+
+STATEMENTS-EVALUATION-003. `lag`, `shift`, `diff`, `pct_change` and the
+reporting windows read typed history, so money keeps its currency and exact
+amount (`lag(cash, 1) + cash` is exact).
+
+- **Offsets** must be exact non-negative integers. A fractional offset and a
+  future read (`shift` by a negative amount) are errors; a negative `shift`
+  used to give no value. A slot before the first period is unavailable.
+- **`pct_change`** is unavailable for an exactly zero base (reason
+  `undefined_change`); a base within `1e-10` of zero used to qualify.
+- **`growth_rate`** needs an exact positive lookback, a strictly positive
+  base and a non-negative ending value; outside that domain it is
+  unavailable (`undefined_change`). A zero ending value is -100%. Daily and
+  weekly plans measure years as Actual/365 Fixed, where they used
+  Actual/Actual.
+- **`ytd`, `qtd`, `fiscal_ytd`, `ttm`** sum only complete windows: a window
+  with a missing slot is unavailable, where `ytd`, `qtd` and `fiscal_ytd`
+  used to sum the values present. `qtd` follows the fiscal quarter on a
+  fiscal plan. `fiscal_ytd` is rejected on a fiscal plan; use `ytd`.

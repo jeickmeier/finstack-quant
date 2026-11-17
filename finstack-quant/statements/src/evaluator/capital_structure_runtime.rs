@@ -18,7 +18,7 @@ use std::sync::Arc;
 type Instruments = IndexMap<String, Arc<dyn finstack_quant_valuations::instruments::Instrument>>;
 type DynamicPeriodEvaluation = (
     IndexMap<String, crate::evaluator::ResultCell>,
-    Vec<Option<f64>>,
+    crate::evaluator::engine::PeriodRow,
     Vec<EvalWarning>,
     crate::capital_structure::CapitalStructureCashflows,
 );
@@ -156,7 +156,10 @@ impl Evaluator {
             .capital_structure_cashflows
             .take()
             .unwrap_or_default();
-        let row = context.current_values.clone();
+        let row = (
+            context.current_values.clone(),
+            context.current_cells.clone(),
+        );
         let (values, mut warnings) = context.into_results();
         // The second `evaluate_nodes_in_order` pass re-evaluates cs-affected
         // nodes into the same context, so node-level warnings (e.g.

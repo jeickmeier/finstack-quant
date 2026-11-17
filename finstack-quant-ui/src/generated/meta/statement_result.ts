@@ -649,6 +649,12 @@ export default [
     "description": "The formula or forecast that supplies the cell had no defined result,\nbecause an input it needs is missing, masked or itself unavailable."
   },
   {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/3",
+    "const": "undefined_change",
+    "description": "A percentage change or growth rate has no defined value for its base:\nan exactly zero base, or for a growth rate a non-positive base or a\nnegative ending value."
+  },
+  {
     "path": "#/$defs/d_6f601764dacadc213e87",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodPlan",
     "description": "Builder/plan for a contiguous sequence of periods and their actual/forecast split.\n\nPeriods are returned in ascending order and are intended to form a contiguous\nrun of model periods. Each [`Period`] uses the crate-wide `[start, end)`\ninterval convention, so the `end` of one period naturally aligns with the\n`start` of the next."

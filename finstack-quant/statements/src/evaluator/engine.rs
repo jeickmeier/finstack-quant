@@ -23,9 +23,12 @@ use std::collections::HashSet;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
+/// One period's float values and typed cells, in column order.
+pub(crate) type PeriodRow = (Vec<Option<f64>>, Vec<Option<Cell>>);
+
 type PeriodEvaluation = (
     IndexMap<String, crate::evaluator::ResultCell>,
-    Vec<Option<f64>>,
+    PeriodRow,
     Vec<EvalWarning>,
 );
 
@@ -520,7 +523,11 @@ impl Evaluator {
             }
 
             // Add to historical context for next period (move, not clone)
-            std::sync::Arc::make_mut(&mut historical).push_row(period.id, period_row);
+            std::sync::Arc::make_mut(&mut historical).push_typed_row(
+                period.id,
+                period_row.0,
+                period_row.1,
+            );
             if has_cs {
                 let period_snapshot = cs_cashflows_accum.period_snapshot(period.id);
                 std::sync::Arc::make_mut(&mut historical_cs).insert(period.id, period_snapshot);
@@ -1102,7 +1109,10 @@ impl Evaluator {
         };
         self.evaluate_nodes_in_order(eval, &mut context, seed_offset, None, mc_z_cache)?;
 
-        let row = context.current_values.clone();
+        let row = (
+            context.current_values.clone(),
+            context.current_cells.clone(),
+        );
         let (results, warnings) = context.into_results();
         Ok((results, row, warnings))
     }

@@ -234,10 +234,10 @@
         "covenant_type": "Debt/EBITDA <= 3.50x",
         "covenant_id": "max_debt_to_ebitda",
         "passed": true,
-        "actual_value": 1.888721960602909,
+        "actual_value": 1.8887219606029089,
         "threshold": 3.5,
         "details": null,
-        "headroom": 0.4603651541134545,
+        "headroom": 0.46036515411345463,
         "meta": {
           "numeric_mode": "f64",
           "rounding": {
