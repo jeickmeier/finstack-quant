@@ -187,7 +187,9 @@ fn ranks_honor_direction_and_minimum_ties_while_skipping_missing_history() {
     let observations: Vec<_> = periods
         .iter()
         .copied()
-        .zip([20.0, 30.0, f64::NAN, 30.0, 20.0, 10.0].map(AmountOrScalar::scalar))
+        .zip([20.0, 30.0, f64::NAN, 30.0, 20.0, 10.0])
+        .filter(|(_, value)| value.is_finite())
+        .map(|(period, value)| (period, AmountOrScalar::scalar(value)))
         .collect();
     let model = {
         let mut model_builder = ModelBuilder::new("ranking");

@@ -50,7 +50,8 @@ def test_dataframe_parses_all_null_column_labels_before_mutation(ready: bool) ->
         builder.from_dataframe(frame)
     if not ready:
         builder.periods("2025Q1..Q2", "2025Q1")
-    assert builder.build().node_count == 0
+    with pytest.raises(ValueError, match="at least one node"):
+        builder.build()
 
 
 def test_dataframe_invalid_cell_does_not_install_an_inferred_timeline() -> None:
@@ -59,6 +60,7 @@ def test_dataframe_invalid_cell_does_not_install_an_inferred_timeline() -> None:
     with pytest.raises(ValueError, match="is not numeric"):
         builder.from_dataframe(frame)
     builder.periods("2025Q3..Q4", "2025Q3")
+    builder.value("revenue", [])
     assert builder.build().periods == ["2025Q3", "2025Q4"]
 
 

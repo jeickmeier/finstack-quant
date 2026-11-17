@@ -23,7 +23,7 @@ function model(values, forecast) {
     nodes: {
       revenue: {
         node_id: 'revenue',
-        node_type: 'value',
+        node_type: 'mixed',
         values,
         ...(forecast ? { forecast } : {}),
       },

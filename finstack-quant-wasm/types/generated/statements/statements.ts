@@ -1861,7 +1861,7 @@ export type CapitalStructureWarning =
  * `Value > Forecast > Formula`, after the node's optional `where` mask. The
  * winning layer is recorded per cell in [`StatementResult::node_sources`].
  */
-export type CellSource = "value" | "forecast" | "formula" | "where_masked";
+export type CellSource = "value" | "forecast" | "formula" | "where_masked" | "missing";
 /**
  * Category that groups related checks together.
  */

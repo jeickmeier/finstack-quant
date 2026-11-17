@@ -366,8 +366,15 @@ test('ModelBuilder capital-structure and registry steps build a valid model', ()
     priority_of_payments: ['fees', 'interest', 'amortization', 'equity'],
     available_cash_node: 'cash',
   });
-  withDebt.withBuiltinMetrics();
-  assert.equal(withDebt.build().capital_structure.debt_instruments[0].id, 'BOND-3');
+  const debtModel = withDebt.build();
+  assert.equal(debtModel.capital_structure.debt_instruments[0].id, 'BOND-3');
+  // The whole catalogue reads inputs this model does not define, and build
+  // resolves every formula reference.
+  const wholeCatalogue = new statements.ModelBuilder('whole-catalogue');
+  wholeCatalogue.periods('2025Q1..Q4');
+  wholeCatalogue.valueScalar('revenue', { [Q1]: 100.0 });
+  wholeCatalogue.withBuiltinMetrics();
+  assert.throws(() => wholeCatalogue.build(), /Unknown identifier/);
 
   const bad = new statements.ModelBuilder('bad');
   assert.throws(

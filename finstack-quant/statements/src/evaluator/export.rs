@@ -23,7 +23,7 @@ impl StatementResult {
     /// nodes duplicate their numerical value in `value_money` and set
     /// `currency`; scalar nodes leave those two fields null. `source` is the
     /// cell's [`CellSource`](super::CellSource) label (`value`, `forecast`, `formula`,
-    /// `where_masked`), or null when the result records no source for it.
+    /// `where_masked`, `missing`), or null when the result records no source for it.
     ///
     /// # Errors
     ///

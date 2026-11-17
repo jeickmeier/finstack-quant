@@ -582,7 +582,7 @@ impl Evaluator {
         self.compiled_cache = std::sync::Arc::new(analysis.compiled);
         self.forecast_cache.clear();
         self.visibility_cutoff = None;
-        let dag = analysis.graph?;
+        let dag = analysis.graph;
         let eval_order = evaluate_order(&dag)?;
         let node_to_column = std::sync::Arc::new(
             eval_order
@@ -963,11 +963,13 @@ impl Evaluator {
                 NodeValueSource::Value(_) => CellSource::Value,
                 NodeValueSource::Forecast => CellSource::Forecast,
                 NodeValueSource::Formula => CellSource::Formula,
+                NodeValueSource::Missing => CellSource::Missing,
             };
             let value = {
                 let mut mc_z_wrapper: Option<&mut McZCache> = mc_z_cache.as_deref_mut();
                 match source {
                     NodeValueSource::Value(v) => Ok(v),
+                    NodeValueSource::Missing => Ok(f64::NAN),
                     NodeValueSource::Forecast => forecast_eval::evaluate_forecast(
                         node_spec,
                         eval,

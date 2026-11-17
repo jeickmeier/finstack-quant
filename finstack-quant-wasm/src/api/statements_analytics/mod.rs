@@ -472,8 +472,8 @@ pub fn goal_seek(
 /// object out).
 ///
 /// Returns the Rust `Explanation` as a structured object: `source` names the
-/// layer that produced the value (`value`, `forecast`, `formula` or
-/// `where_masked`), `forecast` carries the node's forecast spec for a
+/// layer that produced the value (`value`, `forecast`, `formula`,
+/// `where_masked` or `missing`), `forecast` carries the node's forecast spec for a
 /// forecast cell, and `breakdown` lists the formula's components (including
 /// `cs.*` references) when the formula produced the value. A non-finite
 /// `final_value` or breakdown `value` (for example a `lag` node at the first

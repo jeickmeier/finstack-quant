@@ -152,7 +152,7 @@ def test_growth_terminal_rejects_annual_identifier_with_stub_dates() -> None:
         "meta": {"currency": "USD"},
         "schema_version": 1,
     }
-    with pytest.raises(ValueError, match="complete contiguous history"):
+    with pytest.raises(ValueError, match="differ from the calendar"):
         evaluate_dcf(
             json.dumps(model),
             {
@@ -163,7 +163,7 @@ def test_growth_terminal_rejects_annual_identifier_with_stub_dates() -> None:
         )
 
 
-def test_growth_terminal_uses_full_year_across_annual_stub_identifiers() -> None:
+def test_growth_terminal_uses_full_year_across_half_year_periods() -> None:
     def terminal_pv(actual_id: str, forecast_id: str) -> float:
         model = {
             "id": "complete-year-review",
@@ -197,7 +197,12 @@ def test_growth_terminal_uses_full_year_across_annual_stub_identifiers() -> None
         )
         return result.terminal_value_pv.amount
 
-    assert terminal_pv("2024", "2025") == pytest.approx(terminal_pv("2024H2", "2025H1"))
+    # Annual identifiers on half-year intervals are not a canonical plan.
+    with pytest.raises(ValueError, match="differ from the calendar"):
+        terminal_pv("2024", "2025")
+    # Terminal flow 200 = both half-years; TV = 200 * 1.02 / (0.10 - 0.02),
+    # discounted from the end of 2025H1 at the valuation's own convention.
+    assert terminal_pv("2024H2", "2025H1") > 0.0
 
 
 def test_tornado_rejects_joint_scenarios_mislabeled_as_diagonal_json() -> None:
@@ -238,6 +243,7 @@ def test_binding_requires_values_without_a_rust_default() -> None:
 
     builder = ModelBuilder("re")
     builder.periods("2025Q1..Q2", None)
+    builder.value("placeholder", [])
     model = builder.build()
     lease = LeaseSpec(node_id="lease_a", start="2025Q1", base_rent=100.0)
     with pytest.raises(TypeError):

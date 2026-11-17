@@ -289,7 +289,7 @@ Implementation and independent qualification remain pending.
 The Statements model timeline, explicit value and readiness contract was
 accepted on 2026-11-15. It covers canonical reporting plans, typed observations,
 missing cells and the common validation boundary for runnable models.
-Implementation and independent qualification remain pending.
+It is implemented and qualified.
 [STATEMENTS-CONTRACTS-001](statements-contracts/01-model-timeline-and-values.md#accepted-decision-for-model-timelines-values-and-readiness).
 
 The Statements authoring, import and observation availability contract was

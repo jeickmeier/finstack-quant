@@ -387,15 +387,28 @@ fn test_model_builder_with_builtin_metrics() {
                 ),
             ],
         );
-        model_builder.with_builtin_metrics().unwrap();
-        model_builder.build().unwrap()
+        model_builder
     };
 
-    // Should have revenue, cogs, and all built-in metrics
-    assert!(model.has_node("revenue"));
-    assert!(model.has_node("cogs"));
-    assert!(model.has_node("fin.gross_profit"));
-    assert!(model.has_node("fin.gross_margin"));
+    // The whole catalogue needs inputs this model does not have, and a
+    // runnable model resolves every reference.
+    let mut whole_catalogue = ModelBuilder::from_spec({
+        let mut selected = ModelBuilder::from_spec(model.build().unwrap()).unwrap();
+        let registry = finstack_quant_statements::registry::Registry::with_builtins().unwrap();
+        selected
+            .add_metric_from_registry("fin.gross_margin", &registry)
+            .unwrap();
+        let selected = selected.build().unwrap();
+        assert!(selected.has_node("fin.gross_profit"));
+        assert!(selected.has_node("fin.gross_margin"));
+        selected
+    })
+    .unwrap();
+    whole_catalogue.with_builtin_metrics().unwrap();
+    let error = whole_catalogue
+        .build()
+        .expect_err("catalogue metrics with missing inputs leave unresolved references");
+    assert!(error.to_string().contains("Unknown identifier"), "{error}");
 }
 
 #[test]

@@ -1117,7 +1117,7 @@ impl PyExplanation {
     }
 
     /// Evaluation layer that produced the value: ``"value"``, ``"forecast"``,
-    /// ``"formula"`` or ``"where_masked"``; ``None`` when the results carry no
+    /// ``"formula"``, ``"where_masked"`` or ``"missing"``; ``None`` when the results carry no
     /// cell source.
     #[getter]
     fn source(&self) -> Option<&'static str> {

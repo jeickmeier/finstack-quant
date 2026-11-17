@@ -9653,7 +9653,7 @@ export interface StatementsNamespace {
    * (Rust `StatementResult::to_table_long`): one row per `(node, period)` in
    * the result's node and period declaration order.
    * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
-   * @returns `TableEnvelope` with columns `node_id`, `period_id`, `value`, `value_money`, `currency`, `value_type`, `source`; monetary nodes repeat their value in `value_money` and set `currency`, scalar nodes leave both null; `source` is the evaluation layer that produced the cell (`value`, `forecast`, `formula` or `where_masked`), null when the result records none.
+   * @returns `TableEnvelope` with columns `node_id`, `period_id`, `value`, `value_money`, `currency`, `value_type`, `source`; monetary nodes repeat their value in `value_money` and set `currency`, scalar nodes leave both null; `source` is the evaluation layer that produced the cell (`value`, `forecast`, `formula`, `where_masked` or `missing`), null when the result records none.
    *
    * # Errors
    *
@@ -10320,8 +10320,8 @@ export interface StatementsAnalyticsNamespace {
    * object out).
    *
    * Returns the Rust `Explanation` as a structured object: `source` names the
-   * layer that produced the value (`value`, `forecast`, `formula` or
-   * `where_masked`), `forecast` carries the node's forecast spec for a
+   * layer that produced the value (`value`, `forecast`, `formula`,
+   * `where_masked` or `missing`), `forecast` carries the node's forecast spec for a
    * forecast cell, and `breakdown` lists the formula's components (including
    * `cs.*` references) when the formula produced the value. A non-finite
    * `final_value` or breakdown `value` (for example a `lag` node at the first

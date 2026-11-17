@@ -36,7 +36,7 @@ fn model_node_ids_returns_array() {
 }
 
 #[wasm_bindgen_test]
-fn model_node_ids_empty_model() {
+fn model_node_ids_rejects_a_model_without_nodes() {
     let periods = finstack_quant_core::dates::build_periods("2025Q1..Q1", None)
         .unwrap()
         .periods;
@@ -49,9 +49,8 @@ fn model_node_ids_empty_model() {
         .expect("valid period plan"),
     );
     let json = serde_json::to_string(&model).unwrap();
-    let result = model_node_ids(JsValue::from(&json)).unwrap();
-    let ids: Vec<String> = serde_wasm_bindgen::from_value(result).unwrap();
-    assert!(ids.is_empty());
+    // A runnable model needs a node or a capital-structure instrument.
+    assert!(model_node_ids(JsValue::from(&json)).is_err());
 }
 
 #[wasm_bindgen_test]
@@ -187,7 +186,7 @@ fn validate_financial_model_json_accepts_valid_model() {
     let periods = finstack_quant_core::dates::build_periods("2025Q1..Q1", None)
         .expect("valid periods")
         .periods;
-    let model = finstack_quant_statements::types::FinancialModelSpec::new(
+    let mut model = finstack_quant_statements::types::FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
             finstack_quant_core::dates::PeriodCalendar::Gregorian,
@@ -195,6 +194,10 @@ fn validate_financial_model_json_accepts_valid_model() {
         )
         .expect("valid period plan"),
     );
+    model.add_node(finstack_quant_statements::types::NodeSpec::new(
+        "placeholder",
+        finstack_quant_statements::types::NodeType::Value,
+    ));
     let json = serde_json::to_string(&model).expect("model should serialize to JSON");
     let out = validate_financial_model_json(JsValue::from(&json))
         .expect("validate_financial_model_json should accept valid model");
@@ -202,7 +205,7 @@ fn validate_financial_model_json_accepts_valid_model() {
         serde_json::from_str::<finstack_quant_statements::types::FinancialModelSpec>(&out)
             .expect("validated JSON should deserialize");
     assert_eq!(round_trip.id, "test");
-    assert!(round_trip.nodes.is_empty());
+    assert_eq!(round_trip.nodes.len(), 1);
 }
 
 #[wasm_bindgen_test]

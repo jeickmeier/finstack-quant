@@ -233,7 +233,7 @@ fn named_capital_structure_formulas_keep_native_instrument_currency() {
 }
 
 #[test]
-fn model_period_intervals_must_be_positive_and_disjoint() {
+fn model_period_intervals_must_match_their_identifiers_and_be_contiguous() {
     let mut empty = forecast_model();
     empty.periods.periods[0].end = empty.periods.periods[0].start;
     assert!(
@@ -241,7 +241,7 @@ fn model_period_intervals_must_be_positive_and_disjoint() {
             .validate_semantics()
             .unwrap_err()
             .to_string()
-            .contains("start before end")
+            .contains("not canonical")
     );
 
     let mut overlapping = forecast_model();
@@ -251,10 +251,174 @@ fn model_period_intervals_must_be_positive_and_disjoint() {
             .validate_semantics()
             .unwrap_err()
             .to_string()
-            .contains("must not overlap")
+            .contains("not canonical")
     );
 
     let mut sparse = forecast_model();
     sparse.periods.periods[1].start = date!(2025 - 05 - 01);
-    assert!(sparse.validate_semantics().is_ok(), "gaps remain supported");
+    assert!(
+        sparse
+            .validate_semantics()
+            .unwrap_err()
+            .to_string()
+            .contains("not canonical")
+    );
+}
+
+/// STATEMENTS-CONTRACTS-001 worked example: a quarterly USD series on a
+/// canonical Q1–Q3 plan may omit its Q2 observation. Omitting Q2 from the
+/// plan, or referencing a misspelled node, fails runnable-model validation.
+#[test]
+fn runnable_model_keeps_missing_cells_and_rejects_plan_gaps_and_open_references() {
+    use finstack_quant_statements::evaluator::CellSource;
+
+    let usd = |amount: i64| Money::from((amount, Currency::USD)).into();
+    let mut builder = ModelBuilder::new("admission");
+    builder.periods("2025Q1..Q3", None).unwrap();
+    builder.value("sales", &[(quarter(1), usd(100)), (quarter(3), usd(120))]);
+    builder.compute("double", "sales * 2").unwrap();
+    let model = builder
+        .build()
+        .expect("an omitted observation is a valid model");
+    assert_eq!(
+        model.nodes["sales"].value_type,
+        Some(NodeValueType::Monetary {
+            currency: Currency::USD
+        })
+    );
+
+    let result = Evaluator::new().evaluate(&model).unwrap();
+    assert_eq!(result.get("sales", &quarter(1)), Some(100.0));
+    assert!(result.get("sales", &quarter(2)).unwrap().is_nan());
+    assert_eq!(
+        result.get_source("sales", &quarter(2)),
+        Some(CellSource::Missing)
+    );
+    assert!(result.get("double", &quarter(2)).unwrap().is_nan());
+    assert_eq!(result.get("double", &quarter(3)), Some(240.0));
+
+    // The same model without Q2 in its plan is rejected by every load path.
+    let mut gap = serde_json::to_value(&model).unwrap();
+    gap["periods"]["periods"].as_array_mut().unwrap().remove(1);
+    let error = FinancialModelSpec::from_value(gap.clone()).expect_err("a plan gap is rejected");
+    assert!(error.to_string().contains("contiguous"), "{error}");
+    FinancialModelSpec::from_json(&gap.to_string()).expect_err("from_json rejects the gap");
+    FinancialModelSpec::from_slice_strict(gap.to_string().as_bytes(), &LoadLimits::default())
+        .expect_err("the strict loader rejects the gap");
+    let mut direct = model;
+    direct.periods.periods.remove(1);
+    Evaluator::new()
+        .evaluate(&direct)
+        .expect_err("evaluation revalidates a mutated model");
+
+    let mut misspelled = ModelBuilder::new("admission");
+    misspelled.periods("2025Q1..Q3", None).unwrap();
+    misspelled.value("sales", &[]);
+    misspelled.compute("double", "slaes * 2").unwrap();
+    let error = misspelled
+        .build()
+        .expect_err("an open reference is rejected");
+    assert!(
+        error.to_string().contains("Unknown identifier 'slaes'"),
+        "{error}"
+    );
+}
+
+/// Clause 2: each node kind admits only its own value sources, and every
+/// configured source is validated.
+#[test]
+fn node_kinds_admit_only_their_own_sources() {
+    use finstack_quant_statements::types::{NodeSpec, NodeType};
+
+    let base = || {
+        let mut builder = ModelBuilder::new("kinds");
+        builder.periods("2025Q1..Q2", Some("2025Q1")).unwrap();
+        builder.value("revenue", &[(quarter(1), 100.0.into())]);
+        builder.build().unwrap()
+    };
+    let rejected = |node: NodeSpec, expected: &str| {
+        let mut model = base();
+        model.add_node(node);
+        let error = model.validate_semantics().expect_err(expected);
+        assert!(error.to_string().contains(expected), "{error}");
+    };
+    rejected(
+        NodeSpec::new("v", NodeType::Value).with_formula("revenue"),
+        "cannot have a formula",
+    );
+    rejected(
+        NodeSpec::new("v", NodeType::Value).with_forecast(ForecastSpec::growth(0.1)),
+        "cannot have a forecast",
+    );
+    rejected(NodeSpec::new("c", NodeType::Calculated), "needs a formula");
+    rejected(
+        NodeSpec::new("c", NodeType::Calculated)
+            .with_formula("revenue")
+            .with_forecast(ForecastSpec::growth(0.1)),
+        "cannot have a forecast",
+    );
+    rejected(
+        NodeSpec::new("m", NodeType::Mixed).with_formula("revenue +"),
+        "Invalid formula",
+    );
+    rejected(
+        NodeSpec::new("a-b", NodeType::Value),
+        "not a valid identifier",
+    );
+
+    let mut mixed = base();
+    mixed.add_node(
+        NodeSpec::new("m", NodeType::Mixed)
+            .with_formula("revenue")
+            .with_forecast(ForecastSpec::growth(0.1)),
+    );
+    mixed
+        .validate_semantics()
+        .expect("a Mixed node takes every source");
+
+    // The builder promotes a Value node to Mixed when a forecast is attached.
+    assert_eq!(forecast_model().nodes["revenue"].node_type, NodeType::Mixed);
+}
+
+/// Clause 3: observations are finite; a missing cell is absent. Clause 4: a
+/// runnable model needs a node or an evaluable capital structure.
+#[test]
+fn observations_are_finite_and_a_runnable_model_is_not_empty() {
+    for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let mut builder = ModelBuilder::new("finite");
+        builder.periods("2025Q1..Q2", None).unwrap();
+        builder.value("x", &[(quarter(1), value.into())]);
+        let error = builder
+            .build()
+            .expect_err("a non-finite observation is rejected");
+        assert!(error.to_string().contains("non-finite"), "{error}");
+
+        let mut direct = forecast_model();
+        direct
+            .nodes
+            .get_mut("revenue")
+            .unwrap()
+            .values
+            .as_mut()
+            .unwrap()
+            .insert(quarter(1), value.into());
+        direct
+            .validate_semantics()
+            .expect_err("a directly mutated model is revalidated");
+    }
+    assert!(Money::new(f64::NAN, Currency::USD).is_err());
+
+    let mut typed_empty = ModelBuilder::new("typed-empty");
+    typed_empty.periods("2025Q1..Q2", None).unwrap();
+    typed_empty.value_money("cash", &[]);
+    typed_empty
+        .build()
+        .expect("an empty series is a valid node");
+
+    let mut empty = ModelBuilder::new("empty");
+    empty.periods("2025Q1..Q2", None).unwrap();
+    let error = empty
+        .build()
+        .expect_err("a model with no node is not runnable");
+    assert!(error.to_string().contains("at least one node"), "{error}");
 }

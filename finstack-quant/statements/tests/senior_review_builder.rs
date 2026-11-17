@@ -88,7 +88,7 @@ fn rejected_capital_instruments_preserve_both_builder_states() {
     builder
         .periods("2025Q1..Q2", Some("2025Q1"))
         .expect("timeline")
-        .value_scalar("retained-value", &[(quarter, 123.0)]);
+        .value_scalar("retained_value", &[(quarter, 123.0)]);
     reject_invalid_instruments(&mut builder);
     builder
         .add_swap(swap_params("retried-swap", 0.04))
@@ -97,7 +97,7 @@ fn rejected_capital_instruments_preserve_both_builder_states() {
     assert_eq!(model.id, "retained-model");
     assert_eq!(model.periods.len(), 2);
     assert!(model.periods[0].is_actual);
-    assert!(model.has_node("retained-value"));
+    assert!(model.has_node("retained_value"));
     let debt = model
         .capital_structure
         .expect("capital structure")

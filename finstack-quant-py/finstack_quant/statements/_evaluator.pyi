@@ -381,8 +381,9 @@ class StatementResult:
         dict[str, dict[str, str]]
             Node identifier → period identifier (``"2025Q1"``) → source label:
             ``"value"`` (explicit value), ``"forecast"`` (forecast method),
-            ``"formula"`` (formula) or ``"where_masked"`` (the ``where`` clause
-            was false, so the cell is ``0.0``). Same keys as the evaluated
+            ``"formula"`` (formula), ``"where_masked"`` (the ``where`` clause
+            was false, so the cell is ``0.0``) or ``"missing"`` (no
+            observation, forecast or formula; the cell is NaN). Same keys as the evaluated
             values. Empty for a result that was not produced by an evaluator
             or was serialized before sources were recorded.
         """
@@ -591,8 +592,8 @@ class StatementResult:
         float64 mirror of the monetary amount (f64, not fixed-point Decimal,
         precision); use ``to_json()`` or ``get_money()`` when full fixed-point
         precision is required. ``source`` is the evaluation layer that
-        produced the cell (``value``, ``forecast``, ``formula`` or
-        ``where_masked``, see :attr:`node_sources`); it is null when the
+        produced the cell (``value``, ``forecast``, ``formula``,
+        ``where_masked`` or ``missing``, see :attr:`node_sources`); it is null when the
         result records no source for the cell.
 
         Returns

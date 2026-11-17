@@ -412,7 +412,9 @@ impl JsModelBuilder {
     ///
     /// Twin of Python `ModelBuilder.with_builtin_metrics` (Rust
     /// `ModelBuilder::with_builtin_metrics`). A failed call leaves the
-    /// builder usable.
+    /// builder usable. The catalogue reads many input nodes and `build`
+    /// resolves every formula reference, so the model must define all of
+    /// them; use `addMetricFromRegistry` to add a subset.
     ///
     /// @throws Error with kind `validation` if the built-in catalog cannot be loaded or the builder was consumed.
     #[wasm_bindgen(js_name = withBuiltinMetrics)]
@@ -637,10 +639,15 @@ impl JsModelBuilder {
     /// Build the model specification.
     ///
     /// Twin of Python `ModelBuilder.build` (Rust `ModelBuilder::build`). The
-    /// builder is consumed.
+    /// builder is consumed. Build runs the one runnable-model validation: a
+    /// canonical contiguous timeline with actuals as a prefix, node identifiers
+    /// that follow the formula identifier rules, node kinds with only their
+    /// permitted sources, finite observations (a missing cell is left out,
+    /// never stored as NaN), resolved formula references and no same-period
+    /// dependency cycle.
     ///
     /// @returns The completed `FinancialModelSpec` plain object, accepted by every model-taking function.
-    /// @throws Error with kind `validation` if the model fails semantic validation or the builder was consumed.
+    /// @throws Error with kind `validation` if the model has no node and no capital-structure instrument, breaks any rule above (including a reference to an unknown node), or the builder was consumed.
     #[wasm_bindgen(unchecked_return_type = "generated.statements.FinancialModelSpec")]
     pub fn build(&mut self) -> Result<JsValue, JsValue> {
         let builder = self.take()?;

@@ -227,6 +227,7 @@ fn test_model_spec_with_metadata() {
         model_builder.with_meta("author", serde_json::json!("Test Author"));
         model_builder.with_meta("version", serde_json::json!("1.0.0"));
         model_builder.with_meta("created_at", serde_json::json!("2025-01-01"));
+        model_builder.value("placeholder", &[]);
         model_builder.build().unwrap()
     };
 
@@ -607,29 +608,22 @@ fn test_node_id_hyphenated_builder_accepted() {
     use finstack_quant_statements::builder::ModelBuilder;
     use finstack_quant_statements::types::AmountOrScalar;
 
-    // Hyphenated node IDs must be accepted by the builder and remain retrievable
-    // via string lookup after build.
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..2025Q1", None).unwrap();
-        model_builder.value(
-            "lease-1",
-            &[(
-                PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                AmountOrScalar::scalar(500.0),
-            )],
-        );
-        model_builder
-            .build()
-            .expect("hyphenated node id should be valid")
-    };
-
-    assert!(
-        model.has_node("lease-1"),
-        "model should contain 'lease-1' node"
+    // Node IDs follow the formula identifier rules, so a hyphenated ID, which
+    // a formula would read as a subtraction, is rejected.
+    let mut model_builder = ModelBuilder::new("test");
+    model_builder.periods("2025Q1..2025Q1", None).unwrap();
+    model_builder.value(
+        "lease-1",
+        &[(
+            PeriodId::quarter(2025, 1).expect("valid period fixture"),
+            AmountOrScalar::scalar(500.0),
+        )],
     );
-    let node = model
-        .get_node("lease-1")
-        .expect("node should be retrievable by hyphenated str");
-    assert_eq!(node.node_id.as_str(), "lease-1");
+    let error = model_builder
+        .build()
+        .expect_err("a hyphenated node id is not a valid identifier");
+    assert!(
+        error.to_string().contains("not a valid identifier"),
+        "{error}"
+    );
 }

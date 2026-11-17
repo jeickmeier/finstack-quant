@@ -180,6 +180,7 @@ fn missing_node_returns_error() {
     let model = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder.periods("2025Q1..Q1", None).unwrap();
+        model_builder.value("placeholder", &[]);
         model_builder.build().unwrap()
     };
 

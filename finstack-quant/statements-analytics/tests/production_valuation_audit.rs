@@ -283,7 +283,10 @@ fn growth_terminal_flow_rejects_missing_calendar_quarters() {
         .as_mut()
         .unwrap()
         .shift_remove(&missing_period);
-    model.validate_semantics().unwrap();
+    let error = model
+        .validate_semantics()
+        .expect_err("a plan with a missing period is not canonical");
+    assert!(error.to_string().contains("contiguous"), "{error}");
     let error = evaluate_dcf(
         &model,
         &DcfInputs {
@@ -297,7 +300,7 @@ fn growth_terminal_flow_rejects_missing_calendar_quarters() {
         None,
     )
     .unwrap_err();
-    assert!(error.to_string().contains("complete contiguous history"));
+    assert!(error.to_string().contains("contiguous"), "{error}");
 }
 
 #[test]
@@ -341,8 +344,6 @@ fn growth_terminal_flow_rejects_partial_week_at_calendar_year_boundary() {
 #[test]
 fn growth_terminal_flow_rejects_annual_identifier_on_partial_year() {
     use finstack_quant_core::{currency::Currency, dates::Period, money::Money};
-    use finstack_quant_statements_analytics::analysis::{DcfInputs, DcfOptions, evaluate_dcf};
-    use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
     let period = PeriodId::annual(2025).expect("valid annual period");
     let model = {
         let mut model_builder = ModelBuilder::new("annual stub");
@@ -362,56 +363,28 @@ fn growth_terminal_flow_rejects_annual_identifier_on_partial_year() {
             .unwrap();
         model_builder.value_money("ufcf", &[(period, Money::from((100_i64, Currency::USD)))]);
         model_builder.with_meta("currency", serde_json::json!("USD"));
-        model_builder.build().unwrap()
+        model_builder
     };
-    let error = evaluate_dcf(
-        &model,
-        &DcfInputs {
-            wacc: 0.10,
-            terminal_value: TerminalValueSpec::GordonGrowth {
-                stable_growth_rate: 0.02,
-            },
-            ufcf_node: "ufcf".to_string(),
-            net_debt_override: Some(0.0),
-        },
-        &DcfOptions::default(),
-        None,
-        None,
-    )
-    .unwrap_err();
-    assert!(error.to_string().contains("complete contiguous history"));
+    let error = model
+        .build()
+        .expect_err("an annual identifier on a half-year interval is not canonical");
+    assert!(
+        error.to_string().contains("differ from the calendar"),
+        "{error}"
+    );
 }
 
 #[test]
-fn growth_terminal_flow_uses_complete_year_across_annual_stub_identifiers() {
-    use finstack_quant_core::{currency::Currency, dates::Period, money::Money};
+fn growth_terminal_flow_uses_complete_year_across_half_year_periods() {
+    use finstack_quant_core::{currency::Currency, money::Money};
     use finstack_quant_statements_analytics::analysis::{DcfInputs, DcfOptions, evaluate_dcf};
     use finstack_quant_valuations::instruments::equity::dcf_equity::TerminalValueSpec;
-    let actual = PeriodId::annual(2024).expect("valid annual period");
-    let forecast = PeriodId::annual(2025).expect("valid annual period");
+    let actual = PeriodId::half(2024, 2).expect("valid half-year period");
+    let forecast = PeriodId::half(2025, 1).expect("valid half-year period");
     let model = {
-        let mut model_builder = ModelBuilder::new("complete year across annual stubs");
+        let mut model_builder = ModelBuilder::new("complete year across half-years");
         model_builder
-            .periods_explicit(
-                finstack_quant_core::dates::PeriodPlan::try_new(
-                    finstack_quant_core::dates::PeriodCalendar::Gregorian,
-                    vec![
-                        Period {
-                            id: actual,
-                            start: time::macros::date!(2024 - 07 - 01),
-                            end: time::macros::date!(2025 - 01 - 01),
-                            is_actual: true,
-                        },
-                        Period {
-                            id: forecast,
-                            start: time::macros::date!(2025 - 01 - 01),
-                            end: time::macros::date!(2025 - 07 - 01),
-                            is_actual: false,
-                        },
-                    ],
-                )
-                .expect("valid period plan"),
-            )
+            .periods("2024H2..2025H1", Some("2024H2"))
             .unwrap();
         model_builder.value_money(
             "ufcf",

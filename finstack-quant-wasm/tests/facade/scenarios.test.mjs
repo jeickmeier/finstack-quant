@@ -416,7 +416,7 @@ test('applyScenario stamps the caller configuration into meta', () => {
       calendar: 'gregorian',
       periods: [{ id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: false }],
     },
-    nodes: {},
+    nodes: { x: { node_id: 'x', node_type: 'value' } },
   };
   const withModel = scenarios.applyScenario(
     spec,

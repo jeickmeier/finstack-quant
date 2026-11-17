@@ -130,9 +130,9 @@ aliased to the other.
 
 More generally, `with_builtin_metrics()` inserts every `fin.*` metric as a
 `Calculated` node without creating placeholder nodes for the line items they
-reference. Missing inputs (`opex`, `depreciation`, `total_debt`, …) are not
-diagnosed by `build()`; they surface as unknown-identifier errors when the
-dependency graph is built for evaluation. Load selectively with
+reference. `build()` resolves every reference, so missing inputs (`opex`,
+`depreciation`, `total_debt`, …) fail it with an unknown-identifier error.
+Load selectively with
 `add_metric_from_registry` if you only model part of the chart.
 
 ### Reference thresholds

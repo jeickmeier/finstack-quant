@@ -839,3 +839,28 @@ Wire changes. Each field below is now nullable; every value that exists is uncha
 
 - `FxSpot::new_t1` (use `FxSpot::new(..).with_settlement_days(1)`), `Ndf::effective_fixing_source` and `Ndf::with_quote_convention` (use the builder's `quote_convention`).
 - `InstrumentPricingOverrides::with_bk_sigma` and `with_bk_mean_reversion`; set `model_config.bk_sigma` / `model_config.bk_mean_reversion` directly.
+
+### Statements: formula grammar and runnable-model validation follow the accepted contracts
+
+Formulas (STATEMENTS-CONTRACTS-004): `cumsum`, `cumprod`, `cummin`,
+`cummax`, `std`, `var` and `median` take exactly one argument; a negative
+literal offset to `lag`, `shift`, `diff`, `pct_change` or `growth_rate` is
+rejected at compile time; an identifier needs nonempty dot-separated segments
+(`a..b` and `a.` are rejected); canonical rendering writes logical negation as
+`!`, so `parse_formula("not a > b")` returns `"!(a > b)"`; and `dsl::compile`
+validates a caller-built `StmtExpr` (finite literals, names, arity, 256 terms,
+320 levels) before lowering it.
+
+Models (STATEMENTS-CONTRACTS-001): a period plan must be canonical and
+contiguous, each period with the exact bounds of its identifier (core gains
+`PeriodPlan::validate_canonical`), so gapped plans, business-day grids and
+re-bounded periods are rejected. A node ID follows the formula identifier
+rules (no hyphens or spaces). A `value` node takes observations only and a
+`calculated` node needs a formula; attach a forecast to a `mixed` node.
+Observations must be finite: leave a missing cell out instead of storing NaN.
+Build and load now reject a formula that references an unknown node (it was a
+warning until evaluation) and a model with no node and no capital-structure
+instrument, so `with_builtin_metrics` needs every catalogue input defined.
+An absent observation on a `value` or `mixed` node evaluates as a missing
+cell (NaN) with the new cell source `missing`, where it was an evaluation
+error.

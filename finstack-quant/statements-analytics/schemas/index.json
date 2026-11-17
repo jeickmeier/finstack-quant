@@ -182,7 +182,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/explanation.schema.json",
-      "bytes": 9666,
+      "bytes": 9974,
       "kind": "component",
       "path": "schemas/statements_analytics/1/explanation.schema.json",
       "summary": "Detailed explanation of a node's calculation.",

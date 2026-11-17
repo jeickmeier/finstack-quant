@@ -3,7 +3,7 @@
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::Evaluator;
-use finstack_quant_statements::evaluator::{EvalWarning, MonteCarloConfig};
+use finstack_quant_statements::evaluator::MonteCarloConfig;
 use finstack_quant_statements::types::SeasonalMode;
 use finstack_quant_statements::types::{FinancialModelSpec, ForecastMethod, ForecastSpec};
 use serde_json::json;
@@ -92,17 +92,14 @@ fn forecast_bounds_preserve_missing_observations_and_warnings() {
         for (key, value) in bounds {
             forecast.params.insert(key.into(), json!(value));
         }
-        let model = forecast_model(f64::NAN, forecast);
-        let result = Evaluator::new().evaluate(&model).unwrap();
-        for index in 1..=4 {
-            let period = quarter(index);
-            assert!(result.get("x", &period).unwrap().is_nan());
-            assert!(result.meta.warnings.iter().any(|warning| matches!(
-                warning,
-                EvalWarning::NonFiniteValue { node_id, period: warned_period, value }
-                    if node_id == "x" && *warned_period == period && value.is_nan()
-            )));
-        }
+        let mut model_builder = ModelBuilder::new("forecast-regression");
+        model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+        model_builder.value("x", &[(quarter(1), f64::NAN.into())]);
+        model_builder.forecast("x", forecast);
+        let error = model_builder
+            .build()
+            .expect_err("a non-finite observation is not admitted");
+        assert!(error.to_string().contains("non-finite"), "{error}");
     }
 }
 

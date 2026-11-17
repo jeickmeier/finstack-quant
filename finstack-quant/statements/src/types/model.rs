@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 /// Products of one semantic-validation pass; consumed by evaluation preparation.
 pub(crate) struct SemanticAnalysis {
     pub(crate) compiled: IndexMap<NodeId, finstack_quant_core::expr::Expr>,
-    pub(crate) graph: Result<crate::evaluator::DependencyGraph>,
+    pub(crate) graph: crate::evaluator::DependencyGraph,
 }
 
 /// Parse each source once within this validation run.
@@ -93,7 +93,13 @@ impl FinancialModelSpec {
                 )));
             }
             if let Some(values) = &node.values {
-                for period_id in values.keys() {
+                for (period_id, value) in values {
+                    if !value.value().is_finite() {
+                        return Err(Error::build(format!(
+                            "Node '{node_id}' has a non-finite explicit value for period \
+                             {period_id}; leave a missing cell out of the series"
+                        )));
+                    }
                     if !periods.contains(period_id) {
                         return Err(Error::build(format!(
                             "Node '{node_id}' has an explicit value for period {period_id}, \
@@ -353,81 +359,26 @@ impl FinancialModelSpec {
         self.nodes.contains_key(node_id)
     }
 
-    /// Validate that periods are chronological and actuals form a prefix.
+    /// Validate that the plan is canonical and actuals form a prefix.
     ///
-    /// Both rules exist to prevent look-ahead, and neither is enforced by the
-    /// types: `periods_explicit` and raw JSON both accept an arbitrary `Vec`.
+    /// The plan must be nonempty, hold one period kind, give each period its
+    /// calendar bounds and be contiguous
+    /// ([`PeriodPlan::validate_canonical`]). All-actual and all-forecast
+    /// plans are valid.
     ///
     /// Forecasting anchors on the **last** actual period. With actuals
-    /// interleaved among forecast periods — say `[A 2024Q1, F 2024Q2,
-    /// A 2024Q3, F 2024Q4]`, a "fill in the gap quarter" layout — the forecast
-    /// covering 2024Q2 would be anchored on the 2024Q3 actual, a value from
-    /// *after* the period being forecast, and the random-walk recurrence would
-    /// then carry that future information forward. Positional seasonal and
-    /// time-series indexing assumes contiguous forecast periods for the same
-    /// reason.
+    /// interleaved among forecast periods, a forecast would be anchored on a
+    /// value from after the period being forecast.
     ///
     /// # Errors
     ///
-    /// Returns an error if period identifiers are not strictly increasing,
-    /// intervals are empty, reversed or overlapping, or an actual period
-    /// appears after any forecast period. Gaps between intervals are allowed.
-    fn validate_period_timeline(periods: &[finstack_quant_core::dates::Period]) -> Result<()> {
-        // `PeriodId` order is structural, not chronological across kinds or
-        // calendars, so a model holds one kind in one calendar context
-        // (record CORE-CONVENTIONS-014 #8).
-        if let Some(first) = periods.first() {
-            for period in periods {
-                if period.id.kind() != first.id.kind()
-                    || period.id.is_fiscal() != first.id.is_fiscal()
-                {
-                    return Err(Error::build(format!(
-                        "Model periods must share one period kind and calendar context, but {} \
-                         ({}, {}) follows {} ({}, {})",
-                        period.id,
-                        period.id.kind(),
-                        if period.id.is_fiscal() {
-                            "fiscal"
-                        } else {
-                            "Gregorian"
-                        },
-                        first.id,
-                        first.id.kind(),
-                        if first.id.is_fiscal() {
-                            "fiscal"
-                        } else {
-                            "Gregorian"
-                        },
-                    )));
-                }
-            }
-        }
-        for period in periods {
-            if period.end <= period.start {
-                return Err(Error::build(format!(
-                    "Model period {} must have start before end, got [{}, {})",
-                    period.id, period.start, period.end
-                )));
-            }
-        }
-        for window in periods.windows(2) {
-            let [prev, next] = window else { continue };
-            if next.id <= prev.id || next.start <= prev.start {
-                return Err(Error::build(format!(
-                    "Model periods must be in strictly increasing chronological order, but \
-                     {} appears after {}. Forecasts anchor on the last actual period, so an \
-                     out-of-order timeline can silently anchor a forecast on a later value.",
-                    next.id, prev.id
-                )));
-            }
-            if next.start < prev.end {
-                return Err(Error::build(format!(
-                    "Model period {} starts at {} before the preceding period {} ends at {}; \
-                     period intervals must not overlap",
-                    next.id, next.start, prev.id, prev.end
-                )));
-            }
-        }
+    /// Returns an error for an empty plan, mixed period kinds, bounds that
+    /// differ from the identifier's calendar bounds, a gap or disorder between
+    /// periods, or an actual period after any forecast period.
+    fn validate_period_timeline(periods: &PeriodPlan) -> Result<()> {
+        periods
+            .validate_canonical()
+            .map_err(|error| Error::build(format!("Model timeline is not canonical: {error}")))?;
 
         if let Some(first_forecast) = periods.iter().position(|p| !p.is_actual)
             && let Some(stray) = periods
@@ -454,23 +405,28 @@ impl FinancialModelSpec {
 
     /// Validate model semantics that serde alone cannot enforce.
     ///
-    /// This mirrors the terminal validation performed by the builder so JSON
-    /// entry points reject structurally invalid models before evaluation. It
-    /// infers omitted node value types from explicit values, validates formula
-    /// syntax and known monetary/scalar dimensions, and validates the optional
+    /// This is the one validation path for a runnable model: the builder, every
+    /// JSON loader and the evaluator all run it. It requires a canonical
+    /// contiguous period plan with actuals as a prefix, checks each node kind
+    /// against its permitted sources, infers omitted node value types from
+    /// explicit values, validates formula syntax and known monetary/scalar
+    /// dimensions, resolves every formula and `where` reference, rejects
+    /// same-period dependency cycles and validates the optional
     /// capital-structure waterfall. This method may populate `value_type` on
     /// nodes that have explicit values and no declared type.
     ///
     /// # Errors
     ///
-    /// Returns a build error for an empty or invalid period set, reserved node IDs,
-    /// a node ID that differs from its map key, values outside the timeline,
-    /// incompatible node-type fields (such as a calculated node with values),
-    /// mixed scalar/monetary values or currencies within a node, invalid
-    /// forecasts, formulas or known dimensions, or an invalid waterfall. Unknown formula
-    /// references are warned about and deferred to evaluation to allow optional
-    /// registry metrics; callers should treat that warning as a likely model
-    /// authoring error and resolve it before production use.
+    /// Returns a build error for an empty, gapped, misordered or mixed-kind
+    /// period plan or one whose bounds differ from its identifiers; a model
+    /// with no node and no capital-structure instrument; an invalid or
+    /// reserved node ID, or one that differs from its map key; a Value node
+    /// with a formula or forecast, or a Calculated node without a formula or
+    /// with values or a forecast; a non-finite observation, a value outside
+    /// the timeline, or mixed scalar/monetary values or currencies within a
+    /// node; invalid forecasts, formulas or known dimensions; or an invalid
+    /// waterfall. Returns an evaluation error for a reference to an unknown
+    /// node or a same-period dependency cycle.
     pub fn validate_semantics(&mut self) -> Result<()> {
         self.analyze_semantics().map(|_| ())
     }
@@ -482,8 +438,16 @@ impl FinancialModelSpec {
         if self.periods.is_empty() {
             return Err(Error::build("Model must have at least one period"));
         }
-
         Self::validate_period_timeline(&self.periods)?;
+        let evaluable_capital_structure = self
+            .capital_structure
+            .as_ref()
+            .is_some_and(|cs| !cs.debt_instruments.is_empty());
+        if self.nodes.is_empty() && !evaluable_capital_structure {
+            return Err(Error::build(
+                "Model must have at least one node or a capital structure with an instrument",
+            ));
+        }
         let inferred_explicit_types = self.validate_explicit_values()?;
 
         for node_id in self.nodes.keys() {
@@ -508,8 +472,19 @@ impl FinancialModelSpec {
                             node_id
                         )));
                     }
+                    if node.forecast.is_some() {
+                        return Err(Error::build(format!(
+                            "Value node '{node_id}' cannot have a forecast — use Mixed type (a \
+                             Value node takes explicit observations only)"
+                        )));
+                    }
                 }
                 NodeType::Calculated => {
+                    if node.formula_text.is_none() {
+                        return Err(Error::build(format!(
+                            "Calculated node '{node_id}' needs a formula"
+                        )));
+                    }
                     if node.forecast.is_some() {
                         return Err(Error::build(format!(
                             "Calculated node '{}' cannot have a forecast — use Mixed type (a \
@@ -649,26 +624,8 @@ impl FinancialModelSpec {
             cs.validate()?;
         }
 
-        let graph = crate::evaluator::DependencyGraph::from_parsed(self, &parsed);
-        match &graph {
-            Ok(graph) => graph.detect_cycles()?,
-            Err(e) => {
-                // The graph fails to build when a formula references an unknown
-                // identifier (which also means cycle detection is skipped for
-                // this model). This is tolerated rather than fatal because
-                // `with_builtin_metrics` intentionally registers `fin.*` metrics
-                // that reference user nodes which may not all be present. Surface
-                // it at `warn` (not `debug`) so a genuine typo — and the skipped
-                // cycle check — is visible rather than silent.
-                tracing::warn!(
-                    model_id = %self.id,
-                    error = %e,
-                    "Skipping cycle detection: dependency graph could not be built \
-                     (a formula references an unknown identifier). Verify node references; \
-                     cycles will only be caught later, at evaluation."
-                );
-            }
-        }
+        let graph = crate::evaluator::DependencyGraph::from_parsed(self, &parsed)?;
+        graph.detect_cycles()?;
 
         Ok(SemanticAnalysis { compiled, graph })
     }
@@ -1005,7 +962,7 @@ mod period_timeline_tests {
             .validate_semantics()
             .expect_err("descending periods must be rejected");
         assert!(
-            err.to_string().contains("increasing"),
+            err.to_string().contains("not canonical"),
             "expected the ordering diagnostic: {err}"
         );
     }

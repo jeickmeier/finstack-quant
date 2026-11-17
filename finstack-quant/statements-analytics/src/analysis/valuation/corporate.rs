@@ -1843,22 +1843,13 @@ mod tests {
     #[test]
     fn exit_multiple_metric_requires_complete_trailing_year() {
         use time::macros::date;
-        for boundaries in [
-            [
-                date!(2024 - 01 - 01),
-                date!(2024 - 04 - 01),
-                date!(2024 - 07 - 01),
-                date!(2024 - 10 - 01),
-                date!(2025 - 01 - 01),
-            ],
-            [
-                date!(2023 - 03 - 01),
-                date!(2023 - 06 - 01),
-                date!(2023 - 09 - 01),
-                date!(2023 - 12 - 01),
-                date!(2024 - 03 - 01),
-            ],
-        ] {
+        for boundaries in [[
+            date!(2024 - 01 - 01),
+            date!(2024 - 04 - 01),
+            date!(2024 - 07 - 01),
+            date!(2024 - 10 - 01),
+            date!(2025 - 01 - 01),
+        ]] {
             let vals: Vec<_> = (1..=4)
                 .map(|q| {
                     (

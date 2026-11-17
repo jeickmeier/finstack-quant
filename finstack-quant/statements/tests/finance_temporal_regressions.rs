@@ -78,12 +78,9 @@ fn fiscal_weekly_offsets_include_the_short_final_week() {
     close(result.get("difference", &periods[2].id).unwrap(), 11.0);
     close(result.get("nested", &periods[2].id).unwrap(), 105.0);
 
-    let sparse = offset_model(
-        vec![periods[0].clone(), periods[2].clone()],
-        &[100.0, 121.0],
-    );
-    let sparse_result = Evaluator::new().evaluate(&sparse).unwrap();
-    assert!(sparse_result.get("prior", &periods[2].id).unwrap().is_nan());
+    fixture_plan(vec![periods[0].clone(), periods[2].clone()])
+        .validate_canonical()
+        .expect_err("a plan that skips the short final week is not canonical");
 }
 
 #[test]
@@ -108,12 +105,9 @@ fn fiscal_daily_offsets_cross_leap_and_nonleap_fiscal_years() {
         close(result.get("change", &periods[2].id).unwrap(), 0.1);
         close(result.get("nested", &periods[2].id).unwrap(), 105.0);
 
-        let sparse = offset_model(
-            vec![periods[0].clone(), periods[2].clone()],
-            &[100.0, 121.0],
-        );
-        let sparse_result = Evaluator::new().evaluate(&sparse).unwrap();
-        assert!(sparse_result.get("prior", &periods[2].id).unwrap().is_nan());
+        fixture_plan(vec![periods[0].clone(), periods[2].clone()])
+            .validate_canonical()
+            .expect_err("a plan that skips a fiscal day is not canonical");
     }
 }
 
@@ -361,28 +355,26 @@ fn ytd_starts_at_the_first_fiscal_period_of_the_fiscal_year() {
 fn daily_ttm_sums_twelve_calendar_months_of_calendar_and_business_days() {
     let all_days = build_periods("2024D1..2025D365", None).unwrap().periods;
     for business_only in [false, true] {
-        let periods: Vec<Period> = all_days
+        // The plan is every calendar day; a business-day model leaves the
+        // weekend observations out.
+        let values: Vec<_> = all_days
             .iter()
             .filter(|p| !business_only || p.start.weekday().number_days_from_monday() < 5)
-            .cloned()
-            .collect();
-        let values: Vec<_> = periods
-            .iter()
             .map(|period| (period.id, AmountOrScalar::scalar(1.0)))
             .collect();
         let mut model_builder = ModelBuilder::new("daily-ttm");
         model_builder
-            .periods_explicit(fixture_plan(periods))
+            .periods_explicit(fixture_plan(all_days.clone()))
             .unwrap();
         model_builder.value("x", &values);
         model_builder.compute("ltm", "ttm(x)").unwrap();
         let result = Evaluator::new()
             .evaluate(&model_builder.build().unwrap())
             .unwrap();
-        // A calendar-day model sums 2025's 365 days. A business-day grid is
-        // not full calendar-day coverage (absent rows do not prove weekends
-        // or holidays), so its window is incomplete (record
-        // CORE-CONVENTIONS-014 #11).
+        // A calendar-day model sums 2025's 365 days. Business-day
+        // observations are not full calendar-day coverage (absent cells do
+        // not prove weekends or holidays), so the window is incomplete
+        // (record CORE-CONVENTIONS-014 #11).
         let year_end = PeriodId::day(2025, 365).unwrap();
         let ltm = result.get("ltm", &year_end).unwrap();
         if business_only {
@@ -426,11 +418,7 @@ fn model_rejects_periods_of_mixed_kinds() {
                 .build()
                 .expect_err("mixed period kinds must be rejected"),
         };
-        assert!(
-            err.to_string()
-                .contains("one period kind and calendar context"),
-            "{err}"
-        );
+        assert!(err.to_string().contains("one period kind"), "{err}");
     }
 }
 

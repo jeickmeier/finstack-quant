@@ -306,9 +306,14 @@ class TestModelBuilderForecasts:
         b.compute("bonus", "revenue * 0.01")
         b.where_clause("revenue > 50")
         b.with_meta("source", '{"system":"unit-test"}')
-        b.with_builtin_metrics()
+        b.add_metric_from_registry("fin.gross_profit", statements.Registry.with_builtins())
         model = b.build()
         assert model.has_node("fin.gross_profit")
+        # The whole catalogue reads inputs this model does not define.
+        b = statements.ModelBuilder.from_spec(model)
+        b.with_builtin_metrics()
+        with pytest.raises(ValueError, match="Unknown identifier"):
+            b.build()
         assert '"where_text":"revenue > 50"' in model.to_json()
 
     def test_metric_registry_add_metric_from_registry(self) -> None:

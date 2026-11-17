@@ -38,9 +38,17 @@ const RESERVED_DSL_IDENTIFIERS: &[&str] = &["if", "and", "or", "not", "true", "f
 ///
 /// # Errors
 ///
-/// Returns an error if `node_id` uses a reserved prefix, is `period_id`, or
-/// collides with a DSL keyword.
+/// Returns an error if `node_id` is not a formula identifier (nonempty
+/// dot-separated segments of letters, digits and underscores, starting with a
+/// letter or underscore), uses a reserved prefix, is `period_id`, or collides
+/// with a DSL keyword.
 pub fn validate_node_id(node_id: &str) -> Result<()> {
+    if !crate::dsl::signatures::is_valid_identifier(node_id) {
+        return Err(Error::build(format!(
+            "Node ID '{node_id}' is not a valid identifier: use nonempty dot-separated \
+             segments of letters, digits and underscores, starting with a letter or underscore"
+        )));
+    }
     if node_id == "period_id" {
         return Err(Error::build(
             "Node ID 'period_id' is reserved for the timeline column in result exports",
@@ -853,14 +861,19 @@ impl ModelBuilder {
     ///     model_builder.value("revenue", &[]);
     ///     model_builder.value("cogs", &[]);
     ///     model_builder.with_builtin_metrics()?;
-    ///     model_builder.build()?
+    ///     model_builder
     /// };
     ///
-    /// // Now you can use metrics like fin.gross_profit
-    /// assert!(model.has_node("fin.gross_profit"));
+    /// // The catalogue is staged; `build` needs every input it reads.
+    /// assert!(model.nodes().contains_key("fin.gross_profit"));
+    /// assert!(model.build().is_err());
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The whole catalogue reads many input nodes. [`build`](Self::build)
+    /// resolves every reference, so it succeeds only when the model defines
+    /// all of them; add a subset with [`add_metric_from_registry`].
     ///
     /// [`add_metric_from_registry`]: ModelBuilder::add_metric_from_registry
     ///
@@ -1000,16 +1013,17 @@ impl ModelBuilder {
     ///
     /// The returned [`FinancialModelSpec`] is the immutable input to the
     /// evaluator. Formula and `where` references retain the exact node IDs
-    /// supplied by the caller; unknown identifiers are diagnosed by the
-    /// dependency graph instead of being rewritten.
+    /// supplied by the caller; an unknown identifier is an error, never
+    /// rewritten.
     ///
     /// # Errors
     ///
-    /// Returns an error if the completed specification violates semantic
-    /// invariants such as invalid node definitions or incompatible values.
-    /// Builder calls may accept intermediate state, so this is the authoritative
-    /// whole-model validation boundary. Unknown formula references are surfaced
-    /// when the dependency graph is prepared for evaluation.
+    /// Returns the [`FinancialModelSpec::validate_semantics`] error: a
+    /// non-canonical period plan, a model with no node and no capital-structure
+    /// instrument, an invalid node definition or observation, a reference to an
+    /// unknown node, or a same-period dependency cycle. Builder calls may
+    /// accept an incomplete draft, so this is the whole-model validation
+    /// boundary.
     pub fn build(self) -> Result<FinancialModelSpec> {
         let _span = tracing::info_span!(
             "statements.build",
@@ -1272,7 +1286,6 @@ impl MixedNodeBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::evaluator::Evaluator;
 
     #[test]
     fn builtin_metrics_do_not_overwrite_an_existing_node() {
@@ -1357,13 +1370,10 @@ mod tests {
                 .compute("gross_profit", "rev - cogs")
                 .expect("valid formula");
             model_builder_1
-                .build()
-                .expect("formula references are checked when preparing evaluation")
         };
 
-        let mut evaluator = Evaluator::new();
-        let error = evaluator
-            .evaluate(&model)
+        let error = model
+            .build()
             .expect_err("the alias must not be rewritten to revenue");
         let message = error.to_string();
         assert!(message.contains("Unknown identifier 'rev'"));

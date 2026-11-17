@@ -246,6 +246,12 @@ export default [
     "description": "The node's `where` clause evaluated to false (or `NaN`) for this\nperiod, so the cell was set to `0.0` without consulting the value,\nforecast or formula."
   },
   {
+    "path": "#/$defs/d_2a886a29e286928aba1b/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellSource/oneOf/4",
+    "const": "missing",
+    "description": "No observation, forecast or formula supplies this period: the cell is\nmissing and its value is `NaN`. A missing cell is never a zero."
+  },
+  {
     "path": "#/$defs/d_41c015bc9e84634e3d38",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json#/$defs/PeriodId",
     "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`."

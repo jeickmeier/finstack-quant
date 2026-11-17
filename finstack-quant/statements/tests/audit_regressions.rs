@@ -41,7 +41,7 @@ fn declared_units_must_match_observations() {
 }
 
 #[test]
-fn sparse_periods_do_not_shorten_lags_or_fill_ttm() {
+fn sparse_period_plans_are_rejected() {
     let mut model = {
         let mut model_builder = ModelBuilder::new("sparse");
         model_builder.periods("2024Q1..2025Q1", None).unwrap();
@@ -64,18 +64,10 @@ fn sparse_periods_do_not_shorten_lags_or_fill_ttm() {
         .periods
         .periods
         .retain(|period| period.id != q(2024, 2));
-    model
-        .nodes
-        .get_mut("x")
-        .unwrap()
-        .values
-        .as_mut()
-        .unwrap()
-        .shift_remove(&q(2024, 2));
-    let result = Evaluator::new().evaluate(&model).unwrap();
-    assert!(result.get("far", &q(2025, 1)).unwrap().is_nan());
-    assert!(result.get("ttm", &q(2025, 1)).unwrap().is_nan());
-    assert_eq!(result.get("previous_year", &q(2025, 1)), Some(100.0));
+    let error = Evaluator::new()
+        .evaluate(&model)
+        .expect_err("a plan with a missing period is not a canonical timeline");
+    assert!(error.to_string().contains("contiguous"), "{error}");
 }
 
 #[test]
@@ -114,7 +106,6 @@ fn ewm_normalizes_after_each_observation() {
             "x",
             &[
                 (q(2025, 1), 1.0.into()),
-                (q(2025, 2), f64::NAN.into()),
                 (q(2025, 3), 3.0.into()),
                 (q(2025, 4), 4.0.into()),
             ],

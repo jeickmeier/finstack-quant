@@ -317,7 +317,7 @@ export type ReversionMethod =
  * `Value > Forecast > Formula`, after the node's optional `where` mask. The
  * winning layer is recorded per cell in [`StatementResult::node_sources`].
  */
-export type CellSource = "value" | "forecast" | "formula" | "where_masked";
+export type CellSource = "value" | "forecast" | "formula" | "where_masked" | "missing";
 /**
  * Category that groups related checks together.
  */
@@ -2851,8 +2851,9 @@ export interface Explanation {
   /**
    * Evaluation layer that produced `final_value` under the
    * `Value > Forecast > Formula` precedence: `value` (the explicit value
-   * stored on the node), `forecast`, `formula`, or `where_masked` (the
-   * node's `where` clause zeroed the cell).
+   * stored on the node), `forecast`, `formula`, `where_masked` (the
+   * node's `where` clause zeroed the cell) or `missing` (no observation,
+   * forecast or formula; the value is NaN).
    *
    * Read from [`StatementResult::node_sources`]; `None` when the results
    * carry no source for the cell (hand-built results, or results or

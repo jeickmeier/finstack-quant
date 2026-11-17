@@ -268,7 +268,7 @@ test('statements correlated paths retain sampled shocks when peer values round f
     model.nodes = {
       peer: {
         node_id: 'peer',
-        node_type: 'value',
+        node_type: 'mixed',
         values: { '2025Q1': tiny ? 1e16 : 100 },
         forecast: { method, params },
       },

@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **654 review items across 33 source scopes with open items**
+This backlog consolidates **653 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (507): implementation and verification work against an
+- **Reconciliation** (506): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (38): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -68,7 +68,7 @@ product consequences remain in their product scope.
 | [Calibration: Hull–White and LMM](#calibration-hullwhite-and-lmm) | 18 |
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
 | [Statements: capital structure](#statements-capital-structure) | 14 |
-| [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 16 |
+| [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 15 |
 | [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 15 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 16 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
@@ -1049,8 +1049,6 @@ product consequences remain in their product scope.
 - **Reconciliation — Bundled reported-cost earnings and margins.** Reconcile the bundled earnings, margins and cost ratios, including signed expenses, known-zero and missing dependencies, revenue eligibility and recomputation from aggregated inputs. Qualify the D&A inclusion and single add-back with an independent accounting example across formulas, examples, bindings and fixtures. [Accepted STATEMENTS-CONTRACTS-007](statements-contracts/07-earnings-and-margins.md#accepted-decision-for-reported-cost-earnings-and-margins).
 
 - **Reconciliation — Typed capital selectors in Statements formulas.** Replace the `cs.<component>.<instrument or total>` reference form with the typed capital reporting components and selectors, including instrument, native-currency total and consolidated scopes, and qualify each selector through parsing, rendering, compilation and evaluation. The rest of the formula grammar, signature and AST-validation contract is reconciled. [Accepted STATEMENTS-CONTRACTS-004](statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation) · [Capital reporting and selectors](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
-
-- **Reconciliation — Runnable Statements models require a canonical timeline and validated inputs.** Enforce canonical contiguous period plans, source and observation validity, supported units and shared complete validation for build and load. Qualify draft-to-runnable admission, missing cells and typed empty series, formula and capital restrictions, and host and wire paths. [Accepted STATEMENTS-CONTRACTS-001](statements-contracts/01-model-timeline-and-values.md#accepted-decision-for-model-timelines-values-and-readiness).
 
 - **Reconciliation — Statements authoring, imports and point-in-time availability.** Implement shared DSL identifier checks, duplicate rejection, named atomic edits and forecast attachment, validated period-label imports and explicit availability on identified source snapshots. Qualify sparse and unordered imports, publication-date cutoffs, revision replay, distinguished forecast assumptions and full-snapshot mode. [Accepted STATEMENTS-CONTRACTS-002](statements-contracts/02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability).
 

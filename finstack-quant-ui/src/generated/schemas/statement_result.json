@@ -335,6 +335,11 @@
           "const": "where_masked",
           "description": "The node's `where` clause evaluated to false (or `NaN`) for this\nperiod, so the cell was set to `0.0` without consulting the value,\nforecast or formula.",
           "type": "string"
+        },
+        {
+          "const": "missing",
+          "description": "No observation, forecast or formula supplies this period: the cell is\nmissing and its value is `NaN`. A missing cell is never a zero.",
+          "type": "string"
         }
       ]
     },

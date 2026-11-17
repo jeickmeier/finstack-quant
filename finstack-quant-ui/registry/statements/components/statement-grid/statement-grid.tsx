@@ -33,6 +33,7 @@ const sourceGlyphs: Record<StatementCellSource, string> = {
   forecast: "↗",
   formula: "ƒ",
   where_masked: "∅",
+  missing: "·",
 };
 const sourceOrder = Object.keys(sourceGlyphs) as StatementCellSource[];
 

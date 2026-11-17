@@ -258,6 +258,12 @@ export default [
     "description": "The node's `where` clause evaluated to false (or `NaN`) for this\nperiod, so the cell was set to `0.0` without consulting the value,\nforecast or formula."
   },
   {
+    "path": "#/$defs/d_2a886a29e286928aba1b/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellSource/oneOf/4",
+    "const": "missing",
+    "description": "No observation, forecast or formula supplies this period: the cell is\nmissing and its value is `NaN`. A missing cell is never a zero."
+  },
+  {
     "path": "#/$defs/d_4f32370227b1985d85e9",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckResult",
     "description": "Outcome of a single check execution."

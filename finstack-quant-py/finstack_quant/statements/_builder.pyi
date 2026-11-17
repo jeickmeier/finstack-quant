@@ -394,6 +394,10 @@ class ModelBuilder:
         """
         Add all built-in statement metrics to the model.
 
+        The catalogue reads many input nodes and :meth:`build` resolves every
+        formula reference, so the model must define all of them. Use
+        :meth:`add_metric_from_registry` to add a subset.
+
         Returns
         -------
         ModelBuilder
@@ -785,9 +789,15 @@ class ModelBuilder:
         """
         Materialize the ``FinancialModelSpec`` and consume the builder.
 
-        Validates node identities, explicit-value periods, forecasts, formula
-        dimensions and timeline intervals. ``period_id`` is reserved for the
-        timeline column in result exports.
+        Runs the one runnable-model validation: a canonical contiguous
+        timeline with actuals as a prefix, node identifiers that follow the
+        formula identifier rules, node kinds with only their permitted
+        sources (a ``value`` node takes observations only; a ``calculated``
+        node needs a formula), finite observations inside the timeline,
+        forecasts, formula dimensions, resolved formula references and no
+        same-period dependency cycle. A missing cell is left out of a series;
+        it is never stored as NaN. ``period_id`` is reserved for the timeline
+        column in result exports.
 
         Returns
         -------
@@ -797,7 +807,7 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If the builder was already consumed or the model (including its timeline) violates its semantic invariants.
+            If the builder was already consumed, the model has no node and no capital-structure instrument, or the model violates any rule above, including a formula that references an unknown node.
 
         """
         ...
@@ -808,7 +818,7 @@ class ModelBuilder:
         Parameters
         ----------
         plan:
-            Non-empty PeriodPlan (for example from ``build_periods`` or ``build_fiscal_periods``) whose calendar context the model retains. Its periods must be one kind with positive, nonoverlapping intervals; gaps are allowed. Build rejects a non-increasing timeline or actuals that do not form a prefix.
+            Non-empty PeriodPlan (for example from ``build_periods`` or ``build_fiscal_periods``) whose calendar context the model retains. Its periods must be one kind, each with the exact bounds of its identifier, and contiguous. Build rejects a gapped or misordered timeline and actuals that do not form a prefix.
 
         Returns
         -------

@@ -393,7 +393,7 @@ export type D_76Adf23Abc095Fd56514 =
  * `Value > Forecast > Formula`, after the node's optional `where` mask. The
  * winning layer is recorded per cell in [`StatementResult::node_sources`].
  */
-export type D_2A886A29E286928Aba1B = "value" | "forecast" | "formula" | "where_masked";
+export type D_2A886A29E286928Aba1B = "value" | "forecast" | "formula" | "where_masked" | "missing";
 /**
  * Node value type classification.
  *

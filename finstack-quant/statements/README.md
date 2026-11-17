@@ -147,7 +147,8 @@ crate.
 `Registry::with_builtins()` loads the bundled `fin.*` catalog, embedded at
 compile time from [`data/metrics`](data/metrics/README.md) — no runtime data
 directory is required, including in WASM builds. `ModelBuilder::with_builtin_metrics()`
-loads and inserts them all; `ModelBuilder::add_metric_from_registry(id, &registry)`
+loads and inserts them all, so the model must define every input the catalog
+reads before `build()`; `ModelBuilder::add_metric_from_registry(id, &registry)`
 adds one plus its in-registry dependencies, in dependency order, skipping any id
 the model already defines. Additional namespaces load via
 `Registry::load_from_json`, `load_from_json_str`, or `load_registry`; a registry

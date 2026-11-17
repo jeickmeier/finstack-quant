@@ -201,6 +201,7 @@ fn financial_model_missing_version_is_rejected_by_all_loaders() {
     let model = {
         let mut model_builder = ModelBuilder::new("missing-version");
         model_builder.periods("2025Q1..Q1", None).expect("periods");
+        model_builder.value("placeholder", &[]);
         model_builder.build().expect("model")
     };
     let mut json = serde_json::to_value(model).expect("model serializes");
@@ -225,6 +226,7 @@ fn financial_model_accepts_explicit_null_optional_capital_structure() {
     let model = {
         let mut model_builder = ModelBuilder::new("null-capital-structure");
         model_builder.periods("2025Q1..Q1", None).expect("periods");
+        model_builder.value("placeholder", &[]);
         model_builder.build().expect("model")
     };
     let mut json = serde_json::to_value(model).expect("model serializes");
@@ -245,6 +247,7 @@ fn financial_model_strict_loader_rejects_zero_future_malformed_and_invalid_seman
     let model = {
         let mut model_builder = ModelBuilder::new("strict");
         model_builder.periods("2025Q1..Q1", None).expect("periods");
+        model_builder.value("placeholder", &[]);
         model_builder.build().expect("model")
     };
     let base = serde_json::to_value(model).expect("model serializes");
@@ -292,6 +295,7 @@ fn financial_model_requires_exact_v1_marker() {
         model_builder
             .periods("2025Q1..Q2", None)
             .expect("valid periods");
+        model_builder.value("placeholder", &[]);
         model_builder.build().expect("valid model")
     };
     let valid = serde_json::to_value(model).expect("serialize model");

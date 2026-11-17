@@ -100,7 +100,7 @@ def test_explicit_forecast_keeps_growth_anchor_and_seasonal_phase(forecast_json:
         "nodes": {
             "revenue": {
                 "node_id": "revenue",
-                "node_type": "value",
+                "node_type": "mixed",
                 "values": {"2025Q1": 80.0},
                 "forecast": json.loads(forecast_json),
             }

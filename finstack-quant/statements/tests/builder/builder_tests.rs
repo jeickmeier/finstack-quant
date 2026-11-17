@@ -22,7 +22,8 @@ fn test_periods_parsing() {
     };
     assert!(result.is_ok());
 
-    let builder = result.unwrap();
+    let mut builder = result.unwrap();
+    builder.value("placeholder", &[]);
     let model = builder.build().unwrap();
 
     assert_eq!(model.periods.len(), 4);
@@ -41,6 +42,7 @@ fn test_periods_with_actuals_cutoff() {
     let model = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
+        model_builder.value("placeholder", &[]);
         model_builder.build().unwrap()
     };
 
@@ -69,6 +71,7 @@ fn test_periods_explicit() {
                 .expect("valid period plan"),
             )
             .unwrap();
+        model_builder.value("placeholder", &[]);
         model_builder.build().unwrap()
     };
 
@@ -98,6 +101,7 @@ fn test_model_serialization() {
     let model = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("placeholder", &[]);
         model_builder.build().unwrap()
     };
 
@@ -244,10 +248,12 @@ fn test_calculated_node() {
         model_builder
             .compute("gross_profit", "revenue - cogs")
             .unwrap();
+        model_builder.value("revenue", &[]);
+        model_builder.value("cogs", &[]);
         model_builder.build().unwrap()
     };
 
-    assert_eq!(model.nodes.len(), 1);
+    assert_eq!(model.nodes.len(), 3);
     let node = model.get_node("gross_profit").unwrap();
 
     assert_eq!(node.node_type, NodeType::Calculated);
@@ -322,6 +328,7 @@ fn test_metadata() {
         model_builder.periods("2025Q1..Q2", None).unwrap();
         model_builder.with_meta("author", serde_json::json!("Test User"));
         model_builder.with_meta("version", serde_json::json!("1.0.0"));
+        model_builder.value("placeholder", &[]);
         model_builder.build().unwrap()
     };
 
@@ -335,6 +342,7 @@ fn test_schema_version() {
     let model = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder.periods("2025Q1..Q2", None).unwrap();
+        model_builder.value("placeholder", &[]);
         model_builder.build().unwrap()
     };
 

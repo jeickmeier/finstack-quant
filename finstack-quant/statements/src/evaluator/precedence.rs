@@ -20,7 +20,9 @@ pub(crate) struct HiddenObservation {
 /// - If explicit value exists for this period (and is visible) → use Value
 /// - Else if forecast is applicable → use Forecast
 /// - Else if formula exists → use Formula
-/// - Else → error (node cannot be resolved)
+/// - Else, for a Value or Mixed node → Missing (the cell has no observation)
+/// - A Value node whose observation is hidden by the as-of cutoff, or a
+///   Calculated node without a formula → error
 ///
 /// # Arguments
 /// * `node_spec` - Node metadata that includes values, forecast config, and formula text
@@ -55,17 +57,16 @@ pub(crate) fn resolve_node_value(
 
     // 4. No resolution method available
     match node_spec.node_type {
-        NodeType::Value => {
+        NodeType::Value | NodeType::Mixed => {
             let message = match hidden {
-                None => format!(
-                    "Value node '{}' has no value for period {}",
-                    node_spec.node_id, period_id
-                ),
+                // A missing cell is represented by absence
+                // (STATEMENTS-CONTRACTS-001 #3).
+                None => return Ok(NodeValueSource::Missing),
                 Some(HiddenObservation {
                     available_on,
                     as_of,
                 }) => format!(
-                    "Value node '{}' has no value visible under the active as_of policy for \
+                    "Node '{}' has no value visible under the active as_of policy for \
                      period {period_id}: its actual is available on {available_on}, after \
                      as_of {as_of} (an actual becomes visible on its availability date, by \
                      default the period's exclusive end); use an as_of on or after \
@@ -78,10 +79,6 @@ pub(crate) fn resolve_node_value(
         NodeType::Calculated => Err(Error::eval(format!(
             "Calculated node '{}' has no formula",
             node_spec.node_id
-        ))),
-        NodeType::Mixed => Err(Error::eval(format!(
-            "Mixed node '{}' has no value, forecast, or formula for period {}",
-            node_spec.node_id, period_id
         ))),
     }
 }
@@ -97,6 +94,9 @@ pub enum NodeValueSource {
 
     /// Formula to evaluate (looked up from the compiled cache, not stored here)
     Formula,
+
+    /// No observation, forecast or formula for this period
+    Missing,
 }
 
 #[cfg(test)]
@@ -152,18 +152,18 @@ mod tests {
     }
 
     #[test]
-    fn test_value_node_missing_value_error() {
-        let node = NodeSpec::new("revenue", NodeType::Value);
-
-        let result = resolve_node_value(
-            &node,
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            true,
-            None,
-        );
-
-        // Should error because no value provided
-        assert!(result.is_err());
+    fn value_or_mixed_node_without_an_observation_is_missing() {
+        for node_type in [NodeType::Value, NodeType::Mixed] {
+            let node = NodeSpec::new("revenue", node_type);
+            let source = resolve_node_value(
+                &node,
+                &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                true,
+                None,
+            )
+            .expect("an absent observation is a missing cell, not an error");
+            assert_eq!(source, NodeValueSource::Missing);
+        }
     }
 
     #[test]

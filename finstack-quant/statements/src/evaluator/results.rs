@@ -131,11 +131,14 @@ pub enum CellSource {
     /// period, so the cell was set to `0.0` without consulting the value,
     /// forecast or formula.
     WhereMasked,
+    /// No observation, forecast or formula supplies this period: the cell is
+    /// missing and its value is `NaN`. A missing cell is never a zero.
+    Missing,
 }
 
 impl CellSource {
     /// Stable snake_case label, identical to the serde wire form
-    /// (`"value"`, `"forecast"`, `"formula"`, `"where_masked"`).
+    /// (`"value"`, `"forecast"`, `"formula"`, `"where_masked"`, `"missing"`).
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -143,6 +146,7 @@ impl CellSource {
             Self::Forecast => "forecast",
             Self::Formula => "formula",
             Self::WhereMasked => "where_masked",
+            Self::Missing => "missing",
         }
     }
 }

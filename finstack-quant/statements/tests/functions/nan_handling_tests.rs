@@ -179,7 +179,8 @@ fn test_annualize_with_nan() {
 
 #[test]
 fn test_ttm_with_nan() {
-    // Create revenue with one NaN value in the middle
+    // Revenue is missing its 2024Q2 observation; a missing cell is absent,
+    // never a stored NaN.
     let model = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder.periods("2024Q1..2024Q4", None).unwrap();
@@ -189,10 +190,6 @@ fn test_ttm_with_nan() {
                 (
                     PeriodId::quarter(2024, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100.0),
-                ),
-                (
-                    PeriodId::quarter(2024, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(f64::NAN),
                 ),
                 (
                     PeriodId::quarter(2024, 3).expect("valid period fixture"),
