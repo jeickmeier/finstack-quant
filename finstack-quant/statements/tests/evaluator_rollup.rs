@@ -911,11 +911,14 @@ fn scalar_year(
 fn a_scalar_sum_is_compensated_money_is_exact_and_an_overflow_is_an_error() {
     let year = PeriodId::annual(2025).expect("valid annual period");
     // Ordinary summation loses both units: 1e16 + 1 + 1 - 1e16 gives 0.
-    let (model, results) = scalar_year([1e16, 1.0, 1.0, -1e16], |_| {});
-    let annual = results
-        .rollup(&model, &empty_annual_spec())
-        .expect("rollup");
-    assert_eq!(annual.get("x", &year), Some(2.0));
+    // The result does not depend on where the large terms fall.
+    for quarters in [[1e16, 1.0, 1.0, -1e16], [1e16, 1.0, -1e16, 1.0]] {
+        let (model, results) = scalar_year(quarters, |_| {});
+        let annual = results
+            .rollup(&model, &empty_annual_spec())
+            .expect("rollup");
+        assert_eq!(annual.get("x", &year), Some(2.0), "{quarters:?}");
+    }
 
     let (model, results) = scalar_year([f64::MAX, f64::MAX, 0.0, 0.0], |_| {});
     let error = results

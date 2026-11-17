@@ -1363,7 +1363,9 @@ STATEMENTS-EVALUATION-014. **Breaking.**
 - **Verified source.** `StatementResult::rollup` accepts only a result that
   is a run of the given model (content, source snapshot, period plan and run
   identity); a hand-built result or another model's result is rejected.
-- **`sum`.** Money is summed exactly and scalars with a compensated sum. A
+- **`sum`.** Money is summed exactly and scalars with a Neumaier compensated
+  sum, which the formula functions `sum()` and `mean()` now use too (they
+  used Kahan summation). A
   source cell that is missing, masked or unavailable leaves the target
   `unavailable` (it used to be absent); a sum that cannot be represented is
   an error (it used to be dropped).

@@ -924,7 +924,9 @@ mod tests {
         ];
         let sum_value = evaluate_function(&Function::Sum, &args, &mut context, Some("sum_test"))
             .expect("sum evaluation should succeed");
-        let reference = kahan_sum([1e16, 1.0, -1e16]).unwrap();
+        let reference =
+            finstack_quant_core::math::summation::neumaier_sum([1e16, 1.0, -1e16]).unwrap();
+        assert!((reference - 1.0).abs() < f64::EPSILON);
         assert!(
             (sum_value - reference).abs() < 1e-12,
             "sum_value={sum_value}, reference={reference}"

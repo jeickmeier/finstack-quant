@@ -19,7 +19,7 @@ use crate::evaluator::formula::eval_error;
 use finstack_quant_core::config::RoundingMode;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::expr::BinOp;
-use finstack_quant_core::math::summation::kahan_sum;
+use finstack_quant_core::math::summation::neumaier_sum;
 use finstack_quant_core::money::Money;
 use std::cmp::Ordering;
 
@@ -400,7 +400,8 @@ pub(crate) enum Aggregate {
 }
 
 /// `sum`, `mean`, `min` and `max` over operands that must all be available
-/// and in the same units. Scalars use compensated summation; money is exact.
+/// and in the same units. Scalars use Neumaier compensated summation; money is
+/// exact.
 ///
 /// # Errors
 ///
@@ -440,7 +441,7 @@ pub(crate) fn aggregate(kind: Aggregate, values: &[Value], at: At<'_>) -> Result
             });
             let Some(peer) = peer else {
                 let total = at.finite(
-                    at.core(kahan_sum(nums.iter().map(|num| num.float())), what)?,
+                    at.core(neumaier_sum(nums.iter().map(|num| num.float())), what)?,
                     what,
                 )?;
                 let value = if kind == Aggregate::Mean {
