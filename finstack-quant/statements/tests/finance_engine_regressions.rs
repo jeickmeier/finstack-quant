@@ -262,7 +262,8 @@ fn monte_carlo_reports_each_forecast_warning_once() {
             let period = match warning {
                 EvalWarning::DivisionByZero { period, .. }
                 | EvalWarning::NonFiniteValue { period, .. }
-                | EvalWarning::CapitalStructure { period, .. } => *period,
+                | EvalWarning::CapitalStructure { period, .. }
+                | EvalWarning::GappedSample { period, .. } => *period,
             };
             assert!(results.forecast_periods.contains(&period), "{warning:?}");
             format!("{warning:?}")

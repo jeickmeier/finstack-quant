@@ -344,6 +344,7 @@ enum WarningKey<'a> {
     DivisionByZero(&'a PeriodId, &'a str),
     NonFiniteValue(&'a PeriodId, &'a str, u64),
     CapitalStructure(&'a PeriodId, CapitalStructureKey<'a>),
+    GappedSample(&'a PeriodId, &'a str, &'a str, usize),
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -371,6 +372,13 @@ impl<'a> WarningKey<'a> {
             EvalWarning::CapitalStructure { period, warning } => {
                 Self::CapitalStructure(period, CapitalStructureKey::of(warning))
             }
+            EvalWarning::GappedSample {
+                node_id,
+                period,
+                function,
+                observations,
+                ..
+            } => Self::GappedSample(period, node_id, function, *observations),
         }
     }
 }
@@ -414,7 +422,8 @@ fn warning_period(warning: &EvalWarning) -> &PeriodId {
     match warning {
         EvalWarning::DivisionByZero { period, .. }
         | EvalWarning::NonFiniteValue { period, .. }
-        | EvalWarning::CapitalStructure { period, .. } => period,
+        | EvalWarning::CapitalStructure { period, .. }
+        | EvalWarning::GappedSample { period, .. } => period,
     }
 }
 

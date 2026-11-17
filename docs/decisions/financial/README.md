@@ -405,7 +405,7 @@ implemented and qualified across Rust, Python and WASM.
 The Statements historical statistics and EWM contract was accepted on
 2026-11-15. It covers canonical slot windows, available samples, exact
 rank ties, cumulative prefixes and slot-based EWM decay.
-Implementation and independent qualification remain pending.
+It is implemented and qualified across Rust, Python and WASM.
 [STATEMENTS-EVALUATION-004](statements-evaluation/04-historical-statistics-and-ewm.md#accepted-decision-for-historical-statistics-and-ewm).
 
 The Statements forecast segment, anchoring and bounds contract was accepted

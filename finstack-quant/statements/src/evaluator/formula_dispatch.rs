@@ -5,22 +5,19 @@
 //! `sum`, `mean`, `min`, `max`, `pow`, `round`, `clamp`, `is_missing`,
 //! `coalesce`, `annualize`, `annualize_rate` and the elementwise math
 //! helpers) run on typed values with the checked rules of
-//! [`crate::evaluator::value`]. History kernels delegate to
-//! `formula_aggregates`, `formula_ewm` and `formula_timeseries`, whose float
-//! result becomes an untyped number, or unavailable when it is not finite.
+//! [`crate::evaluator::value`]. History functions delegate to
+//! `formula_aggregates`, `formula_ewm` and `formula_timeseries`, which read
+//! the typed value of each canonical period slot.
 
 use crate::error::Result;
 use crate::evaluator::context::EvaluationContext;
-use crate::evaluator::formula::{
-    collect_expression_values_sorted, eval_error, evaluate_formula, evaluate_value, require_args,
-    require_min_args,
-};
+use crate::evaluator::formula::{eval_error, evaluate_value, require_args, require_min_args};
 use crate::evaluator::formula_aggregates::{
-    evaluate_cumulative_function, evaluate_rolling_function, evaluate_statistical_function,
+    eval_quantile, eval_rank, evaluate_cumulative_function, evaluate_rolling_function,
+    evaluate_statistical_function,
 };
 use crate::evaluator::value::{self, Aggregate, At, Value};
-use finstack_quant_core::expr::{BinOp, Expr, ExprNode, Function};
-use finstack_quant_core::math::{ZERO_TOLERANCE, stats::quantile};
+use finstack_quant_core::expr::{BinOp, Expr, Function};
 
 /// Evaluate a function call.
 ///
@@ -42,7 +39,6 @@ pub(crate) fn evaluate_function(
         node_id,
         period: context.period_id,
     };
-    let kernel = |result: Result<f64>| result.map(Value::from_float);
     match func {
         // Time-series functions
         Function::Lag => eval_lag(args, context, node_id),
@@ -60,27 +56,25 @@ pub(crate) fn evaluate_function(
         | Function::RollingMedian
         | Function::RollingMin
         | Function::RollingMax
-        | Function::RollingCount => kernel(evaluate_rolling_function(func, args, context, node_id)),
+        | Function::RollingCount => evaluate_rolling_function(func, args, context, node_id),
         Function::Std | Function::Var | Function::Median => {
-            kernel(evaluate_statistical_function(func, args, context, node_id))
+            evaluate_statistical_function(func, args, context, node_id)
         }
         Function::CumSum | Function::CumProd | Function::CumMin | Function::CumMax => {
-            kernel(evaluate_cumulative_function(func, args, context, node_id))
+            evaluate_cumulative_function(func, args, context, node_id)
         }
         Function::Ytd | Function::Qtd | Function::FiscalYtd | Function::Ttm => {
             evaluate_period_aggregate_function(func, args, context, node_id)
         }
 
         // Exponentially-weighted statistics
-        Function::EwmMean => kernel(crate::evaluator::formula_ewm::eval_ewm_mean(
-            args, context, node_id,
-        )),
-        Function::EwmStd | Function::EwmVar => kernel(
-            crate::evaluator::formula_ewm::eval_ewm_std_or_var(func, args, context, node_id),
-        ),
+        Function::EwmMean => crate::evaluator::formula_ewm::eval_ewm_mean(args, context, node_id),
+        Function::EwmStd | Function::EwmVar => {
+            crate::evaluator::formula_ewm::eval_ewm_std_or_var(func, args, context, node_id)
+        }
 
-        Function::Rank => kernel(eval_rank(args, context, node_id)),
-        Function::Quantile => kernel(eval_quantile(args, context, node_id)),
+        Function::Rank => eval_rank(args, context, node_id),
+        Function::Quantile => eval_quantile(args, context, node_id),
 
         Function::Abs => {
             require_args("abs", args, 1, node_id)?;
@@ -211,98 +205,6 @@ fn unary_scalar(
     };
     let result = compute(x).ok_or_else(|| at.error(format!("{call} is undefined for {x}")))?;
     Ok(value::like(input, at.finite(result, &call)?))
-}
-
-/// Rank of `args[0]` among its historical observations.
-///
-/// 1-based; ascending by default, descending when `args[1]` is zero.
-/// A supplied direction must be finite; any non-zero value selects ascending.
-/// Ties share the minimum rank in the selected direction. Non-finite current values or
-/// empty histories return `NaN` so callers can distinguish "no data" from
-/// "best observation" — `unwrap_or(1.0)` would lose that distinction.
-fn eval_rank(args: &[Expr], context: &mut EvaluationContext, node_id: Option<&str>) -> Result<f64> {
-    if args.is_empty() || args.len() > 2 {
-        return Err(eval_error(
-            node_id,
-            "rank() requires 1 or 2 arguments (series, [ascending])",
-        ));
-    }
-
-    let ascending = if args.len() == 2 {
-        let direction = evaluate_formula(&args[1], context, node_id)?;
-        if !direction.is_finite() {
-            return Err(eval_error(node_id, "rank() ascending flag must be finite"));
-        }
-        direction != 0.0
-    } else {
-        true
-    };
-
-    let current_value = evaluate_formula(&args[0], context, node_id)?;
-
-    if !matches!(args[0].node, ExprNode::Column(_) | ExprNode::CsRef { .. }) {
-        return Err(eval_error(
-            node_id,
-            "rank() requires a statement-node or capital-structure reference",
-        ));
-    }
-
-    let all_values = collect_expression_values_sorted(&args[0], context, node_id)?;
-
-    if !current_value.is_finite() || all_values.is_empty() {
-        return Ok(f64::NAN);
-    }
-
-    let preceding = all_values
-        .values()
-        .filter(|&&v| {
-            v.is_finite()
-                && if ascending {
-                    v < current_value - ZERO_TOLERANCE
-                } else {
-                    v > current_value + ZERO_TOLERANCE
-                }
-        })
-        .count();
-    Ok((preceding + 1) as f64)
-}
-
-/// Quantile of `args[0]`'s historical observations using linear interpolation
-/// (R-7 / numpy default / Excel `PERCENTILE`).
-///
-/// `args[1]` is the quantile level in `[0, 1]`. Non-finite values are dropped
-/// before interpolation; an empty post-filter set returns `NaN`.
-fn eval_quantile(
-    args: &[Expr],
-    context: &mut EvaluationContext,
-    node_id: Option<&str>,
-) -> Result<f64> {
-    require_args("quantile", args, 2, node_id)?;
-
-    let q = evaluate_formula(&args[1], context, node_id)?;
-    if !(0.0..=1.0).contains(&q) {
-        return Err(eval_error(node_id, "quantile must be between 0 and 1"));
-    }
-
-    if !matches!(args[0].node, ExprNode::Column(_) | ExprNode::CsRef { .. }) {
-        return Err(eval_error(
-            node_id,
-            "quantile() requires a statement-node or capital-structure reference",
-        ));
-    }
-
-    let sorted = collect_expression_values_sorted(&args[0], context, node_id)?;
-    let mut values: Vec<_> = sorted
-        .values()
-        .copied()
-        .filter(|value| value.is_finite())
-        .collect();
-    if values.is_empty() {
-        return Ok(f64::NAN);
-    }
-    quantile(&mut values, q)
-        .map(|opt| opt.unwrap_or(f64::NAN))
-        .map_err(|e| eval_error(node_id, e.to_string()))
 }
 
 /// Annualise a flow (cash flows, income, expenses) by multiplying by the

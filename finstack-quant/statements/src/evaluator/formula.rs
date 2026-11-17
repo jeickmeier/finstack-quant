@@ -9,14 +9,10 @@
 
 use crate::error::{Error, Result};
 use crate::evaluator::context::EvaluationContext;
-use crate::evaluator::formula_helpers::{
-    collect_cs_values_sorted, collect_historical_values_sorted, collect_rolling_window_values,
-};
 use crate::evaluator::value::{self, At, Value};
 use finstack_quant_core::dates::PeriodId;
-use finstack_quant_core::expr::{Expr, ExprNode, Function};
-use std::collections::{BTreeMap, BTreeSet};
-use std::rc::Rc;
+use finstack_quant_core::expr::Expr;
+use std::collections::BTreeSet;
 
 fn annotate_error(err: Error, node_id: Option<&str>) -> Error {
     match (node_id, err) {
@@ -201,136 +197,6 @@ pub(super) fn expression_periods(context: &EvaluationContext) -> BTreeSet<Period
         .copied()
         .chain(std::iter::once(context.period_id))
         .collect()
-}
-
-/// Collect expression values over all available periods in chronological order.
-///
-/// Complex expressions (not a simple column or literal) are re-evaluated once
-/// per historical period (O(P)); nested aggregates make this O(P²).
-pub(crate) fn collect_expression_values_sorted(
-    expr: &Expr,
-    context: &EvaluationContext,
-    node_id: Option<&str>,
-) -> Result<Rc<BTreeMap<PeriodId, f64>>> {
-    match &expr.node {
-        ExprNode::Column(name) => return Ok(collect_historical_values_sorted(name, context)),
-        ExprNode::CsRef {
-            component,
-            instrument_or_total,
-        } => return collect_cs_values_sorted(component, instrument_or_total, context),
-        ExprNode::Literal(value) => {
-            let values = expression_periods(context)
-                .into_iter()
-                .map(|period| (period, *value))
-                .collect();
-            return Ok(Rc::new(values));
-        }
-        _ => {}
-    }
-
-    let mut values = BTreeMap::new();
-    for period in expression_periods(context) {
-        let mut period_context = build_context_for_period(period, context);
-        let value = evaluate_formula(expr, &mut period_context, node_id)?;
-        values.insert(period, value);
-    }
-
-    Ok(Rc::new(values))
-}
-
-/// Returns `true` if the expression tree contains any time-series or
-/// aggregate functions that depend on historical values (lag, rolling,
-/// cumulative, etc.). Point-wise arithmetic on columns and literals is
-/// safe to evaluate period-by-period without full history.
-fn has_aggregate(expr: &Expr) -> bool {
-    match &expr.node {
-        ExprNode::Column(_) | ExprNode::CsRef { .. } | ExprNode::Literal(_) => false,
-        ExprNode::Call(func, args) => {
-            matches!(
-                func,
-                Function::Lag
-                    | Function::Lead
-                    | Function::Diff
-                    | Function::PctChange
-                    | Function::CumSum
-                    | Function::CumProd
-                    | Function::CumMin
-                    | Function::CumMax
-                    | Function::RollingMean
-                    | Function::RollingSum
-                    | Function::RollingStd
-                    | Function::RollingVar
-                    | Function::RollingMedian
-                    | Function::RollingMin
-                    | Function::RollingMax
-                    | Function::RollingCount
-                    | Function::EwmMean
-                    | Function::EwmStd
-                    | Function::EwmVar
-                    | Function::Std
-                    | Function::Var
-                    | Function::Median
-                    | Function::Rank
-                    | Function::Quantile
-                    | Function::Shift
-                    | Function::Ttm
-                    | Function::Ytd
-                    | Function::Qtd
-                    | Function::FiscalYtd
-                    | Function::GrowthRate
-            ) || args.iter().any(has_aggregate)
-        }
-        ExprNode::BinOp { left, right, .. } => has_aggregate(left) || has_aggregate(right),
-        ExprNode::UnaryOp { operand, .. } => has_aggregate(operand),
-        ExprNode::IfThenElse {
-            condition,
-            then_expr,
-            else_expr,
-        } => has_aggregate(condition) || has_aggregate(then_expr) || has_aggregate(else_expr),
-    }
-}
-
-/// Collect expression values for a rolling window in chronological order.
-///
-/// Uses an optimized reverse-walk when the expression contains no aggregate
-/// functions, evaluating only the last `window_size` periods instead of all.
-pub(crate) fn collect_expression_window_values(
-    expr: &Expr,
-    context: &EvaluationContext,
-    window_size: usize,
-    node_id: Option<&str>,
-) -> Result<Vec<f64>> {
-    if window_size == 0 {
-        return Ok(Vec::new());
-    }
-
-    match &expr.node {
-        ExprNode::Column(name) => {
-            return Ok(collect_rolling_window_values(name, context, window_size));
-        }
-        ExprNode::Literal(value) => {
-            let total = expression_periods(context).len();
-            return Ok(vec![*value; window_size.min(total)]);
-        }
-        _ => {}
-    }
-
-    if !has_aggregate(expr) {
-        let periods = expression_periods(context);
-
-        let mut values = Vec::with_capacity(window_size);
-        for period in periods.iter().rev().take(window_size) {
-            let mut period_context = build_context_for_period(*period, context);
-            let value = evaluate_formula(expr, &mut period_context, node_id)?;
-            values.push(value);
-        }
-        values.reverse();
-        return Ok(values);
-    }
-
-    let sorted = collect_expression_values_sorted(expr, context, node_id)?;
-    let skip_count = sorted.len().saturating_sub(window_size);
-    Ok(sorted.values().skip(skip_count).copied().collect())
 }
 
 /// Evaluate a compiled expression to its float view.
@@ -656,12 +522,6 @@ mod tests {
         let value = evaluate_function(&Function::EwmMean, &args, &mut context, None)
             .expect("current overlay");
         assert_eq!(value, 2.0);
-
-        context.current_values[0] = None;
-        context.invalidate_sorted_cache("series");
-        let value = evaluate_function(&Function::EwmMean, &args, &mut context, None)
-            .expect("historical values only");
-        assert_eq!(value, 1.0);
     }
 
     #[test]
@@ -1261,10 +1121,10 @@ mod tests {
 
         let expression = crate::dsl::parse_and_compile("cs.debt_balance.total")
             .expect("capital-structure reference should compile");
-        let values =
-            collect_expression_values_sorted(&expression, &context, None).expect("cs history");
-        assert_eq!(values.get(&p1), Some(&100.0));
-        assert_eq!(values.get(&p2), Some(&90.0));
+        // The full-history sum reads the past snapshot and the current one.
+        let total = evaluate_function(&Function::CumSum, &[expression], &mut context, None)
+            .expect("cs history");
+        assert_eq!(total, 190.0);
     }
 
     #[test]

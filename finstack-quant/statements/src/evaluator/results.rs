@@ -918,6 +918,21 @@ pub enum EvalWarning {
         /// Typed reason and associated diagnostic values.
         warning: CapitalStructureWarning,
     },
+    /// A full-history statistic (`std`, `var`, `median`) was computed over a
+    /// history with gaps, so its sample is smaller than its slot count.
+    GappedSample {
+        /// Identifier of the node whose statistic has gaps.
+        node_id: String,
+        /// Period the statistic was computed for.
+        #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+        period: PeriodId,
+        /// Name of the statistic.
+        function: String,
+        /// Observations that had a value.
+        observations: usize,
+        /// Plan slots from the model start through the period.
+        slots: usize,
+    },
 }
 
 // The non-finite number form carried by evaluation warnings.

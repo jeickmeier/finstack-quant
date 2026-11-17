@@ -1013,3 +1013,23 @@ amount (`lag(cash, 1) + cash` is exact).
   with a missing slot is unavailable, where `ytd`, `qtd` and `fiscal_ytd`
   used to sum the values present. `qtd` follows the fiscal quarter on a
   fiscal plan. `fiscal_ytd` is rejected on a fiscal plan; use `ytd`.
+
+### Statements: historical statistics run on calendar slots
+
+STATEMENTS-EVALUATION-004. Rolling, cumulative, full-history and
+exponentially weighted functions read the typed value of each calendar slot.
+
+- **Rolling windows** cover the last `window` calendar slots, where they used
+  the last `window` observations: a missing period now occupies a slot.
+  `min_periods` must be from 1 through the window (`0` is rejected).
+- **Cumulative functions** (`cumsum`, `cumprod`, `cummin`, `cummax`) need
+  every slot from the model start; a gap makes the result unavailable, where
+  it was skipped. Recover a gap explicitly, for example
+  `cumsum(coalesce(x, 0))`. A `cumprod` overflow is an error.
+- **Full-history statistics** (`std`, `var`, `median`) add a `gapped_sample`
+  warning with the sample and slot counts when periods are missing.
+- **`rank`** uses exact ties; the `1e-10` tie band is gone.
+- **Money** sums and means are exact, and `std`, `quantile`, `median` and
+  `ewm_mean` keep the currency.
+- **EWM** takes its correction toggle as a Boolean, `0` or `1`; any other
+  value is an error.

@@ -1938,6 +1938,31 @@ export type EvalWarning =
         warning: CapitalStructureWarning;
         [k: string]: unknown;
       };
+    }
+  | {
+      gapped_sample: {
+        /**
+         * Name of the statistic.
+         */
+        function: string;
+        /**
+         * Identifier of the node whose statistic has gaps.
+         */
+        node_id: string;
+        /**
+         * Observations that had a value.
+         */
+        observations: number;
+        /**
+         * Period the statistic was computed for.
+         */
+        period: string;
+        /**
+         * Plan slots from the model start through the period.
+         */
+        slots: number;
+        [k: string]: unknown;
+      };
     };
 export type ResultNumber = number | ("nan" | "inf" | "-inf");
 /**

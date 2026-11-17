@@ -36,7 +36,7 @@ pub(crate) fn offset_period(context: &EvaluationContext, offset: i32) -> Result<
     Ok(period.shift(offset, calendar).ok())
 }
 
-fn at<'a>(context: &EvaluationContext, node_id: Option<&'a str>) -> At<'a> {
+pub(super) fn at<'a>(context: &EvaluationContext, node_id: Option<&'a str>) -> At<'a> {
     At {
         node_id,
         period: context.period_id,
@@ -81,7 +81,7 @@ fn historical_value(
 }
 
 /// The expression's value in `period`: the current evaluation or a past slot.
-fn value_at(
+pub(super) fn value_at(
     expr: &Expr,
     period: PeriodId,
     context: &mut EvaluationContext,
@@ -317,7 +317,7 @@ fn window_sum(
 }
 
 /// The `count` consecutive plan slots that end at the current period.
-fn trailing_slots(context: &EvaluationContext, count: u16) -> Result<Vec<PeriodId>> {
+pub(super) fn trailing_slots(context: &EvaluationContext, count: u16) -> Result<Vec<PeriodId>> {
     let calendar = context.history.model_plan()?.calendar;
     (0..i32::from(count))
         .rev()

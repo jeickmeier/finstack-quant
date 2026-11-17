@@ -41,7 +41,6 @@ pub(crate) mod formula;
 mod formula_aggregates;
 mod formula_dispatch;
 mod formula_ewm;
-pub(crate) mod formula_helpers;
 mod formula_timeseries;
 pub(crate) mod monte_carlo;
 mod period_history;

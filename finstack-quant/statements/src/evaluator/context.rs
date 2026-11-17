@@ -11,9 +11,6 @@ use crate::evaluator::results::EvalWarning;
 use crate::types::NodeId;
 use finstack_quant_core::dates::{PeriodId, PeriodKind, PeriodPlan};
 use indexmap::IndexMap;
-use std::cell::RefCell;
-use std::collections::BTreeMap;
-use std::rc::Rc;
 use std::sync::Arc;
 
 /// Evaluation context for a single period.
@@ -60,20 +57,6 @@ pub struct EvaluationContext {
 
     /// Warnings collected while evaluating this period
     pub warnings: Vec<EvalWarning>,
-
-    /// Per-context memoization of sorted historical lookups.
-    ///
-    /// Within a single period's evaluation many formulas (rolling, expanding,
-    /// statistical, time-series) reach back into the same node's history.
-    /// Each lookup previously rebuilt a fresh `BTreeMap<PeriodId, f64>` by
-    /// iterating `history`. We now cache the constructed map keyed
-    /// by node identifier (or capital-structure reference) so repeated calls
-    /// in the same period are O(1) refcount bumps instead of O(P) walks.
-    ///
-    /// The cache is intentionally `RefCell` (not Mutex) — `EvaluationContext`
-    /// is per-period and never crosses thread boundaries; Monte Carlo paths
-    /// build fresh contexts inside their own thread closures.
-    pub(crate) sorted_history_cache: RefCell<IndexMap<String, Rc<BTreeMap<PeriodId, f64>>>>,
 }
 
 impl EvaluationContext {
@@ -147,39 +130,16 @@ impl EvaluationContext {
             current_sources: vec![None; num_nodes],
             capital_structure_cashflows: None,
             warnings: Vec::new(),
-            sorted_history_cache: RefCell::new(IndexMap::new()),
         }
     }
 
-    /// Invalidate the sorted-history cache for a single node.
-    ///
-    /// Call this whenever the current-period value for `node_id` changes
-    /// after the cache has been populated — otherwise downstream rolling /
-    /// statistical functions can read a stale "current" entry. Cheap when
-    /// the cache is empty (the common case during the first pass over a
-    /// period's nodes).
-    pub(crate) fn invalidate_sorted_cache(&self, node_id: &str) {
-        let mut cache = self.sorted_history_cache.borrow_mut();
-        cache.shift_remove(node_id);
-    }
-
-    /// Replace the current-period capital-structure cashflows, invalidating any
-    /// memoized `cs.*` history so the next pass re-reads the new flows.
-    ///
-    /// The waterfall revises this period's cashflows after the first evaluation
-    /// pass. Aggregates such as `rolling_mean(cs.interest_expense.total, 2)`
-    /// memoize the pre-waterfall value in `sorted_history_cache`; without
-    /// draining that cache the second pass would silently reuse the stale
-    /// pre-waterfall number while a plain `cs.*` reference (which bypasses the
-    /// cache) reads the revised value, producing internally inconsistent
-    /// results. The whole cache is cleared because it is a per-period
-    /// memoization that is cheap to rebuild lazily.
+    /// Replace the current-period capital-structure cashflows. The waterfall
+    /// revises them after the first evaluation pass.
     pub(crate) fn set_capital_structure_cashflows(
         &mut self,
         cashflows: crate::capital_structure::CapitalStructureCashflows,
     ) {
         self.capital_structure_cashflows = Some(cashflows);
-        self.sorted_history_cache.borrow_mut().clear();
     }
 
     /// Set the value for a node in the current period.
@@ -221,12 +181,6 @@ impl EvaluationContext {
 
         self.current_values[*idx] = Some(value);
         self.current_cells[*idx] = None;
-        // Drop any cached sorted-history entry whose "current" view depended on
-        // the previous value — repeat sets on the same node within a period are
-        // rare but they happen (e.g., normalization rewrites), and a stale
-        // cache here would silently feed yesterday's value to rolling /
-        // statistical functions.
-        self.invalidate_sorted_cache(node_id);
         Ok(())
     }
 
@@ -367,7 +321,6 @@ impl EvaluationContext {
             .ok_or_else(|| Error::node_not_found(node_id))?;
         self.current_values[idx] = Some(cell.numeric().unwrap_or(f64::NAN));
         self.current_cells[idx] = Some(cell);
-        self.invalidate_sorted_cache(node_id);
         Ok(())
     }
 

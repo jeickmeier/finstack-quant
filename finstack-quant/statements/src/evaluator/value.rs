@@ -254,7 +254,7 @@ pub(crate) fn arithmetic(op: BinOp, left: Value, right: Value, at: At<'_>) -> Re
 }
 
 /// Exact ordering of two available numeric values in the same units.
-fn order(left: Value, right: Value, what: &str, at: At<'_>) -> Result<Ordering> {
+pub(crate) fn order(left: Value, right: Value, what: &str, at: At<'_>) -> Result<Ordering> {
     let (l, r) = (numeric(left, what, at)?, numeric(right, what, at)?);
     let money = |a: Money, b: Money| at.core(a.checked_cmp(b), what);
     match (l, r) {

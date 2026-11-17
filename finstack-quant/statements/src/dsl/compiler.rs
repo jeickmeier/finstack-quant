@@ -259,10 +259,16 @@ impl UnitContext<'_> {
     }
 
     fn call(self, func: &str, args: &[StmtExpr]) -> Result<Dimension> {
-        let arg_dims: Vec<_> = args
+        let mut arg_dims: Vec<_> = args
             .iter()
             .map(|arg| self.infer(arg))
             .collect::<Result<Vec<_>>>()?;
+        // The correction toggle of `ewm_std` / `ewm_var` may be a Boolean.
+        if matches!(func, "ewm_std" | "ewm_var")
+            && let Some(toggle @ Dimension::Boolean) = arg_dims.get_mut(2)
+        {
+            *toggle = Dimension::Scalar;
+        }
         let auxiliary_dims = arg_dims.get(1..).unwrap_or_default();
         // `coalesce` may select between Boolean alternatives and `is_missing`
         // may test one. Every other function takes numbers.

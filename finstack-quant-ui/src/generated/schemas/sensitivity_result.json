@@ -748,6 +748,52 @@
             "capital_structure"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A full-history statistic (`std`, `var`, `median`) was computed over a\nhistory with gaps, so its sample is smaller than its slot count.",
+          "properties": {
+            "gapped_sample": {
+              "properties": {
+                "function": {
+                  "description": "Name of the statistic.",
+                  "type": "string"
+                },
+                "node_id": {
+                  "description": "Identifier of the node whose statistic has gaps.",
+                  "type": "string"
+                },
+                "observations": {
+                  "description": "Observations that had a value.",
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "period": {
+                  "description": "Period the statistic was computed for.",
+                  "type": "string"
+                },
+                "slots": {
+                  "description": "Plan slots from the model start through the period.",
+                  "format": "uint",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "node_id",
+                "period",
+                "function",
+                "observations",
+                "slots"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "gapped_sample"
+          ],
+          "type": "object"
         }
       ]
     },
