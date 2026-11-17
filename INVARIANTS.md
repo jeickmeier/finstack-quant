@@ -1406,6 +1406,11 @@ explicit residual. Bind the vega proxy to the elected bucket, apply HVR before
 concentration and add the residual norm after classified diversification.
 [Accepted SIMM equity aggregation](docs/decisions/financial/margin-collateral-im/07-simm-equity.md#accepted-decision-for-checked-simm-equity-delta-and-vega).
 
+SIMM FX uses directed non-USD delta and qualified unordered volatility pairs.
+Select the vega proxy from both currencies, apply HVR before pair concentration
+and preserve signed dependence in separate checked reference-horizon charges.
+[Accepted SIMM FX aggregation](docs/decisions/financial/margin-collateral-im/08-simm-fx.md#accepted-decision-for-checked-simm-fx-delta-and-pair-vega).
+
 Valuation model inputs bind an exact source, unit, clock and parameter block.
 Use dated relative factors for GBM carry. Simulations retain explicit controls,
 exact seed identity and actual work. Apply each tree and quote control on its

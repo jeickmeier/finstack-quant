@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **653 review items across 33 source scopes with open items**
+This backlog consolidates **654 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (506): implementation and verification work against an
+- **Reconciliation** (507): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (38): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -1024,7 +1024,9 @@ product consequences remain in their product scope.
 
 - **Reconciliation — Checked SIMM equity delta and vega.** Carry all 12 numbered buckets and explicit residual, dated classification, direct or constituent index treatment and the source-qualified volatility proxy. Verify signed concentration, historical and custom effective dependence, bucket 12 vega and linear residual addition through valuation, portfolio, MVA and host paths. [Accepted equity contract](margin-collateral-im/07-simm-equity.md#accepted-decision-for-checked-simm-equity-delta-and-vega).
 
-- **Decision — Approximate SIMM coverage and assembly.** Resolve FX dependence, commodity intra-bucket netting and concentration, and curvature expiry, squared correlations and residual conventions. Decide component and class assembly, product-class coverage, MPOR scaling outside ten days, approximation propagation and zero diagnostics. Records: [MARGIN-COLLATERAL-IM-008](margin-collateral-im/08-simm-fx.md), [MARGIN-COLLATERAL-IM-009](margin-collateral-im/09-simm-commodity.md), [MARGIN-COLLATERAL-IM-010](margin-collateral-im/10-simm-curvature.md), [MARGIN-COLLATERAL-IM-011](margin-collateral-im/11-simm-total-and-mpor.md).
+- **Reconciliation — Checked SIMM FX delta and pair vega.** Supply qualified directed USD-basis delta and distinct canonical vega pairs with expiry and volatility evidence. Verify the two-group proxy table, three concentration categories, six pair thresholds, HVR order, signed high/high dependence and effective matrix failures through valuation, portfolio, MVA and host paths. [Accepted FX contract](margin-collateral-im/08-simm-fx.md#accepted-decision-for-checked-simm-fx-delta-and-pair-vega).
+
+- **Decision — Approximate SIMM coverage and assembly.** Resolve commodity intra-bucket netting and concentration, and curvature expiry, squared correlations and residual conventions. Decide component and class assembly, product-class coverage, MPOR scaling outside ten days, approximation propagation and zero diagnostics. Records: [MARGIN-COLLATERAL-IM-009](margin-collateral-im/09-simm-commodity.md), [MARGIN-COLLATERAL-IM-010](margin-collateral-im/10-simm-curvature.md), [MARGIN-COLLATERAL-IM-011](margin-collateral-im/11-simm-total-and-mpor.md).
 
 - **Evidence — Approximate SIMM needs an independent portfolio and MPOR comparison.** Hand formulas and literal parameter transcriptions do not establish complete portfolio agreement or model-specific MPOR scaling. Obtain an independent licensed/reference comparison covering the implemented dimensional limitations, concentration and curvature aggregation. Cover high-concentration/mixed-sign CQ books, same-name multi-tenor and residual-plus-nonresidual credit, concentrated multi-name equity, FX dependence and mixed curvature factors/tenors/buckets. Independently verify all 289 commodity correlation cells and mixed-bucket vectors, including HVR diagnostic replay. Hand vectors do not settle omitted product dimensions or establish current-version/licensed SIMM certification. Records: [MARGIN-COLLATERAL-IM-004](margin-collateral-im/04-simm-interest-rate.md), [MARGIN-COLLATERAL-IM-005](margin-collateral-im/05-simm-qualifying-credit.md), [MARGIN-COLLATERAL-IM-006](margin-collateral-im/06-simm-nonqualifying-credit.md), [MARGIN-COLLATERAL-IM-007](margin-collateral-im/07-simm-equity.md), [MARGIN-COLLATERAL-IM-008](margin-collateral-im/08-simm-fx.md), [MARGIN-COLLATERAL-IM-009](margin-collateral-im/09-simm-commodity.md), [MARGIN-COLLATERAL-IM-010](margin-collateral-im/10-simm-curvature.md), [MARGIN-COLLATERAL-IM-011](margin-collateral-im/11-simm-total-and-mpor.md).
 

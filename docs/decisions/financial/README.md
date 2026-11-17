@@ -2623,6 +2623,11 @@ all 12 numbered buckets and explicit residual, qualified index treatment,
 proxy-weighted vega and checked bucket and residual aggregation.
 [MARGIN-COLLATERAL-IM-007](margin-collateral-im/07-simm-equity.md#accepted-decision-for-checked-simm-equity-delta-and-vega).
 
+SIMM FX delta and pair vega were accepted on 2026-11-16. The package covers
+directed USD shocks, exact unordered vega pairs, both-leg proxy weights and
+checked signed dependence and concentration.
+[MARGIN-COLLATERAL-IM-008](margin-collateral-im/08-simm-fx.md#accepted-decision-for-checked-simm-fx-delta-and-pair-vega).
+
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the
 accepted perspective/sign contracts; broader margin methodology retains its

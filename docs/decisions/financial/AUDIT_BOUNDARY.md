@@ -2235,6 +2235,12 @@ vega support the accepted equity package. Runtime, portfolio and host
 qualification remain pending.
 [MARGIN-COLLATERAL-IM-007](margin-collateral-im/07-simm-equity.md#accepted-decision-for-checked-simm-equity-delta-and-vega).
 
+Independent arithmetic for the accepted FX package covered reciprocal shocks,
+signed high-volatility dependence, pair-specific vega proxies, concentration
+and invalid custom effective dependence. Runtime, portfolio and host
+qualification remain pending.
+[MARGIN-COLLATERAL-IM-008](margin-collateral-im/08-simm-fx.md#accepted-decision-for-checked-simm-fx-delta-and-pair-vega).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

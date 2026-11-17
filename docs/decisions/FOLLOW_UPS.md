@@ -2391,6 +2391,11 @@ requiring reproduction, adoption choices and missing validation are distinct.
   concentration and dependence under the
   [accepted equity contract](financial/margin-collateral-im/07-simm-equity.md#accepted-decision-for-checked-simm-equity-delta-and-vega).
 
+- **SIMM FX delta and pair vega.** Reconcile qualified USD-basis shocks,
+  canonical pairs, pair-specific proxies, concentration categories and signed
+  dependence under the
+  [accepted FX contract](financial/margin-collateral-im/08-simm-fx.md#accepted-decision-for-checked-simm-fx-delta-and-pair-vega).
+
 ### Implementation reconciliation
 
 - **Related scope:** retain the option-bearing CS01/OAS reconciliation above.
