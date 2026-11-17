@@ -180,7 +180,14 @@ pub(crate) fn apply_forecast(
             curve_pct(base_value, forecast_periods, &p.curve).map(|values| (values, None))
         }
         ForecastSpec::Override(p) => {
-            apply_override(base_value, forecast_periods, &p.overrides).map(|values| (values, None))
+            // A method without a base receives NaN; the keyed carry is the
+            // one method that runs without one.
+            apply_override(
+                (!base_value.is_nan()).then_some(base_value),
+                forecast_periods,
+                &p.overrides,
+            )
+            .map(|values| (values, None))
         }
         ForecastSpec::TimeSeries(p) => {
             timeseries_forecast(forecast_periods, p).map(|values| (values, None))

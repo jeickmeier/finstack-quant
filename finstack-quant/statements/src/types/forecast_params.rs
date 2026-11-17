@@ -531,9 +531,10 @@ impl ForecastSpec {
                 correlation(&p.correlation_with, p.correlation)
             }
             Self::Override(p) => p.overrides.iter().try_for_each(|(period, value)| {
-                if period.parse::<PeriodId>().is_err() {
+                let canonical = period.parse::<PeriodId>().map(|id| id.to_string());
+                if canonical.as_deref() != Ok(period.as_str()) {
                     return fail(format!(
-                        "override key '{period}' is not a period identifier"
+                        "override key '{period}' is not a canonical period identifier"
                     ));
                 }
                 finite("overrides", *value)
@@ -578,7 +579,18 @@ impl ForecastSpec {
             Self::Bootstrap(p) => series("historical", &p.historical),
             Self::FadeToTarget(p) => {
                 finite("target", p.target)?;
+                if p.shape == ForecastFadeShape::Geometric {
+                    let crosses = |start: f64| start == 0.0 || (start < 0.0) != (p.target < 0.0);
+                    if p.target == 0.0 || p.start.is_some_and(crosses) {
+                        return fail(
+                            "the geometric shape needs non-zero levels of one sign".to_string(),
+                        );
+                    }
+                }
                 match (p.shape, p.half_life) {
+                    (ForecastFadeShape::Exponential, None) => {
+                        fail("the exponential shape needs a 'half_life'".to_string())
+                    }
                     (_, None) => Ok(()),
                     (ForecastFadeShape::Exponential, Some(half_life))
                         if half_life.is_finite() && half_life > 0.0 =>

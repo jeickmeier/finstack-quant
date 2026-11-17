@@ -83,12 +83,13 @@ pub(crate) fn evaluate_forecast(
     match forecast_cache.get(node_spec.node_id.as_str()) {
         Some(ForecastRun::Unavailable(reason)) => Ok(ForecastCell::Unavailable(*reason)),
         Some(ForecastRun::Series { raw, published }) => {
-            let value = published.get(period_id).copied().ok_or_else(|| {
-                Error::eval(format!(
-                    "Forecast did not produce value for period {:?}",
-                    period_id
-                ))
-            })?;
+            // A keyed override without a base leaves the slots before its
+            // first key out of the series.
+            let Some(value) = published.get(period_id).copied() else {
+                return Ok(ForecastCell::Unavailable(
+                    UnavailableReason::MissingForecastBase,
+                ));
+            };
             let clipped_from = raw
                 .get(period_id)
                 .copied()

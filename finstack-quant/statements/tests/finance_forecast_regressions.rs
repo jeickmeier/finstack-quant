@@ -23,47 +23,29 @@ fn forecast_model(base: f64, forecast: ForecastSpec) -> FinancialModelSpec {
     }
 }
 
+/// An override key is the canonical text of its period: another spelling of
+/// the same period is rejected when the specification is validated, so two
+/// keys can never name one period.
 #[test]
-fn override_period_aliases_apply_to_their_parsed_periods() {
-    let january = PeriodId::month(2025, 1).unwrap();
-    let february = PeriodId::month(2025, 2).unwrap();
-    let march = PeriodId::month(2025, 3).unwrap();
-    for spelling in ["2025M2", "2025m02", " 2025M02 "] {
-        let forecast = ForecastSpec::from_params(
+fn override_keys_are_canonical_period_identifiers() {
+    let keyed = |spelling: &str| {
+        ForecastSpec::from_params(
             ForecastMethod::Override,
             [("overrides".into(), json!({spelling: 200.0}))]
                 .into_iter()
                 .collect(),
         )
-        .unwrap();
-        let model = {
-            let mut model_builder = ModelBuilder::new("monthly-overrides");
-            model_builder.periods("2025M1..M3", Some("2025M1")).unwrap();
-            model_builder.value("x", &[(january, 100.0.into())]);
-            model_builder.forecast("x", forecast);
-            model_builder.build().unwrap()
-        };
-        let result = Evaluator::new().evaluate(&model).unwrap();
-        assert_eq!(result.get("x", &february), Some(200.0), "{spelling}");
-        assert_eq!(result.get("x", &march), Some(200.0), "{spelling}");
+        .unwrap()
+    };
+    let canonical = PeriodId::month(2025, 2).unwrap().to_string();
+    assert!(keyed(&canonical).validate().is_ok());
+    for spelling in ["2025m02", " 2025M02 ", "2025q2", "not-a-period"] {
+        let error = keyed(spelling).validate().unwrap_err();
+        assert!(
+            error.to_string().contains("canonical"),
+            "{spelling}: {error}"
+        );
     }
-}
-
-#[test]
-fn override_duplicate_period_aliases_are_rejected() {
-    let forecast = ForecastSpec::from_params(
-        ForecastMethod::Override,
-        [(
-            "overrides".into(),
-            json!({"2025Q2": 200.0, "2025q2": 300.0}),
-        )]
-        .into_iter()
-        .collect(),
-    )
-    .unwrap();
-    let model = forecast_model(100.0, forecast);
-    let error = Evaluator::new().evaluate(&model).unwrap_err();
-    assert!(error.to_string().contains("Duplicate override"), "{error}");
 }
 
 #[test]
@@ -613,4 +595,133 @@ fn bounds_clip_published_outputs_and_do_not_feed_the_next_step() {
         [(quarter(3), 25.0, 30.0), (quarter(4), 12.5, 30.0)],
         "each clip records the raw level the recurrence kept"
     );
+}
+
+// --- C3: deterministic forecasts and fades (STATEMENTS-EVALUATION-006) ---
+
+#[test]
+fn growth_below_minus_one_hundred_percent_flips_the_sign() {
+    // -100% gives zero and stays there.
+    let zero = Evaluator::new()
+        .evaluate(&growth_model(ForecastSpec::growth(-1.0), Some(100.0), &[]))
+        .unwrap();
+    for index in [2, 3, 4] {
+        assert_eq!(zero.get("x", &quarter(index)), Some(0.0));
+    }
+    // -150% multiplies by -0.5 each period: -50, 25, -12.5.
+    let flipped = Evaluator::new()
+        .evaluate(&growth_model(ForecastSpec::growth(-1.5), Some(100.0), &[]))
+        .unwrap();
+    for (index, expected) in [(2, -50.0), (3, 25.0), (4, -12.5)] {
+        assert_eq!(flipped.get("x", &quarter(index)), Some(expected));
+    }
+    // The same recurrence on a negative level and through a curve.
+    let curve = Evaluator::new()
+        .evaluate(&growth_model(
+            ForecastSpec::curve(vec![-2.0, 0.5, -1.0]),
+            Some(-40.0),
+            &[],
+        ))
+        .unwrap();
+    for (index, expected) in [(2, 40.0), (3, 60.0), (4, 0.0)] {
+        assert_eq!(curve.get("x", &quarter(index)), Some(expected));
+    }
+}
+
+#[test]
+fn override_slots_before_the_first_key_carry_the_base_or_are_unavailable() {
+    use finstack_quant_statements::evaluator::UnavailableReason;
+    let keyed = || ForecastSpec::overrides([(quarter(3), 130.0)].into_iter().collect());
+    // With a base, the leading slot carries it; the key is carried after.
+    let based = Evaluator::new()
+        .evaluate(&growth_model(keyed(), Some(100.0), &[]))
+        .unwrap();
+    for (index, expected) in [(2, 100.0), (3, 130.0), (4, 130.0)] {
+        assert_eq!(based.get("x", &quarter(index)), Some(expected));
+    }
+    // Without one, the leading slot is unavailable with a reason and the
+    // keyed levels are still published.
+    let unbased = Evaluator::new()
+        .evaluate(&growth_model(keyed(), None, &[]))
+        .unwrap();
+    assert_eq!(
+        unbased.get_cell("x", &quarter(2)).unwrap().reason,
+        Some(UnavailableReason::MissingForecastBase)
+    );
+    for index in [3, 4] {
+        assert_eq!(unbased.get("x", &quarter(index)), Some(130.0));
+    }
+}
+
+#[test]
+fn geometric_fade_is_representable_when_the_endpoint_ratio_is_not() {
+    // 1e-200 to 1e200 over three periods: the ratio 1e400 overflows, the
+    // levels 1e-200 x 10^(400 t / 3) do not.
+    for (base, target) in [(1e-200, 1e200), (1e200, 1e-200), (-1e200, -1e-200)] {
+        let result = Evaluator::new()
+            .evaluate(&growth_model(
+                ForecastSpec::fade_to_target(target, ForecastFadeShape::Geometric),
+                Some(base),
+                &[],
+            ))
+            .unwrap();
+        let exponent =
+            |t: f64| base.abs().log10() + (target.abs().log10() - base.abs().log10()) * t / 3.0;
+        for (index, t) in [(2, 1.0), (3, 2.0)] {
+            let value = result.get("x", &quarter(index)).unwrap();
+            assert_eq!(value.signum(), target.signum());
+            assert!((value.abs().log10() - exponent(t)).abs() < 1e-9);
+        }
+        assert_eq!(
+            result.get("x", &quarter(4)).unwrap().to_bits(),
+            target.to_bits()
+        );
+    }
+}
+
+#[test]
+fn geometric_fade_rejects_opposite_sign_and_zero_endpoints() {
+    // A zero target, and a start level across zero, fail when the
+    // specification is built.
+    assert!(
+        ForecastSpec::fade_to_target(0.0, ForecastFadeShape::Geometric)
+            .validate()
+            .is_err()
+    );
+    assert!(
+        ForecastSpec::fade_to_target(50.0, ForecastFadeShape::Geometric)
+            .with_param("start", json!(-10.0))
+            .unwrap()
+            .validate()
+            .is_err()
+    );
+    // A base across zero from the target fails when the forecast runs.
+    for base in [-100.0, 0.0] {
+        let model = growth_model(
+            ForecastSpec::fade_to_target(50.0, ForecastFadeShape::Geometric),
+            Some(base),
+            &[],
+        );
+        let error = Evaluator::new().evaluate(&model).unwrap_err();
+        assert!(error.to_string().contains("same sign"), "{error}");
+    }
+    // An exponential fade without a half-life fails statically.
+    assert!(
+        ForecastSpec::fade_to_target(50.0, ForecastFadeShape::Exponential)
+            .validate()
+            .is_err()
+    );
+}
+
+#[test]
+fn exponential_fade_halves_the_remaining_gap_each_half_life() {
+    let fade = ForecastSpec::fade_to_target(100.0, ForecastFadeShape::Exponential)
+        .with_param("half_life", json!(1.0))
+        .unwrap();
+    let result = Evaluator::new()
+        .evaluate(&growth_model(fade, Some(-60.0), &[]))
+        .unwrap();
+    for (index, expected) in [(2, 20.0), (3, 60.0), (4, 80.0)] {
+        assert!((result.get("x", &quarter(index)).unwrap() - expected).abs() < 1e-12);
+    }
 }

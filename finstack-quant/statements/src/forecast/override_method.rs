@@ -1,31 +1,33 @@
-//! Override forecast method for injecting explicit period-level values.
+//! Override forecast method: period-keyed levels with their own carry.
 //!
-//! The override method lets callers provide sparse adjustments that supersede
-//! previously calculated projections. Any periods without an explicit override
-//! will inherit the most recent value (forward fill).
+//! Each keyed level is carried forward until the next key. Slots before the
+//! first key carry the base when there is one and have no value otherwise.
 
 use crate::error::{Error, Result};
 use finstack_quant_core::dates::PeriodId;
 use indexmap::IndexMap;
 
-/// Override: use explicit period-specific values, forward fill for the rest.
+/// Override: period-keyed levels, each carried forward until the next key.
 ///
 /// # Arguments
 ///
-/// * `base_value` - Value carried forward until the first override
+/// * `base_value` - Level carried through the slots before the first key, in
+///   the node's own units; `None` leaves those slots out of the result, which
+///   the evaluator publishes as unavailable
 /// * `forecast_periods` - Periods that require projected values
 /// * `overrides` - Exact levels keyed by period id text (e.g. `"2025Q2"`); every
 ///   period must parse to one of `forecast_periods`, and no two keys may name
 ///   the same period
 pub(super) fn apply_override(
-    base_value: f64,
+    base_value: Option<f64>,
     forecast_periods: &[PeriodId],
     overrides: &IndexMap<String, f64>,
 ) -> Result<IndexMap<PeriodId, f64>> {
-    if !base_value.is_finite() {
+    if let Some(base) = base_value
+        && !base.is_finite()
+    {
         return Err(Error::forecast(format!(
-            "base_value must be finite, got {}",
-            base_value
+            "base_value must be finite, got {base}"
         )));
     }
 
@@ -57,11 +59,11 @@ pub(super) fn apply_override(
 
     for period_id in forecast_periods {
         if let Some(&override_value) = overrides_map.get(period_id) {
-            current_value = override_value;
+            current_value = Some(override_value);
         }
-        // Otherwise forward fill current_value
-
-        results.insert(*period_id, current_value);
+        if let Some(value) = current_value {
+            results.insert(*period_id, value);
+        }
     }
 
     Ok(results)
@@ -85,8 +87,8 @@ mod tests {
         }))
         .expect("overrides");
 
-        let results =
-            apply_override(100.0, &periods, &overrides).expect("apply_override should succeed");
+        let results = apply_override(Some(100.0), &periods, &overrides)
+            .expect("apply_override should succeed");
 
         assert_eq!(results.len(), 2);
         assert_eq!(
@@ -114,8 +116,8 @@ mod tests {
         }))
         .expect("overrides");
 
-        let results =
-            apply_override(100.0, &periods, &overrides).expect("apply_override should succeed");
+        let results = apply_override(Some(100.0), &periods, &overrides)
+            .expect("apply_override should succeed");
 
         assert_eq!(results.len(), 4);
         assert_eq!(
@@ -146,8 +148,8 @@ mod tests {
         let overrides: IndexMap<String, f64> =
             serde_json::from_value(serde_json::json!({})).expect("overrides");
 
-        let results =
-            apply_override(100.0, &periods, &overrides).expect("apply_override should succeed");
+        let results = apply_override(Some(100.0), &periods, &overrides)
+            .expect("apply_override should succeed");
 
         assert_eq!(results.len(), 2);
         assert_eq!(
@@ -169,8 +171,24 @@ mod tests {
         }))
         .expect("overrides");
 
-        let err = apply_override(100.0, &periods, &overrides)
+        let err = apply_override(Some(100.0), &periods, &overrides)
             .expect_err("unmatched override period must be rejected");
         assert!(err.to_string().contains("not in the forecast periods"));
+    }
+
+    #[test]
+    fn slots_before_the_first_key_have_no_value_without_a_base() {
+        let periods: Vec<PeriodId> = (1..=4)
+            .map(|q| PeriodId::quarter(2025, q).expect("valid period fixture"))
+            .collect();
+        let overrides: IndexMap<String, f64> =
+            serde_json::from_value(serde_json::json!({ "2025Q3": 130.0 })).expect("overrides");
+
+        let results = apply_override(None, &periods, &overrides).expect("override");
+
+        assert_eq!(
+            results.into_iter().collect::<Vec<_>>(),
+            vec![(periods[2], 130.0), (periods[3], 130.0)]
+        );
     }
 }

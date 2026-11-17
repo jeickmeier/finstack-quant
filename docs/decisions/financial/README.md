@@ -418,8 +418,8 @@ forecast and recorded output clipping are implemented and qualified.
 
 The Statements deterministic forecast and fade contract was accepted on
 2026-11-15. It covers signed per-slot growth, keyed carry, stable fade
-domains and validation on empty horizons. Implementation and independent
-qualification remain pending.
+domains and validation on empty horizons. It is implemented and
+qualified.
 [STATEMENTS-EVALUATION-006](statements-evaluation/06-deterministic-forecasts-and-fades.md#accepted-decision-for-deterministic-forecasts-and-fades).
 
 The Statements stochastic forecast kernel contract was accepted on

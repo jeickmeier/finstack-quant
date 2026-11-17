@@ -1137,3 +1137,21 @@ the model's forecast periods, one step per period.
 - **Bounds.** `min` / `max` clip the published value only, for every method;
   later steps build on the unclipped level. Each clipped cell adds a
   `forecast_clipped` warning with the raw and published values.
+
+### Statements: signed growth, keyed override carry and exact fade targets
+
+STATEMENTS-EVALUATION-006.
+
+- **Override keys are canonical.** An `override` forecast key must be the
+  canonical text of its period (`"2025M02"`, not `"2025m2"`); another
+  spelling is rejected when the model is built.
+- **Override without a base.** Slots before the first key carry the base
+  when there is one and are otherwise unavailable (`missing_forecast_base`);
+  the run no longer fails.
+- **Fades.** Linear and geometric fades return the exact target in the final
+  period. The geometric fade interpolates log magnitudes, so extreme
+  endpoints no longer overflow. A geometric fade to zero, a `start` across
+  zero from the target and an exponential fade without `half_life` are
+  rejected when the model is built.
+- **Growth.** Rates below -100% flip the sign of the level, as before; the
+  log advisories about negative bases and large rates are removed.
