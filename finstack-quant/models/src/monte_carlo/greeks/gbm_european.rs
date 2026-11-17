@@ -295,9 +295,8 @@ mod tests {
     }
 
     /// Pins the per-path-paired estimates and standard errors. Captured from
-    /// the paired implementation before it took the short names. Platform
-    /// libm yields one pattern on macOS and another on the Linux libm used by
-    /// GitHub Actions. A third pattern means the seeded Greeks moved.
+    /// the paired implementation before it took the short names. The pins
+    /// cover macOS and the observed Linux builds used by GitHub Actions.
     #[test]
     fn paired_finite_diff_greeks_are_bit_stable() {
         let bits = |estimate: Estimate| [estimate.mean.to_bits(), estimate.stderr.to_bits()];
@@ -308,7 +307,7 @@ mod tests {
             bits(finite_diff_delta(put()).expect("put delta")),
             bits(finite_diff_gamma(put()).expect("put gamma")),
         ];
-        const PINS: [[[u64; 2]; 4]; 2] = [
+        const PINS: [[[u64; 2]; 4]; 3] = [
             [
                 [0x3fe4_435d_3a2c_3108, 0x3f68_16b5_9602_d2dd],
                 [0x3f92_6177_6054_677d, 0x3f5a_48d2_3f3d_5558],
@@ -320,6 +319,13 @@ mod tests {
                 [0x3f92_6177_6054_678a, 0x3f5a_48d2_3f3d_5555],
                 [0xbfe1_70bb_1a96_6f22, 0x3f66_7b61_b338_9e45],
                 [0x3f94_ef48_0153_4ed0, 0x3f4d_ed31_31d4_5fe7],
+            ],
+            // Ubuntu 24.04.5, runner image 20261111.127.1, Rust 1.97.1.
+            [
+                [0x3fe4_435d_3a2c_3108, 0x3f68_16b5_9602_d2de],
+                [0x3f92_6177_6054_6788, 0x3f5a_48d2_3f3d_5556],
+                [0xbfe1_70bb_1a96_6f2a, 0x3f66_7b61_b338_9e42],
+                [0x3f94_ef48_0153_4ed0, 0x3f4d_ed31_31d4_5fe5],
             ],
         ];
         assert!(

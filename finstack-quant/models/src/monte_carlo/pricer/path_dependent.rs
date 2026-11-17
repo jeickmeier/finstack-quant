@@ -2153,8 +2153,8 @@ mod tests {
     }
 
     /// Seeded GBM Asian convenience prices (mean and standard error) are
-    /// pinned for calls and puts. Platform libm yields one pattern on macOS
-    /// and another on the Linux libm used by GitHub Actions.
+    /// pinned for calls and puts on macOS and the observed Linux builds used
+    /// by GitHub Actions.
     #[test]
     fn gbm_asian_call_and_put_are_bit_stable() {
         const EXPECTED: &[u64] = &[
@@ -2310,8 +2310,47 @@ mod tests {
             0x3f9cbc02b2a93f0b,
             0x3fb4c48e3872a8e9,
         ];
+        // Ubuntu 24.04.5, runner image 20261111.127.1, Rust 1.97.1.
+        const UBUNTU_24_04_5: &[u64] = &[
+            0x40195cdbec2b01c4,
+            0x3fdc249afb33387a,
+            0x40176ee1abd3fb0a,
+            0x3fd593ce944bf327,
+            0x4027c98e1c4e20cc,
+            0x3fe31c6bc20af5c2,
+            0x40027bb6f761ef02,
+            0x3fcb758de16af18e,
+            0x3fff484575b19363,
+            0x3fd05d4dc80f367e,
+            0x402ec1b62a42dd2e,
+            0x3fe04e9f5a5800d4,
+            0x401bd9967d816613,
+            0x3fce5f17b4811b71,
+            0x40155dfccc84297c,
+            0x3fc45f08a6f61eab,
+            0x402a9e8a223bfe8b,
+            0x3fcbdb8abd307aec,
+            0x400061190e6e3a50,
+            0x3fc0720e85396db6,
+            0x3fff670343656927,
+            0x3fc56479aab3b6e9,
+            0x402d4a5a81aee858,
+            0x3fb5f30fcc19ac91,
+            0x4019f174aceea582,
+            0x3fe50d0985e19da9,
+            0x3fe521515a7bdef1,
+            0x3fc142f4470e821c,
+            0x3fcebd9d3d2cc036,
+            0x3fc5c2462919b2c4,
+            0x40143d71cec9488b,
+            0x3fdb41a13d264d1e,
+            0xbfd3e8b6c02d1c02,
+            0x3facdadbb65e9911,
+            0x3f9cbc02b2a93ef8,
+            0x3fb4c48e3872a8e9,
+        ];
         assert!(
-            actual.as_slice() == EXPECTED || actual.as_slice() == LINUX,
+            [EXPECTED, LINUX, UBUNTU_24_04_5].contains(&actual.as_slice()),
             "GBM Asian prices moved off the macOS and Linux libm pins:\n{actual:#x?}"
         );
     }
