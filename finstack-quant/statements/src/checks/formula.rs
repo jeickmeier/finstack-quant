@@ -42,7 +42,7 @@ impl Check for FormulaCheckSpec {
             .nodes
             .keys()
             .map(NodeId::as_str)
-            .chain(context.results.nodes.keys().map(String::as_str))
+            .chain(context.results.node_ids())
         {
             value_types.insert(
                 NodeId::new(node),
@@ -69,7 +69,7 @@ impl Check for FormulaCheckSpec {
             .into_iter()
             .filter(|node| {
                 !node.as_str().starts_with("cs.")
-                    && (context.results.nodes.contains_key(node.as_str())
+                    && (context.results.has_node(node.as_str())
                         || context.model.has_node(node.as_str()))
             })
             .collect();
@@ -103,9 +103,9 @@ impl Check for FormulaCheckSpec {
                 .as_ref()
                 .map(|cashflows| cashflows.period_snapshot(period.id));
 
-            for (node_id, values) in &context.results.nodes {
-                if let Some(value) = values.get(&period.id) {
-                    evaluation.set_value(node_id, *value)?;
+            for (node_id, cells) in &context.results.cells {
+                if let Some(cell) = cells.get(&period.id) {
+                    evaluation.set_value(node_id, cell.numeric().unwrap_or(f64::NAN))?;
                 }
             }
 
@@ -209,8 +209,7 @@ impl FormulaCheckSpec {
 
 fn node_columns(results: &StatementResult) -> IndexMap<NodeId, usize> {
     results
-        .nodes
-        .keys()
+        .node_ids()
         .enumerate()
         .map(|(index, node_id)| (NodeId::new(node_id), index))
         .collect()
@@ -223,9 +222,13 @@ fn period_history(
     let mut history = PeriodHistory::with_periods(Arc::new(node_columns(results)), &model.periods);
     for period in &model.periods {
         let row = results
-            .nodes
+            .cells
             .values()
-            .map(|series| series.get(&period.id).copied())
+            .map(|cells| {
+                cells
+                    .get(&period.id)
+                    .map(|cell| cell.numeric().unwrap_or(f64::NAN))
+            })
             .collect();
         history.push_row(period.id, row);
     }

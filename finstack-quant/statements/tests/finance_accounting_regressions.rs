@@ -137,7 +137,7 @@ fn formula_checks_validate_capital_structure_reporting_units() {
 
     let mut usd_model = model;
     usd_model.nodes.shift_remove(&NodeId::new("eur"));
-    results.nodes.shift_remove("eur");
+    results.cells.shift_remove("eur");
     results.node_value_types.shift_remove("eur");
     results.cs_cashflows.as_mut().unwrap().reporting_currency = Some(Currency::EUR);
     let error = formula_check("cs.interest_expense.total == usd", None)
@@ -269,7 +269,7 @@ fn normalization_merge_clears_the_report_for_the_previous_financial_values() {
 fn failed_and_empty_normalization_merges_preserve_the_original_report_and_values() {
     let (_, mut results, _) = checked_balance_sheet();
     let original_report = results.check_report.clone();
-    let original_values = results.nodes.clone();
+    let original_values = results.cells.clone();
     finstack_quant_statements::adjustments::merge_into_results(&mut results, &[], "assets")
         .unwrap();
     assert_eq!(results.check_report, original_report);
@@ -284,7 +284,7 @@ fn failed_and_empty_normalization_merges_preserve_the_original_report_and_values
         )
         .is_err()
     );
-    assert_eq!(results.nodes, original_values);
+    assert_eq!(results.cells, original_values);
     assert_eq!(results.check_report, original_report);
 }
 

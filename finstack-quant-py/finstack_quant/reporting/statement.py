@@ -8,7 +8,7 @@ transform is decimal-to-percent scaling for ratios, growth and variance percenta
 Examples:
 --------
 >>> from finstack_quant.reporting.statement import statement_tearsheet
->>> statement_tearsheet({"nodes": {}}, sections=[]).title
+>>> statement_tearsheet({"cells": {}}, sections=[]).title
 'Financial Statements'
 """
 
@@ -121,7 +121,7 @@ def statement_tearsheet(
     Examples:
     --------
     >>> from finstack_quant.reporting.statement import statement_tearsheet
-    >>> statement_tearsheet({"nodes": {}}, sections=[]).title
+    >>> statement_tearsheet({"cells": {}}, sections=[]).title
     'Financial Statements'
     """
     wanted = _resolve_sections(sections, ALL_SECTIONS)

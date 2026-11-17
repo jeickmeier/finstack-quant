@@ -280,11 +280,7 @@ fn run_model_uses_supplied_results_without_recomputation() {
         model_builder.build().unwrap()
     };
     let mut supplied = Evaluator::new().evaluate(&model).unwrap();
-    supplied
-        .nodes
-        .get_mut("revenue")
-        .unwrap()
-        .insert(q(1), -1.0);
+    supplied.set_scalar("revenue", q(1), -1.0).unwrap();
 
     let report = positive_revenue_suite()
         .run_model(&model, Some(&supplied))

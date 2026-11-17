@@ -135,6 +135,53 @@
       "format": "date",
       "type": "string"
     },
+    "d_1b23dc87c71e8faf60d2": {
+      "additionalProperties": false,
+      "description": "What a result was evaluated from.\n\nA consumer that is handed a result checks this against the model, period\nplan and run it expects before trusting the cells.",
+      "properties": {
+        "model_content_hash": {
+          "description": "Canonical content hash of the evaluated model\n([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).",
+          "type": "string"
+        },
+        "model_id": {
+          "description": "Identifier of the evaluated model.",
+          "type": "string"
+        },
+        "observation_cutoff": {
+          "$ref": "#/$defs/d_9b3d87b6c4349df4e78d",
+          "description": "Observations the run was allowed to read."
+        },
+        "run_id": {
+          "description": "Identity of this evaluation run: the canonical content hash of the\nfields above. Two runs of the same model content, snapshot, cutoff\nand valuation date share it.",
+          "type": "string"
+        },
+        "source_snapshot": {
+          "description": "Identity of the source snapshot the model's observations came from.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "valuation_date": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_11c7dbc9fa7cb6ce298a"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Valuation date the capital structure was priced at, when the run used\na market."
+        }
+      },
+      "required": [
+        "model_id",
+        "model_content_hash",
+        "observation_cutoff",
+        "run_id"
+      ],
+      "type": "object"
+    },
     "d_1b5716dde9957a614f3c": {
       "additionalProperties": false,
       "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
@@ -244,11 +291,11 @@
       "type": "object"
     },
     "d_2a886a29e286928aba1b": {
-      "description": "Which evaluation layer produced a statement cell (one node in one period).\n\nThe evaluator resolves every cell by the precedence\n`Value > Forecast > Formula`, after the node's optional `where` mask. The\nwinning layer is recorded per cell in [`StatementResult::node_sources`].",
+      "description": "Which value source produced a statement cell (one node in one period).\n\nThe evaluator resolves every unmasked cell by the precedence\n`Value > Forecast > Formula`. The selected source is recorded on the cell,\nincluding when that source's result is unavailable.",
       "oneOf": [
         {
           "const": "value",
-          "description": "The explicit value stored on the node for this period (and visible\nunder the active as-of policy).",
+          "description": "The explicit observation stored on the node for this period (and\nvisible under the observation cutoff).",
           "type": "string"
         },
         {
@@ -260,15 +307,30 @@
           "const": "formula",
           "description": "The node's formula.",
           "type": "string"
-        },
+        }
+      ]
+    },
+    "d_2d84d5c82e1a8492041a": {
+      "description": "Whether a cell has a value, and if not, which kind of absence it is.",
+      "oneOf": [
         {
-          "const": "where_masked",
-          "description": "The node's `where` clause evaluated to false for this period, so the\ncell is masked: it has no value (`NaN`, never a zero) and the value,\nforecast and formula were not consulted.",
+          "const": "value",
+          "description": "The cell has a value, which may be a known zero.",
           "type": "string"
         },
         {
           "const": "missing",
-          "description": "No observation, forecast or formula supplies this period: the cell is\nmissing and its value is `NaN`. A missing cell is never a zero.",
+          "description": "No observation, forecast or formula supplies the period.",
+          "type": "string"
+        },
+        {
+          "const": "masked",
+          "description": "The node's `where` predicate is false for the period.",
+          "type": "string"
+        },
+        {
+          "const": "unavailable",
+          "description": "The cell has no value for the reason the cell states.",
           "type": "string"
         }
       ]
@@ -317,6 +379,53 @@
         "category",
         "passed",
         "findings"
+      ],
+      "type": "object"
+    },
+    "d_583d7ac2c659b0d958a8": {
+      "additionalProperties": false,
+      "description": "One published cell: a node in a period.\n\nA `value` cell carries a finite scalar or an exact [`Money`]; every other\nstatus carries no value. An `unavailable` cell carries its reason.",
+      "properties": {
+        "reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_6c08f5490eda9e343593"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Why an `unavailable` cell has no value. Absent otherwise."
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_2a886a29e286928aba1b"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The value source selected for the cell. Absent for a masked cell, a\nmissing cell, a cell left unavailable before a source was selected,\nand cells of hand-built results."
+        },
+        "status": {
+          "$ref": "#/$defs/d_2d84d5c82e1a8492041a",
+          "description": "Whether the cell has a value."
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_8831040eb61de989f7ea"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The value of a `value` cell: a finite number for a scalar node, or\nexact tagged money for a monetary node. Absent otherwise."
+        }
+      },
+      "required": [
+        "status"
       ],
       "type": "object"
     },
@@ -451,6 +560,26 @@
         {
           "const": "data_quality",
           "description": "Missing values, NaN/Inf, sign conventions",
+          "type": "string"
+        }
+      ]
+    },
+    "d_6c08f5490eda9e343593": {
+      "description": "Why a cell has no value although its node and period are valid.\n\nAn unavailable cell is not an error: the model is well formed and the run\ncontinues. Invalid arithmetic, an invalid mask and unrepresentable money\nare errors instead and fail the run.",
+      "oneOf": [
+        {
+          "const": "missing_mask",
+          "description": "The node's `where` predicate had no value for the period, so whether\nthe cell is masked is unknown.",
+          "type": "string"
+        },
+        {
+          "const": "hidden_by_cutoff",
+          "description": "The explicit observation was published after the observation cutoff\nand the node has no forecast or formula for the period.",
+          "type": "string"
+        },
+        {
+          "const": "missing_input",
+          "description": "The formula or forecast that supplies the cell had no defined result,\nbecause an input it needs is missing, masked or itself unavailable.",
           "type": "string"
         }
       ]
@@ -719,6 +848,20 @@
       ],
       "type": "object"
     },
+    "d_8831040eb61de989f7ea": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/d_1b5716dde9957a614f3c",
+          "description": "Currency-aware amount"
+        },
+        {
+          "description": "Unitless scalar (ratio, percentage, count, etc.)",
+          "format": "double",
+          "type": "number"
+        }
+      ],
+      "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
+    },
     "d_8b741636dd21d9f7ad3f": {
       "description": "Node value type classification.\n\nDetermines whether a node represents monetary values (with a specific currency)\nor scalar values (ratios, percentages, counts, etc.).",
       "oneOf": [
@@ -750,6 +893,29 @@
           },
           "required": [
             "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_9b3d87b6c4349df4e78d": {
+      "description": "Which explicit observations an evaluation may read.\n\nOn the wire: `\"full_snapshot\"`, or `{\"through\": \"2025-04-25\"}`.",
+      "oneOf": [
+        {
+          "const": "full_snapshot",
+          "description": "Read every observation in the model's snapshot, with no publication\ncutoff.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Read an observation only when its availability date is on or before\nthis date, inclusive through the end of the day.",
+          "properties": {
+            "through": {
+              "$ref": "#/$defs/d_11c7dbc9fa7cb6ce298a"
+            }
+          },
+          "required": [
+            "through"
           ],
           "type": "object"
         }
@@ -1996,17 +2162,47 @@
       "description": "Versioned financial statement evaluation result.",
       "examples": [
         {
+          "cells": {
+            "revenue": {
+              "2025Q1": {
+                "source": "value",
+                "status": "value",
+                "value": {
+                  "amount": "125.01",
+                  "currency": "USD"
+                }
+              },
+              "2025Q2": {
+                "status": "missing"
+              }
+            }
+          },
           "meta": {
-            "num_nodes": 0,
-            "num_periods": 0,
+            "num_nodes": 1,
+            "num_periods": 2,
             "numeric_mode": "float64",
             "parallel": false
           },
-          "nodes": {},
+          "node_value_types": {
+            "revenue": {
+              "currency": "USD",
+              "type": "monetary"
+            }
+          },
           "schema_version": 1
         }
       ],
       "properties": {
+        "cells": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "$ref": "#/$defs/d_583d7ac2c659b0d958a8"
+            },
+            "type": "object"
+          },
+          "description": "Map of node_id → (period_id → [`ResultCell`]): the typed result.\n\nEvery evaluated node has a cell for every period of the plan.",
+          "type": "object"
+        },
         "check_report": {
           "anyOf": [
             {
@@ -2033,41 +2229,11 @@
           "$ref": "#/$defs/d_d812cec4e88e45c1b673",
           "description": "Metadata about the evaluation"
         },
-        "monetary_nodes": {
-          "additionalProperties": {
-            "additionalProperties": {
-              "$ref": "#/$defs/d_1b5716dde9957a614f3c"
-            },
-            "type": "object"
-          },
-          "description": "Map of node_id → (period_id → Money) for monetary nodes",
-          "type": "object"
-        },
-        "node_sources": {
-          "additionalProperties": {
-            "additionalProperties": {
-              "$ref": "#/$defs/d_2a886a29e286928aba1b"
-            },
-            "type": "object"
-          },
-          "description": "Map of node_id → (period_id → [`CellSource`]): which layer of the\n`Value > Forecast > Formula` precedence produced each cell of `nodes`.\n\nPopulated for every cell by [`Evaluator`](crate::evaluator::Evaluator)\n(with or without market context / capital structure). The model spec\nalone does not determine it: an as-of visibility cutoff can hide an\nexplicit value so that the forecast or formula fires instead. Empty\nonly for results that were not produced by the evaluator (hand-built)\nor were serialized before this field existed.",
-          "type": "object"
-        },
         "node_value_types": {
           "additionalProperties": {
             "$ref": "#/$defs/d_8b741636dd21d9f7ad3f"
           },
-          "description": "Track value types for each node",
-          "type": "object"
-        },
-        "nodes": {
-          "additionalProperties": {
-            "additionalProperties": {
-              "$ref": "#/$defs/d_d2458ef8e558d1360642"
-            },
-            "type": "object"
-          },
-          "description": "Map of node_id → (period_id → value). Native values are f64; JSON uses\nnumbers for finite values and `\"nan\"`, `\"inf\"`, `\"-inf\"` for non-finite cells.",
+          "description": "Units of each node: scalar, or monetary in one currency.",
           "type": "object"
         },
         "periods": {
@@ -2079,7 +2245,18 @@
               "type": "null"
             }
           ],
-          "description": "The period plan `nodes` is keyed by: the periods in timeline order,\nwith their dates and actual/forecast split, and their calendar context.\n\n[`Evaluator`](crate::evaluator::Evaluator) records the model's plan and\n[`rollup`](Self::rollup) records its target periods in the model's\ncalendar, where a target is actual only when every source period is.\n`None` only for hand-built results, such as [`new`](Self::new)."
+          "description": "The period plan `cells` is keyed by: the periods in timeline order,\nwith their dates and actual/forecast split, and their calendar context.\n\n[`Evaluator`](crate::evaluator::Evaluator) records the model's plan and\n[`rollup`](Self::rollup) records its target periods in the model's\ncalendar, where a target is actual only when every source period is.\n`None` only for hand-built results, such as [`new`](Self::new)."
+        },
+        "provenance": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_1b23dc87c71e8faf60d2"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What was evaluated: the model, its source snapshot, the observation\ncutoff and the run. `None` only for hand-built results."
         },
         "schema_version": {
           "$ref": "#/$defs/d_1123ed7c2c0a8683a461",
@@ -2088,7 +2265,7 @@
       },
       "required": [
         "schema_version",
-        "nodes",
+        "cells",
         "meta"
       ],
       "title": "StatementResult",

@@ -274,7 +274,7 @@ fn precomputed_inferred_money_units_keep_valid_results_and_missing_node_warnings
     assert!(suite.run_model(&model, Some(&results)).unwrap().results[0].passed);
     results.node_value_types.clear();
     assert!(suite.run_model(&model, Some(&results)).unwrap().results[0].passed);
-    results.nodes.shift_remove("b");
+    results.cells.shift_remove("b");
     let report = suite.run_model(&model, Some(&results)).unwrap();
     let findings = &report.results[0].findings;
     assert_eq!(findings.len(), 2);

@@ -64,9 +64,7 @@ impl Check for DividendReconciliation {
                     [&self.dividends_cf_node, &self.dividends_equity_node]
                         .into_iter()
                         .filter(|n| {
-                            context
-                                .results
-                                .get(n.as_str(), pid)
+                            crate::cell_float(context.results, n.as_str(), pid)
                                 .is_some_and(|v| !v.is_finite())
                         })
                         .cloned()

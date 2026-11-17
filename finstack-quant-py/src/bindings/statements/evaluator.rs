@@ -35,31 +35,7 @@ wire_methods!(
 
 #[pymethods]
 impl PyStatementResult {
-    /// Get the value for a node at a specific period.
-    ///
-    /// Returns the f64 view of whichever source won this period under the
-    /// crate's **Value > Forecast > Formula** precedence rule.
-    ///
-    /// Parameters
-    /// ----------
-    /// node_id : str
-    ///     Node identifier (e.g. ``"revenue"``).
-    /// period : str
-    ///     Period identifier string (e.g. ``"2025Q1"``).
-    ///
-    /// Returns
-    /// -------
-    /// float | None
-    ///     The value in the node's own units — a currency amount for
-    ///     monetary nodes (currency not carried; use :meth:`get_money` for
-    ///     that) and a unitless scalar otherwise. ``None`` when the node or
-    ///     period is unknown.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``period`` is not a valid period id; the message restates the
-    ///     accepted grammar (``2025Q1``, ``2025M3``, ``2025``, ...).
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.get")]
     #[pyo3(text_signature = "($self, node_id, period)")]
     fn get(&self, node_id: &str, period: &str) -> PyResult<Option<f64>> {
         let pid = parse_period_id(period)?;
@@ -104,25 +80,13 @@ impl PyStatementResult {
         Ok(self.inner.get_scalar(node_id, &pid))
     }
 
-    /// Get the value for a node at a period, or a default when missing.
-    ///
-    /// Parameters
-    /// ----------
-    /// node_id : str
-    ///     Node identifier (e.g. ``"revenue"``).
-    /// period : str
-    ///     Period identifier string (e.g. ``"2025Q1"``).
-    /// default : float
-    ///     Value returned when the node or period is unknown.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     The evaluated value in the node's own units, or ``default``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.get_or")]
     #[pyo3(text_signature = "($self, node_id, period, default)")]
     fn get_or(&self, node_id: &str, period: &str, default: f64) -> PyResult<f64> {
         let pid = parse_period_id(period)?;
-        Ok(self.inner.get_or(node_id, &pid, default))
+        self.inner
+            .get_or(node_id, &pid, default)
+            .map_err(statements_to_py)
     }
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.periods")]
@@ -136,18 +100,7 @@ impl PyStatementResult {
             .collect()
     }
 
-    /// Get every evaluated period for one node as ordered pairs.
-    ///
-    /// Parameters
-    /// ----------
-    /// node_id : str
-    ///     Node identifier (e.g. ``"revenue"``).
-    ///
-    /// Returns
-    /// -------
-    /// list[tuple[str, float]]
-    ///     ``(period, value)`` pairs in evaluation order, in the node's own
-    ///     units. Empty when the node is not in the result.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.all_periods")]
     #[pyo3(text_signature = "($self, node_id)")]
     fn all_periods(&self, node_id: &str) -> Vec<(String, f64)> {
         self.inner
@@ -181,7 +134,7 @@ impl PyStatementResult {
     ///     ``"2025Q1"``; fiscal periods keep their ``FY`` prefix), with
     ///     monetary values, value types and those periods in ``periods`` (each
     ///     actual only when every source period is). It carries no
-    ///     ``node_sources``, capital-structure cashflows or check report.
+    ///     per-cell ``source``, capital-structure cashflows or check report.
     ///
     /// Raises
     /// ------
@@ -221,37 +174,35 @@ impl PyStatementResult {
         Ok(Self { inner })
     }
 
-    /// Which evaluation layer produced each cell of the result.
-    ///
-    /// The evaluator resolves every (node, period) cell by the precedence
-    /// **Value > Forecast > Formula**, after the node's optional ``where``
-    /// mask. The model alone does not determine the outcome: an as-of
-    /// visibility cutoff can hide an explicit value so that the forecast or
-    /// formula fires instead.
-    ///
-    /// Returns
-    /// -------
-    /// dict[str, dict[str, str]]
-    ///     Node identifier → period identifier (``"2025Q1"``) → source label:
-    ///     ``"value"`` (explicit value), ``"forecast"`` (forecast method),
-    ///     ``"formula"`` (formula), ``"where_masked"`` (the ``where``
-    ///     clause was false, so the cell has no value) or ``"missing"`` (no
-    ///     observation, forecast or formula; the cell is NaN). Same keys as the
-    ///     evaluated values. Empty for a result that was not produced by an
-    ///     evaluator or was serialized before sources were recorded.
-    ///
-    /// This property does not raise.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.cells")]
     #[getter]
-    fn node_sources<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let out = PyDict::new(py);
-        for (node_id, by_period) in &self.inner.node_sources {
-            let periods = PyDict::new(py);
-            for (period, source) in by_period {
-                periods.set_item(period.to_string(), source.as_str())?;
-            }
-            out.set_item(node_id, periods)?;
-        }
-        Ok(out)
+    fn cells<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.cells)
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.get_cell")]
+    #[pyo3(text_signature = "($self, node_id, period)")]
+    fn get_cell<'py>(
+        &self,
+        py: Python<'py>,
+        node_id: &str,
+        period: &str,
+    ) -> PyResult<Option<Bound<'py, PyAny>>> {
+        let pid = parse_period_id(period)?;
+        self.inner
+            .get_cell(node_id, &pid)
+            .map(|cell| crate::bindings::pandas_utils::serde_to_py(py, cell))
+            .transpose()
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.provenance")]
+    #[getter]
+    fn provenance<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .provenance
+            .as_ref()
+            .map(|provenance| crate::bindings::pandas_utils::serde_to_py(py, provenance))
+            .transpose()
     }
 
     /// Check report attached by an evaluator configured with
@@ -275,29 +226,17 @@ impl PyStatementResult {
             .map(|inner| PyCapitalStructureCashflows { inner })
     }
 
-    /// Get every evaluated period for one node as a dict.
-    ///
-    /// Parameters
-    /// ----------
-    /// node_id : str
-    ///     Node identifier (e.g. ``"revenue"``).
-    ///
-    /// Returns
-    /// -------
-    /// dict[str, float] | None
-    ///     Period identifier string → value, in evaluation order, in the
-    ///     node's own units (currency amount for monetary nodes, unitless
-    ///     otherwise). ``None`` when the node is not in the result.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.get_node")]
     #[pyo3(text_signature = "($self, node_id)")]
     fn get_node<'py>(
         &self,
         py: Python<'py>,
         node_id: &str,
     ) -> PyResult<Option<Bound<'py, PyDict>>> {
-        match self.inner.get_node(node_id) {
+        match self.inner.numeric_series(node_id) {
             Some(period_map) => {
                 let dict = PyDict::new(py);
-                for (pid, &val) in period_map {
+                for (pid, val) in period_map {
                     dict.set_item(pid.to_string(), val)?;
                 }
                 Ok(Some(dict))
@@ -306,25 +245,7 @@ impl PyStatementResult {
         }
     }
 
-    /// One node's evaluated series as a pandas ``Series``.
-    ///
-    /// Parameters
-    /// ----------
-    /// node_id : str
-    ///     Node identifier (e.g. ``"revenue"``).
-    ///
-    /// Returns
-    /// -------
-    /// pd.Series
-    ///     Float64 series named ``node_id``, indexed by period identifier
-    ///     string in evaluation order, in the node's own units (currency
-    ///     amount for monetary nodes — see :meth:`get_money` for the
-    ///     currency — unitless otherwise).
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If ``node_id`` is not in the result.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.to_series")]
     #[pyo3(text_signature = "($self, node_id)")]
     fn to_series<'py>(&self, py: Python<'py>, node_id: &str) -> PyResult<Bound<'py, PyAny>> {
         let period_map = self
@@ -332,65 +253,58 @@ impl PyStatementResult {
             .get_node(node_id)
             .ok_or_else(|| PyKeyError::new_err(format!("unknown node: {node_id:?}")))?;
         let labels: Vec<String> = period_map.keys().map(ToString::to_string).collect();
-        let values: Vec<f64> = period_map.values().copied().collect();
+        // pandas marks a cell without a value as NaN.
+        let values: Vec<f64> = period_map
+            .values()
+            .map(|cell| cell.numeric().unwrap_or(f64::NAN))
+            .collect();
         values_to_series(py, values, &labels, node_id)
     }
 
-    /// Export one node as a dated cashflow schedule.
-    ///
-    /// Bridges period-based statement output into dated-cashflow consumers
-    /// (real-estate NOI DCFs, valuation instruments). Periods are taken in
-    /// ``model`` timeline order; periods without a value are skipped.
-    ///
-    /// Parameters
-    /// ----------
-    /// model : FinancialModelSpec | str
-    ///     The model that produced this result (its periods supply the
-    ///     dates); a typed model or its JSON.
-    /// node_id : str
-    ///     Node identifier to export.
-    /// convention : {"end", "start"}, optional
-    ///     ``"end"`` (the Rust default when omitted) dates each period on its
-    ///     last inclusive day (``end - 1 day``, since periods are half-open
-    ///     ``[start, end)``); ``"start"`` uses the period start date.
-    ///
-    /// Returns
-    /// -------
-    /// list[tuple[datetime.date, float]]
-    ///     ``(date, value)`` pairs in timeline order, in the node's own
-    ///     units.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If ``node_id`` is not in the result.
-    /// ValueError
-    ///     If ``convention`` is not ``"end"`` or ``"start"``.
-    #[pyo3(signature = (model, node_id, convention=None), text_signature = "($self, model, node_id, convention=None)")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.to_dated_schedule")]
+    #[pyo3(text_signature = "($self, node_id, convention)")]
     fn to_dated_schedule<'py>(
         &self,
         py: Python<'py>,
-        model: &Bound<'py, PyAny>,
         node_id: &str,
-        convention: Option<&str>,
-    ) -> PyResult<Vec<(Bound<'py, PyAny>, f64)>> {
-        let convention = match convention {
-            Some(convention) => convention
-                .parse::<PeriodDateConvention>()
-                .map_err(statements_to_py)?,
-            None => PeriodDateConvention::default(),
-        };
-        let model = extract_model_ref(model)?;
-        let schedule = finstack_quant_statements::evaluator::node_to_dated_schedule(
-            &model,
+        convention: &str,
+    ) -> PyResult<Vec<Bound<'py, PyDict>>> {
+        let convention = convention
+            .parse::<PeriodDateConvention>()
+            .map_err(statements_to_py)?;
+        finstack_quant_statements::evaluator::node_to_dated_schedule(
             &self.inner,
             node_id,
             convention,
         )
-        .map_err(statements_to_py)?;
-        schedule
+        .map_err(statements_to_py)?
+        .into_iter()
+        .map(|row| {
+            let out = PyDict::new(py);
+            out.set_item("date", date_to_py(py, row.date)?)?;
+            out.set_item("period_id", row.period_id.to_string())?;
+            out.set_item(
+                "cell",
+                crate::bindings::pandas_utils::serde_to_py(py, &row.cell)?,
+            )?;
+            Ok(out)
+        })
+        .collect()
+    }
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.to_pricing_flows")]
+    #[pyo3(text_signature = "($self, selection)")]
+    fn to_pricing_flows<'py>(
+        &self,
+        py: Python<'py>,
+        selection: &Bound<'py, PyAny>,
+    ) -> PyResult<Vec<(Bound<'py, PyAny>, PyMoney)>> {
+        let selection: finstack_quant_statements::evaluator::PricingFlowSelection =
+            crate::bindings::module_utils::spec_from_py(py, selection, "pricing flow selection")?;
+        finstack_quant_statements::evaluator::node_to_pricing_flows(&self.inner, &selection)
+            .map_err(statements_to_py)?
             .into_iter()
-            .map(|(date, value)| Ok((date_to_py(py, date)?, value)))
+            .map(|(date, inner)| Ok((date_to_py(py, date)?, PyMoney { inner })))
             .collect()
     }
 
@@ -402,13 +316,13 @@ impl PyStatementResult {
     ///     Node ids as declared in the model graph.
     #[pyo3(text_signature = "($self)")]
     fn node_ids(&self) -> Vec<String> {
-        self.inner.nodes.keys().cloned().collect()
+        self.inner.cells.keys().cloned().collect()
     }
 
     /// Number of nodes in the result.
     #[getter]
     fn node_count(&self) -> usize {
-        self.inner.nodes.len()
+        self.inner.cells.len()
     }
 
     /// Number of periods evaluated, counted in **periods** on the model's own
@@ -464,31 +378,7 @@ impl PyStatementResult {
         self.inner.meta.parallel
     }
 
-    /// Export to a pandas ``DataFrame``.
-    ///
-    /// Parameters
-    /// ----------
-    /// orient : {"long", "wide"}, default "long"
-    ///     ``"long"`` yields one row per (node, period) with columns
-    ///     ``node_id``, ``period``, ``value``, ``value_money``, ``currency``,
-    ///     ``value_type``, ``source``. ``"wide"`` yields node identifiers as
-    ///     rows and period identifiers as columns.
-    ///
-    /// Notes
-    /// -----
-    /// In long format the monetary columns are populated for `Money`-typed
-    /// nodes and left null for scalar nodes. ``value_money`` is a float64
-    /// mirror of the monetary amount, so it carries f64 (not fixed-point
-    /// Decimal) precision; use ``to_json()`` or ``get_money()`` when full
-    /// fixed-point precision is required. ``source`` is the evaluation layer
-    /// that produced the cell (``value``, ``forecast``, ``formula``,
-    /// ``where_masked`` or ``missing``, see :attr:`node_sources`); it is null when the
-    /// result records no source for the cell.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``orient`` is not ``"long"`` or ``"wide"``.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.to_dataframe")]
     #[pyo3(signature = (orient = "long"))]
     #[pyo3(text_signature = "($self, orient='long')")]
     fn to_dataframe<'py>(&self, py: Python<'py>, orient: &str) -> PyResult<Bound<'py, PyAny>> {
@@ -501,10 +391,12 @@ impl PyStatementResult {
                     &[
                         ("node_id", "node_id"),
                         ("period_id", "period"),
+                        ("status", "status"),
                         ("value", "value"),
-                        ("value_money", "value_money"),
+                        ("amount", "amount"),
                         ("currency", "currency"),
                         ("value_type", "value_type"),
+                        ("reason", "reason"),
                         ("source", "source"),
                     ],
                 )
@@ -536,10 +428,7 @@ impl PyStatementResult {
         crate::bindings::core::table::PyArrowTable::from_envelope(&table)
     }
 
-    /// Export the wide-format table via Arrow (zero-copy for consumers).
-    ///
-    /// Rows are periods (column ``period_id``), one ``float64`` column per
-    /// node, matching ``to_dataframe("wide")`` before its transpose.
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.to_arrow_wide")]
     #[pyo3(text_signature = "($self)")]
     fn to_arrow_wide(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
         let table = self.inner.to_table_wide().map_err(statements_to_py)?;
@@ -561,7 +450,7 @@ impl PyStatementResult {
     fn __repr__(&self) -> String {
         format!(
             "StatementResult(nodes={}, periods={})",
-            self.inner.nodes.len(),
+            self.inner.cells.len(),
             self.inner.meta.num_periods
         )
     }

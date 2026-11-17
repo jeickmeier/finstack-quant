@@ -385,11 +385,13 @@ fn nan_operand_warns_instead_of_silently_passing() {
 
     let mut evaluator = Evaluator::new();
     let mut results = evaluator.evaluate(&model).unwrap();
-    results
-        .nodes
-        .entry("total_assets".to_string())
-        .or_default()
-        .insert(q(1), f64::NAN);
+    results.set_cell(
+        "total_assets",
+        q(1),
+        finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
+    );
 
     let check = BalanceSheetArticulation {
         assets_nodes: vec![NodeId::new("total_assets")],

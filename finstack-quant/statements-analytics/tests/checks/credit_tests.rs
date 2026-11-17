@@ -753,11 +753,13 @@ fn trend_nan_period_warns_and_resets() {
 
     let mut ev = Evaluator::new();
     let mut results = ev.evaluate(&model).unwrap();
-    results
-        .nodes
-        .entry("coverage".to_string())
-        .or_default()
-        .insert(q(3), f64::NAN);
+    results.set_cell(
+        "coverage",
+        q(3),
+        finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
+    );
 
     let check = TrendCheck {
         node: NodeId::new("coverage"),

@@ -246,7 +246,7 @@ pub fn evaluate_lbo(model: &FinancialModelSpec, config: &LboConfig) -> Result<Lb
     let results = evaluator.evaluate(model)?;
 
     let node_value = |node: &str, period: &PeriodId, role: &str| -> Result<f64> {
-        if results.get(node, period).is_none() {
+        if crate::cell_float(&results, node, period).is_none() {
             return Err(Error::Eval(format!(
                 "LBO {role} requires node '{node}' at period {period}; the node is absent from \
                  the evaluated model results"

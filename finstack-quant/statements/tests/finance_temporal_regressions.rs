@@ -376,21 +376,17 @@ fn daily_ttm_sums_twelve_calendar_months_of_calendar_and_business_days() {
         // not prove weekends or holidays), so the window is incomplete
         // (record CORE-CONVENTIONS-014 #11).
         let year_end = PeriodId::day(2025, 365).unwrap();
-        let ltm = result.get("ltm", &year_end).unwrap();
+        let ltm = result.get("ltm", &year_end);
         if business_only {
-            assert!(
-                ltm.is_nan(),
-                "business-day LTM must be incomplete, got {ltm}"
-            );
+            assert_eq!(ltm, None, "business-day LTM must be incomplete");
         } else {
-            close(ltm, 365.0);
+            close(ltm.unwrap(), 365.0);
         }
         // 2024-12-30 has one uncovered day (2023-12-31) in its window.
         assert!(
             result
                 .get("ltm", &PeriodId::day(2024, 365).unwrap())
-                .unwrap()
-                .is_nan()
+                .is_none()
         );
     }
 }

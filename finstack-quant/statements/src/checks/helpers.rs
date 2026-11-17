@@ -106,7 +106,7 @@ pub(crate) fn validate_identity_inputs<'a>(
     let mut reference = None;
     for node in nodes {
         // Missing nodes keep the check's existing missing-input diagnostics.
-        if !context.results.nodes.contains_key(node.as_str()) {
+        if !context.results.has_node(node.as_str()) {
             continue;
         }
         let value_type = validated_input_value_type(check_id, context, node.as_str())?;

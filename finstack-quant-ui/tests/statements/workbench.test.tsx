@@ -23,6 +23,19 @@ import capitalStructure from "./capital-structure/cases.json";
 import { budget } from "../shared/budget";
 import { formatRawMoney } from "../../src/format/format";
 import { createClient } from "../shared/worker/client";
+/** Float view of a native result cell: a scalar as returned, money by its exact amount. */
+const cellNumber = (result: any, nodeId: string, periodId: string): number => {
+  const value = result.cells[nodeId][periodId].value;
+  return typeof value === "number" ? value : Number(value.amount);
+};
+/** Float view of every value cell of one node, keyed by period. */
+const cellNumbers = (result: any, nodeId: string): Record<string, number> =>
+  Object.fromEntries(
+    Object.keys(result.cells[nodeId]).map((periodId) => [
+      periodId,
+      cellNumber(result, nodeId, periodId),
+    ]),
+  );
 vi.mock(
   "@/hooks/shared/use-finstack/client",
   () => import("../shared/worker/client"),
@@ -368,7 +381,7 @@ it(
     const nativeResult = new native.Evaluator().evaluate(
       accepted.mock.lastCall![0],
     );
-    expect(nativeResult.nodes.revenue_to_debt["2024Q1"]).toBeCloseTo(
+    expect(cellNumber(nativeResult, "revenue_to_debt", "2024Q1")).toBeCloseTo(
       182400000 / 410000000,
     );
     const ratios = await screen.findByRole("region", {
@@ -907,7 +920,7 @@ it("runs a native sensitivity and applies a goal-seek solution only on explicit 
         {
           node_id: "revenue",
           period_id: "2025Q4",
-          base_value: evaluated.nodes.revenue["2025Q4"],
+          base_value: cellNumber(evaluated, "revenue", "2025Q4"),
           pct_range: [-10, 10],
         },
       ],
@@ -1018,7 +1031,7 @@ it("reviews the variance, bridge and forecast backtest since the last roll forwa
       .map((button) => button.textContent),
   ).toEqual(
     Object.keys(reportedQ4.nodes).filter(
-      (id) => id in baseJson.nodes && id in comparison.nodes,
+      (id) => id in baseJson.cells && id in comparison.cells,
     ),
   );
   expect(lastCall("runVariance")).toBeUndefined();
@@ -1047,8 +1060,8 @@ it("reviews the variance, bridge and forecast backtest since the last roll forwa
   await waitFor(() => expect(lastCall("backtestForecast")).toBeDefined());
   expect(lastCall("backtestForecast")).toEqual({
     actual: [218200000, 219600000, 228900000],
-    forecast: ["2025Q2", "2025Q3", "2025Q4"].map(
-      (period) => baseJson.nodes.revenue[period],
+    forecast: ["2025Q2", "2025Q3", "2025Q4"].map((period) =>
+      cellNumber(baseJson, "revenue", period),
     ),
   });
   // The bridge runs once its metric and period are chosen.
@@ -1145,7 +1158,7 @@ it("tests the host covenant engine on open in the Covenants tab and returns Rust
   // The engine is tested against the workbench's own canonical model and result.
   const evaluated = lastCall("evaluateCovenants");
   expect(JSON.parse(evaluated.engineJson)).toEqual(covenantEngine);
-  expect(Object.keys(JSON.parse(evaluated.resultsJson).nodes)).toContain(
+  expect(Object.keys(JSON.parse(evaluated.resultsJson).cells)).toContain(
     "leverage",
   );
   // The breach forecast waits for a submitted config; the analyst engine
@@ -1234,29 +1247,29 @@ it("rolls reported quarters up to native annual values with editable methods", a
       JSON.stringify(quarterly),
       canonicalModel(),
       JSON.stringify({ frequency: "annual" }),
-    ).nodes,
-  ).toEqual(rolled.nodes);
+    ).cells,
+  ).toEqual(rolled.cells);
   // A value declared period_end takes the year end, not four quarters' sum.
-  expect(rolled.nodes.debt_at_inception).toEqual({
+  expect(cellNumbers(rolled, "debt_at_inception")).toEqual({
     "2024": 420_000_000,
     "2025": 420_000_000,
   });
   // Draws carry no declaration, so they sum.
-  expect(rolled.nodes.debt_draws).toEqual({
+  expect(cellNumbers(rolled, "debt_draws")).toEqual({
     "2024": 40_000_000,
     "2025": 55_000_000,
   });
   // debt_opening declares formula: closing debt less the year's flows is the
   // year's opening balance, not the opening of its fourth quarter.
-  expect(rolled.nodes.debt_opening).toEqual({
+  expect(cellNumbers(rolled, "debt_opening")).toEqual({
     "2024": 420_000_000,
     "2025": 415_000_000,
   });
-  expect(rolled.nodes.debt_opening["2024"]).toBe(
-    quarterly.nodes.debt_opening["2024Q1"],
+  expect(cellNumber(rolled, "debt_opening", "2024")).toBe(
+    cellNumber(quarterly, "debt_opening", "2024Q1"),
   );
-  expect(rolled.nodes.debt_opening["2025"]).toBe(
-    quarterly.nodes.debt_opening["2025Q1"],
+  expect(cellNumber(rolled, "debt_opening", "2025")).toBe(
+    cellNumber(quarterly, "debt_opening", "2025Q1"),
   );
   const revenue = within(income).getByRole("button", {
     name: "Revenue 2024, inspect value",
@@ -1267,7 +1280,7 @@ it("rolls reported quarters up to native annual values with editable methods", a
         periodId: "2024",
         present: true,
         text: "",
-        value: rolled.monetary_nodes.revenue["2024"],
+        value: rolled.cells.revenue["2024"].value,
       },
       "millions",
     ),
@@ -1275,7 +1288,7 @@ it("rolls reported quarters up to native annual values with editable methods", a
   expect(
     within(income).queryByRole("button", { name: "Revenue 2024, edit value" }),
   ).toBeNull();
-  // A native rollup records no node_sources, so annual cells carry no source marker.
+  // A native rollup records no cell source, so annual cells carry no source marker.
   expect(within(income).queryByText("Cell source:")).toBeNull();
 
   await userEvent.click(
@@ -1472,7 +1485,7 @@ it(
             periodId: "2025Q3",
             present: true,
             text: "",
-            value: results[name].monetary_nodes.revenue["2025Q3"],
+            value: results[name].cells.revenue["2025Q3"].value,
           },
           "millions",
         ),

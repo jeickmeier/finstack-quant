@@ -332,10 +332,10 @@ fn test_ttm_function() {
         PeriodId::quarter(2024, 2).expect("valid period fixture"),
         PeriodId::quarter(2024, 3).expect("valid period fixture"),
     ] {
-        let value = results.get("ttm_revenue", &partial).unwrap();
+        let value = results.get("ttm_revenue", &partial);
         assert!(
-            value.is_nan(),
-            "partial TTM at {partial} should be NaN under C18 guard, got {value}"
+            value.is_none(),
+            "partial TTM at {partial} should be NaN under C18 guard, got {value:?}"
         );
     }
 

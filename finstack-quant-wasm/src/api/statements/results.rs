@@ -135,6 +135,39 @@ pub fn statement_result_get_money(
     }
 }
 
+/// Typed cell of one node in one period: its status, value, reason and source.
+///
+/// Free-function twin of Python `StatementResult.get_cell` (Rust
+/// `StatementResult::get_cell`).
+/// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
+/// @param nodeId - Node identifier to read.
+/// @param period - Period identifier, e.g. `"2025Q1"`.
+/// @returns The cell (`status` is `value`, `missing`, `masked` or `unavailable`), or `undefined` when the result has no such node or period.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the result input is malformed or `period`
+/// is not a valid period identifier.
+#[wasm_bindgen(
+    js_name = statementResultGetCell,
+    unchecked_return_type = "generated.statements.ResultCell | undefined"
+)]
+pub fn statement_result_get_cell(
+    #[wasm_bindgen(
+        js_name = "resultJson",
+        unchecked_param_type = "StatementResult | string"
+    )]
+    result_json: JsValue,
+    #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "string")] period: JsValue,
+) -> Result<JsValue, JsValue> {
+    let result: StatementResult = from_js_json(&result_json, "resultJson")?;
+    match result.get_cell(&js_string(&node_id, "nodeId")?, &period_id(&period)?) {
+        Some(cell) => to_js_value(cell),
+        None => Ok(JsValue::UNDEFINED),
+    }
+}
+
 /// Scalar (non-monetary) value of one node in one period.
 ///
 /// Free-function twin of Python `StatementResult.get_scalar` (Rust
@@ -190,11 +223,13 @@ pub fn statement_result_get_or(
     default_value: JsValue,
 ) -> Result<f64, JsValue> {
     let result: StatementResult = from_js_json(&result_json, "resultJson")?;
-    Ok(result.get_or(
-        &js_string(&node_id, "nodeId")?,
-        &period_id(&period)?,
-        js_f64(&default_value, "defaultValue")?,
-    ))
+    result
+        .get_or(
+            &js_string(&node_id, "nodeId")?,
+            &period_id(&period)?,
+            js_f64(&default_value, "defaultValue")?,
+        )
+        .map_err(to_js_err)
 }
 
 /// Every `(period, value)` pair of one node.
@@ -225,10 +260,11 @@ pub fn statement_result_all_periods(
     to_js_value(&rows)
 }
 
-/// Period-to-value map of one node.
+/// Period-to-value map of one node: the float view of its value cells.
 ///
 /// Free-function twin of Python `StatementResult.get_node` (Rust
-/// `StatementResult::get_node`).
+/// `StatementResult::numeric_series`). Cells without a value are omitted;
+/// read `cells` or `statementResultGetCell` for their status.
 /// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
 /// @param nodeId - Node identifier to read.
 /// @returns Object mapping period id to value in the node's own units, or `undefined` when the node is absent.
@@ -246,8 +282,8 @@ pub fn statement_result_get_node(
     #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result: StatementResult = from_js_json(&result_json, "resultJson")?;
-    match result.get_node(&js_string(&node_id, "nodeId")?) {
-        Some(values) => to_js_value(values),
+    match result.numeric_series(&js_string(&node_id, "nodeId")?) {
+        Some(values) => to_js_value(&values),
         None => Ok(JsValue::UNDEFINED),
     }
 }
@@ -270,7 +306,7 @@ pub fn statement_result_node_ids(
     result_json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result: StatementResult = from_js_json(&result_json, "resultJson")?;
-    let ids: Vec<&str> = result.nodes.keys().map(String::as_str).collect();
+    let ids: Vec<&str> = result.node_ids().collect();
     to_js_value(&ids)
 }
 

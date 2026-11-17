@@ -36,8 +36,8 @@ impl Check for NonFiniteCheck {
         let mut findings = Vec::new();
 
         let mut inspect_node = |node_id: &str| {
-            if let Some(period_map) = context.results.nodes.get(node_id) {
-                for (period_id, &value) in period_map {
+            if let Some(period_map) = context.results.float_series(node_id) {
+                for (period_id, &value) in &period_map {
                     if !value.is_finite() {
                         findings.push(CheckFinding {
                             check_id: self.id().to_string(),
@@ -56,7 +56,7 @@ impl Check for NonFiniteCheck {
             }
         };
         if self.nodes.is_empty() {
-            for node_id in context.results.nodes.keys() {
+            for node_id in context.results.node_ids() {
                 inspect_node(node_id);
             }
         } else {

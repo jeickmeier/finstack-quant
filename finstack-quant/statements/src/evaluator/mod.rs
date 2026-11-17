@@ -49,7 +49,10 @@ mod precedence;
 mod results;
 mod rollup;
 
-pub use cashflow_export::{PeriodDateConvention, node_to_dated_schedule};
+pub use cashflow_export::{
+    DatedCell, FlowSign, PeriodDateConvention, PricingFlowSelection, node_to_dated_schedule,
+    node_to_pricing_flows,
+};
 pub use cell::UnavailableReason;
 pub use context::EvaluationContext;
 pub use dag::DependencyGraph;
@@ -58,7 +61,7 @@ pub use formula::evaluate_formula;
 pub use monte_carlo::{MonteCarloConfig, MonteCarloResults, PercentileSeries};
 pub(crate) use period_history::PeriodHistory;
 pub use results::{
-    CapitalStructureClaimCategory, CapitalStructureWarning, CellSource, EvalStats, EvalWarning,
-    NumericMode, StatementResult,
+    CapitalStructureClaimCategory, CapitalStructureWarning, CellSource, CellStatus, EvalStats,
+    EvalWarning, NumericMode, ResultCell, RunProvenance, StatementResult,
 };
 pub use rollup::RollupSpec;

@@ -38,9 +38,13 @@ export function StatementChart({
   const presentation = useMemo(() => {
     try {
       const checked = adaptStatementResult(result);
-      const values = checked.nodes[nodeId];
+      const values = checked.cells[nodeId];
       const points: Point[] = model.periods.periods.flatMap((period) => {
-        const value = values?.[period.id];
+        const native = values?.[period.id]?.value;
+        const value =
+          native !== undefined && native !== null && typeof native === "object"
+            ? Number(native.amount)
+            : native;
         return typeof value === "number" && Number.isFinite(value)
           ? [{ nodeId, periodId: period.id, value }]
           : [];

@@ -425,7 +425,7 @@ pub fn render_tree_detailed(
         &mut output,
         "",
         None,
-        &|node| match results.get(&node.node_id, period) {
+        &|node| match crate::cell_float(results, &node.node_id, period) {
             Some(value) => format!("{} = {:.2}", node.node_id, value),
             None => node.node_id.clone(),
         },
@@ -543,7 +543,7 @@ impl<'a> FormulaExplainer<'a> {
             .get(node_id)
             .ok_or_else(|| Error::node_not_found(node_id))?;
 
-        let final_value = self.results.get(node_id, period).ok_or_else(|| {
+        let final_value = crate::cell_float(self.results, node_id, period).ok_or_else(|| {
             Error::missing_data(format!(
                 "No result for node '{}' in period '{}'",
                 node_id, period
@@ -582,7 +582,7 @@ impl<'a> FormulaExplainer<'a> {
     /// `cs.<component>.<instrument_or_total>` capital-structure component.
     fn component_value(&self, identifier: &str, period: &PeriodId) -> Option<f64> {
         let Some(reference) = identifier.strip_prefix("cs.") else {
-            return self.results.get(identifier, period);
+            return crate::cell_float(self.results, identifier, period);
         };
         let (component, instrument_or_total) = reference.split_once('.')?;
         self.results
@@ -686,15 +686,13 @@ pub struct Explanation {
     /// Type of node (Value, Calculated, etc.)
     pub node_type: NodeType,
 
-    /// Evaluation layer that produced `final_value` under the
+    /// Value source selected for the cell under the
     /// `Value > Forecast > Formula` precedence: `value` (the explicit value
-    /// stored on the node), `forecast`, `formula`, `where_masked` (the
-    /// node's `where` clause masked the cell, which then has no value) or `missing` (no observation,
-    /// forecast or formula; the value is NaN).
+    /// stored on the node), `forecast` or `formula`.
     ///
-    /// Read from [`StatementResult::node_sources`]; `None` when the results
-    /// carry no source for the cell (hand-built results, or results or
-    /// explanations serialized before sources were recorded).
+    /// Read from the result cell; `None` when no source was selected (a
+    /// masked or missing cell, or one left unavailable before a source was
+    /// chosen) and for hand-built results.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<CellSource>,
 
@@ -713,8 +711,8 @@ pub struct Explanation {
     /// capital-structure references.
     ///
     /// Populated only when the formula produced the value (`source` is
-    /// `formula`, or unknown). Empty when `source` is `value`, `forecast` or
-    /// `where_masked`: the formula was not evaluated, and `source` /
+    /// `formula`, or unknown). Empty when `source` is `value` or
+    /// `forecast`: the formula was not evaluated, and `source` /
     /// `forecast` describe where the value came from. When the formula is a
     /// pure sum/difference of references there is one step per term, in
     /// formula order, each with `operation` `"+"` or `"-"`, and the signed
@@ -1243,11 +1241,11 @@ mod tests {
         );
         let mut results = StatementResult::default();
         results
-            .nodes
-            .insert("ebit".into(), [(period, 100.0)].into_iter().collect());
+            .set_series("ebit", [(period, 100.0)].into_iter().collect())
+            .expect("finite fixture values");
         results
-            .nodes
-            .insert("pretax".into(), [(period, 70.0)].into_iter().collect());
+            .set_series("pretax", [(period, 70.0)].into_iter().collect())
+            .expect("finite fixture values");
         results.cs_cashflows = Some(cashflows);
 
         let explanation =

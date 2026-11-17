@@ -61,7 +61,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 const resultJson = JSON.stringify(analystResult);
-const nodeIds = Object.keys(analystResult.nodes);
+const nodeIds = Object.keys(analystResult.cells);
 const results = fixture.results as unknown as NormalizationResult[];
 const config = fixture.config as unknown as NormalizationConfigWire;
 const exact = (value: number) => groupDecimal(String(value));

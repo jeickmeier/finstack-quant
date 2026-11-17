@@ -9,7 +9,6 @@ payment by source.
 from __future__ import annotations
 
 import json
-import math
 
 import pandas as pd
 
@@ -44,50 +43,62 @@ def _mixed_result() -> StatementResult:
     return Evaluator().evaluate(builder.build())
 
 
-def test_node_sources_report_value_formula_forecast_and_where_mask() -> None:
+def test_cells_report_status_source_and_value() -> None:
     result = _mixed_result()
-    sources = result.node_sources
+    cells = result.cells
 
-    assert sources["revenue"] == {Q1: "value", Q2: "formula", Q3: "forecast"}
-    assert sources["masked"] == {Q1: "where_masked", Q2: "where_masked", Q3: "where_masked"}
+    assert {period: cell["source"] for period, cell in cells["revenue"].items()} == {
+        Q1: "value",
+        Q2: "formula",
+        Q3: "forecast",
+    }
+    assert cells["masked"] == {Q1: {"status": "masked"}, Q2: {"status": "masked"}, Q3: {"status": "masked"}}
     assert result.get("revenue", Q1) == 100.0
     assert result.get("revenue", Q2) == 123.0
-    assert math.isnan(result.get("masked", Q1)), "a masked cell has no value"
+    assert result.get("masked", Q1) is None, "a masked cell has no value"
+    assert result.get_cell("masked", Q1) == {"status": "masked"}
 
 
-def test_node_sources_cover_every_cell_and_round_trip() -> None:
+def test_cells_cover_every_period_and_round_trip() -> None:
     result = _mixed_result()
     document = json.loads(result.to_json())
 
-    assert set(document["node_sources"]) == set(document["nodes"])
-    for node_id, values in document["nodes"].items():
-        assert list(document["node_sources"][node_id]) == list(values)
-    assert StatementResult.from_json(result.to_json()).node_sources == result.node_sources
+    for cells in document["cells"].values():
+        assert list(cells) == [Q1, Q2, Q3]
+    assert StatementResult.from_json(result.to_json()).cells == result.cells
+    assert result.provenance["model_id"] == document["provenance"]["model_id"]
+    assert result.provenance["observation_cutoff"] == "full_snapshot"
 
 
-def test_long_dataframe_carries_the_source_column() -> None:
+def test_long_dataframe_carries_status_reason_and_source() -> None:
     frame = _mixed_result().to_dataframe("long")
 
     assert list(frame.columns) == [
         "node_id",
         "period",
+        "status",
         "value",
-        "value_money",
+        "amount",
         "currency",
         "value_type",
+        "reason",
         "source",
     ]
     revenue = frame[frame["node_id"] == "revenue"].set_index("period")["source"]
     assert revenue.to_dict() == {Q1: "value", Q2: "formula", Q3: "forecast"}
+    masked = frame[frame["node_id"] == "masked"]
+    assert masked["status"].tolist() == ["masked"] * 3
+    assert masked["value"].isna().all()
 
 
-def test_result_without_recorded_sources_exports_null_source() -> None:
+def test_hand_built_result_exports_null_source() -> None:
     document = json.loads(_mixed_result().to_json())
-    del document["node_sources"]
-    legacy = StatementResult.from_json(json.dumps(document))
+    for cells in document["cells"].values():
+        for cell in cells.values():
+            cell.pop("source", None)
+    hand_built = StatementResult.from_json(json.dumps(document))
 
-    assert legacy.node_sources == {}
-    assert legacy.to_dataframe("long")["source"].isna().all()
+    assert hand_built.to_dataframe("long")["source"].isna().all()
 
 
 def _balance_sheet_report() -> CheckReport:

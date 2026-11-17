@@ -556,11 +556,13 @@ fn non_finite_input_reports_insufficient_data() {
         model_builder.build().unwrap()
     };
     let mut results = Evaluator::new().evaluate(&model).unwrap();
-    results
-        .nodes
-        .get_mut("leverage")
-        .unwrap()
-        .insert(q(2), f64::INFINITY);
+    results.set_cell(
+        "leverage",
+        q(2),
+        finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
+    );
 
     for tolerance in [None, Some(0.5)] {
         let formula = if tolerance.is_some() {
@@ -595,7 +597,7 @@ fn missing_input_cell_reports_insufficient_data() {
     };
     let mut results = Evaluator::new().evaluate(&model).unwrap();
     results
-        .nodes
+        .cells
         .get_mut("revenue")
         .unwrap()
         .shift_remove(&q(2));

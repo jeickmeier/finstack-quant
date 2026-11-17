@@ -101,11 +101,17 @@ proptest! {
         let mut ev = Evaluator::new();
         let mut results = ev.evaluate(&model).unwrap();
 
-        results
-            .nodes
-            .entry("bad_node".to_string())
-            .or_default()
-            .insert(q1(), f64::NAN);
+        results.set_cell(
+
+            "bad_node",
+
+            q1(),
+
+            finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
+
+        );
 
         let check = NonFiniteCheck { nodes: vec![] };
         let ctx = CheckContext::new(&model, &results);
@@ -127,11 +133,17 @@ proptest! {
         let mut ev = Evaluator::new();
         let mut results = ev.evaluate(&model).unwrap();
 
-        results
-            .nodes
-            .entry("bad_node".to_string())
-            .or_default()
-            .insert(q1(), f64::INFINITY);
+        results.set_cell(
+
+            "bad_node",
+
+            q1(),
+
+            finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
+
+        );
 
         let check = NonFiniteCheck { nodes: vec![] };
         let ctx = CheckContext::new(&model, &results);
@@ -153,11 +165,17 @@ proptest! {
         let mut ev = Evaluator::new();
         let mut results = ev.evaluate(&model).unwrap();
 
-        results
-            .nodes
-            .entry("bad_node".to_string())
-            .or_default()
-            .insert(q1(), f64::NEG_INFINITY);
+        results.set_cell(
+
+            "bad_node",
+
+            q1(),
+
+            finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
+
+        );
 
         let check = NonFiniteCheck { nodes: vec![] };
         let ctx = CheckContext::new(&model, &results);

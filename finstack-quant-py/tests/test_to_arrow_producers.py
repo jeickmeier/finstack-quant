@@ -37,10 +37,12 @@ def test_to_arrow_long_matches_pandas_long_columns() -> None:
     assert at.column_names() == [
         "node_id",
         "period_id",
+        "status",
         "value",
-        "value_money",
+        "amount",
         "currency",
         "value_type",
+        "reason",
         "source",
     ]
 

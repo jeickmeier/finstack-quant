@@ -365,8 +365,6 @@ fn model_period_intervals_must_match_their_identifiers_and_be_contiguous() {
 /// plan, or referencing a misspelled node, fails runnable-model validation.
 #[test]
 fn runnable_model_keeps_missing_cells_and_rejects_plan_gaps_and_open_references() {
-    use finstack_quant_statements::evaluator::CellSource;
-
     let usd = |amount: i64| Money::from((amount, Currency::USD)).into();
     let mut builder = ModelBuilder::new("admission");
     builder.periods("2025Q1..Q3", None).unwrap();
@@ -384,12 +382,9 @@ fn runnable_model_keeps_missing_cells_and_rejects_plan_gaps_and_open_references(
 
     let result = Evaluator::new().evaluate(&model).unwrap();
     assert_eq!(result.get("sales", &quarter(1)), Some(100.0));
-    assert!(result.get("sales", &quarter(2)).unwrap().is_nan());
-    assert_eq!(
-        result.get_source("sales", &quarter(2)),
-        Some(CellSource::Missing)
-    );
-    assert!(result.get("double", &quarter(2)).unwrap().is_nan());
+    assert!(result.get("sales", &quarter(2)).is_none());
+    assert_eq!(result.get_source("sales", &quarter(2)), None);
+    assert!(result.get("double", &quarter(2)).is_none());
     assert_eq!(result.get("double", &quarter(3)), Some(240.0));
 
     // The same model without Q2 in its plan is rejected by every load path.
@@ -725,8 +720,8 @@ fn point_in_time_evaluation_replays_identified_snapshots() {
             .evaluate_with_market(model, &MarketContext::new(), date!(2025 - 06 - 30), cutoff)
             .map(|result| {
                 (
-                    result.get("revenue", &quarter(1)).unwrap(),
-                    result.get("revenue", &quarter(2)).unwrap(),
+                    result.get("revenue", &quarter(1)).unwrap_or(f64::NAN),
+                    result.get("revenue", &quarter(2)).unwrap_or(f64::NAN),
                 )
             })
     };

@@ -311,13 +311,13 @@ export type ReversionMethod =
       };
     };
 /**
- * Which evaluation layer produced a statement cell (one node in one period).
+ * Which value source produced a statement cell (one node in one period).
  *
- * The evaluator resolves every cell by the precedence
- * `Value > Forecast > Formula`, after the node's optional `where` mask. The
- * winning layer is recorded per cell in [`StatementResult::node_sources`].
+ * The evaluator resolves every unmasked cell by the precedence
+ * `Value > Forecast > Formula`. The selected source is recorded on the cell,
+ * including when that source's result is unavailable.
  */
-export type CellSource = "value" | "forecast" | "formula" | "where_masked" | "missing";
+export type CellSource = "value" | "forecast" | "formula";
 /**
  * Category that groups related checks together.
  */
@@ -2811,8 +2811,8 @@ export interface Explanation {
    * capital-structure references.
    *
    * Populated only when the formula produced the value (`source` is
-   * `formula`, or unknown). Empty when `source` is `value`, `forecast` or
-   * `where_masked`: the formula was not evaluated, and `source` /
+   * `formula`, or unknown). Empty when `source` is `value` or
+   * `forecast`: the formula was not evaluated, and `source` /
    * `forecast` describe where the value came from. When the formula is a
    * pure sum/difference of references there is one step per term, in
    * formula order, each with `operation` `"+"` or `"-"`, and the signed
@@ -2849,15 +2849,13 @@ export interface Explanation {
    */
   period_id: PeriodId;
   /**
-   * Evaluation layer that produced `final_value` under the
+   * Value source selected for the cell under the
    * `Value > Forecast > Formula` precedence: `value` (the explicit value
-   * stored on the node), `forecast`, `formula`, `where_masked` (the
-   * node's `where` clause masked the cell, which then has no value) or `missing` (no observation,
-   * forecast or formula; the value is NaN).
+   * stored on the node), `forecast` or `formula`.
    *
-   * Read from [`StatementResult::node_sources`]; `None` when the results
-   * carry no source for the cell (hand-built results, or results or
-   * explanations serialized before sources were recorded).
+   * Read from the result cell; `None` when no source was selected (a
+   * masked or missing cell, or one left unavailable before a source was
+   * chosen) and for hand-built results.
    */
   source?: CellSource | null;
   [k: string]: unknown;

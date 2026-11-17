@@ -118,3 +118,19 @@ pub mod templates;
 #[cfg(doctest)]
 #[doc = include_str!("../README.md")]
 struct ReadmeDoctests;
+
+/// The float view analytics computes on: a value cell's number, `NaN` for a
+/// cell that is present without a value (missing, masked or unavailable), and
+/// `None` when the result has no cell for the node and period.
+///
+/// Analytics already treats a `NaN` input as invalid or undefined, so a cell
+/// without a value keeps that treatment. The typed cell stays authoritative.
+pub(crate) fn cell_float(
+    results: &finstack_quant_statements::evaluator::StatementResult,
+    node_id: &str,
+    period_id: &finstack_quant_core::dates::PeriodId,
+) -> Option<f64> {
+    results
+        .get_cell(node_id, period_id)
+        .map(|cell| cell.numeric().unwrap_or(f64::NAN))
+}

@@ -144,7 +144,8 @@ test('goalSeek returns the Rust GoalSeekResult with the model as an object', () 
   assert.ok(Math.abs(updated.model.nodes.revenue.values['2025Q1'] - 120) < 1e-6);
   // The updated model chains straight back into another call.
   assert.ok(
-    Math.abs(new statements.Evaluator().evaluate(updated.model).nodes.profit['2025Q1'] - 60) < 1e-6
+    Math.abs(new statements.Evaluator().evaluate(updated.model).cells.profit['2025Q1'].value - 60) <
+      1e-6
   );
 
   const bare = sa.goalSeek(
@@ -312,8 +313,12 @@ test('non-finite forecast and explanation values are JavaScript numbers', () => 
   const results = new statements.Evaluator().evaluate(model);
   const explanation = sa.explainFormula(model, JSON.stringify(results), 'lagged', '2025Q1');
   assert.ok(Number.isNaN(explanation.final_value));
-  // The statement result itself keeps the JSON sentinel for its nested node map.
-  assert.equal(results.nodes.lagged['2025Q1'], 'nan');
+  // The statement result states the cell as unavailable instead of a number.
+  assert.deepEqual(results.cells.lagged['2025Q1'], {
+    status: 'unavailable',
+    reason: 'missing_input',
+    source: 'formula',
+  });
 });
 
 test('mappings and variance config reject unknown keys', () => {
@@ -362,7 +367,7 @@ test('evaluateScenarioSet returns the ScenarioResults map', () => {
     scenarios: { base: {}, up: { overrides: { revenue: 200 } } },
   });
   assert.deepEqual(Object.keys(out), ['base', 'up']);
-  assert.equal(out.up.nodes.profit['2025Q1'], 100);
+  assert.equal(out.up.cells.profit['2025Q1'].value, 100);
 });
 
 test('PIK target lists are required and nonempty', () => {

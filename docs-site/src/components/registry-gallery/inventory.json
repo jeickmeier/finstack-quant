@@ -585,7 +585,7 @@
     {
       "name": "statement-grid",
       "type": "registry:component",
-      "docs": "Display schema-checked StatementResult values in a report-style table with historical and forecast columns, accounting presentation, and optional inline editing of explicit cells. Each cell shows the evaluation layer Rust recorded in node_sources (value, forecast, formula or where mask) as a glyph with a legend and accessible text; results without node_sources, such as rollups, show no marker. Exact native values, nonfinite sentinels, metadata, and the full result remain available. Editing is delegated to the host workbench for native validation and evaluation.",
+      "docs": "Display schema-checked StatementResult values in a report-style table with historical and forecast columns, accounting presentation, and optional inline editing of explicit cells. Each cell shows the source Rust recorded on the typed cell (value, forecast or formula) as a glyph with a legend and accessible text; cells without a source, such as rollups, show no marker, and a masked cell is marked as masked. Exact native values, cell statuses, metadata, and the full result remain available. Editing is delegated to the host workbench for native validation and evaluation.",
       "worker": "none"
     },
     {
@@ -1876,7 +1876,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-result.json",
-      "sha256": "a61e49a54b1ea81db59fd03bb6685b8df6fab705e6f82f10f07feca02b0cfa7e"
+      "sha256": "24868fae5c93d32cec36bca4f9aaa6fd119d126b140e73cfd74fca9c6a7b8915"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-check-report.json",
@@ -1916,7 +1916,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity.json",
-      "sha256": "3f3a7c81c0111e0c2547e4721651dc039b27d158b262143f0b91e7c26efd2efd"
+      "sha256": "bff8173ee4f6c3c62ce2a4675557c1212e27d7de539f6d80e878e6b93c0d5c05"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-goal-seek-run.json",
@@ -1976,7 +1976,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/capital-structure/cases.json",
-      "sha256": "cdb1b47d8786509aecd6c00035de8a0e83f58213e1a7a62cf104ffb7ce04b5a0"
+      "sha256": "168a95dd66edb016ca8aae10e15e9dda7af52d4cd2adca98a40126d557a21f8c"
     },
     {
       "path": "finstack-quant-ui/tests/statements/relative-value/cases.json",
@@ -1984,7 +1984,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/export/cases.json",
-      "sha256": "7a9648b76d87423d757bdae647855708476ce957398298fcf9733fc507eff507"
+      "sha256": "01e81daca5617199927418e867261e7f6584aeb52a98c4ce05d4e71f2c624945"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenant-series.json",

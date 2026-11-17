@@ -607,7 +607,7 @@ fn ltv_reference_path(
     if let Some(node) = ltv_value_node {
         let mut path = Vec::with_capacity(periods.len());
         for period in periods {
-            if statement.get(node, &period.id).is_none() {
+            if crate::cell_float(statement, node, &period.id).is_none() {
                 continue;
             }
             let value = super::corporate::monetary_node_value(
@@ -732,7 +732,7 @@ mod tests {
         let result = run_corporate_analysis(model, options, None).expect("statement-only");
 
         assert!(result.equity.is_none());
-        assert_eq!(result.statement.nodes.len(), 1);
+        assert_eq!(result.statement.cells.len(), 1);
     }
 
     #[test]
@@ -1005,12 +1005,11 @@ mod tests {
     fn ltv_reference_rejects_foreign_and_scalar_nodes() {
         let periods = sample_periods();
         let mut statement = StatementResult::new();
-        statement.nodes.insert(
-            "collateral".into(),
-            IndexMap::from([(periods[0].id, 1_000.0)]),
-        );
-        statement.monetary_nodes.insert(
-            "collateral".into(),
+        statement
+            .set_series("collateral", IndexMap::from([(periods[0].id, 1_000.0)]))
+            .expect("finite fixture values");
+        statement.set_money_series(
+            "collateral",
             IndexMap::from([(periods[0].id, Money::from((1_000_i64, Currency::EUR)))]),
         );
         assert!(
@@ -1023,7 +1022,9 @@ mod tests {
             )
             .is_err()
         );
-        statement.monetary_nodes.clear();
+        statement
+            .set_series("collateral", IndexMap::from([(periods[0].id, 1_000.0)]))
+            .expect("finite fixture values");
         assert!(
             ltv_reference_path(
                 &periods,
@@ -1078,10 +1079,10 @@ mod tests {
             12_000_000.0,
         );
         statement
-            .nodes
-            .insert("enterprise_value".to_string(), values.clone());
-        statement.monetary_nodes.insert(
-            "enterprise_value".into(),
+            .set_series("enterprise_value", values.clone())
+            .expect("finite fixture values");
+        statement.set_money_series(
+            "enterprise_value",
             values
                 .iter()
                 .map(|(period, value)| {
@@ -1117,7 +1118,7 @@ mod tests {
         );
 
         statement
-            .nodes
+            .cells
             .get_mut("enterprise_value")
             .expect("node")
             .shift_remove(&PeriodId::quarter(2025, 2).expect("valid period fixture"));

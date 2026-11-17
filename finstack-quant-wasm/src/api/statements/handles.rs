@@ -24,7 +24,7 @@ use wasm_bindgen::prelude::*;
 /// builder.compute("margin", "revenue * 0.4");
 /// const evaluator = new statements.Evaluator();
 /// const result = evaluator.evaluate(builder.build());
-/// result.nodes.margin["2025Q2"];  // 44
+/// result.cells.margin["2025Q2"].value;  // 44
 /// evaluator.free();
 /// ```
 #[wasm_bindgen(js_name = Evaluator)]
@@ -78,15 +78,18 @@ impl JsEvaluator {
     /// Evaluate a model over all of its periods.
     ///
     /// Twin of Python `Evaluator.evaluate` (Rust `Evaluator::evaluate`).
-    /// Non-finite node values and warning values use the canonical strings
-    /// `"nan"`, `"inf"` and `"-inf"`, so a `JSON.stringify`/parse round trip
-    /// preserves missing-data semantics. A capital structure is evaluated
+    /// Every node has one typed cell per period under `cells`: a `value`
+    /// cell carries a finite number or exact tagged money, and a `missing`,
+    /// `masked` or `unavailable` cell carries no value, so a
+    /// `JSON.stringify`/parse round trip preserves it. Non-finite numbers
+    /// appear only in warnings, as `"nan"`, `"inf"` and `"-inf"`. A capital
+    /// structure is evaluated
     /// from an empty market as of the first period's start, so fixed-rate
     /// debt yields `cs_cashflows`; instruments that need market data need
     /// `evaluateWithMarket`.
     ///
     /// @param model - `FinancialModelSpec` to evaluate (object or JSON).
-    /// @returns `StatementResult` plain object: node values per period, value types, evaluation metadata, capital-structure cashflows and the optional check report.
+    /// @returns `StatementResult` plain object: typed `cells` per node and period (`status`, `value`, `reason`, `source`), value types, run `provenance`, evaluation metadata, capital-structure cashflows and the optional check report.
     /// @throws Error with kind `validation` if the model is malformed, fails semantic validation, or a formula fails to evaluate; kind `not_found` if a formula references a missing node or a capital-structure instrument needs market data; kind `computation` for a dependency cycle or a capital-structure failure.
     #[wasm_bindgen(unchecked_return_type = "StatementResult")]
     pub fn evaluate(

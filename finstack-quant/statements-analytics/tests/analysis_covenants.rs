@@ -28,15 +28,23 @@ fn model() -> FinancialModelSpec {
 }
 
 fn results(leverage: [f64; 4], coverage: [f64; 4]) -> StatementResult {
-    let series = |values: [f64; 4]| quarters().into_iter().zip(values).collect();
-    StatementResult {
-        nodes: IndexMap::from([
-            ("leverage".to_string(), series(leverage)),
-            ("interest_coverage".to_string(), series(coverage)),
-        ]),
+    let mut results = StatementResult {
         periods: Some(model().periods),
         ..StatementResult::default()
+    };
+    // A `NaN` fixture value is a cell that is present without a value.
+    for (node, values) in [("leverage", leverage), ("interest_coverage", coverage)] {
+        for (period, value) in quarters().into_iter().zip(values) {
+            let cell = finstack_quant_statements::evaluator::ResultCell::scalar(value)
+                .unwrap_or_else(|_| {
+                    finstack_quant_statements::evaluator::ResultCell::unavailable(
+                        finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+                    )
+                });
+            results.set_cell(node, period, cell);
+        }
     }
+    results
 }
 
 fn leverage_spec() -> CovenantSpec {
@@ -136,7 +144,7 @@ fn a_required_non_finite_metric_fails_the_evaluation() {
 fn a_missing_required_metric_is_not_found() {
     let mut results = results([1.0, 1.0, 2.2, 3.9], COVERAGE);
     results
-        .nodes
+        .cells
         .get_mut("leverage")
         .unwrap()
         .shift_remove(&quarters()[3]);
@@ -151,10 +159,12 @@ fn a_missing_required_metric_is_not_found() {
 fn only_the_result_periods_are_tested() {
     let mut results = results([1.0, 1.0, 2.2, 3.9], COVERAGE);
     results
-        .nodes
-        .get_mut("interest_coverage")
-        .unwrap()
-        .insert(PeriodId::quarter(2025, 1).unwrap(), 6.1);
+        .set_scalar(
+            "interest_coverage",
+            PeriodId::quarter(2025, 1).unwrap(),
+            6.1,
+        )
+        .unwrap();
     let series = evaluate_covenants(&results, &engine(date!(2024 - 07 - 01))).unwrap();
     assert_eq!(series.len(), 4);
     assert_eq!(series[3].as_of, date!(2024 - 12 - 31));

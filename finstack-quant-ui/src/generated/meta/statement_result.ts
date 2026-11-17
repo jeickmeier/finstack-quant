@@ -6,13 +6,33 @@ export default [
     "description": "Versioned financial statement evaluation result.",
     "examples": [
       {
+        "cells": {
+          "revenue": {
+            "2025Q1": {
+              "source": "value",
+              "status": "value",
+              "value": {
+                "amount": "125.01",
+                "currency": "USD"
+              }
+            },
+            "2025Q2": {
+              "status": "missing"
+            }
+          }
+        },
         "meta": {
-          "num_nodes": 0,
-          "num_periods": 0,
+          "num_nodes": 1,
+          "num_periods": 2,
           "numeric_mode": "float64",
           "parallel": false
         },
-        "nodes": {},
+        "node_value_types": {
+          "revenue": {
+            "currency": "USD",
+            "type": "monetary"
+          }
+        },
         "schema_version": 1
       }
     ],
@@ -126,6 +146,53 @@ export default [
     "format": "date"
   },
   {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance",
+    "description": "What a result was evaluated from.\n\nA consumer that is handed a result checks this against the model, period\nplan and run it expects before trusting the cells."
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/model_content_hash",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/model_content_hash",
+    "description": "Canonical content hash of the evaluated model\n([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash))."
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/model_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/model_id",
+    "description": "Identifier of the evaluated model."
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/observation_cutoff",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/observation_cutoff",
+    "description": "Observations the run was allowed to read.",
+    "ref": "#/$defs/ObservationCutoff",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ObservationCutoff"
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/run_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/run_id",
+    "description": "Identity of this evaluation run: the canonical content hash of the\nfields above. Two runs of the same model content, snapshot, cutoff\nand valuation date share it."
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/source_snapshot",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/source_snapshot",
+    "description": "Identity of the source snapshot the model's observations came from."
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/valuation_date",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/valuation_date",
+    "description": "Valuation date the capital structure was priced at, when the run used\na market."
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/valuation_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/valuation_date/anyOf/0",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/valuation_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/valuation_date/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_1b5716dde9957a614f3c",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money",
     "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```"
@@ -231,13 +298,13 @@ export default [
   {
     "path": "#/$defs/d_2a886a29e286928aba1b",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellSource",
-    "description": "Which evaluation layer produced a statement cell (one node in one period).\n\nThe evaluator resolves every cell by the precedence\n`Value > Forecast > Formula`, after the node's optional `where` mask. The\nwinning layer is recorded per cell in [`StatementResult::node_sources`]."
+    "description": "Which value source produced a statement cell (one node in one period).\n\nThe evaluator resolves every unmasked cell by the precedence\n`Value > Forecast > Formula`. The selected source is recorded on the cell,\nincluding when that source's result is unavailable."
   },
   {
     "path": "#/$defs/d_2a886a29e286928aba1b/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellSource/oneOf/0",
     "const": "value",
-    "description": "The explicit value stored on the node for this period (and visible\nunder the active as-of policy)."
+    "description": "The explicit observation stored on the node for this period (and\nvisible under the observation cutoff)."
   },
   {
     "path": "#/$defs/d_2a886a29e286928aba1b/oneOf/1",
@@ -252,16 +319,33 @@ export default [
     "description": "The node's formula."
   },
   {
-    "path": "#/$defs/d_2a886a29e286928aba1b/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellSource/oneOf/3",
-    "const": "where_masked",
-    "description": "The node's `where` clause evaluated to false for this period, so the\ncell is masked: it has no value (`NaN`, never a zero) and the value,\nforecast and formula were not consulted."
+    "path": "#/$defs/d_2d84d5c82e1a8492041a",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellStatus",
+    "description": "Whether a cell has a value, and if not, which kind of absence it is."
   },
   {
-    "path": "#/$defs/d_2a886a29e286928aba1b/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellSource/oneOf/4",
+    "path": "#/$defs/d_2d84d5c82e1a8492041a/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellStatus/oneOf/0",
+    "const": "value",
+    "description": "The cell has a value, which may be a known zero."
+  },
+  {
+    "path": "#/$defs/d_2d84d5c82e1a8492041a/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellStatus/oneOf/1",
     "const": "missing",
-    "description": "No observation, forecast or formula supplies this period: the cell is\nmissing and its value is `NaN`. A missing cell is never a zero."
+    "description": "No observation, forecast or formula supplies the period."
+  },
+  {
+    "path": "#/$defs/d_2d84d5c82e1a8492041a/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellStatus/oneOf/2",
+    "const": "masked",
+    "description": "The node's `where` predicate is false for the period."
+  },
+  {
+    "path": "#/$defs/d_2d84d5c82e1a8492041a/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellStatus/oneOf/3",
+    "const": "unavailable",
+    "description": "The cell has no value for the reason the cell states."
   },
   {
     "path": "#/$defs/d_4f32370227b1985d85e9",
@@ -311,6 +395,63 @@ export default [
     "path": "#/$defs/d_4f32370227b1985d85e9/properties/passed",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckResult/properties/passed",
     "description": "Whether the check passed (no error-severity findings)."
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell",
+    "description": "One published cell: a node in a period.\n\nA `value` cell carries a finite scalar or an exact [`Money`]; every other\nstatus carries no value. An `unavailable` cell carries its reason."
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/reason",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/reason",
+    "description": "Why an `unavailable` cell has no value. Absent otherwise."
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/reason/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/reason/anyOf/0",
+    "ref": "#/$defs/UnavailableReason",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason"
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/reason/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/reason/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/source",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/source",
+    "description": "The value source selected for the cell. Absent for a masked cell, a\nmissing cell, a cell left unavailable before a source was selected,\nand cells of hand-built results."
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/source/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/source/anyOf/0",
+    "ref": "#/$defs/CellSource",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellSource"
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/source/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/source/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/status",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/status",
+    "description": "Whether the cell has a value.",
+    "ref": "#/$defs/CellStatus",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellStatus"
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/value",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/value",
+    "description": "The value of a `value` cell: a finite number for a scalar node, or\nexact tagged money for a monetary node. Absent otherwise."
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/value/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/value/anyOf/0",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar"
+  },
+  {
+    "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/value/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/value/anyOf/1"
   },
   {
     "path": "#/$defs/d_677810bf9653cfb0a467",
@@ -483,6 +624,29 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckCategory/oneOf/4",
     "const": "data_quality",
     "description": "Missing values, NaN/Inf, sign conventions"
+  },
+  {
+    "path": "#/$defs/d_6c08f5490eda9e343593",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason",
+    "description": "Why a cell has no value although its node and period are valid.\n\nAn unavailable cell is not an error: the model is well formed and the run\ncontinues. Invalid arithmetic, an invalid mask and unrepresentable money\nare errors instead and fail the run."
+  },
+  {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/0",
+    "const": "missing_mask",
+    "description": "The node's `where` predicate had no value for the period, so whether\nthe cell is masked is unknown."
+  },
+  {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/1",
+    "const": "hidden_by_cutoff",
+    "description": "The explicit observation was published after the observation cutoff\nand the node has no forecast or formula for the period."
+  },
+  {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/2",
+    "const": "missing_input",
+    "description": "The formula or forecast that supplies the cell had no defined result,\nbecause an input it needs is missing, masked or itself unavailable."
   },
   {
     "path": "#/$defs/d_6f601764dacadc213e87",
@@ -683,6 +847,24 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckSeverity"
   },
   {
+    "path": "#/$defs/d_8831040eb61de989f7ea",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar",
+    "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
+  },
+  {
+    "path": "#/$defs/d_8831040eb61de989f7ea/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar/anyOf/0",
+    "description": "Currency-aware amount",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_8831040eb61de989f7ea/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar/anyOf/1",
+    "description": "Unitless scalar (ratio, percentage, count, etc.)",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_8b741636dd21d9f7ad3f",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NodeValueType",
     "description": "Node value type classification.\n\nDetermines whether a node represents monetary values (with a specific currency)\nor scalar values (ratios, percentages, counts, etc.)."
@@ -713,6 +895,28 @@ export default [
     "path": "#/$defs/d_8b741636dd21d9f7ad3f/oneOf/1/properties/type",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NodeValueType/oneOf/1/properties/type",
     "const": "scalar"
+  },
+  {
+    "path": "#/$defs/d_9b3d87b6c4349df4e78d",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ObservationCutoff",
+    "description": "Which explicit observations an evaluation may read.\n\nOn the wire: `\"full_snapshot\"`, or `{\"through\": \"2025-04-25\"}`."
+  },
+  {
+    "path": "#/$defs/d_9b3d87b6c4349df4e78d/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ObservationCutoff/oneOf/0",
+    "const": "full_snapshot",
+    "description": "Read every observation in the model's snapshot, with no publication\ncutoff."
+  },
+  {
+    "path": "#/$defs/d_9b3d87b6c4349df4e78d/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ObservationCutoff/oneOf/1",
+    "description": "Read an observation only when its availability date is on or before\nthis date, inclusive through the end of the day."
+  },
+  {
+    "path": "#/$defs/d_9b3d87b6c4349df4e78d/oneOf/1/properties/through",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ObservationCutoff/oneOf/1/properties/through",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DateWire"
   },
   {
     "path": "#/$defs/d_9e50e1b9698ebe0e1126",
@@ -2242,6 +2446,21 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/properties/cells",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/cells",
+    "description": "Map of node_id → (period_id → [`ResultCell`]): the typed result.\n\nEvery evaluated node has a cell for every period of the plan."
+  },
+  {
+    "path": "#/properties/cells/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/cells/additionalProperties"
+  },
+  {
+    "path": "#/properties/cells/additionalProperties/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/cells/additionalProperties/additionalProperties",
+    "ref": "#/$defs/ResultCell",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell"
+  },
+  {
     "path": "#/properties/check_report",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/check_report",
     "description": "Check report from inline validation (None if no checks configured)"
@@ -2279,39 +2498,9 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/StatementEvalStats"
   },
   {
-    "path": "#/properties/monetary_nodes",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/monetary_nodes",
-    "description": "Map of node_id → (period_id → Money) for monetary nodes"
-  },
-  {
-    "path": "#/properties/monetary_nodes/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/monetary_nodes/additionalProperties"
-  },
-  {
-    "path": "#/properties/monetary_nodes/additionalProperties/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/monetary_nodes/additionalProperties/additionalProperties",
-    "ref": "#/$defs/Money",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
-  },
-  {
-    "path": "#/properties/node_sources",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/node_sources",
-    "description": "Map of node_id → (period_id → [`CellSource`]): which layer of the\n`Value > Forecast > Formula` precedence produced each cell of `nodes`.\n\nPopulated for every cell by [`Evaluator`](crate::evaluator::Evaluator)\n(with or without market context / capital structure). The model spec\nalone does not determine it: an as-of visibility cutoff can hide an\nexplicit value so that the forecast or formula fires instead. Empty\nonly for results that were not produced by the evaluator (hand-built)\nor were serialized before this field existed."
-  },
-  {
-    "path": "#/properties/node_sources/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/node_sources/additionalProperties"
-  },
-  {
-    "path": "#/properties/node_sources/additionalProperties/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/node_sources/additionalProperties/additionalProperties",
-    "ref": "#/$defs/CellSource",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CellSource"
-  },
-  {
     "path": "#/properties/node_value_types",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/node_value_types",
-    "description": "Track value types for each node"
+    "description": "Units of each node: scalar, or monetary in one currency."
   },
   {
     "path": "#/properties/node_value_types/additionalProperties",
@@ -2320,24 +2509,9 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NodeValueType"
   },
   {
-    "path": "#/properties/nodes",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/nodes",
-    "description": "Map of node_id → (period_id → value). Native values are f64; JSON uses\nnumbers for finite values and `\"nan\"`, `\"inf\"`, `\"-inf\"` for non-finite cells."
-  },
-  {
-    "path": "#/properties/nodes/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/nodes/additionalProperties"
-  },
-  {
-    "path": "#/properties/nodes/additionalProperties/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/nodes/additionalProperties/additionalProperties",
-    "ref": "#/$defs/ResultNumber",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultNumber"
-  },
-  {
     "path": "#/properties/periods",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/periods",
-    "description": "The period plan `nodes` is keyed by: the periods in timeline order,\nwith their dates and actual/forecast split, and their calendar context.\n\n[`Evaluator`](crate::evaluator::Evaluator) records the model's plan and\n[`rollup`](Self::rollup) records its target periods in the model's\ncalendar, where a target is actual only when every source period is.\n`None` only for hand-built results, such as [`new`](Self::new)."
+    "description": "The period plan `cells` is keyed by: the periods in timeline order,\nwith their dates and actual/forecast split, and their calendar context.\n\n[`Evaluator`](crate::evaluator::Evaluator) records the model's plan and\n[`rollup`](Self::rollup) records its target periods in the model's\ncalendar, where a target is actual only when every source period is.\n`None` only for hand-built results, such as [`new`](Self::new)."
   },
   {
     "path": "#/properties/periods/anyOf/0",
@@ -2348,6 +2522,21 @@ export default [
   {
     "path": "#/properties/periods/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/periods/anyOf/1"
+  },
+  {
+    "path": "#/properties/provenance",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/provenance",
+    "description": "What was evaluated: the model, its source snapshot, the observation\ncutoff and the run. `None` only for hand-built results."
+  },
+  {
+    "path": "#/properties/provenance/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/provenance/anyOf/0",
+    "ref": "#/$defs/RunProvenance",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance"
+  },
+  {
+    "path": "#/properties/provenance/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/provenance/anyOf/1"
   },
   {
     "path": "#/properties/schema_version",

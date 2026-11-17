@@ -23,10 +23,9 @@ use std::collections::HashSet;
 use std::time::Instant;
 
 type PeriodEvaluation = (
-    IndexMap<String, f64>,
+    IndexMap<String, crate::evaluator::ResultCell>,
     Vec<Option<f64>>,
     Vec<EvalWarning>,
-    IndexMap<String, CellSource>,
 );
 
 /// Per-path cache of Monte Carlo z-scores, keyed by node then period.
@@ -302,18 +301,23 @@ impl Evaluator {
                 Some(date)
             }
         };
-        self.evaluate_inner(model, Some((market_ctx, as_of)), visibility_cutoff)
-            .inspect_err(|err| {
-                tracing::error!(
-                    model_id = %model.id,
-                    periods = model.periods.len(),
-                    nodes = model.nodes.len(),
-                    has_market = true,
-                    %as_of,
-                    error = %err,
-                    "statement evaluation (with market) failed"
-                );
-            })
+        self.evaluate_inner(
+            model,
+            Some((market_ctx, as_of)),
+            visibility_cutoff,
+            Some(as_of),
+        )
+        .inspect_err(|err| {
+            tracing::error!(
+                model_id = %model.id,
+                periods = model.periods.len(),
+                nodes = model.nodes.len(),
+                has_market = true,
+                %as_of,
+                error = %err,
+                "statement evaluation (with market) failed"
+            );
+        })
     }
 
     /// Internal evaluation implementation shared by [`Evaluator::evaluate`] and
@@ -331,6 +335,7 @@ impl Evaluator {
             finstack_quant_core::dates::Date,
         )>,
         visibility_cutoff: Option<finstack_quant_core::dates::Date>,
+        valuation_date: Option<finstack_quant_core::dates::Date>,
     ) -> Result<StatementResult> {
         let _span = tracing::info_span!(
             "statements.evaluate",
@@ -364,6 +369,7 @@ impl Evaluator {
                 parallel: false,
                 warnings: all_warnings,
             },
+            valuation_date,
         )?;
 
         Ok(results)
@@ -465,11 +471,11 @@ impl Evaluator {
         let mut has_cs = false;
 
         for period in &model.periods {
-            let (period_results, period_row, period_warnings, period_sources) =
+            let (period_results, period_row, period_warnings) =
                 if let (Some(market_ctx), Some(as_of), Some(ref mut state), Some(insts)) =
                     (market_ctx, as_of, cs_state.as_mut(), instruments.as_ref())
                 {
-                    let (vals, row, warns, period_cs, sources) = self.evaluate_period_dynamic(
+                    let (vals, row, warns, period_cs) = self.evaluate_period_dynamic(
                         PeriodEval {
                             model,
                             period,
@@ -491,7 +497,7 @@ impl Evaluator {
                     cs_cashflows_accum.set_period(period_cs);
                     has_cs = true;
 
-                    (vals, row, warns, sources)
+                    (vals, row, warns)
                 } else {
                     self.evaluate_period(
                         PeriodEval {
@@ -508,14 +514,9 @@ impl Evaluator {
 
             all_warnings.extend(period_warnings);
 
-            for (node_id, value) in &period_results {
-                results
-                    .nodes
-                    .entry(node_id.to_owned())
-                    .or_default()
-                    .insert(period.id, *value);
+            for (node_id, cell) in period_results {
+                results.set_cell(&node_id, period.id, cell);
             }
-            results.record_sources(period.id, period_sources);
 
             // Add to historical context for next period (move, not clone)
             std::sync::Arc::make_mut(&mut historical).push_row(period.id, period_row);
@@ -572,6 +573,7 @@ impl Evaluator {
         self.evaluate_inner(
             model,
             contractual_capital_structure(model, &empty_market),
+            None,
             None,
         )
         .inspect_err(|err| {
@@ -773,6 +775,7 @@ impl Evaluator {
                 parallel: false,
                 warnings: all_warnings,
             },
+            None,
         )?;
 
         Ok(results)
@@ -860,7 +863,7 @@ impl Evaluator {
                 capital_structure,
                 Some(seed_offset),
             )?;
-            Ok((results.nodes, warnings))
+            Ok((results.path_values(), warnings))
         };
 
         let accumulator_seed = MonteCarloAccumulator::new(model, config)?;
@@ -924,10 +927,17 @@ impl Evaluator {
         model: &FinancialModelSpec,
         prepared: &PreparedEvaluation,
         meta: EvalStats,
+        valuation_date: Option<finstack_quant_core::dates::Date>,
     ) -> Result<()> {
         results.meta = meta;
         results.periods = Some(model.periods.clone());
         results.populate_value_types(&prepared.node_value_types);
+        results.provenance = Some(crate::evaluator::RunProvenance::for_run(
+            model,
+            self.visibility_cutoff
+                .map_or(ObservationCutoff::FullSnapshot, ObservationCutoff::Through),
+            valuation_date,
+        )?);
         if let Some(suite) = &self.check_suite {
             results.check_report = Some(suite.run(model, results)?);
         }
@@ -994,9 +1004,6 @@ impl Evaluator {
                     };
                     if let Some(cell) = masked {
                         context.set_cell(node_id.as_str(), cell)?;
-                        if cell == Cell::Masked {
-                            context.set_source(node_id.as_str(), CellSource::WhereMasked);
-                        }
                         continue;
                     }
                 }
@@ -1011,8 +1018,7 @@ impl Evaluator {
                 NodeValueSource::Value(_) => Some(CellSource::Value),
                 NodeValueSource::Forecast => Some(CellSource::Forecast),
                 NodeValueSource::Formula => Some(CellSource::Formula),
-                NodeValueSource::Missing => Some(CellSource::Missing),
-                NodeValueSource::Hidden => None,
+                NodeValueSource::Missing | NodeValueSource::Hidden => None,
             };
             let value_type = self.node_value_types.get(node_id).copied();
             let cell = {
@@ -1097,9 +1103,8 @@ impl Evaluator {
         self.evaluate_nodes_in_order(eval, &mut context, seed_offset, None, mc_z_cache)?;
 
         let row = context.current_values.clone();
-        let sources = context.cell_sources();
         let (results, warnings) = context.into_results();
-        Ok((results, row, warnings, sources))
+        Ok((results, row, warnings))
     }
 }
 
@@ -1119,7 +1124,7 @@ fn computed_cell(
     node_id: &NodeId,
     period_id: &PeriodId,
 ) -> Result<Cell> {
-    if value.is_nan() {
+    if !value.is_finite() {
         return Ok(Cell::Unavailable(UnavailableReason::MissingInput));
     }
     match value_type {
@@ -1162,20 +1167,31 @@ impl Default for Evaluator {
 }
 
 /// Which explicit observations an evaluation may read.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// On the wire: `"full_snapshot"`, or `{"through": "2025-04-25"}`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
 pub enum ObservationCutoff {
     /// Read every observation in the model's snapshot, with no publication
     /// cutoff.
     FullSnapshot,
     /// Read an observation only when its availability date is on or before
     /// this date, inclusive through the end of the day.
-    Through(finstack_quant_core::dates::Date),
+    Through(
+        #[cfg_attr(
+            feature = "json-schema",
+            schemars(with = "finstack_quant_core::wire::DateWire")
+        )]
+        finstack_quant_core::dates::Date,
+    ),
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::builder::ModelBuilder;
+    use crate::evaluator::CellStatus;
     use crate::types::{AmountOrScalar, NodeSpec, NodeType};
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::dates::PeriodId;
@@ -1211,25 +1227,35 @@ mod tests {
         };
 
         let results = Evaluator::new().evaluate(&model).expect("evaluation");
-        let value = |node: &str| results.get(node, &q1).expect("cell");
+        let cell = |node: &str| *results.get_cell(node, &q1).expect("cell");
 
-        assert!(value("masked").is_nan(), "a masked cell is not zero");
+        assert_eq!(cell("masked").status, CellStatus::Masked);
         assert_eq!(
-            results.get_source("masked", &q1),
-            Some(CellSource::WhereMasked)
+            results.get("masked", &q1),
+            None,
+            "a masked cell is not zero"
         );
-        assert!(
-            value("downstream").is_nan(),
+        assert_eq!(cell("masked").source, None);
+        assert_eq!(
+            cell("downstream").status,
+            CellStatus::Unavailable,
             "a masked input is not read as zero downstream"
         );
-        assert!(value("unknown_mask").is_nan());
+        assert_eq!(cell("downstream").source, Some(CellSource::Formula));
         assert_eq!(
-            results.get_source("unknown_mask", &q1),
-            None,
-            "an unavailable cell was produced by no value source"
+            cell("unknown_mask"),
+            crate::evaluator::ResultCell::unavailable(UnavailableReason::MissingMask)
         );
-        assert_eq!(value("kept"), 42.0);
-        assert_eq!(results.get_source("kept", &q1), Some(CellSource::Formula));
+        assert_eq!(results.get("kept", &q1), Some(42.0));
+        assert_eq!(cell("kept").source, Some(CellSource::Formula));
+        assert_eq!(cell("flag").status, CellStatus::Missing);
+        assert_eq!(
+            cell("off"),
+            crate::evaluator::ResultCell::scalar(0.0)
+                .expect("finite")
+                .with_source(Some(CellSource::Value)),
+            "a known zero is a value"
+        );
     }
 
     #[test]
@@ -1316,74 +1342,72 @@ mod tests {
             Some(CellSource::Forecast)
         );
         for quarter in 1..=3 {
-            assert!(results.get("masked", &q(quarter)).expect("cell").is_nan());
-            assert_eq!(
-                results.get_source("masked", &q(quarter)),
-                Some(CellSource::WhereMasked)
-            );
+            let cell = results.get_cell("masked", &q(quarter)).expect("cell");
+            assert_eq!(cell.status, CellStatus::Masked);
+            assert_eq!(cell.source, None);
         }
 
-        // Every value cell has a source, and nothing else does.
-        for (node_id, values) in &results.nodes {
-            let sources = &results.node_sources[node_id];
-            assert_eq!(
-                values.keys().collect::<Vec<_>>(),
-                sources.keys().collect::<Vec<_>>()
-            );
-        }
-        assert_eq!(results.nodes.len(), results.node_sources.len());
-
-        // The sources survive the wire format and reach the long table.
-        let json = serde_json::to_value(&results).expect("serialize");
-        assert_eq!(json["node_sources"]["revenue"]["2025Q3"], "forecast");
-        assert_eq!(json["node_sources"]["masked"]["2025Q1"], "where_masked");
-        let back: StatementResult = serde_json::from_value(json).expect("deserialize");
-        assert_eq!(back.node_sources, results.node_sources);
-
-        let table = results.to_table_long().expect("long table");
-        let source_column = table
-            .columns
-            .iter()
-            .find(|column| column.name == "source")
-            .expect("source column");
-        let finstack_quant_core::table::TableColumnData::NullableString(labels) =
-            &source_column.data
-        else {
-            panic!("source column must be a nullable string column");
-        };
-        // Rows follow the result's node order, so pair each label with its
-        // node and period rather than relying on that order.
-        let finstack_quant_core::table::TableColumnData::String(node_ids) = &table.columns[0].data
-        else {
-            panic!("node_id column must be a string column");
-        };
-        let mut expected: Vec<Option<String>> = Vec::new();
-        for (node_id, values) in &results.nodes {
-            for period in values.keys() {
-                expected.push(
-                    results
-                        .get_source(node_id, period)
-                        .map(|source| source.as_str().to_string()),
-                );
+        // Every node has a cell in every period, and each value cell records
+        // the source that produced it.
+        for cells in results.cells.values() {
+            assert_eq!(cells.len(), 3);
+            for cell in cells.values() {
+                assert_eq!(cell.status == CellStatus::Value, cell.source.is_some());
             }
         }
-        assert_eq!(labels, &expected);
-        assert_eq!(labels.len(), node_ids.len());
-        assert!(labels.contains(&Some("forecast".to_string())));
-        assert!(labels.contains(&Some("where_masked".to_string())));
+
+        // Status and source survive the wire format and reach the long table.
+        let json = serde_json::to_value(&results).expect("serialize");
+        assert_eq!(json["cells"]["revenue"]["2025Q3"]["source"], "forecast");
+        assert_eq!(json["cells"]["revenue"]["2025Q1"]["value"], 100.0);
+        assert_eq!(
+            json["cells"]["masked"]["2025Q1"],
+            serde_json::json!({ "status": "masked" })
+        );
+        let back: StatementResult = serde_json::from_value(json).expect("deserialize");
+        assert_eq!(back.cells, results.cells);
+
+        let table = results.to_table_long().expect("long table");
+        let labels = |name: &str| match &table.column(name).expect("column").data {
+            finstack_quant_core::table::TableColumnData::NullableString(labels) => labels.clone(),
+            finstack_quant_core::table::TableColumnData::String(labels) => {
+                labels.iter().cloned().map(Some).collect()
+            }
+            other => panic!("{name} must be a string column: {other:?}"),
+        };
+        let expected_sources: Vec<Option<String>> = results
+            .cells
+            .values()
+            .flat_map(|cells| cells.values())
+            .map(|cell| cell.source.map(|source| source.as_str().to_string()))
+            .collect();
+        assert_eq!(labels("source"), expected_sources);
+        assert!(labels("source").contains(&Some("forecast".to_string())));
+        assert!(labels("status").contains(&Some("masked".to_string())));
     }
 
-    /// A result serialized before `node_sources` existed still deserializes,
-    /// with no sources recorded.
+    /// The wire form of a cell is closed: a status must agree with its
+    /// value and reason.
     #[test]
-    fn statement_result_without_node_sources_deserializes() {
-        let mut json = serde_json::to_value(StatementResult::new()).expect("serialize");
-        assert!(json.get("node_sources").is_none(), "empty map is skipped");
-        json["nodes"] = serde_json::json!({ "revenue": { "2025Q1": 1.0 } });
-        let back: StatementResult = serde_json::from_value(json).expect("deserialize");
-        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        assert_eq!(back.get("revenue", &period), Some(1.0));
-        assert_eq!(back.get_source("revenue", &period), None);
+    fn result_cells_reject_inconsistent_wire_forms() {
+        for invalid in [
+            serde_json::json!({ "status": "value" }),
+            serde_json::json!({ "status": "masked", "value": 1.0 }),
+            serde_json::json!({ "status": "unavailable" }),
+            serde_json::json!({ "status": "missing", "reason": "missing_mask" }),
+            serde_json::json!({ "status": "value", "value": 1.0, "extra": true }),
+        ] {
+            serde_json::from_value::<crate::evaluator::ResultCell>(invalid.clone())
+                .expect_err(&invalid.to_string());
+        }
+        let money = serde_json::json!({
+            "status": "value",
+            "value": { "amount": "125.01", "currency": "USD" },
+            "source": "formula"
+        });
+        let cell: crate::evaluator::ResultCell =
+            serde_json::from_value(money.clone()).expect("money cell");
+        assert_eq!(serde_json::to_value(cell).expect("serialize"), money);
     }
 
     #[test]

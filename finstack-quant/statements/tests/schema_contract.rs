@@ -159,12 +159,11 @@ fn representative_statement_result() -> StatementResult {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let usd = Money::new(100_000.0, Currency::USD).expect("valid money fixture");
     let mut result = StatementResult::default();
-    result
-        .nodes
-        .insert("revenue".to_string(), IndexMap::from([(period, 100_000.0)]));
-    result
-        .monetary_nodes
-        .insert("revenue".to_string(), IndexMap::from([(period, usd)]));
+    result.set_cell(
+        "revenue",
+        period,
+        finstack_quant_statements::evaluator::ResultCell::money(usd),
+    );
     result.node_value_types.insert(
         "revenue".to_string(),
         NodeValueType::Monetary {

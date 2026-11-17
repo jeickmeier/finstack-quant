@@ -112,14 +112,9 @@ fn evaluate_model_produces_computed_nodes() {
         .unwrap();
     let result: finstack_quant_statements::evaluator::StatementResult =
         serde_wasm_bindgen::from_value(out).unwrap();
-    assert!(result.nodes.contains_key("revenue"));
-    assert!(result.nodes.contains_key("gross_profit"));
-    let gp_q1 = result
-        .nodes
-        .get("gross_profit")
-        .and_then(|m| m.get(&q1))
-        .copied()
-        .unwrap();
+    assert!(result.has_node("revenue"));
+    assert!(result.has_node("gross_profit"));
+    let gp_q1 = result.get("gross_profit", &q1).unwrap();
     assert!((gp_q1 - 40.0).abs() < 1e-9);
 }
 

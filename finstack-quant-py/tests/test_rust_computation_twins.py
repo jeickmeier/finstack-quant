@@ -58,12 +58,46 @@ def test_abs_to_smm_is_bound_on_builder() -> None:
 def test_dated_schedule_convention_and_missing_node_come_from_rust() -> None:
     model = FinancialModelSpec.from_json(json.dumps(MODEL))
     result = Evaluator().evaluate(model)
-    assert result.to_dated_schedule(model, "revenue") == [(datetime.date(2025, 3, 31), 100000.0)]
-    assert result.to_dated_schedule(model, "revenue", "start") == [(datetime.date(2025, 1, 1), 100000.0)]
+    cell = {"status": "value", "value": 100000.0, "source": "value"}
+    assert result.to_dated_schedule("revenue", "end") == [
+        {"date": datetime.date(2025, 3, 31), "period_id": "2025Q1", "cell": cell}
+    ]
+    assert result.to_dated_schedule("revenue", "start")[0]["date"] == datetime.date(2025, 1, 1)
     with pytest.raises(KeyError):
-        result.to_dated_schedule(model, "ebitda")
+        result.to_dated_schedule("ebitda", "end")
     with pytest.raises(ValueError, match="start"):
-        result.to_dated_schedule(model, "revenue", "middle")
+        result.to_dated_schedule("revenue", "middle")
+
+
+def test_pricing_flows_negate_an_outflow_magnitude_once_and_require_every_period() -> None:
+    document = json.loads(json.dumps(MODEL))
+    document["periods"]["periods"].append({
+        "id": "2025Q2",
+        "start": "2025-04-01",
+        "end": "2025-07-01",
+        "is_actual": False,
+    })
+    document["nodes"]["capex"] = {
+        "node_id": "capex",
+        "node_type": "value",
+        "values": {"2025Q1": {"amount": "125.01", "currency": "USD"}},
+    }
+    result = Evaluator().evaluate(json.dumps(document))
+    selection = {
+        "node_id": "capex",
+        "currency": "USD",
+        "sign": "outflow_magnitude",
+        "periods": ["2025Q1"],
+        "date_convention": "end",
+    }
+    [(day, amount)] = result.to_pricing_flows(selection)
+    assert (day, amount.amount, str(amount.currency)) == (datetime.date(2025, 3, 31), -125.01, "USD")
+    with pytest.raises(ValueError, match=r"2025Q2.*missing"):
+        result.to_pricing_flows({**selection, "periods": ["2025Q1", "2025Q2"]})
+    with pytest.raises(ValueError, match="no implicit FX"):
+        result.to_pricing_flows({**selection, "currency": "EUR"})
+    with pytest.raises(KeyError):
+        result.to_pricing_flows({**selection, "node_id": "ebitda"})
 
 
 def test_financial_model_content_hash_matches_wasm() -> None:

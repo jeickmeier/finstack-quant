@@ -621,8 +621,8 @@ fn plain_evaluate_generates_fixed_rate_capital_structure_cashflows() {
     model.periods.periods[0].is_actual = true;
     let plain = Evaluator::new().evaluate(&model).expect("plain evaluation");
     assert_eq!(
-        plain.node_sources["cash"][&q1],
-        finstack_quant_statements::evaluator::CellSource::Value
+        plain.get_source("cash", &q1),
+        Some(finstack_quant_statements::evaluator::CellSource::Value)
     );
     assert_eq!(plain.get("cash", &q1), Some(10.0));
     assert!(plain.cs_cashflows.is_some());

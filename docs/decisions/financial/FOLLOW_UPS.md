@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **653 review items across 33 source scopes with open items**
+This backlog consolidates **654 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (506): implementation and verification work against an
+- **Reconciliation** (507): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (38): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -70,7 +70,7 @@ product consequences remain in their product scope.
 | [Statements: capital structure](#statements-capital-structure) | 14 |
 | [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 14 |
 | [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 15 |
-| [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 17 |
+| [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
 | [Scenarios](#scenarios) | 16 |
 | [Portfolio execution](#portfolio-execution) | 15 |
@@ -1052,7 +1052,7 @@ product consequences remain in their product scope.
 
 - **Reconciliation — Typed forecasts and staged validation.** Implement the common typed forecast specification, explicit method controls, complete static validation and runtime checks for the eligible horizon and history. Qualify build/load, inactive configurations, units, peer compatibility and exact stochastic seed round-trips in Rust, Python, WASM and JSON. [Accepted STATEMENTS-CONTRACTS-003](statements-contracts/03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging).
 
-- **Reconciliation — Capital reference units and exact monetary results in Statements formulas.** Resolve `cs` references through the accepted instrument-native, native-currency total and consolidated reporting scopes, and delete the unresolved unit a formula may still carry when a capital reference has no resolved currency; a required missing quote makes consolidated reporting unavailable. Carry monetary results in exact currency-tagged amounts, with an explicit, representability-checked conversion at the floating-point forecast boundary. Qualify missing required FX across hosts. The unit rules, monetary-variance rejection and resolution of every other unit before execution are reconciled. [Accepted STATEMENTS-CONTRACTS-005](statements-contracts/05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency) · [Capital reporting and FX](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx) · [Typed results](statements-evaluation/13-result-units-and-exports.md).
+- **Reconciliation — Capital reference units in Statements formulas.** Resolve `cs` references through the accepted instrument-native, native-currency total and consolidated reporting scopes, and delete the unresolved unit a formula may still carry when a capital reference has no resolved currency; a required missing quote makes consolidated reporting unavailable. Qualify missing required FX across hosts. The unit rules, monetary-variance rejection, resolution of every other unit before execution and exact currency-tagged monetary results are reconciled. [Accepted STATEMENTS-CONTRACTS-005](statements-contracts/05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency) · [Capital reporting and FX](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
 
 - **Reconciliation — Metric registration, pinned dependencies and atomic model import.** Enforce atomic catalogue registration, pinned local and qualified bindings, AST-only qualification, deterministic historical closure and checked same-period dependencies. Qualify shared templates, conflicting imports and explicit overrides. The builder now uses stored namespaces and has a dotted-namespace regression. Its textual rewriter can still collide with function names. [Accepted STATEMENTS-CONTRACTS-006](statements-contracts/06-registry-and-dependencies.md#accepted-decision-for-metric-registration-and-dependencies).
 
@@ -1088,8 +1088,6 @@ product consequences remain in their product scope.
 
 - **Reconciliation — Ordered normalization bridges and separately named adjusted metrics.** Validate references, units and canonical period keys before calculation. Enforce signed adjustments, individual caps and checked arithmetic for every bridge row. Replace existing-node overwrite with collision-checked publication and source provenance. Independently qualify unavailable inputs, Reported and Progressive caps, intermediate overflow with a finite final total, D&A add-backs, and explicit adjusted references in ratios and covenant checks. [Accepted STATEMENTS-EVALUATION-015](statements-evaluation/15-normalization-adjustments.md#accepted-decision-for-normalization-bridges).
 
-- **Reconciliation — Authoritative typed results and explicit export boundaries.** Publish exact money and explicit cell states, preserve diagnostics and provenance, and reconcile exact long tables, numeric wide views and validated dated anchors. Independently qualify monetary overflow, missing cells, exact export round trips and typed sign and coverage checks at the pricing boundary across hosts. [Accepted STATEMENTS-EVALUATION-013](statements-evaluation/13-result-units-and-exports.md#accepted-decision-for-typed-results-and-exports).
-
 - **Reconciliation — Complete Monte Carlo paths, typed samples and exact quantiles.** Implement the path-ID and resource limits, fresh complete paths with deterministic failure order, explicit metric coverage and typed sample validation. Qualify R-7, exact percentile keys, sample count and units, complete path restoration and finite typed strict-upper breach probability. Establish independent moment, quantile and sampling-error evidence. [Accepted STATEMENTS-EVALUATION-011](statements-evaluation/11-monte-carlo-evaluation.md#accepted-decision-for-monte-carlo-paths-quantiles-and-breach-probabilities).
 
 - **Reconciliation — Checked stochastic forecast kernels and replay.** Implement signed normal and mean-reverting steps, unclipped positive lognormal restoration, explicit growth or difference bootstrap with unbiased draws, zero-volatility transitions without draws, and versioned PCG64 streams. Independently qualify moments, extremes, subnormals, bootstrap indices, seed provenance and replay. [Accepted STATEMENTS-EVALUATION-007](statements-evaluation/07-stochastic-forecast-kernels.md#accepted-decision-for-stochastic-forecast-kernels-and-replay).
@@ -1106,13 +1104,17 @@ product consequences remain in their product scope.
 
 - **Reconciliation — Aligned seasonal decomposition and phase-preserving projection.** Implement checked centered averages and unsnapped edge slopes, zero-mean additive effects and normalized multiplicative factors. Qualify equal-period histories and phase, signed trends with zero observations, extreme factors and output bounds. [Accepted STATEMENTS-EVALUATION-010](statements-evaluation/10-seasonal-decomposition.md#accepted-decision-for-seasonal-decomposition-and-projection).
 
-- **Reconciliation — Statements run provenance and the check suite at single-run finalization.** Record the model identity, source snapshot, observation cutoff and run identity with each cell's status, reason and source on the published result, and apply the configured check suite at single-run finalization under the accepted comparison and suite policy. Qualify run provenance and configured single-run checks. Cell states, mask handling, the lag and shift dependency rule, source precedence under a cutoff and checked plan reuse are reconciled; until the typed result publishes them, a masked or unavailable cell reads as a non-numeric `NaN` in the result's numeric view. [Accepted STATEMENTS-EVALUATION-001](statements-evaluation/01-graph-precedence-and-prepared-plans.md#accepted-decision-for-dependency-graphs-cell-precedence-and-prepared-evaluation) · [Check-suite policy](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
+- **Reconciliation — The check suite at single-run finalization.** Apply the configured check suite at single-run finalization under the accepted comparison and suite policy, and qualify configured single-run checks. Cell states, mask handling, the lag and shift dependency rule, source precedence under a cutoff, checked plan reuse and published run provenance with each cell's status, reason and source are reconciled. [Accepted STATEMENTS-EVALUATION-001](statements-evaluation/01-graph-precedence-and-prepared-plans.md#accepted-decision-for-dependency-graphs-cell-precedence-and-prepared-evaluation) · [Check-suite policy](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
+
+- **Reconciliation — Float views of typed cells inside Statements.** The typed result is authoritative, but three internal consumers still read a float view in which a cell without a value is `NaN`: normalization bridges and the non-finite data-quality check (`StatementResult::float_series`), and Monte Carlo path collection (`StatementResult::path_values`). Move each to typed cells and delete both views when its owning contract is reconciled. [Normalization bridges](statements-evaluation/15-normalization-bridges.md) · [Data-quality checks](statements-contracts/13-data-quality-checks.md) · [Monte Carlo paths](statements-evaluation/11-monte-carlo-paths-and-quantiles.md) · [Typed results](statements-evaluation/13-result-units-and-exports.md#accepted-decision-for-typed-results-and-exports).
 
 ## Statements analytics: valuation, comparisons and templates
 
 [Scope inventory](statements-analytics-valuation/README.md).
 
 - **Reconciliation — Statements analytics evaluations read the full snapshot.** Corporate valuation, the valuation orchestrator and scenario-set evaluation pass `ObservationCutoff::FullSnapshot` to the Statements evaluator, so `as_of` dates pricing and no longer hides unpublished observations. Expose the observation cutoff on these entry points and their hosts, and qualify a dated replay against an identified snapshot. [Accepted STATEMENTS-CONTRACTS-002](statements-contracts/02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability).
+
+- **Reconciliation — Statements analytics reads typed cells through a float view.** Analytics reads every statement cell through one crate-private float view (`cell_float`) in which a missing, masked or unavailable cell is `NaN` and money is its nearest float, which preserves the behaviour it had before typed results. Read status, reason and exact amounts from the typed cell at each analytics boundary and delete the view. [Typed results](statements-evaluation/13-result-units-and-exports.md#accepted-decision-for-typed-results-and-exports).
 
 - **Reconciliation — Statement cashflows and the corporate DCF bridge.** Require an authored valuation date, snapshot and cutoff, explicit native currency, complete dated FCFF, a qualified terminal basis and a same-date equity bridge. Reconcile WACC admission, pricing-owner results and replayable provenance. Independently qualify cutoff and bridge dates, annual basis, mixed-frequency and leap-year timing, WACC and tax assumptions, terminal selection, and enterprise-to-equity reconciliation. [Accepted STATEMENTS-ANALYTICS-VALUATION-01](statements-analytics-valuation/01-corporate-dcf.md#accepted-decision-for-statements-corporate-dcf).
 

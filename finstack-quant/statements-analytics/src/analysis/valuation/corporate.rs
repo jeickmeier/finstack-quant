@@ -1172,7 +1172,7 @@ fn equity_bridge_from_model(
 
     let currency = extract_currency_from_model(model)?;
     let component = |names: [&str; 2]| -> Result<f64> {
-        let node = names.into_iter().find(|name| results.get(name, &selected_period_id).is_some())
+        let node = names.into_iter().find(|name| crate::cell_float(results, name, &selected_period_id).is_some())
             .ok_or_else(|| finstack_quant_statements::Error::Eval(format!(
                 "Net debt requires '{}' or '{}' at period {}; provide the balance-sheet node or net_debt_override",
                 names[0], names[1], selected_period_id

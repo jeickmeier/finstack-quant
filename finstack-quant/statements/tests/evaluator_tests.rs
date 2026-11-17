@@ -812,8 +812,7 @@ fn test_shift_function() {
                 "shifted",
                 &PeriodId::quarter(2025, 1).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
     assert!(
         results
@@ -821,8 +820,7 @@ fn test_shift_function() {
                 "shifted",
                 &PeriodId::quarter(2025, 2).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
     assert_eq!(
         results
@@ -917,10 +915,10 @@ fn test_ttm_function_supports_expression_arguments() {
         PeriodId::quarter(2024, 2).expect("valid period fixture"),
         PeriodId::quarter(2024, 3).expect("valid period fixture"),
     ] {
-        let value = results.get("ttm_gross_profit", &partial).unwrap();
+        let value = results.get("ttm_gross_profit", &partial);
         assert!(
-            value.is_nan(),
-            "partial TTM window at {partial} should be NaN under C18 guard, got {value}"
+            value.is_none(),
+            "partial TTM window at {partial} should be NaN under C18 guard, got {value:?}"
         );
     }
     assert_eq!(
@@ -1324,7 +1322,6 @@ fn test_ewm_mean_function() {
         )
         .unwrap();
     assert!(ewm > 0.0);
-    assert!(!ewm.is_nan());
 }
 
 #[test]
@@ -1500,13 +1497,11 @@ fn test_division_by_zero_produces_nan() {
     let mut evaluator = Evaluator::new();
     let results = evaluator.evaluate(&model).unwrap();
 
-    let result = results
-        .get(
-            "result",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        )
-        .unwrap();
-    assert!(result.is_nan());
+    let result = results.get(
+        "result",
+        &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+    );
+    assert!(result.is_none());
 }
 
 #[test]
@@ -1543,8 +1538,7 @@ fn test_pct_change_division_by_zero() {
                 "change",
                 &PeriodId::quarter(2025, 2).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
 }
 
@@ -1769,8 +1763,7 @@ fn test_ewm_var_insufficient_data() {
                 "ewm_variance",
                 &PeriodId::quarter(2025, 1).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
 }
 
@@ -1913,9 +1906,9 @@ fn test_timeseries_expression_args_return_nan_at_boundary() {
 
     let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-    assert!(results.get("lagged", &q1).unwrap().is_nan());
-    assert!(results.get("diffed", &q1).unwrap().is_nan());
-    assert!(results.get("pct", &q1).unwrap().is_nan());
+    assert!(results.get("lagged", &q1).is_none());
+    assert!(results.get("diffed", &q1).is_none());
+    assert!(results.get("pct", &q1).is_none());
     // Periods with available history behave normally.
     assert!((results.get("lagged", &q2).unwrap() - 100.0).abs() < 1e-12);
     assert!((results.get("diffed", &q2).unwrap() - 10.0).abs() < 1e-12);
@@ -1956,8 +1949,7 @@ fn test_growth_rate_negative_base_returns_nan() {
                 "g",
                 &PeriodId::quarter(2025, 2).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan(),
+            .is_none(),
         "growth_rate over a negative base must be NaN, not a sign-flipped rate"
     );
 }
@@ -1983,8 +1975,7 @@ fn test_pct_change_zero_periods_propagates_nan() {
                 "y",
                 &PeriodId::quarter(2025, 1).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
 }
 

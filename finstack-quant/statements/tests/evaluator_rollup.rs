@@ -338,7 +338,7 @@ fn declared_methods_gives_the_same_rollup_as_an_empty_spec() {
     let empty = quarterly
         .rollup(&model, &empty_annual_spec())
         .expect("empty rollup");
-    assert_eq!(listed.nodes, empty.nodes);
+    assert_eq!(listed.cells, empty.cells);
 }
 
 #[test]
@@ -442,7 +442,7 @@ fn quarterly_results_roll_up_to_annual_flows_balances_and_ratios() {
     close(annual.get("margin", &y2025), 280.0 / 620.0);
     close(annual.get("leverage", &y2025), 380.0 / 280.0);
     // `lag` steps back one year at the annual frequency.
-    assert!(annual.get("growth", &y2024).expect("value").is_nan());
+    assert!(annual.get("growth", &y2024).is_none());
     close(annual.get("growth", &y2025), 620.0 / 460.0 - 1.0);
 
     assert_eq!(annual.meta.num_periods, 2);
@@ -465,7 +465,7 @@ fn quarterly_results_roll_up_to_annual_flows_balances_and_ratios() {
         ]
     );
     assert_eq!(
-        annual.nodes["revenue"].keys().copied().collect::<Vec<_>>(),
+        annual.cells["revenue"].keys().copied().collect::<Vec<_>>(),
         [y2024, y2025]
     );
     assert_eq!(
@@ -476,11 +476,18 @@ fn quarterly_results_roll_up_to_annual_flows_balances_and_ratios() {
     );
     assert_eq!(annual.node_value_types["margin"], NodeValueType::Scalar);
     assert_eq!(
-        annual.monetary_nodes["cash"][&y2024].amount(),
+        annual.get_money("cash", &y2024).unwrap().amount(),
         40.0,
         "monetary values are rebuilt for the target periods"
     );
-    assert!(annual.node_sources.is_empty());
+    assert!(
+        annual
+            .cells
+            .values()
+            .flat_map(|cells| cells.values())
+            .all(|cell| cell.source.is_none()),
+        "a rolled-up cell has no single value source"
+    );
     assert!(annual.cs_cashflows.is_none());
 }
 

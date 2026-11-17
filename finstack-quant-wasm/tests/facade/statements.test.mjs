@@ -121,9 +121,9 @@ test('statements.Evaluator.evaluate returns a structured StatementResult', () =>
   const roundTripped = assertStructured(result, 'Evaluator.evaluate result');
   // Property reads resolve directly off the returned object, not only after
   // a JSON round trip.
-  assert.ok(result.nodes, 'nodes is directly readable');
-  assert.ok(Object.keys(result.nodes).includes('revenue'), 'revenue node present');
-  assert.ok(roundTripped.nodes.revenue, 'revenue survives serialization');
+  assert.ok(result.cells, 'cells is directly readable');
+  assert.ok(Object.keys(result.cells).includes('revenue'), 'revenue node present');
+  assert.ok(roundTripped.cells.revenue, 'revenue survives serialization');
 });
 
 test('statements.Evaluator.evaluateMonteCarlo returns a structured object', () => {
@@ -185,7 +185,7 @@ test('statements_analytics.creditAssessment returns a structured object', () => 
   assert.equal(assessment.period, '2025Q1', 'assessment period is directly readable');
 });
 
-test('statement missing values survive JSON.stringify with canonical sentinels', () => {
+test('statement unavailable cells survive JSON.stringify as typed cells', () => {
   const model = JSON.parse(MODEL_JSON);
   model.nodes.lagged = {
     node_id: 'lagged',
@@ -193,8 +193,16 @@ test('statement missing values survive JSON.stringify with canonical sentinels',
     formula_text: 'lag(revenue, 1)',
   };
   const result = new statements.Evaluator().evaluate(JSON.stringify(model));
-  assert.equal(result.nodes.lagged['2025Q1'], 'nan');
-  assert.equal(JSON.parse(JSON.stringify(result)).nodes.lagged['2025Q1'], 'nan');
+  assert.deepEqual(result.cells.lagged['2025Q1'], {
+    status: 'unavailable',
+    reason: 'missing_input',
+    source: 'formula',
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(result)).cells.lagged['2025Q1'], {
+    status: 'unavailable',
+    reason: 'missing_input',
+    source: 'formula',
+  });
 });
 
 test('statement declarations cannot relabel explicit foreign money', () => {

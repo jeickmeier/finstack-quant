@@ -20,7 +20,7 @@ mod specs;
 pub use builder::{JsMixedNodeBuilder, JsModelBuilder};
 pub use handles::{JsEvaluator, JsRegistry};
 
-use crate::utils::input::{from_js_json, js_opt_string, js_string, json_text, validated_json};
+use crate::utils::input::{from_js_json, js_string, json_text, validated_json};
 use crate::utils::to_js_err;
 use finstack_quant_statements::types::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
@@ -219,52 +219,85 @@ pub fn validate_pik_toggle_spec_json(
     )
 }
 
-/// Export one evaluated node as a dated schedule.
+/// Export every period of one evaluated node as dated cells.
 ///
 /// Free-function twin of Python `StatementResult.to_dated_schedule` (Rust
-/// `evaluator::node_to_dated_schedule`): periods are taken in model timeline
-/// order, periods without a value are skipped, and each period is dated by
-/// `convention`.
-/// @param modelJson - The `FinancialModelSpec` that produced the result (its periods supply the dates).
+/// `evaluator::node_to_dated_schedule`). Periods come from the result's own
+/// period plan in timeline order. A period without a value stays in the
+/// schedule with its status and reason. The dates are period anchors, not
+/// payment dates.
 /// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
 /// @param nodeId - Node identifier to export.
-/// @param convention - Optional `"end"` (default: the period's last inclusive day, `end - 1 day`, since periods are half-open `[start, end)`) or `"start"`.
-/// @returns `[isoDate, value]` pairs in timeline order, in the node's own units.
+/// @param convention - `"end"` anchors each period on its last included day (`end - 1 day`, since periods are half-open `[start, end)`); `"start"` on its first day. There is no default.
+/// @returns One `{ date, period_id, cell }` row per result period, with exact amounts and currencies.
 ///
 /// # Errors
 ///
-/// Throws with kind `not_found` if `nodeId` has no values in the result, and
-/// kind `validation` if an input is malformed or `convention` is not
-/// `"start"` / `"end"`.
-#[wasm_bindgen(js_name = nodeToDatedSchedule, unchecked_return_type = "[string, number][]")]
+/// Throws with kind `not_found` if `nodeId` is not in the result, and kind
+/// `validation` if an input is malformed, the result has no period plan or
+/// `convention` is not `"start"` / `"end"`.
+#[wasm_bindgen(js_name = nodeToDatedSchedule, unchecked_return_type = "generated.statements.DatedCell[]")]
 pub fn node_to_dated_schedule(
-    #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
     #[wasm_bindgen(
         js_name = "resultJson",
         unchecked_param_type = "StatementResult | string"
     )]
     result_json: JsValue,
     #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
-    #[wasm_bindgen(unchecked_optional_param_type = "'end' | 'start' | null")] convention: Option<
-        JsValue,
-    >,
+    #[wasm_bindgen(unchecked_param_type = "'end' | 'start'")] convention: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let model =
-        FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?).map_err(to_js_err)?;
     let result: finstack_quant_statements::evaluator::StatementResult =
-        serde_json::from_str(&json_text(&result_json, "resultJson")?).map_err(to_js_err)?;
-    let node_id = js_string(&node_id, "nodeId")?;
-    let convention = match js_opt_string(convention.as_ref(), "convention")? {
-        Some(convention) => convention.parse().map_err(to_js_err)?,
-        None => finstack_quant_statements::evaluator::PeriodDateConvention::default(),
-    };
-    let rows: Vec<(String, f64)> = finstack_quant_statements::evaluator::node_to_dated_schedule(
-        &model, &result, &node_id, convention,
+        from_js_json(&result_json, "resultJson")?;
+    let convention = js_string(&convention, "convention")?
+        .parse()
+        .map_err(to_js_err)?;
+    let rows = finstack_quant_statements::evaluator::node_to_dated_schedule(
+        &result,
+        &js_string(&node_id, "nodeId")?,
+        convention,
     )
-    .map_err(to_js_err)?
-    .into_iter()
-    .map(|(date, value)| (crate::utils::date_to_iso(date), value))
-    .collect();
+    .map_err(to_js_err)?;
+    crate::utils::to_js_value(&rows)
+}
+
+/// Read one monetary node as signed economic cash flows for pricing.
+///
+/// Free-function twin of Python `StatementResult.to_pricing_flows` (Rust
+/// `evaluator::node_to_pricing_flows`). Every requested period must hold an
+/// exact amount in the expected currency. Positive means cash received: an
+/// `outflow_magnitude` node is negated once. No FX and no sign inference is
+/// applied.
+/// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
+/// @param selection - The node (`node_id`), expected `currency`, `sign` (`"inflow_positive"` or `"outflow_magnitude"`), required `periods` and `date_convention` (`"start"` or `"end"`).
+/// @returns `[isoDate, money]` pairs in timeline order, one per requested period.
+///
+/// # Errors
+///
+/// Throws with kind `not_found` if the node is not in the result. Throws with
+/// kind `validation` if an input is malformed, the result has no period plan,
+/// a requested period is repeated or not in the result, a cell is missing,
+/// masked, unavailable or a scalar, an amount is in another currency, or an
+/// outflow magnitude is negative.
+#[wasm_bindgen(js_name = nodeToPricingFlows, unchecked_return_type = "[string, generated.statements.Money][]")]
+pub fn node_to_pricing_flows(
+    #[wasm_bindgen(
+        js_name = "resultJson",
+        unchecked_param_type = "StatementResult | string"
+    )]
+    result_json: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.PricingFlowSelection | string")]
+    selection: JsValue,
+) -> Result<JsValue, JsValue> {
+    let result: finstack_quant_statements::evaluator::StatementResult =
+        from_js_json(&result_json, "resultJson")?;
+    let selection: finstack_quant_statements::evaluator::PricingFlowSelection =
+        from_js_json(&selection, "selection")?;
+    let rows: Vec<(String, finstack_quant_core::money::Money)> =
+        finstack_quant_statements::evaluator::node_to_pricing_flows(&result, &selection)
+            .map_err(to_js_err)?
+            .into_iter()
+            .map(|(date, amount)| (crate::utils::date_to_iso(date), amount))
+            .collect();
     crate::utils::to_js_value(&rows)
 }
 
@@ -340,10 +373,10 @@ pub fn monte_carlo_percentile_by_period(
 /// Export a statement result as a long-format table.
 ///
 /// Free-function twin of Python `StatementResult.to_arrow_long`
-/// (Rust `StatementResult::to_table_long`): one row per `(node, period)` in
-/// the result's node and period declaration order.
+/// (Rust `StatementResult::to_table_long`): the exact table, with one row per
+/// node and period of the result's plan, including cells without a value.
 /// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
-/// @returns `TableEnvelope` with columns `node_id`, `period_id`, `value`, `value_money`, `currency`, `value_type`, `source`; monetary nodes repeat their value in `value_money` and set `currency`, scalar nodes leave both null; `source` is the evaluation layer that produced the cell (`value`, `forecast`, `formula`, `where_masked` or `missing`), null when the result records none.
+/// @returns `TableEnvelope` with columns `node_id`, `period_id`, `status`, `value`, `amount`, `currency`, `value_type`, `reason`, `source`. `status` is `value`, `missing`, `masked` or `unavailable`; `value` is the float view of a value cell and null otherwise; `amount` is the exact decimal text of a monetary value cell and `currency` its ISO code, both null for scalar and value-less cells; `reason` says why an unavailable cell has no value; `source` is the value source selected for the cell (`value`, `forecast` or `formula`), null when none was.
 ///
 /// # Errors
 ///
@@ -365,10 +398,11 @@ pub fn statement_result_to_table_long(
 /// Export a statement result as a wide-format table.
 ///
 /// Free-function twin of Python `StatementResult.to_arrow_wide`
-/// (Rust `StatementResult::to_table_wide`): one row per period in
-/// chronological order and one column per node in declaration order.
+/// (Rust `StatementResult::to_table_wide`): the approximate numeric view, with
+/// one row per period of the result's plan and one column per node in
+/// declaration order.
 /// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
-/// @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds native numeric `NaN`, not zero. Canonical table JSON retains the established `"nan"` sentinel.
+/// @returns `TableEnvelope` with a `period_id` column followed by one nullable number column per node; a cell without a value is `null`, never zero. Each node column's metadata carries its units: `value_type` (`scalar` or `monetary`) and, for money, `currency`.
 ///
 /// # Errors
 ///

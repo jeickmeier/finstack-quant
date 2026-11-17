@@ -88,25 +88,21 @@ fn test_all_nan_values() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // If all values are NaN, sum and mean should return NaN
-    let sum = results
-        .get(
-            "sum_result",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        )
-        .unwrap();
+    let sum = results.get(
+        "sum_result",
+        &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+    );
     assert!(
-        sum.is_nan(),
+        sum.is_none(),
         "sum() should return NaN when all values are NaN"
     );
 
-    let mean = results
-        .get(
-            "mean_result",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        )
-        .unwrap();
+    let mean = results.get(
+        "mean_result",
+        &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+    );
     assert!(
-        mean.is_nan(),
+        mean.is_none(),
         "mean() should return NaN when all values are NaN"
     );
 }
@@ -165,14 +161,12 @@ fn test_annualize_with_nan() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // annualize with NaN input should return NaN
-    let annual = results
-        .get(
-            "annual",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        )
-        .unwrap();
+    let annual = results.get(
+        "annual",
+        &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+    );
     assert!(
-        annual.is_nan(),
+        annual.is_none(),
         "annualize() should return NaN when input is NaN"
     );
 }
@@ -216,15 +210,13 @@ fn test_ttm_with_nan() {
     // trailing-twelve-months metric: a missing quarter is a material
     // signal that the metric is not well-defined and should not be
     // consumed downstream.
-    let ttm = results
-        .get(
-            "revenue_ttm",
-            &PeriodId::quarter(2024, 4).expect("valid period fixture"),
-        )
-        .unwrap();
+    let ttm = results.get(
+        "revenue_ttm",
+        &PeriodId::quarter(2024, 4).expect("valid period fixture"),
+    );
     assert!(
-        ttm.is_nan(),
-        "ttm() should propagate NaN strictly under C18 guard, got {ttm}"
+        ttm.is_none(),
+        "ttm() should propagate NaN strictly under C18 guard, got {ttm:?}"
     );
 }
 

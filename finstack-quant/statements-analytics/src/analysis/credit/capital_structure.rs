@@ -337,10 +337,10 @@ struct StackEntry<'a> {
 /// );
 /// let mut results = StatementResult::new();
 /// results.cs_cashflows = Some(cashflows);
-/// results.nodes.insert(
-///     "ebitda".to_string(),
+/// results.set_series(
+///     "ebitda",
 ///     quarters.iter().map(|id| (*id, 50.0)).collect::<IndexMap<_, _>>(),
-/// );
+/// )?;
 ///
 /// let summary = capital_structure_summary(
 ///     &results,
@@ -380,7 +380,7 @@ pub fn capital_structure_summary(
         )));
     }
     for node in std::iter::once(&config.ebitda_node).chain(&config.cash_node) {
-        if !results.nodes.contains_key(node) {
+        if !results.has_node(node) {
             return Err(Error::invalid_input(format!(
                 "Capital structure summary node '{node}' is not in the results"
             )));
@@ -628,7 +628,7 @@ fn node_values(
     let mut values = Vec::with_capacity(slots.len());
     for slot in slots {
         require_currency(results, node, slot, currency)?;
-        let Some(value) = results.get(node, slot) else {
+        let Some(value) = crate::cell_float(results, node, slot) else {
             continue;
         };
         if !value.is_finite() {
@@ -649,7 +649,7 @@ fn cash_at(
     currency: Currency,
 ) -> Result<Money> {
     require_currency(results, node, &period, currency)?;
-    let value = results.get(node, &period).ok_or_else(|| {
+    let value = crate::cell_float(results, node, &period).ok_or_else(|| {
         Error::invalid_input(format!(
             "Capital structure summary cash node '{node}' has no value in period {period}"
         ))
@@ -905,18 +905,19 @@ mod tests {
         }
         let mut results = StatementResult::new();
         results.cs_cashflows = Some(cashflows);
-        results.nodes.insert(
-            "ebitda".to_string(),
-            quarters
-                .iter()
-                .copied()
-                .zip([100.0, 110.0, 120.0, 130.0])
-                .collect(),
-        );
-        results.nodes.insert(
-            "cash".to_string(),
-            quarters.iter().map(|id| (*id, 150.0)).collect(),
-        );
+        results
+            .set_series(
+                "ebitda",
+                quarters
+                    .iter()
+                    .copied()
+                    .zip([100.0, 110.0, 120.0, 130.0])
+                    .collect(),
+            )
+            .expect("finite fixture values");
+        results
+            .set_series("cash", quarters.iter().map(|id| (*id, 150.0)).collect())
+            .expect("finite fixture values");
         (results, model)
     }
 
@@ -1019,10 +1020,9 @@ mod tests {
             .insert("TLA".to_string(), rows(&days, 261.0, 0.1, 0.0));
         let mut results = StatementResult::new();
         results.cs_cashflows = Some(cashflows);
-        results.nodes.insert(
-            "ebitda".to_string(),
-            days.iter().map(|id| (*id, 1.0)).collect(),
-        );
+        results
+            .set_series("ebitda", days.iter().map(|id| (*id, 1.0)).collect())
+            .expect("finite fixture values");
         (results, model, days)
     }
 
@@ -1142,7 +1142,7 @@ mod tests {
     fn a_missing_ebitda_value_in_the_window_gives_null_ratios() {
         let (mut results, model) = fixture();
         results
-            .nodes
+            .cells
             .get_mut("ebitda")
             .expect("ebitda")
             .shift_remove(&q(2));
@@ -1176,11 +1176,10 @@ mod tests {
             let copy = instrument_rows[&q(3)].clone();
             instrument_rows.insert(period, copy);
         }
-        results
-            .nodes
-            .get_mut("ebitda")
-            .expect("ebitda")
-            .insert(period, 140.0);
+        results.cells.get_mut("ebitda").expect("ebitda").insert(
+            period,
+            finstack_quant_statements::evaluator::ResultCell::scalar(140.0).expect("finite"),
+        );
         let summary =
             capital_structure_summary(&results, &model, &config(period, None)).expect("summary");
         assert_eq!(summary.ltm_periods_found, 3);
@@ -1201,10 +1200,12 @@ mod tests {
             .by_instrument
             .insert("TL".to_string(), rows(&[year], 300.0, 10.0, 0.0));
         results.cs_cashflows = Some(cashflows);
-        results.nodes.insert(
-            "ebitda".to_string(),
-            [(year, 100.0)].into_iter().collect::<IndexMap<_, _>>(),
-        );
+        results
+            .set_series(
+                "ebitda",
+                [(year, 100.0)].into_iter().collect::<IndexMap<_, _>>(),
+            )
+            .expect("finite fixture values");
         let summary =
             capital_structure_summary(&results, &model, &config(year, None)).expect("summary");
         assert_eq!(summary.ltm_periods_required, 1);
@@ -1217,13 +1218,15 @@ mod tests {
     fn negative_or_zero_ltm_ebitda_is_reported_with_null_ratios() {
         for ebitda in [-25.0, 0.0] {
             let (mut results, model) = fixture();
-            results.nodes.insert(
-                "ebitda".to_string(),
-                [q(1), q(2), q(3), q(4)]
-                    .iter()
-                    .map(|id| (*id, ebitda))
-                    .collect(),
-            );
+            results
+                .set_series(
+                    "ebitda",
+                    [q(1), q(2), q(3), q(4)]
+                        .iter()
+                        .map(|id| (*id, ebitda))
+                        .collect(),
+                )
+                .expect("finite fixture values");
             let summary = capital_structure_summary(&results, &model, &config(q(4), Some("cash")))
                 .expect("summary");
             assert_eq!(summary.ltm_ebitda, Some(usd(4.0 * ebitda)));
@@ -1342,8 +1345,8 @@ mod tests {
     #[test]
     fn a_monetary_ebitda_in_the_debt_currency_is_accepted() {
         let (mut results, model) = fixture();
-        results.monetary_nodes.insert(
-            "ebitda".to_string(),
+        results.set_money_series(
+            "ebitda",
             [
                 (q(1), usd(100.0)),
                 (q(2), usd(110.0)),
@@ -1405,7 +1408,7 @@ mod tests {
     fn rejects_a_cash_node_with_no_value_at_the_period() {
         let (mut results, model) = fixture();
         results
-            .nodes
+            .cells
             .get_mut("cash")
             .expect("cash")
             .shift_remove(&q(4));
@@ -1444,20 +1447,22 @@ mod tests {
     #[test]
     fn rejects_non_finite_ebitda_and_cash() {
         let (mut results, model) = fixture();
-        results
-            .nodes
-            .get_mut("ebitda")
-            .expect("ebitda")
-            .insert(q(2), f64::NAN);
+        results.cells.get_mut("ebitda").expect("ebitda").insert(
+            q(2),
+            finstack_quant_statements::evaluator::ResultCell::unavailable(
+                finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+            ),
+        );
         let message = error_of(&results, &model, &config(q(4), None));
         assert!(message.contains("non-finite"), "{message}");
 
         let (mut results, model) = fixture();
-        results
-            .nodes
-            .get_mut("cash")
-            .expect("cash")
-            .insert(q(4), f64::INFINITY);
+        results.cells.get_mut("cash").expect("cash").insert(
+            q(4),
+            finstack_quant_statements::evaluator::ResultCell::unavailable(
+                finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+            ),
+        );
         let message = error_of(&results, &model, &config(q(4), Some("cash")));
         assert!(message.contains("non-finite"), "{message}");
     }
@@ -1465,13 +1470,15 @@ mod tests {
     #[test]
     fn finite_inputs_cannot_produce_an_infinite_ratio() {
         let (mut results, model) = fixture();
-        results.nodes.insert(
-            "ebitda".to_string(),
-            [q(1), q(2), q(3), q(4)]
-                .iter()
-                .map(|id| (*id, 1e-320))
-                .collect(),
-        );
+        results
+            .set_series(
+                "ebitda",
+                [q(1), q(2), q(3), q(4)]
+                    .iter()
+                    .map(|id| (*id, 1e-320))
+                    .collect(),
+            )
+            .expect("finite fixture values");
         // A subnormal EBITDA is rejected when it is admitted as Money (it is
         // outside the Decimal domain), before any ratio can become infinite.
         let error = capital_structure_summary(&results, &model, &config(q(4), None))
@@ -1525,8 +1532,8 @@ mod tests {
                     currency: Currency::EUR,
                 },
             );
-            results.monetary_nodes.insert(
-                node.to_string(),
+            results.set_money_series(
+                node,
                 [q(1), q(2), q(3), q(4)]
                     .iter()
                     .map(|id| {

@@ -105,4 +105,4 @@ def test_statement_tearsheet_stamps_the_results_own_numeric_mode() -> None:
     assert sheet.meta_lines == ["Numeric: float64"]
     assert "Decimal mode" not in sheet.to_html()
     # A bare node map carries no stamp: no provenance line is printed.
-    assert statement_tearsheet({"nodes": {}}, sections=[]).meta_lines == []
+    assert statement_tearsheet({"cells": {}}, sections=[]).meta_lines == []

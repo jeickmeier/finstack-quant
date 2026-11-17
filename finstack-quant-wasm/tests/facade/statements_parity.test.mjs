@@ -97,21 +97,23 @@ test('statements matches the cross-host golden', () => {
 
   const actual = {
     'rollup.declared_methods': rollupSpec,
-    'rollup.annual': rolledUp.nodes,
+    'rollup.annual': rolledUp.cells,
     'rollup.empty_spec': statements.statementResultRollup(
       evaluate(INPUTS.rollup_model),
       INPUTS.rollup_model,
       { frequency: 'annual' }
-    ).nodes,
+    ).cells,
     'rollup.spec_overrides': statements.statementResultRollup(
       evaluate(INPUTS.rollup_model),
       INPUTS.rollup_model,
       { frequency: 'annual', methods: { cash: 'sum' } }
-    ).nodes.cash,
+    ).cells.cash,
     'rollup.periods': rolledUp.periods,
     'result.get': orNull(statements.statementResultGet(result, 'profit', Q2)),
     'result.get_missing': orNull(statements.statementResultGet(result, 'nope', Q2)),
-    'result.get_or': statements.statementResultGetOr(result, 'nope', Q2, -1.0),
+    'result.get_or': statements.statementResultGetOr(result, 'profit', Q2, -1.0),
+    'result.get_cell': statements.statementResultGetCell(result, 'profit', Q2),
+    'result.get_cell_missing': orNull(statements.statementResultGetCell(result, 'nope', Q2)),
     'result.all_periods': statements.statementResultAllPeriods(result, 'profit'),
     'result.get_node': orNull(statements.statementResultGetNode(result, 'profit')),
     'result.get_node_missing': orNull(statements.statementResultGetNode(result, 'nope')),
@@ -448,9 +450,9 @@ test('builder lines roll up with their declared method under an empty spec', () 
   const model = mixed.build().build();
   assert.equal(model.nodes.mixed_balance.rollup, 'period_end');
   const annual = statements.statementResultRollup(evaluate(model), model, { frequency: 'annual' });
-  assert.equal(annual.nodes.flow['2025'], 100);
-  assert.equal(annual.nodes.balance['2025'], 40);
-  assert.equal(annual.nodes.mixed_balance['2025'], 40);
+  assert.equal(annual.cells.flow['2025'].value, 100);
+  assert.equal(annual.cells.balance['2025'].value, 40);
+  assert.equal(annual.cells.mixed_balance['2025'].value, 40);
 });
 
 test('Evaluator.evaluateWithMarket and evaluateMonteCarlo keep their Rust twins', () => {
@@ -638,16 +640,21 @@ test('named edits, snapshot identity and the observation cutoff replay a revisio
         INPUTS.capital_structure_market,
         '2025-06-30',
         cutoff
-      ).nodes.revenue['2025Q1'];
+      ).cells.revenue['2025Q1'];
     } finally {
       evaluator.free();
     }
   };
-  assert.equal(read(original, '2025-04-25'), 100.0);
-  assert.equal(read(original, '2025-04-24'), 'nan');
-  assert.equal(read(revised, '2025-05-15'), 110.0);
-  assert.equal(read(revised, '2025-05-14'), 'nan');
-  assert.equal(read(revised, 'full_snapshot'), 110.0);
+  const hidden = { status: 'unavailable', reason: 'hidden_by_cutoff' };
+  assert.equal(read(original, '2025-04-25').value, 100.0);
+  assert.deepEqual(read(original, '2025-04-24'), hidden);
+  assert.equal(read(revised, '2025-05-15').value, 110.0);
+  assert.deepEqual(read(revised, '2025-05-14'), hidden);
+  assert.deepEqual(read(revised, 'full_snapshot'), {
+    status: 'value',
+    value: 110.0,
+    source: 'value',
+  });
 
   assert.throws(
     () => statements.applyModelEdits(original, [{ edit: 'remove_node', node_id: 'absent' }]),

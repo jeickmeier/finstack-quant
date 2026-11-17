@@ -148,11 +148,11 @@ impl StatementResult {
     /// target period must be complete: a model that starts or ends mid-year
     /// cannot roll up to annual periods.
     ///
-    /// The rolled-up result holds `nodes`, `monetary_nodes` and
-    /// `node_value_types` for the target periods, those periods in `periods`,
+    /// The rolled-up result holds typed `cells` and `node_value_types` for
+    /// the target periods, those periods in `periods`,
     /// and any warnings raised by re-evaluated formulas. Each target period
     /// runs from its first source's start to its last source's end and is
-    /// actual only when every source is. The result records no `node_sources`,
+    /// actual only when every source is. The result records no cell source,
     /// capital-structure cashflows or check report: those describe the source
     /// evaluation.
     ///
@@ -284,11 +284,9 @@ impl StatementResult {
                 };
                 if let Some(value) = value {
                     context.set_value(node, value)?;
-                    rolled
-                        .nodes
-                        .entry(node.to_string())
-                        .or_default()
-                        .insert(target, value);
+                    if value.is_finite() {
+                        rolled.set_scalar(node, target, value)?;
+                    }
                 }
             }
             warnings.append(&mut context.warnings);
@@ -314,6 +312,7 @@ impl StatementResult {
             })
             .collect();
         rolled.populate_value_types(&value_types);
+        rolled.retype_monetary_cells()?;
         Ok(rolled)
     }
 }

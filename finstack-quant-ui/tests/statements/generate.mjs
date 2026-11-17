@@ -9,6 +9,11 @@ import { native } from "../../scripts/fixture-inputs.mjs";
 const fixtures = new URL("../../src/fixtures/statements/", import.meta.url);
 const read = (name) => readFile(new URL(name, fixtures), "utf8");
 const write = (name, json) => emit(new URL(name, fixtures), json);
+/** The float view of a native result cell: a scalar as returned, money by its exact amount. */
+const cellNumber = (result, nodeId, periodId) => {
+  const value = result.cells[nodeId][periodId].value;
+  return typeof value === "number" ? value : Number(value.amount);
+};
 
 const modelJson = native.validateFinancialModelJson(
   await read("analyst-model.json"),
@@ -97,7 +102,7 @@ const sensitivityResult = native.runSensitivity(modelJson, {
   parameters: sensitivity.parameters.map((parameter) => ({
     node_id: parameter.nodeId,
     period_id: parameter.periodId,
-    base_value: evaluated.nodes[parameter.nodeId][parameter.periodId],
+    base_value: cellNumber(evaluated, parameter.nodeId, parameter.periodId),
     pct_range: parameter.pctRange,
   })),
   target_metrics: [sensitivity.targetMetric],
@@ -173,14 +178,14 @@ await write(
     ),
   ),
 );
-const before = JSON.parse(resultJson).nodes.revenue;
-const after = JSON.parse(reportedJson).nodes.revenue;
+const before = JSON.parse(resultJson);
+const after = JSON.parse(reportedJson);
 await write(
   "analyst-backtest.json",
   serializeHost(
     native.backtestForecast(
-      rolled.map((period) => after[period]),
-      rolled.map((period) => before[period]),
+      rolled.map((period) => cellNumber(after, "revenue", period)),
+      rolled.map((period) => cellNumber(before, "revenue", period)),
     ),
   ),
 );

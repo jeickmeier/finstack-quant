@@ -235,13 +235,16 @@ def parse_statement(results: Any) -> StatementView:
     Returns:
     -------
     StatementView
-        Read-only view over the payload's ``nodes`` mapping, carrying the
-        payload's ``meta.numeric_mode`` stamp when present.
+        Read-only float view over the payload's typed ``cells``: a scalar as
+        stored and money as the float of its exact amount. A cell without a
+        value (missing, masked or unavailable) is left out, so the view
+        reports it as absent, never as zero. Carries the payload's
+        ``meta.numeric_mode`` stamp when present.
 
     Examples:
     --------
     >>> from finstack_quant.reporting.statements_common import parse_statement
-    >>> parse_statement({"nodes": {"revenue": {"2025": 100.0}}}).node_ids()
+    >>> parse_statement({"cells": {"revenue": {"2025": {"status": "value", "value": 100.0}}}}).node_ids()
     ['revenue']
     """
     if isinstance(results, StatementView):
@@ -253,7 +256,16 @@ def parse_statement(results: Any) -> StatementView:
     data = json_or_dict(results, noun="results")
     meta = data.get("meta")
     numeric_mode = meta.get("numeric_mode") if isinstance(meta, dict) else None
-    return StatementView(data.get("nodes", {}), numeric_mode=numeric_mode)
+    nodes: dict[str, dict[str, float]] = {}
+    for node_id, cells in data.get("cells", {}).items():
+        values = nodes.setdefault(node_id, {})
+        for period, cell in cells.items():
+            value = cell.get("value")
+            if isinstance(value, dict):
+                values[period] = float(value["amount"])
+            elif value is not None:
+                values[period] = value
+    return StatementView(nodes, numeric_mode=numeric_mode)
 
 
 def pl_matrix_table(

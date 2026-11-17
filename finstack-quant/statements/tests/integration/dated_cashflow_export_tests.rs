@@ -33,15 +33,15 @@ fn exports_node_series_to_dated_schedule_using_period_end_minus_one_day() {
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate should succeed");
 
-    let sched = node_to_dated_schedule(&model, &results, "noi", PeriodDateConvention::End)
+    let sched = node_to_dated_schedule(&results, "noi", PeriodDateConvention::End)
         .expect("schedule export should succeed");
 
     assert_eq!(sched.len(), 2);
 
     // Quarter periods are half-open; Q1 ends at 2025-04-01 exclusive, so End convention is 2025-03-31.
     assert_eq!(
-        sched[0].0,
+        sched[0].date,
         finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::March, 31).unwrap()
     );
-    assert_eq!(sched[0].1, 100.0);
+    assert_eq!(sched[0].cell.numeric(), Some(100.0));
 }

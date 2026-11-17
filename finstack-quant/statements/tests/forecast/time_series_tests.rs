@@ -47,8 +47,7 @@ fn test_lag_function() {
                 "lagged_revenue",
                 &PeriodId::quarter(2025, 1).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
 
     // Q2: lag(110, 1) should be 100 (Q1 value)
@@ -127,8 +126,7 @@ fn test_lag_multiple_periods() {
                 "lagged_revenue_2",
                 &PeriodId::quarter(2025, 1).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
     assert!(
         results
@@ -136,8 +134,7 @@ fn test_lag_multiple_periods() {
                 "lagged_revenue_2",
                 &PeriodId::quarter(2025, 2).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
 
     // Q3: lag(120, 2) should be 100 (Q1 value)
@@ -205,8 +202,7 @@ fn test_diff_function() {
                 "revenue_change",
                 &PeriodId::quarter(2025, 1).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
 
     // Q2: diff(110) = 110 - 100 = 10
@@ -285,8 +281,7 @@ fn test_pct_change_function() {
                 "revenue_growth",
                 &PeriodId::quarter(2025, 1).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
 
     // Q2: pct_change(110) = (110 - 100) / 100 = 0.10
@@ -466,7 +461,7 @@ fn test_complex_time_series() {
         "qoq_growth",
         &PeriodId::quarter(2025, 1).expect("valid period fixture"),
     );
-    assert!(q1_qoq.is_some() && q1_qoq.unwrap().is_nan());
+    assert!(q1_qoq.is_none());
 
     // Q2: (110-100)/100 = 0.10
     assert_eq!(
@@ -494,14 +489,14 @@ fn test_complex_time_series() {
         "revenue_acceleration",
         &PeriodId::quarter(2025, 1).expect("valid period fixture"),
     );
-    assert!(q1_accel.is_some() && q1_accel.unwrap().is_nan());
+    assert!(q1_accel.is_none());
 
     // Q2: NaN since there's no prior QoQ growth to diff against
     let q2_accel = results.get(
         "revenue_acceleration",
         &PeriodId::quarter(2025, 2).expect("valid period fixture"),
     );
-    assert!(q2_accel.is_some() && q2_accel.unwrap().is_nan());
+    assert!(q2_accel.is_none());
 
     // Q3 acceleration: 0.0909 - 0.10 ≈ -0.0091
     let q3_accel = results

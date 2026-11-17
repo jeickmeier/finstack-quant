@@ -69,9 +69,7 @@ impl Check for TrendCheck {
             let prev_val = get_finite_node_value(context.results, &self.node, prev_pid);
             let curr_val = get_finite_node_value(context.results, &self.node, curr_pid);
             let (Some(prev_val), Some(curr_val)) = (prev_val, curr_val) else {
-                if context
-                    .results
-                    .get(self.node.as_str(), curr_pid)
+                if crate::cell_float(context.results, self.node.as_str(), curr_pid)
                     .is_some_and(|v| !v.is_finite())
                 {
                     findings.push(CheckFinding {

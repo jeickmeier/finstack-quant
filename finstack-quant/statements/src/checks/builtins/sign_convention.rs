@@ -43,9 +43,11 @@ impl Check for SignConventionCheck {
             // Preserve positive-node findings before negative-node findings.
             for (nodes, positive) in [(&self.positive_nodes, true), (&self.negative_nodes, false)] {
                 for node in nodes {
-                    let Some(val) = context.results.get(node.as_str(), pid) else {
+                    let Some(cell) = context.results.get_cell(node.as_str(), pid) else {
                         continue;
                     };
+                    // A cell without a value cannot have its sign verified.
+                    let val = cell.numeric().unwrap_or(f64::NAN);
                     let message = if !val.is_finite() {
                         format!(
                             "Node '{}' has non-finite value ({val}) in period {pid}; \

@@ -106,8 +106,8 @@ fn real_estate_noi_and_ncf_templates_compute_expected_values() {
     let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
-    let noi = results.get_node("noi").expect("noi node");
-    let ncf = results.get_node("ncf").expect("ncf node");
+    let noi = results.numeric_series("noi").expect("noi node");
+    let ncf = results.numeric_series("ncf").expect("ncf node");
 
     // NOI = (rent + other_income) - (taxes + repairs)
     assert_eq!(noi[&q1], (100.0 + 10.0) - (20.0 + 5.0));
@@ -189,14 +189,14 @@ fn real_estate_rent_roll_handles_steps_free_rent_and_renewal_downtime() {
     let q4 = PeriodId::quarter(2025, 4).expect("valid period fixture");
 
     // Lease A contractual: Q1=100, Q2=120 (step), Q3 downtime, Q4 renewal starts at 120*1.10=132 but free at renewal start => 0.
-    let a_pgi = results.get_node("lease_a.pgi").expect("a pgi node");
+    let a_pgi = results.numeric_series("lease_a.pgi").expect("a pgi node");
     assert_eq!(a_pgi[&q1], 100.0);
     assert_eq!(a_pgi[&q2], 120.0);
     assert_eq!(a_pgi[&q3], 0.0);
     assert_eq!(a_pgi[&q4], 132.0);
 
     let a_eff = results
-        .get_node("lease_a.effective_rent")
+        .numeric_series("lease_a.effective_rent")
         .expect("a effective node");
     // Effective rent applies occupancy (0.8) in initial term; renewal is additionally probability-weighted (0.5) and Q4 is free.
     assert_eq!(a_eff[&q1], 100.0 * 0.8);
@@ -206,7 +206,7 @@ fn real_estate_rent_roll_handles_steps_free_rent_and_renewal_downtime() {
 
     // Lease B contractual: Q1=50 but free => 0 effective, Q2..Q4 = 50.
     let b_eff = results
-        .get_node("lease_b.effective_rent")
+        .numeric_series("lease_b.effective_rent")
         .expect("b effective node");
     assert_eq!(b_eff[&q1], 0.0);
     assert_eq!(b_eff[&q2], 50.0);
@@ -215,7 +215,7 @@ fn real_estate_rent_roll_handles_steps_free_rent_and_renewal_downtime() {
 
     // Totals: rent_effective = rent_pgi - free_rent - vacancy_loss
     let rent_eff = results
-        .get_node("rent_effective")
+        .numeric_series("rent_effective")
         .expect("rent_effective node");
     assert!(rent_eff[&q2].is_finite(), "rent_effective should compute");
 }
@@ -377,9 +377,9 @@ fn real_estate_full_property_template_computes_egi_noi_ncf() {
     let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
-    let egi = results.get_node("egi").expect("egi node");
-    let noi = results.get_node("noi").expect("noi node");
-    let ncf = results.get_node("ncf").expect("ncf node");
+    let egi = results.numeric_series("egi").expect("egi node");
+    let noi = results.numeric_series("noi").expect("noi node");
+    let ncf = results.numeric_series("ncf").expect("ncf node");
 
     // Q1:
     // Lease A free => 0; Lease B effective = 50 * 0.8 = 40; other income 10 => EGI = 50.
@@ -437,7 +437,7 @@ fn real_estate_annual_escalator_bumps_on_lease_anniversary() {
     let results = eval.evaluate(&model).expect("evaluate");
 
     let pgi = results
-        .get_node("lease_ann.pgi")
+        .numeric_series("lease_ann.pgi")
         .expect("lease_ann.pgi node");
 
     // Year 1: periods 0..3 => exponent = floor(0/4)=0 => 100.0
@@ -509,7 +509,7 @@ fn real_estate_annual_escalator_resets_at_rent_step() {
     let results = eval.evaluate(&model).expect("evaluate");
 
     let pgi = results
-        .get_node("lease_step.pgi")
+        .numeric_series("lease_step.pgi")
         .expect("lease_step.pgi node");
 
     // Q1, Q2 2025: base segment, exponent 0 => 100
@@ -623,7 +623,7 @@ fn real_estate_default_growth_convention_is_annual_escalator() {
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate");
     let pgi = results
-        .get_node("lease_def.pgi")
+        .numeric_series("lease_def.pgi")
         .expect("lease_def.pgi node");
 
     for q in 1..=4 {
@@ -682,7 +682,9 @@ fn real_estate_per_period_growth_convention_compounds_each_period() {
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate");
 
-    let pgi = results.get_node("lease_pp.pgi").expect("lease_pp.pgi node");
+    let pgi = results
+        .numeric_series("lease_pp.pgi")
+        .expect("lease_pp.pgi node");
 
     // Per-period compounding: rent = 100 * 1.10^n where n = 0, 1, 2, 3.
     for (q, n) in [(1u8, 0i32), (2, 1), (3, 2), (4, 3)] {

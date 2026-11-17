@@ -459,7 +459,7 @@ Implementation and independent qualification remain pending.
 The Statements typed result and export contract was accepted on 2026-11-15.
 It covers exact money, distinct cell states, long and wide tables,
 dated anchors, pricing admission and replay provenance.
-Implementation and independent qualification remain pending.
+It is implemented and qualified across Rust, Python and WASM.
 [STATEMENTS-EVALUATION-013](statements-evaluation/13-result-units-and-exports.md#accepted-decision-for-typed-results-and-exports).
 
 The Statements period rollup contract was accepted on 2026-11-15. It covers

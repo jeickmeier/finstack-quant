@@ -1,7 +1,6 @@
 """Binding regressions for semantic validation, units, and result persistence."""
 
 import json
-import math
 import pickle
 from typing import Any
 
@@ -63,10 +62,12 @@ def test_ordinary_missing_results_survive_json_and_pickle() -> None:
     builder.value("x", [("2025Q1", 1.0), ("2025Q2", 2.0)])
     builder.compute("lagged", "lag(x, 1)")
     result = s.Evaluator().evaluate(builder.build())
-    assert json.loads(result.to_json())["nodes"]["lagged"]["2025Q1"] == "nan"
+    unavailable = {"status": "unavailable", "reason": "missing_input", "source": "formula"}
+    assert json.loads(result.to_json())["cells"]["lagged"]["2025Q1"] == unavailable
     pickled = pickle.loads(pickle.dumps(result))  # noqa: S301 - locally constructed fixture
     for restored in [s.StatementResult.from_json(result.to_json()), pickled]:
-        assert math.isnan(restored.get("lagged", "2025Q1"))
+        assert restored.get("lagged", "2025Q1") is None
+        assert restored.get_cell("lagged", "2025Q1") == unavailable
         assert restored.get("lagged", "2025Q2") == 1.0
 
 

@@ -166,12 +166,7 @@ fn coalesce_skips_nan_and_both_infinities_and_retains_finite_zero() {
     ] {
         assert_eq!(result.get(node, &period), Some(expected), "{node}");
     }
-    assert!(
-        result
-            .get("all_missing", &period)
-            .expect("NaN result")
-            .is_nan()
-    );
+    assert!(result.get("all_missing", &period).is_none());
     assert!(!result.meta.warnings.iter().any(|warning| matches!(
         warning,
         finstack_quant_statements::evaluator::EvalWarning::DivisionByZero { node_id, .. }
@@ -224,12 +219,7 @@ fn ranks_honor_direction_and_minimum_ties_while_skipping_missing_history() {
         );
     }
     for node in ["default_rank", "ascending_rank", "descending_rank"] {
-        assert!(
-            result
-                .get(node, &periods[2])
-                .expect("missing rank")
-                .is_nan()
-        );
+        assert!(result.get(node, &periods[2]).is_none());
     }
 }
 

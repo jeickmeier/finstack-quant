@@ -910,7 +910,7 @@ case that may still carry unresolved units.
 STATEMENTS-EVALUATION-001. The evaluator tracks each cell as a value, a
 missing observation, a masked cell or an unavailable cell with a reason
 (`UnavailableReason`). A false `where` mask now leaves the cell without a
-value (`NaN` in the numeric view, source `where_masked`) where it was `0.0`,
+value (status `masked`) where it was `0.0`,
 so downstream formulas no longer read a masked cell as zero. A mask that has
 no value leaves the cell unavailable. An observation hidden by the observation
 cutoff with no forecast or formula is unavailable instead of an evaluation
@@ -926,3 +926,34 @@ observation slots. Adding or removing an observation slot, or changing an
 availability date, mask, forecast, formula, timeline or the capital structure,
 needs a new `prepare`. Sensitivity and goal seek re-prepare when a shock adds
 a slot.
+
+### Statements: results are typed cells; `nodes`, `monetary_nodes` and `node_sources` are gone
+
+STATEMENTS-EVALUATION-013. `StatementResult.cells` is the one result: for each
+node and each plan period a `ResultCell` with a `status` (`value`, `missing`,
+`masked`, `unavailable`), an exact `Money` amount or finite scalar `value`, a
+`reason` for an unavailable cell and the `source` that supplied it. The float
+map `nodes`, the parallel `monetary_nodes` and `node_sources` are removed, and
+the result JSON changes with them. A result can no longer hold `NaN` or an
+infinity. `get` returns a value only for a value cell; `get_cell` returns the
+typed cell (WASM `statementResultGetCell`). `get_or` substitutes its fallback
+only for a missing observation at a known node and period: an unknown node or
+period, a masked cell and an unavailable cell are errors.
+
+The long table has one row per node and plan period with columns `node_id`,
+`period_id`, `status`, `value`, `amount` (exact decimal text), `currency`,
+`value_type`, `reason` and `source`; `value_money` is gone. The wide table is
+a nullable float view over the full period index with each column's units in
+its metadata.
+
+`node_to_dated_schedule` (Python `to_dated_schedule`, WASM
+`nodeToDatedSchedule`) no longer takes the model and has no default anchor:
+pass `"start"` or `"end"`. It returns one dated typed cell per result period,
+gaps included. New `node_to_pricing_flows` (`to_pricing_flows`,
+`nodeToPricingFlows`) reads a monetary node for pricing from a
+`PricingFlowSelection`: expected currency, sign convention
+(`inflow_positive` or `outflow_magnitude`, negated once), required periods
+and anchor; any required period without an amount is an error.
+
+Each result carries `provenance`: model id and content hash, source snapshot,
+observation cutoff, valuation date and run id.

@@ -159,7 +159,7 @@ test('statements_analytics matches the cross-host golden', () => {
       currency: dcf.enterprise_value.currency,
     },
     corporate: {
-      node_count: Object.keys(corporate.statement.nodes).length,
+      node_count: Object.keys(corporate.statement.cells).length,
       equity: corporate.equity,
     },
     terminal_specs: [

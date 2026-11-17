@@ -82,8 +82,8 @@ test('monetary quantile preserves USD through the published facade', () => {
     combined: formula('combined', 'lower + cash'),
   });
   const result = evaluateModel(JSON.stringify(input));
-  assert.equal(result.nodes.lower['2025Q3'], 150);
-  assert.equal(result.nodes.combined['2025Q3'], 350);
+  assert.deepEqual(result.cells.lower['2025Q3'].value, { amount: '150', currency: 'USD' });
+  assert.deepEqual(result.cells.combined['2025Q3'].value, { amount: '350', currency: 'USD' });
   assert.equal(result.node_value_types.lower.currency, 'USD');
 });
 
@@ -95,9 +95,9 @@ test('coalesce skips infinite values and ranks honor direction', () => {
     descending: formula('descending', 'rank(observation, 0)'),
   });
   const result = evaluateModel(JSON.stringify(input));
-  assert.equal(result.nodes.fallback['2025Q3'], 7);
-  assert.equal(result.nodes.ascending['2025Q3'], 1);
-  assert.equal(result.nodes.descending['2025Q3'], 3);
+  assert.equal(result.cells.fallback['2025Q3'].value, 7);
+  assert.equal(result.cells.ascending['2025Q3'].value, 1);
+  assert.equal(result.cells.descending['2025Q3'].value, 3);
   input.nodes.ascending.formula_text = 'rank(observation, 1, 2)';
   assert.throws(() => evaluateModel(JSON.stringify(input)), /1 or 2 arguments/);
 });
@@ -210,7 +210,7 @@ for (const [name, side, fixedRate, forwardRate] of [
       assert.equal(Number(flow[key].amount), 0);
     }
     assert.ok(income > 0);
-    assert.equal(result.nodes.income['2025'], income);
+    assert.equal(statements.statementResultGet(result, 'income', '2025'), income);
   });
 }
 

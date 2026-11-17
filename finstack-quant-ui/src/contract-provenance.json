@@ -2247,8 +2247,8 @@
           }
         ],
         "returns": "TableEnvelope",
-        "declaration": "/**\n * Export a statement result as a wide-format table.\n *\n * Free-function twin of Python `StatementResult.to_arrow_wide`\n * (Rust `StatementResult::to_table_wide`): one row per period in\n * chronological order and one column per node in declaration order.\n * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).\n * @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds native numeric `NaN`, not zero. Canonical table JSON retains the established `\"nan\"` sentinel.\n *\n * # Errors\n *\n * Throws with kind `validation` if the result input is malformed or table\n * construction fails.\n */\nexport function statementResultToTableWide(resultJson: StatementResult | string): TableEnvelope;",
-        "sha256": "b7f6b35affc2e150968d26dfe02d0fa6dd20a6650088744a07d5a3e6bd7a1ced"
+        "declaration": "/**\n * Export a statement result as a wide-format table.\n *\n * Free-function twin of Python `StatementResult.to_arrow_wide`\n * (Rust `StatementResult::to_table_wide`): the approximate numeric view, with\n * one row per period of the result's plan and one column per node in\n * declaration order.\n * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).\n * @returns `TableEnvelope` with a `period_id` column followed by one nullable number column per node; a cell without a value is `null`, never zero. Each node column's metadata carries its units: `value_type` (`scalar` or `monetary`) and, for money, `currency`.\n *\n * # Errors\n *\n * Throws with kind `validation` if the result input is malformed or table\n * construction fails.\n */\nexport function statementResultToTableWide(resultJson: StatementResult | string): TableEnvelope;",
+        "sha256": "d532662712cb9a1bc447f8c42ebf8986b4c6117af851e9df62c8079b2858fae5"
       }
     },
     {

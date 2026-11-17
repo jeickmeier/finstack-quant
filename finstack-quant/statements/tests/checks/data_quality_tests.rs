@@ -39,7 +39,7 @@ fn missing_value_actual_is_error() {
     let mut results = evaluator.evaluate(&model).unwrap();
 
     // Remove Q2 and Q4 to simulate missing values
-    if let Some(period_map) = results.nodes.get_mut("revenue") {
+    if let Some(period_map) = results.cells.get_mut("revenue") {
         period_map.swap_remove(&q(2));
         period_map.swap_remove(&q(4));
     }
@@ -94,7 +94,7 @@ fn missing_value_actuals_only_scope() {
     let mut results = evaluator.evaluate(&model).unwrap();
 
     // Remove Q2 (actual) and Q4 (forecast) to simulate missing values
-    if let Some(period_map) = results.nodes.get_mut("revenue") {
+    if let Some(period_map) = results.cells.get_mut("revenue") {
         period_map.swap_remove(&q(2));
         period_map.swap_remove(&q(4));
     }
@@ -134,7 +134,7 @@ fn missing_value_forecast_only_scope() {
     let mut results = evaluator.evaluate(&model).unwrap();
 
     // Remove Q2 (actual) and Q4 (forecast)
-    if let Some(period_map) = results.nodes.get_mut("revenue") {
+    if let Some(period_map) = results.cells.get_mut("revenue") {
         period_map.swap_remove(&q(2));
         period_map.swap_remove(&q(4));
     }
@@ -271,16 +271,20 @@ fn sign_convention_nan_is_surfaced_not_silently_passed() {
 
     let mut evaluator = Evaluator::new();
     let mut results = evaluator.evaluate(&model).unwrap();
-    results
-        .nodes
-        .entry("revenue".to_string())
-        .or_default()
-        .insert(q(1), f64::NAN);
-    results
-        .nodes
-        .entry("expense".to_string())
-        .or_default()
-        .insert(q(1), f64::NAN);
+    results.set_cell(
+        "revenue",
+        q(1),
+        finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
+    );
+    results.set_cell(
+        "expense",
+        q(1),
+        finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
+    );
 
     let check = SignConventionCheck {
         positive_nodes: vec![NodeId::new("revenue")],
@@ -323,11 +327,13 @@ fn non_finite_nan_detected() {
     let mut results = evaluator.evaluate(&model).unwrap();
 
     // Inject NaN into results
-    results
-        .nodes
-        .entry("nan_node".to_string())
-        .or_default()
-        .insert(q(1), f64::NAN);
+    results.set_cell(
+        "nan_node",
+        q(1),
+        finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
+    );
 
     let check = NonFiniteCheck { nodes: vec![] };
 
@@ -364,11 +370,13 @@ fn non_finite_inf_detected() {
     let mut results = evaluator.evaluate(&model).unwrap();
 
     // Inject Inf into results
-    results
-        .nodes
-        .entry("inf_node".to_string())
-        .or_default()
-        .insert(q(1), f64::INFINITY);
+    results.set_cell(
+        "inf_node",
+        q(1),
+        finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
+    );
 
     let check = NonFiniteCheck {
         nodes: vec![NodeId::new("inf_node")],

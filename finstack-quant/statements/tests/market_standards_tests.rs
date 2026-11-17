@@ -202,25 +202,21 @@ fn test_variance_single_value_returns_nan() {
     let results = evaluator.evaluate(&model).unwrap();
 
     // With sample variance, single value should return NaN (undefined)
-    let variance = results
-        .get(
-            "variance",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        )
-        .unwrap();
+    let variance = results.get(
+        "variance",
+        &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+    );
     assert!(
-        variance.is_nan(),
+        variance.is_none(),
         "Variance of single value should be NaN with sample variance"
     );
 
-    let std_dev = results
-        .get(
-            "std_dev",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        )
-        .unwrap();
+    let std_dev = results.get(
+        "std_dev",
+        &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+    );
     assert!(
-        std_dev.is_nan(),
+        std_dev.is_none(),
         "Std dev of single value should be NaN with sample variance"
     );
 }
@@ -1148,15 +1144,13 @@ fn test_rolling_window_with_limited_history() {
     // Default (min_periods = window): partial windows are NaN, so a 1- or
     // 2-observation history is never presented as a 4-period statistic.
     for quarter in [1, 2] {
-        let value = results
-            .get(
-                "rolling_mean_4",
-                &PeriodId::quarter(2025, quarter).expect("valid period fixture"),
-            )
-            .unwrap();
+        let value = results.get(
+            "rolling_mean_4",
+            &PeriodId::quarter(2025, quarter).expect("valid period fixture"),
+        );
         assert!(
-            value.is_nan(),
-            "partial window must be NaN by default, got {value} in Q{quarter}"
+            value.is_none(),
+            "partial window must be NaN by default, got {value:?} in Q{quarter}"
         );
     }
 

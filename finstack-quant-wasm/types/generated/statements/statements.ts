@@ -1855,13 +1855,17 @@ export type CapitalStructureWarning =
       [k: string]: unknown;
     };
 /**
- * Which evaluation layer produced a statement cell (one node in one period).
+ * Which value source produced a statement cell (one node in one period).
  *
- * The evaluator resolves every cell by the precedence
- * `Value > Forecast > Formula`, after the node's optional `where` mask. The
- * winning layer is recorded per cell in [`StatementResult::node_sources`].
+ * The evaluator resolves every unmasked cell by the precedence
+ * `Value > Forecast > Formula`. The selected source is recorded on the cell,
+ * including when that source's result is unavailable.
  */
-export type CellSource = "value" | "forecast" | "formula" | "where_masked" | "missing";
+export type CellSource = "value" | "forecast" | "formula";
+/**
+ * Whether a cell has a value, and if not, which kind of absence it is.
+ */
+export type CellStatus = "value" | "missing" | "masked" | "unavailable";
 /**
  * Category that groups related checks together.
  */
@@ -1875,6 +1879,19 @@ export type CheckCategory =
  * Severity level for a check finding, ordered from least to most severe.
  */
 export type CheckSeverity = "info" | "warning" | "error";
+/**
+ * Why a cell has no value although its node and period are valid.
+ *
+ * An unavailable cell is not an error: the model is well formed and the run
+ * continues. Invalid arithmetic, an invalid mask and unrepresentable money
+ * are errors instead and fail the run.
+ */
+export type UnavailableReason = "missing_mask" | "hidden_by_cutoff" | "missing_input";
+/**
+ * Identifier for a Gregorian period like `2025Q1` or a fiscal period like
+ * `FY2025W53`.
+ */
+export type PeriodId = string;
 /**
  * Warning emitted during evaluation.
  */
@@ -2009,14 +2026,15 @@ export type PeriodCalendar =
       fiscal: FiscalConfig;
     };
 /**
- * Identifier for a Gregorian period like `2025Q1` or a fiscal period like
- * `FY2025W53`.
- */
-export type PeriodId = string;
-/**
  * Numeric schema revision for contracts whose sole supported revision is v1.
  */
 export type SchemaVersion = number;
+/**
+ * What a positive amount of a statement node means at the pricing boundary.
+ *
+ * Serialized as `"inflow_positive"` / `"outflow_magnitude"`.
+ */
+export type FlowSign = "inflow_positive" | "outflow_magnitude";
 /**
  * One forecast method with its typed parameters, in the wire shape of ForecastSpec.
  */
@@ -2237,6 +2255,23 @@ export type NonFiniteSentinel = "inf" | "-inf" | "nan";
  * Optional semantic hint for a column.
  */
 export type TableColumnRole = "dimension" | "index" | "measure" | "attribute";
+/**
+ * Which explicit observations an evaluation may read.
+ *
+ * On the wire: `"full_snapshot"`, or `{"through": "2025-04-25"}`.
+ */
+export type ObservationCutoff =
+  | "full_snapshot"
+  | {
+      through: DateWire;
+    };
+/**
+ * Which date of a half-open period `[start, end)` anchors its exported cell.
+ *
+ * Serialized and parsed as `"start"` / `"end"`. There is no default: every
+ * dated export states its anchor.
+ */
+export type PeriodDateConvention = "start" | "end";
 /**
  * Period frequency type.
  *
@@ -7202,6 +7237,51 @@ export interface CurvePctParams {
   min?: number | null;
 }
 /**
+ * One period of a dated statement export: the anchor date, the period and its typed cell.
+ */
+export interface DatedCell {
+  /**
+   * The typed cell: an exact amount or scalar, or its missing, masked or
+   * unavailable state.
+   */
+  cell: ResultCell;
+  /**
+   * Anchor date selected by the export's [`PeriodDateConvention`].
+   */
+  date: string;
+  /**
+   * Period the cell belongs to.
+   */
+  period_id: PeriodId;
+}
+/**
+ * One published cell: a node in a period.
+ *
+ * A `value` cell carries a finite scalar or an exact [`Money`]; every other
+ * status carries no value. An `unavailable` cell carries its reason.
+ */
+export interface ResultCell {
+  /**
+   * Why an `unavailable` cell has no value. Absent otherwise.
+   */
+  reason?: UnavailableReason | null;
+  /**
+   * The value source selected for the cell. Absent for a masked cell, a
+   * missing cell, a cell left unavailable before a source was selected,
+   * and cells of hand-built results.
+   */
+  source?: CellSource | null;
+  /**
+   * Whether the cell has a value.
+   */
+  status: CellStatus;
+  /**
+   * The value of a `value` cell: a finite number for a scalar node, or
+   * exact tagged money for a monetary node. Absent otherwise.
+   */
+  value?: AmountOrScalar | null;
+}
+/**
  * Parameters of [`ForecastParameters::Normal`] and [`ForecastParameters::LogNormal`].
  */
 export interface DistributionParams {
@@ -7818,6 +7898,31 @@ export interface NormalizationResult {
   [k: string]: unknown;
 }
 /**
+ * The monetary node, expected currency, sign convention, required periods and anchor date a pricing caller reads.
+ */
+export interface PricingFlowSelection {
+  /**
+   * Currency every amount must carry. No FX is applied.
+   */
+  currency: Currency;
+  /**
+   * Anchor date of each period.
+   */
+  date_convention: PeriodDateConvention;
+  /**
+   * Monetary node to read.
+   */
+  node_id: string;
+  /**
+   * Periods the schedule requires, in any order. Each must hold an amount.
+   */
+  periods: PeriodId[];
+  /**
+   * Sign convention of the node's amounts.
+   */
+  sign: FlowSign;
+}
+/**
  * Target frequency and per-node methods for rolling statement results up to coarser periods.
  */
 export interface RollupSpec {
@@ -7838,6 +7943,42 @@ export interface RollupSpec {
   methods?: {
     [k: string]: RollupMethod;
   };
+}
+/**
+ * What a result was evaluated from.
+ *
+ * A consumer that is handed a result checks this against the model, period
+ * plan and run it expects before trusting the cells.
+ */
+export interface RunProvenance {
+  /**
+   * Canonical content hash of the evaluated model
+   * ([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).
+   */
+  model_content_hash: string;
+  /**
+   * Identifier of the evaluated model.
+   */
+  model_id: string;
+  /**
+   * Observations the run was allowed to read.
+   */
+  observation_cutoff: ObservationCutoff;
+  /**
+   * Identity of this evaluation run: the canonical content hash of the
+   * fields above. Two runs of the same model content, snapshot, cutoff
+   * and valuation date share it.
+   */
+  run_id: string;
+  /**
+   * Identity of the source snapshot the model's observations came from.
+   */
+  source_snapshot?: string | null;
+  /**
+   * Valuation date the capital structure was priced at, when the run used
+   * a market.
+   */
+  valuation_date?: DateWire | null;
 }
 /**
  * Execution statistics for a statement-model evaluation.
@@ -7877,6 +8018,16 @@ export interface StatementEvalStats {
  */
 export interface StatementResult {
   /**
+   * Map of node_id → (period_id → [`ResultCell`]): the typed result.
+   *
+   * Every evaluated node has a cell for every period of the plan.
+   */
+  cells: {
+    [k: string]: {
+      [k: string]: ResultCell;
+    };
+  };
+  /**
    * Check report from inline validation (None if no checks configured)
    */
   check_report?: CheckReport | null;
@@ -7889,46 +8040,13 @@ export interface StatementResult {
    */
   meta: StatementEvalStats;
   /**
-   * Map of node_id → (period_id → Money) for monetary nodes
-   */
-  monetary_nodes?: {
-    [k: string]: {
-      [k: string]: Money;
-    };
-  };
-  /**
-   * Map of node_id → (period_id → [`CellSource`]): which layer of the
-   * `Value > Forecast > Formula` precedence produced each cell of `nodes`.
-   *
-   * Populated for every cell by [`Evaluator`](crate::evaluator::Evaluator)
-   * (with or without market context / capital structure). The model spec
-   * alone does not determine it: an as-of visibility cutoff can hide an
-   * explicit value so that the forecast or formula fires instead. Empty
-   * only for results that were not produced by the evaluator (hand-built)
-   * or were serialized before this field existed.
-   */
-  node_sources?: {
-    [k: string]: {
-      [k: string]: CellSource;
-    };
-  };
-  /**
-   * Track value types for each node
+   * Units of each node: scalar, or monetary in one currency.
    */
   node_value_types?: {
     [k: string]: NodeValueType;
   };
   /**
-   * Map of node_id → (period_id → value). Native values are f64; JSON uses
-   * numbers for finite values and `"nan"`, `"inf"`, `"-inf"` for non-finite cells.
-   */
-  nodes: {
-    [k: string]: {
-      [k: string]: ResultNumber;
-    };
-  };
-  /**
-   * The period plan `nodes` is keyed by: the periods in timeline order,
+   * The period plan `cells` is keyed by: the periods in timeline order,
    * with their dates and actual/forecast split, and their calendar context.
    *
    * [`Evaluator`](crate::evaluator::Evaluator) records the model's plan and
@@ -7937,6 +8055,11 @@ export interface StatementResult {
    * `None` only for hand-built results, such as [`new`](Self::new).
    */
   periods?: PeriodPlan | null;
+  /**
+   * What was evaluated: the model, its source snapshot, the observation
+   * cutoff and the run. `None` only for hand-built results.
+   */
+  provenance?: RunProvenance | null;
   /**
    * Required wire-format schema version. Only numeric `1` is accepted.
    */

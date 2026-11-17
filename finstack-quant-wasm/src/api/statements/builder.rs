@@ -737,7 +737,7 @@ impl JsModelBuilder {
 /// mixed.values({ "2025Q1": 100 });
 /// mixed.forecast({ method: "growth_pct", params: { rate: 0.05 } });
 /// const model = mixed.build().build();
-/// new statements.Evaluator().evaluate(model).nodes.revenue["2025Q2"];  // 105
+/// new statements.Evaluator().evaluate(model).cells.revenue["2025Q2"].value;  // 105
 /// ```
 #[wasm_bindgen(js_name = MixedNodeBuilder)]
 pub struct JsMixedNodeBuilder {

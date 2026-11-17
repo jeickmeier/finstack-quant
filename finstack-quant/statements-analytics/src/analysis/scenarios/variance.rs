@@ -318,19 +318,21 @@ impl<'a> VarianceAnalyzer<'a> {
         for metric in &config.metrics {
             self.validate_units(metric)?;
             for period in &config.periods {
-                let baseline = self.baseline.get(metric, period).ok_or_else(|| {
-                    Error::missing_data(format!(
-                        "Missing baseline value for '{}' @ {}",
-                        metric, period
-                    ))
-                })?;
+                let baseline =
+                    crate::cell_float(self.baseline, metric, period).ok_or_else(|| {
+                        Error::missing_data(format!(
+                            "Missing baseline value for '{}' @ {}",
+                            metric, period
+                        ))
+                    })?;
 
-                let comparison = self.comparison.get(metric, period).ok_or_else(|| {
-                    Error::missing_data(format!(
-                        "Missing comparison value for '{}' @ {}",
-                        metric, period
-                    ))
-                })?;
+                let comparison =
+                    crate::cell_float(self.comparison, metric, period).ok_or_else(|| {
+                        Error::missing_data(format!(
+                            "Missing comparison value for '{}' @ {}",
+                            metric, period
+                        ))
+                    })?;
 
                 let abs_var = comparison - baseline;
                 let pct_var = if baseline.abs() < ZERO_TOLERANCE {
@@ -367,19 +369,21 @@ impl<'a> VarianceAnalyzer<'a> {
         comparison_label: &str,
     ) -> Result<BridgeChart> {
         self.validate_units(target_metric)?;
-        let baseline_value = self.baseline.get(target_metric, &period).ok_or_else(|| {
-            Error::missing_data(format!(
-                "Missing baseline value for '{}' @ {}",
-                target_metric, period
-            ))
-        })?;
+        let baseline_value =
+            crate::cell_float(self.baseline, target_metric, &period).ok_or_else(|| {
+                Error::missing_data(format!(
+                    "Missing baseline value for '{}' @ {}",
+                    target_metric, period
+                ))
+            })?;
 
-        let comparison_value = self.comparison.get(target_metric, &period).ok_or_else(|| {
-            Error::missing_data(format!(
-                "Missing comparison value for '{}' @ {}",
-                target_metric, period
-            ))
-        })?;
+        let comparison_value = crate::cell_float(self.comparison, target_metric, &period)
+            .ok_or_else(|| {
+                Error::missing_data(format!(
+                    "Missing comparison value for '{}' @ {}",
+                    target_metric, period
+                ))
+            })?;
 
         let mut steps = Vec::new();
 
@@ -392,11 +396,11 @@ impl<'a> VarianceAnalyzer<'a> {
                     "Additive bridge drivers must have the target metric type and currency",
                 ));
             }
-            let base_drv = self.baseline.get(driver, &period).ok_or_else(|| {
+            let base_drv = crate::cell_float(self.baseline, driver, &period).ok_or_else(|| {
                 Error::missing_data(format!("Missing baseline driver '{}' @ {}", driver, period))
             })?;
 
-            let cmp_drv = self.comparison.get(driver, &period).ok_or_else(|| {
+            let cmp_drv = crate::cell_float(self.comparison, driver, &period).ok_or_else(|| {
                 Error::missing_data(format!(
                     "Missing comparison driver '{}' @ {}",
                     driver, period
@@ -446,10 +450,8 @@ mod tests {
 
         for (node_id, period, value) in values {
             results
-                .nodes
-                .entry((*node_id).to_string())
-                .or_default()
-                .insert(*period, *value);
+                .set_scalar(node_id, *period, *value)
+                .expect("finite");
         }
 
         results

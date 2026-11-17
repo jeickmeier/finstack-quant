@@ -17,11 +17,10 @@ use std::sync::Arc;
 
 type Instruments = IndexMap<String, Arc<dyn finstack_quant_valuations::instruments::Instrument>>;
 type DynamicPeriodEvaluation = (
-    IndexMap<String, f64>,
+    IndexMap<String, crate::evaluator::ResultCell>,
     Vec<Option<f64>>,
     Vec<EvalWarning>,
     crate::capital_structure::CapitalStructureCashflows,
-    IndexMap<String, crate::evaluator::CellSource>,
 );
 
 /// Capital-structure inputs of [`Evaluator::evaluate_period_dynamic`].
@@ -158,7 +157,6 @@ impl Evaluator {
             .take()
             .unwrap_or_default();
         let row = context.current_values.clone();
-        let sources = context.cell_sources();
         let (values, mut warnings) = context.into_results();
         // The second `evaluate_nodes_in_order` pass re-evaluates cs-affected
         // nodes into the same context, so node-level warnings (e.g.
@@ -167,7 +165,7 @@ impl Evaluator {
         let mut seen: HashSet<String> = HashSet::with_capacity(warnings.len());
         warnings.retain(|w| seen.insert(format!("{w:?}")));
         warnings.append(&mut contractual_warnings);
-        Ok((values, row, warnings, period_cs_cashflows, sources))
+        Ok((values, row, warnings, period_cs_cashflows))
     }
 }
 

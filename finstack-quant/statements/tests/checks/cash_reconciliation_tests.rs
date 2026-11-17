@@ -265,11 +265,13 @@ fn nan_cash_balance_warns_and_skips() {
 
     let mut evaluator = Evaluator::new();
     let mut results = evaluator.evaluate(&model).unwrap();
-    results
-        .nodes
-        .entry("cash".to_string())
-        .or_default()
-        .insert(q(1), f64::NAN);
+    results.set_cell(
+        "cash",
+        q(1),
+        finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
+    );
 
     let check = CashReconciliation {
         cash_balance_node: NodeId::new("cash"),
@@ -351,11 +353,13 @@ fn nan_component_warns_instead_of_silently_skipping() {
 
     let mut evaluator = Evaluator::new();
     let mut results = evaluator.evaluate(&model).unwrap();
-    results
-        .nodes
-        .entry("cfo".to_string())
-        .or_default()
-        .insert(q(2), f64::NAN);
+    results.set_cell(
+        "cfo",
+        q(2),
+        finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
+    );
 
     let check = CashReconciliation {
         cash_balance_node: NodeId::new("cash"),

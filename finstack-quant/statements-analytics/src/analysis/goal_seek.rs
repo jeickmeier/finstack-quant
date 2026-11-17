@@ -365,7 +365,7 @@ pub fn goal_seek(model: &FinancialModelSpec, spec: &GoalSeekSpec) -> Result<Goal
                 "evaluation failed at driver value {driver_value}: {e}"
             ))
         })?;
-        match results.get(target_node, &target_period) {
+        match crate::cell_float(&results, target_node, &target_period) {
             Some(actual_value) => Ok(actual_value - target_value),
             None => Err(finstack_quant_core::Error::Validation(format!(
                 "target node '{target_node}' produced no value for period \

@@ -160,7 +160,7 @@ fn monetary_nonfinite_results_emit_one_diagnostic_per_cell() {
         evaluator.evaluate(&model).unwrap(),
         evaluator.evaluate_prepared(&model, &plan).unwrap(),
     ] {
-        assert!(!result.get("undefined", &quarter()).unwrap().is_finite());
+        assert_eq!(result.get("undefined", &quarter()), None);
         assert!(result.get_money("undefined", &quarter()).is_none());
         assert_eq!(
             result

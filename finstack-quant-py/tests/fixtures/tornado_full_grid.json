@@ -40,14 +40,30 @@
             }
           ]
         },
-        "nodes": {
+        "cells": {
           "revenue": {
-            "2025Q1": 100.0,
-            "2025Q2": 99.0
+            "2025Q1": {
+              "status": "value",
+              "value": 100.0,
+              "source": "value"
+            },
+            "2025Q2": {
+              "status": "value",
+              "value": 99.0,
+              "source": "value"
+            }
           },
           "profit": {
-            "2025Q1": 50.0,
-            "2025Q2": 49.5
+            "2025Q1": {
+              "status": "value",
+              "value": 50.0,
+              "source": "formula"
+            },
+            "2025Q2": {
+              "status": "value",
+              "value": 49.5,
+              "source": "formula"
+            }
           }
         },
         "node_value_types": {
@@ -58,15 +74,11 @@
             "type": "scalar"
           }
         },
-        "node_sources": {
-          "revenue": {
-            "2025Q1": "value",
-            "2025Q2": "value"
-          },
-          "profit": {
-            "2025Q1": "formula",
-            "2025Q2": "formula"
-          }
+        "provenance": {
+          "model_id": "m",
+          "model_content_hash": "sha256:5feab3d7ab174e14048c61cef1d5ece74b664d7451b48506da85626f4d9e7d74",
+          "observation_cutoff": "full_snapshot",
+          "run_id": "sha256:e19c61582dd82a9d59074f8a4136892522c18bc962736f08dad8f4fc6f145bad"
         },
         "meta": {
           "num_nodes": 2,
@@ -99,14 +111,30 @@
             }
           ]
         },
-        "nodes": {
+        "cells": {
           "revenue": {
-            "2025Q1": 100.0,
-            "2025Q2": 121.00000000000001
+            "2025Q1": {
+              "status": "value",
+              "value": 100.0,
+              "source": "value"
+            },
+            "2025Q2": {
+              "status": "value",
+              "value": 121.00000000000001,
+              "source": "value"
+            }
           },
           "profit": {
-            "2025Q1": 50.0,
-            "2025Q2": 60.50000000000001
+            "2025Q1": {
+              "status": "value",
+              "value": 50.0,
+              "source": "formula"
+            },
+            "2025Q2": {
+              "status": "value",
+              "value": 60.50000000000001,
+              "source": "formula"
+            }
           }
         },
         "node_value_types": {
@@ -117,15 +145,11 @@
             "type": "scalar"
           }
         },
-        "node_sources": {
-          "revenue": {
-            "2025Q1": "value",
-            "2025Q2": "value"
-          },
-          "profit": {
-            "2025Q1": "formula",
-            "2025Q2": "formula"
-          }
+        "provenance": {
+          "model_id": "m",
+          "model_content_hash": "sha256:5083c947370878799855cff5a5e8a2cc2431b8189c1f11744cc7043b5873c64e",
+          "observation_cutoff": "full_snapshot",
+          "run_id": "sha256:ff6e53d420530d4b0bba898851362dde3c992154ce2f44f0aad471da3ce0cc3d"
         },
         "meta": {
           "num_nodes": 2,
@@ -155,14 +179,30 @@
         }
       ]
     },
-    "nodes": {
+    "cells": {
       "revenue": {
-        "2025Q1": 100.0,
-        "2025Q2": 110.0
+        "2025Q1": {
+          "status": "value",
+          "value": 100.0,
+          "source": "value"
+        },
+        "2025Q2": {
+          "status": "value",
+          "value": 110.0,
+          "source": "value"
+        }
       },
       "profit": {
-        "2025Q1": 50.0,
-        "2025Q2": 55.0
+        "2025Q1": {
+          "status": "value",
+          "value": 50.0,
+          "source": "formula"
+        },
+        "2025Q2": {
+          "status": "value",
+          "value": 55.0,
+          "source": "formula"
+        }
       }
     },
     "node_value_types": {
@@ -173,15 +213,11 @@
         "type": "scalar"
       }
     },
-    "node_sources": {
-      "revenue": {
-        "2025Q1": "value",
-        "2025Q2": "value"
-      },
-      "profit": {
-        "2025Q1": "formula",
-        "2025Q2": "formula"
-      }
+    "provenance": {
+      "model_id": "m",
+      "model_content_hash": "sha256:74ec5e9add7d000008b0bfa494ae4ce1c1a4ff5c5b88e6622fff0570bfd748f7",
+      "observation_cutoff": "full_snapshot",
+      "run_id": "sha256:6a51112dcd3c362382ca5ef71bddecf783362726b88c393463951b0f748f6224"
     },
     "meta": {
       "num_nodes": 2,

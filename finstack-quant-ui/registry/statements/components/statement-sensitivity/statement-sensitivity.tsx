@@ -15,7 +15,11 @@ import { FieldFrame } from "@/components/finstack/shared/primitives/field-frame/
 import { IdCombobox } from "@/components/finstack/shared/primitives/id-combobox/id-combobox";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { TornadoChart } from "@/components/finstack/statements/components/tornado-chart/tornado-chart";
-import { evaluatedNumber, sensitivityModes } from "./sensitivity";
+import {
+  evaluatedNumber,
+  evaluatedValue,
+  sensitivityModes,
+} from "./sensitivity";
 
 /** The run as submitted, without the model the caller supplies. */
 export type StatementSensitivitySubmission = Omit<
@@ -158,10 +162,11 @@ export function StatementSensitivity({
                 id: "baseline",
                 label: "Baseline",
                 parameters: "Unperturbed",
-                value:
-                  data.result.baseline.nodes[shown.targetMetric]?.[
-                    shown.period
-                  ],
+                value: evaluatedValue(
+                  data.result.baseline,
+                  shown.targetMetric,
+                  shown.period,
+                ),
               },
             ]
           : []),
@@ -175,7 +180,11 @@ export function StatementSensitivity({
                 `${parameterLabel(key)} = ${formatExact(value)}`,
             )
             .join("; "),
-          value: scenario.results.nodes[shown.targetMetric]?.[shown.period],
+          value: evaluatedValue(
+            scenario.results,
+            shown.targetMetric,
+            shown.period,
+          ),
         })),
       ]
     : [];
@@ -234,7 +243,7 @@ export function StatementSensitivity({
         <legend className="px-1 text-sm font-medium">Varied parameters</legend>
         {rows.map((row, index) => {
           const base = row.nodeId
-            ? result.nodes[row.nodeId]?.[row.periodId]
+            ? evaluatedValue(result, row.nodeId, row.periodId)
             : undefined;
           return (
             <div

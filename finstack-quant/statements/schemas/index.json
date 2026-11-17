@@ -19,6 +19,15 @@
       "type_name": "CheckSuiteSpec"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/dated_cell.schema.json",
+      "bytes": 27327,
+      "kind": "output",
+      "path": "schemas/statements/1/dated_cell.schema.json",
+      "summary": "One period of a dated statement export: the anchor date, the period and its typed cell.",
+      "title": "DatedCell",
+      "type_name": "DatedCell"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
       "bytes": 394406,
       "kind": "input",
@@ -91,6 +100,15 @@
       "type_name": "NormalizationResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/pricing_flow_selection.schema.json",
+      "bytes": 22332,
+      "kind": "input",
+      "path": "schemas/statements/1/pricing_flow_selection.schema.json",
+      "summary": "The monetary node, expected currency, sign convention, required periods and anchor date a pricing caller reads.",
+      "title": "PricingFlowSelection",
+      "type_name": "PricingFlowSelection"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
       "bytes": 3958,
       "kind": "input",
@@ -101,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
-      "bytes": 76319,
+      "bytes": 81897,
       "kind": "output",
       "path": "schemas/statements/1/statement_result.schema.json",
       "summary": "Evaluated node values per period, with policy stamps.",

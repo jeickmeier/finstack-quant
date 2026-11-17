@@ -56,7 +56,7 @@ it("validates and evaluates the canonical model through the real worker", async 
   expect(checked.meta).toEqual(result.meta);
 });
 
-it("preserves money precision, absent cells, and nonfinite sentinels", async () => {
+it("preserves money precision, absent cells, and unavailable cells", async () => {
   const model = financialModelModule.codec.parse(
     fixture,
   ) as FinancialModelSpecWire;
@@ -86,8 +86,8 @@ it("preserves money precision, absent cells, and nonfinite sentinels", async () 
     ),
   ).toBe("USD 0.0m");
   expect(
-    rows.find((row) => row.nodeId === "lagged")?.cells["2025Q1"]?.value,
-  ).toBe("nan");
+    rows.find((row) => row.nodeId === "lagged")?.cells["2025Q1"],
+  ).toMatchObject({ present: false, status: "unavailable", text: "—" });
   expect(
     rows.find((row) => row.nodeId === "revenue")?.cells["2025Q2"],
   ).toBeUndefined();
@@ -113,14 +113,27 @@ it("projects the native cell source of every evaluated cell, including a where m
   expect(source("revenue", "2024Q1")).toBe("value");
   expect(source("revenue", "2025Q2")).toBe("forecast");
   expect(source("ebitda", "2024Q1")).toBe("formula");
+  // A masked cell has no value and no source; its native status says why.
+  const masked = rows.find((row) => row.nodeId === "masked_capex")!;
   expect(
-    model.periods.periods.map((period) => source("masked_capex", period.id)),
-  ).toEqual(model.periods.periods.map(() => "where_masked"));
-  // Every returned cell carries the source Rust recorded for it.
+    model.periods.periods.map((period) => masked.cells[period.id]),
+  ).toEqual(
+    model.periods.periods.map((period) => ({
+      periodId: period.id,
+      present: false,
+      status: "masked",
+      text: "—",
+      value: undefined,
+    })),
+  );
+  // Every returned cell carries the status and source Rust recorded for it.
   for (const row of rows)
-    for (const [periodId, cell] of Object.entries(row.cells))
-      if (cell.present)
-        expect(cell.source).toBe(result.node_sources?.[row.nodeId]?.[periodId]);
+    for (const [periodId, cell] of Object.entries(row.cells)) {
+      const native = result.cells[row.nodeId]?.[periodId];
+      expect(cell.status).toBe(native?.status);
+      expect(cell.source).toBe(native?.source);
+      expect(cell.present).toBe(native?.status === "value");
+    }
 });
 
 it("evaluates the analyst model with the node ids Rust credit analytics read", () => {
@@ -234,7 +247,7 @@ it("evaluates the complete analyst example, returned ratios, checks and supplied
   expect(result).toEqual(new native.Evaluator().evaluate(canonical));
   expect(result.meta?.num_nodes).toBe(26);
   expect(result.meta?.num_periods).toBe(8);
-  expect(result.nodes.leverage?.["2025Q4"]).toBeDefined();
+  expect(result.cells.leverage?.["2025Q4"]?.status).toBe("value");
   const report = unwrap(
     await harness.proxy.runChecks({
       modelJson: canonical,
@@ -292,8 +305,8 @@ it("routes scenario sets, rollups and data-gap checks to WASM", async () => {
   expect(scenarios).toEqual(
     native.evaluateScenarioSet(canonical, scenarioSetJson),
   );
-  expect(scenarios.downside.nodes.revenue["2025Q4"]).not.toBe(
-    scenarios.base.nodes.revenue["2025Q4"],
+  expect(scenarios.downside.cells.revenue["2025Q4"].value).not.toEqual(
+    scenarios.base.cells.revenue["2025Q4"].value,
   );
   const asOf = "2025-07-01";
   expect(
@@ -337,7 +350,7 @@ it("routes scenario sets, rollups and data-gap checks to WASM", async () => {
   expect(annual).toEqual(
     native.statementResultRollup(resultsJson, canonical, specJson),
   );
-  expect(Object.keys(annual.nodes.revenue)).toEqual(["2024", "2025"]);
+  expect(Object.keys(annual.cells.revenue)).toEqual(["2024", "2025"]);
   expect(annual.periods?.calendar).toEqual("gregorian");
   expect(annual.periods?.periods).toEqual([
     {

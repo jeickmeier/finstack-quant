@@ -1,11 +1,11 @@
 {
   "$defs": {
     "CellSource": {
-      "description": "Which evaluation layer produced a statement cell (one node in one period).\n\nThe evaluator resolves every cell by the precedence\n`Value > Forecast > Formula`, after the node's optional `where` mask. The\nwinning layer is recorded per cell in [`StatementResult::node_sources`].",
+      "description": "Which value source produced a statement cell (one node in one period).\n\nThe evaluator resolves every unmasked cell by the precedence\n`Value > Forecast > Formula`. The selected source is recorded on the cell,\nincluding when that source's result is unavailable.",
       "oneOf": [
         {
           "const": "value",
-          "description": "The explicit value stored on the node for this period (and visible\nunder the active as-of policy).",
+          "description": "The explicit observation stored on the node for this period (and\nvisible under the observation cutoff).",
           "type": "string"
         },
         {
@@ -16,16 +16,6 @@
         {
           "const": "formula",
           "description": "The node's formula.",
-          "type": "string"
-        },
-        {
-          "const": "where_masked",
-          "description": "The node's `where` clause evaluated to false for this period, so the\ncell is masked: it has no value (`NaN`, never a zero) and the value,\nforecast and formula were not consulted.",
-          "type": "string"
-        },
-        {
-          "const": "missing",
-          "description": "No observation, forecast or formula supplies this period: the cell is\nmissing and its value is `NaN`. A missing cell is never a zero.",
           "type": "string"
         }
       ]
@@ -198,7 +188,7 @@
   "description": "Detailed explanation of a node's calculation.",
   "properties": {
     "breakdown": {
-      "description": "Components of the formula with the values they resolved to in this\nperiod, including `cs.<component>.<instrument_or_total>`\ncapital-structure references.\n\nPopulated only when the formula produced the value (`source` is\n`formula`, or unknown). Empty when `source` is `value`, `forecast` or\n`where_masked`: the formula was not evaluated, and `source` /\n`forecast` describe where the value came from. When the formula is a\npure sum/difference of references there is one step per term, in\nformula order, each with `operation` `\"+\"` or `\"-\"`, and the signed\nvalues sum to `final_value`. For any other formula each referenced\ncomponent is listed once with `operation` unset.",
+      "description": "Components of the formula with the values they resolved to in this\nperiod, including `cs.<component>.<instrument_or_total>`\ncapital-structure references.\n\nPopulated only when the formula produced the value (`source` is\n`formula`, or unknown). Empty when `source` is `value` or\n`forecast`: the formula was not evaluated, and `source` /\n`forecast` describe where the value came from. When the formula is a\npure sum/difference of references there is one step per term, in\nformula order, each with `operation` `\"+\"` or `\"-\"`, and the signed\nvalues sum to `final_value`. For any other formula each referenced\ncomponent is listed once with `operation` unset.",
       "items": {
         "$ref": "#/$defs/ExplanationStep"
       },
@@ -247,7 +237,7 @@
           "type": "null"
         }
       ],
-      "description": "Evaluation layer that produced `final_value` under the\n`Value > Forecast > Formula` precedence: `value` (the explicit value\nstored on the node), `forecast`, `formula`, `where_masked` (the\nnode's `where` clause masked the cell, which then has no value) or `missing` (no observation,\nforecast or formula; the value is NaN).\n\nRead from [`StatementResult::node_sources`]; `None` when the results\ncarry no source for the cell (hand-built results, or results or\nexplanations serialized before sources were recorded)."
+      "description": "Value source selected for the cell under the\n`Value > Forecast > Formula` precedence: `value` (the explicit value\nstored on the node), `forecast` or `formula`.\n\nRead from the result cell; `None` when no source was selected (a\nmasked or missing cell, or one left unavailable before a source was\nchosen) and for hand-built results."
     }
   },
   "required": [

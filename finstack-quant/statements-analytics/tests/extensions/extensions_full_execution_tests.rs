@@ -222,7 +222,9 @@ fn roll_forward_inventory_pairs_with_corkscrew_decreases() {
 
     let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-    let end = results.get_node("inventory_end").expect("inventory_end");
+    let end = results
+        .numeric_series("inventory_end")
+        .expect("inventory_end");
     assert_eq!(end[&q1], 100.0);
     assert_eq!(end[&q2], 130.0);
 

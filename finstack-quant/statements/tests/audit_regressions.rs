@@ -186,29 +186,48 @@ fn every_cash_period_checks_its_components_even_without_a_prior_balance() {
 }
 
 #[test]
-fn non_finite_result_cells_and_warnings_round_trip_and_validate_schema() {
+fn valueless_result_cells_and_warnings_round_trip_and_validate_schema() {
+    use finstack_quant_statements::evaluator::{CellStatus, ResultCell, UnavailableReason};
+
+    // A published cell is finite or has no value; a non-finite number
+    // survives only in a diagnostic warning.
     let mut result = StatementResult::new();
     for (id, value) in [
         ("nan", f64::NAN),
         ("positive", f64::INFINITY),
         ("negative", f64::NEG_INFINITY),
     ] {
-        result.nodes.insert(id.into(), indexmap! {q(2025,1)=>value});
+        ResultCell::scalar(value).expect_err("a non-finite value is not a result cell");
+        result.set_cell(
+            id,
+            q(2025, 1),
+            ResultCell::unavailable(UnavailableReason::MissingInput),
+        );
         result.meta.warnings.push(EvalWarning::NonFiniteValue {
             node_id: id.into(),
             period: q(2025, 1),
             value,
         });
     }
-    let json = serde_json::to_value(&result).unwrap();
-    assert_eq!(json["nodes"]["nan"]["2025Q1"], "nan");
-    let restored: StatementResult = serde_json::from_value(json.clone()).unwrap();
-    assert!(restored.get("nan", &q(2025, 1)).unwrap().is_nan());
-    assert_eq!(restored.get("positive", &q(2025, 1)), Some(f64::INFINITY));
-    assert_eq!(
-        restored.get("negative", &q(2025, 1)),
-        Some(f64::NEG_INFINITY)
+    result.set_cell(
+        "masked",
+        q(2025, 1),
+        ResultCell::without_value(CellStatus::Masked),
     );
+    result.set_scalar("zero", q(2025, 1), 0.0).unwrap();
+    let json = serde_json::to_value(&result).unwrap();
+    assert_eq!(
+        json["cells"]["nan"]["2025Q1"],
+        json!({"status": "unavailable", "reason": "missing_input"})
+    );
+    assert_eq!(
+        json["cells"]["zero"]["2025Q1"],
+        json!({"status": "value", "value": 0.0})
+    );
+    let restored: StatementResult = serde_json::from_value(json.clone()).unwrap();
+    assert_eq!(restored.cells, result.cells);
+    assert_eq!(restored.get("nan", &q(2025, 1)), None);
+    assert_eq!(restored.get("zero", &q(2025, 1)), Some(0.0));
     let schema: serde_json::Value = serde_json::from_str(include_str!(
         "../schemas/statements/1/statement_result.schema.json"
     ))

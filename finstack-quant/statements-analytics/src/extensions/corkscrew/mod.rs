@@ -363,7 +363,7 @@ impl CorkscrewExtension {
             is_valid: true,
         };
 
-        let balance_values = results.nodes.get(&account.node_id).ok_or_else(|| {
+        let balance_values = results.numeric_series(&account.node_id).ok_or_else(|| {
             finstack_quant_statements::Error::missing_data(format!(
                 "Balance account '{}' not found in results",
                 account.node_id
@@ -399,7 +399,7 @@ impl CorkscrewExtension {
             // roll-forward break.
             let mut expected_balance = if let Some(beginning_node) = &account.beginning_balance_node
             {
-                let beginning_values = results.nodes.get(beginning_node).ok_or_else(|| {
+                let beginning_values = results.numeric_series(beginning_node).ok_or_else(|| {
                     finstack_quant_statements::Error::missing_data(format!(
                         "Beginning-balance node '{beginning_node}' for account '{}' not found in results",
                         account.node_id
@@ -473,10 +473,10 @@ impl CorkscrewExtension {
             let period_id = &period.id;
             let mut assets = 0.0;
             let mut liabilities = 0.0;
-            let mut equity = 0.0;
+            let mut equity = 0.0_f64;
 
             for account in &config.accounts {
-                let node_values = results.nodes.get(&account.node_id).ok_or_else(|| {
+                let node_values = results.numeric_series(&account.node_id).ok_or_else(|| {
                     finstack_quant_statements::Error::missing_data(format!(
                         "Articulation account '{}' not found in results",
                         account.node_id
@@ -527,7 +527,7 @@ fn apply_flow_nodes(
     results: &StatementResult,
 ) -> Result<()> {
     for node_id in node_ids {
-        let values = results.nodes.get(node_id).ok_or_else(|| {
+        let values = results.numeric_series(node_id).ok_or_else(|| {
             finstack_quant_statements::Error::missing_data(format!(
                 "{role} node '{node_id}' for account '{account_id}' not found in results"
             ))
@@ -741,16 +741,15 @@ mod tests {
         let (model, mut results) = broken_rollforward_model();
         let q1 = PeriodId::quarter(2025, 1).expect("valid period");
         let q2 = PeriodId::quarter(2025, 2).expect("valid period");
-        results.nodes.insert(
-            "cash".into(),
-            indexmap::IndexMap::from([(q1, 1e18), (q2, 1.0)]),
-        );
         results
-            .nodes
-            .insert("inflows".into(), indexmap::IndexMap::from([(q2, 1.0)]));
+            .set_series("cash", indexmap::IndexMap::from([(q1, 1e18), (q2, 1.0)]))
+            .expect("finite fixture values");
         results
-            .nodes
-            .insert("cash_beg".into(), indexmap::IndexMap::from([(q2, 0.0)]));
+            .set_series("inflows", indexmap::IndexMap::from([(q2, 1.0)]))
+            .expect("finite fixture values");
+        results
+            .set_series("cash_beg", indexmap::IndexMap::from([(q2, 0.0)]))
+            .expect("finite fixture values");
         let extension = CorkscrewExtension::new(CorkscrewConfig {
             accounts: vec![],
             tolerance: 0.01,
@@ -774,13 +773,15 @@ mod tests {
     fn missing_beginning_balance_period_value_is_hard_error() {
         let (model, mut results) = broken_rollforward_model();
         // Add a beginning-balance node with NO value in Q2.
-        results.nodes.insert(
-            "cash_beg".to_string(),
-            indexmap::IndexMap::from([(
-                PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                100.0,
-            )]),
-        );
+        results
+            .set_series(
+                "cash_beg",
+                indexmap::IndexMap::from([(
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    100.0,
+                )]),
+            )
+            .expect("finite fixture values");
 
         let config = CorkscrewConfig {
             accounts: vec![CorkscrewAccount {

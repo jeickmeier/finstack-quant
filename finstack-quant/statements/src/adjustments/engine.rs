@@ -53,7 +53,7 @@ pub fn normalize(
 
     let mut normalization_results = Vec::new();
 
-    let target_values = results.nodes.get(&config.target_node).ok_or_else(|| {
+    let target_values = results.float_series(&config.target_node).ok_or_else(|| {
         Error::eval(format!(
             "Target node '{}' not found in results",
             config.target_node
@@ -92,7 +92,7 @@ pub fn normalize(
         }
     }
 
-    for (period_id, &base_value) in target_values {
+    for (period_id, &base_value) in &target_values {
         if !base_value.is_finite() {
             return Err(Error::eval(format!(
                 "Non-finite normalization base for {period_id}"
@@ -183,33 +183,26 @@ pub fn merge_into_results(
         return Ok(());
     };
     let mut period_map = IndexMap::new();
-    let mut money_map = IndexMap::new();
     for res in normalization_results {
         if res.value_type != first.value_type || !res.final_value.is_finite() {
             return Err(Error::eval(
                 "Normalization results must have finite values and consistent units",
             ));
         }
-        if period_map.insert(res.period, res.final_value).is_some() {
+        let cell = match res.value_type {
+            NodeValueType::Monetary { currency } => crate::evaluator::ResultCell::money(
+                finstack_quant_core::money::Money::new(res.final_value, currency)?,
+            ),
+            NodeValueType::Scalar => crate::evaluator::ResultCell::scalar(res.final_value)?,
+        };
+        if period_map.insert(res.period, cell).is_some() {
             return Err(Error::eval("Duplicate normalization period"));
         }
-        if let NodeValueType::Monetary { currency } = res.value_type {
-            money_map.insert(
-                res.period,
-                finstack_quant_core::money::Money::new(res.final_value, currency)?,
-            );
-        }
     }
-    results.nodes.insert(output_node_id.to_string(), period_map);
+    results.cells.insert(output_node_id.to_string(), period_map);
     results
         .node_value_types
         .insert(output_node_id.to_string(), first.value_type);
-    results.monetary_nodes.shift_remove(output_node_id);
-    if !money_map.is_empty() {
-        results
-            .monetary_nodes
-            .insert(output_node_id.to_string(), money_map);
-    }
     results.check_report = None;
     Ok(())
 }
@@ -227,8 +220,7 @@ fn calculate_adjustment_value(
             percentage,
         } => {
             let node_values = results
-                .nodes
-                .get(node_id)
+                .float_series(node_id)
                 .ok_or_else(|| Error::eval(format!("Reference node '{}' not found", node_id)))?;
 
             let value = node_values.get(&period_id).ok_or_else(|| {
@@ -276,8 +268,7 @@ fn apply_cap(
     }
     let cap_limit = if let Some(base_node) = &cap.base_node {
         let base_values = results
-            .nodes
-            .get(base_node)
+            .float_series(base_node)
             .ok_or_else(|| Error::eval(format!("Cap base node '{}' not found", base_node)))?;
 
         let node_value = *base_values
@@ -330,7 +321,9 @@ mod tests {
             PeriodId::quarter(2025, 2).expect("valid period fixture"),
             120.0,
         );
-        results.nodes.insert("EBITDA".to_string(), ebitda);
+        results
+            .set_series("EBITDA", ebitda)
+            .expect("finite fixture values");
 
         let mut revenue = IndexMap::new();
         revenue.insert(
@@ -341,7 +334,9 @@ mod tests {
             PeriodId::quarter(2025, 2).expect("valid period fixture"),
             1200.0,
         );
-        results.nodes.insert("Revenue".to_string(), revenue);
+        results
+            .set_series("Revenue", revenue)
+            .expect("finite fixture values");
 
         results
     }
@@ -445,7 +440,7 @@ mod tests {
     fn test_percentage_adjustment_errors_when_reference_period_missing() {
         let mut results = mock_results();
         results
-            .nodes
+            .cells
             .get_mut("Revenue")
             .expect("Revenue node should exist")
             .shift_remove(&PeriodId::quarter(2025, 2).expect("valid period fixture"));
@@ -554,10 +549,9 @@ mod tests {
 
         merge_into_results(&mut results, &normalized, "Adjusted EBITDA").expect("valid merge");
 
-        assert!(results.nodes.contains_key("Adjusted EBITDA"));
+        assert!(results.has_node("Adjusted EBITDA"));
         let adjusted = results
-            .nodes
-            .get("Adjusted EBITDA")
+            .float_series("Adjusted EBITDA")
             .expect("Adjusted EBITDA should be added");
         assert_eq!(
             *adjusted
@@ -653,7 +647,9 @@ mod tests {
             PeriodId::quarter(2025, 1).expect("valid period fixture"),
             -100.0,
         );
-        results.nodes.insert("EBITDA".to_string(), ebitda);
+        results
+            .set_series("EBITDA", ebitda)
+            .expect("finite fixture values");
 
         let mut amounts = IndexMap::new();
         amounts.insert(

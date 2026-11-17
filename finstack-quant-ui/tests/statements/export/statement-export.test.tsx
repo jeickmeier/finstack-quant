@@ -119,15 +119,15 @@ it("quotes a field that holds a comma or a quote, per RFC 4180", () => {
   );
 });
 
-it("delivers a missing value as NaN through the worker, written empty and shown undefined", async () => {
+it("delivers a cell without a value as null through the worker, written empty and shown undefined", async () => {
   const live = unwrap(
     await harness.proxy.statementResultToTableWide(resultJson),
   ) as unknown as TableEnvelopeWire;
   const index = live.columns.findIndex(
     (entry) => entry.name === "revenue_growth_qoq",
   );
-  const [cell] = live.columns[index]!.data.values as readonly number[];
-  expect(Number.isNaN(cell)).toBe(true);
+  const [cell] = live.columns[index]!.data.values as readonly (number | null)[];
+  expect(cell).toBeNull();
   // The same empty field the JSON fixture's null gives.
   expect(parseCsv(statementTableCsv(live))).toEqual(
     parseCsv(statementTableCsv(wide)),

@@ -363,11 +363,13 @@ fn nan_dividends_value_warns_and_skips() {
 
     let mut evaluator = Evaluator::new();
     let mut results = evaluator.evaluate(&model).unwrap();
-    results
-        .nodes
-        .entry("dividends".to_string())
-        .or_default()
-        .insert(q(2), f64::NAN);
+    results.set_cell(
+        "dividends",
+        q(2),
+        finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
+    );
 
     let check = RetainedEarningsReconciliation {
         retained_earnings_node: NodeId::new("retained_earnings"),
@@ -427,11 +429,13 @@ fn nan_core_input_warns_and_skips() {
 
     let mut evaluator = Evaluator::new();
     let mut results = evaluator.evaluate(&model).unwrap();
-    results
-        .nodes
-        .entry("retained_earnings".to_string())
-        .or_default()
-        .insert(q(1), f64::NAN);
+    results.set_cell(
+        "retained_earnings",
+        q(1),
+        finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
+    );
 
     let check = RetainedEarningsReconciliation {
         retained_earnings_node: NodeId::new("retained_earnings"),

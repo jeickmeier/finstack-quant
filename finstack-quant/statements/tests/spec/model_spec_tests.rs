@@ -208,13 +208,13 @@ fn test_results_get_or() {
     let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
 
     // Existing value
-    assert_eq!(results.get_or("revenue", &q1, 0.0), 100.0);
+    assert_eq!(results.get("revenue", &q1), Some(100.0));
 
-    // Missing value - use default
-    assert_eq!(results.get_or("revenue", &q2, 0.0), 0.0);
+    // A cell without a value has no numeric view
+    assert_eq!(results.get("revenue", &q2), None);
 
-    // Missing node - use default
-    assert_eq!(results.get_or("nonexistent", &q1, -1.0), -1.0);
+    // Neither does an absent node
+    assert_eq!(results.get("nonexistent", &q1), None);
 }
 
 // FinancialModelSpec Metadata Tests
@@ -282,8 +282,7 @@ fn test_where_clause_masking() {
                 "bonus",
                 &PeriodId::quarter(2025, 1).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
 
     // Q2: revenue > 1M, bonus should be calculated
@@ -304,8 +303,7 @@ fn test_where_clause_masking() {
                 "bonus",
                 &PeriodId::quarter(2025, 3).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
 
     // Q4: revenue > 1M, bonus should be calculated
@@ -370,8 +368,7 @@ fn test_where_clause_with_complex_condition() {
                 "incentive",
                 &PeriodId::quarter(2025, 1).expect("valid period fixture")
             )
-            .unwrap()
-            .is_nan()
+            .is_none()
     );
 
     // Q2: revenue > 100k AND margin > 0.15 - should be calculated

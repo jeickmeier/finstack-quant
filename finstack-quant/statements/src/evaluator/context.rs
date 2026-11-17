@@ -370,26 +370,22 @@ impl EvaluationContext {
         }
     }
 
-    /// Recorded evaluation layers for the current period, keyed by node id.
-    pub(crate) fn cell_sources(&self) -> IndexMap<String, super::CellSource> {
-        self.node_to_column
-            .iter()
-            .filter_map(|(node_id, idx)| {
-                self.current_sources[*idx].map(|source| (node_id.as_str().to_string(), source))
-            })
-            .collect()
-    }
-
-    /// Get all results as a map.
+    /// The period's published cells, with their value sources, and the
+    /// warnings raised while evaluating it.
     ///
-    /// Only includes nodes that have been evaluated (Some value).
-    /// Nodes with None are skipped (should not happen in valid evaluation).
-    pub(crate) fn into_results(self) -> (IndexMap<String, f64>, Vec<EvalWarning>) {
+    /// A value set outside the precedence loop becomes a scalar value cell,
+    /// or a missing cell when it is not finite.
+    pub(crate) fn into_results(self) -> (IndexMap<String, super::ResultCell>, Vec<EvalWarning>) {
         let mut results = IndexMap::new();
         for (node_id, idx) in self.node_to_column.iter() {
-            if let Some(value) = self.current_values[*idx] {
-                results.insert(node_id.as_str().to_string(), value);
-            }
+            let cell = match (self.current_cells[*idx], self.current_values[*idx]) {
+                (Some(cell), _) => super::ResultCell::from_cell(cell, self.current_sources[*idx]),
+                (None, Some(value)) => super::ResultCell::scalar(value).unwrap_or_else(|_| {
+                    super::ResultCell::without_value(super::CellStatus::Missing)
+                }),
+                (None, None) => continue,
+            };
+            results.insert(node_id.as_str().to_string(), cell);
         }
         (results, self.warnings)
     }

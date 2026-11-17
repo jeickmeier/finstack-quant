@@ -376,11 +376,13 @@ fn dividends_nan_operand_warns_and_skips() {
 
     let mut ev = Evaluator::new();
     let mut results = ev.evaluate(&model).unwrap();
-    results
-        .nodes
-        .entry("div_eq".to_string())
-        .or_default()
-        .insert(q(1), f64::NAN);
+    results.set_cell(
+        "div_eq",
+        q(1),
+        finstack_quant_statements::evaluator::ResultCell::unavailable(
+            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
+        ),
+    );
 
     let check = DividendReconciliation {
         dividends_cf_node: NodeId::new("div_cf"),

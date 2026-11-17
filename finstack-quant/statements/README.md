@@ -271,9 +271,12 @@ folds the adjusted series back into a `StatementResult` as a new node.
 
 ## Results and export
 
-`StatementResult` holds `nodes: node_id → period_id → f64`, plus
-`periods` (the periods `nodes` is keyed by), `monetary_nodes` for
-`Money`-typed nodes, `node_value_types`, optional
+`StatementResult` holds `cells: node_id → period_id → ResultCell`, the typed
+result: a cell has a `status` (`value`, `missing`, `masked`, `unavailable`), a
+finite scalar or exact `Money` when it is a value, a `reason` when it is
+unavailable, and the value `source` that was selected. It also holds `periods`
+(the plan `cells` is keyed by), `node_value_types`, `provenance` (model id and
+content hash, source snapshot, observation cutoff, valuation date, run id), optional
 `cs_cashflows`, an optional `check_report`, and `meta: EvalStats` (timings,
 graph size, numeric mode, parallel flag, warnings). Accessors: `get`,
 `get_money`, `get_scalar`, `get_node`, `get_or`, `all_periods`.
@@ -293,9 +296,9 @@ Tabular export returns `finstack_quant_core::table::TableEnvelope`:
 
 | Method | Schema |
 |--------|--------|
-| `to_table_long()` | `(node_id, period_id, value, value_money, currency, value_type)` |
+| `to_table_long()` | Exact: `(node_id, period_id, status, value, amount, currency, value_type, reason, source)`, one row per node and plan period |
 | `to_table_long_filtered(&["a", "b"])` | Same, restricted to named nodes; unknown ids are ignored |
-| `to_table_wide()` | `(period_id, <node1>, <node2>, …)`, one row per period |
+| `to_table_wide()` | Approximate numeric view: `(period_id, <node1>, <node2>, …)`, one row per plan period, null for a cell without a value, units in column metadata |
 
 Wide export encodes missing node-period observations as `NaN`, not zero, so
 absence stays distinguishable from an evaluated zero. Long export preserves
@@ -320,8 +323,9 @@ structure is rejected in Monte Carlo mode; run instrument-level Monte Carlo in
 
 ## Conventions that bite
 
-- **Numerics.** Node results are `f64`. `Money` appears in `monetary_nodes` and
-  in capital-structure cashflows; `NodeValueType` records whether a node is
+- **Numerics.** A scalar node's value cells are finite `f64`; a monetary
+  node's are exact `Money`, as are capital-structure cashflows. A cell without
+  a value is never a zero or a `NaN`. `NodeValueType` records whether a node is
   `Monetary { currency }` or `Scalar`. See [INVARIANTS.md](../../INVARIANTS.md) §1.
 - **Rates and ratios.** Decimal form throughout: a `GrowthPct` `rate` of `0.05`
   is 5%; a leverage metric of `4.5` is 4.5x.

@@ -15,14 +15,8 @@ fn test_results_serialization() {
     let mut results = StatementResult::new();
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
-    results.nodes.insert(
-        "revenue".to_string(),
-        [(period, 100_000.0)].into_iter().collect(),
-    );
-    results.nodes.insert(
-        "cogs".to_string(),
-        [(period, 60_000.0)].into_iter().collect(),
-    );
+    results.set_scalar("revenue", period, 100_000.0).unwrap();
+    results.set_scalar("cogs", period, 60_000.0).unwrap();
 
     results.meta = EvalStats {
         eval_time_ms: Some(42),
@@ -450,7 +444,7 @@ fn test_empty_results_serialization() {
     let deserialized: StatementResult =
         serde_json::from_str(&json).expect("Failed to deserialize empty StatementResult");
 
-    assert_eq!(deserialized.nodes.len(), 0);
+    assert_eq!(deserialized.cells.len(), 0);
     assert_eq!(deserialized.meta.num_nodes, 0);
     assert_eq!(deserialized.meta.num_periods, 0);
     assert_eq!(deserialized.meta.eval_time_ms, None);
@@ -462,10 +456,7 @@ fn test_results_to_json_file() {
     let mut results = StatementResult::new();
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
 
-    results.nodes.insert(
-        "revenue".to_string(),
-        [(period, 100_000.0)].into_iter().collect(),
-    );
+    results.set_scalar("revenue", period, 100_000.0).unwrap();
 
     // Serialize to JSON string
     let json = serde_json::to_string_pretty(&results).expect("Failed to serialize");

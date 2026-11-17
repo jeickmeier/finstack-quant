@@ -80,10 +80,17 @@ fn e2e_statements_to_real_estate_asset_cashflows_prices() {
     let mut eval = Evaluator::new();
     let results = eval.evaluate(&model).expect("evaluate");
 
-    let noi_sched = node_to_dated_schedule(&model, &results, "noi", PeriodDateConvention::End)
-        .expect("noi sched");
-    let capex_sched = node_to_dated_schedule(&model, &results, "capex", PeriodDateConvention::End)
-        .expect("capex sched");
+    // Both nodes are scalar magnitudes in every period; the asset negates
+    // CapEx itself. A gap would fail here rather than shorten the schedule.
+    let schedule = |node: &str| -> Vec<_> {
+        node_to_dated_schedule(&results, node, PeriodDateConvention::End)
+            .expect("dated schedule")
+            .into_iter()
+            .map(|row| (row.date, row.cell.numeric().expect("value in every period")))
+            .collect()
+    };
+    let noi_sched = schedule("noi");
+    let capex_sched = schedule("capex");
 
     // RealEstateAsset uses date-based schedules.
     let asset = RealEstateAsset::builder()

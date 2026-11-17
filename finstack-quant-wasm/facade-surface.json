@@ -3950,6 +3950,7 @@
       "monteCarloBreachProbability",
       "monteCarloPercentileByPeriod",
       "nodeToDatedSchedule",
+      "nodeToPricingFlows",
       "normalizationConfigAddAdjustment",
       "normalize",
       "parseAndCompile",
@@ -3958,6 +3959,7 @@
       "schema",
       "statementResultAllPeriods",
       "statementResultGet",
+      "statementResultGetCell",
       "statementResultGetMoney",
       "statementResultGetNode",
       "statementResultGetOr",
@@ -4067,6 +4069,9 @@
   "statements.nodeToDatedSchedule": {
     "kind": "function"
   },
+  "statements.nodeToPricingFlows": {
+    "kind": "function"
+  },
   "statements.monteCarloBreachProbability": {
     "kind": "function"
   },
@@ -4092,6 +4097,9 @@
     "kind": "function"
   },
   "statements.statementResultGetMoney": {
+    "kind": "function"
+  },
+  "statements.statementResultGetCell": {
     "kind": "function"
   },
   "statements.statementResultGetScalar": {

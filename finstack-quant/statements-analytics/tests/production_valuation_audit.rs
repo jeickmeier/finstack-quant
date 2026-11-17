@@ -152,11 +152,10 @@ fn credit_reports_reject_contradictory_numeric_and_monetary_values() {
             .leverage_ratio,
         Some(5.0)
     );
-    results
-        .nodes
-        .get_mut("ebitda")
-        .unwrap()
-        .insert(period, 1_000.0);
+    results.cells.get_mut("ebitda").unwrap().insert(
+        period,
+        finstack_quant_statements::evaluator::ResultCell::scalar(1_000.0).expect("finite"),
+    );
     assert_eq!(
         CreditAssessment::compute(&results, period)
             .unwrap()
@@ -164,16 +163,11 @@ fn credit_reports_reject_contradictory_numeric_and_monetary_values() {
         None
     );
     let precise = Money::from_decimal_str("100.12345", Currency::USD).unwrap();
-    results
-        .monetary_nodes
-        .get_mut("ebitda")
-        .unwrap()
-        .insert(period, precise);
-    results
-        .nodes
-        .get_mut("ebitda")
-        .unwrap()
-        .insert(period, precise.amount());
+    results.set_cell(
+        "ebitda",
+        period,
+        finstack_quant_statements::evaluator::ResultCell::money(precise),
+    );
     assert_eq!(
         CreditAssessment::compute(&results, period)
             .unwrap()
@@ -211,11 +205,14 @@ fn working_capital_rejects_currency_change_without_metadata() {
     };
     let mut results = Evaluator::new().evaluate(&model).unwrap();
     results.node_value_types.clear();
-    results
-        .monetary_nodes
-        .get_mut("assets")
-        .unwrap()
-        .insert(first, Money::from((100_i64, Currency::EUR)));
+    results.set_cell(
+        "assets",
+        first,
+        finstack_quant_statements::evaluator::ResultCell::money(Money::from((
+            100_i64,
+            Currency::EUR,
+        ))),
+    );
     let context = CheckContext::new(&model, &results);
     let error = WorkingCapitalConsistency {
         wc_change_cf_node: "wc".into(),
