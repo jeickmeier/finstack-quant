@@ -1868,7 +1868,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-model.json",
-      "sha256": "a55fbd0ff2733ea3298f9107f753ec43625db27e39c909abdb741cd2dae10945"
+      "sha256": "c0adfbdb14e41168356f54a9e4d3f55c721b51b6a1d9423ef3de84e506fe5fd6"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-checks.json",
@@ -1876,7 +1876,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-result.json",
-      "sha256": "988562f65f1773d5292dbe7dd74811604534197b324cd2f2fbc4adc24c754e6b"
+      "sha256": "ef2275cc03edd155f9bf81f680ebdb4b51b8952a2f74546708b61e215ecbc053"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-check-report.json",
@@ -1916,7 +1916,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity.json",
-      "sha256": "284f5bd933c8187b2d3328b29a47a29f4cd8d208209e4074006c6e8fb2de226a"
+      "sha256": "6bba6fb5a33980b13212c33c65c8c2dbba1cfab1d380a087724fba450b0a2493"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-goal-seek-run.json",
@@ -1956,15 +1956,15 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q2.json",
-      "sha256": "2bd6a653f144141a15df583c36ae8c249b97e44c770c5b6bf05e62859ec66012"
+      "sha256": "e419e5661d26a216145dffd8041979b2fb5fad34f034e0119a6be93cd73262cb"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q3.json",
-      "sha256": "e5d86ab722794c569135d146079aee634126c54e4ad32930bc6b670f02849842"
+      "sha256": "f1504967c897786d11d6217848e06364c6ea1c5356f9f7e34506185dcec50187"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q4.json",
-      "sha256": "05eb74260e4378f9c1b2685fc184c87374b57e3951387a0348434da99b94a441"
+      "sha256": "a472eee93fee26e710f41e02d3133a23fb7802855c1afec7b0f4815b664c46ae"
     },
     {
       "path": "finstack-quant-ui/tests/statements/wacc/cases.json",
@@ -1976,7 +1976,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/capital-structure/cases.json",
-      "sha256": "67e8ab07599b60fd669846416523c1375d3ad9a762bb4255a0b78b8804615ff2"
+      "sha256": "a58a2af7f980c41975130c7a938fc113beb5d09104a30f8b03314f9815318343"
     },
     {
       "path": "finstack-quant-ui/tests/statements/relative-value/cases.json",

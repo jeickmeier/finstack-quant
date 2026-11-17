@@ -94,7 +94,7 @@ impl CheckSuite {
         results: &StatementResult,
     ) -> Result<CheckReport> {
         self.config.validate()?;
-        verify_supplied_results(model, results, None)?;
+        results.verified_run_of(model, None)?;
         let context = CheckContext {
             model,
             results,
@@ -198,7 +198,7 @@ impl CheckSuite {
     ) -> Result<CheckReport> {
         match results {
             Some(results) => {
-                verify_supplied_results(model, results, Some(observation_cutoff))?;
+                results.verified_run_of(model, Some(observation_cutoff))?;
                 self.run(model, results)
             }
             None => {
@@ -307,49 +307,6 @@ fn unique_check_ids(suite: &str, checks: &[Box<dyn Check>]) -> Result<()> {
                 check.id()
             )));
         }
-    }
-    Ok(())
-}
-
-/// Accept supplied results only as a verified run of `model`.
-///
-/// The results must record provenance, and that provenance must be the one
-/// an evaluation of this model content, source snapshot and period plan
-/// produces under its recorded cutoff and valuation date, and under the
-/// requested cutoff when one is given.
-fn verify_supplied_results(
-    model: &FinancialModelSpec,
-    results: &StatementResult,
-    requested: Option<&ObservationCutoff>,
-) -> Result<()> {
-    let mismatch = |what: &str| {
-        crate::Error::invalid_input(format!(
-            "supplied results are not a verified run of model '{}': {what}. Evaluate the \
-             model, or pass no results to have it evaluated",
-            model.id
-        ))
-    };
-    let provenance = results
-        .provenance
-        .as_ref()
-        .ok_or_else(|| mismatch("they record no provenance"))?;
-    if requested.is_some_and(|cutoff| *cutoff != provenance.observation_cutoff) {
-        return Err(mismatch(
-            "their observation cutoff is not the requested one",
-        ));
-    }
-    let expected = crate::evaluator::RunProvenance::for_run(
-        model,
-        provenance.observation_cutoff,
-        provenance.valuation_date,
-    )?;
-    if expected != *provenance {
-        return Err(mismatch(
-            "their model content, source snapshot or run identity differs",
-        ));
-    }
-    if results.periods.as_ref() != Some(&model.periods) {
-        return Err(mismatch("their period plan differs"));
     }
     Ok(())
 }

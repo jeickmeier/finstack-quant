@@ -100,6 +100,9 @@ fn annual_spec() -> RollupSpec {
     RollupSpec {
         frequency: PeriodKind::Annual,
         methods: IndexMap::from([
+            ("revenue".to_string(), RollupMethod::Sum),
+            ("opex".to_string(), RollupMethod::Sum),
+            ("ebitda".to_string(), RollupMethod::Sum),
             ("cash".to_string(), RollupMethod::PeriodEnd),
             ("debt".to_string(), RollupMethod::PeriodEnd),
             ("ltm_ebitda".to_string(), RollupMethod::PeriodEnd),
@@ -130,7 +133,7 @@ fn declared_model() -> FinancialModelSpec {
         model_builder.value("revenue", &values([100.0, 110.0, 120.0, 130.0]));
         model_builder.value("cash", &values([10.0, 20.0, 30.0, 40.0]));
         model_builder.value("debt_draws", &values([1.0, 2.0, 3.0, 4.0]));
-        // Tagged like a balance, declaring nothing: it must still sum.
+        // Tagged like a balance and declared a flow: the declaration decides.
         model_builder.value("tagged_balance", &values([1.0, 1.0, 1.0, 1.0]));
         model_builder
             .compute("ebitda", "revenue * 0.25")
@@ -138,7 +141,7 @@ fn declared_model() -> FinancialModelSpec {
         model_builder
             .compute("margin", "ebitda / revenue")
             .expect("valid formula");
-        // Tagged like a ratio, declaring nothing: it must still sum.
+        // Tagged like a ratio and declared a flow: the declaration decides.
         model_builder
             .compute("tagged_ratio", "cash / revenue")
             .expect("valid formula");
@@ -152,6 +155,10 @@ fn declared_model() -> FinancialModelSpec {
         ("total_debt", RollupMethod::PeriodEnd),
         ("margin", RollupMethod::Formula),
         ("debt_draws", RollupMethod::Sum),
+        ("revenue", RollupMethod::Sum),
+        ("ebitda", RollupMethod::Sum),
+        ("tagged_balance", RollupMethod::Sum),
+        ("tagged_ratio", RollupMethod::Sum),
     ] {
         model.get_node_mut(node).expect("node").rollup = Some(method);
     }
@@ -226,6 +233,9 @@ fn lines_built_through_the_builder_roll_up_with_their_declared_method() {
     let mut builder = ModelBuilder::new("builder-declared");
     builder.periods("2024Q1..Q4", None).expect("valid periods");
     builder.value("flow", &scalars);
+    builder
+        .rollup("flow", RollupMethod::Sum)
+        .expect("known node");
     builder.value("balance", &scalars);
     builder
         .rollup("balance", RollupMethod::PeriodEnd)
@@ -240,6 +250,7 @@ fn lines_built_through_the_builder_roll_up_with_their_declared_method() {
     let builder = mixed.build().expect("mixed node");
     let mut mixed = builder.mixed("mixed_flow");
     mixed.values(&scalars);
+    mixed.rollup(RollupMethod::Sum);
     let model = mixed
         .build()
         .expect("mixed node")
@@ -271,7 +282,7 @@ fn a_rollup_declared_on_an_unknown_node_is_an_error_naming_it() {
 }
 
 #[test]
-fn a_line_declaring_nothing_sums_whatever_its_tags_say() {
+fn a_declared_sum_sums_whatever_the_tags_say() {
     let model = declared_model();
     let quarterly = Evaluator::new().evaluate(&model).expect("evaluation");
     let annual = quarterly
@@ -311,7 +322,7 @@ fn a_spec_entry_overrides_the_declared_method() {
 }
 
 #[test]
-fn declared_methods_lists_only_declared_lines_and_ignores_tags() {
+fn declared_methods_lists_the_declared_lines() {
     let spec = RollupSpec::declared_methods(&declared_model(), PeriodKind::Annual);
     assert_eq!(spec.frequency, PeriodKind::Annual);
     assert_eq!(
@@ -321,6 +332,10 @@ fn declared_methods_lists_only_declared_lines_and_ignores_tags() {
             ("debt_draws".to_string(), RollupMethod::Sum),
             ("margin".to_string(), RollupMethod::Formula),
             ("total_debt".to_string(), RollupMethod::PeriodEnd),
+            ("revenue".to_string(), RollupMethod::Sum),
+            ("ebitda".to_string(), RollupMethod::Sum),
+            ("tagged_balance".to_string(), RollupMethod::Sum),
+            ("tagged_ratio".to_string(), RollupMethod::Sum),
         ])
     );
 }
@@ -426,7 +441,7 @@ fn quarterly_results_roll_up_to_annual_flows_balances_and_ratios() {
         PeriodId::annual(2025).expect("valid annual period"),
     );
 
-    // Flows sum, including formula flows left at the default.
+    // Flows sum, including formula flows.
     close(annual.get("revenue", &y2024), 460.0);
     close(annual.get("revenue", &y2025), 620.0);
     close(annual.get("ebitda", &y2024), 200.0);
@@ -489,6 +504,23 @@ fn quarterly_results_roll_up_to_annual_flows_balances_and_ratios() {
         "a rolled-up cell has no single value source"
     );
     assert!(annual.cs_cashflows.is_none());
+
+    // The rolled result is linked to its source run, methods and periods.
+    assert!(annual.provenance.is_none(), "a rollup is not a run");
+    let provenance = annual
+        .rollup_provenance
+        .as_ref()
+        .expect("rollup provenance");
+    assert_eq!(Some(&provenance.source_run), quarterly.provenance.as_ref());
+    assert_eq!(provenance.frequency, PeriodKind::Annual);
+    assert_eq!(provenance.methods["revenue"], RollupMethod::Sum);
+    assert_eq!(provenance.methods["cash"], RollupMethod::PeriodEnd);
+    assert_eq!(provenance.methods.len(), model.nodes.len());
+    assert_eq!(
+        provenance.source_periods[&y2025],
+        (1..=4).map(|quarter| q(2025, quarter)).collect::<Vec<_>>()
+    );
+    assert!(quarterly.rollup_provenance.is_none());
 }
 
 #[test]
@@ -516,7 +548,7 @@ fn monthly_results_roll_up_to_quarters() {
             &model,
             &RollupSpec {
                 frequency: PeriodKind::Quarterly,
-                methods: IndexMap::new(),
+                methods: IndexMap::from([("sales".to_string(), RollupMethod::Sum)]),
             },
         )
         .expect("quarterly rollup");
@@ -556,7 +588,7 @@ fn fiscal_quarters_roll_up_to_fiscal_years_and_halves() {
             &model,
             &RollupSpec {
                 frequency: PeriodKind::Annual,
-                methods: IndexMap::new(),
+                methods: IndexMap::from([("x".to_string(), RollupMethod::Sum)]),
             },
         )
         .expect("fiscal annual rollup");
@@ -569,7 +601,7 @@ fn fiscal_quarters_roll_up_to_fiscal_years_and_halves() {
             &model,
             &RollupSpec {
                 frequency: PeriodKind::SemiAnnual,
-                methods: IndexMap::new(),
+                methods: IndexMap::from([("x".to_string(), RollupMethod::Sum)]),
             },
         )
         .expect("fiscal half-year rollup");
@@ -659,6 +691,11 @@ fn bundled_ratio_metrics_roll_up_as_ratios() {
         builder.value("amortization", &series([1.0; 4]));
         builder.value("total_debt", &series([400.0, 410.0, 420.0, 460.0]));
         builder.value("total_equity", &series([200.0, 205.0, 210.0, 230.0]));
+        for flow in ["revenue", "cogs", "opex", "depreciation", "amortization"] {
+            builder
+                .rollup(flow, RollupMethod::Sum)
+                .expect("declared flow");
+        }
         for balance in ["total_debt", "total_equity"] {
             builder
                 .rollup(balance, RollupMethod::PeriodEnd)
@@ -689,16 +726,21 @@ fn bundled_ratio_metrics_roll_up_as_ratios() {
     close(annual.get("fin.debt_to_ebitda", &year), 460.0 / 112.0);
 }
 
-/// Every bundled metric that is not a currency flow declares how it rolls up.
+/// Every bundled metric declares how it rolls up: currency flows sum and
+/// every other metric is recomputed.
 #[test]
-fn every_bundled_ratio_metric_declares_a_rollup_method() {
+fn every_bundled_metric_declares_a_rollup_method() {
     use finstack_quant_statements::registry::{Registry, UnitType};
     let registry = Registry::with_builtins().expect("built-in metrics");
     let mut ratios = 0;
     for (id, metric) in registry.all_metrics() {
         let definition = &metric.definition;
         if definition.unit_type == Some(UnitType::Currency) {
-            assert_eq!(definition.rollup, None, "{id} is a flow and sums");
+            assert_eq!(
+                definition.rollup,
+                Some(RollupMethod::Sum),
+                "{id} is a flow and declares sum"
+            );
         } else {
             ratios += 1;
             assert_eq!(
@@ -709,4 +751,256 @@ fn every_bundled_ratio_metric_declares_a_rollup_method() {
         }
     }
     assert_eq!(ratios, 16);
+}
+
+// Explicit methods, typed accumulation and provenance (STATEMENTS-EVALUATION-014)
+
+use finstack_quant_core::money::Money;
+use finstack_quant_statements::evaluator::{CellStatus, StatementResult, UnavailableReason};
+
+fn h1() -> PeriodId {
+    "2025H1".parse().expect("half-year id")
+}
+
+fn half_year_spec() -> RollupSpec {
+    RollupSpec {
+        frequency: PeriodKind::SemiAnnual,
+        methods: IndexMap::new(),
+    }
+}
+
+/// The record's example: two quarters of revenue, profit and closing cash in
+/// USD and a margin, each declaring its method. `revenue` holds the quarters
+/// given.
+fn half_year(revenue: &[(u8, f64)]) -> (FinancialModelSpec, StatementResult) {
+    let quarter = |values: &[(u8, f64)]| {
+        usd(&values
+            .iter()
+            .map(|(quarter, value)| (q(2025, *quarter), *value))
+            .collect::<Vec<_>>())
+    };
+    let mut builder = ModelBuilder::new("half-year");
+    builder.periods("2025Q1..Q2", None).expect("valid periods");
+    builder.value("revenue", &quarter(revenue));
+    builder.value("profit", &quarter(&[(1, 20.0), (2, 30.0)]));
+    builder.value("cash", &quarter(&[(1, 40.0), (2, 50.0)]));
+    builder
+        .compute("margin", "profit / revenue")
+        .expect("valid formula");
+    for (node, method) in [
+        ("revenue", RollupMethod::Sum),
+        ("profit", RollupMethod::Sum),
+        ("cash", RollupMethod::PeriodEnd),
+        ("margin", RollupMethod::Formula),
+    ] {
+        builder.rollup(node, method).expect("known node");
+    }
+    let model = builder.build().expect("valid model");
+    let results = Evaluator::new().evaluate(&model).expect("evaluation");
+    (model, results)
+}
+
+fn usd_amount(text: &str) -> Money {
+    Money::from_decimal_str(text, Currency::USD).expect("amount")
+}
+
+#[test]
+fn the_half_year_example_sums_flows_copies_the_close_and_recomputes_the_margin() {
+    let (model, quarterly) = half_year(&[(1, 100.0), (2, 300.0)]);
+    let half = quarterly
+        .rollup(&model, &half_year_spec())
+        .expect("half-year rollup");
+
+    assert_eq!(half.get_money("revenue", &h1()), Some(usd_amount("400")));
+    assert_eq!(half.get_money("profit", &h1()), Some(usd_amount("50")));
+    assert_eq!(half.get_money("cash", &h1()), Some(usd_amount("50")));
+    assert_eq!(half.get("margin", &h1()), Some(0.125));
+    assert_eq!(
+        half.rollup_provenance
+            .as_ref()
+            .expect("provenance")
+            .source_periods[&h1()],
+        [q(2025, 1), q(2025, 2)]
+    );
+}
+
+#[test]
+fn an_absent_flow_leaves_the_sum_and_the_ratio_unavailable_but_not_the_close() {
+    let (model, quarterly) = half_year(&[(1, 100.0)]);
+    let half = quarterly
+        .rollup(&model, &half_year_spec())
+        .expect("half-year rollup");
+
+    for node in ["revenue", "margin"] {
+        let cell = half.get_cell(node, &h1()).expect("cell");
+        assert_eq!(cell.status, CellStatus::Unavailable, "{node}");
+        assert_eq!(cell.reason, Some(UnavailableReason::MissingInput), "{node}");
+        assert_eq!(half.get(node, &h1()), None);
+    }
+    assert_eq!(half.get_money("profit", &h1()), Some(usd_amount("50")));
+    assert_eq!(half.get_money("cash", &h1()), Some(usd_amount("50")));
+}
+
+#[test]
+fn a_node_with_no_method_fails_the_rollup_naming_it() {
+    let (mut model, _) = half_year(&[(1, 100.0), (2, 300.0)]);
+    for node in ["revenue", "cash"] {
+        model.get_node_mut(node).expect("node").rollup = None;
+    }
+    let quarterly = Evaluator::new().evaluate(&model).expect("evaluation");
+
+    let error = quarterly
+        .rollup(&model, &half_year_spec())
+        .expect_err("nothing is summed by default")
+        .to_string();
+    assert!(error.contains("revenue, cash"), "{error}");
+    assert!(error.contains("no rollup method"), "{error}");
+
+    // The request can supply the missing methods.
+    let mut spec = half_year_spec();
+    spec.methods.insert("revenue".into(), RollupMethod::Sum);
+    spec.methods.insert("cash".into(), RollupMethod::PeriodEnd);
+    let half = quarterly
+        .rollup(&model, &spec)
+        .expect("resolved by request");
+    assert_eq!(half.get_money("revenue", &h1()), Some(usd_amount("400")));
+}
+
+#[test]
+fn results_of_another_model_or_without_a_run_are_rejected() {
+    let (model, quarterly) = half_year(&[(1, 100.0), (2, 300.0)]);
+    let (other, _) = half_year(&[(1, 100.0), (2, 301.0)]);
+    let error = quarterly
+        .rollup(&other, &half_year_spec())
+        .expect_err("another model's results")
+        .to_string();
+    assert!(error.contains("not a verified run"), "{error}");
+
+    let mut hand_built = quarterly.clone();
+    hand_built.provenance = None;
+    assert!(hand_built.rollup(&model, &half_year_spec()).is_err());
+
+    // A rolled result is not a run and cannot be rolled again.
+    let half = quarterly.rollup(&model, &half_year_spec()).expect("rollup");
+    let annual = RollupSpec {
+        frequency: PeriodKind::Annual,
+        methods: IndexMap::new(),
+    };
+    assert!(half.rollup(&model, &annual).is_err());
+}
+
+fn scalar_year(
+    values: [f64; 4],
+    configure: impl FnOnce(&mut ModelBuilder),
+) -> (FinancialModelSpec, StatementResult) {
+    let series: Vec<(PeriodId, f64)> = (1..=4_u8)
+        .zip(values)
+        .map(|(i, v)| (q(2025, i), v))
+        .collect();
+    let mut builder = ModelBuilder::new("scalar-year");
+    builder.periods("2025Q1..Q4", None).expect("valid periods");
+    builder.value_scalar("x", &series);
+    builder.rollup("x", RollupMethod::Sum).expect("known node");
+    configure(&mut builder);
+    let model = builder.build().expect("valid model");
+    let results = Evaluator::new().evaluate(&model).expect("evaluation");
+    (model, results)
+}
+
+#[test]
+fn a_scalar_sum_is_compensated_money_is_exact_and_an_overflow_is_an_error() {
+    let year = PeriodId::annual(2025).expect("valid annual period");
+    // Ordinary summation loses both units: 1e16 + 1 + 1 - 1e16 gives 0.
+    let (model, results) = scalar_year([1e16, 1.0, 1.0, -1e16], |_| {});
+    let annual = results
+        .rollup(&model, &empty_annual_spec())
+        .expect("rollup");
+    assert_eq!(annual.get("x", &year), Some(2.0));
+
+    let (model, results) = scalar_year([f64::MAX, f64::MAX, 0.0, 0.0], |_| {});
+    let error = results
+        .rollup(&model, &empty_annual_spec())
+        .expect_err("the sum cannot be represented")
+        .to_string();
+    assert!(error.contains("'x'") || error.contains("x"), "{error}");
+
+    // Money: ten cents and twenty cents are thirty cents, exactly.
+    let (model, quarterly) = half_year(&[(1, 0.1), (2, 0.2)]);
+    let half = quarterly
+        .rollup(&model, &half_year_spec())
+        .expect("half-year rollup");
+    assert_eq!(half.get_money("revenue", &h1()), Some(usd_amount("0.30")));
+}
+
+#[test]
+fn period_end_copies_the_status_of_the_final_cell() {
+    let year = PeriodId::annual(2025).expect("valid annual period");
+    let (model, results) = scalar_year([1.0, 2.0, 3.0, 4.0], |builder| {
+        // Masked in the fourth quarter only.
+        builder.compute("masked", "x").expect("formula");
+        builder.where_clause("masked", "x < 4").expect("mask");
+        builder
+            .rollup("masked", RollupMethod::PeriodEnd)
+            .expect("node");
+        // No change is defined before the first quarter, only after it.
+        builder.compute("early", "lag(x, 3)").expect("formula");
+        builder
+            .rollup("early", RollupMethod::PeriodEnd)
+            .expect("node");
+        builder.compute("late", "lag(x, 4)").expect("formula");
+        builder
+            .rollup("late", RollupMethod::PeriodEnd)
+            .expect("node");
+        // A mask re-evaluated on the rolled inputs: the year's x is 10.
+        builder.compute("ratio", "x / 2").expect("formula");
+        builder.where_clause("ratio", "x < 10").expect("mask");
+        builder
+            .rollup("ratio", RollupMethod::Formula)
+            .expect("node");
+    });
+    let annual = results
+        .rollup(&model, &empty_annual_spec())
+        .expect("rollup");
+    let status = |node: &str| annual.get_cell(node, &year).expect("cell").status;
+
+    assert_eq!(status("masked"), CellStatus::Masked);
+    assert_eq!(annual.get("early", &year), Some(1.0));
+    assert_eq!(status("late"), CellStatus::Unavailable);
+    // A false mask is a masked cell, never a zero.
+    assert_eq!(status("ratio"), CellStatus::Masked);
+    assert_eq!(annual.get("ratio", &year), None);
+}
+
+#[test]
+fn a_formula_invalid_at_the_target_cadence_is_an_error() {
+    let months: Vec<(PeriodId, f64)> = (1..=6)
+        .map(|m| (PeriodId::month(2025, m).expect("valid month"), f64::from(m)))
+        .collect();
+    let mut builder = ModelBuilder::new("cadence");
+    builder.periods("2025M1..M6", None).expect("valid periods");
+    builder.value_scalar("sales", &months);
+    builder.rollup("sales", RollupMethod::Sum).expect("node");
+    builder.compute("sales_qtd", "qtd(sales)").expect("formula");
+    builder
+        .rollup("sales_qtd", RollupMethod::Formula)
+        .expect("node");
+    let model = builder.build().expect("valid model");
+    let monthly = Evaluator::new().evaluate(&model).expect("evaluation");
+
+    let spec = RollupSpec {
+        frequency: PeriodKind::Quarterly,
+        methods: IndexMap::new(),
+    };
+    let error = monthly
+        .rollup(&model, &spec)
+        .expect_err("qtd is a monthly function")
+        .to_string();
+    assert!(error.contains("monthly"), "{error}");
+
+    // Copying the quarter-end value is the method for a to-date measure.
+    let mut spec = spec;
+    spec.methods
+        .insert("sales_qtd".into(), RollupMethod::PeriodEnd);
+    let quarterly = monthly.rollup(&model, &spec).expect("rollup");
+    assert_eq!(quarterly.get("sales_qtd", &q(2025, 1)), Some(6.0));
 }

@@ -16208,8 +16208,8 @@ export interface D_7B4Cd44901322286925A {
   node_type: "value" | "calculated" | "mixed";
   /**
    * How this line rolls up to a coarser reporting frequency. A rollup uses
-   * its own per-line method first, then this; a line declaring nothing is
-   * summed. Tags never choose a method.
+   * its own per-line method first, then this; a line with neither fails
+   * the rollup. Tags never choose a method.
    */
   rollup?: DFc17544530079D46D05E | null;
   /**

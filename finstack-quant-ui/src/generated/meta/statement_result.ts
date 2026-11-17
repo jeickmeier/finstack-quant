@@ -160,6 +160,47 @@ export default [
     "format": "date"
   },
   {
+    "path": "#/$defs/d_19e8b43df597ad5d55a2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind",
+    "description": "Period frequency type.\n\nDefines the frequency of periodic schedules (cashflow rolls, return-series\nresampling, statement reporting). Two different yearly counts exist:\n[`PeriodKind::annualization_factor`] is the conventional statistical\nfactor for explicitly selected observations (daily trading 252), and\n[`PeriodKind::slots_per_year`] is the calendar partition count, defined\nonly for the month-block kinds (record CORE-CONVENTIONS-014 #9).\n\nParses only the canonical snake_case wire values via [`std::str::FromStr`]:\n`daily`, `weekly`, `monthly`, `quarterly`, `semi_annual`, and `annual`.\nAliases, whitespace padding and case variants are rejected.\n\nOrdering follows [`PeriodKind::rank`] (daily through annual). It is a\ndeterministic key order, not a chronology."
+  },
+  {
+    "path": "#/$defs/d_19e8b43df597ad5d55a2/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind/oneOf/0",
+    "const": "daily",
+    "description": "Daily periods (252 trading days per year by convention)"
+  },
+  {
+    "path": "#/$defs/d_19e8b43df597ad5d55a2/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind/oneOf/1",
+    "const": "quarterly",
+    "description": "Quarterly periods (4 per year)"
+  },
+  {
+    "path": "#/$defs/d_19e8b43df597ad5d55a2/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind/oneOf/2",
+    "const": "monthly",
+    "description": "Monthly periods (12 per year)"
+  },
+  {
+    "path": "#/$defs/d_19e8b43df597ad5d55a2/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind/oneOf/3",
+    "const": "weekly",
+    "description": "Weekly periods (ISO 8601 week-year, typically 52 or 53 per year)"
+  },
+  {
+    "path": "#/$defs/d_19e8b43df597ad5d55a2/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind/oneOf/4",
+    "const": "semi_annual",
+    "description": "Semi-annual periods (2 per year)"
+  },
+  {
+    "path": "#/$defs/d_19e8b43df597ad5d55a2/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind/oneOf/5",
+    "const": "annual",
+    "description": "Annual periods (1 per year)"
+  },
+  {
     "path": "#/$defs/d_1b23dc87c71e8faf60d2",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance",
     "description": "What a result was evaluated from.\n\nA consumer that is handed a result checks this against the model, period\nplan and run it expects before trusting the cells."
@@ -1022,6 +1063,29 @@ export default [
     "path": "#/$defs/d_8b741636dd21d9f7ad3f/oneOf/1/properties/type",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NodeValueType/oneOf/1/properties/type",
     "const": "scalar"
+  },
+  {
+    "path": "#/$defs/d_8fc526d8a2276361b742",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupMethod",
+    "description": "How one node's values combine over the source periods of a target period."
+  },
+  {
+    "path": "#/$defs/d_8fc526d8a2276361b742/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupMethod/oneOf/0",
+    "const": "sum",
+    "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nMoney is summed exactly and scalars with a compensated sum. A source\ncell without a value leaves the target unavailable."
+  },
+  {
+    "path": "#/$defs/d_8fc526d8a2276361b742/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupMethod/oneOf/1",
+    "const": "period_end",
+    "description": "Copy the last source period's cell with its status: balances such as\ncash, debt and equity, and trailing metrics such as last-twelve-month\nEBITDA."
+  },
+  {
+    "path": "#/$defs/d_8fc526d8a2276361b742/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupMethod/oneOf/2",
+    "const": "formula",
+    "description": "Re-evaluate the node's formula (and `where` clause) on the rolled-up\nvalues: ratios such as margins, leverage and coverage. Time-series\nfunctions then run at the target frequency, so `lag(x, 1)` is the\nprior target period."
   },
   {
     "path": "#/$defs/d_9b3d87b6c4349df4e78d",
@@ -2441,6 +2505,51 @@ export default [
     "const": "principal_shortfall"
   },
   {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance",
+    "description": "How a rolled-up result was produced."
+  },
+  {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab/properties/frequency",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance/properties/frequency",
+    "description": "Target frequency of the rollup.",
+    "ref": "#/$defs/PeriodKind",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodKind"
+  },
+  {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab/properties/methods",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance/properties/methods",
+    "description": "The method used for every node, in model order: the request's entry\nwhere it had one, the node's declaration otherwise."
+  },
+  {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab/properties/methods/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance/properties/methods/additionalProperties",
+    "ref": "#/$defs/RollupMethod",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupMethod"
+  },
+  {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab/properties/source_periods",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance/properties/source_periods",
+    "description": "The source periods combined into each target period, in timeline\norder."
+  },
+  {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab/properties/source_periods/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance/properties/source_periods/additionalProperties"
+  },
+  {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab/properties/source_periods/additionalProperties/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance/properties/source_periods/additionalProperties/items",
+    "ref": "#/$defs/PeriodId",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodId"
+  },
+  {
+    "path": "#/$defs/d_e3cfd6d553de5f758bab/properties/source_run",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance/properties/source_run",
+    "description": "The evaluation run the source result came from. Its diagnostics,\ncheck report and capital-structure cashflows stay on that run, keyed\nby the source periods.",
+    "ref": "#/$defs/RunProvenance",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance"
+  },
+  {
     "path": "#/$defs/d_f0893f1d89ca5934871f",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckReport",
     "description": "Full report aggregating all [`CheckResult`]s from a check run."
@@ -2722,6 +2831,21 @@ export default [
   {
     "path": "#/properties/provenance/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/provenance/anyOf/1"
+  },
+  {
+    "path": "#/properties/rollup_provenance",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/rollup_provenance",
+    "description": "How a rolled-up result was produced: the source run, the method used\nfor each node and the source periods of each target period. `None`\nfor every result that [`rollup`](Self::rollup) did not produce."
+  },
+  {
+    "path": "#/properties/rollup_provenance/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/rollup_provenance/anyOf/0",
+    "ref": "#/$defs/RollupProvenance",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RollupProvenance"
+  },
+  {
+    "path": "#/properties/rollup_provenance/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/rollup_provenance/anyOf/1"
   },
   {
     "path": "#/properties/schema_version",

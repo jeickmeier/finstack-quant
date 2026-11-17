@@ -83,8 +83,8 @@ pub struct NodeSpec {
     pub value_type: Option<NodeValueType>,
 
     /// How this line rolls up to a coarser reporting frequency. A rollup uses
-    /// its own per-line method first, then this; a line declaring nothing is
-    /// summed. Tags never choose a method.
+    /// its own per-line method first, then this; a line with neither fails
+    /// the rollup. Tags never choose a method.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rollup: Option<RollupMethod>,
 
@@ -216,10 +216,12 @@ impl NodeSpec {
 #[serde(rename_all = "snake_case")]
 pub enum RollupMethod {
     /// Sum the source periods: flows such as revenue, expenses and cash flows.
-    /// A missing source value leaves the target value missing.
+    /// Money is summed exactly and scalars with a compensated sum. A source
+    /// cell without a value leaves the target unavailable.
     Sum,
-    /// Take the last source period's value: balances such as cash, debt and
-    /// equity, and trailing metrics such as last-twelve-month EBITDA.
+    /// Copy the last source period's cell with its status: balances such as
+    /// cash, debt and equity, and trailing metrics such as last-twelve-month
+    /// EBITDA.
     PeriodEnd,
     /// Re-evaluate the node's formula (and `where` clause) on the rolled-up
     /// values: ratios such as margins, leverage and coverage. Time-series

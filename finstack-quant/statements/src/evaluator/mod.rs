@@ -64,4 +64,4 @@ pub use results::{
     CapitalStructureClaimCategory, CapitalStructureWarning, CellSource, CellStatus, EvalStats,
     EvalWarning, ForecastStream, NumericMode, ResultCell, RunProvenance, StatementResult,
 };
-pub use rollup::RollupSpec;
+pub use rollup::{RollupProvenance, RollupSpec};

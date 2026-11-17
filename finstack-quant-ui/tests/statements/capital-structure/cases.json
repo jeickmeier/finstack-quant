@@ -1916,7 +1916,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           },
           "revenue_growth_qoq": {
             "node_id": "revenue_growth_qoq",
@@ -1960,7 +1961,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           },
           "gross_profit": {
             "node_id": "gross_profit",
@@ -1971,7 +1973,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           },
           "gross_margin_pct": {
             "node_id": "gross_margin_pct",
@@ -2020,7 +2023,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           },
           "ebitda": {
             "node_id": "ebitda",
@@ -2031,7 +2035,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           },
           "ebitda_margin_pct": {
             "node_id": "ebitda_margin_pct",
@@ -2080,7 +2085,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           },
           "ebit": {
             "node_id": "ebit",
@@ -2091,7 +2097,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           },
           "interest_expense": {
             "node_id": "interest_expense",
@@ -2102,7 +2109,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           },
           "pretax_income": {
             "node_id": "pretax_income",
@@ -2113,7 +2121,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           },
           "taxes": {
             "node_id": "taxes",
@@ -2124,7 +2133,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           },
           "net_income": {
             "node_id": "net_income",
@@ -2135,7 +2145,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           },
           "debt_at_inception": {
             "node_id": "debt_at_inception",
@@ -2222,7 +2233,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           },
           "debt_repayments": {
             "node_id": "debt_repayments",
@@ -2257,7 +2269,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           },
           "total_debt": {
             "node_id": "total_debt",
@@ -2362,7 +2375,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           },
           "free_cash_flow": {
             "node_id": "free_cash_flow",
@@ -2373,7 +2387,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           },
           "ufcf": {
             "node_id": "ufcf",
@@ -2384,7 +2399,8 @@
             "value_type": {
               "type": "monetary",
               "currency": "USD"
-            }
+            },
+            "rollup": "sum"
           }
         },
         "meta": {
@@ -4141,9 +4157,9 @@
         },
         "provenance": {
           "model_id": "ACME-SOFTWARE-3STMT",
-          "model_content_hash": "sha256:f81c5170afe8077200cde71205f5c011e6de668eabfb401d984ccbe9f71b825a",
+          "model_content_hash": "sha256:be5c97adf362f37fe7ccb5d2511a4a0bc0104d79ac6611c52e6683c2abbeb8de",
           "observation_cutoff": "full_snapshot",
-          "run_id": "sha256:4f864bce01edf7a39e97587b085883694696f0c838bfa91181af1e07a16212a8"
+          "run_id": "sha256:02052a6a02accdc45d005542dca5bf8c59edf47f2af7bd55797462af7a5fae5f"
         },
         "meta": {
           "num_nodes": 26,

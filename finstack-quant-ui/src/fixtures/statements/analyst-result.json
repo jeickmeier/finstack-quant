@@ -1745,9 +1745,9 @@
   },
   "provenance": {
     "model_id": "ACME-SOFTWARE-3STMT",
-    "model_content_hash": "sha256:206e9dee97013c97716f7e55ae641335f89fe7b211654fdcc6a38b5414239b5d",
+    "model_content_hash": "sha256:bf5cc381ea4b644301f79af53438eca8a130e7dc0e7da4b593bf97618c04625b",
     "observation_cutoff": "full_snapshot",
-    "run_id": "sha256:2098c19aed97d174b04565004163064f684cb724896046f2ab0718292f06581f"
+    "run_id": "sha256:fe3c1339c4c1cea17a38c25af2b4592bd86d9a8e971ffc4f60ecae3041a96b2c"
   },
   "cs_cashflows": {
     "by_instrument": {

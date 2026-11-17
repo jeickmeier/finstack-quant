@@ -1592,8 +1592,8 @@ class NodeSpec:
         rollup : str, optional
             How the line rolls up to a coarser frequency: ``"sum"`` (flows),
             ``"period_end"`` (balances, trailing metrics) or ``"formula"``
-            (ratios, which need a formula). Without it the line sums. A
-            :class:`RollupSpec` entry overrides it.
+            (ratios, which need a formula). Without it the line needs a
+            :class:`RollupSpec` entry, which also overrides it.
         meta : Mapping[str, Any], default {}
             Free-form JSON metadata.
 
@@ -1751,7 +1751,7 @@ class NodeSpec:
         -------
         str | None
             The declared method, or ``None`` when the line declares none and so
-            sums unless a :class:`RollupSpec` entry says otherwise.
+            needs a :class:`RollupSpec` entry to be rolled up.
 
         Raises
         ------

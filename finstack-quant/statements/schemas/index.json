@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
-      "bytes": 414432,
+      "bytes": 414516,
       "kind": "input",
       "path": "schemas/statements/1/financial_model_spec.schema.json",
       "summary": "Statement model graph: periods, nodes and the Value > Forecast > Formula precedence.",
@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
-      "bytes": 5807,
+      "bytes": 5912,
       "kind": "input",
       "path": "schemas/statements/1/metric_registry.schema.json",
       "summary": "Namespaced catalog of reusable metric definitions.",
@@ -56,7 +56,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/model_edit.schema.json",
-      "bytes": 58399,
+      "bytes": 58483,
       "kind": "input",
       "path": "schemas/statements/1/model_edit.schema.json",
       "summary": "One named change to a financial model, applied atomically with the others in its batch.",
@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
-      "bytes": 3958,
+      "bytes": 4046,
       "kind": "input",
       "path": "schemas/statements/1/rollup_spec.schema.json",
       "summary": "Target frequency and per-node methods for rolling statement results up to coarser periods.",
@@ -119,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
-      "bytes": 89490,
+      "bytes": 93980,
       "kind": "output",
       "path": "schemas/statements/1/statement_result.schema.json",
       "summary": "Evaluated node values per period, with policy stamps.",

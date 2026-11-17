@@ -434,6 +434,7 @@ test('builder lines roll up with their declared method under an empty spec', () 
   const builder = new statements.ModelBuilder('declared');
   builder.periods('2025Q1..Q4');
   builder.value('flow', quarters);
+  builder.rollup('flow', 'sum');
   builder.value('balance', quarters);
   builder.rollup('balance', 'period_end');
   assert.throws(

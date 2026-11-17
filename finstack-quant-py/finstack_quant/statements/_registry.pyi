@@ -277,7 +277,7 @@ class MetricDefinition:
         ``"formula"`` recomputes the metric from the rolled-up inputs (ratios
         and multiples), ``"period_end"`` takes the last source period and
         ``"sum"`` adds the source periods. ``None`` means the metric declares
-        nothing and follows the rollup default, which sums.
+        nothing and needs a method in the rollup request.
 
         Returns
         -------

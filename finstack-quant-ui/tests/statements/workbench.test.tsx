@@ -1227,8 +1227,9 @@ it("rolls reported quarters up to native annual values with editable methods", a
     leverage: "formula",
     ebitda_margin_pct: "formula",
   });
+  // Flows declare sum: nothing is summed by default.
   expect(JSON.parse(lastCall("rollupStatement").specJson).methods.revenue).toBe(
-    undefined,
+    "sum",
   );
   expect(lastCall("defaultRollupSpec")).toEqual({
     modelJson: canonicalModel(),
@@ -1254,7 +1255,7 @@ it("rolls reported quarters up to native annual values with editable methods", a
     "2024": 420_000_000,
     "2025": 420_000_000,
   });
-  // Draws carry no declaration, so they sum.
+  // Draws declare sum.
   expect(cellNumbers(rolled, "debt_draws")).toEqual({
     "2024": 40_000_000,
     "2025": 55_000_000,

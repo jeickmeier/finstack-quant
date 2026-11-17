@@ -77,6 +77,12 @@ pub struct StatementResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provenance: Option<RunProvenance>,
 
+    /// How a rolled-up result was produced: the source run, the method used
+    /// for each node and the source periods of each target period. `None`
+    /// for every result that [`rollup`](Self::rollup) did not produce.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rollup_provenance: Option<super::rollup::RollupProvenance>,
+
     /// Capital structure cashflows (populated when model has a capital_structure)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cs_cashflows: Option<crate::capital_structure::CapitalStructureCashflows>,
@@ -538,6 +544,7 @@ impl Default for StatementResult {
             cells: IndexMap::new(),
             node_value_types: IndexMap::new(),
             provenance: None,
+            rollup_provenance: None,
             cs_cashflows: None,
             check_report: None,
             meta: EvalStats::default(),
@@ -552,6 +559,47 @@ impl StatementResult {
     /// an evaluation.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// The provenance of these results once they are confirmed to be what an
+    /// evaluation of `model` produces: the same model content, source
+    /// snapshot, period plan and run identity under their recorded cutoff and
+    /// valuation date, and under `requested` when a cutoff is given.
+    pub(crate) fn verified_run_of(
+        &self,
+        model: &crate::types::FinancialModelSpec,
+        requested: Option<&super::ObservationCutoff>,
+    ) -> crate::error::Result<&RunProvenance> {
+        let mismatch = |what: &str| {
+            crate::error::Error::invalid_input(format!(
+                "supplied results are not a verified run of model '{}': {what}. Evaluate the \
+                 model, or pass no results to have it evaluated",
+                model.id
+            ))
+        };
+        let provenance = self
+            .provenance
+            .as_ref()
+            .ok_or_else(|| mismatch("they record no provenance"))?;
+        if requested.is_some_and(|cutoff| *cutoff != provenance.observation_cutoff) {
+            return Err(mismatch(
+                "their observation cutoff is not the requested one",
+            ));
+        }
+        let expected = RunProvenance::for_run(
+            model,
+            provenance.observation_cutoff,
+            provenance.valuation_date,
+        )?;
+        if expected != *provenance {
+            return Err(mismatch(
+                "their model content, source snapshot or run identity differs",
+            ));
+        }
+        if self.periods.as_ref() != Some(&model.periods) {
+            return Err(mismatch("their period plan differs"));
+        }
+        Ok(provenance)
     }
 
     /// The periods `nodes` is keyed by, in timeline order; empty for a
@@ -831,33 +879,6 @@ impl StatementResult {
                 )
             })
             .collect()
-    }
-
-    /// Give every scalar value cell of a monetary node its exact amount.
-    ///
-    /// # Errors
-    ///
-    /// Returns an evaluation error naming the node and period when a value
-    /// cannot be represented as `Money`.
-    pub(crate) fn retype_monetary_cells(&mut self) -> crate::error::Result<()> {
-        for (node_id, cells) in &mut self.cells {
-            let Some(NodeValueType::Monetary { currency }) = self.node_value_types.get(node_id)
-            else {
-                continue;
-            };
-            for (period_id, cell) in cells.iter_mut() {
-                if let Some(AmountOrScalar::Scalar(value)) = cell.value {
-                    let money = Money::from_model_value(value, *currency).map_err(|cause| {
-                        crate::error::Error::eval(format!(
-                            "Node '{node_id}' in period {period_id}: result {value} cannot be \
-                             represented as {currency} money: {cause}"
-                        ))
-                    })?;
-                    cell.value = Some(AmountOrScalar::Amount(money));
-                }
-            }
-        }
-        Ok(())
     }
 
     /// Record the resolved units of every evaluated node.

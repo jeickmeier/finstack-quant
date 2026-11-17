@@ -286,11 +286,17 @@ graph size, numeric mode, parallel flag, warnings). Accessors: `get`,
 `rollup(&model, &RollupSpec)` rolls results up to a coarser frequency
 (monthly or quarterly into quarterly, semi-annual or annual, or semi-annual into
 annual). Each line declares its method on the node (`NodeSpec::rollup`):
-`period_end` for balances and trailing metrics, `formula` for ratios, which
-re-evaluates the formula on the rolled-up values, and `sum` for flows. A line
-resolves as its entry in `RollupSpec::methods`, then its declaration, then
-`sum`; tags never choose a method. Every target period must be complete, and
-the result's `periods` are the targets, each actual only when every source is.
+`sum` for flows (exact money, a compensated scalar sum; a source cell without
+a value leaves the target unavailable), `period_end` for balances and trailing
+metrics, which copies the final source cell with its status, and `formula` for
+ratios, which re-evaluates the mask and formula on the rolled-up values at the
+target cadence. A line resolves as its entry in `RollupSpec::methods`, then its
+declaration; a line with neither fails the rollup, because nothing is summed
+by default and tags never choose a method. The source result must be a
+verified run of the model. Every target period must be complete, and the
+result's `periods` are the targets, each actual only when every source is. Its
+`rollup_provenance` records the source run, the method used for each node and
+the source periods of each target period.
 `RollupSpec::declared_methods(&model, frequency)` lists the declared methods so a
 host can seed its method choices.
 

@@ -19,8 +19,8 @@ export interface RollupSpecWire {
   frequency: "daily" | "quarterly" | "monthly" | "weekly" | "semi_annual" | "annual";
   /**
    * Rollup method per node id, overriding the node's own declaration. A
-   * node not listed uses its declared [`NodeSpec::rollup`], and sums when
-   * it declares none.
+   * node not listed uses its declared [`NodeSpec::rollup`]; a node with
+   * neither fails the rollup.
    *
    * [`NodeSpec::rollup`]: crate::types::NodeSpec::rollup
    */

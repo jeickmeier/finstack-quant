@@ -472,7 +472,7 @@ It is implemented and qualified across Rust, Python and WASM.
 The Statements period rollup contract was accepted on 2026-11-15. It covers
 explicit methods, complete coarser periods, typed flow sums, closing cells,
 formula reevaluation and source provenance.
-Implementation and independent qualification remain pending.
+It is implemented and qualified; check suites over a rolled result remain.
 [STATEMENTS-EVALUATION-014](statements-evaluation/14-period-rollup.md#accepted-decision-for-period-rollup).
 
 The Statements normalization bridge contract was accepted on 2026-11-15.

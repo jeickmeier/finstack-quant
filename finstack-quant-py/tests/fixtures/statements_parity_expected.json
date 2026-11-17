@@ -312,6 +312,7 @@
           "revenue",
           "cogs"
         ],
+        "rollup": "sum",
         "tags": [
           "income_statement",
           "profitability"
@@ -404,7 +405,11 @@
       "frequency": "annual",
       "methods": {
         "cash": "period_end",
-        "margin": "formula"
+        "debt_draws": "sum",
+        "ebitda": "sum",
+        "margin": "formula",
+        "revenue": "sum",
+        "score": "sum"
       }
     },
     "rollup.empty_spec": {

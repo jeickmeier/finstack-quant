@@ -1317,6 +1317,30 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements rollup: every line needs a method and results are typed
+
+STATEMENTS-EVALUATION-014. **Breaking.**
+
+- **No automatic sum.** A line rolls up by its `RollupSpec.methods` entry or
+  else its declared `NodeSpec.rollup`; a line with neither fails the rollup,
+  naming every such line. Declare `sum` on flows. The bundled flow metrics
+  (`fin.gross_profit`, `fin.ebitda` and the rest of `fin_basic`) now declare
+  it.
+- **Verified source.** `StatementResult::rollup` accepts only a result that
+  is a run of the given model (content, source snapshot, period plan and run
+  identity); a hand-built result or another model's result is rejected.
+- **`sum`.** Money is summed exactly and scalars with a compensated sum. A
+  source cell that is missing, masked or unavailable leaves the target
+  `unavailable` (it used to be absent); a sum that cannot be represented is
+  an error (it used to be dropped).
+- **`period_end`.** The final source cell is copied with its status.
+- **`formula`.** The mask and formula are re-evaluated on typed cells: a
+  false mask is a `masked` cell (it used to be `0`), and an input without a
+  value leaves the result `unavailable` instead of failing the rollup.
+- **Provenance.** A rolled result has `rollup_provenance` (source run,
+  frequency, the method used for each node, the source periods of each
+  target) and no run `provenance`. Python: `StatementResult.rollup_provenance`.
+
 ### Statements checks: formula checks state their mode and scope
 
 STATEMENTS-CONTRACTS-015. **Breaking.**

@@ -586,6 +586,15 @@ export type D_8B741636Dd21D9F7Ad3F =
  * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
  */
 export type D_11C7Dbc9Fa7Cb6Ce298A = string;
+/**
+ * How one node's values combine over the source periods of a target period.
+ */
+export type D_8Fc526D8A2276361B742 = "sum" | "period_end" | "formula";
+/**
+ * Identifier for a Gregorian period like `2025Q1` or a fiscal period like
+ * `FY2025W53`.
+ */
+export type D_7Ed5D95D5Da0Aa4F3Cb9 = string;
 
 /**
  * Results of sensitivity analysis.
@@ -648,6 +657,12 @@ export interface StatementResult {
    * cutoff and the run. `None` only for hand-built results.
    */
   provenance?: D_1B23Dc87C71E8Faf60D2 | null;
+  /**
+   * How a rolled-up result was produced: the source run, the method used
+   * for each node and the source periods of each target period. `None`
+   * for every result that [`rollup`](Self::rollup) did not produce.
+   */
+  rollup_provenance?: DE3Cfd6D553De5F758Bab | null;
   /**
    * Required wire-format schema version. Only numeric `1` is accepted.
    */
@@ -3019,6 +3034,75 @@ export interface D_5E7D1E3926C16B095Ad9 {
   stream_version: number;
 }
 /**
+ * How a rolled-up result was produced.
+ */
+export interface DE3Cfd6D553De5F758Bab {
+  /**
+   * Target frequency of the rollup.
+   */
+  frequency: "daily" | "quarterly" | "monthly" | "weekly" | "semi_annual" | "annual";
+  /**
+   * The method used for every node, in model order: the request's entry
+   * where it had one, the node's declaration otherwise.
+   */
+  methods: {
+    [k: string]: D_8Fc526D8A2276361B742;
+  };
+  /**
+   * The source periods combined into each target period, in timeline
+   * order.
+   */
+  source_periods: {
+    [k: string]: D_7Ed5D95D5Da0Aa4F3Cb9[];
+  };
+  source_run: D_1B23Dc87C71E8Faf60D21;
+}
+/**
+ * What a result was evaluated from.
+ *
+ * A consumer that is handed a result checks this against the model, period
+ * plan and run it expects before trusting the cells.
+ */
+export interface D_1B23Dc87C71E8Faf60D21 {
+  /**
+   * The random stream of every stochastic forecast node in a single run,
+   * in model node order: enough to replay its draws.
+   */
+  forecast_streams?: D_5E7D1E3926C16B095Ad9[];
+  /**
+   * Canonical content hash of the evaluated model
+   * ([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).
+   */
+  model_content_hash: string;
+  /**
+   * Identifier of the evaluated model.
+   */
+  model_id: string;
+  /**
+   * Observations the run was allowed to read.
+   */
+  observation_cutoff:
+    | "full_snapshot"
+    | {
+        through: D_11C7Dbc9Fa7Cb6Ce298A;
+      };
+  /**
+   * Identity of this evaluation run: the canonical content hash of the
+   * fields above. Two runs of the same model content, snapshot, cutoff
+   * and valuation date share it.
+   */
+  run_id: string;
+  /**
+   * Identity of the source snapshot the model's observations came from.
+   */
+  source_snapshot?: string | null;
+  /**
+   * Valuation date the capital structure was priced at, when the run used
+   * a market.
+   */
+  valuation_date?: D_11C7Dbc9Fa7Cb6Ce298A | null;
+}
+/**
  * Configuration used
  */
 export interface DFeab1608Ae875B3Fa417 {
@@ -3124,6 +3208,12 @@ export interface StatementResult1 {
    * cutoff and the run. `None` only for hand-built results.
    */
   provenance?: D_1B23Dc87C71E8Faf60D2 | null;
+  /**
+   * How a rolled-up result was produced: the source run, the method used
+   * for each node and the source periods of each target period. `None`
+   * for every result that [`rollup`](Self::rollup) did not produce.
+   */
+  rollup_provenance?: DE3Cfd6D553De5F758Bab | null;
   /**
    * Required wire-format schema version. Only numeric `1` is accepted.
    */

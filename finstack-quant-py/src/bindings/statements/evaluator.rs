@@ -205,6 +205,16 @@ impl PyStatementResult {
             .transpose()
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.rollup_provenance")]
+    #[getter]
+    fn rollup_provenance<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .rollup_provenance
+            .as_ref()
+            .map(|provenance| crate::bindings::pandas_utils::serde_to_py(py, provenance))
+            .transpose()
+    }
+
     /// Check report attached by an evaluator configured with
     /// :meth:`Evaluator.with_checks`, or ``None`` when no suite ran.
     #[getter]

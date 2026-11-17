@@ -4,28 +4,36 @@
 //! semi-annual) results by combining each node's values over the source
 //! periods of every target period:
 //!
-//! - **Flows** (revenue, expenses, cash flows) are summed. This is the default.
+//! - **Flows** (revenue, expenses, cash flows) are summed (`sum`): exact
+//!   money, or a compensated scalar sum. A source cell without a value leaves
+//!   the target unavailable.
 //! - **Balances** (cash, debt, equity, last-twelve-month metrics) take the
-//!   value of the bucket's last source period (`period_end`).
+//!   final source cell of the bucket with its status (`period_end`).
 //! - **Ratios** (margins, leverage, coverage) re-evaluate the node's formula
-//!   on the rolled-up inputs (`formula`), since neither a sum nor a period-end
-//!   value of a ratio is the ratio of the period.
+//!   and mask on the rolled-up inputs at the target cadence (`formula`),
+//!   since neither a sum nor a period-end value of a ratio is the ratio of
+//!   the period.
 //!
-//! Each line declares its method on the node ([`NodeSpec::rollup`]), so every
-//! host gets the same numbers from the same model. A line resolves as: its
-//! entry in [`RollupSpec::methods`], then its declaration, then `sum`. Tags
-//! never choose a method. [`RollupSpec::declared_methods`] lists the declarations
-//! for a host that shows or edits them.
+//! Every node needs an explicit method: its entry in [`RollupSpec::methods`],
+//! or else its declaration ([`NodeSpec::rollup`]). Nothing is summed by
+//! default and tags never choose a method; a node with no method fails the
+//! rollup. [`RollupSpec::declared_methods`] lists the declarations for a host
+//! that shows or edits them. The rolled result records the source run, the
+//! method used for each node and the source periods of each target period
+//! ([`RollupProvenance`]).
 //!
 //! [`NodeSpec::rollup`]: crate::types::NodeSpec::rollup
 
 use crate::error::{Error, Result};
 use crate::evaluator::Evaluator;
 use crate::evaluator::PeriodHistory;
+use crate::evaluator::cell::{Cell, UnavailableReason};
 use crate::evaluator::context::EvaluationContext;
-use crate::evaluator::formula::{evaluate_formula, evaluate_value};
-use crate::evaluator::results::{EvalStats, NumericMode, StatementResult};
-use crate::evaluator::value::{self, At};
+use crate::evaluator::formula::evaluate_value;
+use crate::evaluator::results::{
+    EvalStats, NumericMode, ResultCell, RunProvenance, StatementResult,
+};
+use crate::evaluator::value::{self, Aggregate, At, Value};
 use crate::types::{FinancialModelSpec, NodeId, NodeValueType, RollupMethod};
 use finstack_quant_core::dates::{Period, PeriodId, PeriodKind, PeriodPlan};
 use indexmap::IndexMap;
@@ -55,8 +63,8 @@ pub struct RollupSpec {
     /// semi-annual or annual; semi-annual into annual).
     pub frequency: PeriodKind,
     /// Rollup method per node id, overriding the node's own declaration. A
-    /// node not listed uses its declared [`NodeSpec::rollup`], and sums when
-    /// it declares none.
+    /// node not listed uses its declared [`NodeSpec::rollup`]; a node with
+    /// neither fails the rollup.
     ///
     /// [`NodeSpec::rollup`]: crate::types::NodeSpec::rollup
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
@@ -68,7 +76,8 @@ impl RollupSpec {
     /// the method choices it shows.
     ///
     /// Only [`NodeSpec::rollup`] is read. A line that declares nothing is not
-    /// listed and sums, whatever its tags say. Passing the result to
+    /// listed, whatever its tags say, and needs a method before the model
+    /// can be rolled up. Passing the result to
     /// [`StatementResult::rollup`] gives the same numbers as passing a spec
     /// with no methods, because a line resolves to its declaration anyway.
     ///
@@ -130,6 +139,25 @@ impl RollupSpec {
     }
 }
 
+/// How a rolled-up result was produced.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct RollupProvenance {
+    /// The evaluation run the source result came from. Its diagnostics,
+    /// check report and capital-structure cashflows stay on that run, keyed
+    /// by the source periods.
+    pub source_run: RunProvenance,
+    /// Target frequency of the rollup.
+    pub frequency: PeriodKind,
+    /// The method used for every node, in model order: the request's entry
+    /// where it had one, the node's declaration otherwise.
+    pub methods: IndexMap<String, RollupMethod>,
+    /// The source periods combined into each target period, in timeline
+    /// order.
+    pub source_periods: IndexMap<PeriodId, Vec<PeriodId>>,
+}
+
 /// One target period and the source periods it combines.
 struct Bucket {
     period: Period,
@@ -141,20 +169,31 @@ impl StatementResult {
     /// annual.
     ///
     /// Each target period combines its source periods node by node, using the
-    /// node's entry in `spec.methods`, then its declared
-    /// [`NodeSpec::rollup`], then `sum`: the last source value for
-    /// `period_end` nodes, and the node's formula re-evaluated on the
-    /// rolled-up values for `formula` nodes (see [`RollupMethod`]). Every
-    /// target period must be complete: a model that starts or ends mid-year
-    /// cannot roll up to annual periods.
+    /// node's entry in `spec.methods` or else its declared
+    /// [`NodeSpec::rollup`] (see [`RollupMethod`]). Every node needs one of
+    /// the two; nothing is summed by default. Every target period must be
+    /// complete: a model that starts or ends mid-year cannot roll up to
+    /// annual periods.
+    ///
+    /// - `sum` adds the source cells: money exactly, scalars with a
+    ///   compensated sum. A source cell that is missing, masked or
+    ///   unavailable makes the target cell unavailable.
+    /// - `period_end` copies the final source cell with its status, so an
+    ///   earlier gap does not hide a closing balance and a missing closing
+    ///   balance stays missing.
+    /// - `formula` re-evaluates the node's mask and formula on the rolled
+    ///   cells and the target-period history: a lag of one reads one target
+    ///   period. A false mask is a masked cell and an input without a value
+    ///   leaves the result unavailable.
     ///
     /// The rolled-up result holds typed `cells` and `node_value_types` for
-    /// the target periods, those periods in `periods`,
-    /// and any warnings raised by re-evaluated formulas. Each target period
-    /// runs from its first source's start to its last source's end and is
-    /// actual only when every source is. The result records no cell source,
-    /// capital-structure cashflows or check report: those describe the source
-    /// evaluation.
+    /// the target periods, those periods in `periods`, any warnings raised by
+    /// re-evaluated formulas, and its [`RollupProvenance`] in
+    /// `rollup_provenance`. Each
+    /// target period runs from its first source's start to its last source's
+    /// end and is actual only when every source is. It is not itself an
+    /// evaluation run: `provenance`, cell sources, capital-structure
+    /// cashflows and the check report stay on the source result.
     ///
     /// # Arguments
     ///
@@ -172,14 +211,16 @@ impl StatementResult {
     ///
     /// # Errors
     ///
-    /// Returns an invalid-input error if the target frequency is not a whole
-    /// multiple of the model's frequency, the model mixes frequencies, a
-    /// target period is incomplete, `spec.methods` names an unknown node, or
-    /// a node resolving to `formula` has no formula or reads capital-structure
-    /// (`cs.*`) values, which cannot be re-evaluated without rolled-up
-    /// cashflows.
-    /// Formula evaluation errors, such as a `formula` node reading a value
-    /// missing from these results, are propagated.
+    /// Returns an invalid-input error if these results are not a verified run
+    /// of `model` (no provenance, another model content, source snapshot or
+    /// period plan), the target frequency is not a whole multiple of the
+    /// model's frequency, the model mixes frequencies, a target period is
+    /// incomplete, `spec.methods` names an unknown node, a node has no
+    /// method, or a node resolving to `formula` has no formula or reads
+    /// capital-structure (`cs.*`) values, which are not rolled up.
+    /// Returns an evaluation error for a sum that mixes units or cannot be
+    /// represented, and for a re-evaluated formula that is invalid at the
+    /// target cadence or in its arithmetic.
     ///
     /// # Examples
     ///
@@ -211,7 +252,9 @@ impl StatementResult {
     /// let spec = RollupSpec {
     ///     frequency: PeriodKind::Annual,
     ///     methods: IndexMap::from([
+    ///         ("revenue".to_string(), RollupMethod::Sum),
     ///         ("cash".to_string(), RollupMethod::PeriodEnd),
+    ///         ("ebitda".to_string(), RollupMethod::Sum),
     ///         ("margin".to_string(), RollupMethod::Formula),
     ///     ]),
     /// };
@@ -228,6 +271,7 @@ impl StatementResult {
     pub fn rollup(&self, model: &FinancialModelSpec, spec: &RollupSpec) -> Result<StatementResult> {
         let buckets = bucket_periods(&model.periods, spec.frequency)?;
         let methods = resolve_methods(model, spec)?;
+        let source_run = self.verified_run_of(model, None)?.clone();
 
         let prepared = Evaluator::new().prepare(model)?;
         let eval_order = &prepared.eval_order;
@@ -238,6 +282,16 @@ impl StatementResult {
             Arc::clone(&node_to_column),
             &target_plan,
         ));
+        let value_types: IndexMap<NodeId, NodeValueType> = eval_order
+            .iter()
+            .filter_map(|node_id| {
+                self.node_value_types
+                    .get(node_id.as_str())
+                    .copied()
+                    .or_else(|| prepared.node_value_types.get(node_id).copied())
+                    .map(|value_type| (node_id.clone(), value_type))
+            })
+            .collect();
 
         let mut rolled = StatementResult::new();
         rolled.periods = Some(target_plan);
@@ -251,51 +305,61 @@ impl StatementResult {
                 let method = methods.get(node).copied().ok_or_else(|| {
                     Error::eval(format!("No rollup method was resolved for node '{node}'"))
                 })?;
-                let value = match method {
-                    RollupMethod::Sum => bucket
-                        .sources
-                        .iter()
-                        .map(|period| self.get(node, period))
-                        .sum::<Option<f64>>(),
-                    RollupMethod::PeriodEnd => bucket
-                        .sources
-                        .last()
-                        .and_then(|period| self.get(node, period)),
+                let at = At {
+                    node_id: Some(node),
+                    period: target,
+                };
+                let source_cell = |period: &PeriodId| {
+                    self.get_cell(node, period)
+                        .map_or(Cell::Missing, |cell| cell.to_cell())
+                };
+                let cell = match method {
+                    RollupMethod::Sum => {
+                        let values: Vec<Value> = bucket
+                            .sources
+                            .iter()
+                            .map(|period| Value::from_cell(source_cell(period)))
+                            .collect();
+                        let total = value::aggregate(Aggregate::Sum, &values, at)?;
+                        value::into_cell(total, value_types.get(node_id).copied(), at)?
+                    }
+                    RollupMethod::PeriodEnd => {
+                        bucket.sources.last().map_or(Cell::Missing, source_cell)
+                    }
                     RollupMethod::Formula => {
                         let where_key = NodeId::new(format!("__where__{node}"));
-                        let masked = match prepared.compiled_cache.get(&where_key) {
+                        let mask = match prepared.compiled_cache.get(&where_key) {
                             Some(condition) => {
-                                let at = At {
-                                    node_id: Some(node),
-                                    period: context.period_id,
-                                };
                                 let mask = evaluate_value(condition, &mut context, Some(node))?;
-                                value::control(mask, "where clause", at)? != Some(true)
+                                value::control(mask, "where clause", at)?
                             }
-                            None => false,
+                            None => Some(true),
                         };
-                        if masked {
-                            Some(0.0)
-                        } else {
-                            let formula =
-                                prepared.compiled_cache.get(node_id).ok_or_else(|| {
-                                    Error::eval(format!(
-                                        "Formula for node '{node}' was not compiled"
-                                    ))
-                                })?;
-                            Some(evaluate_formula(formula, &mut context, Some(node))?)
+                        match mask {
+                            Some(false) => Cell::Masked,
+                            None => Cell::Unavailable(UnavailableReason::MissingMask),
+                            Some(true) => {
+                                let formula =
+                                    prepared.compiled_cache.get(node_id).ok_or_else(|| {
+                                        Error::eval(format!(
+                                            "Formula for node '{node}' was not compiled"
+                                        ))
+                                    })?;
+                                let result = evaluate_value(formula, &mut context, Some(node))?;
+                                value::into_cell(result, value_types.get(node_id).copied(), at)?
+                            }
                         }
                     }
                 };
-                if let Some(value) = value {
-                    context.set_value(node, value)?;
-                    if value.is_finite() {
-                        rolled.set_scalar(node, target, value)?;
-                    }
-                }
+                context.set_cell(node, cell)?;
+                rolled.set_cell(node, target, ResultCell::from_cell(cell, None));
             }
             warnings.append(&mut context.warnings);
-            Arc::make_mut(&mut history).push_row(target, context.current_values);
+            Arc::make_mut(&mut history).push_typed_row(
+                target,
+                context.current_values,
+                context.current_cells,
+            );
         }
 
         rolled.meta = EvalStats {
@@ -306,18 +370,19 @@ impl StatementResult {
             parallel: false,
             warnings,
         };
-        let value_types: IndexMap<NodeId, NodeValueType> = eval_order
-            .iter()
-            .filter_map(|node_id| {
-                self.node_value_types
-                    .get(node_id.as_str())
-                    .copied()
-                    .or_else(|| prepared.node_value_types.get(node_id).copied())
-                    .map(|value_type| (node_id.clone(), value_type))
-            })
-            .collect();
         rolled.populate_value_types(&value_types);
-        rolled.retype_monetary_cells()?;
+        rolled.rollup_provenance = Some(RollupProvenance {
+            source_run,
+            frequency: spec.frequency,
+            methods: methods
+                .iter()
+                .map(|(node, method)| ((*node).to_string(), *method))
+                .collect(),
+            source_periods: buckets
+                .iter()
+                .map(|bucket| (bucket.period.id, bucket.sources.clone()))
+                .collect(),
+        });
         Ok(rolled)
     }
 }
@@ -402,9 +467,9 @@ fn target_period_id(source: PeriodId, target: PeriodKind, per_bucket: u16) -> Re
     Ok(label.parse()?)
 }
 
-/// Resolve each node's method (its `spec` entry, then its declaration, then
-/// `sum`), rejecting spec entries for unknown nodes and resolved `formula`
-/// methods that cannot be re-evaluated.
+/// Resolve each node's method (its `spec` entry, then its declaration),
+/// rejecting spec entries for unknown nodes, nodes with no method and
+/// resolved `formula` methods that cannot be re-evaluated.
 fn resolve_methods<'model>(
     model: &'model FinancialModelSpec,
     spec: &RollupSpec,
@@ -414,16 +479,28 @@ fn resolve_methods<'model>(
             "Rollup method names unknown node '{node_id}'"
         )));
     }
+    let unresolved: Vec<&str> = model
+        .nodes
+        .iter()
+        .filter(|(node_id, node)| {
+            node.rollup.is_none() && !spec.methods.contains_key(node_id.as_str())
+        })
+        .map(|(node_id, _)| node_id.as_str())
+        .collect();
+    if !unresolved.is_empty() {
+        return Err(Error::invalid_input(format!(
+            "Nodes [{}] have no rollup method: declare sum, period_end or formula on each node, \
+             or name it in the rollup request. Nothing is summed by default",
+            unresolved.join(", ")
+        )));
+    }
     let mut methods = IndexMap::with_capacity(model.nodes.len());
     let mut unrecomputable = Vec::new();
     for (node_id, node) in &model.nodes {
         let node_id = node_id.as_str();
-        let method = spec
-            .methods
-            .get(node_id)
-            .copied()
-            .or(node.rollup)
-            .unwrap_or(RollupMethod::Sum);
+        let Some(method) = spec.methods.get(node_id).copied().or(node.rollup) else {
+            continue;
+        };
         methods.insert(node_id, method);
         if method != RollupMethod::Formula {
             continue;

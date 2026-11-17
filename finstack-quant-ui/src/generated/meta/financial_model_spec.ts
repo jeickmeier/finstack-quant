@@ -5353,7 +5353,7 @@ export default [
   {
     "path": "#/$defs/d_7b4cd44901322286925a/properties/rollup",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NodeSpec/properties/rollup",
-    "description": "How this line rolls up to a coarser reporting frequency. A rollup uses\nits own per-line method first, then this; a line declaring nothing is\nsummed. Tags never choose a method."
+    "description": "How this line rolls up to a coarser reporting frequency. A rollup uses\nits own per-line method first, then this; a line with neither fails\nthe rollup. Tags never choose a method."
   },
   {
     "path": "#/$defs/d_7b4cd44901322286925a/properties/rollup/anyOf/0",
@@ -9320,13 +9320,13 @@ export default [
     "path": "#/$defs/d_fc17544530079d46d05e/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RollupMethod/oneOf/0",
     "const": "sum",
-    "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nA missing source value leaves the target value missing."
+    "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nMoney is summed exactly and scalars with a compensated sum. A source\ncell without a value leaves the target unavailable."
   },
   {
     "path": "#/$defs/d_fc17544530079d46d05e/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RollupMethod/oneOf/1",
     "const": "period_end",
-    "description": "Take the last source period's value: balances such as cash, debt and\nequity, and trailing metrics such as last-twelve-month EBITDA."
+    "description": "Copy the last source period's cell with its status: balances such as\ncash, debt and equity, and trailing metrics such as last-twelve-month\nEBITDA."
   },
   {
     "path": "#/$defs/d_fc17544530079d46d05e/oneOf/2",

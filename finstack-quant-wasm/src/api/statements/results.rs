@@ -49,21 +49,28 @@ pub fn statement_result_get(
 ///
 /// Free-function twin of Python `StatementResult.rollup` (Rust
 /// `StatementResult::rollup`). Each target period combines its source
-/// periods node by node: summed by default (flows), the last source value
-/// for `period_end` nodes (balances, LTM metrics), and the node's formula
-/// re-evaluated on the rolled-up values for `formula` nodes (ratios). Every
-/// target period must be complete.
+/// periods node by node by the node's method, from the request or else the
+/// node's declaration: `sum` adds the source cells (money exactly, scalars
+/// with a compensated sum; a source cell without a value leaves the target
+/// unavailable), `period_end` copies the last source cell with its status
+/// (balances, LTM metrics), and `formula` re-evaluates the node's mask and
+/// formula on the rolled-up values at the target cadence (ratios). Nothing is
+/// summed by default: a node with no method fails the rollup. Every target
+/// period must be complete.
 /// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
 /// @param model - The `FinancialModelSpec` the result was evaluated from (object or JSON); it supplies the period dates and the formulas of `formula` nodes.
-/// @param spec - `RollupSpec`: target `frequency` (`"quarterly"`, `"semi_annual"` or `"annual"`) and per-node `methods` (`"sum"` default, `"period_end"`, `"formula"`) (object or JSON).
-/// @returns `StatementResult` plain object keyed by the target periods (`"2025"`, `"2025H1"`, `"2025Q1"`), with those periods in `periods` (each actual only when every source period is), without `node_sources`, capital-structure cashflows or a check report.
+/// @param spec - `RollupSpec`: target `frequency` (`"quarterly"`, `"semi_annual"` or `"annual"`) and per-node `methods` (`"sum"`, `"period_end"` or `"formula"`), which override the methods the nodes declare (object or JSON).
+/// @returns `StatementResult` plain object keyed by the target periods (`"2025"`, `"2025H1"`, `"2025Q1"`), with those periods in `periods` (each actual only when every source period is) and `rollup_provenance` (the source run, the method used for each node and the source periods of each target period), without run `provenance`, cell sources, capital-structure cashflows or a check report.
 ///
 /// # Errors
 ///
-/// Throws with kind `validation` if an input is malformed, the target
-/// frequency is not a whole multiple of the model's, a target period is
-/// incomplete, a method names an unknown node, a `formula` node has no
-/// formula or reads `cs.*` values, or a re-evaluated formula fails.
+/// Throws with kind `validation` if an input is malformed, the result is
+/// not a verified run of the model (no provenance, or another model content,
+/// source snapshot or period plan), the target frequency is not a whole
+/// multiple of the model's, a target period is incomplete, a method names an
+/// unknown node, a node has no method, a `formula` node has no formula or
+/// reads `cs.*` values, a sum cannot be represented, or a re-evaluated
+/// formula fails.
 #[wasm_bindgen(js_name = statementResultRollup, unchecked_return_type = "StatementResult")]
 pub fn statement_result_rollup(
     #[wasm_bindgen(
@@ -85,7 +92,8 @@ pub fn statement_result_rollup(
 ///
 /// Free-function twin of Python `RollupSpec.declared_methods` (Rust
 /// `RollupSpec::declared_methods`). Only each node's `rollup` field is read: a line
-/// that declares nothing is not listed and sums, whatever its tags say.
+/// that declares nothing is not listed, whatever its tags say, and needs a
+/// method before the model can be rolled up.
 /// @param model - The `FinancialModelSpec` whose node declarations are listed (object or JSON); nothing is evaluated.
 /// @param frequency - Target frequency stored on the spec: `"quarterly"`, `"semi_annual"` or `"annual"`. `statementResultRollup` checks it against the model's periods.
 /// @returns `RollupSpec` plain object with the `frequency` and every declared node with its method in model order; `methods` is omitted when no node declares one.

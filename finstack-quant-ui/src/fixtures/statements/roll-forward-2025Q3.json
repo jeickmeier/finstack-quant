@@ -60,6 +60,7 @@
       "name": "Revenue",
       "node_type": "mixed",
       "tags": ["income_statement", "driver"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"
@@ -117,6 +118,7 @@
       "name": "Cost of revenue",
       "node_type": "mixed",
       "tags": ["income_statement"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"
@@ -150,6 +152,7 @@
       "name": "Gross profit",
       "node_type": "calculated",
       "tags": ["income_statement"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"
@@ -172,6 +175,7 @@
       "name": "Operating expenses, ex D&A",
       "node_type": "mixed",
       "tags": ["income_statement"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"
@@ -218,6 +222,7 @@
       "name": "EBITDA",
       "node_type": "calculated",
       "tags": ["income_statement", "headline"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"
@@ -240,6 +245,7 @@
       "name": "Depreciation & amortisation",
       "node_type": "mixed",
       "tags": ["income_statement"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"
@@ -286,6 +292,7 @@
       "name": "EBIT",
       "node_type": "calculated",
       "tags": ["income_statement"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"
@@ -297,6 +304,7 @@
       "name": "Interest expense",
       "node_type": "calculated",
       "tags": ["income_statement"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"
@@ -308,6 +316,7 @@
       "name": "Pre-tax income",
       "node_type": "calculated",
       "tags": ["income_statement"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"
@@ -319,6 +328,7 @@
       "name": "Income tax expense",
       "node_type": "calculated",
       "tags": ["income_statement"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"
@@ -330,6 +340,7 @@
       "name": "Net income",
       "node_type": "calculated",
       "tags": ["income_statement", "headline"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"
@@ -386,6 +397,7 @@
       "name": "Debt drawn",
       "node_type": "mixed",
       "tags": ["debt"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"
@@ -434,6 +446,7 @@
       "name": "Debt repaid",
       "node_type": "mixed",
       "tags": ["debt"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"
@@ -579,6 +592,7 @@
       "name": "Capital expenditure",
       "node_type": "calculated",
       "tags": ["cash_flow"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"
@@ -590,6 +604,7 @@
       "name": "Free cash flow, pre-financing",
       "node_type": "calculated",
       "tags": ["cash_flow", "headline"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"
@@ -601,6 +616,7 @@
       "name": "Unlevered free cash flow",
       "node_type": "calculated",
       "tags": ["cash_flow"],
+      "rollup": "sum",
       "value_type": {
         "type": "monetary",
         "currency": "USD"

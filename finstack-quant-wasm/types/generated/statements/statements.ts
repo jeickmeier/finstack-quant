@@ -7623,8 +7623,8 @@ export interface NodeSpec {
   node_type: NodeType;
   /**
    * How this line rolls up to a coarser reporting frequency. A rollup uses
-   * its own per-line method first, then this; a line declaring nothing is
-   * summed. Tags never choose a method.
+   * its own per-line method first, then this; a line with neither fails
+   * the rollup. Tags never choose a method.
    */
   rollup?: RollupMethod | null;
   /**
@@ -7918,8 +7918,9 @@ export interface MetricDefinition {
   /**
    * How the metric combines over the source periods of a coarser period
    * when results are rolled up. A ratio or a multiple declares `formula`
-   * so it is recomputed from the rolled-up inputs; a metric that leaves
-   * this unset follows the rollup default and is summed.
+   * so it is recomputed from the rolled-up inputs and a flow declares
+   * `sum`; a metric that leaves this unset needs a method in the rollup
+   * request.
    */
   rollup?: RollupMethod | null;
   /**
@@ -8138,26 +8139,33 @@ export interface PricingFlowSelection {
   sign: FlowSign;
 }
 /**
- * Target frequency and per-node methods for rolling statement results up to coarser periods.
+ * How a rolled-up result was produced.
  */
-export interface RollupSpec {
+export interface RollupProvenance {
   /**
-   * Target frequency: `quarterly`, `semi_annual` or `annual`. It must be
-   * coarser than the model's periods and hold a whole number of them
-   * (monthly into quarterly, semi-annual or annual; quarterly into
-   * semi-annual or annual; semi-annual into annual).
+   * Target frequency of the rollup.
    */
   frequency: PeriodKind;
   /**
-   * Rollup method per node id, overriding the node's own declaration. A
-   * node not listed uses its declared [`NodeSpec::rollup`], and sums when
-   * it declares none.
-   *
-   * [`NodeSpec::rollup`]: crate::types::NodeSpec::rollup
+   * The method used for every node, in model order: the request's entry
+   * where it had one, the node's declaration otherwise.
    */
-  methods?: {
+  methods: {
     [k: string]: RollupMethod;
   };
+  /**
+   * The source periods combined into each target period, in timeline
+   * order.
+   */
+  source_periods: {
+    [k: string]: PeriodId[];
+  };
+  /**
+   * The evaluation run the source result came from. Its diagnostics,
+   * check report and capital-structure cashflows stay on that run, keyed
+   * by the source periods.
+   */
+  source_run: RunProvenance;
 }
 /**
  * What a result was evaluated from.
@@ -8199,6 +8207,28 @@ export interface RunProvenance {
    * a market.
    */
   valuation_date?: DateWire | null;
+}
+/**
+ * Target frequency and per-node methods for rolling statement results up to coarser periods.
+ */
+export interface RollupSpec {
+  /**
+   * Target frequency: `quarterly`, `semi_annual` or `annual`. It must be
+   * coarser than the model's periods and hold a whole number of them
+   * (monthly into quarterly, semi-annual or annual; quarterly into
+   * semi-annual or annual; semi-annual into annual).
+   */
+  frequency: PeriodKind;
+  /**
+   * Rollup method per node id, overriding the node's own declaration. A
+   * node not listed uses its declared [`NodeSpec::rollup`]; a node with
+   * neither fails the rollup.
+   *
+   * [`NodeSpec::rollup`]: crate::types::NodeSpec::rollup
+   */
+  methods?: {
+    [k: string]: RollupMethod;
+  };
 }
 /**
  * Execution statistics for a statement-model evaluation.
@@ -8280,6 +8310,12 @@ export interface StatementResult {
    * cutoff and the run. `None` only for hand-built results.
    */
   provenance?: RunProvenance | null;
+  /**
+   * How a rolled-up result was produced: the source run, the method used
+   * for each node and the source periods of each target period. `None`
+   * for every result that [`rollup`](Self::rollup) did not produce.
+   */
+  rollup_provenance?: RollupProvenance | null;
   /**
    * Required wire-format schema version. Only numeric `1` is accepted.
    */

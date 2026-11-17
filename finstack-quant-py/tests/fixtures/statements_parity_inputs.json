@@ -830,6 +830,7 @@
     "nodes": {
       "revenue": {
         "node_id": "revenue",
+        "rollup": "sum",
         "node_type": "value",
         "tags": [
           "income_statement"
@@ -857,6 +858,7 @@
       },
       "debt_draws": {
         "node_id": "debt_draws",
+        "rollup": "sum",
         "node_type": "value",
         "tags": [
           "debt"
@@ -870,6 +872,7 @@
       },
       "ebitda": {
         "node_id": "ebitda",
+        "rollup": "sum",
         "node_type": "calculated",
         "tags": [
           "income_statement"
@@ -887,6 +890,7 @@
       },
       "score": {
         "node_id": "score",
+        "rollup": "sum",
         "node_type": "calculated",
         "tags": [
           "metric"

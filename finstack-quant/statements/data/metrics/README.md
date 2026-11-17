@@ -51,10 +51,10 @@ only — nothing in the evaluator converts or validates units from it.
 
 `rollup` is optional and is one of `sum`, `period_end`, `formula`. It is copied
 onto the model node and decides how the metric combines when results are rolled
-up to coarser periods. A metric that leaves it out follows the rollup default
-and is summed, which is only right for a flow. Every bundled ratio, margin and
-multiple declares `formula`, so its annual value is recomputed from the annual
-inputs. The inputs follow their own declarations: declare `period_end` on
+up to coarser periods. Nothing is summed by default: a metric that leaves it
+out needs a method in the rollup request. Every bundled flow declares `sum`,
+and every bundled ratio, margin and multiple declares `formula`, so its annual
+value is recomputed from the annual inputs. The inputs follow their own declarations: declare `period_end` on
 balances such as `total_debt` so a rolled-up leverage ratio reads the closing
 balance.
 

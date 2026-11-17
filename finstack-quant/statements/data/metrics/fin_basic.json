@@ -9,6 +9,7 @@
       "description": "Revenue minus cost of goods sold",
       "category": "income_statement",
       "unit_type": "currency",
+      "rollup": "sum",
       "requires": ["revenue", "cogs"],
       "tags": ["income_statement", "profitability"]
     },
@@ -19,6 +20,7 @@
       "description": "Gross profit minus reported operating expenses. CONVENTION: `cogs` and `opex` are reported costs that include their depreciation and amortization.",
       "category": "income_statement",
       "unit_type": "currency",
+      "rollup": "sum",
       "requires": ["gross_profit", "opex"],
       "tags": ["income_statement", "profitability"]
     },
@@ -29,6 +31,7 @@
       "description": "EBIT plus the depreciation and amortization included in reported COGS and OPEX, added back once. CONVENTION: `cogs` and `opex` are reported costs that include their depreciation and amortization. Supply only the D&A those lines include.",
       "category": "income_statement",
       "unit_type": "currency",
+      "rollup": "sum",
       "requires": ["ebit", "depreciation", "amortization"],
       "tags": ["income_statement", "profitability", "cash_proxy"]
     },
@@ -39,6 +42,7 @@
       "description": "Earnings before interest and taxes: operating income.",
       "category": "income_statement",
       "unit_type": "currency",
+      "rollup": "sum",
       "requires": ["operating_income"],
       "tags": ["income_statement", "profitability"]
     },
@@ -49,6 +53,7 @@
       "description": "Earnings before tax: EBIT minus statement interest expense.",
       "category": "income_statement",
       "unit_type": "currency",
+      "rollup": "sum",
       "requires": ["ebit", "interest_expense"],
       "tags": ["income_statement", "profitability"]
     },
@@ -59,6 +64,7 @@
       "description": "EBT minus statement tax expense.",
       "category": "income_statement",
       "unit_type": "currency",
+      "rollup": "sum",
       "requires": ["ebt", "tax_expense"],
       "tags": ["income_statement", "profitability", "bottom_line"]
     }

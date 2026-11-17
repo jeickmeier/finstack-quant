@@ -2111,6 +2111,41 @@
       "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
       "type": "string"
     },
+    "PeriodKind": {
+      "description": "Period frequency type.\n\nDefines the frequency of periodic schedules (cashflow rolls, return-series\nresampling, statement reporting). Two different yearly counts exist:\n[`PeriodKind::annualization_factor`] is the conventional statistical\nfactor for explicitly selected observations (daily trading 252), and\n[`PeriodKind::slots_per_year`] is the calendar partition count, defined\nonly for the month-block kinds (record CORE-CONVENTIONS-014 #9).\n\nParses only the canonical snake_case wire values via [`std::str::FromStr`]:\n`daily`, `weekly`, `monthly`, `quarterly`, `semi_annual`, and `annual`.\nAliases, whitespace padding and case variants are rejected.\n\nOrdering follows [`PeriodKind::rank`] (daily through annual). It is a\ndeterministic key order, not a chronology.",
+      "oneOf": [
+        {
+          "const": "daily",
+          "description": "Daily periods (252 trading days per year by convention)",
+          "type": "string"
+        },
+        {
+          "const": "quarterly",
+          "description": "Quarterly periods (4 per year)",
+          "type": "string"
+        },
+        {
+          "const": "monthly",
+          "description": "Monthly periods (12 per year)",
+          "type": "string"
+        },
+        {
+          "const": "weekly",
+          "description": "Weekly periods (ISO 8601 week-year, typically 52 or 53 per year)",
+          "type": "string"
+        },
+        {
+          "const": "semi_annual",
+          "description": "Semi-annual periods (2 per year)",
+          "type": "string"
+        },
+        {
+          "const": "annual",
+          "description": "Annual periods (1 per year)",
+          "type": "string"
+        }
+      ]
+    },
     "PeriodPlan": {
       "additionalProperties": false,
       "description": "Builder/plan for a contiguous sequence of periods and their actual/forecast split.\n\nPeriods are returned in ascending order and are intended to form a contiguous\nrun of model periods. Each [`Period`] uses the crate-wide `[start, end)`\ninterval convention, so the `end` of one period naturally aligns with the\n`start` of the next.",
@@ -2193,6 +2228,64 @@
           ]
         }
       ]
+    },
+    "RollupMethod": {
+      "description": "How one node's values combine over the source periods of a target period.",
+      "oneOf": [
+        {
+          "const": "sum",
+          "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nMoney is summed exactly and scalars with a compensated sum. A source\ncell without a value leaves the target unavailable.",
+          "type": "string"
+        },
+        {
+          "const": "period_end",
+          "description": "Copy the last source period's cell with its status: balances such as\ncash, debt and equity, and trailing metrics such as last-twelve-month\nEBITDA.",
+          "type": "string"
+        },
+        {
+          "const": "formula",
+          "description": "Re-evaluate the node's formula (and `where` clause) on the rolled-up\nvalues: ratios such as margins, leverage and coverage. Time-series\nfunctions then run at the target frequency, so `lag(x, 1)` is the\nprior target period.",
+          "type": "string"
+        }
+      ]
+    },
+    "RollupProvenance": {
+      "additionalProperties": false,
+      "description": "How a rolled-up result was produced.",
+      "properties": {
+        "frequency": {
+          "$ref": "#/$defs/PeriodKind",
+          "description": "Target frequency of the rollup."
+        },
+        "methods": {
+          "additionalProperties": {
+            "$ref": "#/$defs/RollupMethod"
+          },
+          "description": "The method used for every node, in model order: the request's entry\nwhere it had one, the node's declaration otherwise.",
+          "type": "object"
+        },
+        "source_periods": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/PeriodId"
+            },
+            "type": "array"
+          },
+          "description": "The source periods combined into each target period, in timeline\norder.",
+          "type": "object"
+        },
+        "source_run": {
+          "$ref": "#/$defs/RunProvenance",
+          "description": "The evaluation run the source result came from. Its diagnostics,\ncheck report and capital-structure cashflows stay on that run, keyed\nby the source periods."
+        }
+      },
+      "required": [
+        "source_run",
+        "frequency",
+        "methods",
+        "source_periods"
+      ],
+      "type": "object"
     },
     "RunProvenance": {
       "additionalProperties": false,
@@ -2446,6 +2539,17 @@
         }
       ],
       "description": "What was evaluated: the model, its source snapshot, the observation\ncutoff and the run. `None` only for hand-built results."
+    },
+    "rollup_provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RollupProvenance"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "How a rolled-up result was produced: the source run, the method used\nfor each node and the source periods of each target period. `None`\nfor every result that [`rollup`](Self::rollup) did not produce."
     },
     "schema_version": {
       "$ref": "#/$defs/SchemaVersion",

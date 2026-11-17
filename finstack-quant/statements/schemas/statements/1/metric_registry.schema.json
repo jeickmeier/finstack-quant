@@ -51,7 +51,7 @@
               "type": "null"
             }
           ],
-          "description": "How the metric combines over the source periods of a coarser period\nwhen results are rolled up. A ratio or a multiple declares `formula`\nso it is recomputed from the rolled-up inputs; a metric that leaves\nthis unset follows the rollup default and is summed."
+          "description": "How the metric combines over the source periods of a coarser period\nwhen results are rolled up. A ratio or a multiple declares `formula`\nso it is recomputed from the rolled-up inputs and a flow declares\n`sum`; a metric that leaves this unset needs a method in the rollup\nrequest."
         },
         "tags": {
           "description": "Tags for filtering/searching",
@@ -84,12 +84,12 @@
       "oneOf": [
         {
           "const": "sum",
-          "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nA missing source value leaves the target value missing.",
+          "description": "Sum the source periods: flows such as revenue, expenses and cash flows.\nMoney is summed exactly and scalars with a compensated sum. A source\ncell without a value leaves the target unavailable.",
           "type": "string"
         },
         {
           "const": "period_end",
-          "description": "Take the last source period's value: balances such as cash, debt and\nequity, and trailing metrics such as last-twelve-month EBITDA.",
+          "description": "Copy the last source period's cell with its status: balances such as\ncash, debt and equity, and trailing metrics such as last-twelve-month\nEBITDA.",
           "type": "string"
         },
         {

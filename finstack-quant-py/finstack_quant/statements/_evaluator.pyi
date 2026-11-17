@@ -277,12 +277,15 @@ class StatementResult:
         """
         Roll these results up to a coarser frequency, such as quarterly to annual.
 
-        Each target period combines its source periods node by node: summed by
-        default (flows), the last source value for ``"period_end"`` nodes
-        (balances, LTM metrics), and the node's formula re-evaluated on the
-        rolled-up values for ``"formula"`` nodes (ratios). ``lag`` and other
-        time-series functions then step in target periods. Every target period
-        must be complete.
+        Each target period combines its source periods node by node by the
+        node's method, from ``spec`` or else the node's declaration. ``"sum"``
+        adds the source cells (money exactly, scalars with a compensated sum)
+        and is unavailable when a source cell has no value. ``"period_end"``
+        copies the last source cell with its status (balances, LTM metrics).
+        ``"formula"`` re-evaluates the node's mask and formula on the rolled-up
+        values (ratios); ``lag`` and other time-series functions then step in
+        target periods. Nothing is summed by default: a node with no method
+        fails the rollup. Every target period must be complete.
 
         Parameters
         ----------
@@ -299,16 +302,21 @@ class StatementResult:
             Values keyed by the target periods (``"2025"``, ``"2025H1"``,
             ``"2025Q1"``; fiscal periods keep their ``FY`` prefix), with
             monetary values, value types and those periods in ``periods`` (each
-            actual only when every source period is). It carries no
-            per-cell ``source``, capital-structure cashflows or check report.
+            actual only when every source period is) and
+            :attr:`rollup_provenance`. It is not an evaluation run: it carries
+            no ``provenance``, per-cell ``source``, capital-structure cashflows
+            or check report.
 
         Raises
         ------
         ValueError
-            If the JSON is malformed, the target frequency is not a whole
-            multiple of the model's, a target period is incomplete, a method
-            names an unknown node, a ``"formula"`` node has no formula or reads
-            ``cs.*`` values, or a re-evaluated formula fails.
+            If the JSON is malformed, these results are not a verified run of
+            ``model`` (no provenance, or another model content, source snapshot
+            or period plan), the target frequency is not a whole multiple of
+            the model's, a target period is incomplete, a method names an
+            unknown node, a node has no method, a ``"formula"`` node has no
+            formula or reads ``cs.*`` values, a sum cannot be represented, or a
+            re-evaluated formula fails.
 
         Examples
         --------
@@ -320,7 +328,10 @@ class StatementResult:
         >>> _ = b.compute("ebitda", "revenue * 0.25")
         >>> _ = b.compute("margin", "ebitda / revenue")
         >>> model = b.build()
-        >>> spec = RollupSpec("annual", {"cash": "period_end", "margin": "formula"})
+        >>> spec = RollupSpec(
+        ...     "annual",
+        ...     {"revenue": "sum", "cash": "period_end", "ebitda": "sum", "margin": "formula"},
+        ... )
         >>> annual = Evaluator().evaluate(model).rollup(model, spec)
         >>> (annual.get("revenue", "2025"), annual.get("cash", "2025"), annual.get("margin", "2025"))
         (400.0, 40.0, 0.25)
@@ -506,6 +517,25 @@ class StatementResult:
             strings, enough to replay the draws) and ``run_id`` (the
             content hash of the other fields). ``None``
             for a result that was not produced by an evaluator.
+        """
+        ...
+
+    @property
+    def rollup_provenance(self) -> dict[str, Any] | None:
+        """
+        How a rolled-up result was produced.
+
+        This property does not raise.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``source_run`` (the :attr:`provenance` of the result that was
+            rolled up), ``frequency`` (the target frequency label),
+            ``methods`` (node id to the ``"sum"``, ``"period_end"`` or
+            ``"formula"`` method used, in model order) and ``source_periods``
+            (target period id to its source period ids, in timeline order).
+            ``None`` for a result that :meth:`rollup` did not produce.
         """
         ...
 

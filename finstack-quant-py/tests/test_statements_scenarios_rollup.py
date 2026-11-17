@@ -113,7 +113,8 @@ def test_quarterly_results_roll_up_to_annual() -> None:
     model = builder.build()
     quarterly = Evaluator().evaluate(model)
 
-    spec = RollupSpec("annual", {"cash": "period_end", "margin": "formula"})
+    methods = {"revenue": "sum", "cash": "period_end", "ebitda": "sum", "margin": "formula"}
+    spec = RollupSpec("annual", methods)
     annual = quarterly.rollup(model, spec)
 
     assert annual.get("revenue", "2025") == pytest.approx(460.0)
@@ -122,7 +123,18 @@ def test_quarterly_results_roll_up_to_annual() -> None:
     assert annual.get("margin", "2025") == pytest.approx(0.3)
     # JSON spec input and round trip.
     assert quarterly.rollup(model, spec.to_json()).get("cash", "2025") == pytest.approx(40.0)
-    assert RollupSpec.from_json(spec.to_json()).methods == {"cash": "period_end", "margin": "formula"}
+    assert RollupSpec.from_json(spec.to_json()).methods == methods
+    # Nothing is summed by default: a line with no method fails the rollup.
+    with pytest.raises(ValueError, match=r"revenue, ebitda.*no rollup method"):
+        quarterly.rollup(model, RollupSpec("annual", {"cash": "period_end", "margin": "formula"}))
+    # The rolled result names its source run, methods and periods.
+    assert annual.provenance is None
+    provenance = annual.rollup_provenance
+    assert provenance["source_run"] == quarterly.provenance
+    assert provenance["frequency"] == "annual"
+    assert provenance["methods"] == methods
+    assert provenance["source_periods"] == {"2025": QUARTERS}
+    assert quarterly.rollup_provenance is None
 
     builder = ModelBuilder("partial")
     builder.periods("2025Q2..Q4", None)
@@ -173,9 +185,9 @@ def _declared_model() -> object:
     builder = ModelBuilder("declared")
     builder.periods("2025Q1..Q4", None)
     for node_id, node_type, rollup, tags, formula in [
-        ("revenue", NodeType.value(), None, ["income_statement"], None),
+        ("revenue", NodeType.value(), "sum", ["income_statement"], None),
         ("cash", NodeType.value(), "period_end", [], None),
-        ("tagged_balance", NodeType.value(), None, ["balance_sheet"], None),
+        ("tagged_balance", NodeType.value(), "sum", ["balance_sheet"], None),
         ("margin", NodeType.calculated(), "formula", [], "cash / revenue"),
     ]:
         values = None
@@ -197,13 +209,13 @@ def _declared_model() -> object:
 def test_a_line_declares_its_rollup_method_on_the_node() -> None:
     model = _declared_model()
     assert model.get_node("cash").rollup == "period_end"
-    assert model.get_node("revenue").rollup is None
+    assert model.get_node("revenue").rollup == "sum"
     quarterly = Evaluator().evaluate(model)
 
     annual = quarterly.rollup(model, RollupSpec("annual"))
     assert annual.get("cash", "2025") == pytest.approx(40.0)
     assert annual.get("margin", "2025") == pytest.approx(40.0 / 100.0)
-    # A tag decides nothing: this balance-tagged line declares no method, so it sums.
+    # A tag decides nothing: this balance-tagged line declares sum, so it sums.
     assert annual.get("tagged_balance", "2025") == pytest.approx(100.0)
 
     # A spec entry overrides the declaration.
@@ -211,7 +223,7 @@ def test_a_line_declares_its_rollup_method_on_the_node() -> None:
 
     # declared_methods lists declarations only and rolls up to the same numbers.
     listed = RollupSpec.declared_methods(model, "annual")
-    assert listed.methods == {"cash": "period_end", "margin": "formula"}
+    assert listed.methods == {"revenue": "sum", "cash": "period_end", "tagged_balance": "sum", "margin": "formula"}
     assert quarterly.rollup(model, listed).get("margin", "2025") == annual.get("margin", "2025")
 
 
@@ -219,12 +231,12 @@ def test_builder_lines_roll_up_with_their_declared_method() -> None:
     values = list(zip(QUARTERS, [10.0, 20.0, 30.0, 40.0], strict=True))
     builder = ModelBuilder("builder-declared")
     builder.periods("2025Q1..Q4", None)
-    builder.value("flow", values)
+    builder.value("flow", values).rollup("flow", "sum")
     builder.value("balance", values).rollup("balance", "period_end")
     builder.compute("ratio", "balance / flow").rollup("ratio", "formula")
     mixed = builder.mixed("mixed_balance").values(values).rollup("period_end")
     builder = mixed.build()
-    model = builder.mixed("mixed_flow").values(values).build().build()
+    model = builder.mixed("mixed_flow").values(values).rollup("sum").build().build()
     assert model.get_node("mixed_balance").rollup == "period_end"
 
     annual = Evaluator().evaluate(model).rollup(model, RollupSpec("annual"))

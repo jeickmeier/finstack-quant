@@ -2340,7 +2340,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 414432
+            "bytes": 414516
           },
           {
             "path": "schemas/statements/1/forecast_method.schema.json",
@@ -2361,14 +2361,14 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
             "type_name": "MetricRegistry",
             "kind": "input",
-            "bytes": 5807
+            "bytes": 5912
           },
           {
             "path": "schemas/statements/1/model_edit.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/model_edit.schema.json",
             "type_name": "ModelEdit",
             "kind": "input",
-            "bytes": 58399
+            "bytes": 58483
           },
           {
             "path": "schemas/statements/1/monte_carlo_config.schema.json",
@@ -2410,14 +2410,14 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
             "type_name": "RollupSpec",
             "kind": "input",
-            "bytes": 3958
+            "bytes": 4046
           },
           {
             "path": "schemas/statements/1/statement_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 89490
+            "bytes": 93980
           }
         ]
       },
@@ -5158,7 +5158,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 414432
+            "bytes": 414516
           },
           {
             "domain": "statements",
@@ -5182,7 +5182,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
             "type_name": "MetricRegistry",
             "kind": "input",
-            "bytes": 5807
+            "bytes": 5912
           },
           {
             "domain": "statements",
@@ -5190,7 +5190,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/model_edit.schema.json",
             "type_name": "ModelEdit",
             "kind": "input",
-            "bytes": 58399
+            "bytes": 58483
           },
           {
             "domain": "statements",
@@ -5238,7 +5238,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/rollup_spec.schema.json",
             "type_name": "RollupSpec",
             "kind": "input",
-            "bytes": 3958
+            "bytes": 4046
           },
           {
             "domain": "statements",
@@ -5246,7 +5246,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 89490
+            "bytes": 93980
           },
           {
             "domain": "valuations",
