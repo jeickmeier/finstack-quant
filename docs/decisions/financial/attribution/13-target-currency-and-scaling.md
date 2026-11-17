@@ -1,11 +1,26 @@
 # ATTRIBUTION-013: Currency translation, quantity scaling and residual qualification
 
-- Decision status: Draft (observed implementation; adoption pending).
-- Implementation status: Observed for the source scope listed below.
-- Validation status: Source evidence inspected; named test evidence located, not executed. No numerical accuracy certification.
+- Decision status: Accepted 2026-11-16 for checked reporting FX, sizing, aggregation and residual qualification. The portfolio translation requirement was previously accepted in PORTFOLIO-ATTRIBUTION-008.
+- Implementation status: Observed for the source scope listed below. Runtime, reporting, arithmetic and host reconciliation with the accepted contract are pending.
+- Validation status: Independent exact examples checked composed FX, representation rounding, signed sizing, independent endpoint reductions and exact-zero residual and tolerance behavior. Production attribution and host qualification remain pending.
 - Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and scope
+## Accepted portfolio requirement for composable reporting FX
+
+For the accepted portfolio path, translate each qualified child-to-parent edge using its opening and closing cash FX rates `q0,q1` and prepared opening value `V0`. Preserve inherited reporting FX at `q1` and add `V0*(q1-q0)`. Embedded pricing FX and the existing economic residual travel separately at closing FX, as do the other signed factors. Retain the owner-selected native cash and label its translated addback as closing-equivalent attribution cash. Keep traceable conversion rounding distinct from economic residual, and verify the native and reporting endpoint values on their respective bases. Portfolio must use this shared transform. Runtime reconciliation is pending. [Accepted portfolio P&L attribution](../portfolio-attribution/08-portfolio-pnl-endpoints.md#accepted-decision-for-checked-portfolio-pl-attribution).
+
+## Accepted decision for checked reporting FX, sizing, aggregation and residual qualification
+
+1. Translate each authored currency edge using qualified marks and cash. Bind actual opening and closing holder marks, eligible cash and directed cash FX rates `q0,q1` at their respective cuts. Compute reporting MTM as `q1 V1 − q0 V0`, closing-equivalent cash as `q1 C` and headline P&L as their sum. Carry reporting FX forward as `q1 X + V0(q1 − q0)` for inherited reporting FX `X`. Translate embedded pricing FX, other factors and existing economic residual at `q1`. Verify both endpoints independently. A qualified same-currency edge is an identity and requires no FX lookup. Retire bare opening marks and cash inferred from `total − MTM`. [Accepted portfolio P&L attribution](../portfolio-attribution/08-portfolio-pnl-endpoints.md#accepted-decision-for-checked-portfolio-pl-attribution) · [Accepted cash FX authority](../portfolio-execution/08-spot-and-forward-fx.md#accepted-decision-for-checked-portfolio-nav-and-cashflow-fx).
+2. Keep native evidence and trace representation rounding. Preserve native marks, settlement cash, risk coordinates and the authored FX path. Translate Waterfall stage marks and monetary sensitivity working on the common closing-rate display basis. Headline marks use their respective dated rates. Use checked Decimal transforms and keep independently traceable conversion or scaling adjustments separate from economic residual. An unexplained gap fails reconciliation. [Accepted Money precision](../core-conventions/012-money-decimal-precision.md#accepted-decision-monetary-precision-rounding-and-currency-identity).
+3. Apply signed quantity once at each authored sizing edge. Use an admitted signed Decimal multiplier `k` for marks, cash, P&L and monetary sensitivities, and `|k|` for absolute amount diagnostics. Preserve market moves, model evidence, source amounts and actual pricing work. Derive percentages and qualification for the resulting report. Zero sizing produces zero amounts after input validation and preserves constituent invalidity. [Accepted signed sizing](../portfolio-execution/01-position-sizing-and-validation.md#accepted-decision-for-checked-portfolio-holdings-and-signed-sizing) · [Accepted primitive exposures](../portfolio-execution/11-primitive-exposures.md#accepted-decision-for-checked-portfolio-primitive-exposures).
+4. Aggregate atomically in holding and leaf order. Require compatible cuts, report semantics, currency, cash and FX bases. Reduce opening and closing marks independently and check MTM, cash and each additive top-level bucket once. A validated empty book yields reporting-currency zero. Retain constituent lineage, diagnostics and invalidity through cancellation. Keep detail on its constituent path. Publish aggregate detail only for explicitly defined compatible rollups. Commit only after all amounts and required checks succeed.
+5. Separate economic residual, monetary closure and residual materiality. Calculate economic residual from verified headline P&L less additive effects and traced representation adjustments. Carry it through transforms and independently recheck closure. Keep an elected monetary reconciliation tolerance separate. For residual materiality, elect nonnegative absolute Money `A` and relative tolerance `p` in percentage points on the current report basis. Pass inclusively when `|R| ≤ A` or `100|R| ≤ p|T|`, using checked widened comparisons. At exact-zero headline `T` use only `A`. With no elected policy, materiality is unevaluated. Translation, sizing or aggregation onto a new report basis requires policy for that report. Missing required evidence fails qualification. [Accepted local tolerances](../core-numerics/rounding-and-config.md#accepted-decision-explicit-rounding-config-local-tolerances-and-producer-metadata).
+6. Use exact-zero availability across report views. Derive signed shares as `100 × bucket / T` on qualified same-currency Money. Exact-zero headline P&L makes shares unavailable. Nonzero amounts below display precision remain eligible. Use the same availability in text and structured outputs. Rust publishes checked amounts, basis and statuses for Python and WASM to project. [Accepted portfolio share rules](../portfolio-attribution/08-portfolio-pnl-endpoints.md#accepted-decision-for-checked-portfolio-pl-attribution).
+
+Exact examples verified that EUR marks `100 → 110`, cash `5` and residual `2`, translated with EUR/USD `1.10 → 1.20` and USD/CAD `1.30 → 1.40`, give CAD marks `143 → 184.80`, cash `8.40` and headline P&L `50.20`. Reporting FX is `25.00`, including `14.00` inherited from the inner edge. Economic residual is `3.36`. A separate example verified that residual `0.00003` on headline `0.00010` gives a `30%` share and passes an elected `30%` relative limit exactly.
+
+## Observed choice and scope
 
 A native-currency attribution translates factor amounts at closing FX and reports opening-principal FX translation separately. Quantity scaling acts on every signed Money leaf. These transformations preserve existing decomposition algebra; they do not recalculate underlying sensitivities or market moves.
 
@@ -33,6 +48,6 @@ The rationale is explicit economic separation between pricing FX exposure and tr
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#attribution). This record does not
-authorize a runtime change or certify the observed method.
+Runtime reconciliation and validation are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#attribution). Production and host
+qualification remain pending.

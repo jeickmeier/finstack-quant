@@ -1,13 +1,24 @@
 # PORTFOLIO-ATTRIBUTION-013: Issuer-netted credit residual risk and hierarchy reporting
 
 - ID: PORTFOLIO-ATTRIBUTION-013
-- Decision status: Draft (observed implementation; adoption pending).
-- Implementation status: Observed for the stated owning source scope; discrepancies are named below.
-- Validation status: Evidence inspected/located, not executed; independent accuracy qualification remains open.
+- Decision status: Accepted 2026-11-16 for checked issuer residual risk and hierarchy reporting.
+- Implementation status: Observed for the stated owning source scope. Runtime, forecast, report and host reconciliation with the accepted contract are pending.
+- Validation status: Independent cases checked a common fractional-year horizon, signed allocation closure, near-offset exposure and shared-source member attribution. Runtime and host qualification remain pending.
 - Audit date: 2026-11-05.
 - Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and domain
+## Accepted decision for checked issuer residual risk and hierarchy reporting
+
+1. Elect systematic-only analysis or analysis with named issuer residuals. Require complete coverage of the selected scope. Each active named issuer in scope needs a qualified exposure and one authoritative finite nonnegative residual forecast. Preserve proven structural zeros and explicitly selected zero forecasts. Missing calibration, ambiguous no-history defaults and unsupported exposures fail complete analysis. A proxy requires explicit selection and provenance. Report aggregate and anonymous index sources as outside named-issuer residual scope. [Issuer forecast source owner](../factor/credit-residual-volatility.md).
+2. Consume the qualified pre-beta exposure for each holding and exact issuer. Combine distinct sources only when each maps to the same issuer residual spread direction. A shared hazard replay may be reused when qualified. Require a separately attributable price effect for every required issuer on that source. Adopt the live exposures and recoveries in the selected full-product pricer, including its pool weights once. [Accepted exposure construction](12-factor-assignment-and-credit-exposures.md#accepted-decision-for-checked-factor-assignment-and-credit-exposures) · [CDS and index risk](../models-and-valuations-credit/13-cds-and-index-risk.md#accepted-decision-for-checked-cds-and-index-risk).
+3. Bind systematic covariance and residual variance to one explicit qualified forecast horizon. Apply its finite nonnegative flat-variance multiplier once to both annualized inputs. Take issuer variance from the forecast's validated residual state and check any duplicate matching-row representation against it. Reject unknown or incompatible horizons. A validated zero horizon yields zero risk. [Horizon owner](../factor/credit-horizons.md).
+4. Positions on one issuer share its residual shock. Assume zero covariance across distinct issuer residual shocks and between residuals and systematic factors. In reporting currency per bp, net `E[j] = Σ_p e[p,j]`. With horizon spread variance `v[j]` in bp², compute issuer variance `E[j]² × v[j]` and signed holding allocation `e[p,j] × E[j] × v[j]`. Remove the near-flat cutoff. Independently sum the nonnegative issuer totals and verify closure to signed allocations with deterministic checked arithmetic and a scale-aware rounding bound.
+5. Combine systematic and residual variance before the factor owner's transformation for variance, volatility, normal P&L VaR or normal P&L ES. Apply one common component scale to all variance allocations. Preserve signed hedge allocations and the existing P&L sign convention for VaR and ES. Variance is in reporting currency squared. The other measures are in reporting currency. Carry variance allocations and their measure contributions explicitly for report use. [Factor-risk transform owner](../factor/factor-risk.md).
+6. Build and validate the hierarchy report in Rust from the same checked decomposition, credit model, forecast, ordered factor axis and holding axis. Verify exact declared credit factor IDs and canonical hierarchy levels and buckets. Check issuer, bucket, level, requested holding and portfolio closure. Carry horizon, currency, measure, applicable confidence and coverage. Retain covered zero holding rows in requested detail and distinguish omitted detail from requested-empty detail. Existing Python and WASM paths consume the checked result. Stress and what-if consume the same residual contract under [record 014](14-factor-stress-and-position-what-if.md).
+
+An independent quarter-year example gives systematic variance of `25 USD²` and issuer residual variance of `11 USD²`. Signed residual allocations are `+22` and `−11 USD²`, and combined volatility is `6 USD`. The observed mixed-horizon formula would give `69 USD²` of combined variance for those inputs.
+
+## Observed choice and domain
 
 The portfolio adapter augments factor-decomposed risk with issuer-specific residual spread variance from credit hierarchical matching configuration. `adder_vol_annualized` is squared into residual variance in the factor model's spread units (basis-point shocks); the factor crate converts combined variance to the selected risk measure. This adapter squares annualized residual volatility directly and does not apply a holding-horizon scale. This is a shared issuer shock across positions, not independent position noise.
 

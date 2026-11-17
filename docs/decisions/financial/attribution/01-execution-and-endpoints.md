@@ -1,11 +1,23 @@
 # ATTRIBUTION-001: Method dispatch, endpoint valuation and execution contracts
 
-- Decision status: Draft (observed implementation; adoption pending).
-- Implementation status: Observed for the source scope listed below.
-- Validation status: Source evidence inspected; named test evidence located, not executed. No numerical accuracy certification.
+- Decision status: Accepted 2026-11-16 for checked instrument attribution execution and endpoint valuation.
+- Implementation status: Observed for the source scope listed below. Runtime, pricing, replay and host reconciliation with the accepted contract are pending.
+- Validation status: Independent arithmetic checked date-matched FX, closing-equivalent eligible cash and distinct endpoint pairs with identical MTM. Production pricing and host qualification remain pending.
 - Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and scope
+## Accepted decision for checked instrument attribution execution and endpoints
+
+1. Require explicit Parallel, ordered Waterfall, Taylor or MetricsBased attribution. Validate method-specific controls before pricing and reject inapplicable controls. Scheduling is independent of financial method. The mark-to-market-only `pnl_bridge` uses the same checked endpoint preparation.
+2. Freeze the held instrument economics, including contract terms and deal size. Bind both immutable markets and the selected pricer, registry, settings and provider. Retain requested and effective valuation dates and cuts. Reject reversed comparisons before pricing. An explicitly ordered same-date comparison has zero elapsed carry and period cash. Where the model has parameters, require qualified opening parameters or an explicit election to use the closing parameters at opening. [Accepted pricing lifecycle](../valuations-framework/pricing-lifecycle.md#accepted-decision-for-checked-valuation-dispatch-and-lifecycle).
+3. Use unscaled PV-only endpoints for Parallel, Waterfall, Taylor and the bridge. MetricsBased uses opening PV and the complete applicable opening metric profile, including carry over the actual interval, plus closing PV. Admit prepared values only when instrument, endpoint role, market, date and cut, pricing controls, currency and required FX and stochastic basis match. Retire bare prepared Money pairs and the speculative rounding-currency probe. Bind any currency-specific rounding override to the qualified valuation or reporting currency. [Accepted portfolio endpoint profiles](../portfolio-attribution/08-portfolio-pnl-endpoints.md#accepted-decision-for-checked-portfolio-pl-attribution).
+4. Preserve both native and reporting marks and their dated FX evidence. Compute reporting MTM as `q1 × V1 − q0 × V0`. A change in native valuation currency requires a qualified common basis. Full attribution adds eligible period cash under [record 003](03-total-return-carry.md#accepted-decision-for-checked-period-cash-gross-carry-and-funding) and labels the closing-equivalent reporting amount. Keep marks, MTM, eligible cash and residual explicit. [Record 013](13-target-currency-and-scaling.md) owns shared translation and residual rules. The caller applies holding scale to the as-built instrument result.
+5. Replace the broad strict-validation switch with typed failures for missing applicable inputs, failed pricing or FX, and invalid arithmetic. Proven inapplicability can contribute zero. Explicitly elected advisory detail may report typed unavailability. Invalid results cannot qualify as reconciled. Validate supplied tolerances as finite and nonnegative in their declared currency or percentage units.
+6. Default to serial scheduling. Waterfall stages are sequential and independent work uses at most one parallel axis. Report actual valuation attempts and reused marks separately. Validate shared inputs even for an empty batch. Publish atomically or report the first failure in logical input order with instrument, method and stage context.
+7. Use one bounded checked Rust contract across native and host routes, with exact supported schema markers and strict field admission. Canonical JSON establishes wire validity. Semantic admission and source-backed replay establish qualification as pricing evidence. Python and WASM consume the checked Rust outputs and typed errors. [Auditable result and replay policy](../../project/0025-auditable-results-and-replay.md#decision).
+
+Independent arithmetic gave USD `22` MTM for EUR marks `100 → 110` at USD/EUR `1.10 → 1.20`, including USD `10` of opening-principal translation. With EUR `5` of eligible period cash, full closing-equivalent P&L was USD `28`.
+
+## Observed choice and scope
 
 `attribute_pnl` explicitly dispatches Parallel, ordered Waterfall, Taylor or MetricsBased. The enum default is Parallel; the execution-policy default is Serial, a separate scheduling choice. This applies to instruments implementing the valuations instrument contract, with two market states and a non-reversed date interval. The raw `pnl_bridge` is a separate two-price mark-to-market calculation and does not collect period cash or validate date order.
 

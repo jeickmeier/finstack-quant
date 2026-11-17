@@ -1,11 +1,23 @@
 # ATTRIBUTION-005: Closing-state restoration and pairwise interaction correction
 
-- Decision status: Draft (observed implementation; adoption pending).
-- Implementation status: Observed for the source scope listed below.
-- Validation status: Source evidence inspected; named test evidence located, not executed. No numerical accuracy certification.
+- Decision status: Accepted 2026-11-16 for checked Parallel repricing and cross-factor effects.
+- Implementation status: Observed for the source scope listed below. Runtime, cash coverage, pricing, replay and host reconciliation with the accepted contract are pending.
+- Validation status: Independent exact examples checked pair signs, zero singles with nonzero interaction, higher-order residual, rate grouping, cash realization and reporting FX. Production attribution and host qualification remain pending.
 - Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and algorithm
+## Accepted decision for checked Parallel repricing and cross-factor effects
+
+1. Anchor every experiment to the same qualified closing state. At the resolved closing cut, restore each applicable changed factor to its exact opening sources and reprice through the selected pricer and provider. A model-parameter restore uses qualified opening parameters for the same instrument. Apply the same required failure rules under every pair election. Skip only a proven no-op or irrelevant source. Qualified one-sided availability still enters the experiment. [Accepted restoration contract](02-market-factor-restoration.md#accepted-decision-for-checked-economic-factor-families-and-market-restoration).
+2. Use held-market Carry under [record 003](03-total-return-carry.md#accepted-decision-for-checked-period-cash-gross-carry-and-funding). For restored state `S` let `W_S` be its qualified holder mark and eligible period cash combined. Compute the single-factor effect as `W_close − W_A` while retaining its price and cash components. Verify that singles and elected pairs account exactly once for `C_close − C_held`. An unsupported cash difference fails complete attribution.
+3. Elect rate grouping independently of pair selection. Use combined Rates or an explicitly qualified discount and projection split. A split requires disjoint source ownership, including related fixings and FX bridge inputs. Use the same grouping for singles and pairs. Retire the coupling between all-pairs selection and the rates basis.
+4. Elect no pairs, a typed pair list or all applicable pairs. Each pair is unordered. Reject self-pairs, duplicates including reversed duplicates, and overlapping restore scopes. Restore both factors atomically from the closing state. Add the correction `W_A + W_B − W_close − W_AB`. An evaluated zero single-factor effect can still have a nonzero pair effect. Retire the implicit nine-pair list.
+5. Use checked Money and bounded widened arithmetic for the full signed combination and accumulation. Retire the fixed `1e−12` pair filter and binary64 cross total. Two-factor closure requires the jointly restored state to reproduce the held basis. Higher-order price interactions can remain in residual even with all applicable pairs. Carry has no separately evaluated time pairs. [Record 013](13-target-currency-and-scaling.md) owns residual qualification.
+6. Use the respective staged markets at the closing cut on both sides of a native FX comparison. Apply reporting translation through [record 013](13-target-currency-and-scaling.md#accepted-portfolio-requirement-for-composable-reporting-fx). An elected credit cascade explains the verified standalone Credit effect using its exact restored-credit and closing states. Disclose any par-risk center bridge and final adjustment, and reconcile detail to its parent with cash identified separately. Required detail failure aborts. Explicitly advisory detail may be unavailable with a typed cause. [Credit hierarchy record](11-credit-factor-hierarchy.md).
+7. Publish checked Rust evidence with typed factor and pair identities, elected scope, marks and cash, state and cut provenance, skip reasons, actual pricing attempts and reuse. Use serial scheduling by default, with deterministic reduction and error order for independent parallel work. Python and WASM consume the checked result. [Accepted execution contract](01-execution-and-endpoints.md#accepted-decision-for-checked-instrument-attribution-execution-and-endpoints).
+
+Independent examples verified cash single effects of `+1` and `+1` with a pair correction of `−1`, closing to a cash difference of `+1`. Another example closed to P&L of `45` with combined Rates and Credit. Splitting discount and projection left `13` of third-order residual after every pair.
+
+## Observed choice and algorithm
 
 Parallel attribution separates economic methodology from scheduling. At closing date/state, restore one factor to opening state and define its contribution as `V1 - V(restore A)`. Carry separately reprices opening parameters and frozen opening market at closing date, then applies period cash. The method name does not force parallel execution: Serial is the default policy and parallel maps preserve factor reduction order.
 

@@ -2853,9 +2853,11 @@ and implementation and validation evidence.
 
 ### Campisi 2000
 
-- Campisi, S. "Primer on Fixed Income Performance Attribution." *Journal of
-  Portfolio Management*, 26(4), 14-25. Canonical carry / treasury / spread /
-  selection decomposition for fixed-income attribution.
+- Campisi, S. (2000). "Primer on Fixed Income Performance Attribution."
+  *Journal of Performance Measurement*, 4(4), 14–25. The original uses coupon
+  income relative to opening market value. The project's chosen position-level
+  quote moves and sensitivities are specified in its fixed-income attribution
+  record. [Publisher archive](https://tsgperformance.com/insights/spaulding-group-books-and-articles/).
 
 <a id="ben-dor-2007-dts"></a>
 
@@ -2892,13 +2894,13 @@ and implementation and validation evidence.
 
 ### Jeet Partani 2023
 
-- Jeet, V., & Partani, A. (2023). "Brinson-Style Attribution over Continuous
-  Factors." *The Journal of Portfolio Management*, Quantitative Special Issue
-  2023, 216-223. Appendix A source for the equality-constrained least-squares
-  correction (`f = f̂ + λg`) used by
-  `finstack-quant/analytics/src/regression.rs::constrained_least_squares` to
-  enforce `w'Xf = w'r` on top of an unconstrained OLS factor-return fit, for
-  factor-Brinson attribution.
+- Jeet, V., and Partani, A. (2023). "Brinson-Style Attribution over Continuous
+  Factors." *The Journal of Portfolio Management*, 49(2), 216–223.
+  [DOI](https://doi.org/10.3905/jpm.2022.1.446).
+  The project specifies its [constrained-fit contract](decisions/financial/analytics/14-svd-and-constrained-regression.md)
+  and its [continuous-factor attribution contract](decisions/financial/portfolio-attribution/06-continuous-factor-brinson.md)
+  in their owning records. The publisher full text and Appendix A were
+  unavailable for this review.
 
 <a id="fama-french-1993"></a>
 

@@ -2219,6 +2219,128 @@ requiring reproduction, adoption choices and missing validation are distinct.
   source-backed restoration under the
   [accepted single-period Brinson–Fachler contract](financial/portfolio-attribution/05-brinson-fachler.md#accepted-decision-for-checked-single-period-brinsonfachler-attribution).
 
+- **Continuous-factor attribution.** Reconcile the named dated inputs, exact
+  opening weights, explicit completeness gate, independent effects and
+  source-backed restoration under the
+  [accepted continuous-factor attribution contract](financial/portfolio-attribution/06-continuous-factor-brinson.md#accepted-decision-for-checked-continuous-factor-attribution).
+
+- **Fixed-income attribution.** Reconcile dated coupon carry, matched opening
+  sensitivities and observed moves, the residual label, signed sector admission
+  and checked host results under the
+  [accepted fixed-income attribution contract](financial/portfolio-attribution/07-fixed-income-campisi.md#accepted-decision-for-checked-fixed-income-attribution).
+
+- **Portfolio P&L attribution.** Reconcile role-specific endpoint profiles,
+  frozen tree reduction, composable reporting FX, checked Money closure
+  and source-backed results under the
+  [accepted portfolio P&L attribution contract](financial/portfolio-attribution/08-portfolio-pnl-endpoints.md#accepted-decision-for-checked-portfolio-pl-attribution).
+
+- **Duration-matched excess returns.** Reconcile shared cell bounds, typed
+  provenance, endpoint-relative zero-coupon pricing, exact opening weights
+  and checked host results under the
+  [accepted duration-matching contract](financial/portfolio-attribution/09-duration-cell-excess-returns.md#accepted-decision-for-checked-duration-matched-excess-returns).
+
+- **Optimization decision space.** Reconcile exact feature menus, physical
+  size and direction bounds, positive frozen share bases and source-backed
+  inputs under the
+  [accepted optimization decision-space contract](financial/portfolio-attribution/10-optimization-decision-space.md#accepted-decision-for-checked-optimization-decision-space).
+
+- **Linear optimization.** Reconcile explicit exposure and turnover controls,
+  scoped average domains and verification in original row units under the
+  [accepted linear optimization contract](financial/portfolio-attribution/11-linear-program-formulation.md#accepted-decision-for-checked-linear-optimization).
+
+- **Factor assignment and credit exposures.** Reconcile selected-source
+  coverage, issuer and index lineage, shared-source beta consistency,
+  raw par-quote endpoint repricing and exact request-local reuse under the
+  [accepted factor assignment contract](financial/portfolio-attribution/12-factor-assignment-and-credit-exposures.md#accepted-decision-for-checked-factor-assignment-and-credit-exposures).
+
+- **Issuer residual risk and hierarchy reporting.** Reconcile the common
+  factor and issuer forecast horizon, qualified member exposure, signed
+  variance allocations and checked hierarchy and host results under the
+  [accepted issuer residual contract](financial/portfolio-attribution/13-credit-residual-risk-and-reporting.md#accepted-decision-for-checked-issuer-residual-risk-and-hierarchy-reporting).
+
+- **Factor stress and position what-if.** Reconcile simultaneous source
+  moves, qualified comparison centers, selective endpoint reuse, absolute
+  target sizing and checked before-and-after results under the
+  [accepted stress and what-if contract](financial/portfolio-attribution/14-factor-stress-and-position-what-if.md#accepted-decision-for-checked-factor-stress-and-position-what-if).
+
+- **Duration-cell and sector attribution.** Reconcile typed grid membership,
+  exact weighted contributions, one-sided effects and verification of period
+  detail before linking under the
+  [accepted grid attribution contract](financial/portfolio-attribution/15-hierarchical-grid-attribution.md#accepted-decision-for-checked-duration-cell-and-sector-attribution).
+
+- **Optimization results and rebalance.** Reconcile absolute target
+  reconstruction, original-unit diagnostics, solve-bound application and
+  atomic portfolio materialization under the
+  [accepted optimization result contract](financial/portfolio-attribution/16-optimization-results-and-rebalance.md#accepted-decision-for-checked-optimization-results-and-rebalance).
+
+- **Carino linking.** Reconcile dated compatible periods, verified method
+  detail, range-safe growth and coefficient calculations, and source-backed
+  linked results under the
+  [accepted Carino linking contract](financial/portfolio-attribution/17-carino-linking-and-reconciliation.md#accepted-decision-for-checked-carino-linking-and-reconciliation).
+
+- **Instrument attribution execution.** Reconcile explicit dispatch,
+  qualified endpoint profiles and reuse, dated FX and deterministic
+  native and host execution under the
+  [accepted instrument attribution execution contract](financial/attribution/01-execution-and-endpoints.md#accepted-decision-for-checked-instrument-attribution-execution-and-endpoints).
+
+- **Instrument attribution market restoration.** Reconcile typed source
+  roles, capture authority, atomic dependency rebinding and cut and FX
+  provenance for shared restore-and-reprice stages under the
+  [accepted market restoration contract](financial/attribution/02-market-factor-restoration.md#accepted-decision-for-checked-economic-factor-families-and-market-restoration).
+
+- **Instrument attribution carry and funding.** Reconcile held-market carry,
+  closing-path cash, qualified fixed-yield detail, signed funding and
+  exact metric basis under the
+  [accepted carry and funding contract](financial/attribution/03-total-return-carry.md#accepted-decision-for-checked-period-cash-gross-carry-and-funding).
+
+- **Ordered Waterfall.** Reconcile explicit stage coverage, actual marks
+  and cash, independent terminal checks, FX and nested credit detail
+  under the [accepted Waterfall contract](financial/attribution/04-ordered-waterfall.md#accepted-decision-for-checked-ordered-waterfall-revaluation).
+
+- **Parallel repricing and cross-factor effects.** Reconcile closing-cut
+  experiments, explicit rate grouping and pairs, checked price and cash
+  effects, and replay under the
+  [accepted Parallel attribution contract](financial/attribution/05-parallel-and-cross-factor.md#accepted-decision-for-checked-parallel-repricing-and-cross-factor-effects).
+
+- **Taylor curve sensitivities and directional gamma.** Reconcile native rate
+  clock mapping, deduplicated rate shocks and exact credit quote coverage,
+  complete directional delivery and the qualified zero-shock credit center
+  under the [accepted Taylor curve risk contract](financial/attribution/06-taylor-curve-risk.md#accepted-decision-for-checked-taylor-curve-sensitivities-and-directional-gamma).
+
+- **Taylor volatility, restored factors and cash theta.** Reconcile native-grid
+  directional repricing, disjoint closing restores, required FX failures,
+  qualified held and closing cash and checked host evidence under the
+  [accepted Taylor volatility and cash theta contract](financial/attribution/07-taylor-volatility-and-restoration.md#accepted-decision-for-checked-taylor-volatility-restored-factors-and-cash-theta).
+
+- **MetricsBased input selection and pairing.** Reconcile opening metric
+  profiles, endpoint and producer provenance, native risk coordinates,
+  actual carry horizons, closing cash and same-basis counterfactual marks
+  under the [accepted metric input contract](financial/attribution/08-metric-inputs-and-move-pairing.md#accepted-decision-for-checked-metric-selection-horizon-matching-and-market-move-pairing).
+
+- **Rate and credit metric P&L.** Reconcile signed bucket products,
+  matched directional curvature, producer units and centers, and checked
+  arithmetic and availability under the [accepted rate and credit metric contract](financial/attribution/09-metric-rates-and-credit.md#accepted-decision-for-checked-metric-rate-and-credit-pl).
+
+- **Other metric factors and mixed P&L.** Reconcile exact spot and directed FX,
+  native volatility units, projected CPI and continuous-yield dividend axes,
+  registered mixed pairs and checked working under the
+  [accepted metric factor contract](financial/attribution/10-metric-other-factors.md#accepted-decision-for-checked-metric-spot-fx-volatility-inflation-and-mixed-factor-pl).
+
+- **Credit hierarchy and spread-replay allocation.** Reconcile frozen issuer
+  scope, measured reference and factor moves, ordered replay and opening
+  sensitivity allocations, and parent closure under the
+  [accepted credit hierarchy contract](financial/attribution/11-credit-factor-hierarchy.md#accepted-decision-for-checked-credit-hierarchy-and-spread-replay-allocation).
+
+- **Rates benchmark and credit carry allocation.** Reconcile the qualified
+  benchmark, independent cash lineage, signed gross carry and elected
+  opening-spread hierarchy under the
+  [accepted credit carry contract](financial/attribution/12-credit-carry-partition.md#accepted-decision-for-checked-rates-benchmark-and-credit-carry-allocation).
+
+- **Reporting FX, sizing and residual qualification.** Reconcile authored
+  conversion and sizing edges, checked atomic reductions, separate
+  representation adjustments and report-basis qualification under the
+  [accepted reporting and residual contract](financial/attribution/13-target-currency-and-scaling.md#accepted-decision-for-checked-reporting-fx-sizing-aggregation-and-residual-qualification).
+
 ### Implementation reconciliation
 
 - **Related scope:** retain the option-bearing CS01/OAS reconciliation above.

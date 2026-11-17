@@ -107,7 +107,7 @@ is accepted for floating-point accumulation and its finite-input requirements.
   not make `NaN` or infinity safe.
 
 **Evidence:** the shared [summation](finstack-quant/core/src/math/summation.rs)
-and [statistics](finstack-quant/core/src/math/stats.rs) modules provide the
+and [statistics](finstack-quant/core/src/math/stats/mod.rs) modules provide the
 numerical primitives. Their existence does not establish that every caller
 validates finiteness or uses the required arithmetic. The concrete monetary
 paths needing classification and correction are recorded in
@@ -1228,6 +1228,133 @@ exact signed weights summing to one on each side. Portfolio-only sectors
 have interaction only and benchmark-only sectors have allocation only.
 Verify centered effects and active return before binary64 projection.
 [Accepted single-period Brinson–Fachler](docs/decisions/financial/portfolio-attribution/05-brinson-fachler.md#accepted-decision-for-checked-single-period-brinsonfachler-attribution).
+
+Continuous-factor attribution binds dated exposures and coefficients to
+ordered asset and factor IDs. Check the signed benchmark residual against
+an explicit absolute tolerance and verify active-return closure independently.
+[Accepted continuous-factor attribution](docs/decisions/financial/portfolio-attribution/06-continuous-factor-brinson.md#accepted-decision-for-checked-continuous-factor-attribution).
+
+Fixed-income attribution calculates dated coupon carry and matched Treasury
+and Z-spread effects at position level. Preserve the residual and verify
+centered sector effects and active return before binary64 projection.
+[Accepted fixed-income attribution](docs/decisions/financial/portfolio-attribution/07-fixed-income-campisi.md#accepted-decision-for-checked-fixed-income-attribution).
+
+Portfolio P&L attribution uses qualified endpoints of one frozen valuation
+tree. Reconcile both marks, preserve reporting FX through each currency
+edge, and check all twelve base-currency buckets in Money.
+[Accepted portfolio P&L attribution](docs/decisions/financial/portfolio-attribution/08-portfolio-pnl-endpoints.md#accepted-decision-for-checked-portfolio-pl-attribution).
+
+Duration matching uses one materialized cell axis for assignment and
+lookup. Curve proxies use one dated maturity at both endpoints.
+Compute position-level excess before weighted aggregation.
+[Accepted duration-matched excess returns](docs/decisions/financial/portfolio-attribution/09-duration-cell-excess-returns.md#accepted-decision-for-checked-duration-matched-excess-returns).
+
+Optimization freezes a qualified valuation state and an explicit decision
+coordinate. Intersect hard bounds with signed holding size, and derive
+required additive coefficients from unscaled measures and target size once.
+[Accepted optimization decision space](docs/decisions/financial/portfolio-attribution/10-optimization-decision-space.md#accepted-decision-for-checked-optimization-decision-space).
+
+Linear optimization has separate explicit net, gross and full L1 turnover
+controls. Apply the positive scoped denominator requirement inside the LP.
+Verify results on the original row units and reconstructed target sizes.
+[Accepted linear optimization](docs/decisions/financial/portfolio-attribution/11-linear-program-formulation.md#accepted-decision-for-checked-linear-optimization).
+
+Factor assignment uses the selected pricer’s exact dependency roles and
+issuer identities. Apply each qualified pre-beta par-quote source exposure
+once per holding and factor. Require coherent shared-source betas and
+complete requested coverage for numerical publication.
+[Accepted factor assignment](docs/decisions/financial/portfolio-attribution/12-factor-assignment-and-credit-exposures.md#accepted-decision-for-checked-factor-assignment-and-credit-exposures).
+
+Systematic covariance and named issuer residual variance share one explicit
+forecast horizon. Net exact issuer spread exposures before computing
+residual variance and apply one risk-measure transform to combined variance.
+[Accepted issuer residual risk](docs/decisions/financial/portfolio-attribution/13-credit-residual-risk-and-reporting.md#accepted-decision-for-checked-issuer-residual-risk-and-hierarchy-reporting).
+
+Factor stress resolves a simultaneous typed shock vector on the qualified
+opening basis and measures full-product endpoint P&L. Position what-if uses
+the absolute target scale and re-nets issuer hedges on the fixed forecast.
+[Accepted factor stress and position what-if](docs/decisions/financial/portfolio-attribution/14-factor-stress-and-position-what-if.md#accepted-decision-for-checked-factor-stress-and-position-what-if).
+
+Hierarchical return attribution uses exact signed opening weights and a
+shared dated grid and taxonomy. Keep weighted portfolio contributions at
+zero net weight and require defined benchmark comparators. Verify cell
+and overall active-return closure before projection.
+[Accepted duration-cell and sector attribution](docs/decisions/financial/portfolio-attribution/15-hierarchical-grid-attribution.md#accepted-decision-for-checked-duration-cell-and-sector-attribution).
+
+Optimization publishes checked absolute target quantities and original-unit
+diagnostics. Rebalance previews apply verified targets to the exact admitted
+opening basis through atomic holding construction.
+[Accepted optimization results and rebalance](docs/decisions/financial/portfolio-attribution/16-optimization-results-and-rebalance.md#accepted-decision-for-checked-optimization-results-and-rebalance).
+
+Carino linking requires verified contiguous periods with positive growth.
+Calculate compounded active return from underlying growth and verify
+linked effects before display projection.
+[Accepted Carino linking](docs/decisions/financial/portfolio-attribution/17-carino-linking-and-reconciliation.md#accepted-decision-for-checked-carino-linking-and-reconciliation).
+
+Instrument attribution uses explicit methods and qualified, unscaled
+endpoint marks on the frozen instrument and pricing basis. Validate
+reused endpoints independently and compute reporting MTM at dated FX.
+[Accepted instrument attribution execution](docs/decisions/financial/attribution/01-execution-and-endpoints.md#accepted-decision-for-checked-instrument-attribution-execution-and-endpoints).
+
+Attribution restores exact captured market sources by qualified economic
+role. Distinguish qualified absence from uncaptured state and rebind and
+validate all required dependencies before pricing a restored state.
+[Accepted market factor restoration](docs/decisions/financial/attribution/02-market-factor-restoration.md#accepted-decision-for-checked-economic-factor-families-and-market-restoration).
+
+Attribution measures gross carry on held dated opening sources and uses
+the qualified closing-path cash for headline P&L. Count settlement cash
+once by entitlement and cut. Verify any cash difference and funding basis.
+[Accepted period cash, carry and funding](docs/decisions/financial/attribution/03-total-return-carry.md#accepted-decision-for-checked-period-cash-gross-carry-and-funding).
+
+Waterfall starts with qualified Carry and applies the explicit factor order
+to actual priced states. Verify terminal economic bindings, mark and cash
+independently before closing the checked Money audit trail.
+[Accepted ordered Waterfall](docs/decisions/financial/attribution/04-ordered-waterfall.md#accepted-decision-for-checked-ordered-waterfall-revaluation).
+
+Parallel attribution restores exact opening sources on a common closing
+basis. Elect rate grouping and pair coverage independently. Verify the
+allocated cash change and accumulate signed effects in checked Money.
+[Accepted Parallel repricing](docs/decisions/financial/attribution/05-parallel-and-cross-factor.md#accepted-decision-for-checked-parallel-repricing-and-cross-factor-effects).
+
+Taylor curve sensitivities pair rate and CDS quote moves on their verified native
+shock coordinates. Mutate each physical source once and evaluate elected gamma
+along its full move from one qualified center.
+[Accepted Taylor curve risk](docs/decisions/financial/attribution/06-taylor-curve-risk.md#accepted-decision-for-checked-taylor-curve-sensitivities-and-directional-gamma).
+
+Taylor volatility uses the matched native grid direction at opening or a
+disjoint restore scope at closing. Required restorations fail on missing
+coverage. Reconcile changed period cash exactly once by event.
+[Accepted Taylor volatility and cash theta](docs/decisions/financial/attribution/07-taylor-volatility-and-restoration.md#accepted-decision-for-checked-taylor-volatility-restored-factors-and-cash-theta).
+
+MetricsBased attribution binds the elected opening metrics to their exact
+producer directions and measures the actual held carry horizon. Fresh and
+supplied valuations must qualify on the same basis, including closing cash.
+[Accepted metric selection and move pairing](docs/decisions/financial/attribution/08-metric-inputs-and-move-pairing.md#accepted-decision-for-checked-metric-selection-horizon-matching-and-market-move-pairing).
+
+Rate and credit metric P&L pairs signed opening risk with matched native
+moves. Elect curvature only on the producer's verified direction and apply
+its actual units and center. Accumulate checked monetary effects once.
+[Accepted metric rate and credit P&L](docs/decisions/financial/attribution/09-metric-rates-and-credit.md#accepted-decision-for-checked-metric-rate-and-credit-pl).
+
+Spot, FX, volatility and inflation metric P&L use qualified producer units and
+directions. Elect mixed pairs on both matched axes, count each effect once and
+fail missing required inputs.
+[Accepted other metric factors and mixed P&L](docs/decisions/financial/attribution/10-metric-other-factors.md#accepted-decision-for-checked-metric-spot-fx-volatility-inflation-and-mixed-factor-pl).
+
+Credit hierarchy detail binds a validated opening model, exact issuer and
+quote scope, and the parent's pricing basis. Reconcile ordered moves, curve
+shape and separate bridges and cash before publishing nested detail.
+[Accepted credit hierarchy and spread replay](docs/decisions/financial/attribution/11-credit-factor-hierarchy.md#accepted-decision-for-checked-credit-hierarchy-and-spread-replay-allocation).
+
+Rates and credit carry reconcile to gross held carry through a qualified
+no-future-default benchmark and its own cash ledger. Elect and validate
+any signed opening-spread hierarchy allocation separately.
+[Accepted rates benchmark and credit carry](docs/decisions/financial/attribution/12-credit-carry-partition.md#accepted-decision-for-checked-rates-benchmark-and-credit-carry-allocation).
+
+Translate each qualified currency edge with dated marks, closing-equivalent
+cash and inherited reporting FX. Apply signed quantity once, reduce atomically
+and assess economic residual and monetary closure on the current report basis.
+[Accepted reporting FX, sizing and residual qualification](docs/decisions/financial/attribution/13-target-currency-and-scaling.md#accepted-decision-for-checked-reporting-fx-sizing-aggregation-and-residual-qualification).
 
 Valuation model inputs bind an exact source, unit, clock and parameter block.
 Use dated relative factors for GBM carry. Simulations retain explicit controls,

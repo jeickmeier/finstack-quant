@@ -155,27 +155,50 @@
 
 ### Choice, scope, and rationale
 
-The shared CPI/RPI helper treats observation lag and publication availability separately. Historical contractual anchors must come from supplied index history; unpublished anchors come from the inflation curve. This avoids silently projecting a missing historical fixing and applies month lag/daily interpolation once. Inflation instrument pricing and option distribution remain in their product/model records.
+The shared CPI/RPI helper takes explicit contractual lag, interpolation and
+knowledge cutoff. The cutoff must match the supplied immutable monthly fixing
+snapshot. Observations and expected releases remain separate from the unlagged
+projection curve. Inflation instrument pricing and option distribution remain
+in their product/model records.
 
 ### Algorithm and controls
 
-Effective lag priority is explicit contract lag, inflation-index lag, projection-curve `indexation_lag_months`, then none. Calendar months or days are subtracted; unsupported lag variants and date underflow fail. A curve lag that cannot fit `u8` becomes none, as does zero. This observed fallback is not an adopted economic convention.
+The shared resolver has no source-owned lag or interpolation fallback. All
+supported lag forms use canonical monthly anchors, independently of release
+metadata. Month lags retain the original contractual month's daily weight;
+day lags shift the date before selecting its month and weight. Unsupported
+lags and calendar underflow error.
 
-Monthly-anchor mode is selected for a month lag or an index carrying explicit monthly publication dates. A reference anchor is known when its publication date (or reference date if unspecified) is on/before as-of. Known anchors require history; unknown anchors require a same-ID inflation curve. Month lags move the reference month but retain the original contractual month's daily interpolation weight. Day/zero lags first move the reference date, then use that date's month/weight when publication metadata selects monthly mode.
+An exact observation in the matching snapshot takes priority over an expected
+release. Without an observation, a matching expected-release fact strictly
+after the knowledge cutoff admits projection at that exact monthly anchor.
+Missing or overdue release facts error, as does projection before the curve's
+origin. A valuation-date change does not change the snapshot.
 
-Let `I0` be lagged month's first-day anchor and `I1` the next month's. Step interpolation or day one returns `I0`; linear interpolation returns `I0+w(I1−I0)`, `w=(day−1)/days_in_weight_month`. The reference is known only if both required anchors are known. Its outstanding publication date is the latest unknown-anchor publication when all required dates are supplied, otherwise unspecified. Known anchors are never replaced by projected values because history is missing.
+Step interpolation or zero daily weight resolves only the first anchor.
+Linear interpolation at positive weight also resolves the next month, with
+`w=(day−1)/days_in_weight_month`. Stable positive convex interpolation preserves
+equal subnormal and maximum finite levels. The result retains the index,
+knowledge cutoff, contributing months, weights, levels and actual observation
+or expected-release records. It is known only when all required anchors are
+observed; its optional outstanding completion date is the latest expected
+release, not an actual publication timestamp.
 
-Outside monthly mode, apply the effective lag directly and resolve the resulting date. For historical Step series, the last supplied observation may carry through the remainder of its calendar month; Linear requires right-anchor coverage through the effective date. The helper errors before extrapolating stale history. `BlackScholesInputsDf::r_eff` separately derives `−ln(DF)/T` for a model's volatility clock, returning zero for nonpositive time or discount factor; this convenience accessor does not enforce the stricter positive-DF validator used elsewhere.
-
-The helper's `interpolation` argument controls only the monthly-anchor branch. Outside it, historical resolution uses the index's own interpolation after clearing its lag, and future resolution delegates to the projection curve's `cpi_on_date`. A requested Step therefore does not override a Linear historical index in this branch, and vice versa.
+`BlackScholesInputsDf::r_eff` remains a separate helper. It derives
+`−ln(DF)/T` for a model's volatility clock and still returns zero for
+nonpositive time or discount factor; its accepted checked-inverse
+reconciliation remains pending.
 
 ### Limitations and alternatives
 
-Publication schedules must be supplied to represent not-yet-published past reference months. Without them, reference date is the availability boundary, so missing history errors. This is intentionally different from an automatic publication-lag estimate.
+Projection requires an identified snapshot, even when its observation history
+is empty, and explicit outstanding release facts. Missing dates are not
+inferred from reference months or contractual lags. The shared profile covers
+first-of-month Step/Linear geometry, not alternative issue-specific anchors.
 
 ## Evidence
 
-- [helpers.rs](../../../../finstack-quant/valuations/core/src/instruments/common_impl/helpers.rs): production inflation helpers after the first inline test module; `realized_inflation_index_tests` exercise known/future anchors and stale history. Those tests are behavioral, not vendor calibration evidence.
+- [helpers.rs](../../../../finstack-quant/valuations/core/src/instruments/common_impl/helpers.rs): `realized_inflation_index_tests` exercise observation priority, future/overdue/missing release facts, snapshot mismatch, lag geometry, unused anchors, extreme positive levels and calendar underflow. These are behavioral tests, not vendor calibration evidence.
 - [Deacon–Derry–Mirfendereski](../../../REFERENCES.md#deacon-derry-mirfendereski-2004) and [Kerkhof](../../../REFERENCES.md#kerkhof-2005) are canonical inflation-model context. The precise publication/default policy remains a repository choice awaiting approval.
 
 The live [indexed bond helper](../../../../finstack-quant/valuations/fixed-income/src/inflation_linked_bond/indexation.rs)

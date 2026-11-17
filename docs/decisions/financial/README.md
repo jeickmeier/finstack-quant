@@ -2443,6 +2443,135 @@ The package covers exact dated sector partitions, the centered formula,
 one-sided sector effects and checked reconciliation before projection.
 [PORTFOLIO-ATTRIBUTION-005](portfolio-attribution/05-brinson-fachler.md#accepted-decision-for-checked-single-period-brinsonfachler-attribution).
 
+Continuous-factor attribution was accepted on 2026-11-16. The package
+covers dated input provenance, benchmark completeness, independent factor
+and specific effects, and the one-hot sector reduction.
+[PORTFOLIO-ATTRIBUTION-006](portfolio-attribution/06-continuous-factor-brinson.md#accepted-decision-for-checked-continuous-factor-attribution).
+
+Campisi-style fixed-income attribution was accepted on 2026-11-16. The
+package covers dated coupon carry, matched Treasury and Z-spread effects,
+residual, signed sectors and reconciliation before projection.
+[PORTFOLIO-ATTRIBUTION-007](portfolio-attribution/07-fixed-income-campisi.md#accepted-decision-for-checked-fixed-income-attribution).
+
+Portfolio P&L attribution was accepted on 2026-11-16. The package covers
+frozen valuation endpoints, prepared leaf reduction, composable reporting
+FX and exact-money reconciliation and reporting.
+[PORTFOLIO-ATTRIBUTION-008](portfolio-attribution/08-portfolio-pnl-endpoints.md#accepted-decision-for-checked-portfolio-pl-attribution).
+
+Duration-matched excess returns were accepted on 2026-11-16. The package
+covers shared cell bounds, reference provenance, dated zero-coupon proxies
+and signed position-first excess aggregation.
+[PORTFOLIO-ATTRIBUTION-009](portfolio-attribution/09-duration-cell-excess-returns.md#accepted-decision-for-checked-duration-matched-excess-returns).
+
+Optimization decision-space construction was accepted on 2026-11-16. The
+package covers frozen valuation inputs, explicit coordinates, signed
+trade eligibility and unit-qualified strict feature preparation.
+[PORTFOLIO-ATTRIBUTION-010](portfolio-attribution/10-optimization-decision-space.md#accepted-decision-for-checked-optimization-decision-space).
+
+Continuous linear optimization was accepted on 2026-11-16. The package
+covers net, gross and turnover controls, scoped positive-denominator
+averages and independent verification of reconstructed solutions.
+[PORTFOLIO-ATTRIBUTION-011](portfolio-attribution/11-linear-program-formulation.md#accepted-decision-for-checked-linear-optimization).
+
+Factor assignment and assignment-driven credit exposures were accepted
+on 2026-11-16. The package covers selected-pricer dependencies, complete
+coverage for numerical publication, two-endpoint par-quote exposures
+and checked first-order factor loadings.
+[PORTFOLIO-ATTRIBUTION-012](portfolio-attribution/12-factor-assignment-and-credit-exposures.md#accepted-decision-for-checked-factor-assignment-and-credit-exposures).
+
+Issuer residual risk and hierarchy reporting were accepted on 2026-11-16.
+The package covers named issuer exposure and coverage, one forecast
+horizon, issuer-netted variance and a checked measure-aware report.
+[PORTFOLIO-ATTRIBUTION-013](portfolio-attribution/13-credit-residual-risk-and-reporting.md#accepted-decision-for-checked-issuer-residual-risk-and-hierarchy-reporting).
+
+Factor stress and position what-if were accepted on 2026-11-16. The
+package covers simultaneous shocks, qualified full-product repricing,
+conditional stressed risk, absolute target sizing and checked reports.
+[PORTFOLIO-ATTRIBUTION-014](portfolio-attribution/14-factor-stress-and-position-what-if.md#accepted-decision-for-checked-factor-stress-and-position-what-if).
+
+Duration-cell and sector attribution was accepted on 2026-11-16. The
+package covers a shared dated grid, exact signed weights, one-sided
+effects, cell and portfolio closure and verified period detail.
+[PORTFOLIO-ATTRIBUTION-015](portfolio-attribution/15-hierarchical-grid-attribution.md#accepted-decision-for-checked-duration-cell-and-sector-attribution).
+
+Optimization results and rebalance were accepted on 2026-11-16. The
+package covers verified absolute quantities, original-unit diagnostics,
+quantity-based trade suggestions and solve-bound rebalance previews.
+[PORTFOLIO-ATTRIBUTION-016](portfolio-attribution/16-optimization-results-and-rebalance.md#accepted-decision-for-checked-optimization-results-and-rebalance).
+
+Carino linking was accepted on 2026-11-16, completing adoption in all
+17 portfolio attribution records. The package covers contiguous verified
+periods, positive growth, stable coefficients, compounded active return
+and checked linked results.
+[PORTFOLIO-ATTRIBUTION-017](portfolio-attribution/17-carino-linking-and-reconciliation.md#accepted-decision-for-checked-carino-linking-and-reconciliation).
+
+Shared instrument attribution execution was accepted on 2026-11-16.
+The package covers explicit method selection, qualified endpoints and
+dated reporting FX, ordered execution and checked host results.
+[ATTRIBUTION-001](attribution/01-execution-and-endpoints.md#accepted-decision-for-checked-instrument-attribution-execution-and-endpoints).
+
+Shared economic factor families and market restoration were accepted on
+2026-11-16. The package covers qualified typed dependencies, exact
+captured replacements, atomic rebinding and dated state and FX evidence.
+[ATTRIBUTION-002](attribution/02-market-factor-restoration.md#accepted-decision-for-checked-economic-factor-families-and-market-restoration).
+
+Period cash, gross carry and funding were accepted on 2026-11-16.
+The package covers cash eligibility at each cut, held versus closing
+cash, qualified fixed-yield partition and explicit signed funding.
+[ATTRIBUTION-003](attribution/03-total-return-carry.md#accepted-decision-for-checked-period-cash-gross-carry-and-funding).
+
+Ordered Waterfall revaluation was accepted on 2026-11-16. The package
+covers explicit stage order and coverage, qualified marks and cash,
+independent terminal checks and nested credit detail.
+[ATTRIBUTION-004](attribution/04-ordered-waterfall.md#accepted-decision-for-checked-ordered-waterfall-revaluation).
+
+Parallel repricing and cross-factor effects were accepted on 2026-11-16.
+The package covers closing-cut restorations, exact cash reconciliation,
+explicit rate grouping and pair selection, and checked result evidence.
+[ATTRIBUTION-005](attribution/05-parallel-and-cross-factor.md#accepted-decision-for-checked-parallel-repricing-and-cross-factor-effects).
+
+Taylor curve sensitivities and directional gamma were accepted on 2026-11-16.
+The package covers qualified opening repricing, native rate clocks and triangular
+grids, exact credit quote pairing, and verified full within-curve move delivery.
+[ATTRIBUTION-006](attribution/06-taylor-curve-risk.md#accepted-decision-for-checked-taylor-curve-sensitivities-and-directional-gamma).
+
+Taylor volatility, restored factors and cash theta were accepted on 2026-11-16.
+The package covers full native-grid directions, disjoint opening and closing
+experiments, typed failures, cash realization and checked result evidence.
+[ATTRIBUTION-007](attribution/07-taylor-volatility-and-restoration.md#accepted-decision-for-checked-taylor-volatility-restored-factors-and-cash-theta).
+
+Metric selection, horizon matching and market-move pairing were accepted on
+2026-11-16. The package covers qualified opening profiles and endpoints,
+exact producer directions, actual held carry and independently qualified
+closing cash.
+[ATTRIBUTION-008](attribution/08-metric-inputs-and-move-pairing.md#accepted-decision-for-checked-metric-selection-horizon-matching-and-market-move-pairing).
+
+Metric rate and credit P&L was accepted on 2026-11-16. The package covers
+signed bucket and directional scalar effects, distinct producer axes and
+centers, and checked totals and diagnostics.
+[ATTRIBUTION-009](attribution/09-metric-rates-and-credit.md#accepted-decision-for-checked-metric-rate-and-credit-pl).
+
+Metric spot, FX, volatility, inflation and mixed-factor P&L were accepted on
+2026-11-16. The package covers exact producer directions and units,
+continuous-yield dividend risk, explicit registered pairs and checked working.
+[ATTRIBUTION-010](attribution/10-metric-other-factors.md#accepted-decision-for-checked-metric-spot-fx-volatility-inflation-and-mixed-factor-pl).
+
+Credit hierarchy and spread-replay allocation were accepted on 2026-11-16.
+The package covers exact issuer and quote scope, ordered replay or opening
+sensitivity allocation, separate curve shape and bridges, and parent closure.
+[ATTRIBUTION-011](attribution/11-credit-factor-hierarchy.md#accepted-decision-for-checked-credit-hierarchy-and-spread-replay-allocation).
+
+Rates benchmark and credit carry allocation were accepted on 2026-11-16.
+The package covers a qualified no-future-default benchmark, separate cash
+ledgers, signed gross carry and elected opening-spread hierarchy detail.
+[ATTRIBUTION-012](attribution/12-credit-carry-partition.md#accepted-decision-for-checked-rates-benchmark-and-credit-carry-allocation).
+
+Reporting FX, sizing, aggregation and residual qualification were accepted
+on 2026-11-16. The package extends the earlier portfolio FX rule to the
+shared translator and covers atomic reduction, report-basis materiality
+and exact-zero share availability.
+[ATTRIBUTION-013](attribution/13-target-currency-and-scaling.md#accepted-decision-for-checked-reporting-fx-sizing-aggregation-and-residual-qualification).
+
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the
 accepted perspective/sign contracts; broader margin methodology retains its

@@ -2032,6 +2032,151 @@ of the published example, one-sided sectors, signed weights, exact closure
 and binary64 projection. Runtime and host qualification remain pending.
 [PORTFOLIO-ATTRIBUTION-005](portfolio-attribution/05-brinson-fachler.md#accepted-decision-for-checked-single-period-brinsonfachler-attribution).
 
+The accepted continuous-factor package has independent checks of algebraic
+closure, complete and incomplete fits, exposure rescaling, sector reduction
+and required output range. Runtime and host qualification remain pending.
+[PORTFOLIO-ATTRIBUTION-006](portfolio-attribution/06-continuous-factor-brinson.md#accepted-decision-for-checked-continuous-factor-attribution).
+
+The accepted fixed-income attribution package has independent checks of
+dated coupon and shock effects, one-sided sectors, signed net weights,
+residual and active-return closure. Runtime, market-data and host
+qualification remain pending.
+[PORTFOLIO-ATTRIBUTION-007](portfolio-attribution/07-fixed-income-campisi.md#accepted-decision-for-checked-fixed-income-attribution).
+
+The accepted portfolio P&L attribution package has independent endpoint,
+nested FX, signed cash, monetary closure and percentage checks. Runtime,
+shared translator, integration and host qualification remain pending.
+[PORTFOLIO-ATTRIBUTION-008](portfolio-attribution/08-portfolio-pnl-endpoints.md#accepted-decision-for-checked-portfolio-pl-attribution).
+
+The accepted duration-matching package has independent checks of cell
+boundaries, fills, dated discount-price normalization and signed excess
+closure. Runtime, market-data and host qualification remain pending.
+[PORTFOLIO-ATTRIBUTION-009](portfolio-attribution/09-duration-cell-excess-returns.md#accepted-decision-for-checked-duration-matched-excess-returns).
+
+The accepted optimization decision-space package has independent checks
+of signed-PV direction, held constraints, gross and net bases, zero-PV
+holdings and additive metric scaling. Runtime and host qualification remain
+pending.
+[PORTFOLIO-ATTRIBUTION-010](portfolio-attribution/10-optimization-decision-space.md#accepted-decision-for-checked-optimization-decision-space).
+
+The accepted linear optimization package has independent checks of net,
+gross and turnover arithmetic and average-denominator eligibility.
+Production solver, reconstruction and host qualification remain pending.
+[PORTFOLIO-ATTRIBUTION-011](portfolio-attribution/11-linear-program-formulation.md#accepted-decision-for-checked-linear-optimization).
+
+The accepted factor assignment package has independent checks of signed
+source sensitivities, issuer beta application and the difference between
+local loadings and finite stress. Production replay, numerical-range and
+host qualification remain pending.
+[PORTFOLIO-ATTRIBUTION-012](portfolio-attribution/12-factor-assignment-and-credit-exposures.md#accepted-decision-for-checked-factor-assignment-and-credit-exposures).
+
+The accepted issuer residual package has independent checks of common
+fractional-year scaling, signed allocation closure, near-offset exposures
+and the need for issuer attribution on shared sources. Runtime forecast,
+risk, report and host qualification remain pending.
+[PORTFOLIO-ATTRIBUTION-013](portfolio-attribution/13-credit-residual-risk-and-reporting.md#accepted-decision-for-checked-issuer-residual-risk-and-hierarchy-reporting).
+
+The accepted stress and what-if package has independent checks of joint
+shock composition, the credit comparison center, reporting-only FX,
+issuer re-netting and resize range. Production and host qualification
+remain pending.
+[PORTFOLIO-ATTRIBUTION-014](portfolio-attribution/14-factor-stress-and-position-what-if.md#accepted-decision-for-checked-factor-stress-and-position-what-if).
+
+The accepted grid attribution package has independent checks of one-sided
+effects, an occupied zero-net portfolio cell, signed benchmark nets and
+active return before projection. Original appendix verification and
+production and host qualification remain pending.
+[PORTFOLIO-ATTRIBUTION-015](portfolio-attribution/15-hierarchical-grid-attribution.md#accepted-decision-for-checked-duration-cell-and-sector-attribution).
+
+The accepted optimization result package has independent checks of signed
+reconstruction, small-weight trades, original-unit slacks, rounded quantity
+deltas and stale-basis application. Solver, replay, construction and host
+qualification remain pending.
+[PORTFOLIO-ATTRIBUTION-016](portfolio-attribution/16-optimization-results-and-rebalance.md#accepted-decision-for-checked-optimization-results-and-rebalance).
+
+The accepted Carino package has independent checks of ordinary linking,
+exactly flat active horizons with offsetting effects, near-loss growth
+and range-safe reconciliation. Production and host qualification remain
+pending.
+[PORTFOLIO-ATTRIBUTION-017](portfolio-attribution/17-carino-linking-and-reconciliation.md#accepted-decision-for-checked-carino-linking-and-reconciliation).
+
+The accepted instrument attribution execution package has independent
+checks of dated FX, closing-equivalent cash and the independent identity
+of both endpoints. Production pricing, replay and host qualification
+remain pending.
+[ATTRIBUTION-001](attribution/01-execution-and-endpoints.md#accepted-decision-for-checked-instrument-attribution-execution-and-endpoints).
+
+The accepted market factor restoration package has independent examples
+of symmetric replacement, namespace isolation, qualified closing-only
+inputs and a changed FX route. Production attribution, replay and host
+qualification remain pending.
+[ATTRIBUTION-002](attribution/02-market-factor-restoration.md#accepted-decision-for-checked-economic-factor-families-and-market-restoration).
+
+The accepted carry package has independent checks of cash-phase
+combinations, fixed-yield closure, cash realization differences,
+signed funding and closing-equivalent FX. Production attribution,
+pricing and host qualification remain pending.
+[ATTRIBUTION-003](attribution/03-total-return-carry.md#accepted-decision-for-checked-period-cash-gross-carry-and-funding).
+
+The accepted Waterfall package has independent checks of order effects,
+offsetting marks, price and cash closure, reporting FX and nested
+credit details. Production pricing, replay and host qualification
+remain pending.
+[ATTRIBUTION-004](attribution/04-ordered-waterfall.md#accepted-decision-for-checked-ordered-waterfall-revaluation).
+
+The accepted Parallel package has independent checks of pair signs,
+zero singles with nonzero interaction, grouping, higher-order residual,
+cash realization and reporting FX. Production pricing, replay and host
+qualification remain pending.
+[ATTRIBUTION-005](attribution/05-parallel-and-cross-factor.md#accepted-decision-for-checked-parallel-repricing-and-cross-factor-effects).
+
+The accepted Taylor curve risk package has independent checks of rate-clock
+mapping, signed credit twists, joint directional gamma, zero-shock credit centers
+and unequal-node curvature. Production pricing, replay and host qualification
+remain pending.
+[ATTRIBUTION-006](attribution/06-taylor-curve-risk.md#accepted-decision-for-checked-taylor-curve-sensitivities-and-directional-gamma).
+
+The accepted Taylor volatility and cash theta package has independent checks
+of directional volatility curvature, disjoint restoration, cash realization
+and mixed-anchor residual. Production pricing, cash and host qualification
+remain pending.
+[ATTRIBUTION-007](attribution/07-taylor-volatility-and-restoration.md#accepted-decision-for-checked-taylor-volatility-restored-factors-and-cash-theta).
+
+The accepted MetricsBased input package has independent checks of native
+rate-clock mapping, credit twists, directed FX, model-parameter repricing,
+exact carry horizons and closing cash reconciliation. Production metric,
+pricing, cash and host qualification remain pending.
+[ATTRIBUTION-008](attribution/08-metric-inputs-and-move-pairing.md#accepted-decision-for-checked-metric-selection-horizon-matching-and-market-move-pairing).
+
+The accepted metric rate and credit P&L package has independent checks of
+credit twists, matched spread and rate curvature, intensity risk and product
+scaling. Production metric, pricing and host qualification remain pending.
+[ATTRIBUTION-009](attribution/09-metric-rates-and-credit.md#accepted-decision-for-checked-metric-rate-and-credit-pl).
+
+The accepted other metric factor and mixed P&L package has independent checks
+of spot units, directed and unequal FX moves, native Normal volatility, CPI
+growth, dividend yield, mixed terms and small Money amounts. Production metric,
+pricing and host qualification remain pending.
+[ATTRIBUTION-010](attribution/10-metric-other-factors.md#accepted-decision-for-checked-metric-spot-fx-volatility-inflation-and-mixed-factor-pl).
+
+The accepted credit hierarchy package has independent checks of signed beta
+moves and adder, replay order, measured shape, separate curvature and parent
+cash closure. Production model, pricing, replay and host qualification remain
+pending.
+[ATTRIBUTION-011](attribution/11-credit-factor-hierarchy.md#accepted-decision-for-checked-credit-hierarchy-and-spread-replay-allocation).
+
+The accepted rates benchmark and credit carry package has independent
+checks of signed benchmark carry, separate price and cash differences,
+signed hierarchy weights and a zero denominator. Production benchmark,
+cash, model and host qualification remain pending.
+[ATTRIBUTION-012](attribution/12-credit-carry-partition.md#accepted-decision-for-checked-rates-benchmark-and-credit-carry-allocation).
+
+The accepted reporting FX and residual package has independent checks of
+composed FX, representation rounding, signed sizing, independent endpoint
+reductions and exact-zero tolerance and share behavior. Production arithmetic,
+report and host qualification remain pending.
+[ATTRIBUTION-013](attribution/13-target-currency-and-scaling.md#accepted-decision-for-checked-reporting-fx-sizing-aggregation-and-residual-qualification).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

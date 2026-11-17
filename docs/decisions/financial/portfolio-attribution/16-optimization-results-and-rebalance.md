@@ -1,13 +1,25 @@
 # PORTFOLIO-ATTRIBUTION-016: Optimization reconstruction, diagnostics and portfolio rebalance
 
 - ID: PORTFOLIO-ATTRIBUTION-016
-- Decision status: Draft (observed implementation; adoption pending).
-- Implementation status: Observed for the stated owning source scope; discrepancies are named below.
-- Validation status: Evidence inspected/located, not executed; independent accuracy qualification remains open.
+- Decision status: Accepted 2026-11-16 for checked optimization results and rebalance previews.
+- Implementation status: Observed for the stated owning source scope. Solver, construction, replay and host reconciliation with the accepted contract are pending.
+- Validation status: Independent arithmetic covered signed reconstruction, small-weight trades, original-unit slacks, rounded quantity deltas and stale-basis application. Production and host qualification remain pending.
 - Audit date: 2026-11-05.
 - Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and reconstruction
+## Accepted decision for checked optimization results and rebalance
+
+1. Read and require the backend's actual Optimal status before inspecting solution values. Publish solution quantities, objective and trades only after independent reconstruction and verification pass. Stopped, infeasible, unbounded and failed outcomes carry typed diagnostics with solution fields absent. [Accepted LP contract](11-linear-program-formulation.md#accepted-decision-for-checked-linear-optimization).
+2. Reconstruct absolute quantities on the frozen solve basis. For ValueWeight use `w × G / p` with signed PV per unit scale `p`. For NotionalWeight use `w × G / n` with qualified positive notional per unit scale `n`. TargetScale supplies scale directly. Convert once to the authored quantity unit. Preserve exact held quantities, including held zero-PV positions. Reject unrepresentable quantities and hard-bound breaches. Recompute the objective, net, gross and full L1 turnover on the actual admitted quantities and original reference. TargetScale needs a qualified common monetary map for aggregate exposure and turnover. [Accepted decision coordinates](10-optimization-decision-space.md#accepted-decision-for-checked-optimization-decision-space).
+3. Report every original check in its own units with a stable ordered ID, including unnamed constraints, position bounds, holds and average-denominator controls. Display labels may repeat. Report upper-bound slack as `rhs − lhs`, lower-bound slack as `lhs − rhs` and signed equality residual as `lhs − rhs`. Inequality binding is exact by default and any elected binding band is explicit in row units. Identify any violation admitted by an authorized feasibility tolerance. Use the original average and denominator checks.
+4. Derive one suggestion for every nonzero quantity change in existing-holding order followed by declared candidate order. Buy or Sell follows the sign of `target_quantity − opening_quantity`, including a sign reversal. A nonzero candidate opens and an existing nonzero holding closes at exact zero. Retire weight and quantity thresholds. Use admitted absolute targets for application.
+5. Bind application to the exact verified solve, including ordered opening holdings and candidates, objective and constraints, decision coordinate and reference, market snapshot, valuation date, effective settings, FX and producing build. Restore reports for inspection through the checked result contract. Applying a restored result requires trusted verification evidence or a replay on the exact historical inputs that verifies the same target quantities. Decoded status and matching IDs alone are insufficient. [Auditable results and replay](../../project/0025-auditable-results-and-replay.md#decision).
+6. Construct and publish the target portfolio atomically through canonical holding admission. Retain existing zero-sized closeouts and add exactly the nonzero candidates with their admitted ownership and instrument definitions. Rebuild indices and evaluation identity. Verify the constructed holdings on the frozen basis using qualified coefficients or exact-basis pricing when needed. The result is a continuous allocation preview. Lot rounding, transaction costs, cash funding and settlement require their own modeled terms. [Accepted holding admission](../portfolio-execution/01-position-sizing-and-validation.md#accepted-decision-for-checked-portfolio-holdings-and-signed-sizing).
+7. Use one bounded checked Rust result and restoration contract. Verify ordered identities and the correspondence among absolute quantities, trades, diagnostics and outcome. Python and WASM use the same admission and application checks.
+
+Independent arithmetic gave `0.3 years` of slack for a `3.2-year` achieved duration against a `3.5-year` cap. A weight change of `5 × 10⁻¹⁰` on a USD `10 trillion` reference represents USD `5,000`. Applying a rounded binary64 quantity delta to an opening quantity of `2⁵³` can produce zero when the verified absolute target is `−1`.
+
+## Observed choice and reconstruction
 
 A successful solver result is translated from continuous weights back into position quantities, trade suggestions and scalar diagnostics. It is not executed in a trading system and does not round to lots. Only `OptimizationStatus::Optimal` is treated as feasible; the result object can be deserialized, so downstream validation remains material.
 
