@@ -6,8 +6,11 @@ def parse_formula(formula: str) -> str:
     """
     Parse a DSL formula and render it back as canonical DSL source text.
 
-    Parentheses are emitted only where operator precedence requires them, so
-    the returned text re-parses to an identical expression.
+    Parentheses are emitted only where operator precedence requires them and
+    logical negation is always written ``!``, so the returned text re-parses
+    to an identical expression. ``!`` binds like unary minus (``!a > b`` is
+    ``(!a) > b``); keyword ``not`` binds outside a comparison (``not a > b``
+    is ``not (a > b)``); a nested comparison needs explicit parentheses.
 
     Parameters
     ----------
@@ -22,13 +25,17 @@ def parse_formula(formula: str) -> str:
     Raises
     ------
     ValueError
-        If ``formula`` is not valid statements DSL.
+        If ``formula`` is not one complete expression, an identifier has an
+        empty dot-separated segment, or the formula exceeds 64 levels of
+        nesting or 256 terms.
 
     Examples
     --------
     >>> from finstack_quant.statements import parse_formula
     >>> parse_formula("(revenue - cogs)/revenue")
     '(revenue - cogs) / revenue'
+    >>> parse_formula("not a > b")
+    '!(a > b)'
 
     """
     ...
@@ -36,6 +43,12 @@ def parse_formula(formula: str) -> str:
 def parse_and_compile(formula: str) -> None:
     """
     Validate that ``formula`` parses and compiles successfully.
+
+    Compilation checks every branch, including one evaluation would skip:
+    function names and argument counts (``cumsum``, ``cumprod``, ``cummin``,
+    ``cummax``, ``std``, ``var`` and ``median`` take exactly one argument),
+    capital-structure components, and that no ``lag``, ``shift``, ``diff``,
+    ``pct_change`` or ``growth_rate`` offset is a negative literal.
 
     Parameters
     ----------
@@ -51,7 +64,9 @@ def parse_and_compile(formula: str) -> None:
     Raises
     ------
     ValueError
-        If parsing or compilation fails.
+        If the formula does not parse, names an unknown function or
+        capital-structure component, passes a wrong number of arguments, or
+        reads a future period through a negative literal offset.
 
     Examples
     --------

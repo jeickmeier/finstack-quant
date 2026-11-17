@@ -1,10 +1,11 @@
 //! Compiler from Statements DSL AST to core Expr.
 
 use crate::dsl::ast::StmtExpr;
+use crate::dsl::signatures::FunctionSignature;
 use crate::error::Result;
 use crate::types::{NodeId, NodeValueType};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::expr::{BinOp, Expr, Function, UnaryOp};
+use finstack_quant_core::expr::{BinOp, Expr, UnaryOp};
 use indexmap::IndexMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,68 +19,57 @@ enum Dimension {
 ///
 /// Converts the statements DSL syntax into the shared expression engine
 /// representation used by the evaluator.
-/// Capital-structure references are checked against the fixed component
-/// vocabulary at this boundary and encoded as the core expression engine's
+/// The whole tree is validated before it is lowered, so a tree built with the
+/// public [`StmtExpr`] constructors meets the same rules as parsed text.
+/// Capital-structure references are encoded as the core expression engine's
 /// dedicated `cs` reference form.
 ///
 /// # Arguments
 ///
-/// * `ast` - Parsed statements DSL expression to lower into the core expression
-///   representation.
+/// * `ast` - Statements DSL expression to lower, parsed from text or built
+///   with the [`StmtExpr`] constructors. At most 256 terms (literals,
+///   references, calls and conditionals) and 320 levels deep.
 ///
 /// # Errors
 ///
-/// Returns an evaluation error when a capital-structure reference names an
-/// unsupported component, or when a nested operator/function expression is
-/// invalid for compilation. Parsing is a separate step; use
-/// [`crate::dsl::parse_and_compile`] when starting from source text.
-///
+/// Returns a formula-parse error for a non-finite literal, an identifier
+/// without nonempty dot-separated segments, or a tree over the size limits.
+/// Returns an evaluation error for an unknown capital-structure component, an
+/// unknown function, a wrong argument count, or a negative literal offset to
+/// `lag`, `shift`, `diff`, `pct_change` or `growth_rate`. Every branch is
+/// checked, including one evaluation would skip.
 pub fn compile(ast: &StmtExpr) -> Result<Expr> {
+    crate::dsl::validate::validate_ast(ast)?;
+    lower(ast)
+}
+
+/// Lower a validated tree. Recursion depth is bounded by the preflight.
+fn lower(ast: &StmtExpr) -> Result<Expr> {
     match ast {
         StmtExpr::Literal(val) => Ok(Expr::literal(*val)),
-
         StmtExpr::NodeRef(name) => Ok(Expr::column(name.as_str().to_string())),
-
-        // Preserve capital-structure references as dedicated expression nodes.
         StmtExpr::CsRef {
             component,
             instrument_or_total,
-        } => {
-            // Validate component name at compile time to catch typos early
-            const VALID_CS_COMPONENTS: &[&str] = &[
-                "interest_expense",
-                "interest_expense_cash",
-                "interest_expense_pik",
-                "interest_income",
-                "principal_payment",
-                "debt_balance",
-                "fees",
-                "accrued_interest",
-            ];
-            if !VALID_CS_COMPONENTS.contains(&component.as_str()) {
-                return Err(crate::error::Error::eval(format!(
-                    "Unknown capital structure component: '{}'. Valid components: {}",
-                    component,
-                    VALID_CS_COMPONENTS.join(", ")
-                )));
-            }
-
-            Ok(Expr::cs_ref(component.clone(), instrument_or_total.clone()))
+        } => Ok(Expr::cs_ref(component.clone(), instrument_or_total.clone())),
+        StmtExpr::BinOp { op, left, right } => Ok(Expr::bin_op(*op, lower(left)?, lower(right)?)),
+        StmtExpr::UnaryOp { op, operand } => Ok(Expr::unary_op(*op, lower(operand)?)),
+        StmtExpr::Call { func, args } => {
+            let signature = FunctionSignature::lookup(func).ok_or_else(|| {
+                crate::error::Error::eval(format!("Function '{func}' is not supported"))
+            })?;
+            let args = args.iter().map(lower).collect::<Result<Vec<_>>>()?;
+            Ok(Expr::call(signature.function, args))
         }
-
-        StmtExpr::BinOp { op, left, right } => {
-            Ok(Expr::bin_op(*op, compile(left)?, compile(right)?))
-        }
-
-        StmtExpr::UnaryOp { op, operand } => Ok(Expr::unary_op(*op, compile(operand)?)),
-
-        StmtExpr::Call { func, args } => compile_function_call(func, args),
-
         StmtExpr::IfThenElse {
             condition,
             then_expr,
             else_expr,
-        } => compile_if_then_else(condition, then_expr, else_expr),
+        } => Ok(Expr::if_then_else(
+            lower(condition)?,
+            lower(then_expr)?,
+            lower(else_expr)?,
+        )),
     }
 }
 
@@ -366,7 +356,7 @@ fn infer_call_dimension(
 /// Used for functions whose trailing arguments are dimensionless counts,
 /// windows, offsets, smoothing factors or digit counts (see the rule stated in
 /// [`infer_call_dimension`]). A call with no arguments is dimension-unknown;
-/// arity itself is validated separately by [`compile_function_call`].
+/// arity itself is validated separately by the preflight.
 fn first_arg_dimension(arg_dims: &[Dimension]) -> Dimension {
     arg_dims.first().copied().unwrap_or(Dimension::Unknown)
 }
@@ -383,256 +373,6 @@ fn combine_arg_dimensions(context: &str, arg_dims: Vec<Dimension>) -> Result<Dim
     iter.try_fold(first, |acc, dim| compatible_dimensions(context, acc, dim))
 }
 
-/// Compile function calls.
-fn compile_function_call(func_name: &str, args: &[StmtExpr]) -> Result<Expr> {
-    let compiled_args: Result<Vec<_>> = args.iter().map(compile).collect();
-    let compiled_args = compiled_args?;
-
-    // Map DSL function names to core Function enum
-    let func = match func_name {
-        "lag" => Some(Function::Lag),
-        // `lead` is intentionally unsupported: forward-looking references
-        // silently corrupt historical model cells and backtests.
-        "diff" => Some(Function::Diff),
-        "pct_change" => Some(Function::PctChange),
-        "cumsum" => Some(Function::CumSum),
-        "cumprod" => Some(Function::CumProd),
-        "cummin" => Some(Function::CumMin),
-        "cummax" => Some(Function::CumMax),
-        "rolling_mean" => Some(Function::RollingMean),
-        "rolling_sum" => Some(Function::RollingSum),
-        "rolling_std" => Some(Function::RollingStd),
-        "rolling_var" => Some(Function::RollingVar),
-        "rolling_median" => Some(Function::RollingMedian),
-        "rolling_min" => Some(Function::RollingMin),
-        "rolling_max" => Some(Function::RollingMax),
-        "rolling_count" => Some(Function::RollingCount),
-        "ewm_mean" => Some(Function::EwmMean),
-        "ewm_std" => Some(Function::EwmStd),
-        "ewm_var" => Some(Function::EwmVar),
-        "std" => Some(Function::Std),
-        "var" => Some(Function::Var),
-        "median" => Some(Function::Median),
-        "shift" => Some(Function::Shift),
-        "rank" => Some(Function::Rank),
-        "quantile" => Some(Function::Quantile),
-        "sum" => Some(Function::Sum),
-        "mean" => Some(Function::Mean),
-        "min" => Some(Function::Min),
-        "max" => Some(Function::Max),
-        "ttm" => Some(Function::Ttm),
-        "ytd" => Some(Function::Ytd),
-        "qtd" => Some(Function::Qtd),
-        "fiscal_ytd" => Some(Function::FiscalYtd),
-        "annualize" => Some(Function::Annualize),
-        "annualize_rate" => Some(Function::AnnualizeRate),
-        "coalesce" => Some(Function::Coalesce),
-        "abs" => Some(Function::Abs),
-        "sign" => Some(Function::Sign),
-        "growth_rate" => Some(Function::GrowthRate),
-        "pow" => Some(Function::Pow),
-        "round" => Some(Function::Round),
-        "floor" => Some(Function::Floor),
-        "ceil" => Some(Function::Ceil),
-        "ln" => Some(Function::Ln),
-        "exp" => Some(Function::Exp),
-        "log10" => Some(Function::Log10),
-        "sqrt" => Some(Function::Sqrt),
-        "clamp" => Some(Function::Clamp),
-        "is_missing" => Some(Function::IsMissing),
-        _ => None,
-    };
-
-    if let Some(f) = func {
-        match f {
-            Function::Sum | Function::Mean | Function::Min | Function::Max => {
-                if compiled_args.is_empty() {
-                    return Err(crate::error::Error::eval(format!(
-                        "{:?} requires at least one argument",
-                        f
-                    )));
-                }
-            }
-            Function::Abs
-            | Function::Sign
-            | Function::Floor
-            | Function::Ceil
-            | Function::Ln
-            | Function::Exp
-            | Function::Log10
-            | Function::Sqrt
-            | Function::IsMissing => {
-                if compiled_args.len() != 1 {
-                    return Err(crate::error::Error::eval(format!(
-                        "{:?} requires exactly 1 argument",
-                        f
-                    )));
-                }
-            }
-            Function::Pow => {
-                if compiled_args.len() != 2 {
-                    return Err(crate::error::Error::eval(
-                        "pow() requires exactly 2 arguments (base, exponent)",
-                    ));
-                }
-            }
-            Function::Round => {
-                if compiled_args.is_empty() || compiled_args.len() > 2 {
-                    return Err(crate::error::Error::eval(
-                        "round() requires 1 or 2 arguments (value, [digits])",
-                    ));
-                }
-            }
-            Function::Clamp => {
-                if compiled_args.len() != 3 {
-                    return Err(crate::error::Error::eval(
-                        "clamp() requires exactly 3 arguments (value, lo, hi)",
-                    ));
-                }
-            }
-            Function::Ttm => {
-                if compiled_args.len() != 1 {
-                    return Err(crate::error::Error::eval(
-                        "ttm() requires exactly 1 argument",
-                    ));
-                }
-            }
-            Function::Ytd => {
-                if compiled_args.len() != 1 {
-                    return Err(crate::error::Error::eval(
-                        "ytd() requires exactly 1 argument",
-                    ));
-                }
-            }
-            Function::Qtd => {
-                if compiled_args.len() != 1 {
-                    return Err(crate::error::Error::eval(
-                        "qtd() requires exactly 1 argument",
-                    ));
-                }
-            }
-            Function::FiscalYtd => {
-                if compiled_args.len() != 2 {
-                    return Err(crate::error::Error::eval(
-                        "fiscal_ytd() requires 2 arguments (expr, fiscal_start_month)",
-                    ));
-                }
-            }
-            Function::Annualize => {
-                if compiled_args.len() != 2 {
-                    return Err(crate::error::Error::eval(
-                        "annualize() requires 2 arguments (value, annualization_factor)",
-                    ));
-                }
-            }
-            Function::AnnualizeRate => {
-                if compiled_args.len() != 3 {
-                    return Err(crate::error::Error::eval(
-                        "annualize_rate() requires 3 arguments (rate, periods_per_year, compounding)",
-                    ));
-                }
-            }
-            Function::Coalesce => {
-                if compiled_args.len() < 2 {
-                    return Err(crate::error::Error::eval(
-                        "coalesce() requires at least 2 arguments",
-                    ));
-                }
-            }
-            Function::GrowthRate => {
-                if compiled_args.len() != 2 {
-                    return Err(crate::error::Error::eval(
-                        "growth_rate() requires 2 arguments (series, periods)",
-                    ));
-                }
-            }
-            Function::Lag | Function::Shift | Function::EwmMean | Function::Quantile => {
-                if compiled_args.len() != 2 {
-                    return Err(crate::error::Error::eval(format!(
-                        "{}() requires exactly 2 arguments",
-                        func_name
-                    )));
-                }
-            }
-            Function::RollingMean
-            | Function::RollingSum
-            | Function::RollingStd
-            | Function::RollingVar
-            | Function::RollingMedian
-            | Function::RollingMin
-            | Function::RollingMax
-            | Function::RollingCount => {
-                if compiled_args.len() < 2 || compiled_args.len() > 3 {
-                    return Err(crate::error::Error::eval(format!(
-                        "{}() requires 2 or 3 arguments (series, window, [min_periods])",
-                        func_name
-                    )));
-                }
-            }
-            Function::Diff | Function::PctChange => {
-                if compiled_args.is_empty() || compiled_args.len() > 2 {
-                    return Err(crate::error::Error::eval(format!(
-                        "{}() requires 1 or 2 arguments",
-                        func_name
-                    )));
-                }
-            }
-            Function::EwmStd | Function::EwmVar => {
-                if compiled_args.len() < 2 || compiled_args.len() > 3 {
-                    return Err(crate::error::Error::eval(format!(
-                        "{}() requires 2 or 3 arguments",
-                        func_name
-                    )));
-                }
-            }
-            Function::Rank => {
-                if compiled_args.is_empty() || compiled_args.len() > 2 {
-                    return Err(crate::error::Error::eval(
-                        "rank() requires 1 or 2 arguments (series, [ascending])",
-                    ));
-                }
-            }
-            Function::CumSum
-            | Function::CumProd
-            | Function::CumMin
-            | Function::CumMax
-            | Function::Std
-            | Function::Var
-            | Function::Median => {
-                if compiled_args.is_empty() {
-                    return Err(crate::error::Error::eval(format!(
-                        "{}() requires at least 1 argument",
-                        func_name
-                    )));
-                }
-            }
-            Function::Lead => {}
-        }
-        Ok(Expr::call(f, compiled_args))
-    } else {
-        Err(crate::error::Error::eval(format!(
-            "Function '{}' is not supported. \
-             Supported functions include: lag, diff, pct_change, rolling_*, ewm_*, std, var, median, \
-             sum, mean, min, max, ttm, ytd, qtd, fiscal_ytd, annualize, growth_rate, abs, sign, coalesce, \
-             pow, round, floor, ceil, ln, exp, log10, sqrt, clamp, is_missing",
-            func_name
-        )))
-    }
-}
-
-/// Compile if-then-else expressions.
-fn compile_if_then_else(
-    condition: &StmtExpr,
-    then_expr: &StmtExpr,
-    else_expr: &StmtExpr,
-) -> Result<Expr> {
-    let cond = compile(condition)?;
-    let then_branch = compile(then_expr)?;
-    let else_branch = compile(else_expr)?;
-
-    Ok(Expr::if_then_else(cond, then_branch, else_branch))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -644,7 +384,7 @@ mod tests {
     ) -> Result<()> {
         infer_dimension(ast, node_types, None, &IndexMap::new()).map(|_| ())
     }
-    use finstack_quant_core::expr::ExprNode;
+    use finstack_quant_core::expr::{ExprNode, Function};
 
     #[test]
     fn test_compile_literal() {

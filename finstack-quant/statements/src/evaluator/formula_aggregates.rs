@@ -4,7 +4,6 @@ use super::EvaluationContext;
 use super::formula::{
     collect_expression_range_values, collect_expression_values_sorted,
     collect_expression_window_values, eval_error, evaluate_non_negative_integer_arg, require_args,
-    require_min_args,
 };
 use super::results::EvalWarning;
 use crate::error::Result;
@@ -155,7 +154,7 @@ pub(crate) fn evaluate_statistical_function(
     context: &mut EvaluationContext,
     node_id: Option<&str>,
 ) -> Result<f64> {
-    require_min_args(&func.to_string(), args, 1, node_id)?;
+    require_args(&func.to_string(), args, 1, node_id)?;
 
     let raw_values = collect_all_values(&args[0], context, node_id)?;
     let values = retain_finite(&raw_values);
@@ -177,7 +176,7 @@ pub(crate) fn evaluate_cumulative_function(
     context: &mut EvaluationContext,
     node_id: Option<&str>,
 ) -> Result<f64> {
-    require_min_args(&func.to_string(), args, 1, node_id)?;
+    require_args(&func.to_string(), args, 1, node_id)?;
 
     let raw_values = collect_all_values(&args[0], context, node_id)?;
     let values = retain_finite(&raw_values);

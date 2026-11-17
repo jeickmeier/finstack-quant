@@ -1129,42 +1129,14 @@ fn test_shift_zero_periods() {
 }
 
 #[test]
-fn test_shift_negative_returns_nan() {
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..2025Q2", None).unwrap();
-        model_builder.value(
-            "revenue",
-            &[
-                (
-                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    AmountOrScalar::scalar(100.0),
-                ),
-                (
-                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(110.0),
-                ),
-            ],
-        );
-        model_builder
-            .compute("future_shifted", "shift(revenue, -1)")
-            .unwrap();
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    // Negative shift (forward-looking) should return NaN
-    assert!(
-        results
-            .get(
-                "future_shifted",
-                &PeriodId::quarter(2025, 1).expect("valid period fixture")
-            )
-            .unwrap()
-            .is_nan()
-    );
+fn test_shift_negative_literal_is_rejected_at_build() {
+    let mut model_builder = ModelBuilder::new("test");
+    model_builder.periods("2025Q1..2025Q2", None).unwrap();
+    model_builder.value("revenue", &[]);
+    let error = model_builder
+        .compute("future_shifted", "shift(revenue, -1)")
+        .expect_err("a negative literal shift reads a future period");
+    assert!(error.to_string().contains("future period"), "{error}");
 }
 
 #[test]
@@ -1629,26 +1601,13 @@ fn test_rolling_functions_edge_cases() {
 
 #[test]
 fn test_lag_negative_periods_error() {
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..2025Q1", None).unwrap();
-        model_builder.value(
-            "revenue",
-            &[(
-                PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                AmountOrScalar::scalar(100.0),
-            )],
-        );
-        model_builder
-            .compute("bad_lag", "lag(revenue, -1)")
-            .unwrap();
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let eval_result = evaluator.evaluate(&model);
-
-    assert!(eval_result.is_err());
+    let mut model_builder = ModelBuilder::new("test");
+    model_builder.periods("2025Q1..2025Q1", None).unwrap();
+    model_builder.value("revenue", &[]);
+    let error = model_builder
+        .compute("bad_lag", "lag(revenue, -1)")
+        .expect_err("a negative literal lag reads a future period");
+    assert!(error.to_string().contains("future period"), "{error}");
 }
 
 #[test]

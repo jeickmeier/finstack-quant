@@ -48,7 +48,7 @@ const MAX_PARSE_DEPTH: usize = 64;
 /// 256 terms is far beyond any legitimate formula (financial expressions run to
 /// a few dozen), and the diagnostic points oversized ones at intermediate
 /// model nodes.
-const MAX_FORMULA_TERMS: usize = 256;
+pub(crate) const MAX_FORMULA_TERMS: usize = 256;
 
 thread_local! {
     static PARSE_DEPTH: Cell<usize> = const { Cell::new(0) };
@@ -359,16 +359,20 @@ fn identifier(input: &str) -> IResult<&str, StmtExpr> {
     Ok((input, StmtExpr::NodeRef(NodeId::from(id_str.as_str()))))
 }
 
-// Identifier string (alphanumeric + underscore + dot).
+// Identifier string: nonempty segments of letters, digits and underscores
+// joined by single dots, the first starting with a letter or underscore.
+// `a..b` and `a.` stop at the stray dot and fail as trailing input.
 //
 // Hyphens are intentionally excluded from ordinary identifiers so
 // `revenue-cogs` parses as subtraction. Capital-structure references use a
 // separate parser that permits hyphens in the instrument segment.
 fn identifier_string(input: &str) -> IResult<&str, String> {
+    let segment = |c: char| c.is_alphanumeric() || c == '_';
     map(
-        recognize(pair(
+        recognize((
             take_while1(|c: char| c.is_alphabetic() || c == '_'),
-            nom::bytes::complete::take_while(|c: char| c.is_alphanumeric() || c == '_' || c == '.'),
+            nom::bytes::complete::take_while(segment),
+            nom::multi::many0_count(pair(char('.'), take_while1(segment))),
         )),
         |s: &str| s.to_string(),
     )

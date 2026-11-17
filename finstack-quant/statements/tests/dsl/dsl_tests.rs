@@ -364,3 +364,238 @@ fn malformed_and_unsupported_formulas_fail_at_the_public_boundary() {
         );
     }
 }
+
+/// STATEMENTS-CONTRACTS-004 clause 3: the seven cumulative and full-history
+/// functions take exactly one argument.
+#[test]
+fn unary_history_functions_reject_surplus_arguments() {
+    for name in [
+        "cumsum", "cumprod", "cummin", "cummax", "std", "var", "median",
+    ] {
+        parse_and_compile(&format!("{name}(revenue)")).expect("one argument compiles");
+        for surplus in [format!("{name}(revenue, cogs)"), format!("{name}()")] {
+            let error = parse_and_compile(&surplus).expect_err("wrong arity is rejected");
+            assert!(
+                error.to_string().contains("exactly 1 argument"),
+                "{surplus}: {error}"
+            );
+        }
+    }
+}
+
+/// Clause 1: `!` binds at unary precedence, `not` outside a comparison, and
+/// nested comparisons need parentheses.
+#[test]
+fn negation_and_comparison_grouping_follow_the_accepted_grammar() {
+    let a_gt_b = || StmtExpr::bin_op(BinOp::Gt, StmtExpr::node_ref("a"), StmtExpr::node_ref("b"));
+    assert_eq!(
+        parse_formula("!a > b").expect("parses"),
+        StmtExpr::bin_op(
+            BinOp::Gt,
+            StmtExpr::unary_op(UnaryOp::Not, StmtExpr::node_ref("a")),
+            StmtExpr::node_ref("b"),
+        )
+    );
+    assert_eq!(
+        parse_formula("not a > b").expect("parses"),
+        StmtExpr::unary_op(UnaryOp::Not, a_gt_b())
+    );
+    parse_formula("a > b > c").expect_err("a chained comparison needs parentheses");
+    parse_formula("(a > b) > c").expect("an explicit grouping parses");
+}
+
+/// Clause 1: canonical rendering re-parses to the same grouping, for parsed
+/// text and for trees a caller builds directly.
+#[test]
+fn canonical_rendering_preserves_grouping() {
+    for source in [
+        "!a > b",
+        "not a > b",
+        "-!a",
+        "!-a",
+        "!(a and b)",
+        "not (a or b) and c",
+        "(a > b) == (c > d)",
+        "(a > b) > c",
+        "a - (b - c)",
+        "a / (b * c)",
+        "-(a + b) * c",
+        "if(not a > b, -(a - b), !a)",
+        "min(a, -b, (a > b) + 1)",
+    ] {
+        let ast = parse_formula(source).expect("valid source");
+        let rendered = ast.to_string();
+        assert_eq!(
+            parse_formula(&rendered).expect("rendered text parses"),
+            ast,
+            "{source} rendered as {rendered}"
+        );
+    }
+
+    let a = || StmtExpr::node_ref("a");
+    let b = || StmtExpr::node_ref("b");
+    let built = [
+        StmtExpr::bin_op(
+            BinOp::Lt,
+            StmtExpr::bin_op(BinOp::Gt, a(), b()),
+            StmtExpr::bin_op(BinOp::Eq, a(), b()),
+        ),
+        StmtExpr::bin_op(BinOp::Gt, StmtExpr::unary_op(UnaryOp::Not, a()), b()),
+        StmtExpr::unary_op(UnaryOp::Neg, StmtExpr::unary_op(UnaryOp::Not, a())),
+        StmtExpr::unary_op(
+            UnaryOp::Not,
+            StmtExpr::bin_op(BinOp::Or, a(), StmtExpr::bin_op(BinOp::And, a(), b())),
+        ),
+        StmtExpr::bin_op(BinOp::Sub, a(), StmtExpr::bin_op(BinOp::Sub, a(), b())),
+        StmtExpr::bin_op(
+            BinOp::Mul,
+            StmtExpr::bin_op(BinOp::And, a(), b()),
+            StmtExpr::unary_op(UnaryOp::Neg, StmtExpr::bin_op(BinOp::Add, a(), b())),
+        ),
+    ];
+    for ast in built {
+        let rendered = ast.to_string();
+        assert_eq!(
+            parse_formula(&rendered).expect("rendered text parses"),
+            ast,
+            "built tree rendered as {rendered}"
+        );
+    }
+}
+
+/// Clause 2: identifiers are nonempty dot-separated segments.
+#[test]
+fn identifiers_need_nonempty_dot_separated_segments() {
+    for valid in ["fin.gross_margin", "a.b.c", "_private", "rev.2024"] {
+        assert_eq!(
+            parse_formula(valid).expect("valid identifier"),
+            StmtExpr::node_ref(valid)
+        );
+    }
+    for invalid in [
+        "a..b",
+        "a.",
+        ".a",
+        "a.b.",
+        "cs.debt_balance",
+        "cs.debt_balance.",
+    ] {
+        parse_formula(invalid).expect_err(invalid);
+    }
+}
+
+/// Clause 3: an invalid expression is rejected in a branch evaluation would
+/// skip, and a literal future read is rejected for every offset function.
+#[test]
+fn untaken_branches_and_future_reads_are_rejected() {
+    for formula in [
+        "if(1, revenue, unknown_function(revenue))",
+        "if(0, cumsum(revenue, cogs), revenue)",
+        "1 or lag(revenue)",
+        "if(1, revenue, cs.not_a_component.total)",
+        "if(1, revenue, lead(revenue, 1))",
+    ] {
+        parse_and_compile(formula).expect_err(formula);
+    }
+    for name in ["lag", "shift", "diff", "pct_change", "growth_rate"] {
+        parse_and_compile(&format!("{name}(revenue, 1)")).expect("a past read compiles");
+        for offset in ["-1", "-(1)", "- 2"] {
+            let formula = format!("if(1, revenue, {name}(revenue, {offset}))");
+            let error = parse_and_compile(&formula).expect_err("a future read is rejected");
+            assert!(
+                error.to_string().contains("future period"),
+                "{formula}: {error}"
+            );
+        }
+    }
+}
+
+/// Clause 4: text is limited to 64 levels of nesting and 256 terms.
+#[test]
+fn text_limits_are_inclusive_at_the_boundary() {
+    let chain = |terms: usize| {
+        std::iter::repeat_n("1", terms)
+            .collect::<Vec<_>>()
+            .join(" + ")
+    };
+    parse_and_compile(&chain(256)).expect("256 terms are accepted");
+    let error = parse_and_compile(&chain(257)).expect_err("257 terms are rejected");
+    assert!(
+        error.to_string().contains("maximum of 256 terms"),
+        "{error}"
+    );
+
+    let negated = |levels: usize| format!("{}1", "-".repeat(levels));
+    parse_and_compile(&negated(61)).expect("nesting within the limit is accepted");
+    let error = parse_and_compile(&negated(65)).expect_err("65 levels are rejected");
+    assert!(error.to_string().contains("maximum depth 64"), "{error}");
+}
+
+/// Clause 4: a caller-built tree is validated before any recursive pass.
+#[test]
+fn caller_built_trees_are_preflighted() {
+    use finstack_quant_statements::dsl::compile;
+
+    for literal in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let ast = StmtExpr::bin_op(
+            BinOp::Add,
+            StmtExpr::node_ref("revenue"),
+            StmtExpr::if_then_else(
+                StmtExpr::literal(1.0),
+                StmtExpr::literal(2.0),
+                StmtExpr::literal(literal),
+            ),
+        );
+        let error = compile(&ast).expect_err("a non-finite literal is rejected");
+        assert!(error.to_string().contains("finite"), "{error}");
+    }
+
+    for identifier in ["", "a..b", "a.", "1a", "a b", "cs.debt_balance.total"] {
+        compile(&StmtExpr::node_ref(identifier)).expect_err(identifier);
+    }
+    for (component, target) in [
+        ("debt_balance", ""),
+        ("debt_balance", "a b"),
+        ("nope", "total"),
+    ] {
+        let ast = StmtExpr::CsRef {
+            component: component.into(),
+            instrument_or_total: target.into(),
+        };
+        compile(&ast).expect_err("an invalid capital-structure reference is rejected");
+    }
+    compile(&StmtExpr::call("if", vec![StmtExpr::literal(1.0); 3]))
+        .expect_err("`if` is a conditional, not a callable function");
+    compile(&StmtExpr::call("median", vec![StmtExpr::node_ref("a"); 2]))
+        .expect_err("surplus arguments are rejected for a built call");
+
+    let sum_of = |terms: usize| {
+        (1..terms).fold(StmtExpr::literal(1.0), |acc, _| {
+            StmtExpr::bin_op(BinOp::Add, acc, StmtExpr::literal(1.0))
+        })
+    };
+    compile(&sum_of(256)).expect("256 terms are accepted");
+    let error = compile(&sum_of(257)).expect_err("257 terms are rejected");
+    assert!(
+        error.to_string().contains("maximum of 256 terms"),
+        "{error}"
+    );
+
+    // One term under 100,000 negations: only the depth limit can reject it,
+    // and a recursive validator would overflow the stack first.
+    let negated = |levels: usize| {
+        (0..levels).fold(StmtExpr::node_ref("a"), |acc, _| {
+            StmtExpr::unary_op(UnaryOp::Neg, acc)
+        })
+    };
+    compile(&negated(319)).expect("a tree 320 levels deep is accepted");
+    let too_deep = negated(100_000);
+    let error = compile(&too_deep).expect_err("a deeper tree is rejected");
+    assert!(
+        error.to_string().contains("maximum depth of 320"),
+        "{error}"
+    );
+    // The derived `Drop` recurses to the tree's depth; this test only
+    // qualifies the validator.
+    std::mem::forget(too_deep);
+}

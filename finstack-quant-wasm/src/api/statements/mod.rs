@@ -390,15 +390,19 @@ pub fn financial_model_content_hash(
 /// Parse a DSL formula and return its canonical source text.
 ///
 /// The formula is parsed into the statements AST and rendered back through
-/// the AST's `Display`: whitespace normalised, operators spaced, and
-/// parentheses kept only where precedence requires them. Parsing the returned
+/// the AST's `Display`: whitespace normalised, operators spaced, logical
+/// negation written `!`, and parentheses kept only where precedence requires
+/// them. `!` binds like unary minus (`!a > b` is `(!a) > b`), keyword `not`
+/// binds outside a comparison, and a nested comparison needs explicit
+/// parentheses. Parsing the returned
 /// text again yields the same AST, so it is a stable form for previewing,
 /// diffing, or hashing formulas. Mirrors Python `parse_formula`.
 ///
 /// # Errors
 ///
-/// Rejects trailing tokens, malformed or incomplete syntax, or a formula that
-/// exceeds the parser's nesting or term limits.
+/// Rejects trailing tokens, malformed or incomplete syntax, an identifier
+/// with an empty dot-separated segment, or a formula over 64 levels of nesting
+/// or 256 terms.
 /// @param formula - Financial-model formula string to parse into its canonical expression representation.
 /// @returns Canonical formula text, e.g. `"(revenue - cogs) / revenue"`.
 #[wasm_bindgen(js_name = parseFormula)]
@@ -413,8 +417,11 @@ pub fn parse_formula(
 /// Parse and compile a DSL formula, throwing if either step fails.
 ///
 /// Compilation lowers the AST onto the core expression engine and rejects
-/// unsupported functions, wrong arities, and malformed capital-structure
-/// references that a bare parse would accept. Returns `undefined` when the
+/// unsupported functions, wrong arities (`cumsum`, `cumprod`, `cummin`,
+/// `cummax`, `std`, `var` and `median` take exactly one argument), malformed
+/// capital-structure references and negative literal offsets to `lag`,
+/// `shift`, `diff`, `pct_change` or `growth_rate`, in every branch including
+/// one evaluation would skip. Returns `undefined` when the
 /// formula is valid; an invalid formula throws a `FinstackError`, so
 /// `if (parseAndCompile(f))` is not a validity check. Mirrors Python
 /// `parse_and_compile`.

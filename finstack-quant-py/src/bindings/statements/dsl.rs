@@ -6,8 +6,10 @@ use pyo3::prelude::*;
 /// Parse a DSL formula and return its canonical source rendering.
 ///
 /// The formula is parsed into the statements AST and rendered back to
-/// canonical text: whitespace normalised, operators spaced, and
-/// parentheses kept only where operator precedence requires them. Parsing
+/// canonical text: whitespace normalised, operators spaced, logical negation
+/// written `!`, and parentheses kept only where operator precedence requires
+/// them. `!` binds like unary minus, keyword `not` binds outside a comparison,
+/// and a nested comparison needs explicit parentheses. Parsing
 /// the returned string again yields the same AST, so the output is a stable
 /// surface for diffing, hashing, or displaying formulas — not a debug dump.
 ///
@@ -41,8 +43,9 @@ fn parse_formula(formula: &str) -> PyResult<String> {
 /// Parse and compile a formula, raising if either step fails.
 ///
 /// Compilation lowers the AST onto the core expression engine and rejects
-/// unsupported functions, wrong arities, and malformed capital-structure
-/// references that a bare parse would accept.
+/// unsupported functions, wrong arities, malformed capital-structure
+/// references and negative literal offsets (future reads) that a bare parse
+/// would accept, in every branch.
 ///
 /// Parameters
 /// ----------

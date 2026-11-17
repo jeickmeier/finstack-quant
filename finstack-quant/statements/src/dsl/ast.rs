@@ -112,7 +112,8 @@ fn binary_symbol(op: BinOp) -> &'static str {
 /// Render the expression as canonical DSL source text.
 ///
 /// Parentheses are emitted only where the operator precedence requires them,
-/// so `parse_formula(expr.to_string())` yields an AST equal to `expr`. This
+/// and logical negation is always written `!`, so
+/// `parse_formula(expr.to_string())` yields an AST equal to a parsed `expr`. This
 /// is the stable, host-facing rendering of a parsed formula (the `Debug`
 /// form is not a contract).
 impl std::fmt::Display for StmtExpr {
@@ -134,17 +135,28 @@ impl std::fmt::Display for StmtExpr {
             Self::NodeRef(id) => f.write_str(id.as_str()),
             Self::BinOp { op, left, right } => {
                 let level = precedence(self);
-                child(f, left, precedence(left) < level)?;
+                // Comparisons do not chain: `(a > b) > c` keeps its
+                // parentheses on either side.
+                let comparison = level == 3;
+                let left_level = precedence(left);
+                child(
+                    f,
+                    left,
+                    left_level < level || (comparison && left_level == level),
+                )?;
                 write!(f, " {} ", binary_symbol(*op))?;
                 // Left-associative: a right operand at the same level needs
                 // parentheses to preserve `a - (b - c)`.
                 child(f, right, precedence(right) <= level)
             }
             Self::UnaryOp { op, operand } => {
-                match op {
-                    UnaryOp::Neg => f.write_str("-")?,
-                    UnaryOp::Not => f.write_str("not ")?,
-                }
+                // `!` binds at unary precedence, so `(!a) > b` renders as
+                // `!a > b`. Keyword `not` binds outside a comparison and
+                // would regroup it.
+                f.write_str(match op {
+                    UnaryOp::Neg => "-",
+                    UnaryOp::Not => "!",
+                })?;
                 child(f, operand, precedence(operand) < precedence(self))
             }
             Self::Call { func, args } => {
@@ -253,7 +265,12 @@ mod tests {
             ("a - b - c", "a - b - c"),
             ("a * (b + c)", "a * (b + c)"),
             ("-(a + b)", "-(a + b)"),
-            ("not (a > 1) and b <= 2", "not (a > 1) and b <= 2"),
+            ("not (a > 1) and b <= 2", "!(a > 1) and b <= 2"),
+            ("not a > b", "!(a > b)"),
+            ("!a > b", "!a > b"),
+            ("-!a", "-!a"),
+            ("!-a", "!-a"),
+            ("(a > b) == (c > d)", "(a > b) == (c > d)"),
             ("if(a > 0, a, 0)", "if(a > 0, a, 0)"),
             ("lag(revenue, 1) * 1.05", "lag(revenue, 1) * 1.05"),
             (

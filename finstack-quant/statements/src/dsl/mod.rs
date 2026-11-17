@@ -16,7 +16,9 @@
 //!
 //! ### Logical
 //! - `and`, `or`
-//! - `not expr` / `!expr`
+//! - `!expr` binds like unary minus: `!a > b` is `(!a) > b`
+//! - `not expr` binds outside a comparison: `not a > b` is `not (a > b)`
+//! - A comparison does not chain; write `(a > b) == (c > d)` with parentheses
 //!
 //! ### Function Reference
 //!
@@ -77,6 +79,8 @@
 pub(crate) mod ast;
 pub(crate) mod compiler;
 mod parser;
+pub(crate) mod signatures;
+mod validate;
 
 pub use crate::utils::formula::extract_all_identifiers;
 pub use ast::StmtExpr;
@@ -143,5 +147,28 @@ mod stack_safety {
             .join()
             .expect("compiling a budget-sized formula must not overflow a 512 KiB stack");
         assert!(compiled, "a budget-sized formula must compile successfully");
+    }
+
+    /// The deepest tree the preflight accepts must lower, render and drop
+    /// on the same small stack.
+    #[test]
+    fn tree_at_depth_limit_compiles_on_a_small_stack() {
+        use crate::dsl::StmtExpr;
+        use finstack_quant_core::expr::UnaryOp;
+
+        let compiled = std::thread::Builder::new()
+            .stack_size(512 * 1024)
+            .spawn(|| {
+                let tree = (1..crate::dsl::validate::MAX_AST_DEPTH)
+                    .fold(StmtExpr::node_ref("a"), |acc, _| {
+                        StmtExpr::unary_op(UnaryOp::Neg, acc)
+                    });
+                let _ = tree.to_string();
+                crate::dsl::compile(&tree).is_ok()
+            })
+            .expect("probe thread should spawn")
+            .join()
+            .expect("a depth-limit tree must not overflow a 512 KiB stack");
+        assert!(compiled, "a depth-limit tree must compile successfully");
     }
 }

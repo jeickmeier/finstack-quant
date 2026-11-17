@@ -307,7 +307,7 @@ Implementation and independent qualification remain pending.
 The Statements formula grammar and dispatch contract was accepted on
 2026-11-15. It covers canonical syntax and rendering, shared identifiers,
 checked signatures and bounded validation of text and caller-built trees.
-Implementation and independent qualification remain pending.
+These are implemented and qualified; the typed `cs` selectors remain pending.
 [STATEMENTS-CONTRACTS-004](statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation).
 
 The Statements formula units and currency contract was accepted on

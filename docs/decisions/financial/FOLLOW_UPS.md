@@ -67,9 +67,9 @@ product consequences remain in their product scope.
 | [Calibration: quotes and curve/smile targets](#calibration-quotes-and-curvesmile-targets) | 18 |
 | [Calibration: Hull–White and LMM](#calibration-hullwhite-and-lmm) | 18 |
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
-| [Statements: capital structure](#statements-capital-structure) | 15 |
+| [Statements: capital structure](#statements-capital-structure) | 14 |
 | [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 16 |
-| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 17 |
+| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 15 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 16 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
 | [Scenarios](#scenarios) | 16 |
@@ -1048,7 +1048,7 @@ product consequences remain in their product scope.
 
 - **Reconciliation — Bundled reported-cost earnings and margins.** Reconcile the bundled earnings, margins and cost ratios, including signed expenses, known-zero and missing dependencies, revenue eligibility and recomputation from aggregated inputs. Qualify the D&A inclusion and single add-back with an independent accounting example across formulas, examples, bindings and fixtures. [Accepted STATEMENTS-CONTRACTS-007](statements-contracts/07-earnings-and-margins.md#accepted-decision-for-reported-cost-earnings-and-margins).
 
-- **Reconciliation — Canonical Statements formula grammar, signatures and AST validation.** Enforce shared identifier and typed capital-selector rules, grouping-preserving rendering, one function signature across compiler, evaluator and hosts, and bounded validation of text and caller-built ASTs. Qualify unary signature enforcement with surplus arguments that the audited evaluator ignores, invalid branches and future reads, grouping round-trips and resource boundaries. [Accepted STATEMENTS-CONTRACTS-004](statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation) · [Observed evaluator arity](statements-evaluation/04-historical-statistics-and-ewm.md).
+- **Reconciliation — Typed capital selectors in Statements formulas.** Replace the `cs.<component>.<instrument or total>` reference form with the typed capital reporting components and selectors, including instrument, native-currency total and consolidated scopes, and qualify each selector through parsing, rendering, compilation and evaluation. The rest of the formula grammar, signature and AST-validation contract is reconciled. [Accepted STATEMENTS-CONTRACTS-004](statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation) · [Capital reporting and selectors](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
 
 - **Reconciliation — Runnable Statements models require a canonical timeline and validated inputs.** Enforce canonical contiguous period plans, source and observation validity, supported units and shared complete validation for build and load. Qualify draft-to-runnable admission, missing cells and typed empty series, formula and capital restrictions, and host and wire paths. [Accepted STATEMENTS-CONTRACTS-001](statements-contracts/01-model-timeline-and-values.md#accepted-decision-for-model-timelines-values-and-readiness).
 
