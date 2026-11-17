@@ -15,6 +15,7 @@ use crate::evaluator::value::{self, At};
 use crate::evaluator::{
     PeriodHistory, capital_structure_runtime, capital_structure_runtime::dependent_closure,
 };
+use crate::forecast::stream::PathId;
 use crate::types::{AmountOrScalar, FinancialModelSpec, NodeId, NodeValueType};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::expr::Expr;
@@ -383,7 +384,7 @@ impl Evaluator {
     ///
     /// `capital_structure` is the market and cashflow date the model's
     /// instruments are generated from; `None` skips the capital structure.
-    /// `mc_seed` is a Monte Carlo path's seed offset (`None` for a single
+    /// `mc_path` is the Monte Carlo path (`None` for a single
     /// deterministic run); each path runs this same loop, capital-structure
     /// waterfall included. Shared by [`evaluate_inner`](Self::evaluate_inner),
     /// [`evaluate_prepared_inner`](Self::evaluate_prepared_inner) and
@@ -396,7 +397,7 @@ impl Evaluator {
             &finstack_quant_core::market_data::context::MarketContext,
             finstack_quant_core::dates::Date,
         )>,
-        mc_seed: Option<u64>,
+        mc_path: Option<PathId>,
     ) -> Result<(StatementResult, Vec<EvalWarning>)> {
         let mut mc_z_cache = McZCache::new();
         let market_ctx = capital_structure.map(|(market, _)| market);
@@ -495,7 +496,7 @@ impl Evaluator {
                             state,
                             affected_nodes: &cs_affected_nodes,
                         },
-                        mc_seed.map(|seed| (seed, &mut mc_z_cache)),
+                        mc_path.map(|path| (path, &mut mc_z_cache)),
                     )?;
 
                     cs_cashflows_accum.set_period(period_cs);
@@ -512,7 +513,7 @@ impl Evaluator {
                         },
                         &historical,
                         &historical_cs,
-                        mc_seed.map(|seed| (seed, &mut mc_z_cache)),
+                        mc_path.map(|path| (path, &mut mc_z_cache)),
                     )?
                 };
 
@@ -861,16 +862,12 @@ impl Evaluator {
             let mut path_eval = self.clone();
             path_eval.forecast_cache.clear();
 
-            let seed_offset = config
-                .seed
-                .wrapping_mul(6_364_136_223_846_793_005)
-                .wrapping_add(path_idx as u64);
-            let (results, warnings) = path_eval.evaluate_periods(
-                model,
-                &prepared,
-                capital_structure,
-                Some(seed_offset),
-            )?;
+            let path = PathId {
+                run_seed: config.seed,
+                path: path_idx as u64,
+            };
+            let (results, warnings) =
+                path_eval.evaluate_periods(model, &prepared, capital_structure, Some(path))?;
             Ok((results.path_values(), warnings))
         };
 
@@ -961,7 +958,7 @@ impl Evaluator {
         &mut self,
         eval: PeriodEval<'_>,
         context: &mut EvaluationContext,
-        seed_offset: Option<u64>,
+        mc_path: Option<PathId>,
         node_filter: Option<&HashSet<NodeId>>,
         mut mc_z_cache: Option<&mut McZCache>,
     ) -> Result<()> {
@@ -1042,7 +1039,7 @@ impl Evaluator {
                         eval,
                         context,
                         &mut self.forecast_cache,
-                        seed_offset,
+                        mc_path,
                         &mut mc_z_wrapper,
                     )
                     .and_then(|forecast| match forecast {
@@ -1114,7 +1111,7 @@ impl Evaluator {
         historical_cs: &std::sync::Arc<
             IndexMap<PeriodId, crate::capital_structure::CapitalStructureCashflows>,
         >,
-        mc: Option<(u64, &mut McZCache)>,
+        mc: Option<(PathId, &mut McZCache)>,
     ) -> Result<PeriodEvaluation> {
         let mut context = EvaluationContext::new_with_history(
             eval.period.id,
@@ -1122,11 +1119,11 @@ impl Evaluator {
             std::sync::Arc::clone(historical_cs),
         );
 
-        let (seed_offset, mc_z_cache) = match mc {
-            Some((seed_offset, cache)) => (Some(seed_offset), Some(cache)),
+        let (mc_path, mc_z_cache) = match mc {
+            Some((path, cache)) => (Some(path), Some(cache)),
             None => (None, None),
         };
-        self.evaluate_nodes_in_order(eval, &mut context, seed_offset, None, mc_z_cache)?;
+        self.evaluate_nodes_in_order(eval, &mut context, mc_path, None, mc_z_cache)?;
 
         let row = (
             context.current_values.clone(),

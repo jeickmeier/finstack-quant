@@ -1,11 +1,11 @@
-//! Statistical forecast helpers that produce deterministic sequences.
+//! Stochastic forecast kernels.
 //!
-//! Each algorithm consumes a pre-seeded pseudo-random number generator so that
-//! repeated calls with identical parameters return the same series. This makes
-//! them suitable for scenario analysis where reproducibility matters.
-//!
-//! Uses [`Pcg64Rng`] for production-quality random number generation.
+//! Each kernel draws from a [`Pcg64Rng`] positioned on the node's versioned
+//! stream ([`super::stream`]), so a run replays from its recorded seed and
+//! stream. A zero standard deviation takes the deterministic transition and
+//! consumes no draws.
 
+use super::stream::{PathId, StreamKey};
 use crate::error::{Error, Result};
 use crate::types::{
     BootstrapParams, DistributionParams, ForecastBootstrapMode, ForecastSpec, MeanRevertingParams,
@@ -14,58 +14,6 @@ use crate::types::{
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
 use indexmap::IndexMap;
-
-/// Build the generator for one node's shocks.
-///
-/// `seed` is the node-mixed seed. On a Monte Carlo path (`stream_id` set)
-/// both the starting state and the increment are hashed from the
-/// `(seed, stream_id)` pair, so every node on every path owns its own PCG
-/// sequence. Giving all nodes of a path one increment and distinct states
-/// instead puts them on a single sequence at a fixed offset from each other,
-/// which left fixed node pairs correlated at about 0.07.
-fn build_rng(seed: u64, stream_id: Option<u64>) -> Pcg64Rng {
-    const GOLDEN_GAMMA: u64 = 0x9E37_79B9_7F4A_7C15;
-    match stream_id {
-        Some(stream_id) => {
-            let node = splitmix64_finalize(seed.wrapping_add(GOLDEN_GAMMA));
-            let path = splitmix64_finalize(stream_id.wrapping_add(GOLDEN_GAMMA.wrapping_mul(2)));
-            let state = splitmix64_finalize(node ^ path);
-            let increment =
-                splitmix64_finalize(node.wrapping_add(path.rotate_left(32)) ^ GOLDEN_GAMMA);
-            Pcg64Rng::new_with_stream(state, increment)
-        }
-        None => Pcg64Rng::new(seed),
-    }
-}
-
-/// Deterministic 64-bit mix of a node identifier for Monte Carlo seeding.
-///
-/// Used to decorrelate independent stochastic forecasts across nodes while
-/// keeping results reproducible for a given `(seed, path_offset, node_id)` tuple.
-///
-/// Implementation: 64-bit FNV-1a absorption followed by a splitmix64 finalizer
-/// to improve avalanche. FNV-1a alone has poor bit diffusion and can cluster
-/// similar identifiers (e.g. `revenue_2024`, `revenue_2025`), which in
-/// correlated Monte Carlo can translate into correlated seed streams across
-/// otherwise-independent nodes. The splitmix64 finalizer is the standard
-/// finalizer from Vigna's SplitMix generator; it is bijective, so no
-/// collisions are introduced and reproducibility is preserved.
-#[must_use]
-pub(crate) fn stable_hash_u64(node_id: &str) -> u64 {
-    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-    for &b in node_id.as_bytes() {
-        hash ^= u64::from(b);
-        hash = hash.wrapping_mul(0x0100_0000_01b3);
-    }
-    splitmix64_finalize(hash)
-}
-
-#[inline]
-fn splitmix64_finalize(mut z: u64) -> u64 {
-    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
-    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
-    z ^ (z >> 31)
-}
 
 /// Optional Monte Carlo correlation pair: `(peer_node_id, rho)` in `[-1, 1]`.
 ///
@@ -132,13 +80,13 @@ fn validate_distribution(p: &DistributionParams, method_name: &str) -> Result<()
 /// * `params` - Per-period drift `mean`, non-negative per-period volatility
 ///   `std_dev`, and the `seed` of the deterministic sampler
 ///
-/// * `stream_id` - Optional independent RNG stream for a Monte Carlo path;
-///   `None` uses the configured seed without selecting a path stream.
+/// * `rng` - Generator positioned on the node's stream; advanced by the
+///   draws this path consumes
 ///
 /// # Returns
 ///
 /// Returns the per-period levels and the exact sampled standard-normal shocks.
-/// A zero `std_dev` retains zero shocks while still consuming the same draws.
+/// A zero `std_dev` records zero shocks and consumes no draws.
 ///
 /// # Errors
 ///
@@ -153,18 +101,17 @@ pub(crate) fn normal_forecast_with_stream(
     base_value: f64,
     forecast_periods: &[PeriodId],
     p: &DistributionParams,
-    stream_id: Option<u64>,
+    rng: &mut Pcg64Rng,
 ) -> Result<(IndexMap<PeriodId, f64>, IndexMap<PeriodId, f64>)> {
     validate_distribution(p, "Normal")?;
 
-    let mut rng = build_rng(p.seed, stream_id);
     let mut results = IndexMap::new();
     let mut shocks = IndexMap::new();
     let mut prev = base_value;
 
     for period_id in forecast_periods {
-        let z = rng.normal(0.0, 1.0);
-        shocks.insert(*period_id, if p.std_dev == 0.0 { 0.0 } else { z });
+        let z = standard_shock(rng, p.std_dev);
+        shocks.insert(*period_id, z);
         let value = normal_step(prev, p, z);
         if !value.is_finite() {
             return Err(Error::forecast(format!(
@@ -183,17 +130,24 @@ fn normal_step(prev: f64, params: &DistributionParams, z: f64) -> f64 {
     prev + params.mean + params.std_dev * z
 }
 
-fn lognormal_step(prev: f64, params: &DistributionParams, z: f64) -> f64 {
-    const EXP_CLAMP: f64 = 709.0;
-    let log_return = (params.mean - 0.5 * params.std_dev * params.std_dev) + params.std_dev * z;
-    if log_return.abs() > EXP_CLAMP {
-        tracing::warn!(
-            mean = params.mean,
-            std_dev = params.std_dev,
-            "LogNormal exponent clamped to avoid overflow"
-        );
+/// One standard-normal innovation, or zero without a draw when the
+/// transition is deterministic.
+fn standard_shock(rng: &mut Pcg64Rng, std_dev: f64) -> f64 {
+    if std_dev == 0.0 {
+        0.0
+    } else {
+        rng.normal(0.0, 1.0)
     }
-    prev * log_return.clamp(-EXP_CLAMP, EXP_CLAMP).exp()
+}
+
+/// Advance a log level by one lognormal step and restore the level.
+///
+/// The exponent is not clipped. The restored level must be finite and
+/// strictly positive; a positive subnormal is valid.
+fn lognormal_step(log_level: &mut f64, params: &DistributionParams, z: f64) -> Option<f64> {
+    *log_level += (params.mean - 0.5 * params.std_dev * params.std_dev) + params.std_dev * z;
+    let level = log_level.exp();
+    (level.is_finite() && level > 0.0).then_some(level)
 }
 
 fn mean_reverting_step(prev: f64, params: &MeanRevertingParams, z: f64) -> f64 {
@@ -239,13 +193,13 @@ fn validate_lognormal_base(base_value: f64, context: &str) -> Result<()> {
 ///   expected log return is `mean - 0.5 * std_dev²`), non-negative log-return
 ///   volatility `std_dev`, and the `seed` of the deterministic sampler
 ///
-/// * `stream_id` - Optional independent RNG stream for a Monte Carlo path;
-///   `None` uses the configured seed without selecting a path stream.
+/// * `rng` - Generator positioned on the node's stream; advanced by the
+///   draws this path consumes
 ///
 /// # Returns
 ///
 /// Returns the per-period positive levels and exact sampled standard-normal shocks.
-/// A zero `std_dev` retains zero shocks while still consuming the same draws.
+/// A zero `std_dev` records zero shocks and consumes no draws.
 ///
 /// # Errors
 ///
@@ -261,35 +215,26 @@ pub(crate) fn lognormal_forecast_with_stream(
     base_value: f64,
     forecast_periods: &[PeriodId],
     p: &DistributionParams,
-    stream_id: Option<u64>,
+    rng: &mut Pcg64Rng,
 ) -> Result<(IndexMap<PeriodId, f64>, IndexMap<PeriodId, f64>)> {
     validate_distribution(p, "LogNormal")?;
 
-    if p.std_dev == 0.0 {
-        tracing::warn!(
-            "LogNormal forecast with std_dev=0.0 produces degenerate distribution (all values identical)"
-        );
-    }
-
     validate_lognormal_base(base_value, "LogNormal forecast")?;
 
-    let mut rng = build_rng(p.seed, stream_id);
     let mut results = IndexMap::new();
     let mut shocks = IndexMap::new();
-    let mut prev = base_value;
+    let mut log_level = base_value.ln();
 
     for period_id in forecast_periods {
-        let z = rng.normal(0.0, 1.0);
-        shocks.insert(*period_id, if p.std_dev == 0.0 { 0.0 } else { z });
-        let value = lognormal_step(prev, p, z);
-        if !value.is_finite() {
-            return Err(Error::forecast(format!(
-                "LogNormal forecast produced a non-finite value at period {:?}",
-                period_id
-            )));
-        }
+        let z = standard_shock(rng, p.std_dev);
+        shocks.insert(*period_id, z);
+        let value = lognormal_step(&mut log_level, p, z).ok_or_else(|| {
+            Error::forecast(format!(
+                "LogNormal forecast produced a level that is not finite and strictly \
+                 positive at period {period_id:?}"
+            ))
+        })?;
         results.insert(*period_id, value);
-        prev = value;
     }
 
     Ok((results, shocks))
@@ -340,13 +285,13 @@ fn validate_mean_reverting(p: &MeanRevertingParams) -> Result<()> {
 ///   `(0, 1]`), `std_dev` (per-period additive shock volatility,
 ///   non-negative), and the `seed` of the deterministic sampler
 ///
-/// * `stream_id` - Optional independent RNG stream for a Monte Carlo path;
-///   `None` uses the configured seed without selecting a path stream.
+/// * `rng` - Generator positioned on the node's stream; advanced by the
+///   draws this path consumes
 ///
 /// # Returns
 ///
 /// Returns the per-period levels and the exact sampled standard-normal shocks.
-/// A zero `std_dev` retains zero shocks while still consuming the same draws.
+/// A zero `std_dev` records zero shocks and consumes no draws.
 ///
 /// # Errors
 ///
@@ -360,7 +305,7 @@ pub(crate) fn mean_reverting_forecast_with_stream(
     base_value: f64,
     forecast_periods: &[PeriodId],
     p: &MeanRevertingParams,
-    stream_id: Option<u64>,
+    rng: &mut Pcg64Rng,
 ) -> Result<(IndexMap<PeriodId, f64>, IndexMap<PeriodId, f64>)> {
     validate_mean_reverting(p)?;
 
@@ -370,14 +315,13 @@ pub(crate) fn mean_reverting_forecast_with_stream(
         )));
     }
 
-    let mut rng = build_rng(p.seed, stream_id);
     let mut results = IndexMap::new();
     let mut shocks = IndexMap::new();
     let mut prev = base_value;
 
     for period_id in forecast_periods {
-        let z = rng.normal(0.0, 1.0);
-        shocks.insert(*period_id, if p.std_dev == 0.0 { 0.0 } else { z });
+        let z = standard_shock(rng, p.std_dev);
+        shocks.insert(*period_id, z);
         let value = mean_reverting_step(prev, p, z);
         if !value.is_finite() {
             return Err(Error::forecast(format!(
@@ -430,7 +374,7 @@ fn bootstrap_increments(p: &BootstrapParams) -> Result<Vec<f64>> {
 /// Resamples per-period increments observed in a historical series (i.i.d.,
 /// with replacement) and applies them sequentially from `base_value`:
 ///
-/// - `mode = "growth"` (default): increments are period-over-period growth
+/// - `mode = "growth"`: increments are period-over-period growth
 ///   rates `h[i]/h[i-1] - 1`; the path compounds
 ///   `value[t] = value[t-1] * (1 + g*)`. Requires strictly positive history.
 /// - `mode = "diff"`: increments are additive level changes `h[i] - h[i-1]`;
@@ -443,7 +387,8 @@ fn bootstrap_increments(p: &BootstrapParams) -> Result<Vec<f64>> {
 ///
 /// # Arguments
 ///
-/// * `base_value` - Starting level for the resampled path; must be finite
+/// * `base_value` - Starting level for the resampled path; must be finite,
+///   and strictly positive in growth mode
 /// * `forecast_periods` - Periods to simulate
 /// * `params` - `historical` (at least 2 finite numbers in the node's own
 ///   units, oldest first), the resampling `mode`, and the `seed` of the
@@ -461,7 +406,7 @@ pub(crate) fn bootstrap_forecast_with_stream(
     base_value: f64,
     forecast_periods: &[PeriodId],
     p: &BootstrapParams,
-    stream_id: Option<u64>,
+    rng: &mut Pcg64Rng,
 ) -> Result<IndexMap<PeriodId, f64>> {
     let increments = bootstrap_increments(p)?;
 
@@ -470,16 +415,19 @@ pub(crate) fn bootstrap_forecast_with_stream(
             "Bootstrap forecast requires a finite base_value, got {base_value}"
         )));
     }
+    if p.mode == ForecastBootstrapMode::Growth && base_value <= 0.0 {
+        return Err(Error::forecast(format!(
+            "Bootstrap growth mode requires a strictly positive base value, got {base_value}. \
+             Use mode = \"diff\" for series that touch zero or change sign."
+        )));
+    }
 
-    let mut rng = build_rng(p.seed, stream_id);
     let mut results = IndexMap::new();
     let mut prev = base_value;
-    let n = increments.len();
 
     for period_id in forecast_periods {
-        // Uniform in [0, 1) scaled to an index; the min() guards the
-        // (unreachable in exact arithmetic) u == 1.0 edge.
-        let idx = ((rng.uniform() * n as f64) as usize).min(n - 1);
+        // Unbiased uniform index, with replacement.
+        let idx = rng.index(increments.len());
         let value = match p.mode {
             ForecastBootstrapMode::Growth => prev * (1.0 + increments[idx]),
             ForecastBootstrapMode::Diff => prev + increments[idx],
@@ -505,7 +453,8 @@ pub(crate) struct CorrelatedMonteCarloSeries<'a> {
     /// Starting level anchoring the path; must match the peer-path convention.
     pub base_value: f64,
     pub forecast_periods: &'a [PeriodId],
-    pub seed_offset: u64,
+    /// The Monte Carlo path whose stream the independent shocks come from.
+    pub path: PathId,
     pub node_id: &'a str,
     pub peer_id: &'a str,
     pub rho: f64,
@@ -537,7 +486,7 @@ pub(crate) fn monte_carlo_correlated_series(
         parameters,
         base_value,
         forecast_periods,
-        seed_offset,
+        path,
         node_id,
         peer_id,
         rho,
@@ -617,10 +566,16 @@ pub(crate) fn monte_carlo_correlated_series(
 
     // The same generator an uncorrelated node would use, so a zero
     // correlation reproduces the uncorrelated draws exactly.
-    let mut rng = build_rng(super::mix_node_seed(seed, node_id), Some(seed_offset));
+    let mut rng = StreamKey {
+        seed,
+        node_id,
+        path: Some(path),
+    }
+    .rng()?;
     let mut values = IndexMap::new();
     let mut z_out = IndexMap::new();
     let mut prev = base_value;
+    let mut log_level = base_value.ln();
 
     // sqrt(1 - ρ²) with floor at zero in case of tiny numerical overshoot.
     let indep_weight = (1.0 - rho * rho).max(0.0).sqrt();
@@ -634,21 +589,26 @@ pub(crate) fn monte_carlo_correlated_series(
             ))
         })?;
 
-        let z_indep = rng.normal(0.0, 1.0);
-        let z = rho * z_peer + indep_weight * z_indep;
-        z_out.insert(*period_id, if sigma == 0.0 { 0.0 } else { z });
+        // A deterministic transition takes no shock and consumes no draw.
+        let z = if sigma == 0.0 {
+            0.0
+        } else {
+            rho * z_peer + indep_weight * rng.normal(0.0, 1.0)
+        };
+        z_out.insert(*period_id, z);
 
         let value = match kernel {
-            Kernel::Normal(p) => normal_step(prev, p, z),
-            Kernel::LogNormal(p) => lognormal_step(prev, p, z),
-            Kernel::MeanReverting(p) => mean_reverting_step(prev, p, z),
-        };
-
-        if !value.is_finite() {
-            return Err(Error::forecast(format!(
-                "{method_name} correlated forecast produced a non-finite value at period {period_id:?}"
-            )));
+            Kernel::Normal(p) => Some(normal_step(prev, p, z)),
+            Kernel::LogNormal(p) => lognormal_step(&mut log_level, p, z),
+            Kernel::MeanReverting(p) => Some(mean_reverting_step(prev, p, z)),
         }
+        .filter(|value| value.is_finite())
+        .ok_or_else(|| {
+            Error::forecast(format!(
+                "{method_name} correlated forecast produced an unrepresentable value at \
+                 period {period_id:?}"
+            ))
+        })?;
         values.insert(*period_id, value);
         prev = value;
     }
@@ -661,12 +621,24 @@ mod tests {
     use super::*;
     use finstack_quant_core::dates::PeriodId;
 
+    /// The stream of node `node` for `seed`, on path `path` of run 0 when set.
+    fn rng_for(seed: u64, path: Option<u64>) -> Pcg64Rng {
+        StreamKey {
+            seed,
+            node_id: "node",
+            path: path.map(|path| PathId { run_seed: 0, path }),
+        }
+        .rng()
+        .expect("stream")
+    }
+
     fn normal_forecast(
         base_value: f64,
         periods: &[PeriodId],
         params: &DistributionParams,
     ) -> Result<IndexMap<PeriodId, f64>> {
-        normal_forecast_with_stream(base_value, periods, params, None).map(|(values, _)| values)
+        normal_forecast_with_stream(base_value, periods, params, &mut rng_for(params.seed, None))
+            .map(|(values, _)| values)
     }
 
     fn lognormal_forecast(
@@ -674,7 +646,8 @@ mod tests {
         periods: &[PeriodId],
         params: &DistributionParams,
     ) -> Result<IndexMap<PeriodId, f64>> {
-        lognormal_forecast_with_stream(base_value, periods, params, None).map(|(values, _)| values)
+        lognormal_forecast_with_stream(base_value, periods, params, &mut rng_for(params.seed, None))
+            .map(|(values, _)| values)
     }
 
     fn mean_reverting_forecast(
@@ -682,8 +655,13 @@ mod tests {
         periods: &[PeriodId],
         params: &MeanRevertingParams,
     ) -> Result<IndexMap<PeriodId, f64>> {
-        mean_reverting_forecast_with_stream(base_value, periods, params, None)
-            .map(|(values, _)| values)
+        mean_reverting_forecast_with_stream(
+            base_value,
+            periods,
+            params,
+            &mut rng_for(params.seed, None),
+        )
+        .map(|(values, _)| values)
     }
 
     fn bootstrap_forecast(
@@ -691,7 +669,7 @@ mod tests {
         periods: &[PeriodId],
         params: &BootstrapParams,
     ) -> Result<IndexMap<PeriodId, f64>> {
-        bootstrap_forecast_with_stream(base_value, periods, params, None)
+        bootstrap_forecast_with_stream(base_value, periods, params, &mut rng_for(params.seed, None))
     }
 
     fn distribution(mean: f64, std_dev: f64, seed: u64) -> DistributionParams {
@@ -723,7 +701,10 @@ mod tests {
             parameters,
             base_value,
             forecast_periods: periods,
-            seed_offset: 1,
+            path: PathId {
+                run_seed: 0,
+                path: 1,
+            },
             node_id,
             peer_id,
             rho: 0.5,
@@ -746,8 +727,13 @@ mod tests {
             PeriodId::quarter(2025, 1).expect("valid period fixture"),
             PeriodId::quarter(2025, 2).expect("valid period fixture"),
         ];
-        let error = lognormal_forecast_with_stream(0.0, &periods, &lognormal_params(), Some(11))
-            .expect_err("zero cannot anchor a GBM path");
+        let error = lognormal_forecast_with_stream(
+            0.0,
+            &periods,
+            &lognormal_params(),
+            &mut rng_for(7, Some(11)),
+        )
+        .expect_err("zero cannot anchor a GBM path");
         assert!(error.to_string().contains("strictly positive"));
     }
 
@@ -864,7 +850,15 @@ mod tests {
     #[test]
     fn direct_lognormal_shocks_reject_negative_base() {
         let periods = vec![PeriodId::quarter(2025, 1).unwrap()];
-        assert!(lognormal_forecast_with_stream(-5.0, &periods, &lognormal_params(), None).is_err());
+        assert!(
+            lognormal_forecast_with_stream(
+                -5.0,
+                &periods,
+                &lognormal_params(),
+                &mut rng_for(7, None)
+            )
+            .is_err()
+        );
     }
 
     fn mean_reverting_params() -> MeanRevertingParams {
@@ -958,10 +952,14 @@ mod tests {
             PeriodId::quarter(2025, 1).unwrap(),
             PeriodId::quarter(2025, 2).unwrap(),
         ];
-        let (_, shocks) =
-            mean_reverting_forecast_with_stream(0.10, &periods, &mean_reverting_params(), Some(5))
-                .expect("forecast");
-        let mut rng = build_rng(42, Some(5));
+        let (_, shocks) = mean_reverting_forecast_with_stream(
+            0.10,
+            &periods,
+            &mean_reverting_params(),
+            &mut rng_for(42, Some(5)),
+        )
+        .expect("forecast");
+        let mut rng = rng_for(42, Some(5));
         for pid in &periods {
             assert_eq!(shocks[pid].to_bits(), rng.normal(0.0, 1.0).to_bits());
         }
@@ -993,7 +991,10 @@ mod tests {
                 parameters: &parameters,
                 base_value: 0.10,
                 forecast_periods: &periods,
-                seed_offset: 1,
+                path: PathId {
+                    run_seed: 0,
+                    path: 1,
+                },
                 node_id: "node",
                 peer_id: "peer",
                 rho,
@@ -1215,15 +1216,27 @@ mod tests {
         assert_eq!(results1, results2);
     }
 
+    /// The exponent is not clipped: a level that cannot be represented is a
+    /// computation error in either direction, while a positive subnormal is
+    /// a valid level.
     #[test]
-    fn test_lognormal_forecast_clamps_overflow() {
+    fn lognormal_rejects_unrepresentable_levels_and_accepts_a_subnormal() {
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
-
-        let values = lognormal_forecast(1.0, &periods, &distribution(1000.0, 0.0, 42))
-            .expect("lognormal with large mean should clamp, not fail");
-        for v in values.values() {
-            assert!(v.is_finite(), "clamped output must be finite");
+        for mean in [1000.0, -1000.0] {
+            let error = lognormal_forecast(1.0, &periods, &distribution(mean, 0.0, 42))
+                .expect_err("overflow and underflow to zero are errors");
+            assert!(error.to_string().contains("strictly positive"), "{error}");
         }
+        // exp(-740) is about 4.2e-322: below the smallest normal double
+        // (2.2e-308) and above the smallest subnormal (4.9e-324).
+        let values = lognormal_forecast(1.0, &periods, &distribution(-740.0, 0.0, 42))
+            .expect("a positive subnormal is representable");
+        let level = values[&periods[0]];
+        assert!(level > 0.0 && level < f64::MIN_POSITIVE, "{level}");
+        // A subnormal base is a valid strictly positive anchor.
+        let from_subnormal = lognormal_forecast(5e-324, &periods, &distribution(1.0, 0.0, 42))
+            .expect("subnormal base");
+        assert!(from_subnormal[&periods[0]] > 0.0);
     }
 
     /// Normal forecast must never produce NaN or non-finite values — exercises
@@ -1288,22 +1301,28 @@ mod tests {
         let runs = [
             (
                 "Normal",
-                normal_forecast_with_stream(1e16, &periods, &flat, Some(5)),
+                normal_forecast_with_stream(1e16, &periods, &flat, &mut rng_for(42, Some(5))),
             ),
             (
                 "LogNormal",
-                lognormal_forecast_with_stream(1e16, &periods, &flat, Some(5)),
+                lognormal_forecast_with_stream(1e16, &periods, &flat, &mut rng_for(42, Some(5))),
             ),
             (
                 "MeanReverting",
-                mean_reverting_forecast_with_stream(1e16, &periods, &mean_reverting, Some(5)),
+                mean_reverting_forecast_with_stream(
+                    1e16,
+                    &periods,
+                    &mean_reverting,
+                    &mut rng_for(42, Some(5)),
+                ),
             ),
         ];
         for (method, run) in runs {
             let (values, shocks) = run.expect("forecast");
-            let mut rng = build_rng(42, Some(5));
+            let mut rng = rng_for(42, Some(5));
             for period in &periods {
-                assert_eq!(values[period], 1e16, "{method}");
+                // The lognormal level is restored from its logarithm.
+                assert!((values[period] / 1e16 - 1.0).abs() < 1e-12, "{method}");
                 assert_eq!(
                     shocks[period].to_bits(),
                     rng.normal(0.0, 1.0).to_bits(),
@@ -1328,7 +1347,10 @@ mod tests {
             parameters: &flat,
             base_value: 10.0,
             forecast_periods: &periods,
-            seed_offset: 7,
+            path: PathId {
+                run_seed: 0,
+                path: 7,
+            },
             node_id: "flat",
             peer_id: "peer",
             rho: 0.5,
@@ -1345,7 +1367,10 @@ mod tests {
             parameters: &child,
             base_value: 10.0,
             forecast_periods: &periods,
-            seed_offset: 7,
+            path: PathId {
+                run_seed: 0,
+                path: 7,
+            },
             node_id: "child",
             peer_id: "flat",
             rho: 0.5,
@@ -1353,5 +1378,34 @@ mod tests {
         })
         .expect_err("zero-variance peer");
         assert!(err.to_string().contains("zero variance"));
+    }
+
+    /// A zero standard deviation consumes no draws: the generator is where
+    /// it started, and the recorded shocks are zero.
+    #[test]
+    fn zero_volatility_consumes_no_draws() {
+        let periods: Vec<_> = (1..=4)
+            .map(|q| PeriodId::quarter(2025, q).expect("valid period fixture"))
+            .collect();
+        let flat = distribution(0.5, 0.0, 42);
+        let reverting = MeanRevertingParams {
+            std_dev: 0.0,
+            ..mean_reverting_params()
+        };
+        for kernel in ["normal", "lognormal", "mean_reverting"] {
+            let mut rng = rng_for(42, None);
+            let (_, shocks) = match kernel {
+                "normal" => normal_forecast_with_stream(10.0, &periods, &flat, &mut rng),
+                "lognormal" => lognormal_forecast_with_stream(10.0, &periods, &flat, &mut rng),
+                _ => mean_reverting_forecast_with_stream(10.0, &periods, &reverting, &mut rng),
+            }
+            .expect("forecast");
+            assert!(shocks.values().all(|z| *z == 0.0), "{kernel}");
+            assert_eq!(
+                rng.normal(0.0, 1.0).to_bits(),
+                rng_for(42, None).normal(0.0, 1.0).to_bits(),
+                "{kernel}"
+            );
+        }
     }
 }

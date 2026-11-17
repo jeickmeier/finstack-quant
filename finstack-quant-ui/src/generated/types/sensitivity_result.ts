@@ -2701,6 +2701,11 @@ export interface D_29936D53E5E53Cef8284 {
  */
 export interface D_1B23Dc87C71E8Faf60D2 {
   /**
+   * The random stream of every stochastic forecast node in a single run,
+   * in model node order: enough to replay its draws.
+   */
+  forecast_streams?: D_5E7D1E3926C16B095Ad9[];
+  /**
    * Canonical content hash of the evaluated model
    * ([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).
    */
@@ -2732,6 +2737,36 @@ export interface D_1B23Dc87C71E8Faf60D2 {
    * a market.
    */
   valuation_date?: D_11C7Dbc9Fa7Cb6Ce298A | null;
+}
+/**
+ * Replay provenance of one stochastic forecast node in a single run.
+ *
+ * The generator is the shared PCG64 started at `state` on stream `stream`
+ * (`Pcg64Rng::new_with_stream(state, stream)`). Both are derived from the
+ * versioned key: the key version, the configured seed, the node and the
+ * single-run mode. Unsigned 64-bit values are decimal strings in JSON.
+ */
+export interface D_5E7D1E3926C16B095Ad9 {
+  /**
+   * The stochastic forecast node.
+   */
+  node_id: string;
+  /**
+   * The forecast method's exact configured seed.
+   */
+  seed: string;
+  /**
+   * Effective PCG64 starting state.
+   */
+  state: string;
+  /**
+   * Effective PCG64 stream selector.
+   */
+  stream: string;
+  /**
+   * Version of the mapping from the key to the stream.
+   */
+  stream_version: number;
 }
 /**
  * Configuration used

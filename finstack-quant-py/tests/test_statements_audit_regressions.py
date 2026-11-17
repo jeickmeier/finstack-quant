@@ -134,6 +134,7 @@ def test_correlated_paths_keep_shocks_when_peer_levels_round_flat(method: str, r
         ]
 
     baseline, rounded = run(False), run(True)
-    assert all(v == 1e16 for v in paths(rounded, "peer"))
+    # A log-normal level is restored from its logarithm, so it is flat to rounding.
+    assert all(abs(v / 1e16 - 1.0) < 1e-12 for v in paths(rounded, "peer"))
     for metric in ["follower", "child"]:
         assert paths(rounded, metric) == paths(baseline, metric)

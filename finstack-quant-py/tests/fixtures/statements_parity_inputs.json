@@ -1416,5 +1416,141 @@
       "ev_ebitda",
       "pe"
     ]
+  },
+  "stochastic_model": {
+    "id": "stochastic",
+    "periods": {
+      "calendar": "gregorian",
+      "periods": [
+        {
+          "id": "2025Q1",
+          "start": "2025-01-01",
+          "end": "2025-04-01",
+          "is_actual": true
+        },
+        {
+          "id": "2025Q2",
+          "start": "2025-04-01",
+          "end": "2025-07-01",
+          "is_actual": false
+        },
+        {
+          "id": "2025Q3",
+          "start": "2025-07-01",
+          "end": "2025-10-01",
+          "is_actual": false
+        },
+        {
+          "id": "2025Q4",
+          "start": "2025-10-01",
+          "end": "2026-01-01",
+          "is_actual": false
+        }
+      ]
+    },
+    "nodes": {
+      "normal": {
+        "node_id": "normal",
+        "node_type": "mixed",
+        "values": {
+          "2025Q1": 100.0
+        },
+        "forecast": {
+          "method": "normal",
+          "params": {
+            "mean": 1.5,
+            "seed": "9007199254740993",
+            "std_dev": 3.0
+          }
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "log_normal": {
+        "node_id": "log_normal",
+        "node_type": "mixed",
+        "values": {
+          "2025Q1": 100.0
+        },
+        "forecast": {
+          "method": "log_normal",
+          "params": {
+            "mean": 0.02,
+            "seed": "7",
+            "std_dev": 0.2
+          }
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "mean_reverting": {
+        "node_id": "mean_reverting",
+        "node_type": "mixed",
+        "values": {
+          "2025Q1": 100.0
+        },
+        "forecast": {
+          "method": "mean_reverting",
+          "params": {
+            "long_run_mean": 80.0,
+            "reversion_speed": 0.4,
+            "seed": "11",
+            "std_dev": 2.0
+          }
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "bootstrap_growth": {
+        "node_id": "bootstrap_growth",
+        "node_type": "mixed",
+        "values": {
+          "2025Q1": 100.0
+        },
+        "forecast": {
+          "method": "bootstrap",
+          "params": {
+            "historical": [
+              100.0,
+              110.0,
+              99.0,
+              104.0
+            ],
+            "mode": "growth",
+            "seed": "13"
+          }
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "bootstrap_diff": {
+        "node_id": "bootstrap_diff",
+        "node_type": "mixed",
+        "values": {
+          "2025Q1": 100.0
+        },
+        "forecast": {
+          "method": "bootstrap",
+          "params": {
+            "historical": [
+              100.0,
+              110.0,
+              99.0,
+              104.0
+            ],
+            "mode": "diff",
+            "seed": "13"
+          }
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      }
+    },
+    "schema_version": 1
   }
 }

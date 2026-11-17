@@ -526,6 +526,9 @@ impl ForecastSpec {
             // the model checks its coverage.
             Self::CurvePct(p) => p.curve.iter().try_for_each(|rate| finite("curve", *rate)),
             Self::Normal(p) | Self::LogNormal(p) => {
+                if matches!(self, Self::LogNormal(_)) && p.start.is_some_and(|start| start <= 0.0) {
+                    return fail("'start' must be strictly positive".to_string());
+                }
                 finite("mean", p.mean)?;
                 volatility("std_dev", p.std_dev)?;
                 correlation(&p.correlation_with, p.correlation)
@@ -572,11 +575,28 @@ impl ForecastSpec {
             }
             Self::MeanReverting(p) => {
                 finite("long_run_mean", p.long_run_mean)?;
-                finite("reversion_speed", p.reversion_speed)?;
+                if !(p.reversion_speed > 0.0 && p.reversion_speed <= 1.0) {
+                    return fail("'reversion_speed' must be in (0, 1]".to_string());
+                }
                 volatility("std_dev", p.std_dev)?;
                 correlation(&p.correlation_with, p.correlation)
             }
-            Self::Bootstrap(p) => series("historical", &p.historical),
+            Self::Bootstrap(p) => {
+                series("historical", &p.historical)?;
+                if p.historical.len() < 2 {
+                    return fail("'historical' needs at least two levels".to_string());
+                }
+                let positive = |level: &f64| *level > 0.0;
+                if p.mode == ForecastBootstrapMode::Growth
+                    && !(p.historical.iter().all(positive) && p.start.iter().all(positive))
+                {
+                    return fail(
+                        "the growth mode needs strictly positive history and start level"
+                            .to_string(),
+                    );
+                }
+                Ok(())
+            }
             Self::FadeToTarget(p) => {
                 finite("target", p.target)?;
                 if p.shape == ForecastFadeShape::Geometric {
@@ -605,6 +625,17 @@ impl ForecastSpec {
                     )),
                 }
             }
+        }
+    }
+
+    /// The exact configured seed of a stochastic method; `None` for
+    /// deterministic methods.
+    pub(crate) fn seed(&self) -> Option<u64> {
+        match self {
+            Self::Normal(p) | Self::LogNormal(p) => Some(p.seed),
+            Self::MeanReverting(p) => Some(p.seed),
+            Self::Bootstrap(p) => Some(p.seed),
+            _ => None,
         }
     }
 
@@ -638,34 +669,18 @@ impl ForecastSpec {
             Self::FadeToTarget(p) => (p.min, p.max),
         }
     }
-
-    /// The random seed of a stochastic method; `None` for deterministic methods.
-    pub(crate) fn seed_mut(&mut self) -> Option<&mut u64> {
-        match self {
-            Self::Normal(p) | Self::LogNormal(p) => Some(&mut p.seed),
-            Self::MeanReverting(p) => Some(&mut p.seed),
-            Self::Bootstrap(p) => Some(&mut p.seed),
-            Self::ForwardFill(_)
-            | Self::GrowthPct(_)
-            | Self::CurvePct(_)
-            | Self::Override(_)
-            | Self::TimeSeries(_)
-            | Self::Seasonal(_)
-            | Self::FadeToTarget(_) => None,
-        }
-    }
 }
 
 /// Seeds are exact `u64` values written as canonical decimal strings, so
 /// every host carries all 64 bits: `"9007199254740993"` is that integer.
-mod seed {
+pub(crate) mod seed {
     use serde::{Deserialize, Deserializer, Serializer};
 
-    pub(super) fn serialize<S: Serializer>(seed: &u64, serializer: S) -> Result<S::Ok, S::Error> {
+    pub(crate) fn serialize<S: Serializer>(seed: &u64, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&seed.to_string())
     }
 
-    pub(super) fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u64, D::Error> {
+    pub(crate) fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u64, D::Error> {
         let text = String::deserialize(deserializer).map_err(|_| {
             serde::de::Error::custom("a seed is a decimal string of an unsigned 64-bit integer")
         })?;

@@ -499,8 +499,12 @@ class StatementResult:
         dict[str, Any] | None
             ``model_id``, ``model_content_hash``, optional
             ``source_snapshot``, ``observation_cutoff`` (``"full_snapshot"``
-            or ``{"through": "2025-04-25"}``), optional ``valuation_date``
-            and ``run_id`` (the content hash of the other fields). ``None``
+            or ``{"through": "2025-04-25"}``), optional ``valuation_date``,
+            ``forecast_streams`` when the model has stochastic forecasts
+            (per node: ``node_id``, ``stream_version``, and the ``seed``,
+            ``state`` and ``stream`` of its PCG64 generator as decimal
+            strings, enough to replay the draws) and ``run_id`` (the
+            content hash of the other fields). ``None``
             for a result that was not produced by an evaluator.
         """
         ...

@@ -461,6 +461,70 @@
         "status": "value",
         "value": 100.0
       }
+    },
+    "stochastic.streams": [
+      {
+        "node_id": "normal",
+        "seed": "9007199254740993",
+        "state": "3117243698345702134",
+        "stream": "94280920230921889",
+        "stream_version": 1
+      },
+      {
+        "node_id": "log_normal",
+        "seed": "7",
+        "state": "2290705235353552679",
+        "stream": "2700445761921302834",
+        "stream_version": 1
+      },
+      {
+        "node_id": "mean_reverting",
+        "seed": "11",
+        "state": "14620627736251365435",
+        "stream": "10803372203327503804",
+        "stream_version": 1
+      },
+      {
+        "node_id": "bootstrap_growth",
+        "seed": "13",
+        "state": "17914113250802253740",
+        "stream": "10609489772245139974",
+        "stream_version": 1
+      },
+      {
+        "node_id": "bootstrap_diff",
+        "seed": "13",
+        "state": "13352767283008906270",
+        "stream": "11997726139553619742",
+        "stream_version": 1
+      }
+    ],
+    "stochastic.values": {
+      "bootstrap_diff": [
+        89.0,
+        94.0,
+        99.0
+      ],
+      "bootstrap_growth": [
+        105.05050505050507,
+        115.55555555555559,
+        121.3916947250281
+      ],
+      "log_normal": [
+        79.48257764843356,
+        96.46345656948989,
+        127.13922227003066
+      ],
+      "mean_reverting": [
+        87.73483847754254,
+        81.5615447009124,
+        82.61988456441702
+      ],
+      "normal": [
+        102.41180896824203,
+        103.4936804445769,
+        105.8727609437272
+      ]
     }
   },
   "statements_analytics": {

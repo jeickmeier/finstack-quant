@@ -314,7 +314,8 @@ test('statements correlated paths retain sampled shocks when peer values round f
     for (const rho of [-1, 0, 0.6, 1]) {
       const baseline = run(method, rho, false);
       const rounded = run(method, rho, true);
-      assert.ok(paths(rounded, 'peer').every((value) => value === 1e16));
+      // A log-normal level is restored from its logarithm, so it is flat to rounding.
+      assert.ok(paths(rounded, 'peer').every((value) => Math.abs(value / 1e16 - 1) < 1e-12));
       for (const metric of ['follower', 'child'])
         assert.deepEqual(
           paths(rounded, metric),

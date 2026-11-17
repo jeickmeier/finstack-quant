@@ -7,6 +7,7 @@ mod node;
 mod value;
 
 pub use edit::ModelEdit;
+pub(crate) use forecast_params::seed as forecast_seed;
 pub use forecast_params::{
     BootstrapParams, BoundsParams, CurvePctParams, DistributionParams, FadeToTargetParams,
     ForecastBootstrapMode, ForecastFadeShape, ForecastSpec, ForecastTrendMethod, GrowthPctParams,

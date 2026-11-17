@@ -57,6 +57,7 @@ function builtModel() {
 
 test('statements matches the cross-host golden', () => {
   const result = evaluate(MODEL);
+  const stochastic = evaluate(INPUTS.stochastic_model);
   const built = builtModel();
   const builtResult = evaluate(built);
 
@@ -141,6 +142,17 @@ test('statements matches the cross-host golden', () => {
       statements.statementResultGet(builtResult, 'capex', Q2),
     ],
     normalize: statements.normalize(result, config),
+    'stochastic.values': Object.fromEntries(
+      statements
+        .statementResultNodeIds(stochastic)
+        .map((node) => [
+          node,
+          ['2025Q2', '2025Q3', '2025Q4'].map((period) =>
+            statements.statementResultGet(stochastic, node, period)
+          ),
+        ])
+    ),
+    'stochastic.streams': stochastic.provenance.forecast_streams,
     forecast_specs: [
       { method: 'forward_fill' },
       { method: 'growth_pct', params: { rate: 0.05 } },

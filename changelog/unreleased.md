@@ -1155,3 +1155,24 @@ STATEMENTS-EVALUATION-006.
   rejected when the model is built.
 - **Growth.** Rates below -100% flip the sign of the level, as before; the
   log advisories about negative bases and large rates are removed.
+
+### Statements: stochastic forecasts on versioned random streams
+
+STATEMENTS-EVALUATION-007. **Every seeded forecast value changes**: normal,
+log-normal, mean-reverting and bootstrap forecasts, single-run and Monte
+Carlo, now draw from a stream derived from a versioned key (the seed, the
+node, the evaluation mode, and the run seed and path on a Monte Carlo path).
+Re-pin any stored stochastic numbers.
+
+- **Replay.** A single run records `provenance.forecast_streams`: per
+  stochastic node the `seed`, `stream_version` and the PCG64 `state` and
+  `stream` (decimal strings), enough to replay its draws.
+- **Log-normal.** The step is taken in log space with no exponent clipping.
+  A level that is not finite and strictly positive is an error (it used to be
+  clipped, or underflow to an absorbing zero); a positive subnormal is valid.
+  A `start` level must be strictly positive.
+- **Bootstrap.** Index draws are unbiased. Growth mode needs strictly positive
+  history, `start` and base; fewer than two history levels fail at build.
+- **Zero volatility.** A zero `std_dev` is the deterministic transition and
+  consumes no draws.
+- **Mean reversion.** `reversion_speed` outside `(0, 1]` fails at build.

@@ -64,6 +64,8 @@ def statements_cases() -> dict[str, Any]:
     result = st.Evaluator().evaluate(MODEL)
     model = st.FinancialModelSpec.from_json(MODEL)
 
+    stochastic = st.Evaluator().evaluate(json.dumps(INPUTS["stochastic_model"]))
+
     built = built_model()
     built_result = st.Evaluator().evaluate(built)
 
@@ -126,6 +128,11 @@ def statements_cases() -> dict[str, Any]:
             built_result.get("capex", Q2),
         ],
         "normalize": [doc(row) for row in normalized],
+        "stochastic.values": {
+            node: [stochastic.get(node, period) for period in ("2025Q2", "2025Q3", "2025Q4")]
+            for node in stochastic.node_ids()
+        },
+        "stochastic.streams": stochastic.provenance["forecast_streams"],
         "forecast_specs": [
             doc(spec)
             for spec in (

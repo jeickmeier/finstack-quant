@@ -151,6 +151,17 @@ export default [
     "description": "What a result was evaluated from.\n\nA consumer that is handed a result checks this against the model, period\nplan and run it expects before trusting the cells."
   },
   {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/forecast_streams",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/forecast_streams",
+    "description": "The random stream of every stochastic forecast node in a single run,\nin model node order: enough to replay its draws."
+  },
+  {
+    "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/forecast_streams/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/forecast_streams/items",
+    "ref": "#/$defs/ForecastStream",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ForecastStream"
+  },
+  {
     "path": "#/$defs/d_1b23dc87c71e8faf60d2/properties/model_content_hash",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance/properties/model_content_hash",
     "description": "Canonical content hash of the evaluated model\n([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash))."
@@ -452,6 +463,38 @@ export default [
   {
     "path": "#/$defs/d_583d7ac2c659b0d958a8/properties/value/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ResultCell/properties/value/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_5e7d1e3926c16b095ad9",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ForecastStream",
+    "description": "Replay provenance of one stochastic forecast node in a single run.\n\nThe generator is the shared PCG64 started at `state` on stream `stream`\n(`Pcg64Rng::new_with_stream(state, stream)`). Both are derived from the\nversioned key: the key version, the configured seed, the node and the\nsingle-run mode. Unsigned 64-bit values are decimal strings in JSON."
+  },
+  {
+    "path": "#/$defs/d_5e7d1e3926c16b095ad9/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ForecastStream/properties/node_id",
+    "description": "The stochastic forecast node."
+  },
+  {
+    "path": "#/$defs/d_5e7d1e3926c16b095ad9/properties/seed",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ForecastStream/properties/seed",
+    "description": "The forecast method's exact configured seed."
+  },
+  {
+    "path": "#/$defs/d_5e7d1e3926c16b095ad9/properties/state",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ForecastStream/properties/state",
+    "description": "Effective PCG64 starting state."
+  },
+  {
+    "path": "#/$defs/d_5e7d1e3926c16b095ad9/properties/stream",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ForecastStream/properties/stream",
+    "description": "Effective PCG64 stream selector."
+  },
+  {
+    "path": "#/$defs/d_5e7d1e3926c16b095ad9/properties/stream_version",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/ForecastStream/properties/stream_version",
+    "description": "Version of the mapping from the key to the stream.",
+    "format": "uint32",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_677810bf9653cfb0a467",

@@ -273,7 +273,12 @@ fn rounded_peer_levels_preserve_correlated_paths_and_chains() {
             let rounded = Evaluator::new()
                 .evaluate_monte_carlo(&shock_chain_model(method, true, rho), &config)
                 .unwrap();
-            assert!(metric_paths(&rounded, "peer").iter().all(|v| *v == 1e16));
+            // The lognormal level is restored from its logarithm.
+            assert!(
+                metric_paths(&rounded, "peer")
+                    .iter()
+                    .all(|v| (*v / 1e16 - 1.0).abs() < 1e-12)
+            );
             for metric in ["follower", "child"] {
                 assert_eq!(
                     metric_paths(&rounded, metric),
@@ -301,9 +306,14 @@ fn clipping_and_explicit_overrides_preserve_latent_correlated_paths() {
                 .unwrap()
                 .insert(quarter(3), 200.0.into());
         } else {
-            let params = &mut peer.forecast.as_mut().unwrap().params();
-            params.insert("min".into(), json!(100.0));
-            params.insert("max".into(), json!(100.0));
+            let forecast = peer.forecast.take().unwrap();
+            peer.forecast = Some(
+                forecast
+                    .with_param("min", json!(100.0))
+                    .unwrap()
+                    .with_param("max", json!(100.0))
+                    .unwrap(),
+            );
         }
         let actual = Evaluator::new()
             .evaluate_monte_carlo(&model, &config)
@@ -723,5 +733,197 @@ fn exponential_fade_halves_the_remaining_gap_each_half_life() {
         .unwrap();
     for (index, expected) in [(2, 20.0), (3, 60.0), (4, 80.0)] {
         assert!((result.get("x", &quarter(index)).unwrap() - expected).abs() < 1e-12);
+    }
+}
+
+// --- C4: stochastic kernels and versioned streams (STATEMENTS-EVALUATION-007) ---
+
+/// Mean and variance of node `x` in the last period across Monte Carlo paths.
+fn terminal_moments(forecast: ForecastSpec, base: f64, paths: usize) -> (f64, f64) {
+    let config = MonteCarloConfig::new(paths, 20_261_117).with_path_data(true);
+    let results = Evaluator::new()
+        .evaluate_monte_carlo(&growth_model(forecast, Some(base), &[]), &config)
+        .unwrap();
+    // Path data is ordered by path, then period: the last period of each
+    // path is every third value.
+    let terminal: Vec<f64> = metric_paths(&results, "x")
+        .chunks(3)
+        .map(|path| path[2])
+        .collect();
+    assert_eq!(terminal.len(), paths);
+    let mean = terminal.iter().sum::<f64>() / paths as f64;
+    let variance = terminal.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (paths as f64 - 1.0);
+    (mean, variance)
+}
+
+/// Sample moments after three steps against closed forms derived
+/// independently of the kernels.
+#[test]
+fn stochastic_kernels_match_closed_form_moments() {
+    let paths = 20_000;
+    let n = paths as f64;
+    // Normal walk from -50 (a signed level): mean x0 + 3 mu, variance 3 sigma^2.
+    let (mean, variance) = terminal_moments(ForecastSpec::normal(2.0, 4.0, 1), -50.0, paths);
+    let (expected_mean, expected_variance) = (-50.0 + 3.0 * 2.0, 3.0 * 16.0);
+    assert!((mean - expected_mean).abs() < 4.0 * (expected_variance / n).sqrt());
+    // The sample variance of a normal has standard error var * sqrt(2 / (n - 1)).
+    assert!((variance - expected_variance).abs() < 4.0 * expected_variance * (2.0 / n).sqrt());
+
+    // Lognormal: the expected gross multiplier per step is exp(mu), so the
+    // mean is x0 exp(3 mu) and the variance mean^2 (exp(3 sigma^2) - 1).
+    let (mu, sigma) = (0.03, 0.2);
+    let (mean, variance) = terminal_moments(ForecastSpec::log_normal(mu, sigma, 2), 80.0, paths);
+    let expected_mean = 80.0 * (3.0 * mu).exp();
+    let expected_variance = expected_mean.powi(2) * ((3.0 * sigma * sigma).exp() - 1.0);
+    assert!((mean - expected_mean).abs() < 4.0 * (expected_variance / n).sqrt());
+    assert!((variance / expected_variance - 1.0).abs() < 0.1);
+
+    // Mean reversion from -10 (signed) toward 5 with kappa = 0.4:
+    // mean theta + (x0 - theta)(1 - kappa)^3, variance sigma^2 (1 + a^2 + a^4)
+    // with a = 1 - kappa.
+    let (theta, kappa, sigma) = (5.0, 0.4, 1.5);
+    let (mean, variance) = terminal_moments(
+        ForecastSpec::mean_reverting(theta, kappa, sigma, 3),
+        -10.0,
+        paths,
+    );
+    let a: f64 = 1.0 - kappa;
+    let expected_mean = theta + (-10.0 - theta) * a.powi(3);
+    let expected_variance = sigma * sigma * (1.0 + a.powi(2) + a.powi(4));
+    assert!((mean - expected_mean).abs() < 4.0 * (expected_variance / n).sqrt());
+    assert!((variance - expected_variance).abs() < 4.0 * expected_variance * (2.0 / n).sqrt());
+}
+
+/// A single run replays from the seed and stream its provenance records,
+/// with no access to the key derivation.
+#[test]
+fn a_single_run_replays_from_its_recorded_stream() {
+    use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
+    let seed = 9_007_199_254_740_993;
+    let result = Evaluator::new()
+        .evaluate(&growth_model(
+            ForecastSpec::normal(1.5, 3.0, seed),
+            Some(100.0),
+            &[],
+        ))
+        .unwrap();
+    let streams = &result.provenance.as_ref().unwrap().forecast_streams;
+    assert_eq!(streams.len(), 1);
+    let recorded = &streams[0];
+    assert_eq!(
+        (
+            recorded.node_id.as_str(),
+            recorded.seed,
+            recorded.stream_version
+        ),
+        ("x", seed, 1)
+    );
+    let mut rng = Pcg64Rng::new_with_stream(recorded.state, recorded.stream);
+    let mut level = 100.0;
+    for index in [2, 3, 4] {
+        level += 1.5 + 3.0 * rng.normal(0.0, 1.0);
+        assert_eq!(
+            result.get("x", &quarter(index)).unwrap().to_bits(),
+            level.to_bits()
+        );
+    }
+    // The record survives the wire with its integers exact.
+    let wire = serde_json::to_value(recorded).unwrap();
+    assert_eq!(wire["seed"], json!("9007199254740993"));
+    assert_eq!(
+        serde_json::from_value::<finstack_quant_statements::evaluator::ForecastStream>(wire)
+            .unwrap(),
+        *recorded
+    );
+    // A model without a stochastic forecast records no stream.
+    let deterministic = Evaluator::new()
+        .evaluate(&growth_model(ForecastSpec::growth(0.1), Some(100.0), &[]))
+        .unwrap();
+    assert!(
+        deterministic
+            .provenance
+            .unwrap()
+            .forecast_streams
+            .is_empty()
+    );
+}
+
+/// Zero volatility is the deterministic transition, exactly.
+#[test]
+fn zero_volatility_is_the_deterministic_transition() {
+    let normal = Evaluator::new()
+        .evaluate(&growth_model(
+            ForecastSpec::normal(-2.5, 0.0, 9),
+            Some(-10.0),
+            &[],
+        ))
+        .unwrap();
+    for (index, expected) in [(2, -12.5), (3, -15.0), (4, -17.5)] {
+        assert_eq!(normal.get("x", &quarter(index)), Some(expected));
+    }
+    let reverting = Evaluator::new()
+        .evaluate(&growth_model(
+            ForecastSpec::mean_reverting(0.0, 0.5, 0.0, 9),
+            Some(-16.0),
+            &[],
+        ))
+        .unwrap();
+    for (index, expected) in [(2, -8.0), (3, -4.0), (4, -2.0)] {
+        assert_eq!(reverting.get("x", &quarter(index)), Some(expected));
+    }
+}
+
+#[test]
+fn bootstrap_modes_state_their_domains() {
+    use finstack_quant_statements::types::ForecastBootstrapMode;
+    let history = vec![100.0, 110.0, 99.0];
+    // Growth needs strictly positive history, start level and anchor.
+    assert!(
+        ForecastSpec::bootstrap(vec![100.0, 0.0, 5.0], ForecastBootstrapMode::Growth, 1)
+            .validate()
+            .is_err()
+    );
+    assert!(
+        ForecastSpec::bootstrap(vec![100.0], ForecastBootstrapMode::Diff, 1)
+            .validate()
+            .is_err()
+    );
+    let growth = ForecastSpec::bootstrap(history.clone(), ForecastBootstrapMode::Growth, 1);
+    assert!(
+        growth
+            .clone()
+            .with_param("start", json!(-1.0))
+            .unwrap()
+            .validate()
+            .is_err()
+    );
+    let error = Evaluator::new()
+        .evaluate(&growth_model(growth.clone(), Some(-5.0), &[]))
+        .unwrap_err();
+    assert!(error.to_string().contains("strictly positive"), "{error}");
+    // Every growth step is one of the two observed growth rates.
+    let result = Evaluator::new()
+        .evaluate(&growth_model(growth, Some(200.0), &[]))
+        .unwrap();
+    let mut level = 200.0;
+    for index in [2, 3, 4] {
+        let next = result.get("x", &quarter(index)).unwrap();
+        let rate: f64 = next / level - 1.0;
+        assert!(
+            (rate - 0.1).abs() < 1e-12 || (rate + 0.1).abs() < 1e-12,
+            "{rate}"
+        );
+        level = next;
+    }
+    // Difference mode supports signed levels: every step is +10 or -11.
+    let diff = ForecastSpec::bootstrap(history, ForecastBootstrapMode::Diff, 1);
+    let result = Evaluator::new()
+        .evaluate(&growth_model(diff, Some(-3.0), &[]))
+        .unwrap();
+    let mut level = -3.0;
+    for index in [2, 3, 4] {
+        let next = result.get("x", &quarter(index)).unwrap();
+        assert!([10.0, -11.0].contains(&(next - level)), "{}", next - level);
+        level = next;
     }
 }

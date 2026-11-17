@@ -75,7 +75,10 @@ impl Evaluator {
             IndexMap<PeriodId, crate::capital_structure::CapitalStructureCashflows>,
         >,
         cs: CapitalStructureRun<'_>,
-        mut mc: Option<(u64, &mut super::engine::McZCache)>,
+        mut mc: Option<(
+            crate::forecast::stream::PathId,
+            &mut super::engine::McZCache,
+        )>,
     ) -> Result<DynamicPeriodEvaluation> {
         let PeriodEval { model, period, .. } = eval;
         let CapitalStructureRun {

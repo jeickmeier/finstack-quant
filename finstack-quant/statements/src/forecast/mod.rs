@@ -70,6 +70,7 @@ mod deterministic;
 mod fade;
 mod override_method;
 pub(crate) mod statistical;
+pub(crate) mod stream;
 mod timeseries;
 
 use deterministic::{curve_pct, forward_fill, growth_pct};
@@ -128,46 +129,49 @@ pub(crate) fn apply_forecast_unbounded(
 
 /// Run a forecast method without bounds.
 ///
-/// Stochastic methods (normal, log-normal, mean-reverting, bootstrap) mix
-/// `node_id` into their configured seed so different nodes on the same run do
-/// not reuse identical draws. `stream` selects an independent RNG stream
-/// for Monte Carlo path `stream`; `None` is the single-run stream.
-/// Deterministic methods ignore both. Monte Carlo callers apply
-/// [`apply_bounds`] themselves, after recording correlation shocks.
+/// Stochastic methods (normal, log-normal, mean-reverting, bootstrap) draw
+/// from the versioned stream of their seed, `node_id` and `path`
+/// ([`stream::StreamKey`]); `None` is the single-run stream. Deterministic
+/// methods ignore both. Monte Carlo callers apply [`apply_bounds`]
+/// themselves, after recording correlation shocks.
 ///
 /// Returns the generated levels and the sampled Gaussian shocks, or `None`
 /// for methods that do not draw Gaussian shocks. Zero-volatility forecasts
-/// retain zero shocks so they cannot serve as stochastic correlation peers.
+/// record zero shocks so they cannot serve as stochastic correlation peers.
 pub(crate) fn apply_forecast(
     parameters: &ForecastSpec,
     base_value: f64,
     forecast_periods: &[PeriodId],
     node_id: &str,
-    stream: Option<u64>,
+    path: Option<stream::PathId>,
 ) -> Result<(ForecastSeries, Option<ForecastSeries>)> {
     use statistical::{
         bootstrap_forecast_with_stream, lognormal_forecast_with_stream,
         mean_reverting_forecast_with_stream, normal_forecast_with_stream,
     };
-    let mut seeded = parameters.clone();
-    if let Some(seed) = seeded.seed_mut() {
-        *seed = mix_node_seed(*seed, node_id);
-    }
-    match &seeded {
+    let rng = |seed: u64| {
+        stream::StreamKey {
+            seed,
+            node_id,
+            path,
+        }
+        .rng()
+    };
+    match parameters {
         ForecastSpec::Normal(p) => {
-            normal_forecast_with_stream(base_value, forecast_periods, p, stream)
+            normal_forecast_with_stream(base_value, forecast_periods, p, &mut rng(p.seed)?)
                 .map(|(values, shocks)| (values, Some(shocks)))
         }
         ForecastSpec::LogNormal(p) => {
-            lognormal_forecast_with_stream(base_value, forecast_periods, p, stream)
+            lognormal_forecast_with_stream(base_value, forecast_periods, p, &mut rng(p.seed)?)
                 .map(|(values, shocks)| (values, Some(shocks)))
         }
         ForecastSpec::MeanReverting(p) => {
-            mean_reverting_forecast_with_stream(base_value, forecast_periods, p, stream)
+            mean_reverting_forecast_with_stream(base_value, forecast_periods, p, &mut rng(p.seed)?)
                 .map(|(values, shocks)| (values, Some(shocks)))
         }
         ForecastSpec::Bootstrap(p) => {
-            bootstrap_forecast_with_stream(base_value, forecast_periods, p, stream)
+            bootstrap_forecast_with_stream(base_value, forecast_periods, p, &mut rng(p.seed)?)
                 .map(|values| (values, None))
         }
         ForecastSpec::ForwardFill(_) => {
@@ -263,14 +267,6 @@ pub(crate) fn apply_bounds(parameters: &ForecastSpec, results: &mut ForecastSeri
         }
     }
     Ok(())
-}
-
-fn mix_node_seed(seed: u64, node_id: &str) -> u64 {
-    // SplitMix64-style combine: a plain XOR can cancel bits when the
-    // user seed and node hash overlap (worst case yielding seed 0);
-    // multiply-add by the golden-ratio constant decorrelates them.
-    seed.wrapping_mul(0x9E37_79B9_7F4A_7C15)
-        .wrapping_add(statistical::stable_hash_u64(node_id))
 }
 
 #[cfg(test)]
@@ -409,8 +405,17 @@ mod tests {
         spec = spec.clone().with_param("max", json!(101.0)).unwrap();
         let parameters = spec.clone();
 
-        let (seeded, _) =
-            apply_forecast(&parameters, 100.0, &periods, "node", Some(3)).expect("seeded forecast");
+        let (seeded, _) = apply_forecast(
+            &parameters,
+            100.0,
+            &periods,
+            "node",
+            Some(stream::PathId {
+                run_seed: 0,
+                path: 3,
+            }),
+        )
+        .expect("seeded forecast");
         // With sigma = 50 and tight bounds, an unclamped walk must escape
         // [99, 101] somewhere in 8 periods.
         assert!(

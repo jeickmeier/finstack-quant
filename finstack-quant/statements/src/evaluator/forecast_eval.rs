@@ -7,6 +7,7 @@ use crate::evaluator::engine::PeriodEval;
 use crate::evaluator::value::Value;
 use crate::forecast;
 use crate::forecast::statistical::{CorrelatedMonteCarloSeries, monte_carlo_correlated_series};
+use crate::forecast::stream::PathId;
 use crate::types::{FinancialModelSpec, ForecastSpec, NodeId, NodeSpec};
 use finstack_quant_core::dates::PeriodId;
 use indexmap::IndexMap;
@@ -64,31 +65,32 @@ pub(crate) fn evaluate_forecast(
     eval: PeriodEval<'_>,
     context: &EvaluationContext,
     forecast_cache: &mut IndexMap<NodeId, ForecastRun>,
-    seed_offset: Option<u64>,
+    path: Option<PathId>,
     mc_z_cache: &mut Option<&mut IndexMap<NodeId, IndexMap<PeriodId, f64>>>,
 ) -> Result<ForecastCell> {
     let model = eval.model;
     let period_id = &eval.period.id;
     if !forecast_cache.contains_key(node_spec.node_id.as_str()) {
-        let run = generate_run(
-            node_spec,
-            model,
-            period_id,
-            context,
-            seed_offset,
-            mc_z_cache,
-        )?;
+        let run = generate_run(node_spec, model, period_id, context, path, mc_z_cache)?;
         forecast_cache.insert(node_spec.node_id.clone(), run);
     }
     match forecast_cache.get(node_spec.node_id.as_str()) {
         Some(ForecastRun::Unavailable(reason)) => Ok(ForecastCell::Unavailable(*reason)),
         Some(ForecastRun::Series { raw, published }) => {
-            // A keyed override without a base leaves the slots before its
-            // first key out of the series.
-            let Some(value) = published.get(period_id).copied() else {
-                return Ok(ForecastCell::Unavailable(
-                    UnavailableReason::MissingForecastBase,
-                ));
+            let value = match published.get(period_id).copied() {
+                Some(value) => value,
+                // A keyed override without a base leaves the slots before
+                // its first key out of the series.
+                None if matches!(node_spec.forecast, Some(ForecastSpec::Override(_))) => {
+                    return Ok(ForecastCell::Unavailable(
+                        UnavailableReason::MissingForecastBase,
+                    ));
+                }
+                None => {
+                    return Err(Error::eval(format!(
+                        "Forecast did not produce value for period {period_id:?}"
+                    )));
+                }
             };
             let clipped_from = raw
                 .get(period_id)
@@ -112,7 +114,7 @@ fn generate_run(
     model: &FinancialModelSpec,
     period_id: &PeriodId,
     context: &EvaluationContext,
-    seed_offset: Option<u64>,
+    path: Option<PathId>,
     mc_z_cache: &mut Option<&mut IndexMap<NodeId, IndexMap<PeriodId, f64>>>,
 ) -> Result<ForecastRun> {
     let forecast_spec = node_spec
@@ -164,7 +166,7 @@ fn generate_run(
     };
 
     let parameters = forecast_spec;
-    let raw = if let Some(offset) = seed_offset {
+    let raw = if let Some(path) = path {
         let correlation = if mc_z_cache.is_some() {
             forecast::statistical::correlation(parameters)?
         } else {
@@ -181,7 +183,7 @@ fn generate_run(
                     parameters,
                     base_value,
                     forecast_periods: &forecast_periods,
-                    seed_offset: offset,
+                    path,
                     node_id: node_spec.node_id.as_str(),
                     peer_id: peer,
                     rho,
@@ -194,7 +196,7 @@ fn generate_run(
                     base_value,
                     &forecast_periods,
                     node_spec.node_id.as_str(),
-                    Some(offset),
+                    Some(path),
                 )?
             };
         // Sampled shocks are recorded before output bounds: clipping the

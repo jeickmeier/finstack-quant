@@ -424,8 +424,9 @@ qualified.
 
 The Statements stochastic forecast kernel contract was accepted on
 2026-11-15. It covers checked per-step kernels, unclipped lognormal
-restoration, explicit bootstrap and versioned PCG64 replay. Implementation
-and independent qualification remain pending.
+restoration, explicit bootstrap and versioned PCG64 replay. It is
+implemented and qualified; recording the stream version on a Monte Carlo
+result is tracked with the Monte Carlo contract.
 [STATEMENTS-EVALUATION-007](statements-evaluation/07-stochastic-forecast-kernels.md#accepted-decision-for-stochastic-forecast-kernels-and-replay).
 
 The Statements latent one-peer correlation contract was accepted on

@@ -1940,11 +1940,11 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo.json",
-      "sha256": "550f9a8af4b7dccdf620dd5e0ec9c73aa592907e34d4b0456ca427d7e7995c1e"
+      "sha256": "bbe6374185738c083f5d7226e106a5c4fc8666b00c1b8f0ad32536c87c54590f"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo-breach.json",
-      "sha256": "405600e4509ab62d12da2089d57d5632607aeba04bdcf16e7d312551bc733232"
+      "sha256": "76cfb15a85e931fa639e767309a03b08feeefca150dc11c807852864def85c2a"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-scenarios.json",

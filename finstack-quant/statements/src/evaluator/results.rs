@@ -358,10 +358,42 @@ pub struct RunProvenance {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub valuation_date: Option<Date>,
+    /// The random stream of every stochastic forecast node in a single run,
+    /// in model node order: enough to replay its draws.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub forecast_streams: Vec<ForecastStream>,
     /// Identity of this evaluation run: the canonical content hash of the
     /// fields above. Two runs of the same model content, snapshot, cutoff
     /// and valuation date share it.
     pub run_id: String,
+}
+
+/// Replay provenance of one stochastic forecast node in a single run.
+///
+/// The generator is the shared PCG64 started at `state` on stream `stream`
+/// (`Pcg64Rng::new_with_stream(state, stream)`). Both are derived from the
+/// versioned key: the key version, the configured seed, the node and the
+/// single-run mode. Unsigned 64-bit values are decimal strings in JSON.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ForecastStream {
+    /// The stochastic forecast node.
+    pub node_id: String,
+    /// Version of the mapping from the key to the stream.
+    pub stream_version: u32,
+    /// The forecast method's exact configured seed.
+    #[serde(with = "crate::types::forecast_seed")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    pub seed: u64,
+    /// Effective PCG64 starting state.
+    #[serde(with = "crate::types::forecast_seed")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    pub state: u64,
+    /// Effective PCG64 stream selector.
+    #[serde(with = "crate::types::forecast_seed")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    pub stream: u64,
 }
 
 impl RunProvenance {
@@ -391,12 +423,40 @@ impl RunProvenance {
             source_snapshot: model.source_snapshot.clone(),
             observation_cutoff,
             valuation_date,
+            forecast_streams: forecast_streams(model)?,
             run_id: String::new(),
         };
         provenance.run_id =
             finstack_quant_core::canonical::content_hash(&provenance).map_err(hash_error)?;
         Ok(provenance)
     }
+}
+
+/// The single-run stream of every stochastic forecast node of `model`.
+fn forecast_streams(
+    model: &crate::types::FinancialModelSpec,
+) -> crate::error::Result<Vec<ForecastStream>> {
+    use crate::forecast::stream::{STREAM_VERSION, StreamKey};
+    model
+        .nodes
+        .iter()
+        .filter_map(|(node_id, node)| Some((node_id, node.forecast.as_ref()?.seed()?)))
+        .map(|(node_id, seed)| {
+            let (state, stream) = StreamKey {
+                seed,
+                node_id: node_id.as_str(),
+                path: None,
+            }
+            .derive()?;
+            Ok(ForecastStream {
+                node_id: node_id.to_string(),
+                stream_version: STREAM_VERSION,
+                seed,
+                state,
+                stream,
+            })
+        })
+        .collect()
 }
 
 /// Execution statistics for a statement-model evaluation.

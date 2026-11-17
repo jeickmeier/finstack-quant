@@ -62,6 +62,6 @@ pub use monte_carlo::{MonteCarloConfig, MonteCarloResults, PercentileSeries};
 pub(crate) use period_history::PeriodHistory;
 pub use results::{
     CapitalStructureClaimCategory, CapitalStructureWarning, CellSource, CellStatus, EvalStats,
-    EvalWarning, NumericMode, ResultCell, RunProvenance, StatementResult,
+    EvalWarning, ForecastStream, NumericMode, ResultCell, RunProvenance, StatementResult,
 };
 pub use rollup::RollupSpec;

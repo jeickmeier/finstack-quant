@@ -220,6 +220,13 @@
       "additionalProperties": false,
       "description": "What a result was evaluated from.\n\nA consumer that is handed a result checks this against the model, period\nplan and run it expects before trusting the cells.",
       "properties": {
+        "forecast_streams": {
+          "description": "The random stream of every stochastic forecast node in a single run,\nin model node order: enough to replay its draws.",
+          "items": {
+            "$ref": "#/$defs/d_5e7d1e3926c16b095ad9"
+          },
+          "type": "array"
+        },
         "model_content_hash": {
           "description": "Canonical content hash of the evaluated model\n([`FinancialModelSpec::content_hash`](crate::types::FinancialModelSpec::content_hash)).",
           "type": "string"
@@ -503,6 +510,42 @@
       },
       "required": [
         "status"
+      ],
+      "type": "object"
+    },
+    "d_5e7d1e3926c16b095ad9": {
+      "additionalProperties": false,
+      "description": "Replay provenance of one stochastic forecast node in a single run.\n\nThe generator is the shared PCG64 started at `state` on stream `stream`\n(`Pcg64Rng::new_with_stream(state, stream)`). Both are derived from the\nversioned key: the key version, the configured seed, the node and the\nsingle-run mode. Unsigned 64-bit values are decimal strings in JSON.",
+      "properties": {
+        "node_id": {
+          "description": "The stochastic forecast node.",
+          "type": "string"
+        },
+        "seed": {
+          "description": "The forecast method's exact configured seed.",
+          "type": "string"
+        },
+        "state": {
+          "description": "Effective PCG64 starting state.",
+          "type": "string"
+        },
+        "stream": {
+          "description": "Effective PCG64 stream selector.",
+          "type": "string"
+        },
+        "stream_version": {
+          "description": "Version of the mapping from the key to the stream.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node_id",
+        "stream_version",
+        "seed",
+        "state",
+        "stream"
       ],
       "type": "object"
     },
