@@ -1,40 +1,60 @@
-//! Normalization Engine implementation.
+//! Normalization bridge engine.
 
 use crate::adjustments::types::{
-    Adjustment, AdjustmentCap, AdjustmentValue, AppliedAdjustment, CapBaseMode,
-    NormalizationConfig, NormalizationResult,
+    AdjustmentCap, AdjustmentValue, AppliedAdjustment, CapBaseMode, NormalizationConfig,
+    NormalizationResult,
 };
 use crate::error::{Error, Result};
-use crate::evaluator::StatementResult;
-use crate::types::NodeValueType;
+use crate::evaluator::cell::Cell;
+use crate::evaluator::{ResultCell, StatementResult, UnavailableReason};
+use crate::types::{AmountOrScalar, NodeValueType};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
-use indexmap::IndexMap;
+use finstack_quant_core::money::Money;
 
-/// Normalize a target node across every period present in the results.
+/// Build the ordered bridge from a reported node to its adjusted value for
+/// every period of the result's plan.
 ///
-/// Each result starts with the reported target value, applies configured
-/// adjustments in their declaration order, then adds the capped adjustment
-/// total. Every [`AppliedAdjustment`] records the target value through that
-/// step (`adjusted_value`); the last one equals `final_value`. Fixed adjustments default to zero for periods not listed. A
-/// percentage adjustment uses its referenced node's value for the same
-/// period. Self-referential caps use either the reported base or the
-/// progressively adjusted base according to [`CapBaseMode`]. Referenced
-/// nodes must share the target's scalar/monetary type and currency; fixed
-/// adjustments and absolute caps use the target's units. There is no FX conversion.
+/// The whole configuration is validated before any period is calculated:
+/// identifiers, the output node, every referenced node, units and
+/// currencies, the period keys of fixed amounts and every number. Each
+/// period then starts from the reported target value and applies the
+/// adjustments in declaration order. A fixed adjustment that does not list
+/// the period adjusts by zero. A percentage adjustment multiplies its
+/// reference node's reported value in the same period. Each cap limits its
+/// own adjustment's magnitude and keeps its sign; a reference cap is
+/// `fraction` times the positive part of its base, where a base equal to the
+/// target is the reported value, or the reported value plus the earlier
+/// applied adjustments under [`CapBaseMode::Progressive`]. Money is added
+/// and scaled exactly with checked arithmetic and scalars with a compensated
+/// sum; every row's raw amount, cap base, limit, applied amount and running
+/// value is checked. There is no currency conversion.
 ///
-/// # Errors
-///
-/// Returns an evaluation error if `target_node` is absent, an adjustment's
-/// referenced or cap-base node is missing, a percentage source lacks a
-/// value for a target period, units differ, any used numeric input or
-/// output is non-finite, or a cap is negative. Results are returned
-/// only after all periods are processed and are sorted chronologically.
+/// A period whose target, percentage reference or cap base is missing,
+/// masked or unavailable has no adjusted value: its result carries the
+/// reason and no rows. Nothing is written to `results`; use
+/// [`merge_into_results`] to publish the adjusted node.
 ///
 /// # Arguments
 ///
-/// * `results` - Evaluated statement or pricing results consumed by the operation.
-/// * `config` - Configuration object controlling validation, rounding, or solver behavior
+/// * `results` - Evaluated or rolled-up statement results with their period
+///   plan and typed cells. They are only read.
+/// * `config` - The reported node, the new output node and the ordered
+///   adjustments with their caps.
+///
+/// # Returns
+///
+/// One [`NormalizationResult`] per period of the plan, in timeline order.
+///
+/// # Errors
+///
+/// Returns an invalid-input error when the results carry no period plan,
+/// the output node is empty or equals the target, an adjustment id repeats,
+/// the target or a referenced node is absent or has no recorded units,
+/// units or currencies differ, a fixed amount names a period outside the
+/// plan, or a number is non-finite or a cap negative. Returns an evaluation
+/// error when a consumed value is not finite or any row's arithmetic cannot
+/// be represented; no partial bridge is returned.
 pub fn normalize(
     results: &StatementResult,
     config: &NormalizationConfig,
@@ -46,633 +66,391 @@ pub fn normalize(
     )
     .entered();
 
-    // A config can arrive from JSON, which bypasses `add_adjustment`'s
-    // duplicate guard. Every adjustment below is applied unconditionally,
-    // so an unchecked duplicate would silently double-count.
-    config.validate()?;
-
-    let mut normalization_results = Vec::new();
-
-    let target_values = results.float_series(&config.target_node).ok_or_else(|| {
-        Error::eval(format!(
-            "Target node '{}' not found in results",
-            config.target_node
-        ))
-    })?;
-
-    let value_type = results
-        .node_value_types
-        .get(&config.target_node)
-        .copied()
-        .unwrap_or(NodeValueType::Scalar);
-    for adjustment in &config.adjustments {
-        let mut references = Vec::new();
-        if let AdjustmentValue::PercentageOfNode { node_id, .. } = &adjustment.value {
-            references.push(node_id);
-        }
-        if let Some(base) = adjustment
-            .cap
-            .as_ref()
-            .and_then(|cap| cap.base_node.as_ref())
-        {
-            references.push(base);
-        }
-        for node in references {
-            let source_type = results
-                .node_value_types
-                .get(node)
-                .copied()
-                .unwrap_or(NodeValueType::Scalar);
-            if source_type != value_type {
-                return Err(Error::eval(format!(
-                    "Normalization target '{}' ({value_type:?}) and reference '{node}' ({source_type:?}) have incompatible units",
-                    config.target_node
-                )));
-            }
-        }
-    }
-
-    for (period_id, &base_value) in &target_values {
-        if !base_value.is_finite() {
-            return Err(Error::eval(format!(
-                "Non-finite normalization base for {period_id}"
-            )));
-        }
-        let mut applied_adjustments = Vec::new();
-        let mut total_acc = NeumaierAccumulator::new();
-
-        for adjustment in &config.adjustments {
-            let raw_amount = calculate_adjustment_value(adjustment, *period_id, results)?;
-
-            if !raw_amount.is_finite() {
-                return Err(Error::eval(format!(
-                    "Non-finite adjustment '{}' for {period_id}",
-                    adjustment.id
-                )));
-            }
-            let running_total = total_acc.get_total()?;
-            let (capped_amount, is_capped) = if let Some(cap) = &adjustment.cap {
-                apply_cap(
-                    cap,
-                    raw_amount,
-                    &config.target_node,
-                    running_total,
-                    *period_id,
-                    results,
-                )?
-            } else {
-                (raw_amount, false)
-            };
-
-            total_acc.add(capped_amount)?;
-
-            applied_adjustments.push(AppliedAdjustment {
-                adjustment_id: adjustment.id.clone(),
-                name: adjustment.name.clone(),
-                raw_amount,
-                capped_amount,
-                is_capped,
-                // Same expression as `final_value`, so the last step matches it exactly.
-                adjusted_value: base_value + total_acc.get_total()?,
-            });
-        }
-
-        let final_value = base_value + total_acc.get_total()?;
-        if !final_value.is_finite() {
-            return Err(Error::eval(format!(
-                "Non-finite normalized result for {period_id}"
-            )));
-        }
-        normalization_results.push(NormalizationResult {
-            value_type,
-            period: *period_id,
-            base_value,
-            adjustments: applied_adjustments,
-            final_value,
-        });
-    }
-
-    normalization_results.sort_by_key(|r| r.period);
-
-    Ok(normalization_results)
+    let value_type = validate(results, config)?;
+    let periods = results.get_periods();
+    periods
+        .iter()
+        .map(|period| bridge(results, config, value_type, period.id))
+        .collect()
 }
 
-/// Merge normalized values and their units atomically into a result node.
+/// Publish the adjusted metric of `config` as the new node
+/// `config.output_node`.
 ///
-/// A successful nonempty merge clears the attached check report because
-/// its findings describe the values before this modification. Rerun the
-/// desired check suite to validate the updated results.
+/// The bridge is calculated from `config` by [`normalize`], so the published
+/// values always agree with the configuration recorded for them in
+/// [`StatementResult::normalizations`]. A period without an adjusted value
+/// is published as an unavailable cell with its reason. The reported target,
+/// every other node and the check report are left as they are: source checks
+/// describe the reported figures, and a ratio or covenant on the adjusted
+/// basis must reference the output node explicitly.
 ///
 /// # Arguments
 ///
-/// * `results` - Result whose numeric, monetary, and type maps are updated together.
-/// * `normalization_results` - Finite period values with one shared unit/currency;
-///   an empty slice leaves the result unchanged.
-/// * `output_node_id` - Node to create or replace, including all its existing periods.
+/// * `results` - Result of an evaluation run, or a rollup of one, that
+///   receives the new node, its units and the configuration.
+/// * `config` - The bridge to calculate and publish.
+///
+/// # Returns
+///
+/// The bridge that was published, one [`NormalizationResult`] per period.
 ///
 /// # Errors
 ///
-/// Returns an evaluation error for mixed units, duplicate periods, or non-finite
-/// values, and a monetary error if a final value cannot be represented as Money.
+/// Returns an invalid-input error when `results` record no source run, or
+/// already hold a node named `config.output_node` (including one published
+/// earlier), and every error of [`normalize`]. On error nothing is
+/// published.
 pub fn merge_into_results(
     results: &mut StatementResult,
-    normalization_results: &[NormalizationResult],
-    output_node_id: &str,
-) -> Result<()> {
-    let Some(first) = normalization_results.first() else {
-        return Ok(());
-    };
-    let mut period_map = IndexMap::new();
-    for res in normalization_results {
-        if res.value_type != first.value_type || !res.final_value.is_finite() {
-            return Err(Error::eval(
-                "Normalization results must have finite values and consistent units",
-            ));
-        }
-        let cell = match res.value_type {
-            NodeValueType::Monetary { currency } => crate::evaluator::ResultCell::money(
-                finstack_quant_core::money::Money::new(res.final_value, currency)?,
-            ),
-            NodeValueType::Scalar => crate::evaluator::ResultCell::scalar(res.final_value)?,
-        };
-        if period_map.insert(res.period, cell).is_some() {
-            return Err(Error::eval("Duplicate normalization period"));
-        }
-    }
-    results.cells.insert(output_node_id.to_string(), period_map);
-    results
-        .node_value_types
-        .insert(output_node_id.to_string(), first.value_type);
-    results.check_report = None;
-    Ok(())
-}
-
-/// Calculate the raw value of an adjustment for a specific period.
-fn calculate_adjustment_value(
-    adjustment: &Adjustment,
-    period_id: PeriodId,
-    results: &StatementResult,
-) -> Result<f64> {
-    match &adjustment.value {
-        AdjustmentValue::Fixed { amounts } => Ok(*amounts.get(&period_id).unwrap_or(&0.0)),
-        AdjustmentValue::PercentageOfNode {
-            node_id,
-            percentage,
-        } => {
-            let node_values = results
-                .float_series(node_id)
-                .ok_or_else(|| Error::eval(format!("Reference node '{}' not found", node_id)))?;
-
-            let value = node_values.get(&period_id).ok_or_else(|| {
-                Error::eval(format!(
-                    "Reference node '{}' has no value for period {}",
-                    node_id, period_id
-                ))
-            })?;
-            Ok(value * percentage)
-        }
-    }
-}
-
-/// Apply capping logic to an adjustment amount.
-///
-/// For self-referential caps (`base_node == target_node`), the base is
-/// resolved according to [`AdjustmentCap::base_mode`]:
-/// - `Reported` (default): the cap denominator is the **reported**
-///   (pre-adjustment) target value. Matches the standard LBO / credit
-///   agreement definition of e.g. "add-backs capped at 25% of reported
-///   EBITDA" — cap room is fixed for the period and does not widen as
-///   earlier add-backs are applied.
-/// - `Progressive`: the cap denominator is `target_value + running_total`,
-///   so earlier adjustments widen cap room for later ones.
-///
-/// For caps referencing a different node, the base is always that node's
-/// reported value (that node is not being adjusted in this pass).
-fn apply_cap(
-    cap: &AdjustmentCap,
-    raw_amount: f64,
-    target_node: &str,
-    running_total: f64,
-    period_id: PeriodId,
-    results: &StatementResult,
-) -> Result<(f64, bool)> {
-    // A negative cap value would make `|raw| > cap_limit` always true and
-    // then `signum * cap_limit` flips the adjustment's sign — silently
-    // turning an EBITDA add-back into a deduction. Reject it.
-    if !cap.value.is_finite() || cap.value < 0.0 {
-        return Err(Error::eval(format!(
-            "Adjustment cap value must be non-negative; got {}. A negative cap would flip the \
-             adjustment's sign (turning an add-back into a deduction).",
-            cap.value
+    config: &NormalizationConfig,
+) -> Result<Vec<NormalizationResult>> {
+    if results.provenance.is_none() && results.rollup_provenance.is_none() {
+        return Err(Error::invalid_input(format!(
+            "Cannot publish '{}': the results record no source run to link it to",
+            config.output_node
         )));
     }
-    let cap_limit = if let Some(base_node) = &cap.base_node {
-        let base_values = results
-            .float_series(base_node)
-            .ok_or_else(|| Error::eval(format!("Cap base node '{}' not found", base_node)))?;
-
-        let node_value = *base_values
-            .get(&period_id)
-            .filter(|value| value.is_finite())
-            .ok_or_else(|| {
-                Error::eval(format!(
-                    "Missing or non-finite cap base '{base_node}' for {period_id}"
-                ))
-            })?;
-        let effective_base = if base_node == target_node {
-            match cap.base_mode {
-                CapBaseMode::Reported => node_value,
-                CapBaseMode::Progressive => node_value + running_total,
+    if results.cells.contains_key(&config.output_node) {
+        return Err(Error::invalid_input(format!(
+            "Cannot publish '{}': the results already hold a node with that id. An adjusted \
+             metric is published under a new id and never overwrites a node",
+            config.output_node
+        )));
+    }
+    let rows = normalize(results, config)?;
+    let value_type = validate(results, config)?;
+    for row in &rows {
+        let cell = match (row.final_value, row.unavailable) {
+            (Some(AmountOrScalar::Amount(money)), _) => ResultCell::money(money),
+            (Some(AmountOrScalar::Scalar(value)), _) => ResultCell::scalar(value)?,
+            (None, reason) => {
+                ResultCell::unavailable(reason.unwrap_or(UnavailableReason::MissingInput))
             }
-        } else {
-            node_value
         };
-        effective_base.max(0.0) * cap.value
-    } else {
-        cap.value
+        results.set_cell(&config.output_node, row.period, cell);
+    }
+    results
+        .node_value_types
+        .insert(config.output_node.clone(), value_type);
+    results
+        .normalizations
+        .insert(config.output_node.clone(), config.clone());
+    Ok(rows)
+}
+
+/// Validate the whole configuration against the result before any period is
+/// calculated, and return the target's units.
+fn validate(results: &StatementResult, config: &NormalizationConfig) -> Result<NodeValueType> {
+    config.validate()?;
+    let plan = results.periods.as_ref().ok_or_else(|| {
+        Error::invalid_input("Normalization needs results that carry their period plan")
+    })?;
+    let units = |node: &str, role: &str| -> Result<NodeValueType> {
+        if !results.cells.contains_key(node) {
+            return Err(Error::invalid_input(format!(
+                "Normalization {role} '{node}' is not a node of the results"
+            )));
+        }
+        results.node_value_types.get(node).copied().ok_or_else(|| {
+            Error::invalid_input(format!(
+                "Normalization {role} '{node}' has no recorded units in the results"
+            ))
+        })
+    };
+    let value_type = units(&config.target_node, "target")?;
+    let same_units = |node: &str, role: &str| -> Result<()> {
+        let other = units(node, role)?;
+        if other == value_type {
+            Ok(())
+        } else {
+            Err(Error::invalid_input(format!(
+                "Normalization target '{}' ({value_type:?}) and {role} '{node}' ({other:?}) \
+                 have different units; there is no currency conversion",
+                config.target_node
+            )))
+        }
+    };
+    let typed = |amount: AmountOrScalar, what: &str| -> Result<()> {
+        let matches = match (amount, value_type) {
+            (AmountOrScalar::Scalar(value), NodeValueType::Scalar) => value.is_finite(),
+            (AmountOrScalar::Amount(money), NodeValueType::Monetary { currency }) => {
+                money.currency() == currency
+            }
+            _ => false,
+        };
+        if matches {
+            Ok(())
+        } else {
+            Err(Error::invalid_input(format!(
+                "{what} must be a finite amount in the units of target '{}' ({value_type:?})",
+                config.target_node
+            )))
+        }
     };
 
-    if !cap_limit.is_finite() {
-        return Err(Error::eval("Non-finite adjustment cap limit"));
+    for adjustment in &config.adjustments {
+        let id = &adjustment.id;
+        match &adjustment.value {
+            AdjustmentValue::Fixed { amounts } => {
+                for (period, amount) in amounts {
+                    if !plan.periods.iter().any(|known| known.id == *period) {
+                        return Err(Error::invalid_input(format!(
+                            "Adjustment '{id}' has an amount for {period}, which is not a \
+                             period of the results"
+                        )));
+                    }
+                    typed(*amount, &format!("Adjustment '{id}' amount for {period}"))?;
+                }
+            }
+            AdjustmentValue::PercentageOfNode {
+                node_id,
+                percentage,
+            } => {
+                same_units(node_id, "reference")?;
+                if !percentage.is_finite() {
+                    return Err(Error::invalid_input(format!(
+                        "Adjustment '{id}' percentage must be finite"
+                    )));
+                }
+            }
+        }
+        match &adjustment.cap {
+            None => {}
+            Some(AdjustmentCap::Absolute { amount }) => {
+                typed(*amount, &format!("Adjustment '{id}' absolute cap"))?;
+                if is_negative(*amount) {
+                    return Err(Error::invalid_input(format!(
+                        "Adjustment '{id}' absolute cap must be non-negative: a cap limits \
+                         magnitude and the adjustment keeps its sign"
+                    )));
+                }
+            }
+            Some(AdjustmentCap::Reference {
+                base_node,
+                fraction,
+                ..
+            }) => {
+                same_units(base_node, "cap base")?;
+                if !fraction.is_finite() || *fraction < 0.0 {
+                    return Err(Error::invalid_input(format!(
+                        "Adjustment '{id}' cap fraction must be finite and non-negative: a \
+                         cap limits magnitude and the adjustment keeps its sign"
+                    )));
+                }
+            }
+        }
     }
-    if raw_amount.abs() > cap_limit {
-        Ok((raw_amount.signum() * cap_limit, true))
-    } else {
-        Ok((raw_amount, false))
+    Ok(value_type)
+}
+
+/// The bridge of one period.
+fn bridge(
+    results: &StatementResult,
+    config: &NormalizationConfig,
+    value_type: NodeValueType,
+    period: PeriodId,
+) -> Result<NormalizationResult> {
+    let unavailable = |base_value, reason| NormalizationResult {
+        value_type,
+        period,
+        base_value,
+        adjustments: Vec::new(),
+        final_value: None,
+        unavailable: Some(reason),
+    };
+    let base = match read(results, &config.target_node, period)? {
+        Ok(base) => base,
+        Err(reason) => return Ok(unavailable(None, reason)),
+    };
+
+    let mut rows = Vec::with_capacity(config.adjustments.len());
+    let mut running = Running::new(base);
+    for adjustment in &config.adjustments {
+        let at = |what: &str| format!("adjustment '{}' {what} in {period}", adjustment.id);
+        let raw = match &adjustment.value {
+            AdjustmentValue::Fixed { amounts } => {
+                amounts.get(&period).copied().unwrap_or(zero(value_type))
+            }
+            AdjustmentValue::PercentageOfNode {
+                node_id,
+                percentage,
+            } => match read(results, node_id, period)? {
+                Ok(reference) => scale(reference, *percentage, &at("amount"))?,
+                Err(reason) => return Ok(unavailable(Some(base), reason)),
+            },
+        };
+        let (cap_base, cap_limit) = match &adjustment.cap {
+            None => (None, None),
+            Some(AdjustmentCap::Absolute { amount }) => (None, Some(*amount)),
+            Some(AdjustmentCap::Reference {
+                base_node,
+                fraction,
+                base_mode,
+            }) => {
+                let cap_base = if *base_node != config.target_node {
+                    match read(results, base_node, period)? {
+                        Ok(value) => value,
+                        Err(reason) => return Ok(unavailable(Some(base), reason)),
+                    }
+                } else if *base_mode == CapBaseMode::Progressive {
+                    running.value()
+                } else {
+                    base
+                };
+                let room = if is_negative(cap_base) {
+                    zero(value_type)
+                } else {
+                    cap_base
+                };
+                (
+                    Some(cap_base),
+                    Some(scale(room, *fraction, &at("cap limit"))?),
+                )
+            }
+        };
+        let (applied, is_capped) = match cap_limit {
+            Some(limit) if exceeds(raw, limit)? => {
+                let signed = if is_negative(raw) {
+                    negate(limit)
+                } else {
+                    limit
+                };
+                (signed, true)
+            }
+            _ => (raw, false),
+        };
+        running.add(applied, &at("running value"))?;
+        rows.push(AppliedAdjustment {
+            adjustment_id: adjustment.id.clone(),
+            name: adjustment.name.clone(),
+            raw_amount: raw,
+            cap_base,
+            cap_limit,
+            capped_amount: applied,
+            is_capped,
+            adjusted_value: running.value(),
+        });
+    }
+
+    Ok(NormalizationResult {
+        value_type,
+        period,
+        base_value: Some(base),
+        adjustments: rows,
+        final_value: Some(running.value()),
+        unavailable: None,
+    })
+}
+
+/// The reported value plus the applied adjustments so far: exact for money,
+/// a compensated sum for scalars.
+struct Running {
+    base: AmountOrScalar,
+    value: AmountOrScalar,
+    scalar_total: NeumaierAccumulator,
+}
+
+impl Running {
+    fn new(base: AmountOrScalar) -> Self {
+        Self {
+            base,
+            value: base,
+            scalar_total: NeumaierAccumulator::new(),
+        }
+    }
+
+    fn value(&self) -> AmountOrScalar {
+        self.value
+    }
+
+    fn add(&mut self, applied: AmountOrScalar, what: &str) -> Result<()> {
+        self.value = match (self.value, self.base, applied) {
+            (AmountOrScalar::Amount(value), _, AmountOrScalar::Amount(applied)) => {
+                AmountOrScalar::Amount(value.checked_add(applied)?)
+            }
+            (_, AmountOrScalar::Scalar(base), AmountOrScalar::Scalar(applied)) => {
+                self.scalar_total.add(applied)?;
+                AmountOrScalar::Scalar(finite(base + self.scalar_total.get_total()?, what)?)
+            }
+            _ => return Err(Error::eval(format!("The {what} mixes money and scalars"))),
+        };
+        Ok(())
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::adjustments::types::Adjustment;
-    use crate::evaluator::StatementResult;
-    use finstack_quant_core::dates::PeriodId;
-    use indexmap::IndexMap;
+/// The value of a node in a period, or why it has none. A value cell that
+/// holds a non-finite number is an error.
+fn read(
+    results: &StatementResult,
+    node: &str,
+    period: PeriodId,
+) -> Result<std::result::Result<AmountOrScalar, UnavailableReason>> {
+    let cell = results
+        .get_cell(node, &period)
+        .map_or(Cell::Missing, |cell| cell.to_cell());
+    Ok(match cell {
+        Cell::Scalar(value) => Ok(AmountOrScalar::Scalar(finite(
+            value,
+            &format!("value of '{node}' in {period}"),
+        )?)),
+        Cell::Money(money) => Ok(AmountOrScalar::Amount(money)),
+        Cell::Missing | Cell::Masked => Err(UnavailableReason::MissingInput),
+        Cell::Unavailable(reason) => Err(reason),
+    })
+}
 
-    fn mock_results() -> StatementResult {
-        let mut results = StatementResult::new();
-        let mut ebitda = IndexMap::new();
-        ebitda.insert(
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            100.0,
-        );
-        ebitda.insert(
-            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-            120.0,
-        );
-        results
-            .set_series("EBITDA", ebitda)
-            .expect("finite fixture values");
-
-        let mut revenue = IndexMap::new();
-        revenue.insert(
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            1000.0,
-        );
-        revenue.insert(
-            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-            1200.0,
-        );
-        results
-            .set_series("Revenue", revenue)
-            .expect("finite fixture values");
-
-        results
+fn finite(value: f64, what: &str) -> Result<f64> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(Error::eval(format!(
+            "The {what} is not finite or cannot be represented"
+        )))
     }
+}
 
-    /// Duplicate adjustment IDs arriving via JSON must be rejected.
-    ///
-    /// `NormalizationConfig::add_adjustment` guards against duplicates to
-    /// prevent accidental double-counting, but the derived `Deserialize` did
-    /// not, and the engine applies every entry unconditionally. That let
-    /// valid-looking JSON double-count an add-back and report a wrong adjusted
-    /// EBITDA — an accounting-grade output.
-    #[test]
-    fn duplicate_adjustment_ids_from_json_are_rejected() {
-        let json = r#"{
-            "target_node": "EBITDA",
-            "adjustments": [
-                {"id": "addback1", "name": "Synergies",
-                 "value": {"type": "fixed", "amounts": {"2025Q1": 10.0}}},
-                {"id": "addback1", "name": "Synergies (duplicate)",
-                 "value": {"type": "fixed", "amounts": {"2025Q1": 10.0}}}
-            ]
-        }"#;
-        let config: NormalizationConfig =
-            serde_json::from_str(json).expect("document is structurally valid JSON");
-
-        let results = mock_results();
-        let err = normalize(&results, &config)
-            .expect_err("duplicate adjustment ids must be rejected, not double-counted");
-        assert!(
-            err.to_string().contains("Duplicate adjustment ID"),
-            "expected a duplicate-id diagnostic, got: {err}"
-        );
+fn zero(value_type: NodeValueType) -> AmountOrScalar {
+    match value_type {
+        NodeValueType::Monetary { currency } => AmountOrScalar::Amount(Money::zero(currency)),
+        NodeValueType::Scalar => AmountOrScalar::Scalar(0.0),
     }
+}
 
-    /// The builder guard and the JSON path must agree.
-    #[test]
-    fn add_adjustment_and_validate_agree_on_duplicates() {
-        let mut amounts = IndexMap::new();
-        amounts.insert(
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            10.0,
-        );
+fn scale(amount: AmountOrScalar, factor: f64, what: &str) -> Result<AmountOrScalar> {
+    Ok(match amount {
+        AmountOrScalar::Amount(money) => AmountOrScalar::Amount(money.checked_mul_f64(factor)?),
+        AmountOrScalar::Scalar(value) => AmountOrScalar::Scalar(finite(value * factor, what)?),
+    })
+}
 
-        let config = NormalizationConfig::new("EBITDA")
-            .add_adjustment(Adjustment::fixed("a", "A", amounts.clone()))
-            .expect("first add succeeds");
-        assert!(
-            config
-                .clone()
-                .add_adjustment(Adjustment::fixed("a", "A dup", amounts))
-                .is_err(),
-            "builder must reject a duplicate id"
-        );
-        config.validate().expect("a unique-id config is valid");
-    }
-
-    #[test]
-    fn test_fixed_adjustment() {
-        let results = mock_results();
-        let mut amounts = IndexMap::new();
-        amounts.insert(
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            10.0,
-        );
-        amounts.insert(
-            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-            15.0,
-        );
-
-        let adj = Adjustment::fixed("addback1", "Addback 1", amounts);
-        let config = NormalizationConfig::new("EBITDA")
-            .add_adjustment(adj)
-            .expect("unique adjustment id");
-
-        let normalized = normalize(&results, &config)
-            .expect("normalization should succeed for fixed adjustment");
-
-        assert_eq!(normalized.len(), 2);
-        assert_eq!(normalized[0].final_value, 110.0); // 100 + 10
-        assert_eq!(normalized[1].final_value, 135.0); // 120 + 15
-    }
-
-    #[test]
-    fn test_percentage_adjustment() {
-        let results = mock_results();
-        // 5% of Revenue
-        let adj = Adjustment::percentage("perc1", "Perc 1", "Revenue", 0.05);
-        let config = NormalizationConfig::new("EBITDA")
-            .add_adjustment(adj)
-            .expect("unique adjustment id");
-
-        let normalized = normalize(&results, &config)
-            .expect("normalization should succeed for percentage adjustment");
-
-        // Q1: Revenue 1000 * 0.05 = 50. EBITDA 100 + 50 = 150.
-        assert_eq!(normalized[0].adjustments[0].raw_amount, 50.0);
-        assert_eq!(normalized[0].final_value, 150.0);
-    }
-
-    #[test]
-    fn test_percentage_adjustment_errors_when_reference_period_missing() {
-        let mut results = mock_results();
-        results
-            .cells
-            .get_mut("Revenue")
-            .expect("Revenue node should exist")
-            .shift_remove(&PeriodId::quarter(2025, 2).expect("valid period fixture"));
-
-        let adj = Adjustment::percentage("perc1", "Perc 1", "Revenue", 0.05);
-        let config = NormalizationConfig::new("EBITDA")
-            .add_adjustment(adj)
-            .expect("unique adjustment id");
-
-        let err = normalize(&results, &config).expect_err("missing reference period should fail");
-        assert!(
-            err.to_string()
-                .contains("Reference node 'Revenue' has no value for period 2025Q2")
-        );
-    }
-
-    #[test]
-    fn test_capped_adjustment() {
-        let results = mock_results();
-        // Synergies: 50.0 fixed. Cap: 20% of EBITDA.
-        // Q1 EBITDA = 100. Cap = 20. Raw = 50. Result = 20 (Capped).
-        let mut amounts = IndexMap::new();
-        amounts.insert(
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            50.0,
-        );
-
-        let adj = Adjustment::fixed("syn", "Synergies", amounts).with_cap(
-            Some("EBITDA".to_string()),
-            0.20,
-            CapBaseMode::Reported,
-        );
-
-        let config = NormalizationConfig::new("EBITDA")
-            .add_adjustment(adj)
-            .expect("unique adjustment id");
-        let normalized = normalize(&results, &config)
-            .expect("normalization should succeed for capped adjustment");
-
-        let q1 = &normalized[0];
-        assert_eq!(q1.adjustments[0].raw_amount, 50.0);
-        assert_eq!(q1.adjustments[0].capped_amount, 20.0);
-        assert!(q1.adjustments[0].is_capped);
-        assert_eq!(q1.final_value, 120.0); // 100 + 20
-    }
-
-    #[test]
-    fn adjusted_value_runs_from_base_to_final_value_in_declaration_order() {
-        let results = mock_results();
-        let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
-        // Q1 EBITDA 100, revenue 1000: one-off +10, capped synergy 50 -> 20
-        // (20% of reported EBITDA), then a 1% of revenue deduction of -10.
-        let one_off = Adjustment::fixed("one_off", "One-off", IndexMap::from([(q1, 10.0)]));
-        let synergy = Adjustment::fixed("syn", "Synergies", IndexMap::from([(q1, 50.0)])).with_cap(
-            Some("EBITDA".to_string()),
-            0.20,
-            CapBaseMode::Reported,
-        );
-        let deduction = Adjustment::percentage("ded", "Deduction", "Revenue", -0.01);
-        let config = NormalizationConfig::new("EBITDA")
-            .add_adjustment(one_off)
-            .and_then(|config| config.add_adjustment(synergy))
-            .and_then(|config| config.add_adjustment(deduction))
-            .expect("unique adjustment ids");
-
-        let normalized = normalize(&results, &config).expect("normalization succeeds");
-
-        let steps: Vec<f64> = normalized[0]
-            .adjustments
-            .iter()
-            .map(|applied| applied.adjusted_value)
-            .collect();
-        assert_eq!(steps, vec![110.0, 130.0, 120.0]);
-        assert_eq!(normalized[0].final_value, 120.0);
-        for result in &normalized {
-            let last = result.adjustments.last().expect("three adjustments");
-            assert_eq!(last.adjusted_value.to_bits(), result.final_value.to_bits());
+fn is_negative(amount: AmountOrScalar) -> bool {
+    match amount {
+        AmountOrScalar::Amount(money) => {
+            money.amount_decimal().is_sign_negative() && !money.amount_decimal().is_zero()
         }
-        // Q2 has no fixed amounts: the first two steps stay at the reported 120.
-        assert_eq!(normalized[1].period, q2);
-        assert_eq!(normalized[1].adjustments[0].adjusted_value, 120.0);
-        assert_eq!(normalized[1].adjustments[1].adjusted_value, 120.0);
+        AmountOrScalar::Scalar(value) => value < 0.0,
     }
+}
 
-    #[test]
-    fn test_merge_into_results() {
-        let mut results = mock_results();
-        let mut amounts = IndexMap::new();
-        amounts.insert(
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            10.0,
-        );
-        amounts.insert(
-            PeriodId::quarter(2025, 2).expect("valid period fixture"),
-            15.0,
-        );
-
-        let adj = Adjustment::fixed("addback1", "Addback 1", amounts);
-        let config = NormalizationConfig::new("EBITDA")
-            .add_adjustment(adj)
-            .expect("unique adjustment id");
-
-        let normalized =
-            normalize(&results, &config).expect("normalization should succeed for merge test");
-
-        merge_into_results(&mut results, &normalized, "Adjusted EBITDA").expect("valid merge");
-
-        assert!(results.has_node("Adjusted EBITDA"));
-        let adjusted = results
-            .float_series("Adjusted EBITDA")
-            .expect("Adjusted EBITDA should be added");
-        assert_eq!(
-            *adjusted
-                .get(&PeriodId::quarter(2025, 1).expect("valid period fixture"))
-                .expect("Q1 adjusted value present"),
-            110.0
-        );
-        assert_eq!(
-            *adjusted
-                .get(&PeriodId::quarter(2025, 2).expect("valid period fixture"))
-                .expect("Q2 adjusted value present"),
-            135.0
-        );
+fn negate(amount: AmountOrScalar) -> AmountOrScalar {
+    match amount {
+        AmountOrScalar::Amount(money) => AmountOrScalar::Amount(money.checked_neg()),
+        AmountOrScalar::Scalar(value) => AmountOrScalar::Scalar(-value),
     }
+}
 
-    /// Characterization test: an omitted `base_mode` must cap a
-    /// self-referential adjustment against the **reported** (pre-adjustment)
-    /// target value, while an explicit `CapBaseMode::Progressive` must cap
-    /// against the running adjusted base after a prior adjustment. The two
-    /// outcomes must numerically diverge once an earlier adjustment has
-    /// widened (or narrowed) the running total.
-    #[test]
-    fn self_referential_cap_reported_and_progressive_bases() {
-        let results = mock_results();
-
-        let mut addback_amounts = IndexMap::new();
-        addback_amounts.insert(
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            20.0,
-        );
-        let addback = Adjustment::fixed("addback", "Addback", addback_amounts);
-
-        let mut second_amounts = IndexMap::new();
-        second_amounts.insert(
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            40.0,
-        );
-
-        // Reported caps use the target value before any adjustments.
-        let reported_second = Adjustment::fixed("second", "Second", second_amounts.clone())
-            .with_cap(Some("EBITDA".to_string()), 0.30, CapBaseMode::Reported);
-        // Explicit Progressive base mode.
-        let progressive_second = Adjustment::fixed("second", "Second", second_amounts).with_cap(
-            Some("EBITDA".to_string()),
-            0.30,
-            CapBaseMode::Progressive,
-        );
-
-        let reported_config = NormalizationConfig::new("EBITDA")
-            .add_adjustment(addback.clone())
-            .expect("unique adjustment id")
-            .add_adjustment(reported_second)
-            .expect("unique adjustment id");
-        let progressive_config = NormalizationConfig::new("EBITDA")
-            .add_adjustment(addback)
-            .expect("unique adjustment id")
-            .add_adjustment(progressive_second)
-            .expect("unique adjustment id");
-
-        let reported_result =
-            normalize(&results, &reported_config).expect("reported-base cap normalizes");
-        let progressive_result = normalize(&results, &progressive_config)
-            .expect("explicit progressive-base cap normalizes");
-
-        let reported_capped = reported_result[0].adjustments[1].capped_amount;
-        let progressive_capped = progressive_result[0].adjustments[1].capped_amount;
-
-        // Reported EBITDA is 100.0; the cap room does not widen from the
-        // prior 20.0 addback: 100.0 * 0.30 = 30.0.
-        assert_eq!(
-            reported_capped, 30.0,
-            "Reported must cap against the reported (pre-adjustment) EBITDA"
-        );
-        // Progressive base is 100.0 + 20.0 (running total after the prior
-        // addback): (100.0 + 20.0) * 0.30 = 36.0.
-        assert_eq!(
-            progressive_capped, 36.0,
-            "explicit Progressive must cap against the running adjusted base"
-        );
-        assert_ne!(
-            reported_capped, progressive_capped,
-            "Reported and Progressive self-referential caps must diverge after a prior adjustment"
-        );
-        assert!(reported_result[0].adjustments[1].is_capped);
-        assert!(progressive_result[0].adjustments[1].is_capped);
-    }
-
-    #[test]
-    fn test_capped_adjustment_does_not_use_negative_ebitda_as_positive_cap_room() {
-        let mut results = StatementResult::new();
-        let mut ebitda = IndexMap::new();
-        ebitda.insert(
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            -100.0,
-        );
-        results
-            .set_series("EBITDA", ebitda)
-            .expect("finite fixture values");
-
-        let mut amounts = IndexMap::new();
-        amounts.insert(
-            PeriodId::quarter(2025, 1).expect("valid period fixture"),
-            50.0,
-        );
-
-        let adj = Adjustment::fixed("syn", "Synergies", amounts).with_cap(
-            Some("EBITDA".to_string()),
-            0.20,
-            CapBaseMode::Reported,
-        );
-        let config = NormalizationConfig::new("EBITDA")
-            .add_adjustment(adj)
-            .expect("unique adjustment id");
-
-        let normalized = normalize(&results, &config)
-            .expect("normalization should succeed for negative EBITDA case");
-
-        let q1 = &normalized[0];
-        assert_eq!(q1.adjustments[0].raw_amount, 50.0);
-        assert_eq!(q1.adjustments[0].capped_amount, 0.0);
-        assert!(q1.adjustments[0].is_capped);
-        assert_eq!(q1.final_value, -100.0);
-    }
+/// Whether the magnitude of `raw` is above the non-negative `limit`.
+fn exceeds(raw: AmountOrScalar, limit: AmountOrScalar) -> Result<bool> {
+    Ok(match (raw, limit) {
+        (AmountOrScalar::Amount(raw), AmountOrScalar::Amount(limit)) => {
+            raw.abs().checked_cmp(limit)? == std::cmp::Ordering::Greater
+        }
+        (AmountOrScalar::Scalar(raw), AmountOrScalar::Scalar(limit)) => raw.abs() > limit,
+        _ => {
+            return Err(Error::eval(
+                "A cap limit and its adjustment mix money and scalars",
+            ));
+        }
+    })
 }

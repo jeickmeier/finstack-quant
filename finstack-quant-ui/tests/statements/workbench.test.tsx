@@ -604,6 +604,10 @@ it(
       within(region).getByRole("combobox", { name: "Target node" }),
       { target: { value: "ebitda" } },
     );
+    fireEvent.change(
+      within(region).getByRole("textbox", { name: "Output node" }),
+      { target: { value: "adjusted_ebitda" } },
+    );
     await waitFor(
       () =>
         expect(

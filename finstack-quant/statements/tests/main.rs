@@ -49,6 +49,8 @@ mod integration_all;
 mod market_standards_tests;
 #[path = "monte_carlo_capital_structure.rs"]
 mod monte_carlo_capital_structure;
+#[path = "normalization_bridges.rs"]
+mod normalization_bridges;
 #[path = "production_reporting_audit.rs"]
 mod production_reporting_audit;
 #[path = "proptest_evaluator.rs"]

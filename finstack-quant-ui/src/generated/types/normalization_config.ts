@@ -2,15 +2,63 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
+ * A cap on the magnitude of one adjustment. The adjustment keeps its sign.
+ * Each cap applies to its own adjustment only; it is not a shared basket.
+ */
+export type DB067E48C60674Cfe1858 =
+  | {
+      /**
+       * Non-negative limit: a scalar for a scalar target, money in the
+       * target's currency for a monetary one.
+       */
+      amount: DEd941Ef877Ec5Af43B4C | number;
+      type: "absolute";
+    }
+  | {
+      /**
+       * When `base_node` is the target: size the cap against its reported
+       * value (the default) or against the reported value plus every
+       * earlier applied adjustment. Any other base node is always read at
+       * its reported value.
+       */
+      base_mode?: "reported" | "progressive";
+      /**
+       * Node the cap is sized against; it must share the target's units.
+       */
+      base_node: string;
+      /**
+       * Non-negative decimal fraction of the base (0.30 for 30%). It may
+       * exceed 1.
+       */
+      fraction: number;
+      type: "reference";
+    };
+/**
+ * Value that can be currency-aware or unitless.
+ *
+ * Used for node values that can represent:
+ * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+ * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
+ */
+export type DE4844B9E6Dff95971B13 = DEd941Ef877Ec5Af43B4C | number;
+
+/**
  * Financial statement normalization policy and adjustment catalog.
  */
 export interface NormalizationConfigWire {
   /**
-   * List of adjustments to apply
+   * Adjustments, applied in this order
    */
   adjustments?: D_38F91644B05Ebd53D53E[];
   /**
-   * The target node to normalize (e.g., "EBITDA")
+   * The new node the adjusted metric is published under (e.g.,
+   * "adjusted_ebitda"). It must differ from `target_node` and from every
+   * node the result already holds.
+   */
+  output_node: string;
+  /**
+   * The reported node the bridge starts from (e.g., "ebitda"). It is never
+   * modified.
    */
   target_node: string;
 }
@@ -40,10 +88,10 @@ export interface D_38F91644B05Ebd53D53E {
   value:
     | {
         /**
-         * Map of period_id -> amount
+         * Map of period_id -> signed amount
          */
         amounts: {
-          [k: string]: number;
+          [k: string]: DE4844B9E6Dff95971B13;
         };
         type: "fixed";
         [k: string]: unknown;
@@ -54,7 +102,7 @@ export interface D_38F91644B05Ebd53D53E {
          */
         node_id: string;
         /**
-         * Percentage to apply (e.g., 0.05 for 5%)
+         * Signed decimal percentage to apply (0.05 for 5%)
          */
         percentage: number;
         type: "percentage_of_node";
@@ -62,25 +110,179 @@ export interface D_38F91644B05Ebd53D53E {
       };
 }
 /**
- * Defines a cap on an adjustment.
+ * Currency-aware amount
  */
-export interface DB067E48C60674Cfe1858 {
+export interface DEd941Ef877Ec5Af43B4C {
   /**
-   * For self-referential caps (`base_node == target_node`), choose whether
-   * to size the cap against the reported or the progressively adjusted
-   * base. Defaults to `Reported`, the standard LBO / credit-agreement
-   * convention. Ignored when `base_node` is `None` or points to a
-   * different node.
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
    */
-  base_mode?: "reported" | "progressive";
+  amount: string;
   /**
-   * The base node to calculate the cap against (e.g., "EBITDA")
-   * If None, the cap is a fixed absolute amount.
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
    */
-  base_node?: string | null;
-  /**
-   * The percentage of the base node to cap at (e.g., 0.20 for 20%)
-   * Or the absolute amount if base_node is None.
-   */
-  value: number;
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
 }

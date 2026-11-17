@@ -42,11 +42,12 @@ def test_normalization_preserves_currency_and_rejects_foreign_adjustment() -> No
     result = s.Evaluator().evaluate(money_model())
     payload = {
         "target_node": "usd",
+        "output_node": "adjusted_usd",
         "adjustments": [
             {"id": "a", "name": "a", "value": {"type": "percentage_of_node", "node_id": "eur", "percentage": 0.1}}
         ],
     }
-    with pytest.raises(ValueError, match="incompatible units"):
+    with pytest.raises(ValueError, match="different units"):
         s.normalize(result, s.NormalizationConfig.from_json(json.dumps(payload)))
     payload["adjustments"][0]["value"]["node_id"] = "usd"
     normalized = s.normalize(result, s.NormalizationConfig.from_json(json.dumps(payload)))[0]

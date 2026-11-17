@@ -478,7 +478,7 @@ It is implemented and qualified; check suites over a rolled result remain.
 The Statements normalization bridge contract was accepted on 2026-11-15.
 It covers ordered signed adjustments, individual caps, checked bridge
 arithmetic and separate publication of adjusted metrics.
-Implementation and independent qualification remain pending.
+It is implemented and qualified across Rust, Python and WASM.
 [STATEMENTS-EVALUATION-015](statements-evaluation/15-normalization-adjustments.md#accepted-decision-for-normalization-bridges).
 
 The Statements corporate DCF contract was accepted on 2026-11-15. It covers

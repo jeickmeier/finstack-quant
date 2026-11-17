@@ -215,6 +215,12 @@ impl PyStatementResult {
             .transpose()
     }
 
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.normalizations")]
+    #[getter]
+    fn normalizations<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.normalizations)
+    }
+
     /// Check report attached by an evaluator configured with
     /// :meth:`Evaluator.with_checks`, or ``None`` when no suite ran.
     #[getter]

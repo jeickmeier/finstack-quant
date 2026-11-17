@@ -21,6 +21,7 @@ import {
 import { useNormalizationConfigValidator } from "@/hooks/statements/use-normalization-config-validator/use-normalization-config-validator";
 import {
   NormalizationEditor,
+  amountNumber,
   bridgeBars,
 } from "@/components/finstack/statements/components/normalization-editor/normalization-editor";
 import { unwrap, type NormalizationResult } from "@/workers/finstack-contract";
@@ -90,28 +91,38 @@ it("returns the fixture's results and canonical config through the worker", asyn
 
 it("draws each step between the values Rust returns, with no running sum", async () => {
   // The fixture holds a capped and an uncapped step, and a deduction.
-  const steps = results.flatMap((result) => result.adjustments);
+  const steps = results.flatMap((result) => result.adjustments!);
   expect(steps.some((step) => step.is_capped)).toBe(true);
   expect(steps.some((step) => !step.is_capped)).toBe(true);
-  expect(steps.some((step) => step.capped_amount < 0)).toBe(true);
+  expect(steps.some((step) => amountNumber(step.capped_amount) < 0)).toBe(true);
   for (const result of results) {
     const bars = bridgeBars(result);
-    expect(bars[0]).toMatchObject({ from: 0, to: result.base_value });
-    expect(bars.at(-1)).toMatchObject({ from: 0, to: result.final_value });
-    result.adjustments.forEach((step, index) => {
+    const adjustments = result.adjustments!;
+    expect(bars[0]).toMatchObject({
+      from: 0,
+      to: amountNumber(result.base_value!),
+    });
+    expect(bars.at(-1)).toMatchObject({
+      from: 0,
+      to: amountNumber(result.final_value!),
+    });
+    adjustments.forEach((step, index) => {
       const bar = bars[index + 1]!;
-      expect(bar.to).toBe(step.adjusted_value);
+      expect(bar.to).toBe(amountNumber(step.adjusted_value));
       expect(bar.from).toBe(
-        index === 0
-          ? result.base_value
-          : result.adjustments[index - 1]!.adjusted_value,
+        amountNumber(
+          index === 0
+            ? result.base_value!
+            : adjustments[index - 1]!.adjusted_value,
+        ),
       );
       expect(bar.kind).toBe(
         step.is_capped ? "Capped adjustment" : "Adjustment",
       );
-      expect(bar.amount).toBe(step.capped_amount);
+      expect(bar.amount).toBe(amountNumber(step.capped_amount));
     });
-    expect(result.adjustments.at(-1)!.adjusted_value).toBe(result.final_value);
+    // Money is exact: the last row's value is the final value.
+    expect(adjustments.at(-1)!.adjusted_value).toEqual(result.final_value);
   }
   const source = await readFile(
     resolve(
@@ -142,27 +153,28 @@ it("shows every adjustment by period as returned, with a capped one's raw amount
     ...results.map((result) => result.period),
   ]);
   const rows = within(table).getAllByRole("row").slice(1);
-  expect(rows).toHaveLength(results[0]!.adjustments.length + 2);
+  expect(rows).toHaveLength(results[0]!.adjustments!.length + 2);
   const cells = (row: HTMLElement) =>
     within(row)
       .getAllByRole("cell")
       .map((cell) => cell.textContent);
   expect(cells(rows[0]!)).toEqual(
-    results.map((result) => exact(result.base_value)),
+    results.map((result) => exact(amountNumber(result.base_value!))),
   );
   expect(cells(rows.at(-1)!)).toEqual(
-    results.map((result) => exact(result.final_value)),
+    results.map((result) => exact(amountNumber(result.final_value!))),
   );
-  results[0]!.adjustments.forEach((step, index) => {
+  results[0]!.adjustments!.forEach((step, index) => {
     expect(within(rows[index + 1]!).getByRole("rowheader").textContent).toBe(
       step.name,
     );
     expect(cells(rows[index + 1]!)).toEqual(
       results.map((result) => {
-        const applied = result.adjustments[index]!;
+        const applied = result.adjustments![index]!;
+        const amount = exact(amountNumber(applied.capped_amount));
         return applied.is_capped
-          ? `${exact(applied.capped_amount)} (capped; raw ${exact(applied.raw_amount)})`
-          : exact(applied.capped_amount);
+          ? `${amount} (capped; raw ${exact(amountNumber(applied.raw_amount))})`
+          : amount;
       }),
     );
   });
@@ -262,7 +274,7 @@ it("edits the target as a node combobox, validates natively and normalizes throu
   );
   const rows = within(table).getAllByRole("row");
   expect(within(rows.at(-1)!).getAllByRole("cell")[0]!.textContent).toBe(
-    exact(results[0]!.final_value),
+    exact(amountNumber(results[0]!.final_value!)),
   );
 });
 
@@ -291,6 +303,38 @@ it("shows the native rejection of a target the result lacks", async () => {
     (await screen.findByRole("alert", undefined, { timeout: budget(10000) }))
       .textContent,
   ).toBe(fixture.errors.missingTarget.message);
+});
+
+it("shows a period Rust returns without an adjusted value as unavailable, not as zero", () => {
+  const unavailable = fixture.unavailable as unknown as NormalizationResult[];
+  const gap = unavailable.find((result) => result.unavailable)!;
+  const valued = unavailable.find((result) => result.final_value != null)!;
+  expect(gap.final_value ?? null).toBeNull();
+  expect(bridgeBars(gap)).toEqual([]);
+  render(
+    <NormalizationEditor
+      nodeIds={nodeIds}
+      validate={async (json) => json}
+      onSubmit={() => {}}
+      results={unavailable}
+    />,
+  );
+  // The first returned period is the gap: its reason replaces the bridge.
+  expect(unavailable[0]).toBe(gap);
+  expect(
+    screen.getByText(new RegExp(`${gap.period} has no adjusted value`)),
+  ).toBeTruthy();
+  const table = screen.getByRole("table", {
+    name: "Adjustments by period (USD)",
+  });
+  const finalRow = within(table).getAllByRole("row").at(-1)!;
+  const cells = within(finalRow)
+    .getAllByRole("cell")
+    .map((cell) => cell.textContent);
+  expect(cells[unavailable.indexOf(gap)]).toBe("Unavailable");
+  expect(cells[unavailable.indexOf(valued)]).toBe(
+    exact(amountNumber(valued.final_value!)),
+  );
 });
 
 it("keys the query on the result and config", () => {

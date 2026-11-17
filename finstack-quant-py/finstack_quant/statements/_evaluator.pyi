@@ -540,6 +540,26 @@ class StatementResult:
         ...
 
     @property
+    def normalizations(self) -> dict[str, Any]:
+        """
+        The configuration of every adjusted metric published into this result.
+
+        Returns
+        -------
+        dict[str, Any]
+            Output node id to the ``NormalizationConfig`` (its serde form)
+            that :func:`merge_into_results` calculated it from, in publication
+            order; empty when nothing was published. The source run is this
+            result's ``provenance`` or ``rollup_provenance``.
+
+        Raises
+        ------
+        ValueError
+            If a stored configuration cannot be serialized.
+        """
+        ...
+
+    @property
     def check_report(self) -> CheckReport | None:
         """
         Check report attached by an evaluator configured with checks.

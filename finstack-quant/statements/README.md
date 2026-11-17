@@ -259,17 +259,34 @@ are in the analytics crate.
 
 ## Adjustments
 
-`adjustments::normalize(&result, &config)` computes an adjusted metric
-(typically adjusted EBITDA) from a reported node plus an explicit catalog of
-add-backs. Each `Adjustment` carries an `AdjustmentValue` (fixed per-period
-amounts or a percentage of another node) and an optional `AdjustmentCap`. The
-returned `Vec<NormalizationResult>` keeps both the adjusted total (`final_value`)
-and the per-adjustment audit trail (`adjustments: Vec<AppliedAdjustment>`), so
-the reported-to-adjusted bridge stays explainable: each `AppliedAdjustment`
-carries its raw and capped amounts and `adjusted_value`, the target through
-that step, so a bridge chart reads every step's position without summing.
-`adjustments::merge_into_results(&mut result, &normalized, "adj_ebitda")`
-folds the adjusted series back into a `StatementResult` as a new node.
+`adjustments::normalize(&result, &config)` builds the ordered bridge from a
+reported node to a separately named adjusted metric (typically reported EBITDA
+to adjusted EBITDA). A `NormalizationConfig` names the reported `target_node`,
+the new `output_node` and the adjustments in order. Each `Adjustment` carries
+an `AdjustmentValue` (signed fixed per-period amounts in the target's units, or
+a signed decimal percentage of another node's reported value) and an optional
+`AdjustmentCap`: `Absolute { amount }`, or `Reference { base_node, fraction,
+base_mode }`, a fraction of the positive part of a base node. A cap limits its
+own adjustment's magnitude and keeps its sign; a cap on the target uses the
+reported value unless `base_mode` is `Progressive`, which adds the earlier
+applied adjustments.
+
+The whole configuration is validated before any period is calculated:
+identifiers, references, units and currencies, the period keys of fixed
+amounts and every number. Money is added and scaled exactly and scalars with a
+compensated sum, and every row is checked, so an arithmetic failure returns an
+error and no bridge. Each `NormalizationResult` holds the reported
+`base_value`, the rows (`AppliedAdjustment`: raw amount, cap base and limit,
+applied amount and `adjusted_value`, the target through that row) and the
+`final_value`, all typed. A period whose target, percentage reference or cap
+base has no value is `unavailable` with its reason.
+
+`adjustments::merge_into_results(&mut result, &config)` calculates the bridge
+and publishes `output_node` as a new node. It never overwrites a node, leaves
+the reported target and the check report as they are, and records the
+configuration in `StatementResult::normalizations` beside the result's source
+run. A ratio or covenant on the adjusted basis references the output node
+explicitly.
 
 ## Results and export
 

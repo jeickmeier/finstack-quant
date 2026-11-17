@@ -74,9 +74,9 @@ def statements_cases() -> dict[str, Any]:
 
     one_off = st.Adjustment.fixed("one_off", "One-off cost", {Q1: 5.0})
     synergy = st.Adjustment.percentage("synergy", "Synergies", "revenue", 0.1)
-    extended = st.NormalizationConfig("profit")
+    extended = st.NormalizationConfig("profit", "adjusted_profit")
     extended.add_adjustment(one_off)
-    extended.add_adjustment(synergy.with_cap("revenue", 0.05, "reported"))
+    extended.add_adjustment(synergy.with_cap({"type": "reference", "base_node": "revenue", "fraction": 0.05}))
 
     suite = st.CheckSuiteSpec.from_json(json.dumps(INPUTS["check_suite"]))
     evaluator = st.Evaluator()
@@ -152,8 +152,8 @@ def statements_cases() -> dict[str, Any]:
         "adjustments": [
             doc(one_off),
             doc(synergy),
-            doc(synergy.with_cap("revenue", 0.05, "reported")),
-            doc(synergy.with_cap(None, 3.0, "progressive")),
+            doc(synergy.with_cap({"type": "reference", "base_node": "revenue", "fraction": 0.05})),
+            doc(synergy.with_cap({"type": "absolute", "amount": 3.0})),
             doc(one_off.with_category("non_recurring")),
         ],
         "normalization_config.add_adjustment": doc(extended),

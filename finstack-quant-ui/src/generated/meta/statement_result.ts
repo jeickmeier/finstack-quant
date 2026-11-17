@@ -414,6 +414,53 @@ export default [
     "description": "The cell has no value for the reason the cell states."
   },
   {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue",
+    "description": "Defines how an adjustment value is derived."
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/0",
+    "description": "Signed fixed amount per period, in the target's units: a scalar for a\nscalar target, money in the target's currency for a monetary one. A\nperiod of the plan that is not listed adjusts by zero; a period\noutside the plan is rejected."
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/0/properties/amounts",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/0/properties/amounts",
+    "description": "Map of period_id -> signed amount"
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/0/properties/amounts/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/0/properties/amounts/additionalProperties",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar"
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/0/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/0/properties/type",
+    "const": "fixed"
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/1",
+    "description": "Signed decimal percentage of a reference node's reported value in the\nsame period. The reference must share the target's units."
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/1/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/1/properties/node_id",
+    "description": "Node ID to reference (e.g., \"revenue\")"
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/1/properties/percentage",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/1/properties/percentage",
+    "description": "Signed decimal percentage to apply (0.05 for 5%)",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_3fd7f4ca4c2f52381fa9/oneOf/1/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue/oneOf/1/properties/type",
+    "const": "percentage_of_node"
+  },
+  {
     "path": "#/$defs/d_4f32370227b1985d85e9",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckResult",
     "description": "Outcome of a single check execution."
@@ -774,6 +821,32 @@ export default [
     "description": "A correlated forecast needs the shocks of a peer whose forecast was\nitself unavailable on the path."
   },
   {
+    "path": "#/$defs/d_6d88c3cd9765d62eaff0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NormalizationConfig",
+    "description": "An ordered bridge from a reported metric to a separately named adjusted\nmetric (for example reported EBITDA to adjusted EBITDA)."
+  },
+  {
+    "path": "#/$defs/d_6d88c3cd9765d62eaff0/properties/adjustments",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NormalizationConfig/properties/adjustments",
+    "description": "Adjustments, applied in this order"
+  },
+  {
+    "path": "#/$defs/d_6d88c3cd9765d62eaff0/properties/adjustments/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NormalizationConfig/properties/adjustments/items",
+    "ref": "#/$defs/Adjustment",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment"
+  },
+  {
+    "path": "#/$defs/d_6d88c3cd9765d62eaff0/properties/output_node",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NormalizationConfig/properties/output_node",
+    "description": "The new node the adjusted metric is published under (e.g.,\n\"adjusted_ebitda\"). It must differ from `target_node` and from every\nnode the result already holds."
+  },
+  {
+    "path": "#/$defs/d_6d88c3cd9765d62eaff0/properties/target_node",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NormalizationConfig/properties/target_node",
+    "description": "The reported node the bridge starts from (e.g., \"ebitda\"). It is never\nmodified."
+  },
+  {
     "path": "#/$defs/d_6f601764dacadc213e87",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodPlan",
     "description": "Builder/plan for a contiguous sequence of periods and their actual/forecast split.\n\nPeriods are returned in ascending order and are intended to form a contiguous\nrun of model periods. Each [`Period`] uses the crate-wide `[start, end)`\ninterval convention, so the `end` of one period naturally aligns with the\n`start` of the next."
@@ -1015,6 +1088,57 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckSeverity"
   },
   {
+    "path": "#/$defs/d_87e7d6db07659c292388",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap",
+    "description": "A cap on the magnitude of one adjustment. The adjustment keeps its sign.\nEach cap applies to its own adjustment only; it is not a shared basket."
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/0",
+    "description": "A fixed limit in the target's units."
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/0/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/0/properties/amount",
+    "description": "Non-negative limit: a scalar for a scalar target, money in the\ntarget's currency for a monetary one.",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar"
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/0/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/0/properties/type",
+    "const": "absolute"
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/1",
+    "description": "A limit of `fraction` times the positive part of a base node's value\nin the same period. A negative base gives no cap room."
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/1/properties/base_mode",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/1/properties/base_mode",
+    "default": "reported",
+    "description": "When `base_node` is the target: size the cap against its reported\nvalue (the default) or against the reported value plus every\nearlier applied adjustment. Any other base node is always read at\nits reported value.",
+    "ref": "#/$defs/CapBaseMode",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapBaseMode"
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/1/properties/base_node",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/1/properties/base_node",
+    "description": "Node the cap is sized against; it must share the target's units."
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/1/properties/fraction",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/1/properties/fraction",
+    "description": "Non-negative decimal fraction of the base (0.30 for 30%). It may\nexceed 1.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_87e7d6db07659c292388/oneOf/1/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap/oneOf/1/properties/type",
+    "const": "reference"
+  },
+  {
     "path": "#/$defs/d_8831040eb61de989f7ea",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar",
     "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
@@ -1031,6 +1155,48 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AmountOrScalar/anyOf/1",
     "description": "Unitless scalar (ratio, percentage, count, etc.)",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment",
+    "description": "Specification for a single adjustment (add-back or deduction)."
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e/properties/cap",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment/properties/cap",
+    "description": "Optional cap on the adjustment amount"
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e/properties/cap/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment/properties/cap/anyOf/0",
+    "ref": "#/$defs/AdjustmentCap",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentCap"
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e/properties/cap/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment/properties/cap/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e/properties/category",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment/properties/category",
+    "description": "Category for grouping (optional)"
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e/properties/id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment/properties/id",
+    "description": "Unique identifier for this adjustment"
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e/properties/name",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment/properties/name",
+    "description": "Human-readable name (e.g., \"Synergies\", \"Management Fees\")"
+  },
+  {
+    "path": "#/$defs/d_88c9bc8df9daae33f80e/properties/value",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Adjustment/properties/value",
+    "description": "How the adjustment value is calculated",
+    "ref": "#/$defs/AdjustmentValue",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/AdjustmentValue"
   },
   {
     "path": "#/$defs/d_8b741636dd21d9f7ad3f",
@@ -2550,6 +2716,23 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/RunProvenance"
   },
   {
+    "path": "#/$defs/d_ed07f3603dd3fb46568b",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapBaseMode",
+    "description": "How a self-referential cap base (where `base_node == target_node`) is\nresolved each period."
+  },
+  {
+    "path": "#/$defs/d_ed07f3603dd3fb46568b/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapBaseMode/oneOf/0",
+    "const": "reported",
+    "description": "Cap against the **reported** (pre-adjustment) value of the base node.\nThis is the standard credit-agreement convention — e.g., \"add-backs\ncapped at 25% of reported EBITDA\" uses a fixed denominator that does\nnot widen as earlier add-backs are applied."
+  },
+  {
+    "path": "#/$defs/d_ed07f3603dd3fb46568b/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapBaseMode/oneOf/1",
+    "const": "progressive",
+    "description": "Cap against the **progressively adjusted** value\n(`base_value + running_total_of_earlier_adjustments`). Earlier\nadjustments widen the cap room for later ones. Use this only when a\ndocument explicitly caps against \"adjusted\" EBITDA at each step."
+  },
+  {
     "path": "#/$defs/d_f0893f1d89ca5934871f",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckReport",
     "description": "Full report aggregating all [`CheckResult`]s from a check run."
@@ -2801,6 +2984,17 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/node_value_types/additionalProperties",
     "ref": "#/$defs/NodeValueType",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NodeValueType"
+  },
+  {
+    "path": "#/properties/normalizations",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/normalizations",
+    "description": "The ordered configuration of every adjusted metric published into\nthis result, by its output node id\n([`merge_into_results`](crate::adjustments::merge_into_results)). The\nsource run is this result's own `provenance` or `rollup_provenance`."
+  },
+  {
+    "path": "#/properties/normalizations/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/properties/normalizations/additionalProperties",
+    "ref": "#/$defs/NormalizationConfig",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NormalizationConfig"
   },
   {
     "path": "#/properties/periods",

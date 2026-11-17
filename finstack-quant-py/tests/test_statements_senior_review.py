@@ -146,18 +146,49 @@ def test_merge_into_results_writes_normalized_node() -> None:
         "ebitda", [("2025Q1", Money(100.0, Currency("USD"))), ("2025Q2", Money(110.0, Currency("USD")))]
     )
     results = s.Evaluator().evaluate(builder.build())
-    config = s.NormalizationConfig("ebitda").add_adjustment(
-        s.Adjustment.fixed("addback", "Addback", {"2025Q1": 5.0, "2025Q2": 5.0})
+    five = Money(5.0, Currency("USD"))
+    config = s.NormalizationConfig("ebitda", "adjusted_ebitda").add_adjustment(
+        s.Adjustment.fixed("addback", "Addback", {"2025Q1": five, "2025Q2": five})
     )
     normalized = s.normalize(results, config)
+    assert [row.final_value for row in normalized] == [105.0, 115.0]
 
-    merged = s.merge_into_results(results, normalized, "adjusted_ebitda")
-    assert merged.get("adjusted_ebitda", "2025Q1") == pytest.approx(normalized[0].final_value)
-    assert merged.get("adjusted_ebitda", "2025Q2") == pytest.approx(normalized[1].final_value)
+    merged = s.merge_into_results(results, config)
+    assert merged.get("adjusted_ebitda", "2025Q1") == 105.0
+    assert merged.get("adjusted_ebitda", "2025Q2") == 115.0
+    # The reported line is untouched and the result records the bridge.
+    assert merged.get("ebitda", "2025Q1") == 100.0
+    assert list(merged.normalizations) == ["adjusted_ebitda"]
+    assert merged.normalizations["adjusted_ebitda"] == json.loads(config.to_json())
     assert "adjusted_ebitda" not in results.node_ids()
-    assert s.merge_into_results(results, [], "adjusted_ebitda").node_ids() == results.node_ids()
-    with pytest.raises(ValueError, match="Duplicate normalization period"):
-        s.merge_into_results(results, [normalized[0], normalized[0]], "adjusted_ebitda")
+    assert results.normalizations == {}
+    # A node is never overwritten, including one published earlier.
+    with pytest.raises(ValueError, match="already hold"):
+        s.merge_into_results(merged, config)
+    with pytest.raises(ValueError, match="new id"):
+        s.merge_into_results(results, s.NormalizationConfig("ebitda", "ebitda"))
+    # A fixed amount carries the target's units.
+    scalar = s.NormalizationConfig("ebitda", "x").add_adjustment(s.Adjustment.fixed("a", "A", {"2025Q1": 5.0}))
+    with pytest.raises(ValueError, match="units"):
+        s.normalize(results, scalar)
+    # Caps: a reference cap keeps the sign and records its base and limit.
+    capped = s.NormalizationConfig("ebitda", "capped").add_adjustment(
+        s.Adjustment.fixed("d", "Deduction", {"2025Q1": Money(-40.0, Currency("USD"))}).with_cap({
+            "type": "reference",
+            "base_node": "ebitda",
+            "fraction": 0.1,
+        })
+    )
+    row = s.normalize(results, capped)[0].adjustments[0]
+    assert (row.raw_amount, row.cap_base, row.cap_limit, row.capped_amount, row.is_capped) == (
+        -40.0,
+        100.0,
+        10.0,
+        -10.0,
+        True,
+    )
+    with pytest.raises(ValueError, match="adjustment cap"):
+        s.Adjustment.fixed("d", "D", {}).with_cap({"type": "basket"})
 
 
 def test_model_rejects_rate_hedge_as_pik_target() -> None:
@@ -182,17 +213,27 @@ def test_model_rejects_rate_hedge_as_pik_target() -> None:
         builder.build()
 
 
-def test_adjustment_cap_requires_an_explicit_supported_base_mode() -> None:
+def test_adjustment_cap_is_one_of_the_two_rust_forms() -> None:
     adjustment = s.Adjustment.percentage("synergies", "Synergies", "revenue", 0.05)
-    for mode in ("reported", "progressive"):
-        capped = adjustment.with_cap("ebitda", 0.20, mode)
-        assert capped.cap_base_mode == mode
+    reference = {"type": "reference", "base_node": "ebitda", "fraction": 0.20}
+    # A cap on the target defaults to its reported value; progressive is explicit.
+    assert adjustment.with_cap(reference).cap == reference
+    progressive = {**reference, "base_mode": "progressive"}
+    assert adjustment.with_cap(progressive).cap == progressive
+    assert adjustment.with_cap({**reference, "base_mode": "reported"}).cap == reference
+    absolute = {"type": "absolute", "amount": 3.0}
+    assert adjustment.with_cap(absolute).cap == absolute
+    assert adjustment.cap is None
+    assert not adjustment.has_cap
     assert json.loads(adjustment.to_json()).get("cap") is None
-    assert not hasattr(adjustment, "with_cap_mode")
-    with pytest.raises(TypeError):
-        adjustment.with_cap("ebitda", 0.20)  # type: ignore[call-arg]
-    with pytest.raises(ValueError, match="reported or progressive"):
-        adjustment.with_cap("ebitda", 0.20, "same_period")
+    for bad in (
+        {"base_node": "ebitda", "value": 0.20},
+        {**reference, "base_mode": "same_period"},
+        {**reference, "value": 1.0},
+        {"type": "absolute"},
+    ):
+        with pytest.raises(ValueError, match="adjustment cap"):
+            adjustment.with_cap(bad)
 
 
 def test_empty_explicit_periods_preserve_model_builder_for_retry() -> None:

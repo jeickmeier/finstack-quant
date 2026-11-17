@@ -83,6 +83,13 @@ pub struct StatementResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rollup_provenance: Option<super::rollup::RollupProvenance>,
 
+    /// The ordered configuration of every adjusted metric published into
+    /// this result, by its output node id
+    /// ([`merge_into_results`](crate::adjustments::merge_into_results)). The
+    /// source run is this result's own `provenance` or `rollup_provenance`.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub normalizations: IndexMap<String, crate::adjustments::NormalizationConfig>,
+
     /// Capital structure cashflows (populated when model has a capital_structure)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cs_cashflows: Option<crate::capital_structure::CapitalStructureCashflows>,
@@ -545,6 +552,7 @@ impl Default for StatementResult {
             node_value_types: IndexMap::new(),
             provenance: None,
             rollup_provenance: None,
+            normalizations: IndexMap::new(),
             cs_cashflows: None,
             check_report: None,
             meta: EvalStats::default(),
@@ -850,18 +858,6 @@ impl StatementResult {
             .entry(node_id.to_string())
             .or_default()
             .insert(period_id, cell);
-    }
-
-    /// Float values of one node's cells in timeline order, with `NaN`
-    /// standing for a cell without a value. For consumers that still compute
-    /// on floats; the typed cells stay authoritative.
-    pub(crate) fn float_series(&self, node_id: &str) -> Option<IndexMap<PeriodId, f64>> {
-        self.cells.get(node_id).map(|cells| {
-            cells
-                .iter()
-                .map(|(period, cell)| (*period, cell.numeric().unwrap_or(f64::NAN)))
-                .collect()
-        })
     }
 
     /// Float values of every cell for Monte Carlo path aggregation, with

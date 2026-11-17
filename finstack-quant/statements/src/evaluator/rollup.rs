@@ -215,7 +215,8 @@ impl StatementResult {
     /// of `model` (no provenance, another model content, source snapshot or
     /// period plan), the target frequency is not a whole multiple of the
     /// model's frequency, the model mixes frequencies, a target period is
-    /// incomplete, `spec.methods` names an unknown node, a node has no
+    /// incomplete, these results hold a published adjusted metric,
+    /// `spec.methods` names an unknown node, a node has no
     /// method, or a node resolving to `formula` has no formula or reads
     /// capital-structure (`cs.*`) values, which are not rolled up.
     /// Returns an evaluation error for a sum that mixes units or cannot be
@@ -269,6 +270,13 @@ impl StatementResult {
     ///
     /// [`NodeSpec::rollup`]: crate::types::NodeSpec::rollup
     pub fn rollup(&self, model: &FinancialModelSpec, spec: &RollupSpec) -> Result<StatementResult> {
+        if let Some(published) = self.normalizations.keys().next() {
+            return Err(Error::invalid_input(format!(
+                "Cannot roll up results that hold the published adjusted metric '{published}': \
+                 it is not a model node and has no rollup method. Roll up the evaluated \
+                 results and normalize the rolled-up result"
+            )));
+        }
         let buckets = bucket_periods(&model.periods, spec.frequency)?;
         let methods = resolve_methods(model, spec)?;
         let source_run = self.verified_run_of(model, None)?.clone();

@@ -83,7 +83,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json",
-      "bytes": 5883,
+      "bytes": 29517,
       "kind": "component",
       "path": "schemas/statements/1/normalization_config.schema.json",
       "summary": "Add-back and deduction catalog applied to a target metric such as EBITDA.",
@@ -92,7 +92,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
-      "bytes": 23930,
+      "bytes": 29486,
       "kind": "output",
       "path": "schemas/statements/1/normalization_result.schema.json",
       "summary": "Per-period normalization outcome: base value, applied adjustments and final value.",
@@ -119,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
-      "bytes": 93980,
+      "bytes": 101128,
       "kind": "output",
       "path": "schemas/statements/1/statement_result.schema.json",
       "summary": "Evaluated node values per period, with policy stamps.",

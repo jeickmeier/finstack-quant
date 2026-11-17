@@ -23,7 +23,8 @@
       {
         "cap": {
           "base_node": "revenue",
-          "value": 0.05
+          "fraction": 0.05,
+          "type": "reference"
         },
         "id": "synergy",
         "name": "Synergies",
@@ -35,9 +36,8 @@
       },
       {
         "cap": {
-          "base_mode": "progressive",
-          "base_node": null,
-          "value": 3.0
+          "amount": 3.0,
+          "type": "absolute"
         },
         "id": "synergy",
         "name": "Synergies",
@@ -233,7 +233,8 @@
         {
           "cap": {
             "base_node": "revenue",
-            "value": 0.05
+            "fraction": 0.05,
+            "type": "reference"
           },
           "id": "synergy",
           "name": "Synergies",
@@ -244,6 +245,7 @@
           }
         }
       ],
+      "output_node": "adjusted_profit",
       "target_node": "profit"
     },
     "normalize": [

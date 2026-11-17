@@ -126,6 +126,7 @@ fn model_fixture_with_bond() -> Value {
 fn normalization_fixture() -> Value {
     json!({
         "target_node": "ebitda",
+        "output_node": "adjusted_ebitda",
         "adjustments": [
             {
                 "id": "restructuring",
@@ -139,8 +140,9 @@ fn normalization_fixture() -> Value {
                     }
                 },
                 "cap": {
+                    "type": "reference",
                     "base_node": "ebitda",
-                    "value": 0.10
+                    "fraction": 0.10
                 }
             },
             {
@@ -412,7 +414,7 @@ fn normalization_config_schema_exposes_base_mode_reported_default() {
     // not just in the schema comparison below.
     assert_eq!(default_mode, json!("reported"));
     assert_eq!(
-        schema["$defs"]["AdjustmentCap"]["properties"]["base_mode"]["default"],
+        schema["$defs"]["AdjustmentCap"]["oneOf"][1]["properties"]["base_mode"]["default"],
         default_mode
     );
 }

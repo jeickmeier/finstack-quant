@@ -130,7 +130,7 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
         "MixedNodeBuilder",
         "Registry.get_dependencies",
         "ForecastSpec.overrides",
-        "Adjustment.cap_base_mode",
+        "Adjustment.cap",
         "Adjustment.with_cap",
         "CheckConfig.min_severity",
         "CheckFinding.severity",

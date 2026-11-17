@@ -18,8 +18,10 @@ const rejection = (run) => {
 // Adjusted EBITDA: a one-off add-back, run-rate synergies capped at 10% of
 // reported EBITDA (capped in some quarters only), management fees under an
 // absolute cap and a one-time gain taken out.
+const usd = (amount) => ({ amount: String(amount), currency: "USD" });
 const config = {
   target_node: "ebitda",
+  output_node: "adjusted_ebitda",
   adjustments: [
     {
       id: "restructuring",
@@ -27,7 +29,7 @@ const config = {
       category: "non_recurring",
       value: {
         type: "fixed",
-        amounts: { "2024Q1": 4500000, "2024Q3": 2000000 },
+        amounts: { "2024Q1": usd(4500000), "2024Q3": usd(2000000) },
       },
     },
     {
@@ -39,7 +41,7 @@ const config = {
         node_id: "revenue",
         percentage: 0.025,
       },
-      cap: { base_node: "ebitda", value: 0.1 },
+      cap: { type: "reference", base_node: "ebitda", fraction: 0.1 },
     },
     {
       id: "management_fees",
@@ -47,18 +49,18 @@ const config = {
       value: {
         type: "fixed",
         amounts: {
-          "2024Q1": 1200000,
-          "2024Q2": 1200000,
-          "2024Q3": 1200000,
-          "2024Q4": 1200000,
+          "2024Q1": usd(1200000),
+          "2024Q2": usd(1200000),
+          "2024Q3": usd(1200000),
+          "2024Q4": usd(1200000),
         },
       },
-      cap: { base_node: null, value: 1000000 },
+      cap: { type: "absolute", amount: usd(1000000) },
     },
     {
       id: "one_time_gain",
       name: "Gain on asset sale",
-      value: { type: "fixed", amounts: { "2024Q2": -3000000 } },
+      value: { type: "fixed", amounts: { "2024Q2": usd(-3000000) } },
     },
   ],
 };
@@ -75,23 +77,48 @@ const errors = {
     message: rejection(() => native.validateNormalizationConfigJson(duplicate)),
   },
   missingTarget: {
-    config: { ...config, target_node: "adjusted_ebitda" },
+    config: { ...config, target_node: "reported_ebitda" },
     message: rejection(() =>
       native.normalize(resultJson, {
         ...config,
-        target_node: "adjusted_ebitda",
+        target_node: "reported_ebitda",
       }),
     ),
   },
-  // ltm_ebitda has no value (NaN) in its first quarters.
-  nonFiniteBase: {
-    config: { ...config, target_node: "ltm_ebitda" },
+  // A fixed amount in the wrong units for the monetary target.
+  wrongUnits: {
+    config: {
+      ...config,
+      adjustments: [
+        {
+          id: "scalar",
+          name: "Scalar amount",
+          value: { type: "fixed", amounts: { "2024Q1": 1 } },
+        },
+      ],
+    },
     message: rejection(() =>
-      native.normalize(resultJson, { ...config, target_node: "ltm_ebitda" }),
+      native.normalize(resultJson, {
+        ...config,
+        adjustments: [
+          {
+            id: "scalar",
+            name: "Scalar amount",
+            value: { type: "fixed", amounts: { "2024Q1": 1 } },
+          },
+        ],
+      }),
     ),
   },
 };
+// ltm_ebitda has no value in its first quarters: those periods come back
+// unavailable with a reason, the later ones with a bridge.
+const unavailable = native.normalize(resultJson, {
+  target_node: "ltm_ebitda",
+  output_node: "adjusted_ltm_ebitda",
+  adjustments: [config.adjustments[0]],
+});
 await emit(
   new URL("cases.json", import.meta.url),
-  JSON.stringify({ config, canonical, results, errors }),
+  JSON.stringify({ config, canonical, results, unavailable, errors }),
 );

@@ -583,6 +583,41 @@ export type D_8B741636Dd21D9F7Ad3F =
       [k: string]: unknown;
     };
 /**
+ * A cap on the magnitude of one adjustment. The adjustment keeps its sign.
+ * Each cap applies to its own adjustment only; it is not a shared basket.
+ */
+export type D_87E7D6Db07659C292388 =
+  | {
+      /**
+       * Value that can be currency-aware or unitless.
+       *
+       * Used for node values that can represent:
+       * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+       * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
+       */
+      amount: D_1B5716Dde9957A614F3C | number;
+      type: "absolute";
+    }
+  | {
+      /**
+       * When `base_node` is the target: size the cap against its reported
+       * value (the default) or against the reported value plus every
+       * earlier applied adjustment. Any other base node is always read at
+       * its reported value.
+       */
+      base_mode?: "reported" | "progressive";
+      /**
+       * Node the cap is sized against; it must share the target's units.
+       */
+      base_node: string;
+      /**
+       * Non-negative decimal fraction of the base (0.30 for 30%). It may
+       * exceed 1.
+       */
+      fraction: number;
+      type: "reference";
+    };
+/**
  * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
  */
 export type D_11C7Dbc9Fa7Cb6Ce298A = string;
@@ -624,6 +659,15 @@ export interface StatementResultWire {
    */
   node_value_types?: {
     [k: string]: D_8B741636Dd21D9F7Ad3F;
+  };
+  /**
+   * The ordered configuration of every adjusted metric published into
+   * this result, by its output node id
+   * ([`merge_into_results`](crate::adjustments::merge_into_results)). The
+   * source run is this result's own `provenance` or `rollup_provenance`.
+   */
+  normalizations?: {
+    [k: string]: D_6D88C3Cd9765D62Eaff0;
   };
   /**
    * The period plan `cells` is keyed by: the periods in timeline order,
@@ -2887,6 +2931,74 @@ export interface DD812Cec4E88E45C1B673 {
    * Warnings encountered during evaluation (division by zero, NaN propagation, etc.)
    */
   warnings?: D_76Adf23Abc095Fd56514[];
+}
+/**
+ * An ordered bridge from a reported metric to a separately named adjusted
+ * metric (for example reported EBITDA to adjusted EBITDA).
+ */
+export interface D_6D88C3Cd9765D62Eaff0 {
+  /**
+   * Adjustments, applied in this order
+   */
+  adjustments?: D_88C9Bc8Df9Daae33F80E[];
+  /**
+   * The new node the adjusted metric is published under (e.g.,
+   * "adjusted_ebitda"). It must differ from `target_node` and from every
+   * node the result already holds.
+   */
+  output_node: string;
+  /**
+   * The reported node the bridge starts from (e.g., "ebitda"). It is never
+   * modified.
+   */
+  target_node: string;
+}
+/**
+ * Specification for a single adjustment (add-back or deduction).
+ */
+export interface D_88C9Bc8Df9Daae33F80E {
+  /**
+   * Optional cap on the adjustment amount
+   */
+  cap?: D_87E7D6Db07659C292388 | null;
+  /**
+   * Category for grouping (optional)
+   */
+  category?: string | null;
+  /**
+   * Unique identifier for this adjustment
+   */
+  id: string;
+  /**
+   * Human-readable name (e.g., "Synergies", "Management Fees")
+   */
+  name: string;
+  /**
+   * How the adjustment value is calculated
+   */
+  value:
+    | {
+        /**
+         * Map of period_id -> signed amount
+         */
+        amounts: {
+          [k: string]: D_8831040Eb61De989F7Ea;
+        };
+        type: "fixed";
+        [k: string]: unknown;
+      }
+    | {
+        /**
+         * Node ID to reference (e.g., "revenue")
+         */
+        node_id: string;
+        /**
+         * Signed decimal percentage to apply (0.05 for 5%)
+         */
+        percentage: number;
+        type: "percentage_of_node";
+        [k: string]: unknown;
+      };
 }
 /**
  * Builder/plan for a contiguous sequence of periods and their actual/forecast split.

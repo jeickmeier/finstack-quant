@@ -24,7 +24,8 @@
       {
         "cap": {
           "base_node": "ebitda",
-          "value": 0.15
+          "fraction": 0.15,
+          "type": "reference"
         },
         "id": "synergies",
         "name": "Synergies (capped at 15% of reported EBITDA)",
@@ -37,6 +38,7 @@
         }
       }
     ],
+    "output_node": "adjusted_ebitda",
     "target_node": "ebitda"
   }
 }

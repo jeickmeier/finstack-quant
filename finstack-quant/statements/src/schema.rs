@@ -77,11 +77,18 @@ fn normalization_examples() -> finstack_quant_core::Result<Vec<Value>> {
         let period: finstack_quant_core::dates::PeriodId = label.parse().map_err(|error| {
             finstack_quant_core::Error::Internal(format!("parse example period {label}: {error}"))
         })?;
-        amounts.insert(period, amount);
+        amounts.insert(
+            period,
+            crate::types::AmountOrScalar::amount(
+                amount,
+                finstack_quant_core::currency::Currency::USD,
+            )?,
+        );
     }
 
     let config = NormalizationConfig {
         target_node: "ebitda".to_string(),
+        output_node: "adjusted_ebitda".to_string(),
         adjustments: vec![
             Adjustment {
                 id: "restructuring".to_string(),
@@ -272,16 +279,16 @@ fn normalization_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
         serde_json::json!({
             "value_type": {"type": "monetary", "currency": "USD"},
             "period": "2024Q1",
-            "base_value": 12_000_000.0,
+            "base_value": {"amount": "12000000", "currency": "USD"},
             "adjustments": [{
                 "adjustment_id": "restructuring",
                 "name": "Restructuring charges",
-                "raw_amount": 1_500_000.0,
-                "capped_amount": 1_500_000.0,
+                "raw_amount": {"amount": "1500000", "currency": "USD"},
+                "capped_amount": {"amount": "1500000", "currency": "USD"},
                 "is_capped": false,
-                "adjusted_value": 13_500_000.0
+                "adjusted_value": {"amount": "13500000", "currency": "USD"}
             }],
-            "final_value": 13_500_000.0
+            "final_value": {"amount": "13500000", "currency": "USD"}
         }),
     )
 }

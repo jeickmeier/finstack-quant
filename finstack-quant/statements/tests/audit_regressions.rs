@@ -149,27 +149,32 @@ fn normalization_preserves_units_and_rejects_foreign_sources_and_caps() {
         model_builder.build().unwrap()
     };
     let mut result = Evaluator::new().evaluate(&model).unwrap();
-    let invalid: NormalizationConfig = serde_json::from_value(json!({"target_node":"usd","adjustments":[{"id":"a","name":"a","value":{"type":"percentage_of_node","node_id":"eur","percentage":0.1}}]})).unwrap();
+    let invalid: NormalizationConfig = serde_json::from_value(json!({"target_node":"usd","output_node":"adjusted","adjustments":[{"id":"a","name":"a","value":{"type":"percentage_of_node","node_id":"eur","percentage":0.1}}]})).unwrap();
     assert!(normalize(&result, &invalid).is_err());
-    let invalid_cap: NormalizationConfig = serde_json::from_value(json!({"target_node":"usd","adjustments":[{"id":"a","name":"a","value":{"type":"fixed","amounts":{"2025Q1":10}},"cap":{"base_node":"eur","value":0.1}}]})).unwrap();
+    let invalid_cap: NormalizationConfig = serde_json::from_value(json!({"target_node":"usd","output_node":"adjusted","adjustments":[{"id":"a","name":"a","value":{"type":"fixed","amounts":{"2025Q1":{"amount":"10","currency":"USD"}}},"cap":{"type":"reference","base_node":"eur","fraction":0.1}}]})).unwrap();
     assert!(normalize(&result, &invalid_cap).is_err());
-    let config = NormalizationConfig::new("usd")
-        .add_adjustment(Adjustment::fixed("a", "a", indexmap! {q(2025,1)=>10.0}))
-        .unwrap();
-    let normalized = normalize(&result, &config).unwrap();
-    for target in ["adjusted", "usd", "eur"] {
-        finstack_quant_statements::adjustments::merge_into_results(
-            &mut result,
-            &normalized,
-            target,
-        )
-        .unwrap();
-        assert_eq!(result.get(target, &q(2025, 1)), Some(110.0));
-        assert_eq!(
-            result.get_money(target, &q(2025, 1)),
-            Some(Money::from((110_i64, Currency::USD)))
-        );
+    // A fixed amount and an absolute cap carry the target's currency.
+    for amount in [json!(10), json!({"amount":"10","currency":"EUR"})] {
+        let foreign: NormalizationConfig = serde_json::from_value(json!({"target_node":"usd","output_node":"adjusted","adjustments":[{"id":"a","name":"a","value":{"type":"fixed","amounts":{"2025Q1":amount}}}]})).unwrap();
+        assert!(normalize(&result, &foreign).is_err());
     }
+    let ten = Money::from((10_i64, Currency::USD));
+    let config = NormalizationConfig::new("usd", "adjusted")
+        .add_adjustment(Adjustment::fixed(
+            "a",
+            "a",
+            indexmap! {q(2025,1)=>ten.into()},
+        ))
+        .unwrap();
+    finstack_quant_statements::adjustments::merge_into_results(&mut result, &config).unwrap();
+    assert_eq!(
+        result.get_money("adjusted", &q(2025, 1)),
+        Some(Money::from((110_i64, Currency::USD)))
+    );
+    assert_eq!(
+        result.get_money("usd", &q(2025, 1)),
+        Some(Money::from((100_i64, Currency::USD)))
+    );
 }
 
 #[test]

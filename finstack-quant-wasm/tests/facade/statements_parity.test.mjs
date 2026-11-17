@@ -72,11 +72,11 @@ test('statements matches the cross-host golden', () => {
     name: 'Synergies',
     value: { type: 'percentage_of_node', node_id: 'revenue', percentage: 0.1 },
   };
-  let extended = { target_node: 'profit', adjustments: [] };
+  let extended = { target_node: 'profit', output_node: 'adjusted_profit', adjustments: [] };
   extended = statements.normalizationConfigAddAdjustment(extended, oneOff);
   extended = statements.normalizationConfigAddAdjustment(extended, {
     ...synergy,
-    cap: { base_node: 'revenue', value: 0.05 },
+    cap: { type: 'reference', base_node: 'revenue', fraction: 0.05 },
   });
 
   const evaluator = new statements.Evaluator();
@@ -178,8 +178,8 @@ test('statements matches the cross-host golden', () => {
     adjustments: [
       oneOff,
       synergy,
-      { ...synergy, cap: { base_node: 'revenue', value: 0.05 } },
-      { ...synergy, cap: { base_node: null, value: 3.0, base_mode: 'progressive' } },
+      { ...synergy, cap: { type: 'reference', base_node: 'revenue', fraction: 0.05 } },
+      { ...synergy, cap: { type: 'absolute', amount: 3.0 } },
       { ...oneOff, category: 'non_recurring' },
     ],
     'normalization_config.add_adjustment': extended,
@@ -516,26 +516,38 @@ test('normalization validation and duplicate adjustments are rejected in Rust', 
     () =>
       statements.validateNormalizationConfigJson({
         target_node: 'profit',
+        output_node: 'adjusted_profit',
         adjustments: [config.adjustments[0], config.adjustments[0]],
       }),
     (e) => e.kind === 'validation'
   );
 });
 
-test('mergeIntoResults writes normalized values back as a node', () => {
+test('mergeIntoResults publishes the adjusted metric under a new node', () => {
   const result = evaluate(MODEL);
-  const normalized = statements.normalize(result, INPUTS.normalization_config);
-  const merged = statements.mergeIntoResults(result, normalized, 'adjusted_profit');
+  const config = INPUTS.normalization_config;
+  const normalized = statements.normalize(result, config);
+  const merged = statements.mergeIntoResults(result, config);
   for (const row of normalized) {
     assert.equal(
       statements.statementResultGet(merged, 'adjusted_profit', row.period),
       row.final_value
     );
   }
+  // The reported node is untouched and the result records the bridge.
+  assert.deepEqual(merged.cells.profit, result.cells.profit);
+  assert.deepEqual(merged.normalizations.adjusted_profit, config);
   assert.equal(statements.statementResultGet(result, 'adjusted_profit', Q1), undefined);
+  // An existing node, a second publication and the target itself are rejected.
+  for (const output of ['revenue', 'profit']) {
+    assert.throws(
+      () => statements.mergeIntoResults(result, { ...config, output_node: output }),
+      (e) => e.name === 'FinstackError' && e.kind === 'validation'
+    );
+  }
   assert.throws(
-    () => statements.mergeIntoResults(result, [normalized[0], normalized[0]], 'x'),
-    (e) => e.name === 'FinstackError'
+    () => statements.mergeIntoResults(merged, config),
+    (e) => e.kind === 'validation' && /already hold/.test(e.message)
   );
 });
 

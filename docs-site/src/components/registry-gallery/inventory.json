@@ -687,7 +687,7 @@
     {
       "name": "normalization-editor",
       "type": "registry:component",
-      "docs": "Answers what adjusted EBITDA is and how each add-back gets there. Edits a NormalizationConfig with the schema form over the generated normalization_config contract (target, percentage and cap-base nodes as id-comboboxes over the supplied node ids; fixed per-period amounts, percentages of a node and caps as Rust declares them), validated natively (useNormalizationConfigValidator; a duplicate id is Rust's error). Normalize passes the canonical config to the caller (usually the useNormalize request). The native statements.normalize results are shown as returned, above the form: for a chosen period, a bridge from the reported base through each adjustment in declaration order to the final value, each step drawn from the previous step's adjusted_value (the base for the first) to its own, coloured by Rust's is_capped, and a table of every adjustment's capped amount by period with the raw amount beside a capped one. A missing node, a non-finite base or a negative cap shows the native error. Nothing is summed, capped or classified here. Accepts defaultConfig, nodeIds, validate, onSubmit, results, loading, error, formatValue and density props; no worker or query provider required.",
+      "docs": "Answers what adjusted EBITDA is and how each add-back gets there. Edits a NormalizationConfig with the schema form over the generated normalization_config contract (target, percentage and cap-base nodes as id-comboboxes over the supplied node ids; the new output node the adjusted metric is published under; fixed per-period amounts in the target's units, percentages of a node and absolute or reference caps as Rust declares them), validated natively (useNormalizationConfigValidator; a duplicate id is Rust's error). Normalize passes the canonical config to the caller (usually the useNormalize request). The native statements.normalize results are shown as returned, above the form: for a chosen period, a bridge from the reported base through each adjustment in declaration order to the final value, each step drawn from the previous step's adjusted_value (the base for the first) to its own, coloured by Rust's is_capped, and a table of every adjustment's capped amount by period with the raw amount beside a capped one. A period Rust returns without an adjusted value (its target, percentage reference or cap base has no value) shows its reason instead of a bridge and reads Unavailable in the table. A missing node, mismatched units or a negative cap shows the native error. Nothing is summed, capped or classified here. Accepts defaultConfig, nodeIds, validate, onSubmit, results, loading, error, formatValue and density props; no worker or query provider required.",
       "worker": "none"
     },
     {
@@ -1972,7 +1972,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/normalization/cases.json",
-      "sha256": "ec146d2897af8e8aefd2dc6cdb5e90381b4cf45fd0706108dba20bc58b35fb27"
+      "sha256": "5e9e2a31fc19b933eefdeb0f9d1afcc077591b05eb45aadebe023d1f4e0838f4"
     },
     {
       "path": "finstack-quant-ui/tests/statements/capital-structure/cases.json",

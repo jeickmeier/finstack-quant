@@ -6,7 +6,7 @@ use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::dates::StubKind;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
-use finstack_quant_statements::adjustments::{Adjustment, NormalizationConfig, normalize};
+use finstack_quant_statements::adjustments::{Adjustment, NormalizationConfig};
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};
 use finstack_quant_statements::checks::builtins::BalanceSheetArticulation;
@@ -253,47 +253,43 @@ fn checked_balance_sheet() -> (FinancialModelSpec, StatementResult, CheckSuite) 
 }
 
 #[test]
-fn normalization_merge_clears_the_report_for_the_previous_financial_values() {
+fn publishing_an_adjusted_metric_keeps_the_reported_values_and_their_report() {
     let (model, mut results, suite) = checked_balance_sheet();
-    assert_eq!(results.check_report.as_ref().unwrap().summary.passed, 1);
-    let config = NormalizationConfig::new("assets")
+    let original_report = results.check_report.clone();
+    let config = NormalizationConfig::new("assets", "adjusted_assets")
         .add_adjustment(Adjustment::fixed(
             "asset_adjustment",
             "Asset adjustment",
-            [(q1(), 50.0)].into_iter().collect(),
+            [(q1(), AmountOrScalar::scalar(50.0))].into_iter().collect(),
         ))
         .unwrap();
-    let normalized = normalize(&results, &config).unwrap();
 
-    finstack_quant_statements::adjustments::merge_into_results(&mut results, &normalized, "assets")
-        .unwrap();
+    finstack_quant_statements::adjustments::merge_into_results(&mut results, &config).unwrap();
 
-    assert_eq!(results.get("assets", &q1()), Some(150.0));
-    assert!(results.check_report.is_none());
-    assert_eq!(suite.run(&model, &results).unwrap().summary.failed, 1);
+    assert_eq!(results.get("adjusted_assets", &q1()), Some(150.0));
+    // The reported line and the checks that describe it are untouched.
+    assert_eq!(results.get("assets", &q1()), Some(100.0));
+    assert_eq!(results.check_report, original_report);
+    assert_eq!(suite.run(&model, &results).unwrap().summary.passed, 1);
 }
 
 #[test]
-fn failed_and_empty_normalization_merges_preserve_the_original_report_and_values() {
+fn a_failed_publication_leaves_the_results_as_they_were() {
     let (_, mut results, _) = checked_balance_sheet();
-    let original_report = results.check_report.clone();
-    let original_values = results.cells.clone();
-    finstack_quant_statements::adjustments::merge_into_results(&mut results, &[], "assets")
-        .unwrap();
-    assert_eq!(results.check_report, original_report);
-
-    let normalized = normalize(&results, &NormalizationConfig::new("assets")).unwrap();
-    let duplicated = vec![normalized[0].clone(), normalized[0].clone()];
+    let original = results.clone();
+    // An existing node is never overwritten.
+    let collision = NormalizationConfig::new("assets", "liabilities");
     assert!(
-        finstack_quant_statements::adjustments::merge_into_results(
-            &mut results,
-            &duplicated,
-            "assets"
-        )
-        .is_err()
+        finstack_quant_statements::adjustments::merge_into_results(&mut results, &collision)
+            .is_err()
     );
-    assert_eq!(results.cells, original_values);
-    assert_eq!(results.check_report, original_report);
+    let same = NormalizationConfig::new("assets", "assets");
+    assert!(
+        finstack_quant_statements::adjustments::merge_into_results(&mut results, &same).is_err()
+    );
+    assert_eq!(results.cells, original.cells);
+    assert_eq!(results.check_report, original.check_report);
+    assert!(results.normalizations.is_empty());
 }
 
 fn scalar_opening(value: f64) -> finstack_quant_statements::checks::DatedOpening {

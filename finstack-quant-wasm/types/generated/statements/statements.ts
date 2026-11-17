@@ -9,104 +9,45 @@
  */
 export type AccrualMethod = "linear" | "compounded";
 /**
- * How a self-referential cap base (where `base_node == target_node`) is
- * resolved each period.
+ * A cap on the magnitude of one adjustment. The adjustment keeps its sign.
+ * Each cap applies to its own adjustment only; it is not a shared basket.
  */
-export type CapBaseMode = "reported" | "progressive";
-/**
- * Defines how an adjustment value is derived.
- */
-export type AdjustmentValue =
+export type AdjustmentCap =
   | {
       /**
-       * Map of period_id -> amount
+       * Non-negative limit: a scalar for a scalar target, money in the
+       * target's currency for a monetary one.
        */
-      amounts: {
-        [k: string]: number;
-      };
-      type: "fixed";
-      [k: string]: unknown;
+      amount: AmountOrScalar;
+      type: "absolute";
     }
   | {
       /**
-       * Node ID to reference (e.g., "revenue")
+       * When `base_node` is the target: size the cap against its reported
+       * value (the default) or against the reported value plus every
+       * earlier applied adjustment. Any other base node is always read at
+       * its reported value.
        */
-      node_id: string;
+      base_mode?: CapBaseMode;
       /**
-       * Percentage to apply (e.g., 0.05 for 5%)
+       * Node the cap is sized against; it must share the target's units.
        */
-      percentage: number;
-      type: "percentage_of_node";
-      [k: string]: unknown;
+      base_node: string;
+      /**
+       * Non-negative decimal fraction of the base (0.30 for 30%). It may
+       * exceed 1.
+       */
+      fraction: number;
+      type: "reference";
     };
 /**
- * The explicit selection of every modeled node (`"all"`).
- */
-export type AllNodes = "all";
-/**
- * Amortization specification for principal over time.
+ * Value that can be currency-aware or unitless.
  *
- * Describes how principal amortizes or is exchanged during the life of the contract.
- * Used by instruments (e.g., bonds) and cashflow legs for consistent behavior.
+ * Used for node values that can represent:
+ * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
+ * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
  */
-export type AmortizationSpec =
-  | "none"
-  | {
-      linear_to: {
-        /**
-         * Target remaining principal at the end of the amortization schedule.
-         */
-        final_notional: Money;
-      };
-    }
-  | {
-      step_remaining: {
-        /**
-         * Ordered list of `(date, remaining_principal_after_date)`.
-         */
-        schedule: [DateWire, Money][];
-      };
-    }
-  | {
-      percent_of_original_per_period: {
-        /**
-         * Fraction of original notional paid per period (e.g., 0.05 = 5%).
-         */
-        pct: number;
-      };
-    }
-  | {
-      percent_of_remaining_per_period: {
-        /**
-         * Fraction of the outstanding principal paid per period (e.g.,
-         * 0.025 = 2.5%), in `[0, 1]`.
-         */
-        pct: number;
-      };
-    }
-  | {
-      linear_between: {
-        /**
-         * Economic end of amortization (full repayment), which must be an
-         * actual coupon accrual boundary on or before the effective terminal
-         * accrual date. Cash settlement may follow this date due to payment lag.
-         */
-        end: DateWire;
-        /**
-         * Economic amortization start, on or after issue; installments fall
-         * on coupon accrual boundaries strictly after it.
-         */
-        start: DateWire;
-      };
-    }
-  | {
-      custom_principal: {
-        /**
-         * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
-         */
-        items: [DateWire, Money][];
-      };
-    };
+export type AmountOrScalar = Money | number;
 /**
  * Exact decimal encoded only as a JSON string.
  *
@@ -283,17 +224,108 @@ export type Currency =
   | "ZWG"
   | "ZWL";
 /**
+ * How a self-referential cap base (where `base_node == target_node`) is
+ * resolved each period.
+ */
+export type CapBaseMode = "reported" | "progressive";
+/**
+ * Defines how an adjustment value is derived.
+ */
+export type AdjustmentValue =
+  | {
+      /**
+       * Map of period_id -> signed amount
+       */
+      amounts: {
+        [k: string]: AmountOrScalar;
+      };
+      type: "fixed";
+      [k: string]: unknown;
+    }
+  | {
+      /**
+       * Node ID to reference (e.g., "revenue")
+       */
+      node_id: string;
+      /**
+       * Signed decimal percentage to apply (0.05 for 5%)
+       */
+      percentage: number;
+      type: "percentage_of_node";
+      [k: string]: unknown;
+    };
+/**
+ * The explicit selection of every modeled node (`"all"`).
+ */
+export type AllNodes = "all";
+/**
+ * Amortization specification for principal over time.
+ *
+ * Describes how principal amortizes or is exchanged during the life of the contract.
+ * Used by instruments (e.g., bonds) and cashflow legs for consistent behavior.
+ */
+export type AmortizationSpec =
+  | "none"
+  | {
+      linear_to: {
+        /**
+         * Target remaining principal at the end of the amortization schedule.
+         */
+        final_notional: Money;
+      };
+    }
+  | {
+      step_remaining: {
+        /**
+         * Ordered list of `(date, remaining_principal_after_date)`.
+         */
+        schedule: [DateWire, Money][];
+      };
+    }
+  | {
+      percent_of_original_per_period: {
+        /**
+         * Fraction of original notional paid per period (e.g., 0.05 = 5%).
+         */
+        pct: number;
+      };
+    }
+  | {
+      percent_of_remaining_per_period: {
+        /**
+         * Fraction of the outstanding principal paid per period (e.g.,
+         * 0.025 = 2.5%), in `[0, 1]`.
+         */
+        pct: number;
+      };
+    }
+  | {
+      linear_between: {
+        /**
+         * Economic end of amortization (full repayment), which must be an
+         * actual coupon accrual boundary on or before the effective terminal
+         * accrual date. Cash settlement may follow this date due to payment lag.
+         */
+        end: DateWire;
+        /**
+         * Economic amortization start, on or after issue; installments fall
+         * on coupon accrual boundaries strictly after it.
+         */
+        start: DateWire;
+      };
+    }
+  | {
+      custom_principal: {
+        /**
+         * List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
+         */
+        items: [DateWire, Money][];
+      };
+    };
+/**
  * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
  */
 export type DateWire = string;
-/**
- * Value that can be currency-aware or unitless.
- *
- * Used for node values that can represent:
- * - **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)
- * - **Scalar**: Unitless values (e.g., ratios, percentages, counts)
- */
-export type AmountOrScalar = Money | number;
 /**
  * Anti-dilution protection applied to conversion terms.
  *
@@ -2352,29 +2384,6 @@ export interface Adjustment {
   value: AdjustmentValue;
 }
 /**
- * Defines a cap on an adjustment.
- */
-export interface AdjustmentCap {
-  /**
-   * For self-referential caps (`base_node == target_node`), choose whether
-   * to size the cap against the reported or the progressively adjusted
-   * base. Defaults to `Reported`, the standard LBO / credit-agreement
-   * convention. Ignored when `base_node` is `None` or points to a
-   * different node.
-   */
-  base_mode?: CapBaseMode;
-  /**
-   * The base node to calculate the cap against (e.g., "EBITDA")
-   * If None, the cap is a fixed absolute amount.
-   */
-  base_node?: string | null;
-  /**
-   * The percentage of the base node to cap at (e.g., 0.20 for 20%)
-   * Or the absolute amount if base_node is None.
-   */
-  value: number;
-}
-/**
  * Currency-tagged monetary amount with safe arithmetic.
  *
  * Values retain decimal precision independently of ISO 4217 display precision.
@@ -2396,27 +2405,35 @@ export interface Money {
   currency: Currency;
 }
 /**
- * Details of a single applied adjustment.
+ * One row of a normalization bridge.
  */
 export interface AppliedAdjustment {
   /**
    * Target value through this adjustment: the period's `base_value` plus
-   * the capped amounts of this and every earlier adjustment, in declaration
-   * order and the target's units. The last adjustment's value equals the
-   * period's `final_value`, so a base-to-adjusted bridge reads each step's
-   * span from the previous step's value (or `base_value`) to this one.
+   * the applied amounts of this and every earlier adjustment, in
+   * declaration order. The last row's value equals the period's
+   * `final_value`.
    */
-  adjusted_value: number;
+  adjusted_value: AmountOrScalar;
   /**
    * ID of the adjustment
    */
   adjustment_id: string;
   /**
-   * The final amount after applying any caps
+   * The value the cap was sized against, for a reference cap.
    */
-  capped_amount: number;
+  cap_base?: AmountOrScalar | null;
   /**
-   * Whether the amount was capped
+   * The non-negative limit on the adjustment's magnitude, when it has a
+   * cap.
+   */
+  cap_limit?: AmountOrScalar | null;
+  /**
+   * The signed amount applied after any cap
+   */
+  capped_amount: AmountOrScalar;
+  /**
+   * Whether the cap reduced the amount
    */
   is_capped: boolean;
   /**
@@ -2424,10 +2441,9 @@ export interface AppliedAdjustment {
    */
   name: string;
   /**
-   * The raw calculated amount before capping
+   * The signed amount before capping
    */
-  raw_amount: number;
-  [k: string]: unknown;
+  raw_amount: AmountOrScalar;
 }
 /**
  * User-defined tags and key-value metadata for instrument classification.
@@ -8079,11 +8095,18 @@ export interface PercentileSeries {
  */
 export interface NormalizationConfig {
   /**
-   * List of adjustments to apply
+   * Adjustments, applied in this order
    */
   adjustments?: Adjustment[];
   /**
-   * The target node to normalize (e.g., "EBITDA")
+   * The new node the adjusted metric is published under (e.g.,
+   * "adjusted_ebitda"). It must differ from `target_node` and from every
+   * node the result already holds.
+   */
+  output_node: string;
+  /**
+   * The reported node the bridge starts from (e.g., "ebitda"). It is never
+   * modified.
    */
   target_node: string;
 }
@@ -8092,26 +8115,33 @@ export interface NormalizationConfig {
  */
 export interface NormalizationResult {
   /**
-   * Detailed breakdown of applied adjustments
+   * The bridge rows in declaration order. Empty when the period is
+   * unavailable.
    */
-  adjustments: AppliedAdjustment[];
+  adjustments?: AppliedAdjustment[];
   /**
-   * The original raw value of the target node
+   * The reported value of the target node. Absent when the period is
+   * unavailable because the target itself has no value.
    */
-  base_value: number;
+  base_value?: AmountOrScalar | null;
   /**
-   * The final adjusted value
+   * The adjusted value. Absent when the period is unavailable.
    */
-  final_value: number;
+  final_value?: AmountOrScalar | null;
   /**
    * The period this result applies to
    */
   period: PeriodId;
   /**
+   * Why the period has no adjusted value: the target, a percentage
+   * reference or a cap base is missing, masked or unavailable. Absent
+   * when the period has a value.
+   */
+  unavailable?: UnavailableReason | null;
+  /**
    * Unit and currency shared by the base, adjustments, and final value.
    */
   value_type: NodeValueType;
-  [k: string]: unknown;
 }
 /**
  * The monetary node, expected currency, sign convention, required periods and anchor date a pricing caller reads.
@@ -8294,6 +8324,15 @@ export interface StatementResult {
    */
   node_value_types?: {
     [k: string]: NodeValueType;
+  };
+  /**
+   * The ordered configuration of every adjusted metric published into
+   * this result, by its output node id
+   * ([`merge_into_results`](crate::adjustments::merge_into_results)). The
+   * source run is this result's own `provenance` or `rollup_provenance`.
+   */
+  normalizations?: {
+    [k: string]: NormalizationConfig;
   };
   /**
    * The period plan `cells` is keyed by: the periods in timeline order,

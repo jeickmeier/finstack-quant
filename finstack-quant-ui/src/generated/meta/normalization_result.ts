@@ -8,16 +8,31 @@ export default [
       {
         "adjustments": [
           {
-            "adjusted_value": 13500000,
+            "adjusted_value": {
+              "amount": "13500000",
+              "currency": "USD"
+            },
             "adjustment_id": "restructuring",
-            "capped_amount": 1500000,
+            "capped_amount": {
+              "amount": "1500000",
+              "currency": "USD"
+            },
             "is_capped": false,
             "name": "Restructuring charges",
-            "raw_amount": 1500000
+            "raw_amount": {
+              "amount": "1500000",
+              "currency": "USD"
+            }
           }
         ],
-        "base_value": 12000000,
-        "final_value": 13500000,
+        "base_value": {
+          "amount": "12000000",
+          "currency": "USD"
+        },
+        "final_value": {
+          "amount": "13500000",
+          "currency": "USD"
+        },
         "period": "2024Q1",
         "value_type": {
           "currency": "USD",
@@ -26,6 +41,24 @@ export default [
       }
     ],
     "title": "NormalizationResult"
+  },
+  {
+    "path": "#/$defs/d_1a33cd5924cacf20c932",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AmountOrScalar",
+    "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
+  },
+  {
+    "path": "#/$defs/d_1a33cd5924cacf20c932/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AmountOrScalar/anyOf/0",
+    "description": "Currency-aware amount",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_1a33cd5924cacf20c932/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AmountOrScalar/anyOf/1",
+    "description": "Unitless scalar (ratio, percentage, count, etc.)",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_1c79992380ed7d5b7258",
@@ -1031,15 +1064,57 @@ export default [
     "const": "scalar"
   },
   {
+    "path": "#/$defs/d_54b78745cfcb23fb39c0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/UnavailableReason",
+    "description": "Why a cell has no value although its node and period are valid.\n\nAn unavailable cell is not an error: the model is well formed and the run\ncontinues. Invalid arithmetic, an invalid mask and unrepresentable money\nare errors instead and fail the run."
+  },
+  {
+    "path": "#/$defs/d_54b78745cfcb23fb39c0/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/UnavailableReason/oneOf/0",
+    "const": "missing_mask",
+    "description": "The node's `where` predicate had no value for the period, so whether\nthe cell is masked is unknown."
+  },
+  {
+    "path": "#/$defs/d_54b78745cfcb23fb39c0/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/UnavailableReason/oneOf/1",
+    "const": "hidden_by_cutoff",
+    "description": "The explicit observation was published after the observation cutoff\nand the node has no forecast or formula for the period."
+  },
+  {
+    "path": "#/$defs/d_54b78745cfcb23fb39c0/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/UnavailableReason/oneOf/2",
+    "const": "missing_input",
+    "description": "The formula or forecast that supplies the cell had no defined result,\nbecause an input it needs is missing, masked or itself unavailable."
+  },
+  {
+    "path": "#/$defs/d_54b78745cfcb23fb39c0/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/UnavailableReason/oneOf/3",
+    "const": "undefined_base",
+    "description": "A change, growth rate or ratio has no defined value for its base: an\nexactly zero base for a percentage change, a non-positive base or a\nnegative ending value for a growth rate, and a non-positive base for\n`ratio`."
+  },
+  {
+    "path": "#/$defs/d_54b78745cfcb23fb39c0/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/UnavailableReason/oneOf/4",
+    "const": "missing_forecast_base",
+    "description": "A forecast has no base: no start level is selected and the slot\nimmediately before the forecast suffix has no value."
+  },
+  {
+    "path": "#/$defs/d_54b78745cfcb23fb39c0/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/UnavailableReason/oneOf/5",
+    "const": "missing_peer_shock",
+    "description": "A correlated forecast needs the shocks of a peer whose forecast was\nitself unavailable on the path."
+  },
+  {
     "path": "#/$defs/d_662416664db07cac434b",
     "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AppliedAdjustment",
-    "description": "Details of a single applied adjustment."
+    "description": "One row of a normalization bridge."
   },
   {
     "path": "#/$defs/d_662416664db07cac434b/properties/adjusted_value",
     "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AppliedAdjustment/properties/adjusted_value",
-    "description": "Target value through this adjustment: the period's `base_value` plus\nthe capped amounts of this and every earlier adjustment, in declaration\norder and the target's units. The last adjustment's value equals the\nperiod's `final_value`, so a base-to-adjusted bridge reads each step's\nspan from the previous step's value (or `base_value`) to this one.",
-    "format": "double"
+    "description": "Target value through this adjustment: the period's `base_value` plus\nthe applied amounts of this and every earlier adjustment, in\ndeclaration order. The last row's value equals the period's\n`final_value`.",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_662416664db07cac434b/properties/adjustment_id",
@@ -1047,15 +1122,46 @@ export default [
     "description": "ID of the adjustment"
   },
   {
+    "path": "#/$defs/d_662416664db07cac434b/properties/cap_base",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AppliedAdjustment/properties/cap_base",
+    "description": "The value the cap was sized against, for a reference cap."
+  },
+  {
+    "path": "#/$defs/d_662416664db07cac434b/properties/cap_base/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AppliedAdjustment/properties/cap_base/anyOf/0",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AmountOrScalar"
+  },
+  {
+    "path": "#/$defs/d_662416664db07cac434b/properties/cap_base/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AppliedAdjustment/properties/cap_base/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_662416664db07cac434b/properties/cap_limit",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AppliedAdjustment/properties/cap_limit",
+    "description": "The non-negative limit on the adjustment's magnitude, when it has a\ncap."
+  },
+  {
+    "path": "#/$defs/d_662416664db07cac434b/properties/cap_limit/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AppliedAdjustment/properties/cap_limit/anyOf/0",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AmountOrScalar"
+  },
+  {
+    "path": "#/$defs/d_662416664db07cac434b/properties/cap_limit/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AppliedAdjustment/properties/cap_limit/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_662416664db07cac434b/properties/capped_amount",
     "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AppliedAdjustment/properties/capped_amount",
-    "description": "The final amount after applying any caps",
-    "format": "double"
+    "description": "The signed amount applied after any cap",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_662416664db07cac434b/properties/is_capped",
     "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AppliedAdjustment/properties/is_capped",
-    "description": "Whether the amount was capped"
+    "description": "Whether the cap reduced the amount"
   },
   {
     "path": "#/$defs/d_662416664db07cac434b/properties/name",
@@ -1065,8 +1171,9 @@ export default [
   {
     "path": "#/$defs/d_662416664db07cac434b/properties/raw_amount",
     "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AppliedAdjustment/properties/raw_amount",
-    "description": "The raw calculated amount before capping",
-    "format": "double"
+    "description": "The signed amount before capping",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AmountOrScalar"
   },
   {
     "path": "#/$defs/d_6b3f07783828aa0bab33",
@@ -1074,9 +1181,34 @@ export default [
     "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`."
   },
   {
+    "path": "#/$defs/d_c3896cb08b179a9d0375",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/Money",
+    "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```"
+  },
+  {
+    "path": "#/$defs/d_c3896cb08b179a9d0375/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/Money/properties/amount",
+    "description": "Monetary amount, carried on the wire as an exact decimal string rather\nthan a JSON number so no precision is lost in transit. Construction with\nconfiguration applies the selected ingest scale; raw construction does not.",
+    "ref": "#/$defs/DecimalWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/DecimalWire"
+  },
+  {
+    "path": "#/$defs/d_c3896cb08b179a9d0375/properties/currency",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/Money/properties/currency",
+    "description": "ISO 4217 currency of `amount`. Arithmetic between two `Money` values\nrequires this to match; there is no implicit conversion.",
+    "ref": "#/$defs/Currency",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/Currency"
+  },
+  {
+    "path": "#/$defs/d_f37303216d1ad660db0f",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/DecimalWire",
+    "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
+    "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
+  },
+  {
     "path": "#/properties/adjustments",
     "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/properties/adjustments",
-    "description": "Detailed breakdown of applied adjustments"
+    "description": "The bridge rows in declaration order. Empty when the period is\nunavailable."
   },
   {
     "path": "#/properties/adjustments/items",
@@ -1087,14 +1219,32 @@ export default [
   {
     "path": "#/properties/base_value",
     "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/properties/base_value",
-    "description": "The original raw value of the target node",
-    "format": "double"
+    "description": "The reported value of the target node. Absent when the period is\nunavailable because the target itself has no value."
+  },
+  {
+    "path": "#/properties/base_value/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/properties/base_value/anyOf/0",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AmountOrScalar"
+  },
+  {
+    "path": "#/properties/base_value/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/properties/base_value/anyOf/1"
   },
   {
     "path": "#/properties/final_value",
     "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/properties/final_value",
-    "description": "The final adjusted value",
-    "format": "double"
+    "description": "The adjusted value. Absent when the period is unavailable."
+  },
+  {
+    "path": "#/properties/final_value/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/properties/final_value/anyOf/0",
+    "ref": "#/$defs/AmountOrScalar",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AmountOrScalar"
+  },
+  {
+    "path": "#/properties/final_value/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/properties/final_value/anyOf/1"
   },
   {
     "path": "#/properties/period",
@@ -1102,6 +1252,21 @@ export default [
     "description": "The period this result applies to",
     "ref": "#/$defs/PeriodId",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/PeriodId"
+  },
+  {
+    "path": "#/properties/unavailable",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/properties/unavailable",
+    "description": "Why the period has no adjusted value: the target, a percentage\nreference or a cap base is missing, masked or unavailable. Absent\nwhen the period has a value."
+  },
+  {
+    "path": "#/properties/unavailable/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/properties/unavailable/anyOf/0",
+    "ref": "#/$defs/UnavailableReason",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/UnavailableReason"
+  },
+  {
+    "path": "#/properties/unavailable/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/properties/unavailable/anyOf/1"
   },
   {
     "path": "#/properties/value_type",

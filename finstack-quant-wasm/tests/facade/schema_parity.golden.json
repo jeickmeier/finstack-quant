@@ -2389,14 +2389,14 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json",
             "type_name": "NormalizationConfig",
             "kind": "component",
-            "bytes": 5883
+            "bytes": 29517
           },
           {
             "path": "schemas/statements/1/normalization_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
             "type_name": "NormalizationResult",
             "kind": "output",
-            "bytes": 23930
+            "bytes": 29486
           },
           {
             "path": "schemas/statements/1/pricing_flow_selection.schema.json",
@@ -2417,7 +2417,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 93980
+            "bytes": 101128
           }
         ]
       },
@@ -5214,7 +5214,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_config.schema.json",
             "type_name": "NormalizationConfig",
             "kind": "component",
-            "bytes": 5883
+            "bytes": 29517
           },
           {
             "domain": "statements",
@@ -5222,7 +5222,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
             "type_name": "NormalizationResult",
             "kind": "output",
-            "bytes": 23930
+            "bytes": 29486
           },
           {
             "domain": "statements",
@@ -5246,7 +5246,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 93980
+            "bytes": 101128
           },
           {
             "domain": "valuations",

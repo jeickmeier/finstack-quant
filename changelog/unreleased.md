@@ -1317,6 +1317,40 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements normalization: an ordered bridge to a new adjusted node
+
+STATEMENTS-EVALUATION-015. **Breaking.**
+
+- **`output_node` is required** on `NormalizationConfig`
+  (`NormalizationConfig::new(target, output)`, Python
+  `NormalizationConfig(target_node, output_node)`). The adjusted metric is
+  published under that new id; the reported node is never overwritten.
+- **`merge_into_results(results, config)`** calculates the bridge and
+  publishes it. It no longer takes result rows and a node id, rejects any id
+  the result already holds, needs a source run, keeps the check report and
+  records the configuration in `StatementResult.normalizations`.
+- **Typed amounts.** A fixed amount is a scalar for a scalar target and money
+  in its currency for a monetary one (`{"amount": "5", "currency": "USD"}`;
+  Python accepts `Money`). Bridge values (`base_value`, `raw_amount`,
+  `capped_amount`, `adjusted_value`, `final_value`) are typed the same way on
+  the wire; the Python accessors return floats.
+- **Caps are one of two forms**: `{"type": "absolute", "amount": ...}` or
+  `{"type": "reference", "base_node": ..., "fraction": ..., "base_mode":
+  ...}`. The `{base_node, value}` form is removed. Rust:
+  `AdjustmentCap::Absolute` / `AdjustmentCap::Reference` and
+  `Adjustment::with_cap(cap)`; Python `Adjustment.with_cap(cap)` takes the
+  mapping and `Adjustment.cap` replaces `cap_base_node`, `cap_value` and
+  `cap_base_mode`. Rows record `cap_base` and `cap_limit`.
+- **Validated before calculation.** Unknown references, nodes without recorded
+  units, unit or currency mismatches, fixed amounts keyed outside the result's
+  periods, non-finite numbers and negative caps are rejected up front.
+- **Unavailable, not an error.** A target, percentage reference or cap base
+  without a value leaves the period `unavailable` with its reason
+  (`base_value` and `final_value` may be absent). A row whose arithmetic
+  cannot be represented is an error and nothing is published.
+- **Rollup.** A result holding a published adjusted node cannot be rolled
+  up; normalize the rolled result.
+
 ### Statements rollup: every line needs a method and results are typed
 
 STATEMENTS-EVALUATION-014. **Breaking.**
