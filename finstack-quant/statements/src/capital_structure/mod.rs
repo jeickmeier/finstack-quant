@@ -86,7 +86,12 @@
 //! );
 //!
 //! let mut evaluator = Evaluator::new();
-//! let results = evaluator.evaluate_with_market(&model, &market_ctx, issue_date)?;
+//! let results = evaluator.evaluate_with_market(
+//!     &model,
+//!     &market_ctx,
+//!     issue_date,
+//!     finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+//! )?;
 //! let q1_interest = results.get("interest_expense", &PeriodId::quarter(2025, 1).expect("valid period fixture"));
 //! # let _ = q1_interest;
 //! # Ok(())

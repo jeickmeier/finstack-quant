@@ -734,9 +734,12 @@ impl ModelBuilder {
     /// let model = {
     ///     let mut model_builder = ModelBuilder::new("test");
     ///     model_builder.periods("2025Q1..Q2", None)?;
+    ///     model_builder.value_scalar("revenue", &[]);
+    ///     model_builder.value_scalar("cogs", &[]);
     ///     model_builder.compute("gross_profit", "revenue - cogs")?;
     ///     model_builder.build()?
     /// };
+    /// # let _ = model;
     /// # Ok(())
     /// # }
     /// ```
@@ -914,6 +917,7 @@ impl ModelBuilder {
     /// let model = {
     ///     let mut model_builder = ModelBuilder::new("demo");
     ///     model_builder.periods("2025Q1..Q2", None)?;
+    ///     model_builder.value_scalar("headcount", &[]);
     ///     model_builder.with_meta("currency", serde_json::json!("USD"));
     ///     model_builder.build()?
     /// };
@@ -1346,11 +1350,13 @@ impl MixedNodeBuilder {
     ///
     /// ```rust
     /// # use finstack_quant_statements::builder::ModelBuilder;
-    /// # use finstack_quant_statements::types::RollupMethod;
+    /// # use finstack_quant_statements::types::{AmountOrScalar, RollupMethod};
+    /// # use finstack_quant_core::dates::PeriodId;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut model_builder = ModelBuilder::new("demo");
     /// model_builder.periods("2025Q1..Q2", None)?;
     /// let mut mixed = model_builder.mixed("cash");
+    /// mixed.values(&[(PeriodId::quarter(2025, 1)?, AmountOrScalar::scalar(10.0))]);
     /// mixed.rollup(RollupMethod::PeriodEnd);
     /// let model = mixed.build()?.build()?;
     /// assert_eq!(model.get_node("cash").and_then(|node| node.rollup), Some(RollupMethod::PeriodEnd));
